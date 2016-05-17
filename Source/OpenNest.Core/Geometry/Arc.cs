@@ -1,0 +1,538 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace OpenNest.Geometry
+{
+    public class Arc : Entity
+    {
+        private double radius;
+        private double startAngle;
+        private double endAngle;
+        private Vector center;
+        private bool reversed;
+
+        public Arc()
+        {
+        }
+
+        public Arc(double x, double y, double r, double a1, double a2, bool reversed = false)
+            : this(new Vector(x, y), r, a1, a2, reversed)
+        {
+        }
+
+        public Arc(Vector center, double radius, double startAngle, double endAngle, bool reversed = false)
+        {
+            this.center = center;
+            this.radius = radius;
+            this.startAngle = startAngle;
+            this.endAngle = endAngle;
+            this.reversed = reversed;
+            UpdateBounds();
+        }
+
+        /// <summary>
+        /// Center point.
+        /// </summary>
+        public Vector Center
+        {
+            get { return center; }
+            set
+            {
+                var offset = value - center;
+                boundingBox.Offset(offset);
+                center = value;
+            }
+        }
+
+        /// <summary>
+        /// Arc radius.
+        /// </summary>
+        public double Radius
+        {
+            get { return radius; }
+            set
+            {
+                radius = value;
+                UpdateBounds();
+            }
+        }
+
+        /// <summary>
+        /// Arc radius * 2. Value NOT stored.
+        /// </summary>
+        public double Diameter
+        {
+            get { return Radius * 2.0; }
+            set { Radius = value / 2.0; }
+        }
+
+        /// <summary>
+        /// Start angle in radians.
+        /// </summary>
+        public double StartAngle
+        {
+            get { return startAngle; }
+            set
+            {
+                startAngle = Angle.NormalizeRad(value);
+                UpdateBounds();
+            }
+        }
+
+        /// <summary>
+        /// End angle in radians.
+        /// </summary>
+        public double EndAngle
+        {
+            get { return endAngle; }
+            set
+            {
+                endAngle = Angle.NormalizeRad(value);
+                UpdateBounds();
+            }
+        }
+
+        /// <summary>
+        /// Angle in radians between start and end angles.
+        /// </summary>
+        /// <returns></returns>
+        public double SweepAngle()
+        {
+            var startAngle = StartAngle;
+            var endAngle = EndAngle;
+
+            if (IsReversed)
+                Generic.Swap(ref startAngle, ref endAngle);
+
+            if (startAngle > endAngle)
+                startAngle -= Angle.TwoPI;
+
+            return endAngle - startAngle;
+        }
+
+        /// <summary>
+        /// Gets or sets if the arc direction is reversed (clockwise).
+        /// </summary>
+        public bool IsReversed
+        {
+            get { return reversed; }
+            set
+            {
+                if (reversed != value)
+                    Reverse();
+            }
+        }
+
+        public RotationType Rotation
+        {
+            get { return IsReversed ? RotationType.CW : RotationType.CCW; }
+            set
+            {
+                IsReversed = (value == RotationType.CW);
+            }
+        }
+
+        /// <summary>
+        /// Start point of the arc.
+        /// </summary>
+        /// <returns></returns>
+        public Vector StartPoint()
+        {
+            return new Vector(
+                Center.X + Radius * Math.Cos(StartAngle),
+                Center.Y + Radius * Math.Sin(StartAngle));
+        }
+
+        /// <summary>
+        /// End point of the arc.
+        /// </summary>
+        /// <returns></returns>
+        public Vector EndPoint()
+        {
+            return new Vector(
+                Center.X + Radius * Math.Cos(EndAngle),
+                Center.Y + Radius * Math.Sin(EndAngle));
+        }
+
+        /// <summary>
+        /// Returns true if the given arc has the same center point and radius as this.
+        /// </summary>
+        /// <param name="arc"></param>
+        /// <returns></returns>
+        public bool IsCoradialTo(Arc arc)
+        {
+            return center == arc.Center && Radius.IsEqualTo(arc.Radius);
+        }
+
+        /// <summary>
+        /// Returns true if the given arc has the same radius as this.
+        /// </summary>
+        /// <param name="arc"></param>
+        /// <returns></returns>
+        public bool IsConcentricTo(Arc arc)
+        {
+            return center == arc.center;
+        }
+
+        /// <summary>
+        /// Returns true if the given circle has the same radius as this.
+        /// </summary>
+        /// <param name="circle"></param>
+        /// <returns></returns>
+        public bool IsConcentricTo(Circle circle)
+        {
+            return center == circle.Center;
+        }
+
+        /// <summary>
+        /// Converts the arc to a group of points.
+        /// </summary>
+        /// <param name="segments">Number of parts to divide the arc into.</param>
+        /// <returns></returns>
+        public List<Vector> ToPoints(int segments = 1000)
+        {
+            var points = new List<Vector>();
+            var stepAngle = reversed
+                ? -SweepAngle() / segments
+                : SweepAngle() / segments;
+
+            for (int i = 0; i <= segments; ++i)
+            {
+                var angle = stepAngle * i + StartAngle;
+
+                points.Add(new Vector(
+                    Math.Cos(angle) * Radius + Center.X,
+                    Math.Sin(angle) * Radius + Center.Y));
+            }
+
+            return points;
+        }
+
+        /// <summary>
+        /// Linear distance of the arc.
+        /// </summary>
+        public override double Length
+        {
+            get { return Diameter * Math.PI * SweepAngle() / Angle.TwoPI; }
+        }
+
+        /// <summary>
+        /// Reverses the rotation direction.
+        /// </summary>
+        public override void Reverse()
+        {
+            reversed = !reversed;
+            Generic.Swap(ref startAngle, ref endAngle);
+        }
+
+        /// <summary>
+        /// Moves the center point to the given coordinates.
+        /// </summary>
+        /// <param name="x">The x-coordinate</param>
+        /// <param name="y">The y-coordinate</param>
+        public override void MoveTo(double x, double y)
+        {
+            Center = new Vector(x, y);
+        }
+
+        /// <summary>
+        /// Moves the center point to the given point.
+        /// </summary>
+        /// <param name="pt">The new center point location.</param>
+        public override void MoveTo(Vector pt)
+        {
+            Center = pt;
+        }
+
+        /// <summary>
+        /// Offsets the center point by the given distances.
+        /// </summary>
+        /// <param name="x">The x-axis offset distance.</param>
+        /// <param name="y">The y-axis offset distance.</param>
+        public override void Offset(double x, double y)
+        {
+            Center = new Vector(Center.X + x, Center.Y + y);
+        }
+
+        /// <summary>
+        /// Offsets the center point by the given distances.
+        /// </summary>
+        /// <param name="voffset"></param>
+        public override void Offset(Vector voffset)
+        {
+            Center += voffset;
+        }
+
+        /// <summary>
+        /// Scales the arc from the zero point.
+        /// </summary>
+        /// <param name="factor"></param>
+        public override void Scale(double factor)
+        {
+            center *= factor;
+            radius *= factor;
+            UpdateBounds();
+        }
+
+        /// <summary>
+        /// Scales the arc from the origin.
+        /// </summary>
+        /// <param name="factor"></param>
+        /// <param name="origin"></param>
+        public override void Scale(double factor, Vector origin)
+        {
+            center = center.Scale(factor, origin);
+            radius *= factor;
+            UpdateBounds();
+        }
+
+        /// <summary>
+        /// Rotates the arc from the zero point.
+        /// </summary>
+        /// <param name="angle"></param>
+        public override void Rotate(double angle)
+        {
+            startAngle += angle;
+            endAngle += angle;
+            center = center.Rotate(angle);
+            UpdateBounds();
+        }
+
+        /// <summary>
+        /// Rotates the arc from the origin.
+        /// </summary>
+        /// <param name="angle"></param>
+        /// <param name="origin"></param>
+        public override void Rotate(double angle, Vector origin)
+        {
+            startAngle += angle;
+            endAngle += angle;
+            center = center.Rotate(angle, origin);
+            UpdateBounds();
+        }
+
+        /// <summary>
+        /// Updates the bounding box.
+        /// </summary>
+        public override void UpdateBounds()
+        {
+            var startpt = StartPoint();
+            var endpt = EndPoint();
+
+            double minX;
+            double minY;
+            double maxX;
+            double maxY;
+
+            if (startpt.X < endpt.X)
+            {
+                minX = startpt.X;
+                maxX = endpt.X;
+            }
+            else
+            {
+                minX = endpt.X;
+                maxX = startpt.X;
+            }
+
+            if (startpt.Y < endpt.Y)
+            {
+                minY = startpt.Y;
+                maxY = endpt.Y;
+            }
+            else
+            {
+                minY = endpt.Y;
+                maxY = startpt.Y;
+            }
+
+            var angle1 = StartAngle;
+            var angle2 = EndAngle;
+
+            // switch the angle to counter clockwise.
+            if (IsReversed)
+                Generic.Swap(ref angle1, ref angle2);
+
+            if (Angle.IsBetweenRad(Angle.HalfPI, angle1, angle2))
+                maxY = Center.Y + Radius;
+
+            if (Angle.IsBetweenRad(Math.PI, angle1, angle2))
+                minX = Center.X - Radius;
+
+            const double oneHalfPI = Math.PI * 1.5;
+
+            if (Angle.IsBetweenRad(oneHalfPI, angle1, angle2))
+                minY = Center.Y - Radius;
+
+            if (Angle.IsBetweenRad(Angle.TwoPI, angle1, angle2))
+                maxX = Center.X + Radius;
+
+            boundingBox.X = minX;
+            boundingBox.Y = minY;
+            boundingBox.Width = maxX - minX;
+            boundingBox.Height = maxY - minY;
+        }
+
+        public override Entity OffsetEntity(double distance, OffsetSide side)
+        {
+            if (side == OffsetSide.Left && reversed)
+            {
+                return new Arc(center, radius + distance, startAngle, endAngle, reversed);
+            }
+            else
+            {
+                if (distance >= radius)
+                    return null;
+
+                return new Arc(center, radius - distance, startAngle, endAngle, reversed);
+            }
+        }
+
+        public override Entity OffsetEntity(double distance, Vector pt)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Gets the closest point on the arc to the given point.
+        /// </summary>
+        /// <param name="pt"></param>
+        /// <returns></returns>
+        public override Vector ClosestPointTo(Vector pt)
+        {
+            var angle = Center.AngleTo(pt);
+
+            if (Angle.IsBetweenRad(angle, StartAngle, EndAngle, IsReversed))
+            {
+                return new Vector(
+                    Math.Cos(angle) * Radius + Center.X,
+                    Math.Sin(angle) * Radius + Center.Y);
+            }
+            else
+            {
+                var sp = StartPoint();
+                var ep = EndPoint();
+
+                return pt.DistanceTo(sp) <= pt.DistanceTo(ep) ? sp : ep;
+            }
+        }
+
+        /// <summary>
+        /// Returns true if the given arc is intersecting this.
+        /// </summary>
+        /// <param name="arc"></param>
+        /// <returns></returns>
+        public override bool Intersects(Arc arc)
+        {
+            List<Vector> pts;
+            return Helper.Intersects(this, arc, out pts);
+        }
+
+        /// <summary>
+        /// Returns true if the given arc is intersecting this.
+        /// </summary>
+        /// <param name="arc"></param>
+        /// <param name="pts">Points of intersection.</param>
+        /// <returns></returns>
+        public override bool Intersects(Arc arc, out List<Vector> pts)
+        {
+            return Helper.Intersects(this, arc, out pts); ;
+        }
+
+        /// <summary>
+        /// Returns true if the given circle is intersecting this.
+        /// </summary>
+        /// <param name="circle"></param>
+        /// <returns></returns>
+        public override bool Intersects(Circle circle)
+        {
+            List<Vector> pts;
+            return Helper.Intersects(this, circle, out pts);
+        }
+
+        /// <summary>
+        /// Returns true if the given circle is intersecting this.
+        /// </summary>
+        /// <param name="circle"></param>
+        /// <param name="pts">Points of intersection.</param>
+        /// <returns></returns>
+        public override bool Intersects(Circle circle, out List<Vector> pts)
+        {
+            return Helper.Intersects(this, circle, out pts);
+        }
+
+        /// <summary>
+        /// Returns true if the given line is intersecting this.
+        /// </summary>
+        /// <param name="line"></param>
+        /// <returns></returns>
+        public override bool Intersects(Line line)
+        {
+            List<Vector> pts;
+            return Helper.Intersects(this, line, out pts);
+        }
+
+        /// <summary>
+        /// Returns true if the given line is intersecting this.
+        /// </summary>
+        /// <param name="line"></param>
+        /// <param name="pts">Points of intersection.</param>
+        /// <returns></returns>
+        public override bool Intersects(Line line, out List<Vector> pts)
+        {
+            return Helper.Intersects(this, line, out pts);
+        }
+
+        /// <summary>
+        /// Returns true if the given polygon is intersecting this.
+        /// </summary>
+        /// <param name="polygon"></param>
+        /// <returns></returns>
+        public override bool Intersects(Polygon polygon)
+        {
+            List<Vector> pts;
+            return Helper.Intersects(this, polygon, out pts);
+        }
+
+        /// <summary>
+        /// Returns true if the given polygon is intersecting this.
+        /// </summary>
+        /// <param name="polygon"></param>
+        /// <param name="pts">Points of intersection.</param>
+        /// <returns></returns>
+        public override bool Intersects(Polygon polygon, out List<Vector> pts)
+        {
+            return Helper.Intersects(this, polygon, out pts);
+        }
+
+        /// <summary>
+        /// Returns true if the given shape is intersecting this.
+        /// </summary>
+        /// <param name="shape"></param>
+        /// <returns></returns>
+        public override bool Intersects(Shape shape)
+        {
+            List<Vector> pts;
+            return Helper.Intersects(this, shape, out pts);
+        }
+
+        /// <summary>
+        /// Returns true if the given shape is intersecting this.
+        /// </summary>
+        /// <param name="shape"></param>
+        /// <param name="pts">Points of intersection.</param>
+        /// <returns></returns>
+        public override bool Intersects(Shape shape, out List<Vector> pts)
+        {
+            return Helper.Intersects(this, shape, out pts);
+        }
+
+        /// <summary>
+        /// Type of entity.
+        /// </summary>
+        public override EntityType Type
+        {
+            get { return EntityType.Arc; }
+        }
+    }
+}

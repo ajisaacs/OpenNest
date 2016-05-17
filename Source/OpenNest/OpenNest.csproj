@@ -1,0 +1,324 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{1F1E40E0-5C53-474F-A258-69C9C3FAC15A}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>OpenNest</RootNamespace>
+    <AssemblyName>OpenNest</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
+    <Optimize>false</Optimize>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Ionic.Zip, Version=1.9.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\External\Ionic.Zip.dll</HintPath>
+    </Reference>
+    <Reference Include="netDxf, Version=0.9.4.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\External\netDxf.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Actions\Action.cs" />
+    <Compile Include="Actions\ActionAddPart.cs" />
+    <Compile Include="Actions\ActionClone.cs" />
+    <Compile Include="Actions\ActionFillArea.cs" />
+    <Compile Include="Actions\ActionSelect.cs" />
+    <Compile Include="Actions\ActionSelectArea.cs" />
+    <Compile Include="Actions\ActionSetSequence.cs" />
+    <Compile Include="Actions\ActionZoomWindow.cs" />
+    <Compile Include="ColorScheme.cs" />
+    <Compile Include="Controls\BottomPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\DrawControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\DrawingListBox.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\EntityView.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\HorizontalLine.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\PlateView.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\QuadrantSelect.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\NumericUpDown.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\VerticalLine.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="GraphicsHelper.cs" />
+    <Compile Include="Forms\AutoNestForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\AutoNestForm.Designer.cs">
+      <DependentUpon>AutoNestForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\CadConverterForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\CadConverterForm.Designer.cs">
+      <DependentUpon>CadConverterForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\EditDrawingForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\EditDrawingForm.Designer.cs">
+      <DependentUpon>EditDrawingForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\EditNestForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\EditNestForm.Designer.cs">
+      <DependentUpon>EditNestForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\FillPlateForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\FillPlateForm.Designer.cs">
+      <DependentUpon>FillPlateForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\CutParametersForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\CutParametersForm.Designer.cs">
+      <DependentUpon>CutParametersForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\MainForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\MainForm.Designer.cs">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\EditNestInfoForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\EditNestInfoForm.Designer.cs">
+      <DependentUpon>EditNestInfoForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\OptionsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\OptionsForm.Designer.cs">
+      <DependentUpon>OptionsForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\EditPlateForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\EditPlateForm.Designer.cs">
+      <DependentUpon>EditPlateForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\SequenceForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\SequenceForm.Designer.cs">
+      <DependentUpon>SequenceForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\SetValueForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\SetValueForm.Designer.cs">
+      <DependentUpon>SetValueForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\TimingForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\TimingForm.Designer.cs">
+      <DependentUpon>TimingForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="IO\DxfExporter.cs" />
+    <Compile Include="IO\DxfImporter.cs" />
+    <Compile Include="IO\Extensions.cs" />
+    <Compile Include="IO\NestReader.cs" />
+    <Compile Include="IO\NestWriter.cs" />
+    <Compile Include="IO\ProgramReader.cs" />
+    <Compile Include="LayoutPart.cs" />
+    <Compile Include="MdiExtensions.cs" />
+    <Compile Include="MainApp.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PushDirection.cs" />
+    <Compile Include="ToolStripRenderer.cs" />
+    <Compile Include="SelectionType.cs" />
+    <Compile Include="Win32.cs" />
+    <EmbeddedResource Include="Forms\AutoNestForm.resx">
+      <DependentUpon>AutoNestForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\CadConverterForm.resx">
+      <DependentUpon>CadConverterForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\EditDrawingForm.resx">
+      <DependentUpon>EditDrawingForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\EditNestForm.resx">
+      <DependentUpon>EditNestForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\FillPlateForm.resx">
+      <DependentUpon>FillPlateForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\CutParametersForm.resx">
+      <DependentUpon>CutParametersForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\MainForm.resx">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\EditNestInfoForm.resx">
+      <DependentUpon>EditNestInfoForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\OptionsForm.resx">
+      <DependentUpon>OptionsForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\EditPlateForm.resx">
+      <DependentUpon>EditPlateForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\SequenceForm.resx">
+      <DependentUpon>SequenceForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\SetValueForm.resx">
+      <DependentUpon>SetValueForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\TimingForm.resx">
+      <DependentUpon>TimingForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+    </Compile>
+    <None Include="app.config" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\watermark.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj">
+      <Project>{5a5fde8d-f8db-440e-866c-c4807e1686cf}</Project>
+      <Name>OpenNest.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj">
+      <Project>{0083b9cc-54ad-4085-a30d-56bc6834b71a}</Project>
+      <Name>OpenNest.Engine</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\add.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\remove.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\save_as.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\clear.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\clock.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\import.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\move_first.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\move_last.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\move_next.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\move_previous.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\rotate_ccw.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\rotate_cw.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\save.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\zoom_all.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\zoom_in.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\zoom_out.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\doc_new.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\doc_open.png" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>if $(ConfigurationName) == Release (
+    xcopy "$(TargetDir)*.*" "$(SolutionDir)\..\Installer\" /Y
+)</PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

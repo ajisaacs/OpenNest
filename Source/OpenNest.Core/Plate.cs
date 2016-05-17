@@ -1,0 +1,475 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using OpenNest.Collections;
+
+namespace OpenNest
+{
+    public class Plate
+    {
+        private int quadrant;
+
+        public event EventHandler<PartAddedEventArgs> PartAdded
+        {
+            add { Parts.PartAdded += value; }
+            remove { Parts.PartAdded -= value; }
+        }
+
+        public event EventHandler<PartRemovedEventArgs> PartRemoved
+        {
+            add { Parts.PartRemoved += value; }
+            remove { Parts.PartRemoved -= value; }
+        }
+
+        public event EventHandler<PartChangedEventArgs> PartChanged
+        {
+            add { Parts.PartChanged += value; }
+            remove { Parts.PartChanged -= value; }
+        }
+
+        public Plate()
+            : this(60, 120)
+        {
+        }
+
+        public Plate(double width, double length)
+            : this(new Size(length, width))
+        {
+        }
+
+        public Plate(Size size)
+        {
+            EdgeSpacing = new Spacing();
+            Size = size;
+            Material = new Material();
+            Parts = new PartCollection();
+            Parts.PartAdded += Parts_PartAdded;
+            Parts.PartRemoved += Parts_PartRemoved;
+            Quadrant = 1;
+        }
+
+        private void Parts_PartAdded(object sender, PartAddedEventArgs e)
+        {
+            e.Part.BaseDrawing.Quantity.Nested += Quantity;
+        }
+
+        private void Parts_PartRemoved(object sender, PartRemovedEventArgs e)
+        {
+            e.Part.BaseDrawing.Quantity.Nested -= Quantity;
+        }
+
+        /// <summary>
+        /// Thickness of the plate.
+        /// </summary>
+        public double Thickness { get; set; }
+
+        /// <summary>
+        /// The spacing between parts.
+        /// </summary>
+        public double PartSpacing { get; set; }
+
+        /// <summary>
+        /// The spacing along the edges of the plate.
+        /// </summary>
+        public Spacing EdgeSpacing;
+
+        /// <summary>
+        /// The size of the plate.
+        /// </summary>
+        public Size Size { get; set; }
+
+        /// <summary>
+        /// Material the plate is made out of.
+        /// </summary>
+        public Material Material { get; set; }
+
+        /// <summary>
+        /// The parts that the plate contains.
+        /// </summary>
+        public PartCollection Parts { get; set; }
+
+        /// <summary>
+        /// The number of times to cut the plate.
+        /// </summary>
+        public int Quantity { get; set; }
+
+        /// <summary>
+        /// The quadrant the plate is located in.
+        /// 1 = TopRight
+        /// 2 = TopLeft
+        /// 3 = BottomLeft
+        /// 4 = BottomRight
+        /// </summary>
+        public int Quadrant
+        {
+            get { return quadrant; }
+            set { quadrant = value <= 4 && value > 0 ? value : 1; }
+        }
+
+        /// <summary>
+        /// Rotates the plate clockwise or counter-clockwise along with all parts.
+        /// </summary>
+        /// <param name="rotationDirection"></param>
+        /// <param name="keepSameQuadrant"></param>
+        public void Rotate90(RotationType rotationDirection, bool keepSameQuadrant = true)
+        {
+            const double oneAndHalfPI = Math.PI * 1.5;
+
+            Size = new Size(Size.Height, Size.Width);
+
+            if (rotationDirection == RotationType.CW)
+            {
+                Rotate(oneAndHalfPI);
+
+                if (keepSameQuadrant)
+                {
+                    switch (Quadrant)
+                    {
+                        case 1:
+                            Offset(0, Size.Height);
+                            break;
+
+                        case 2:
+                            Offset(-Size.Width, 0);
+                            break;
+
+                        case 3:
+                            Offset(0, -Size.Height);
+                            break;
+
+                        case 4:
+                            Offset(Size.Width, 0);
+                            break;
+
+                        default:
+                            return;
+                    }
+                }
+                else
+                {
+                    Quadrant = Quadrant < 2 ? 4 : Quadrant - 1;
+                }
+            }
+            else
+            {
+                Rotate(Angle.HalfPI);
+
+                if (keepSameQuadrant)
+                {
+                    switch (Quadrant)
+                    {
+                        case 1:
+                            Offset(Size.Width, 0);
+                            break;
+
+                        case 2:
+                            Offset(0, Size.Height);
+                            break;
+
+                        case 3:
+                            Offset(-Size.Width, 0);
+                            break;
+
+                        case 4:
+                            Offset(0, -Size.Height);
+                            break;
+
+                        default:
+                            return;
+                    }
+                }
+                else
+                {
+                    Quadrant = Quadrant > 3 ? 1 : Quadrant + 1;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Rotates the plate 180 degrees along with all parts.
+        /// </summary>
+        /// <param name="keepSameQuadrant"></param>
+        public void Rotate180(bool keepSameQuadrant = true)
+        {
+            if (keepSameQuadrant)
+            {
+                Vector centerpt;
+
+                switch (Quadrant)
+                {
+                    case 1:
+                        centerpt = new Vector(Size.Width * 0.5, Size.Height * 0.5);
+                        break;
+
+                    case 2:
+                        centerpt = new Vector(-Size.Width * 0.5, Size.Height * 0.5);
+                        break;
+
+                    case 3:
+                        centerpt = new Vector(-Size.Width * 0.5, -Size.Height * 0.5);
+                        break;
+
+                    case 4:
+                        centerpt = new Vector(Size.Width * 0.5, -Size.Height * 0.5);
+                        break;
+
+                    default:
+                        return;
+                }
+
+                Rotate(Math.PI, centerpt);
+            }
+            else
+            {
+                Rotate(Math.PI);
+                Quadrant = (Quadrant + 2) % 4;
+
+                if (Quadrant == 0)
+                    Quadrant = 4;
+            }
+        }
+
+        /// <summary>
+        /// Rotates the parts on the plate.
+        /// </summary>
+        /// <param name="angle"></param>
+        public void Rotate(double angle)
+        {
+            for (int i = 0; i < Parts.Count; ++i)
+            {
+                var part = Parts[i];
+                part.Rotate(angle);
+            }
+        }
+
+        /// <summary>
+        /// Rotates the parts on the plate around the specified origin.
+        /// </summary>
+        /// <param name="angle"></param>
+        /// <param name="origin"></param>
+        public void Rotate(double angle, Vector origin)
+        {
+            for (int i = 0; i < Parts.Count; ++i)
+            {
+                var part = Parts[i];
+                part.Rotate(angle, origin);
+            }
+        }
+
+        /// <summary>
+        /// Offsets the parts on the plate.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        public void Offset(double x, double y)
+        {
+            for (int i = 0; i < Parts.Count; ++i)
+            {
+                var part = Parts[i];
+                part.Offset(x, y);
+            }
+        }
+
+        /// <summary>
+        /// Offsets the parts on the plate.
+        /// </summary>
+        /// <param name="voffset"></param>
+        public void Offset(Vector voffset)
+        {
+            for (int i = 0; i < Parts.Count; ++i)
+            {
+                var part = Parts[i];
+                part.Offset(voffset);
+            }
+        }
+
+        /// <summary>
+        /// The smallest box that contains the plate.
+        /// </summary>
+        /// <param name="includeParts"></param>
+        /// <returns></returns>
+        public Box BoundingBox(bool includeParts = true)
+        {
+            var plateBox = new Box();
+
+            switch (Quadrant)
+            {
+                case 1:
+                    plateBox.X = 0;
+                    plateBox.Y = 0;
+                    break;
+
+                case 2:
+                    plateBox.X = (float)-Size.Width;
+                    plateBox.Y = 0;
+                    break;
+
+                case 3:
+                    plateBox.X = (float)-Size.Width;
+                    plateBox.Y = (float)-Size.Height;
+                    break;
+
+                case 4:
+                    plateBox.X = 0;
+                    plateBox.Y = (float)-Size.Height;
+                    break;
+
+                default:
+                    return new Box();
+            }
+
+            plateBox.Width = Size.Width;
+            plateBox.Height = Size.Height;
+
+            if (!includeParts)
+                return plateBox;
+
+            var boundingBox = new Box();
+            var partsBox = Parts.GetBoundingBox();
+
+            boundingBox.X = partsBox.Left < plateBox.Left
+                ? partsBox.Left
+                : plateBox.Left;
+
+            boundingBox.Y = partsBox.Bottom < plateBox.Bottom
+                ? partsBox.Bottom
+                : plateBox.Bottom;
+
+            boundingBox.Width = partsBox.Right > plateBox.Right
+                ? partsBox.Right - boundingBox.X
+                : plateBox.Right - boundingBox.X;
+
+            boundingBox.Height = partsBox.Top > plateBox.Top
+                ? partsBox.Top - boundingBox.Y
+                : plateBox.Top - boundingBox.Y;
+
+            return boundingBox;
+        }
+
+        /// <summary>
+        /// The area within the edge spacing.
+        /// </summary>
+        /// <returns></returns>
+        public Box WorkArea()
+        {
+            var box = BoundingBox(false);
+
+            box.X += EdgeSpacing.Left;
+            box.Y += EdgeSpacing.Bottom;
+            box.Width -= EdgeSpacing.Left + EdgeSpacing.Right;
+            box.Height -= EdgeSpacing.Top + EdgeSpacing.Bottom;
+
+            return box;
+        }
+
+        /// <summary>
+        /// Automatically sizes the plate to fit the parts.
+        /// </summary>
+        /// <param name="roundingFactor">The factor to round the actual size up to.</param>
+        /// <example>
+        /// AutoSize 9.7 x 10.1
+        /// * roundingFactor=1.0   new Size=10 x 11
+        /// * roundingFactor=0.5   new Size=10 x 10.5
+        /// * roundingFactor=0.25  new Size=9.75 x 10.25
+        /// * roundingFactor=0.0   new Size=9.7 x 10.1
+        /// </example>
+        public void AutoSize(double roundingFactor = 1.0)
+        {
+            if (Parts.Count == 0)
+                return;
+
+            var bounds = Parts.GetBoundingBox();
+
+            double width;
+            double height;
+
+            switch (Quadrant)
+            {
+                case 1:
+                    width = Math.Abs(bounds.Right) + EdgeSpacing.Right;
+                    height = Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    break;
+
+                case 2:
+                    width = Math.Abs(bounds.Left) + EdgeSpacing.Left;
+                    height = Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    break;
+
+                case 3:
+                    width = Math.Abs(bounds.Left) + EdgeSpacing.Left;
+                    height = Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    break;
+
+                case 4:
+                    width = Math.Abs(bounds.Right) + EdgeSpacing.Right;
+                    height = Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    break;
+
+                default:
+                    return;
+            }
+
+            Size = new Size(
+                Helper.RoundUpToNearest(width, roundingFactor),
+                Helper.RoundUpToNearest(height, roundingFactor));
+        }
+
+        /// <summary>
+        /// Gets the area of the top surface of the plate.
+        /// </summary>
+        /// <returns></returns>
+        public double Area()
+        {
+            return Size.Width * Size.Height;
+        }
+
+        /// <summary>
+        /// Gets the volume of the plate.
+        /// </summary>
+        /// <returns></returns>
+        public double Volume()
+        {
+            return Area() * Thickness;
+        }
+
+        /// <summary>
+        /// Gets the weight of the plate.
+        /// </summary>
+        /// <returns></returns>
+        public double Weight()
+        {
+            return Volume() * Material.Density;
+        }
+
+        /// <summary>
+        /// Percentage of the material used.
+        /// </summary>
+        /// <returns>Returns a number between 0.0 and 1.0</returns>
+        public double Utilization()
+        {
+            return Parts.Sum(part => part.BaseDrawing.Area) / Area();
+        }
+
+        public bool HasOverlappingParts(out List<Vector> pts)
+        {
+            pts = new List<Vector>();
+
+            for (int i = 0; i < Parts.Count; i++)
+            {
+                var part1 = Parts[i];
+
+                for (int j = i + 1; j < Parts.Count; j++)
+                {
+                    var part2 = Parts[j];
+
+                    List<Vector> pts2;
+
+                    if (part1.Intersects(part2, out pts2))
+                        pts.AddRange(pts2);
+                }
+            }
+
+            return pts.Count > 0;
+        }
+    }
+}

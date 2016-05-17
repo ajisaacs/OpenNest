@@ -1,0 +1,109 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{5A5FDE8D-F8DB-440E-866C-C4807E1686CF}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>OpenNest</RootNamespace>
+    <AssemblyName>OpenNest.Core</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Align.cs" />
+    <Compile Include="AlignType.cs" />
+    <Compile Include="Angle.cs" />
+    <Compile Include="CNC\KerfType.cs" />
+    <Compile Include="CNC\CodeType.cs" />
+    <Compile Include="CNC\LayerType.cs" />
+    <Compile Include="CNC\Mode.cs" />
+    <Compile Include="CutParameters.cs" />
+    <Compile Include="Drawing.cs" />
+    <Compile Include="Collections\DrawingCollection.cs" />
+    <Compile Include="EvenOdd.cs" />
+    <Compile Include="ConvertGeometry.cs" />
+    <Compile Include="CNC\CircularMove.cs" />
+    <Compile Include="CNC\Comment.cs" />
+    <Compile Include="CNC\ICode.cs" />
+    <Compile Include="CNC\LinearMove.cs" />
+    <Compile Include="CNC\Motion.cs" />
+    <Compile Include="CNC\RapidMove.cs" />
+    <Compile Include="CNC\Feedrate.cs" />
+    <Compile Include="CNC\Kerf.cs" />
+    <Compile Include="CNC\SubProgramCall.cs" />
+    <Compile Include="Generic.cs" />
+    <Compile Include="Geometry\Arc.cs" />
+    <Compile Include="BoundingBox.cs" />
+    <Compile Include="Box.cs" />
+    <Compile Include="BoxSplitter.cs" />
+    <Compile Include="Geometry\Circle.cs" />
+    <Compile Include="Geometry\DefinedShape.cs" />
+    <Compile Include="Geometry\Entity.cs" />
+    <Compile Include="Geometry\EntityType.cs" />
+    <Compile Include="Helper.cs" />
+    <Compile Include="IBoundable.cs" />
+    <Compile Include="Geometry\Layer.cs" />
+    <Compile Include="Geometry\Line.cs" />
+    <Compile Include="OffsetSide.cs" />
+    <Compile Include="Geometry\Polygon.cs" />
+    <Compile Include="RelativePosition.cs" />
+    <Compile Include="RotationType.cs" />
+    <Compile Include="Geometry\Shape.cs" />
+    <Compile Include="Size.cs" />
+    <Compile Include="Tolerance.cs" />
+    <Compile Include="Units.cs" />
+    <Compile Include="Vector.cs" />
+    <Compile Include="IPostProcessor.cs" />
+    <Compile Include="NestConstraints.cs" />
+    <Compile Include="Sequence.cs" />
+    <Compile Include="SpecialLayers.cs" />
+    <Compile Include="Material.cs" />
+    <Compile Include="ConvertMode.cs" />
+    <Compile Include="Nest.cs" />
+    <Compile Include="Part.cs" />
+    <Compile Include="Collections\PartCollection.cs" />
+    <Compile Include="Plate.cs" />
+    <Compile Include="Collections\PlateCollection.cs" />
+    <Compile Include="CNC\Program.cs" />
+    <Compile Include="ConvertProgram.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Quantity.cs" />
+    <Compile Include="Spacing.cs" />
+    <Compile Include="Timing.cs" />
+    <Compile Include="TimingInfo.cs" />
+    <Compile Include="Trigonometry.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
