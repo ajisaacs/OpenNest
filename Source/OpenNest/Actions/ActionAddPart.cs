@@ -126,8 +126,28 @@ namespace OpenNest.Actions
         {
             if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
             {
-                plateView.PushSelected(PushDirection.Left);
-                plateView.PushSelected(PushDirection.Down);
+                switch (plateView.Plate.Quadrant)
+                {
+                    case 1:
+                        plateView.PushSelected(PushDirection.Left);
+                        plateView.PushSelected(PushDirection.Down);
+                        break;
+
+                    case 2:
+                        plateView.PushSelected(PushDirection.Right);
+                        plateView.PushSelected(PushDirection.Down);
+                        break;
+
+                    case 3:
+                        plateView.PushSelected(PushDirection.Right);
+                        plateView.PushSelected(PushDirection.Up);
+                        break;
+                    case 4:
+                        plateView.PushSelected(PushDirection.Left);
+                        plateView.PushSelected(PushDirection.Up);
+                        break;
+                }
+                
             }
 
             plateView.Plate.Parts.Add(part.BasePart.Clone() as Part);
