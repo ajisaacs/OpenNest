@@ -27,6 +27,8 @@ namespace OpenNest.Controls
 
         public Units Units { get; set; }
 
+        public bool HideDepletedParts { get; set; }
+
         protected override void OnDrawItem(DrawItemEventArgs e)
         {
             if (e.Index >= Items.Count || e.Index <= -1)
@@ -37,7 +39,10 @@ namespace OpenNest.Controls
             if (dwg == null)
                 return;
 
-            e.Graphics.FillRectangle(Brushes.White, e.Bounds);
+            var isComplete = dwg.Quantity.Nested > 0 && dwg.Quantity.Remaining == 0;
+            var bgBrush = isComplete ? SystemBrushes.Info : Brushes.White;
+
+            e.Graphics.FillRectangle(bgBrush, e.Bounds);
 
             var pt = new PointF(5, e.Bounds.Y + 5);
 

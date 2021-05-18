@@ -8,7 +8,11 @@
 
         public int Remaining
         {
-            get { return Required - Nested; }
+            get 
+            {
+                var x = Required - Nested;
+                return x < 0 ? 0: x; 
+            }
         }
     }
 }
