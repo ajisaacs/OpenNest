@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Actions;
+using OpenNest.Collections;
 using OpenNest.IO;
 using OpenNest.Properties;
 

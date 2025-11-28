@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>OpenNest</RootNamespace>
     <AssemblyName>OpenNest.Core</AssemblyName>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -21,6 +21,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -29,6 +30,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -86,9 +88,8 @@
     <Compile Include="ConvertMode.cs" />
     <Compile Include="Nest.cs" />
     <Compile Include="Part.cs" />
-    <Compile Include="Collections\PartCollection.cs" />
+    <Compile Include="Collections\ObservableList.cs" />
     <Compile Include="Plate.cs" />
-    <Compile Include="Collections\PlateCollection.cs" />
     <Compile Include="CNC\Program.cs" />
     <Compile Include="ConvertProgram.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

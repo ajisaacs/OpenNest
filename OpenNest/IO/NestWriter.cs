@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Xml;
-using Ionic.Zip;
 using OpenNest.CNC;
 
 namespace OpenNest.IO
@@ -18,7 +18,7 @@ namespace OpenNest.IO
         private const int OutputPrecision = 10;
 
         private readonly Nest nest;
-        private ZipFile zipFile;
+        private ZipArchive zipArchive;
         private Dictionary<int, Drawing> drawingDict;
 
         public NestWriter(Nest nest)
@@ -32,13 +32,16 @@ namespace OpenNest.IO
             this.nest.DateLastModified = DateTime.Now;
 
             SetDrawingIds();
-            zipFile = new ZipFile();
-            AddNestInfo();
-            AddPlates();
-            AddPlateInfo();
-            AddDrawings();
-            AddDrawingInfo();
-            zipFile.Save(file);
+
+            using (var fileStream = new FileStream(file, FileMode.Create))
+            using (zipArchive = new ZipArchive(fileStream, ZipArchiveMode.Create))
+            {
+                AddNestInfo();
+                AddPlates();
+                AddPlateInfo();
+                AddDrawings();
+                AddDrawingInfo();
+            }
 
             return true;
         }
@@ -102,7 +105,11 @@ namespace OpenNest.IO
 
             stream.Position = 0;
 
-            zipFile.AddEntry("info", stream);
+            var entry = zipArchive.CreateEntry("info");
+            using (var entryStream = entry.Open())
+            {
+                stream.CopyTo(entryStream);
+            }
         }
 
         private void AddPlates()
@@ -115,7 +122,12 @@ namespace OpenNest.IO
                 var name = string.Format("plate-{0}", num.ToString().PadLeft(3, '0'));
 
                 WritePlate(stream, plate);
-                zipFile.AddEntry(name, stream);
+
+                var entry = zipArchive.CreateEntry(name);
+                using (var entryStream = entry.Open())
+                {
+                    stream.CopyTo(entryStream);
+                }
 
                 num++;
             }
@@ -171,7 +183,11 @@ namespace OpenNest.IO
 
             stream.Position = 0;
 
-            zipFile.AddEntry("plate-info", stream);
+            var entry = zipArchive.CreateEntry("plate-info");
+            using (var entryStream = entry.Open())
+            {
+                stream.CopyTo(entryStream);
+            }
         }
 
         private void AddDrawings()
@@ -184,7 +200,12 @@ namespace OpenNest.IO
                 var name = string.Format("program-{0}", num.ToString().PadLeft(3, '0'));
 
                 WriteDrawing(stream, dwg);
-                zipFile.AddEntry(name, stream);
+
+                var entry = zipArchive.CreateEntry(name);
+                using (var entryStream = entry.Open())
+                {
+                    stream.CopyTo(entryStream);
+                }
 
                 num++;
             }
@@ -244,7 +265,11 @@ namespace OpenNest.IO
 
             stream.Position = 0;
 
-            zipFile.AddEntry("drawing-info", stream);
+            var entry = zipArchive.CreateEntry("drawing-info");
+            using (var entryStream = entry.Open())
+            {
+                stream.CopyTo(entryStream);
+            }
         }
 
         private void WritePlate(Stream stream, Plate plate)

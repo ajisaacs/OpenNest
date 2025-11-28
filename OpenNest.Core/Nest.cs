@@ -5,7 +5,7 @@ namespace OpenNest
 {
     public class Nest
     {
-        public PlateCollection Plates;
+        public ObservableList<Plate> Plates;
         public DrawingCollection Drawings;
 
         public Nest()
@@ -16,17 +16,17 @@ namespace OpenNest
         public Nest(string name)
         {
             Name = name;
-            Plates = new PlateCollection();
-            Plates.PlateRemoved += Plates_PlateRemoved;
+            Plates = new ObservableList<Plate>();
+            Plates.ItemRemoved += Plates_PlateRemoved;
             Drawings = new DrawingCollection();
             PlateDefaults = new PlateSettings();
             Customer = string.Empty;
             Notes = string.Empty;
         }
 
-        private static void Plates_PlateRemoved(object sender, PlateRemovedEventArgs e)
+        private static void Plates_PlateRemoved(object sender, ItemRemovedEventArgs<Plate> e)
         {
-            e.Plate.Parts.Clear();
+            e.Item.Parts.Clear();
         }
 
         public string Name { get; set; }

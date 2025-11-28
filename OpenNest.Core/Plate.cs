@@ -9,22 +9,22 @@ namespace OpenNest
     {
         private int quadrant;
 
-        public event EventHandler<PartAddedEventArgs> PartAdded
+        public event EventHandler<ItemAddedEventArgs<Part>> PartAdded
         {
-            add { Parts.PartAdded += value; }
-            remove { Parts.PartAdded -= value; }
+            add { Parts.ItemAdded += value; }
+            remove { Parts.ItemAdded -= value; }
         }
 
-        public event EventHandler<PartRemovedEventArgs> PartRemoved
+        public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved
         {
-            add { Parts.PartRemoved += value; }
-            remove { Parts.PartRemoved -= value; }
+            add { Parts.ItemRemoved += value; }
+            remove { Parts.ItemRemoved -= value; }
         }
 
-        public event EventHandler<PartChangedEventArgs> PartChanged
+        public event EventHandler<ItemChangedEventArgs<Part>> PartChanged
         {
-            add { Parts.PartChanged += value; }
-            remove { Parts.PartChanged -= value; }
+            add { Parts.ItemChanged += value; }
+            remove { Parts.ItemChanged -= value; }
         }
 
         public Plate()
@@ -42,20 +42,20 @@ namespace OpenNest
             EdgeSpacing = new Spacing();
             Size = size;
             Material = new Material();
-            Parts = new PartCollection();
-            Parts.PartAdded += Parts_PartAdded;
-            Parts.PartRemoved += Parts_PartRemoved;
+            Parts = new ObservableList<Part>();
+            Parts.ItemAdded += Parts_PartAdded;
+            Parts.ItemRemoved += Parts_PartRemoved;
             Quadrant = 1;
         }
 
-        private void Parts_PartAdded(object sender, PartAddedEventArgs e)
+        private void Parts_PartAdded(object sender, ItemAddedEventArgs<Part> e)
         {
-            e.Part.BaseDrawing.Quantity.Nested += Quantity;
+            e.Item.BaseDrawing.Quantity.Nested += Quantity;
         }
 
-        private void Parts_PartRemoved(object sender, PartRemovedEventArgs e)
+        private void Parts_PartRemoved(object sender, ItemRemovedEventArgs<Part> e)
         {
-            e.Part.BaseDrawing.Quantity.Nested -= Quantity;
+            e.Item.BaseDrawing.Quantity.Nested -= Quantity;
         }
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace OpenNest
         /// <summary>
         /// The parts that the plate contains.
         /// </summary>
-        public PartCollection Parts { get; set; }
+        public ObservableList<Part> Parts { get; set; }
 
         /// <summary>
         /// The number of times to cut the plate.

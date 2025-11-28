@@ -27,8 +27,8 @@ namespace OpenNest.Controls
         public List<LayoutPart> SelectedParts;
         public ReadOnlyCollection<LayoutPart> Parts;
         
-        public event EventHandler<PartAddedEventArgs> PartAdded;
-        public event EventHandler<PartRemovedEventArgs> PartRemoved;
+        public event EventHandler<ItemAddedEventArgs<Part>> PartAdded;
+        public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
         public event EventHandler StatusChanged;
 
         public PlateView()
@@ -688,21 +688,21 @@ namespace OpenNest.Controls
             Invalidate();
         }
 
-        private void plate_PartAdded(object sender, PartAddedEventArgs e)
+        private void plate_PartAdded(object sender, ItemAddedEventArgs<Part> e)
         {
             if (PartAdded != null)
                 PartAdded.Invoke(this, e);
 
-            parts.Insert(e.Index, LayoutPart.Create(e.Part, this));
+            parts.Insert(e.Index, LayoutPart.Create(e.Item, this));
             redrawTimer.Start();
         }
 
-        private void plate_PartRemoved(object sender, PartRemovedEventArgs e)
+        private void plate_PartRemoved(object sender, ItemRemovedEventArgs<Part> e)
         {
             if (PartRemoved != null)
                 PartRemoved.Invoke(this, e);
 
-            parts.RemoveAll(p => p.BasePart == e.Part);
+            parts.RemoveAll(p => p.BasePart == e.Item);
         }
 
         public void DeselectAll()

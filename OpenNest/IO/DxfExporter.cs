@@ -31,7 +31,7 @@ namespace OpenNest.IO
 
             rapidLayer = new Layer("Rapid");
             rapidLayer.Color = AciColor.Blue;
-            rapidLayer.LineType = LineType.Dashed;
+            rapidLayer.Linetype = Linetype.Dashed;
 
             plateLayer = new Layer("Plate");
             plateLayer.Color = AciColor.Cyan;
@@ -78,7 +78,7 @@ namespace OpenNest.IO
                 var endpt = part.Location.ToNetDxf();
                 var line = new netDxf.Entities.Line(curpos, endpt);
                 line.Layer = rapidLayer;
-                doc.AddEntity(line);
+                doc.Entities.Add(line);
                 curpos = part.Location.ToNetDxf();
                 AddProgram(part.Program);
             }
@@ -151,10 +151,10 @@ namespace OpenNest.IO
                     return;
             }
 
-            doc.AddEntity(new Line(pt1, pt2) { Layer = plateLayer });
-            doc.AddEntity(new Line(pt2, pt3) { Layer = plateLayer });
-            doc.AddEntity(new Line(pt3, pt4) { Layer = plateLayer });
-            doc.AddEntity(new Line(pt4, pt1) { Layer = plateLayer });
+            doc.Entities.Add(new Line(pt1, pt2) { Layer = plateLayer });
+            doc.Entities.Add(new Line(pt2, pt3) { Layer = plateLayer });
+            doc.Entities.Add(new Line(pt3, pt4) { Layer = plateLayer });
+            doc.Entities.Add(new Line(pt4, pt1) { Layer = plateLayer });
 
             pt1.X += plate.EdgeSpacing.Left;
             pt1.Y += plate.EdgeSpacing.Bottom;
@@ -168,10 +168,10 @@ namespace OpenNest.IO
             pt4.X = pt3.X;
             pt4.Y = pt1.Y;
 
-            doc.AddEntity(new Line(pt1, pt2) { Layer = plateLayer, LineType = LineType.Dashed });
-            doc.AddEntity(new Line(pt2, pt3) { Layer = plateLayer, LineType = LineType.Dashed });
-            doc.AddEntity(new Line(pt3, pt4) { Layer = plateLayer, LineType = LineType.Dashed });
-            doc.AddEntity(new Line(pt4, pt1) { Layer = plateLayer, LineType = LineType.Dashed });
+            doc.Entities.Add(new Line(pt1, pt2) { Layer = plateLayer, Linetype = Linetype.Dashed });
+            doc.Entities.Add(new Line(pt2, pt3) { Layer = plateLayer, Linetype = Linetype.Dashed });
+            doc.Entities.Add(new Line(pt3, pt4) { Layer = plateLayer, Linetype = Linetype.Dashed });
+            doc.Entities.Add(new Line(pt4, pt1) { Layer = plateLayer, Linetype = Linetype.Dashed });
         }
 
         private void AddProgram(Program program)
@@ -218,7 +218,7 @@ namespace OpenNest.IO
 
             var ln = new Line(curpos, pt);
             ln.Layer = cutLayer;
-            doc.AddEntity(ln);
+            doc.Entities.Add(ln);
             curpos = pt;
         }
 
@@ -231,7 +231,7 @@ namespace OpenNest.IO
 
             var ln = new Line(curpos, pt);
             ln.Layer = rapidLayer;
-            doc.AddEntity(ln);
+            doc.Entities.Add(ln);
             curpos = pt;
         }
 
@@ -272,13 +272,13 @@ namespace OpenNest.IO
             {
                 var circle = new Circle(center, radius);
                 circle.Layer = cutLayer;
-                doc.AddEntity(circle);
+                doc.Entities.Add(circle);
             }
             else
             {
                 var arc2 = new Arc(center, radius, startAngle, endAngle);
                 arc2.Layer = cutLayer;
-                doc.AddEntity(arc2);
+                doc.Entities.Add(arc2);
             }
 
             curpos = endpt;

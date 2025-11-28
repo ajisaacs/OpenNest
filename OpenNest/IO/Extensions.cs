@@ -16,14 +16,9 @@ namespace OpenNest.IO
             return new Vector(v.X, v.Y);
         }
 
-        public static Vector ToOpenNest(this netDxf.Entities.PolylineVertex v)
+        public static Vector ToOpenNest(this netDxf.Entities.Polyline2DVertex v)
         {
-            return new Vector(v.Location.X, v.Location.Y);
-        }
-
-        public static Vector ToOpenNest(this netDxf.Entities.LwPolylineVertex v)
-        {
-            return new Vector(v.Location.X, v.Location.Y);
+            return new Vector(v.Position.X, v.Position.Y);
         }
 
         public static Arc ToOpenNest(this netDxf.Entities.Arc arc)
@@ -84,7 +79,7 @@ namespace OpenNest.IO
             return lines;
         }
 
-        public static List<Line> ToOpenNest(this netDxf.Entities.Polyline polyline)
+        public static List<Line> ToOpenNest(this netDxf.Entities.Polyline3D polyline)
         {
             var lines = new List<Line>();
 
@@ -110,7 +105,7 @@ namespace OpenNest.IO
             return lines;
         }
 
-        public static List<Line> ToOpenNest(this netDxf.Entities.LwPolyline polyline)
+        public static List<Line> ToOpenNest(this netDxf.Entities.Polyline2D polyline)
         {
             var lines = new List<Line>();
 
@@ -138,7 +133,7 @@ namespace OpenNest.IO
 
         public static List<Line> ToOpenNest(this netDxf.Entities.Ellipse ellipse, int precision = 200)
         {
-            var lines = ellipse.ToPolyline(precision).ToOpenNest();
+            var lines = ellipse.ToPolyline2D(precision).ToOpenNest();
 
             if (lines.Count < 2)
                 return lines;

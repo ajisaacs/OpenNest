@@ -2,17 +2,17 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml;
-using Ionic.Zip;
 using OpenNest.CNC;
 
 namespace OpenNest.IO
 {
     public sealed class NestReader
     {
-        private ZipFile zipFile;
+        private ZipArchive zipArchive;
         private Dictionary<int, Plate> plateDict;
         private Dictionary<int, Drawing> drawingDict;
         private Dictionary<int, Program> programDict;
@@ -32,14 +32,15 @@ namespace OpenNest.IO
         public NestReader(string file)
             : this()
         {
-            stream = new FileStream(file, FileMode.Open, FileAccess.ReadWrite);
-            zipFile = ZipFile.Read(stream);
+            stream = new FileStream(file, FileMode.Open, FileAccess.Read);
+            zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
         }
 
         public NestReader(Stream stream)
             : this()
         {
-            zipFile = ZipFile.Read(stream);
+            this.stream = stream;
+            zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
         }
 
         public Nest Read()
@@ -47,14 +48,17 @@ namespace OpenNest.IO
             const string plateExtensionPattern = "plate-\\d\\d\\d";
             const string programExtensionPattern = "program-\\d\\d\\d";
 
-            foreach (var entry in zipFile.Entries)
+            foreach (var entry in zipArchive.Entries)
             {
                 var memstream = new MemoryStream();
-                entry.Extract(memstream);
+                using (var entryStream = entry.Open())
+                {
+                    entryStream.CopyTo(memstream);
+                }
 
                 memstream.Position = 0;
 
-                switch (entry.FileName)
+                switch (entry.FullName)
                 {
                     case "info":
                         ReadNestInfo(memstream);
@@ -69,15 +73,15 @@ namespace OpenNest.IO
                         continue;
                 }
 
-                if (Regex.IsMatch(entry.FileName, programExtensionPattern))
+                if (Regex.IsMatch(entry.FullName, programExtensionPattern))
                 {
-                    ReadProgram(memstream, entry.FileName);
+                    ReadProgram(memstream, entry.FullName);
                     continue;
                 }
 
-                if (Regex.IsMatch(entry.FileName, plateExtensionPattern))
+                if (Regex.IsMatch(entry.FullName, plateExtensionPattern))
                 {
-                    ReadPlate(memstream, entry.FileName);
+                    ReadPlate(memstream, entry.FullName);
                     continue;
                 }
             }
@@ -88,6 +92,7 @@ namespace OpenNest.IO
             AddPlatesToNest();
             AddDrawingsToNest();
 
+            zipArchive.Dispose();
             stream.Close();
 
             return nest;

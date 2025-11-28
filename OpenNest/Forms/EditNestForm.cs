@@ -69,8 +69,8 @@ namespace OpenNest.Forms
             updateDrawingListTimer.Elapsed += drawingListUpdateTimer_Elapsed;
 
             Nest = nest;
-            Nest.Plates.PlateAdded += Plates_PlateAdded;
-            Nest.Plates.PlateRemoved += Plates_PlateRemoved;
+            Nest.Plates.ItemAdded += Plates_PlateAdded;
+            Nest.Plates.ItemRemoved += Plates_PlateRemoved;
 
             if (Nest.Plates.Count == 0)
                 Nest.CreatePlate();
@@ -592,7 +592,7 @@ namespace OpenNest.Forms
 
         #region Plate Collection Events
 
-        private void Plates_PlateRemoved(object sender, PlateRemovedEventArgs e)
+        private void Plates_PlateRemoved(object sender, ItemRemovedEventArgs<Plate> e)
         {
             if (Nest.Plates.Count <= CurrentPlateIndex)
                 LoadLastPlate();
@@ -603,7 +603,7 @@ namespace OpenNest.Forms
             PlateView.ZoomToFit();
         }
 
-        private void Plates_PlateAdded(object sender, PlateAddedEventArgs e)
+        private void Plates_PlateAdded(object sender, ItemAddedEventArgs<Plate> e)
         {
             tabControl1.SelectedIndex = 0;
             UpdatePlateList();
@@ -622,13 +622,13 @@ namespace OpenNest.Forms
             return item;
         }
 
-        private void PlateView_PartRemoved(object sender, PartRemovedEventArgs e)
+        private void PlateView_PartRemoved(object sender, ItemRemovedEventArgs<Part> e)
         {
             updateDrawingListTimer.Stop();
             updateDrawingListTimer.Start();
         }
 
-        private void PlateView_PartAdded(object sender, PartAddedEventArgs e)
+        private void PlateView_PartAdded(object sender, ItemAddedEventArgs<Part> e)
         {
             updateDrawingListTimer.Stop();
             updateDrawingListTimer.Start();
