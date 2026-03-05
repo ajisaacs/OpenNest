@@ -33,7 +33,7 @@ namespace OpenNest
 
         public int Priority { get; set; }
 
-        public Quantity Quantity;
+        public DwgQty Quantity;
 
         public Material Material { get; set; }
 

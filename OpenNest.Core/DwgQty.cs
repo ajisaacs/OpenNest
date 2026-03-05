@@ -1,6 +1,6 @@
 ﻿namespace OpenNest
 {
-    public struct Quantity
+    public struct DwgQty
     {
         public int Nested { get; internal set; }
 
