@@ -28,8 +28,8 @@ namespace OpenNest
 
                 switch (code.Type)
                 {
-                    case CodeType.CircularMove:
-                        AddCircularMove((CircularMove)code, ref mode, ref curpos, ref geometry);
+                    case CodeType.ArcMove:
+                        AddArcMove((ArcMove)code, ref mode, ref curpos, ref geometry);
                         break;
 
                     case CodeType.LinearMove:
@@ -82,10 +82,10 @@ namespace OpenNest
             curpos = pt;
         }
 
-        private static void AddCircularMove(CircularMove circularMove, ref Mode mode, ref Vector curpos, ref List<Entity> geometry)
+        private static void AddArcMove(ArcMove arcMove, ref Mode mode, ref Vector curpos, ref List<Entity> geometry)
         {
-            var center = circularMove.CenterPoint;
-            var endpt = circularMove.EndPoint;
+            var center = arcMove.CenterPoint;
+            var endpt = arcMove.EndPoint;
 
             if (mode == Mode.Incremental)
             {
@@ -100,12 +100,12 @@ namespace OpenNest
             var dy = endpt.Y - center.Y;
 
             var radius = Math.Sqrt(dx * dx + dy * dy);
-            var layer = ConvertLayer(circularMove.Layer);
+            var layer = ConvertLayer(arcMove.Layer);
 
             if (startAngle.IsEqualTo(endAngle))
                 geometry.Add(new Circle(center, radius) { Layer = layer });
             else
-                geometry.Add(new Arc(center, radius, startAngle, endAngle, circularMove.Rotation == RotationType.CW) { Layer = layer });
+                geometry.Add(new Arc(center, radius, startAngle, endAngle, arcMove.Rotation == RotationType.CW) { Layer = layer });
 
             curpos = endpt;
         }

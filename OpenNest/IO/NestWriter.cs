@@ -311,30 +311,30 @@ namespace OpenNest.IO
         {
             switch (code.Type)
             {
-                case CodeType.CircularMove:
+                case CodeType.ArcMove:
                     {
                         var sb = new StringBuilder();
-                        var circularMove = (CircularMove)code;
+                        var arcMove = (ArcMove)code;
 
-                        if (circularMove.Rotation == RotationType.CW)
+                        if (arcMove.Rotation == RotationType.CW)
                         {
                             sb.Append(string.Format("G02X{0}Y{1}I{2}J{3}",
-                                Math.Round(circularMove.EndPoint.X, OutputPrecision),
-                                Math.Round(circularMove.EndPoint.Y, OutputPrecision),
-                                Math.Round(circularMove.CenterPoint.X, OutputPrecision),
-                                Math.Round(circularMove.CenterPoint.Y, OutputPrecision)));
+                                Math.Round(arcMove.EndPoint.X, OutputPrecision),
+                                Math.Round(arcMove.EndPoint.Y, OutputPrecision),
+                                Math.Round(arcMove.CenterPoint.X, OutputPrecision),
+                                Math.Round(arcMove.CenterPoint.Y, OutputPrecision)));
                         }
                         else
                         {
                             sb.Append(string.Format("G03X{0}Y{1}I{2}J{3}",
-                                Math.Round(circularMove.EndPoint.X, OutputPrecision),
-                                Math.Round(circularMove.EndPoint.Y, OutputPrecision),
-                                Math.Round(circularMove.CenterPoint.X, OutputPrecision),
-                                Math.Round(circularMove.CenterPoint.Y, OutputPrecision)));
+                                Math.Round(arcMove.EndPoint.X, OutputPrecision),
+                                Math.Round(arcMove.EndPoint.Y, OutputPrecision),
+                                Math.Round(arcMove.CenterPoint.X, OutputPrecision),
+                                Math.Round(arcMove.CenterPoint.Y, OutputPrecision)));
                         }
 
-                        if (circularMove.Layer != LayerType.Cut)
-                            sb.Append(GetLayerString(circularMove.Layer));
+                        if (arcMove.Layer != LayerType.Cut)
+                            sb.Append(GetLayerString(arcMove.Layer));
 
                         return sb.ToString();
                     }

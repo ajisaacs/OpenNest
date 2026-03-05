@@ -85,7 +85,7 @@ namespace OpenNest
             return img;
         }
 
-        private static void AddArc(GraphicsPath path, CircularMove arc, Mode mode, ref Vector curpos)
+        private static void AddArc(GraphicsPath path, ArcMove arc, Mode mode, ref Vector curpos)
         {
             var endpt = arc.EndPoint;
             var center = arc.CenterPoint;
@@ -186,8 +186,8 @@ namespace OpenNest
 
                 switch (code.Type)
                 {
-                    case CodeType.CircularMove:
-                        AddArc(path, (CircularMove)code, mode, ref curpos);
+                    case CodeType.ArcMove:
+                        AddArc(path, (ArcMove)code, mode, ref curpos);
                         break;
 
                     case CodeType.LinearMove:

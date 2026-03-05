@@ -263,7 +263,7 @@ namespace OpenNest.IO
                         break;
                 }
             }
-            program.Codes.Add(new CircularMove()
+            program.Codes.Add(new ArcMove()
             {
                 EndPoint = new Vector(x, y),
                 CenterPoint = new Vector(i, j),

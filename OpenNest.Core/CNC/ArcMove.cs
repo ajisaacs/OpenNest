@@ -1,18 +1,18 @@
 ﻿
 namespace OpenNest.CNC
 {
-    public class CircularMove : Motion
+    public class ArcMove : Motion
     {
-        public CircularMove()
+        public ArcMove()
         {
         }
 
-        public CircularMove(double x, double y, double i, double j, RotationType rotation = RotationType.CCW)
+        public ArcMove(double x, double y, double i, double j, RotationType rotation = RotationType.CCW)
             : this(new Vector(x, y), new Vector(i, j), rotation)
         {
         }
 
-        public CircularMove(Vector endPoint, Vector centerPoint, RotationType rotation = RotationType.CCW)
+        public ArcMove(Vector endPoint, Vector centerPoint, RotationType rotation = RotationType.CCW)
         {
             EndPoint = endPoint;
             CenterPoint = centerPoint;
@@ -57,12 +57,12 @@ namespace OpenNest.CNC
 
         public override CodeType Type
         {
-            get { return CodeType.CircularMove; }
+            get { return CodeType.ArcMove; }
         }
 
         public override ICode Clone()
         {
-            return new CircularMove(EndPoint, CenterPoint, Rotation)
+            return new ArcMove(EndPoint, CenterPoint, Rotation)
             {
                 Layer = Layer
             };

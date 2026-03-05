@@ -49,7 +49,7 @@
     <Compile Include="Collections\DrawingCollection.cs" />
     <Compile Include="EvenOdd.cs" />
     <Compile Include="ConvertGeometry.cs" />
-    <Compile Include="CNC\CircularMove.cs" />
+    <Compile Include="CNC\ArcMove.cs" />
     <Compile Include="CNC\Comment.cs" />
     <Compile Include="CNC\ICode.cs" />
     <Compile Include="CNC\LinearMove.cs" />

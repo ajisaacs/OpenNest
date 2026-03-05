@@ -184,9 +184,9 @@ namespace OpenNest.IO
 
                 switch (code.Type)
                 {
-                    case CodeType.CircularMove:
-                        var arc = (CircularMove)code;
-                        AddCircularMove(arc);
+                    case CodeType.ArcMove:
+                        var arc = (ArcMove)code;
+                        AddArcMove(arc);
                         break;
 
                     case CodeType.LinearMove:
@@ -235,7 +235,7 @@ namespace OpenNest.IO
             curpos = pt;
         }
 
-        private void AddCircularMove(CircularMove arc)
+        private void AddArcMove(ArcMove arc)
         {
             var center = arc.CenterPoint.ToNetDxf();
             var endpt = arc.EndPoint.ToNetDxf();

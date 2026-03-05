@@ -3,7 +3,7 @@ namespace OpenNest.CNC
 {
     public enum CodeType
     {
-        CircularMove,
+        ArcMove,
         Comment,
         LinearMove,
         RapidMove,

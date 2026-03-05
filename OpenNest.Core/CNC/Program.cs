@@ -180,12 +180,12 @@ namespace OpenNest.CNC
 
         public void ArcTo(double x, double y, double i, double j, RotationType rotation)
         {
-            Codes.Add(new CircularMove(x, y, i, j, rotation));
+            Codes.Add(new ArcMove(x, y, i, j, rotation));
         }
 
         public void ArcTo(Vector endpt, Vector center, RotationType rotation)
         {
-            Codes.Add(new CircularMove(endpt, center, rotation));
+            Codes.Add(new ArcMove(endpt, center, rotation));
         }
 
         public void AddSubProgram(Program program)
@@ -339,9 +339,9 @@ namespace OpenNest.CNC
                             break;
                         }
 
-                    case CodeType.CircularMove:
+                    case CodeType.ArcMove:
                         {
-                            var arc = (CircularMove)code;
+                            var arc = (ArcMove)code;
                             var radius = arc.CenterPoint.DistanceTo(arc.EndPoint);
 
                             Vector endpt;
