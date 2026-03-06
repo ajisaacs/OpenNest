@@ -175,7 +175,6 @@
     <Compile Include="MdiExtensions.cs" />
     <Compile Include="MainApp.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="PushDirection.cs" />
     <Compile Include="ToolStripRenderer.cs" />
     <Compile Include="SelectionType.cs" />
     <Compile Include="Win32.cs" />

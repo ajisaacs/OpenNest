@@ -88,6 +88,7 @@
     <Compile Include="Converters\ConvertMode.cs" />
     <Compile Include="Nest.cs" />
     <Compile Include="Part.cs" />
+    <Compile Include="PushDirection.cs" />
     <Compile Include="Collections\ObservableList.cs" />
     <Compile Include="Plate.cs" />
     <Compile Include="CNC\Program.cs" />

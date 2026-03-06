@@ -1,4 +1,4 @@
-﻿
+
 namespace OpenNest
 {
     public enum PushDirection
