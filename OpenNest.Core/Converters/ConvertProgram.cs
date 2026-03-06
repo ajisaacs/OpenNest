@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using OpenNest;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Converters
 {
     public static class ConvertProgram
     {

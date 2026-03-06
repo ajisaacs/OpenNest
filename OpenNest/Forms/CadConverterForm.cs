@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.CNC;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Properties;

@@ -1,7 +1,7 @@
 ﻿using OpenNest.CNC;
 using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Converters
 {
     public static class ConvertMode
     {

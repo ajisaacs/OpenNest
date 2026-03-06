@@ -1,6 +1,7 @@
 ﻿using System.Drawing;
 using System.Linq;
 using OpenNest.CNC;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 
 namespace OpenNest

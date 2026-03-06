@@ -48,7 +48,7 @@
     <Compile Include="Drawing.cs" />
     <Compile Include="Collections\DrawingCollection.cs" />
     <Compile Include="Math\EvenOdd.cs" />
-    <Compile Include="ConvertGeometry.cs" />
+    <Compile Include="Converters\ConvertGeometry.cs" />
     <Compile Include="CNC\ArcMove.cs" />
     <Compile Include="CNC\Comment.cs" />
     <Compile Include="CNC\ICode.cs" />
@@ -85,13 +85,13 @@
     <Compile Include="Sequence.cs" />
     <Compile Include="SpecialLayers.cs" />
     <Compile Include="Material.cs" />
-    <Compile Include="ConvertMode.cs" />
+    <Compile Include="Converters\ConvertMode.cs" />
     <Compile Include="Nest.cs" />
     <Compile Include="Part.cs" />
     <Compile Include="Collections\ObservableList.cs" />
     <Compile Include="Plate.cs" />
     <Compile Include="CNC\Program.cs" />
-    <Compile Include="ConvertProgram.cs" />
+    <Compile Include="Converters\ConvertProgram.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="DwgQty.cs" />
     <Compile Include="Geometry\Spacing.cs" />
