@@ -752,87 +752,89 @@ namespace OpenNest.Controls
 
         public void PushSelected(PushDirection direction)
         {
-            var boxes = new List<Box>();
+            // Build line segments for all stationary parts.
+            var stationaryParts = parts.Where(p => !p.IsSelected && !SelectedParts.Contains(p)).ToList();
+            var stationaryLines = new List<List<Line>>(stationaryParts.Count);
+            var stationaryBoxes = new List<Box>(stationaryParts.Count);
 
-            foreach (var part in parts.Where(p => !p.IsSelected).ToList())
+            foreach (var part in stationaryParts)
             {
-                if (!SelectedParts.Contains(part))
-                    boxes.Add(part.BoundingBox);
+                stationaryLines.Add(Helper.GetPartLines(part.BasePart));
+                stationaryBoxes.Add(part.BoundingBox);
             }
 
             var workArea = Plate.WorkArea();
             var distance = double.MaxValue;
-            var offset = new Vector();
 
-            switch (direction)
+            foreach (var selected in SelectedParts)
             {
-                case PushDirection.Down:
-                    SelectedParts.ForEach(part =>
+                // Get offset lines for the moving part.
+                var movingLines = Plate.PartSpacing > 0
+                    ? Helper.GetOffsetPartLines(selected.BasePart, Plate.PartSpacing)
+                    : Helper.GetPartLines(selected.BasePart);
+
+                var movingBox = selected.BoundingBox;
+
+                // Check geometry distance against each stationary part.
+                for (int i = 0; i < stationaryLines.Count; i++)
+                {
+                    // Early-out: skip if bounding boxes don't overlap on the perpendicular axis.
+                    var stBox = stationaryBoxes[i];
+                    bool perpOverlap;
+
+                    switch (direction)
                     {
-                        var d1 = Helper.ClosestDistanceDown(part.BoundingBox.Offset(Plate.PartSpacing), boxes);
+                        case PushDirection.Left:
+                        case PushDirection.Right:
+                            perpOverlap = !(movingBox.Bottom >= stBox.Top || movingBox.Top <= stBox.Bottom);
+                            break;
+                        default: // Up, Down
+                            perpOverlap = !(movingBox.Left >= stBox.Right || movingBox.Right <= stBox.Left);
+                            break;
+                    }
 
-                        if (d1 < distance)
-                            distance = d1;
+                    if (!perpOverlap)
+                        continue;
 
-                        var d2 = part.Bottom - workArea.Bottom;
+                    var d = Helper.DirectionalDistance(movingLines, stationaryLines[i], direction);
+                    if (d < distance)
+                        distance = d;
+                }
 
-                        if (d2 > 0 && d2 < distance)
-                            distance = d2;
-                    });
-                    offset.Y = -distance;
-                    break;
+                // Check distance to plate edge (actual geometry bbox, not offset).
+                double edgeDist;
+                switch (direction)
+                {
+                    case PushDirection.Left:
+                        edgeDist = selected.Left - workArea.Left;
+                        break;
+                    case PushDirection.Right:
+                        edgeDist = workArea.Right - selected.Right;
+                        break;
+                    case PushDirection.Up:
+                        edgeDist = workArea.Top - selected.Top;
+                        break;
+                    default: // Down
+                        edgeDist = selected.Bottom - workArea.Bottom;
+                        break;
+                }
 
-                case PushDirection.Left:
-                    SelectedParts.ForEach(part =>
-                    {
-                        var d1 = Helper.ClosestDistanceLeft(part.BoundingBox.Offset(Plate.PartSpacing), boxes);
-
-                        if (d1 < distance)
-                            distance = d1;
-
-                        var d2 = part.Left - workArea.Left;
-
-                        if (d2 > 0 && d2 < distance)
-                            distance = d2;
-                    });
-                    offset.X = -distance;
-                    break;
-
-                case PushDirection.Right:
-                    SelectedParts.ForEach(part =>
-                    {
-                        var d1 = Helper.ClosestDistanceRight(part.BoundingBox.Offset(Plate.PartSpacing), boxes);
-
-                        if (d1 < distance)
-                            distance = d1;
-
-                        var d2 = workArea.Right - part.Right;
-
-                        if (d2 > 0 && d2 < distance)
-                            distance = d2;
-                    });
-                    offset.X = distance;
-                    break;
-
-                case PushDirection.Up:
-                    SelectedParts.ForEach(part =>
-                    {
-                        var d1 = Helper.ClosestDistanceUp(part.BoundingBox.Offset(Plate.PartSpacing), boxes);
-
-                        if (d1 < distance)
-                            distance = d1;
-
-                        var d2 = workArea.Top - part.Top;
-
-                        if (d2 > 0 && d2 < distance)
-                            distance = d2;
-                    });
-                    offset.Y = distance;
-                    break;
+                if (edgeDist > 0 && edgeDist < distance)
+                    distance = edgeDist;
             }
 
-            if (distance < double.MaxValue)
+            if (distance < double.MaxValue && distance > 0)
             {
+                var offset = new Vector();
+
+                switch (direction)
+                {
+                    case PushDirection.Left:  offset.X = -distance; break;
+                    case PushDirection.Right: offset.X =  distance; break;
+                    case PushDirection.Up:    offset.Y =  distance; break;
+                    case PushDirection.Down:  offset.Y = -distance; break;
+                }
+
                 SelectedParts.ForEach(p => p.Offset(offset));
                 Invalidate();
             }
