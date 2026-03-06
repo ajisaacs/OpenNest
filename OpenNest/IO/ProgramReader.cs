@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using OpenNest.CNC;
+using OpenNest.Geometry;
 
 namespace OpenNest.IO
 {

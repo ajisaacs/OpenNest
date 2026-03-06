@@ -1,4 +1,4 @@
-﻿namespace OpenNest
+﻿namespace OpenNest.Geometry
 {
     public static class BoxSplitter
     {

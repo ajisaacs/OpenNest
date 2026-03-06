@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
+using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Properties;
 
@@ -314,7 +315,7 @@ namespace OpenNest.Forms
                 nest.Units = Properties.Settings.Default.DefaultUnit;
                 nest.PlateDefaults.EdgeSpacing = new Spacing(0, 0, 0, 0);
                 nest.PlateDefaults.PartSpacing = 0;
-                nest.PlateDefaults.Size = new OpenNest.Size(100, 100);
+                nest.PlateDefaults.Size = new OpenNest.Geometry.Size(100, 100);
                 nest.PlateDefaults.Quadrant = 1;
             }
 

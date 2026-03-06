@@ -1,4 +1,6 @@
-﻿namespace OpenNest.CNC
+﻿using OpenNest.Geometry;
+
+namespace OpenNest.CNC
 {
     public class LinearMove : Motion
     {

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml;
 using OpenNest.CNC;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
 namespace OpenNest.IO
@@ -138,7 +139,7 @@ namespace OpenNest.IO
                         break;
 
                     case "Size":
-                        nest.PlateDefaults.Size = Size.Parse(reader.ReadString());
+                        nest.PlateDefaults.Size = OpenNest.Geometry.Size.Parse(reader.ReadString());
                         break;
 
                     case "Thickness":
@@ -293,7 +294,7 @@ namespace OpenNest.IO
                         break;
 
                     case "Size":
-                        plate.Size = Size.Parse(reader.ReadString());
+                        plate.Size = OpenNest.Geometry.Size.Parse(reader.ReadString());
                         break;
 
                     case "Qty":

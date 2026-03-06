@@ -2,6 +2,7 @@
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {

@@ -1,6 +1,6 @@
 ﻿using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Geometry
 {
     public class Box
     {

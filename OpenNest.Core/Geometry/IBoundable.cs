@@ -1,5 +1,5 @@
 ﻿
-namespace OpenNest
+namespace OpenNest.Geometry
 {
     public interface IBoundable
     {

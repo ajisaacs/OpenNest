@@ -1,4 +1,5 @@
-﻿
+﻿using OpenNest.Geometry;
+
 namespace OpenNest.CNC
 {
     public class ArcMove : Motion

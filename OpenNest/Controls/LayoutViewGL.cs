@@ -5,6 +5,7 @@ using OpenTK.Graphics.OpenGL;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
 namespace OpenNest.Controls

@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {

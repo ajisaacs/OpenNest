@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Collections;
+using OpenNest.Geometry;
 using OpenNest.Math;
 using Action = OpenNest.Actions.Action;
 using Timer = System.Timers.Timer;

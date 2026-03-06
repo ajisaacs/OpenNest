@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace OpenNest
+namespace OpenNest.Geometry
 {
     public struct Size
     {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
+using OpenNest.Geometry;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Forms
@@ -130,9 +131,9 @@ namespace OpenNest.Forms
 
         public void EnableCheck()
         {
-            OpenNest.Size size;
+            OpenNest.Geometry.Size size;
 
-            if (!OpenNest.Size.TryParse(SizeString, out size))
+            if (!OpenNest.Geometry.Size.TryParse(SizeString, out size))
             {
                 applyButton.Enabled = false;
                 return;
@@ -168,7 +169,7 @@ namespace OpenNest.Forms
 
         private void Save()
         {
-            plate.Size = OpenNest.Size.Parse(SizeString);
+            plate.Size = OpenNest.Geometry.Size.Parse(SizeString);
             plate.EdgeSpacing.Left = LeftSpacing;
             plate.EdgeSpacing.Top = TopSpacing;
             plate.EdgeSpacing.Right = RightSpacing;

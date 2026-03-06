@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
 namespace OpenNest.CirclePacking

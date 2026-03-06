@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 using OpenNest.Math;
 using OpenNest.RectanglePacking;
 

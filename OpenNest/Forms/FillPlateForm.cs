@@ -2,6 +2,7 @@
 using System.Windows.Forms;
 using OpenNest.Collections;
 using OpenNest.Controls;
+using OpenNest.Geometry;
 
 namespace OpenNest.Forms
 {
@@ -36,7 +37,7 @@ namespace OpenNest.Forms
                 control.AllowSelect = false;
                 control.AllowZoom = false;
                 control.BackColor = Color.White;
-                control.Plate.Size = new OpenNest.Size(0, 0);
+                control.Plate.Size = new OpenNest.Geometry.Size(0, 0);
                 control.AddPartFromDrawing(dwg, Vector.Zero);
                 control.MouseDoubleClick += (sender, e) =>
                 {

@@ -1,7 +1,7 @@
 ﻿using System;
 using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Geometry
 {
     public struct Vector
     {
