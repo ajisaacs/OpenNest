@@ -739,6 +739,8 @@ namespace OpenNest
             return pts.Count > 0;
         }
 
+        private const int PushArcSegments = 36;
+
         public static List<Line> GetPartLines(Part part)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
@@ -747,7 +749,7 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var polygon = shape.ToPolygon();
+                var polygon = shape.ToPolygon(PushArcSegments);
                 polygon.Offset(part.Location);
                 lines.AddRange(polygon.ToLines());
             }
@@ -768,7 +770,7 @@ namespace OpenNest
                 if (offsetEntity == null)
                     continue;
 
-                var polygon = offsetEntity.ToPolygon();
+                var polygon = offsetEntity.ToPolygon(PushArcSegments);
                 polygon.Offset(part.Location);
                 lines.AddRange(polygon.ToLines());
             }
