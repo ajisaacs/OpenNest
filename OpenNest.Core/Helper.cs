@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -736,6 +737,43 @@ namespace OpenNest
             }
 
             return pts.Count > 0;
+        }
+
+        public static List<Line> GetPartLines(Part part)
+        {
+            var entities = ConvertProgram.ToGeometry(part.Program);
+            var shapes = GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var lines = new List<Line>();
+
+            foreach (var shape in shapes)
+            {
+                var polygon = shape.ToPolygon();
+                polygon.Offset(part.Location);
+                lines.AddRange(polygon.ToLines());
+            }
+
+            return lines;
+        }
+
+        public static List<Line> GetOffsetPartLines(Part part, double spacing)
+        {
+            var entities = ConvertProgram.ToGeometry(part.Program);
+            var shapes = GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var lines = new List<Line>();
+
+            foreach (var shape in shapes)
+            {
+                var offsetEntity = shape.OffsetEntity(spacing, OffsetSide.Left) as Shape;
+
+                if (offsetEntity == null)
+                    continue;
+
+                var polygon = offsetEntity.ToPolygon();
+                polygon.Offset(part.Location);
+                lines.AddRange(polygon.ToLines());
+            }
+
+            return lines;
         }
 
         public static double ClosestDistanceLeft(Box box, List<Box> boxes)
