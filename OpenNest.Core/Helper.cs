@@ -739,7 +739,7 @@ namespace OpenNest
             return pts.Count > 0;
         }
 
-        private const int PushArcSegments = 36;
+        private const double PushChordTolerance = 0.08;
 
         public static List<Line> GetPartLines(Part part)
         {
@@ -749,7 +749,7 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var polygon = shape.ToPolygon(PushArcSegments);
+                var polygon = shape.ToPolygonWithTolerance(PushChordTolerance);
                 polygon.Offset(part.Location);
                 lines.AddRange(polygon.ToLines());
             }
@@ -770,7 +770,7 @@ namespace OpenNest
                 if (offsetEntity == null)
                     continue;
 
-                var polygon = offsetEntity.ToPolygon(PushArcSegments);
+                var polygon = offsetEntity.ToPolygonWithTolerance(PushChordTolerance);
                 polygon.Offset(part.Location);
                 lines.AddRange(polygon.ToLines());
             }

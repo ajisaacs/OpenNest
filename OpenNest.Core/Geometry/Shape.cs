@@ -244,6 +244,49 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Converts the shape to a polygon using a chord tolerance to determine
+        /// the number of segments per arc/circle.
+        /// </summary>
+        public Polygon ToPolygonWithTolerance(double tolerance)
+        {
+            var polygon = new Polygon();
+
+            foreach (var entity in Entities)
+            {
+                switch (entity.Type)
+                {
+                    case EntityType.Arc:
+                        var arc = (Arc)entity;
+                        polygon.Vertices.AddRange(arc.ToPoints(arc.SegmentsForTolerance(tolerance)));
+                        break;
+
+                    case EntityType.Line:
+                        var line = (Line)entity;
+                        polygon.Vertices.AddRange(new[]
+                        {
+                            line.StartPoint,
+                            line.EndPoint
+                        });
+                        break;
+
+                    case EntityType.Circle:
+                        var circle = (Circle)entity;
+                        polygon.Vertices.AddRange(circle.ToPoints(circle.SegmentsForTolerance(tolerance)));
+                        break;
+
+                    default:
+                        Debug.Fail("Unhandled geometry type");
+                        break;
+                }
+            }
+
+            polygon.Close();
+            polygon.Cleanup();
+
+            return polygon;
+        }
+
+        /// <summary>
         /// Reverses the rotation direction of the shape.
         /// </summary>
         public override void Reverse()

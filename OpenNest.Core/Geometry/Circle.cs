@@ -122,6 +122,19 @@ namespace OpenNest.Geometry
             return Center.DistanceTo(pt) <= Radius;
         }
 
+        /// <summary>
+        /// Returns the minimum number of segments needed so that the chord-to-arc
+        /// deviation (sagitta) does not exceed the given tolerance.
+        /// </summary>
+        public int SegmentsForTolerance(double tolerance)
+        {
+            if (tolerance >= Radius)
+                return 3;
+
+            var maxAngle = 2.0 * System.Math.Acos(1.0 - tolerance / Radius);
+            return System.Math.Max(3, (int)System.Math.Ceiling(Angle.TwoPI / maxAngle));
+        }
+
         public List<Vector> ToPoints(int segments = 1000)
         {
             var points = new List<Vector>();

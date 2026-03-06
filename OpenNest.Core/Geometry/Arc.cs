@@ -186,6 +186,19 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Returns the minimum number of segments needed so that the chord-to-arc
+        /// deviation (sagitta) does not exceed the given tolerance.
+        /// </summary>
+        public int SegmentsForTolerance(double tolerance)
+        {
+            if (tolerance >= Radius)
+                return 1;
+
+            var maxAngle = 2.0 * System.Math.Acos(1.0 - tolerance / Radius);
+            return System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Abs(SweepAngle()) / maxAngle));
+        }
+
+        /// <summary>
         /// Converts the arc to a group of points.
         /// </summary>
         /// <param name="segments">Number of parts to divide the arc into.</param>
