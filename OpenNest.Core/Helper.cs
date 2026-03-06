@@ -776,6 +776,130 @@ namespace OpenNest
             return lines;
         }
 
+        /// <summary>
+        /// Finds the distance from a vertex to a line segment along a push axis.
+        /// Returns double.MaxValue if the ray does not hit the segment.
+        /// </summary>
+        private static double RayEdgeDistance(Vector vertex, Line edge, PushDirection direction)
+        {
+            var p1 = edge.StartPoint;
+            var p2 = edge.EndPoint;
+
+            switch (direction)
+            {
+                case PushDirection.Left:
+                {
+                    // Ray goes in -X direction. Need non-horizontal edge.
+                    if (p1.Y.IsEqualTo(p2.Y))
+                        return double.MaxValue; // horizontal edge, parallel to ray
+
+                    var t = (vertex.Y - p1.Y) / (p2.Y - p1.Y);
+                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                        return double.MaxValue;
+
+                    var ix = p1.X + t * (p2.X - p1.X);
+                    var dist = vertex.X - ix; // positive if edge is to the left
+                    return dist > Tolerance.Epsilon ? dist : double.MaxValue;
+                }
+
+                case PushDirection.Right:
+                {
+                    if (p1.Y.IsEqualTo(p2.Y))
+                        return double.MaxValue;
+
+                    var t = (vertex.Y - p1.Y) / (p2.Y - p1.Y);
+                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                        return double.MaxValue;
+
+                    var ix = p1.X + t * (p2.X - p1.X);
+                    var dist = ix - vertex.X;
+                    return dist > Tolerance.Epsilon ? dist : double.MaxValue;
+                }
+
+                case PushDirection.Down:
+                {
+                    // Ray goes in -Y direction. Need non-vertical edge.
+                    if (p1.X.IsEqualTo(p2.X))
+                        return double.MaxValue; // vertical edge, parallel to ray
+
+                    var t = (vertex.X - p1.X) / (p2.X - p1.X);
+                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                        return double.MaxValue;
+
+                    var iy = p1.Y + t * (p2.Y - p1.Y);
+                    var dist = vertex.Y - iy;
+                    return dist > Tolerance.Epsilon ? dist : double.MaxValue;
+                }
+
+                case PushDirection.Up:
+                {
+                    if (p1.X.IsEqualTo(p2.X))
+                        return double.MaxValue;
+
+                    var t = (vertex.X - p1.X) / (p2.X - p1.X);
+                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                        return double.MaxValue;
+
+                    var iy = p1.Y + t * (p2.Y - p1.Y);
+                    var dist = iy - vertex.Y;
+                    return dist > Tolerance.Epsilon ? dist : double.MaxValue;
+                }
+
+                default:
+                    return double.MaxValue;
+            }
+        }
+
+        /// <summary>
+        /// Computes the minimum translation distance along a push direction before
+        /// any edge of movingLines contacts any edge of stationaryLines.
+        /// Returns double.MaxValue if no collision path exists.
+        /// </summary>
+        public static double DirectionalDistance(List<Line> movingLines, List<Line> stationaryLines, PushDirection direction)
+        {
+            var minDist = double.MaxValue;
+
+            // Case 1: Each moving vertex → each stationary edge
+            for (int i = 0; i < movingLines.Count; i++)
+            {
+                var movingLine = movingLines[i];
+
+                for (int j = 0; j < stationaryLines.Count; j++)
+                {
+                    var d = RayEdgeDistance(movingLine.StartPoint, stationaryLines[j], direction);
+                    if (d < minDist) minDist = d;
+                }
+            }
+
+            // Case 2: Each stationary vertex → each moving edge (opposite direction)
+            var opposite = OppositeDirection(direction);
+
+            for (int i = 0; i < stationaryLines.Count; i++)
+            {
+                var stationaryLine = stationaryLines[i];
+
+                for (int j = 0; j < movingLines.Count; j++)
+                {
+                    var d = RayEdgeDistance(stationaryLine.StartPoint, movingLines[j], opposite);
+                    if (d < minDist) minDist = d;
+                }
+            }
+
+            return minDist;
+        }
+
+        private static PushDirection OppositeDirection(PushDirection direction)
+        {
+            switch (direction)
+            {
+                case PushDirection.Left: return PushDirection.Right;
+                case PushDirection.Right: return PushDirection.Left;
+                case PushDirection.Up: return PushDirection.Down;
+                case PushDirection.Down: return PushDirection.Up;
+                default: return direction;
+            }
+        }
+
         public static double ClosestDistanceLeft(Box box, List<Box> boxes)
         {
             var closestDistance = double.MaxValue;
