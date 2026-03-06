@@ -23,11 +23,14 @@ No test projects exist in this solution.
 Three projects form a layered architecture:
 
 ### OpenNest.Core (class library)
-Domain model and geometry primitives. Everything lives in the `OpenNest` namespace.
+Domain model, geometry, and CNC primitives organized into namespaces:
 
-- **Domain model**: `Nest` → `Plate[]` → `Part[]` → `Drawing` → `Program`. A `Nest` is the top-level container. Each `Plate` has a size, material, quadrant, spacing, and contains placed `Part` instances. Each `Part` references a `Drawing` (the template) and has its own location/rotation. A `Drawing` wraps a CNC `Program`.
-- **CNC subsystem** (`CNC/`): `Program` holds a list of `ICode` instructions (G-code-like: `RapidMove`, `LinearMove`, `ArcMove`, `SubProgramCall`). Programs support absolute/incremental mode conversion, rotation, offset, bounding box calculation, and cloning. This is the core geometric representation — parts are manipulated by transforming their `Program`.
-- **Geometry** (`Geometry/`): Higher-level shapes (`Line`, `Arc`, `Circle`, `Polygon`, `Shape`) used for intersection detection, area calculation, and DXF conversion. `ConvertProgram.ToGeometry()` bridges from CNC codes to geometry entities.
+- **Root** (`namespace OpenNest`): Domain model — `Nest` → `Plate[]` → `Part[]` → `Drawing` → `Program`. A `Nest` is the top-level container. Each `Plate` has a size, material, quadrant, spacing, and contains placed `Part` instances. Each `Part` references a `Drawing` (the template) and has its own location/rotation. A `Drawing` wraps a CNC `Program`. Also contains utilities: `Helper`, `Align`, `Sequence`, `Timing`.
+- **CNC** (`CNC/`, `namespace OpenNest.CNC`): `Program` holds a list of `ICode` instructions (G-code-like: `RapidMove`, `LinearMove`, `ArcMove`, `SubProgramCall`). Programs support absolute/incremental mode conversion, rotation, offset, bounding box calculation, and cloning.
+- **Geometry** (`Geometry/`, `namespace OpenNest.Geometry`): Spatial primitives (`Vector`, `Box`, `Size`, `Spacing`, `BoundingBox`, `IBoundable`) and higher-level shapes (`Line`, `Arc`, `Circle`, `Polygon`, `Shape`) used for intersection detection, area calculation, and DXF conversion.
+- **Converters** (`Converters/`, `namespace OpenNest.Converters`): Bridges between CNC and Geometry — `ConvertProgram` (CNC→Geometry), `ConvertGeometry` (Geometry→CNC), `ConvertMode` (absolute↔incremental).
+- **Math** (`Math/`, `namespace OpenNest.Math`): `Angle` (radian/degree conversion), `Tolerance` (floating-point comparison), `Trigonometry`, `Generic` (swap utility), `EvenOdd`. Note: `OpenNest.Math` shadows `System.Math` — use `System.Math` fully qualified where both are needed.
+- **Collections** (`Collections/`, `namespace OpenNest.Collections`): `ObservableList<T>`, `DrawingCollection`.
 - **Quadrant system**: Plates use quadrants 1-4 (like Cartesian quadrants) to determine coordinate origin placement. This affects bounding box calculation, rotation, and part positioning.
 
 ### OpenNest.Engine (class library, depends on Core)
@@ -58,7 +61,7 @@ Nest files (`.zip`) contain:
 
 ## Key Patterns
 
-- All namespace roots are `OpenNest` (even OpenNest.Core uses `namespace OpenNest`).
+- OpenNest.Core uses multiple namespaces: `OpenNest` (root domain), `OpenNest.CNC`, `OpenNest.Geometry`, `OpenNest.Converters`, `OpenNest.Math`, `OpenNest.Collections`.
 - `ObservableList<T>` provides ItemAdded/ItemRemoved/ItemChanged events used for automatic quantity tracking between plates and drawings.
 - Angles throughout the codebase are in **radians** (use `Angle.ToRadians()`/`Angle.ToDegrees()` for conversion).
 - `Tolerance.Epsilon` is used for floating-point comparisons across geometry operations.
