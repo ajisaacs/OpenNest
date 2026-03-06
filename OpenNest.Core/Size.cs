@@ -49,7 +49,7 @@ namespace OpenNest
 
         public string ToString(int decimalPlaces)
         {
-            return string.Format("{0} x {1}", Math.Round(Height, decimalPlaces), Math.Round(Width, decimalPlaces));
+            return string.Format("{0} x {1}", System.Math.Round(Height, decimalPlaces), System.Math.Round(Width, decimalPlaces));
         }
     }
 }

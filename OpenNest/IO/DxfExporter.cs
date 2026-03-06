@@ -5,6 +5,7 @@ using netDxf;
 using netDxf.Entities;
 using netDxf.Tables;
 using OpenNest.CNC;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {
@@ -13,7 +14,7 @@ namespace OpenNest.IO
 
     public class DxfExporter
     {
-        private const double RadToDeg = 180.0 / Math.PI;
+        private const double RadToDeg = 180.0 / System.Math.PI;
 
         private DxfDocument doc;
         private Vector2 curpos;
@@ -247,12 +248,12 @@ namespace OpenNest.IO
             }
 
             // start angle in radians
-            var startAngle = Math.Atan2(
+            var startAngle = System.Math.Atan2(
                 curpos.Y - center.Y,
                 curpos.X - center.X);
 
             // end angle in radians
-            var endAngle = Math.Atan2(
+            var endAngle = System.Math.Atan2(
                 endpt.Y - center.Y,
                 endpt.X - center.X);
 
@@ -266,7 +267,7 @@ namespace OpenNest.IO
             var dx = endpt.X - center.X;
             var dy = endpt.Y - center.Y;
 
-            var radius = Math.Sqrt(dx * dx + dy * dy);
+            var radius = System.Math.Sqrt(dx * dx + dy * dy);
 
             if (startAngle.IsEqualTo(endAngle))
             {

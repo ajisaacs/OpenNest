@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Controls
 {
@@ -59,12 +60,12 @@ namespace OpenNest.Controls
         {
             base.OnMouseWheel(e);
 
-            float multiplier = Math.Abs(e.Delta / 120.0f);
+            float multiplier = System.Math.Abs(e.Delta / 120.0f);
 
             if (e.Delta > 0)
-                ZoomToControlPoint(e.Location, (float)Math.Pow(ZoomInFactor, multiplier));
+                ZoomToControlPoint(e.Location, (float)System.Math.Pow(ZoomInFactor, multiplier));
             else
-                ZoomToControlPoint(e.Location, (float)Math.Pow(ZoomOutFactor, multiplier));
+                ZoomToControlPoint(e.Location, (float)System.Math.Pow(ZoomOutFactor, multiplier));
 
             Invalidate();
         }

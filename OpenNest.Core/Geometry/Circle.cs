@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -84,7 +85,7 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public double Area()
         {
-            return Math.PI * Radius * Radius;
+            return System.Math.PI * Radius * Radius;
         }
 
         /// <summary>
@@ -93,7 +94,7 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public double Circumference()
         {
-            return Math.PI * Diameter;
+            return System.Math.PI * Diameter;
         }
 
         /// <summary>
@@ -131,8 +132,8 @@ namespace OpenNest.Geometry
                 var angle = stepAngle * i;
 
                 points.Add(new Vector(
-                    Math.Cos(angle) * Radius + Center.X,
-                    Math.Sin(angle) * Radius + Center.Y));
+                    System.Math.Cos(angle) * Radius + Center.X,
+                    System.Math.Sin(angle) * Radius + Center.Y));
             }
 
             return points;
@@ -290,8 +291,8 @@ namespace OpenNest.Geometry
             var angle = Center.AngleTo(pt);
 
             return new Vector(
-                Math.Cos(angle) * Radius + Center.X,
-                Math.Sin(angle) * Radius + Center.Y);
+                System.Math.Cos(angle) * Radius + Center.X,
+                System.Math.Sin(angle) * Radius + Center.Y);
         }
 
         /// <summary>
@@ -324,7 +325,7 @@ namespace OpenNest.Geometry
         public override bool Intersects(Circle circle)
         {
             var dist = Center.DistanceTo(circle.Center);
-            return (dist < (Radius + circle.Radius) && dist > Math.Abs(Radius - circle.Radius));
+            return (dist < (Radius + circle.Radius) && dist > System.Math.Abs(Radius - circle.Radius));
         }
 
         /// <summary>

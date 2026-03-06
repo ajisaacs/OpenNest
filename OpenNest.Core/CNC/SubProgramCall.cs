@@ -1,4 +1,6 @@
-﻿namespace OpenNest.CNC
+﻿using OpenNest.Math;
+
+namespace OpenNest.CNC
 {
     public class SubProgramCall : ICode
     {

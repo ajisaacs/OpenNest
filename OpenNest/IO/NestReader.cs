@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Xml;
 using OpenNest.CNC;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {

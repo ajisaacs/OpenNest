@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -17,7 +18,7 @@ namespace OpenNest
         /// <returns></returns>
         public static double RoundDownToNearest(double num, double factor)
         {
-            return factor.IsEqualTo(0) ? num : Math.Floor(num / factor) * factor;
+            return factor.IsEqualTo(0) ? num : System.Math.Floor(num / factor) * factor;
         }
 
         /// <summary>
@@ -28,7 +29,7 @@ namespace OpenNest
         /// <returns></returns>
         public static double RoundUpToNearest(double num, double factor)
         {
-            return factor.IsEqualTo(0) ? num : Math.Ceiling(num / factor) * factor;
+            return factor.IsEqualTo(0) ? num : System.Math.Ceiling(num / factor) * factor;
         }
 
         /// <summary>
@@ -39,7 +40,7 @@ namespace OpenNest
         /// <returns></returns>
         public static double RoundToNearest(double num, double factor)
         {
-            return factor.IsEqualTo(0) ? num : Math.Round(num / factor) * factor;
+            return factor.IsEqualTo(0) ? num : System.Math.Round(num / factor) * factor;
         }
 
         public static void Optimize(IList<Arc> arcs)
@@ -483,7 +484,7 @@ namespace OpenNest
             }
 
             // check if one circle contains the other
-            if (distance < Math.Abs(circle1.Radius - circle2.Radius))
+            if (distance < System.Math.Abs(circle1.Radius - circle2.Radius))
             {
                 pts = new List<Vector>();
                 return false;
@@ -491,7 +492,7 @@ namespace OpenNest
 
             var d = circle2.Center - circle1.Center;
             var a = (circle1.Radius * circle1.Radius - circle2.Radius * circle2.Radius + distance * distance) / (2.0 * distance);
-            var h = Math.Sqrt(circle1.Radius * circle1.Radius - a * a);
+            var h = System.Math.Sqrt(circle1.Radius * circle1.Radius - a * a);
 
             var pt = new Vector(
                 circle1.Center.X + (a * d.X) / distance,
@@ -541,13 +542,13 @@ namespace OpenNest
                 return true;
             }
 
-            t = (-b + Math.Sqrt(det)) / (2 * a);
+            t = (-b + System.Math.Sqrt(det)) / (2 * a);
             var pt2 = new Vector(line.StartPoint.X + t * d1.X, line.StartPoint.Y + t * d1.Y);
 
             if (line.BoundingBox.Contains(pt2))
                 pts.Add(pt2);
 
-            t = (-b - Math.Sqrt(det)) / (2 * a);
+            t = (-b - System.Math.Sqrt(det)) / (2 * a);
             var pt3 = new Vector(line.StartPoint.X + t * d1.X, line.StartPoint.Y + t * d1.Y);
 
             if (line.BoundingBox.Contains(pt3))

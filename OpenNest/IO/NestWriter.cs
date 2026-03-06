@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Xml;
 using OpenNest.CNC;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {
@@ -319,18 +320,18 @@ namespace OpenNest.IO
                         if (arcMove.Rotation == RotationType.CW)
                         {
                             sb.Append(string.Format("G02X{0}Y{1}I{2}J{3}",
-                                Math.Round(arcMove.EndPoint.X, OutputPrecision),
-                                Math.Round(arcMove.EndPoint.Y, OutputPrecision),
-                                Math.Round(arcMove.CenterPoint.X, OutputPrecision),
-                                Math.Round(arcMove.CenterPoint.Y, OutputPrecision)));
+                                System.Math.Round(arcMove.EndPoint.X, OutputPrecision),
+                                System.Math.Round(arcMove.EndPoint.Y, OutputPrecision),
+                                System.Math.Round(arcMove.CenterPoint.X, OutputPrecision),
+                                System.Math.Round(arcMove.CenterPoint.Y, OutputPrecision)));
                         }
                         else
                         {
                             sb.Append(string.Format("G03X{0}Y{1}I{2}J{3}",
-                                Math.Round(arcMove.EndPoint.X, OutputPrecision),
-                                Math.Round(arcMove.EndPoint.Y, OutputPrecision),
-                                Math.Round(arcMove.CenterPoint.X, OutputPrecision),
-                                Math.Round(arcMove.CenterPoint.Y, OutputPrecision)));
+                                System.Math.Round(arcMove.EndPoint.X, OutputPrecision),
+                                System.Math.Round(arcMove.EndPoint.Y, OutputPrecision),
+                                System.Math.Round(arcMove.CenterPoint.X, OutputPrecision),
+                                System.Math.Round(arcMove.CenterPoint.Y, OutputPrecision)));
                         }
 
                         if (arcMove.Layer != LayerType.Cut)
@@ -351,8 +352,8 @@ namespace OpenNest.IO
                         var linearMove = (LinearMove)code;
 
                         sb.Append(string.Format("G01X{0}Y{1}",
-                            Math.Round(linearMove.EndPoint.X, OutputPrecision),
-                            Math.Round(linearMove.EndPoint.Y, OutputPrecision)));
+                            System.Math.Round(linearMove.EndPoint.X, OutputPrecision),
+                            System.Math.Round(linearMove.EndPoint.Y, OutputPrecision)));
 
                         if (linearMove.Layer != LayerType.Cut)
                             sb.Append(GetLayerString(linearMove.Layer));
@@ -365,8 +366,8 @@ namespace OpenNest.IO
                         var rapidMove = (RapidMove)code;
 
                         return string.Format("G00X{0}Y{1}",
-                            Math.Round(rapidMove.EndPoint.X, OutputPrecision),
-                            Math.Round(rapidMove.EndPoint.Y, OutputPrecision));
+                            System.Math.Round(rapidMove.EndPoint.X, OutputPrecision),
+                            System.Math.Round(rapidMove.EndPoint.Y, OutputPrecision));
                     }
 
                 case CodeType.SetFeedrate:

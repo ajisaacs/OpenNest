@@ -9,6 +9,7 @@ using OpenNest.Actions;
 using OpenNest.Collections;
 using OpenNest.Controls;
 using OpenNest.IO;
+using OpenNest.Math;
 using OpenNest.Properties;
 using Timer = System.Timers.Timer;
 
@@ -292,8 +293,8 @@ namespace OpenNest.Forms
 
                             writer.WriteLine("{0}|{1},{2}|{3}",
                                 part.BaseDrawing.Source.Path,
-                                Math.Round(part.Location.X - pt.X, 8),
-                                Math.Round(part.Location.Y - pt.Y, 8),
+                                System.Math.Round(part.Location.X - pt.X, 8),
+                                System.Math.Round(part.Location.Y - pt.Y, 8),
                                 Angle.ToDegrees(part.Rotation));
                         }
                     }

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace OpenNest
+namespace OpenNest.Math
 {
     public static class Trigonometry
     {
@@ -12,7 +12,7 @@ namespace OpenNest
         /// <returns></returns>
         public static double Base(double height, double hypotenuse)
         {
-            return Math.Sqrt(hypotenuse * hypotenuse - height * height);
+            return System.Math.Sqrt(hypotenuse * hypotenuse - height * height);
         }
 
         /// <summary>
@@ -23,7 +23,7 @@ namespace OpenNest
         /// <returns></returns>
         public static double Height(double bottom, double hypotenuse)
         {
-            return Math.Sqrt(hypotenuse * hypotenuse - bottom * bottom);
+            return System.Math.Sqrt(hypotenuse * hypotenuse - bottom * bottom);
         }
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace OpenNest
         /// <returns></returns>
         public static double Hypotenuse(double height, double bottom)
         {
-            return Math.Sqrt(height * height + bottom * bottom);
+            return System.Math.Sqrt(height * height + bottom * bottom);
         }
     }
 }

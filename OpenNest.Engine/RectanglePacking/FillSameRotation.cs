@@ -1,4 +1,5 @@
-﻿
+﻿using OpenNest.Math;
+
 namespace OpenNest.RectanglePacking
 {
     internal class FillSameRotation : FillEngine

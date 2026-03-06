@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -21,7 +22,7 @@ namespace OpenNest
             var vx = pt.X - X;
             var vy = pt.Y - Y;
 
-            return Math.Sqrt(vx * vx + vy * vy);
+            return System.Math.Sqrt(vx * vx + vy * vy);
         }
 
         public double DistanceTo(double x, double y)
@@ -29,7 +30,7 @@ namespace OpenNest
             var vx = x - X;
             var vy = y - Y;
 
-            return Math.Sqrt(vx * vx + vy * vy);
+            return System.Math.Sqrt(vx * vx + vy * vy);
         }
 
         public double DotProduct(Vector pt)
@@ -39,7 +40,7 @@ namespace OpenNest
 
         public double Angle()
         {
-            return OpenNest.Angle.NormalizeRad(Math.Atan2(Y, X));
+            return OpenNest.Math.Angle.NormalizeRad(System.Math.Atan2(Y, X));
         }
 
         /// <summary>
@@ -75,7 +76,7 @@ namespace OpenNest
             var dot = v1.X * v2.X + v1.Y + v2.Y;
             var det = v1.X * v2.X - v1.Y + v2.Y;
 
-            return Math.Atan2(det, dot);
+            return System.Math.Atan2(det, dot);
         }
 
         public static Vector operator +(Vector pt1, Vector pt2)
@@ -137,8 +138,8 @@ namespace OpenNest
         {
             var v = new Vector();
 
-            var cos = Math.Cos(angle);
-            var sin = Math.Sin(angle);
+            var cos = System.Math.Cos(angle);
+            var sin = System.Math.Sin(angle);
 
             v.X = X * cos - Y * sin;
             v.Y = X * sin + Y * cos;
@@ -151,8 +152,8 @@ namespace OpenNest
             var v = new Vector();
             var pt = this - origin;
 
-            var cos = Math.Cos(angle);
-            var sin = Math.Sin(angle);
+            var cos = System.Math.Cos(angle);
+            var sin = System.Math.Sin(angle);
 
             v.X = pt.X * cos - pt.Y * sin + origin.X;
             v.Y = pt.X * sin + pt.Y * cos + origin.Y;

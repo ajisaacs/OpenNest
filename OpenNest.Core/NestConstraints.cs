@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -37,7 +38,7 @@ namespace OpenNest
             if (diff.IsEqualTo(Angle.TwoPI))
                 return false;
 
-            if ((diff > Math.PI || diff.IsEqualTo(Math.PI)) && Allow180Equivalent)
+            if ((diff > System.Math.PI || diff.IsEqualTo(System.Math.PI)) && Allow180Equivalent)
                 return false;
 
             return true;

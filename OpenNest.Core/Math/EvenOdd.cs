@@ -1,4 +1,4 @@
-﻿namespace OpenNest
+﻿namespace OpenNest.Math
 {
     public static class EvenOdd
     {

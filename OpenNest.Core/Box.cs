@@ -1,4 +1,6 @@
-﻿namespace OpenNest
+﻿using OpenNest.Math;
+
+namespace OpenNest
 {
     public class Box
     {

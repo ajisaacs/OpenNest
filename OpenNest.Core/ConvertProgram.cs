@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -99,7 +100,7 @@ namespace OpenNest
             var dx = endpt.X - center.X;
             var dy = endpt.Y - center.Y;
 
-            var radius = Math.Sqrt(dx * dx + dy * dy);
+            var radius = System.Math.Sqrt(dx * dx + dy * dy);
             var layer = ConvertLayer(arcMove.Layer);
 
             if (startAngle.IsEqualTo(endAngle))

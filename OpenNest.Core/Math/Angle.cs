@@ -1,28 +1,28 @@
 ﻿using System;
 
-namespace OpenNest
+namespace OpenNest.Math
 {
     public static class Angle
     {
         /// <summary>
         /// Number of radians equal to 1 degree.
         /// </summary>
-        public const double RadPerDeg = Math.PI / 180.0;
+        public const double RadPerDeg = System.Math.PI / 180.0;
 
         /// <summary>
         /// Number of degrees equal to 1 radian.
         /// </summary>
-        public const double DegPerRad = 180.0 / Math.PI;
+        public const double DegPerRad = 180.0 / System.Math.PI;
 
         /// <summary>
         /// Half of PI.
         /// </summary>
-        public const double HalfPI = Math.PI * 0.5;
+        public const double HalfPI = System.Math.PI * 0.5;
 
         /// <summary>
         /// 2 x PI
         /// </summary>
-        public const double TwoPI = Math.PI * 2.0;
+        public const double TwoPI = System.Math.PI * 2.0;
 
         /// <summary>
         /// Converts radians to degrees.

@@ -19,12 +19,12 @@ namespace OpenNest.Forms
 
         public void SetCutDistance(double dist)
         {
-            cutDistanceLabel.Text = string.Format("{0} {1}", Math.Round(dist, 4), UnitsHelper.GetShortString(Units));
+            cutDistanceLabel.Text = string.Format("{0} {1}", System.Math.Round(dist, 4), UnitsHelper.GetShortString(Units));
         }
 
         public void SetRapidDistance(double dist)
         {
-            rapidDistanceLabel.Text = string.Format("{0} {1}", Math.Round(dist, 4), UnitsHelper.GetShortString(Units));
+            rapidDistanceLabel.Text = string.Format("{0} {1}", System.Math.Round(dist, 4), UnitsHelper.GetShortString(Units));
         }
 
         public void SetIntersectionCount(int count)

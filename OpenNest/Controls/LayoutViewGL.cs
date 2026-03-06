@@ -5,6 +5,7 @@ using OpenTK.Graphics.OpenGL;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Math;
 
 namespace OpenNest.Controls
 {
@@ -13,7 +14,7 @@ namespace OpenNest.Controls
         private float scale;
         private bool loaded = false;
 
-        private const double TwoPI = Math.PI * 2.0;
+        private const double TwoPI = System.Math.PI * 2.0;
         private const int Resolution = 100;
         private const int BorderWidth = 50;
         private const float ZoomInFactor = 1.1f;
@@ -117,12 +118,12 @@ namespace OpenNest.Controls
         {
             base.OnMouseWheel(e);
 
-            float multiplier = Math.Abs(e.Delta / 120.0f);
+            float multiplier = System.Math.Abs(e.Delta / 120.0f);
 
             if (e.Delta > 0)
-                ZoomToPoint(e.X, e.Y, (float)Math.Pow(ZoomInFactor, multiplier));
+                ZoomToPoint(e.X, e.Y, (float)System.Math.Pow(ZoomInFactor, multiplier));
             else
-                ZoomToPoint(e.X, e.Y, (float)Math.Pow(ZoomOutFactor, multiplier));
+                ZoomToPoint(e.X, e.Y, (float)System.Math.Pow(ZoomOutFactor, multiplier));
 
             Invalidate();
         }
@@ -292,12 +293,12 @@ namespace OpenNest.Controls
             }
 
             // start angle in radians
-            var startAngle = Math.Atan2(
+            var startAngle = System.Math.Atan2(
                 curpos.Y - center.Y,
                 curpos.X - center.X);
 
             // end angle in radians
-            var endAngle = Math.Atan2(
+            var endAngle = System.Math.Atan2(
                 endpt.Y - center.Y,
                 endpt.X - center.X);
 
@@ -312,7 +313,7 @@ namespace OpenNest.Controls
             var dx = endpt.X - center.X;
             var dy = endpt.Y - center.Y;
 
-            var radius = Math.Sqrt(dx * dx + dy * dy);
+            var radius = System.Math.Sqrt(dx * dx + dy * dy);
 
             if (startAngle.IsEqualTo(endAngle))
             {
@@ -337,8 +338,8 @@ namespace OpenNest.Controls
             for (int i = 0; i <= Resolution; i++)
             {
                 GL.Vertex2(
-                    Math.Cos(startAngle + angle * i) * radius + center.X,
-                    Math.Sin(startAngle + angle * i) * radius + center.Y);
+                    System.Math.Cos(startAngle + angle * i) * radius + center.X,
+                    System.Math.Sin(startAngle + angle * i) * radius + center.Y);
             }
 
             GL.End();
@@ -346,14 +347,14 @@ namespace OpenNest.Controls
 
         private void DrawCircle(Vector center, double radius)
         {
-            const float angle = (float)Math.PI * 2.0f;
+            const float angle = (float)System.Math.PI * 2.0f;
             const float increment = angle / Resolution;
 
             for (float i = 0; i <= angle; i += increment)
             {
                 GL.Vertex2(
-                    Math.Cos(i) * radius + center.X,
-                    Math.Sin(i) * radius + center.Y);
+                    System.Math.Cos(i) * radius + center.X,
+                    System.Math.Sin(i) * radius + center.Y);
             }
             
         }

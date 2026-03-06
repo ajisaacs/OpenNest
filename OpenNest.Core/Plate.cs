@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Collections;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -113,7 +114,7 @@ namespace OpenNest
         /// <param name="keepSameQuadrant"></param>
         public void Rotate90(RotationType rotationDirection, bool keepSameQuadrant = true)
         {
-            const double oneAndHalfPI = Math.PI * 1.5;
+            const double oneAndHalfPI = System.Math.PI * 1.5;
 
             Size = new Size(Size.Height, Size.Width);
 
@@ -217,11 +218,11 @@ namespace OpenNest
                         return;
                 }
 
-                Rotate(Math.PI, centerpt);
+                Rotate(System.Math.PI, centerpt);
             }
             else
             {
-                Rotate(Math.PI);
+                Rotate(System.Math.PI);
                 Quadrant = (Quadrant + 2) % 4;
 
                 if (Quadrant == 0)
@@ -386,23 +387,23 @@ namespace OpenNest
             switch (Quadrant)
             {
                 case 1:
-                    width = Math.Abs(bounds.Right) + EdgeSpacing.Right;
-                    height = Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    width = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
+                    height = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
                     break;
 
                 case 2:
-                    width = Math.Abs(bounds.Left) + EdgeSpacing.Left;
-                    height = Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    width = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
+                    height = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
                     break;
 
                 case 3:
-                    width = Math.Abs(bounds.Left) + EdgeSpacing.Left;
-                    height = Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    width = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
+                    height = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
                     break;
 
                 case 4:
-                    width = Math.Abs(bounds.Right) + EdgeSpacing.Right;
-                    height = Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    width = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
+                    height = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
                     break;
 
                 default:

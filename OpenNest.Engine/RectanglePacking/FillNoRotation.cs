@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest.RectanglePacking
 {
@@ -13,8 +14,8 @@ namespace OpenNest.RectanglePacking
 
         public override void Fill(Item item)
         {
-            var ycount = (int)Math.Floor((Bin.Height + Tolerance.Epsilon) / item.Height);
-            var xcount = (int)Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
+            var ycount = (int)System.Math.Floor((Bin.Height + Tolerance.Epsilon) / item.Height);
+            var xcount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
             var count = ycount * xcount;
 
             for (int i = 0; i < xcount; i++)
@@ -35,8 +36,8 @@ namespace OpenNest.RectanglePacking
 
         public override void Fill(Item item, int maxCount)
         {
-            var ycount = (int)Math.Floor((Bin.Height + Tolerance.Epsilon) / item.Height);
-            var xcount = (int)Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
+            var ycount = (int)System.Math.Floor((Bin.Height + Tolerance.Epsilon) / item.Height);
+            var xcount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
             var count = ycount * xcount;
 
             if (count <= maxCount)
@@ -50,13 +51,13 @@ namespace OpenNest.RectanglePacking
 
             if (NestDirection == NestDirection.Vertical)
             {
-                columns = (int)Math.Ceiling((double)maxCount / ycount);
-                rows = (int)Math.Ceiling((double)maxCount / columns);
+                columns = (int)System.Math.Ceiling((double)maxCount / ycount);
+                rows = (int)System.Math.Ceiling((double)maxCount / columns);
             }
             else
             {
-                rows = (int)Math.Ceiling((double)maxCount / xcount);
-                columns = (int)Math.Ceiling((double)maxCount / rows);
+                rows = (int)System.Math.Ceiling((double)maxCount / xcount);
+                columns = (int)System.Math.Ceiling((double)maxCount / rows);
             }
 
             if (item.Width > item.Height)

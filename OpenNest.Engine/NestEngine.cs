@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using OpenNest.Math;
 using OpenNest.RectanglePacking;
 
 namespace OpenNest
@@ -143,7 +144,7 @@ namespace OpenNest
                 var item = items[i];
                 var binItem = ConvertToRectangleItem(item, i);
 
-                int maxQty = (int)Math.Floor(Plate.Area() / binItem.Area());
+                int maxQty = (int)System.Math.Floor(Plate.Area() / binItem.Area());
 
                 int qty = item.Quantity < maxQty
                     ? item.Quantity

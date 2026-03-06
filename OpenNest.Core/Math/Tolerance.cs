@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace OpenNest
+namespace OpenNest.Math
 {
     public static class Tolerance
     {
@@ -8,7 +8,7 @@ namespace OpenNest
 
         public static bool IsEqualTo(this double a, double b, double tolerance = Epsilon)
         {
-            return Math.Abs(b - a) <= tolerance;
+            return System.Math.Abs(b - a) <= tolerance;
         }
     }
 }

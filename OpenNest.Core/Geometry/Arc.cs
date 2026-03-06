@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -139,8 +140,8 @@ namespace OpenNest.Geometry
         public Vector StartPoint()
         {
             return new Vector(
-                Center.X + Radius * Math.Cos(StartAngle),
-                Center.Y + Radius * Math.Sin(StartAngle));
+                Center.X + Radius * System.Math.Cos(StartAngle),
+                Center.Y + Radius * System.Math.Sin(StartAngle));
         }
 
         /// <summary>
@@ -150,8 +151,8 @@ namespace OpenNest.Geometry
         public Vector EndPoint()
         {
             return new Vector(
-                Center.X + Radius * Math.Cos(EndAngle),
-                Center.Y + Radius * Math.Sin(EndAngle));
+                Center.X + Radius * System.Math.Cos(EndAngle),
+                Center.Y + Radius * System.Math.Sin(EndAngle));
         }
 
         /// <summary>
@@ -201,8 +202,8 @@ namespace OpenNest.Geometry
                 var angle = stepAngle * i + StartAngle;
 
                 points.Add(new Vector(
-                    Math.Cos(angle) * Radius + Center.X,
-                    Math.Sin(angle) * Radius + Center.Y));
+                    System.Math.Cos(angle) * Radius + Center.X,
+                    System.Math.Sin(angle) * Radius + Center.Y));
             }
 
             return points;
@@ -213,7 +214,7 @@ namespace OpenNest.Geometry
         /// </summary>
         public override double Length
         {
-            get { return Diameter * Math.PI * SweepAngle() / Angle.TwoPI; }
+            get { return Diameter * System.Math.PI * SweepAngle() / Angle.TwoPI; }
         }
 
         /// <summary>
@@ -356,10 +357,10 @@ namespace OpenNest.Geometry
             if (Angle.IsBetweenRad(Angle.HalfPI, angle1, angle2))
                 maxY = Center.Y + Radius;
 
-            if (Angle.IsBetweenRad(Math.PI, angle1, angle2))
+            if (Angle.IsBetweenRad(System.Math.PI, angle1, angle2))
                 minX = Center.X - Radius;
 
-            const double oneHalfPI = Math.PI * 1.5;
+            const double oneHalfPI = System.Math.PI * 1.5;
 
             if (Angle.IsBetweenRad(oneHalfPI, angle1, angle2))
                 minY = Center.Y - Radius;
@@ -405,8 +406,8 @@ namespace OpenNest.Geometry
             if (Angle.IsBetweenRad(angle, StartAngle, EndAngle, IsReversed))
             {
                 return new Vector(
-                    Math.Cos(angle) * Radius + Center.X,
-                    Math.Sin(angle) * Radius + Center.Y);
+                    System.Math.Cos(angle) * Radius + Center.X,
+                    System.Math.Sin(angle) * Radius + Center.Y);
             }
             else
             {

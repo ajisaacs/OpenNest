@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest.CirclePacking
 {
@@ -15,7 +16,7 @@ namespace OpenNest.CirclePacking
                 Bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
                 Bin.Top - item.BoundingBox.Top + Tolerance.Epsilon);
 
-            var rows = Math.Floor((Bin.Height + Tolerance.Epsilon) / (item.Diameter));
+            var rows = System.Math.Floor((Bin.Height + Tolerance.Epsilon) / (item.Diameter));
 
             var diameter = item.Diameter;
             var remaining = Bin.Height - diameter * rows;

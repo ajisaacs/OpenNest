@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Collections;
+using OpenNest.Math;
 using Action = OpenNest.Actions.Action;
 using Timer = System.Timers.Timer;
 
@@ -164,7 +165,7 @@ namespace OpenNest.Controls
         {
             base.OnMouseWheel(e);
 
-            var multiplier = Math.Abs(e.Delta / 120);
+            var multiplier = System.Math.Abs(e.Delta / 120);
 
             if (SelectedParts.Count > 0 && ((ModifierKeys & Keys.Shift) == Keys.Shift))
             {
@@ -181,9 +182,9 @@ namespace OpenNest.Controls
                 if (AllowZoom)
                 {
                     if (e.Delta > 0)
-                        ZoomToControlPoint(e.Location, (float)Math.Pow(ZoomInFactor, multiplier));
+                        ZoomToControlPoint(e.Location, (float)System.Math.Pow(ZoomInFactor, multiplier));
                     else
-                        ZoomToControlPoint(e.Location, (float)Math.Pow(ZoomOutFactor, multiplier));
+                        ZoomToControlPoint(e.Location, (float)System.Math.Pow(ZoomOutFactor, multiplier));
                 }
             }
 

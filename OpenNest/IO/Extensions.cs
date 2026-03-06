@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {

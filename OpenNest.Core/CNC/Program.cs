@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.CNC
 {
@@ -398,10 +399,10 @@ namespace OpenNest.CNC
                             if (Angle.IsBetweenRad(Angle.HalfPI, startAngle, endAngle))
                                 maxY1 = centerpt.Y + radius;
 
-                            if (Angle.IsBetweenRad(Math.PI, startAngle, endAngle))
+                            if (Angle.IsBetweenRad(System.Math.PI, startAngle, endAngle))
                                 minX1 = centerpt.X - radius;
 
-                            const double oneHalfPI = Math.PI * 1.5;
+                            const double oneHalfPI = System.Math.PI * 1.5;
 
                             if (Angle.IsBetweenRad(oneHalfPI, startAngle, endAngle))
                                 minY1 = centerpt.Y - radius;

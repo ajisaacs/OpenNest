@@ -63,7 +63,7 @@ namespace OpenNest.Controls
             var bounds = dwg.Program.BoundingBox();
             var text1 = string.Format("{0} of {1} nested", dwg.Quantity.Nested, dwg.Quantity.Required);
             var text2 = bounds.Size.ToString(4);
-            var text3 = string.Format("{0} sq/{1}", Math.Round(dwg.Area, 4), UnitsHelper.GetShortString(Units));
+            var text3 = string.Format("{0} sq/{1}", System.Math.Round(dwg.Area, 4), UnitsHelper.GetShortString(Units));
 
             pt.Y += 22;
             e.Graphics.DrawString(text1, Font, Brushes.Gray, pt);
@@ -100,7 +100,7 @@ namespace OpenNest.Controls
             var x = pt2.X - pt1.X;
             var y = pt2.Y - pt1.Y;
 
-            return Math.Sqrt(x * x + y * y);
+            return System.Math.Sqrt(x * x + y * y);
         }
     }
 }

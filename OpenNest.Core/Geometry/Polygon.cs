@@ -73,7 +73,7 @@ namespace OpenNest.Geometry
             if (Vertices.Count < 3)
                 return 0.0;
 
-            return Math.Abs(CalculateArea());
+            return System.Math.Abs(CalculateArea());
         }
 
         /// <summary>

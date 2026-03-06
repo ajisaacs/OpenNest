@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -219,7 +220,7 @@ namespace OpenNest.Geometry
         {
             var m1 = Slope();
             var m2 = line.Slope();
-            return Math.Atan(Math.Abs((m2 - m1) / (1 + m2 * m1)));
+            return System.Math.Atan(System.Math.Abs((m2 - m1) / (1 + m2 * m1)));
         }
 
         /// <summary>
@@ -252,7 +253,7 @@ namespace OpenNest.Geometry
             {
                 var x = EndPoint.X - StartPoint.X;
                 var y = EndPoint.Y - StartPoint.Y;
-                return Math.Sqrt(x * x + y * y);
+                return System.Math.Sqrt(x * x + y * y);
             }
         }
 
@@ -391,10 +392,10 @@ namespace OpenNest.Geometry
 
         public override Entity OffsetEntity(double distance, OffsetSide side)
         {
-            var angle = OpenNest.Angle.NormalizeRad(Angle() + OpenNest.Angle.HalfPI);
+            var angle = OpenNest.Math.Angle.NormalizeRad(Angle() + OpenNest.Math.Angle.HalfPI);
 
-            var x = Math.Cos(angle) * distance;
-            var y = Math.Sin(angle) * distance;
+            var x = System.Math.Cos(angle) * distance;
+            var y = System.Math.Sin(angle) * distance;
 
             var pt = new Vector(x, y);
 

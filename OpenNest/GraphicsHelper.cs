@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using OpenNest.CNC;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -97,12 +98,12 @@ namespace OpenNest
             }
 
             // start angle in degrees
-            var startAngle = Angle.ToDegrees(Math.Atan2(
+            var startAngle = Angle.ToDegrees(System.Math.Atan2(
                 curpos.Y - center.Y,
                 curpos.X - center.X));
 
             // end angle in degrees
-            var endAngle = Angle.ToDegrees(Math.Atan2(
+            var endAngle = Angle.ToDegrees(System.Math.Atan2(
                 endpt.Y - center.Y,
                 endpt.X - center.X));
 
@@ -117,7 +118,7 @@ namespace OpenNest
             var dx = endpt.X - center.X;
             var dy = endpt.Y - center.Y;
 
-            var radius = Math.Sqrt(dx * dx + dy * dy);
+            var radius = System.Math.Sqrt(dx * dx + dy * dy);
 
             var pt = new PointF((float)(center.X - radius), (float)(center.Y - radius));
             var size = (float)(radius * 2.0);

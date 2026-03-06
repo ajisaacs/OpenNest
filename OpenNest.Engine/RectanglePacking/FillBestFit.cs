@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest.RectanglePacking
 {
@@ -45,8 +46,8 @@ namespace OpenNest.RectanglePacking
             if (!BestCombination.FindFrom2(item.Width, item.Height, bin.Width, out normalColumns, out rotateColumns))
                 return bin;
 
-            var normalRows = (int)Math.Floor((bin.Height + Tolerance.Epsilon) / item.Height);
-            var rotateRows = (int)Math.Floor((bin.Height + Tolerance.Epsilon) / item.Width);
+            var normalRows = (int)System.Math.Floor((bin.Height + Tolerance.Epsilon) / item.Height);
+            var rotateRows = (int)System.Math.Floor((bin.Height + Tolerance.Epsilon) / item.Width);
 
             item.Location = bin.Location;
 
@@ -70,8 +71,8 @@ namespace OpenNest.RectanglePacking
             if (!BestCombination.FindFrom2(item.Height, item.Width, Bin.Height, out normalRows, out rotateRows))
                 return bin;
 
-            var normalColumns = (int)Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
-            var rotateColumns = (int)Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Height);
+            var normalColumns = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
+            var rotateColumns = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Height);
 
             item.Location = bin.Location;
 

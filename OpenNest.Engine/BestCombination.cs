@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -18,18 +19,18 @@ namespace OpenNest
                 }
 
                 count1 = 0;
-                count2 = (int)Math.Floor(overallLength / length2);
+                count2 = (int)System.Math.Floor(overallLength / length2);
                 return true;
             }
 
             if (length2 > overallLength)
             {
-                count1 = (int)Math.Floor(overallLength / length1);
+                count1 = (int)System.Math.Floor(overallLength / length1);
                 count2 = 0;
                 return true;
             }
 
-            var maxCountLength1 = (int)Math.Floor(overallLength / length1);
+            var maxCountLength1 = (int)System.Math.Floor(overallLength / length1);
 
             count1 = maxCountLength1;
             count2 = 0;
@@ -45,7 +46,7 @@ namespace OpenNest
 
                 if (remnant1 >= length2)
                 {
-                    var countLength2 = (int)Math.Floor(remnant1 / length2);
+                    var countLength2 = (int)System.Math.Floor(remnant1 / length2);
                     var remnant2 = remnant1 - length2 * countLength2;
 
                     if (!(remnant2 < remnant))

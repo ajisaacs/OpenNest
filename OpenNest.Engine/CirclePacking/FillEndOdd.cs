@@ -1,4 +1,5 @@
 ﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest.CirclePacking
 {
@@ -33,7 +34,7 @@ namespace OpenNest.CirclePacking
                 bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
                 bin.Top - item.BoundingBox.Top + Tolerance.Epsilon);
 
-            var count = Math.Floor((bin.Width + Tolerance.Epsilon) / item.Diameter);
+            var count = System.Math.Floor((bin.Width + Tolerance.Epsilon) / item.Diameter);
 
             if (count == 0)
                 return bin;
@@ -69,7 +70,7 @@ namespace OpenNest.CirclePacking
                 Bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
                 Bin.Top - item.BoundingBox.Top + Tolerance.Epsilon);
 
-            var count = Math.Floor((bin.Height + Tolerance.Epsilon) / item.Diameter);
+            var count = System.Math.Floor((bin.Height + Tolerance.Epsilon) / item.Diameter);
 
             if (count == 0)
                 return bin;
