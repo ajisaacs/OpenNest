@@ -37,6 +37,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BestCombination.cs" />
+    <Compile Include="BestFit\PairCandidate.cs" />
+    <Compile Include="BestFit\BestFitResult.cs" />
+    <Compile Include="BestFit\IBestFitStrategy.cs" />
     <Compile Include="CirclePacking\Bin.cs" />
     <Compile Include="CirclePacking\FillEndEven.cs" />
     <Compile Include="CirclePacking\FillEndOdd.cs" />
