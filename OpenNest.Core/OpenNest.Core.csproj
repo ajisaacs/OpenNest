@@ -64,6 +64,7 @@
     <Compile Include="Geometry\Box.cs" />
     <Compile Include="Geometry\BoxSplitter.cs" />
     <Compile Include="Geometry\Circle.cs" />
+    <Compile Include="Geometry\ConvexHull.cs" />
     <Compile Include="Geometry\DefinedShape.cs" />
     <Compile Include="Geometry\Entity.cs" />
     <Compile Include="Geometry\EntityType.cs" />
