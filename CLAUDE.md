@@ -8,13 +8,13 @@ OpenNest is a Windows desktop application for CNC nesting — arranging 2D parts
 
 ## Build
 
-This is a .NET Framework 4.8 solution using legacy-style `.csproj` files (not SDK-style). Build with:
+This is a .NET 8 solution using SDK-style `.csproj` files targeting `net8.0-windows`. Build with:
 
 ```bash
-msbuild OpenNest.sln /p:Configuration=Release
+dotnet build OpenNest.sln
 ```
 
-NuGet dependency: `netDxf` (referenced via `packages/` folder, not PackageReference). Restore with `nuget restore OpenNest.sln` if needed.
+NuGet dependency: `ACadSharp` 3.1.32 (DXF/DWG import/export), `System.Drawing.Common` 8.0.10.
 
 No test projects exist in this solution.
 
@@ -47,7 +47,7 @@ The UI application with MDI interface.
 - **Forms/**: `MainForm` (MDI parent), `EditNestForm` (MDI child per nest), plus dialogs for plate editing, auto-nesting, DXF conversion, cut parameters, etc.
 - **Controls/**: `PlateView` (2D plate renderer with zoom/pan), `DrawingListBox`, `DrawControl`, `QuadrantSelect`.
 - **Actions/**: User interaction modes — `ActionSelect`, `ActionAddPart`, `ActionClone`, `ActionFillArea`, `ActionZoomWindow`, `ActionSetSequence`.
-- **IO/**: `DxfImporter`/`DxfExporter` (via netDxf library), `NestReader`/`NestWriter` (custom ZIP-based format with XML metadata + G-code programs), `ProgramReader`.
+- **IO/**: `DxfImporter`/`DxfExporter` (via ACadSharp library), `NestReader`/`NestWriter` (custom ZIP-based format with XML metadata + G-code programs), `ProgramReader`.
 - **Post-processing**: `IPostProcessor` plugin interface loaded from DLLs in a `Posts/` directory at runtime.
 
 ## File Format
