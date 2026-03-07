@@ -1,41 +1,39 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
+using ACadSharp.Entities;
+using CSMath;
 using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest.IO
 {
     internal static class Extensions
     {
-        public static Vector ToOpenNest(this netDxf.Vector2 v)
+        public static Vector ToOpenNest(this XY v)
         {
             return new Vector(v.X, v.Y);
         }
 
-        public static Vector ToOpenNest(this netDxf.Vector3 v)
+        public static Vector ToOpenNest(this XYZ v)
         {
             return new Vector(v.X, v.Y);
         }
 
-        public static Vector ToOpenNest(this netDxf.Entities.Polyline2DVertex v)
+        public static Geometry.Arc ToOpenNest(this ACadSharp.Entities.Arc arc)
         {
-            return new Vector(v.Position.X, v.Position.Y);
-        }
-
-        public static Arc ToOpenNest(this netDxf.Entities.Arc arc)
-        {
-            return new Arc(
+            return new Geometry.Arc(
                 arc.Center.X, arc.Center.Y, arc.Radius,
-                Angle.ToRadians(arc.StartAngle),
-                Angle.ToRadians(arc.EndAngle))
+                arc.StartAngle,
+                arc.EndAngle)
                 {
                     Layer = arc.Layer.ToOpenNest()
                 };
         }
 
-        public static Circle ToOpenNest(this netDxf.Entities.Circle circle)
+        public static Geometry.Circle ToOpenNest(this ACadSharp.Entities.Circle circle)
         {
-            return new Circle(
+            return new Geometry.Circle(
                 circle.Center.X, circle.Center.Y,
                 circle.Radius)
                 {
@@ -43,9 +41,9 @@ namespace OpenNest.IO
                 };
         }
 
-        public static Line ToOpenNest(this netDxf.Entities.Line line)
+        public static Geometry.Line ToOpenNest(this ACadSharp.Entities.Line line)
         {
-            return new Line(
+            return new Geometry.Line(
                 line.StartPoint.X, line.StartPoint.Y,
                 line.EndPoint.X, line.EndPoint.Y)
                 {
@@ -53,21 +51,21 @@ namespace OpenNest.IO
                 };
         }
 
-        public static List<Line> ToOpenNest(this netDxf.Entities.Spline spline, int precision = 200)
+        public static List<Geometry.Line> ToOpenNest(this Spline spline)
         {
-            var lines = new List<Line>();
-            var pts = spline.PolygonalVertexes(precision);
+            var lines = new List<Geometry.Line>();
+            var pts = spline.ControlPoints;
 
             if (pts.Count == 0)
                 return lines;
 
             var lastPoint = pts[0].ToOpenNest();
 
-            for (int i = 1; i < pts.Count; i++)
+            for (var i = 1; i < pts.Count; i++)
             {
                 var nextPoint = pts[i].ToOpenNest();
 
-                lines.Add(new Line(
+                lines.Add(new Geometry.Line(
                     lastPoint,
                     nextPoint) { Layer = spline.Layer.ToOpenNest() });
 
@@ -75,91 +73,142 @@ namespace OpenNest.IO
             }
 
             if (spline.IsClosed)
-                lines.Add(new Line(lastPoint, pts[0].ToOpenNest()) { Layer = spline.Layer.ToOpenNest() });
+                lines.Add(new Geometry.Line(lastPoint, pts[0].ToOpenNest()) { Layer = spline.Layer.ToOpenNest() });
 
             return lines;
         }
 
-        public static List<Line> ToOpenNest(this netDxf.Entities.Polyline3D polyline)
+        public static List<Geometry.Line> ToOpenNest(this Polyline polyline)
         {
-            var lines = new List<Line>();
+            var lines = new List<Geometry.Line>();
 
-            if (polyline.Vertexes.Count == 0)
+            if (polyline.Vertices.Count == 0)
                 return lines;
 
-            var lastPoint = polyline.Vertexes[0].ToOpenNest();
+            var lastPoint = polyline.Vertices[0].Location.ToOpenNest();
 
-            for (int i = 1; i < polyline.Vertexes.Count; i++)
+            for (var i = 1; i < polyline.Vertices.Count; i++)
             {
-                var nextPoint = polyline.Vertexes[i].ToOpenNest();
+                var nextPoint = polyline.Vertices[i].Location.ToOpenNest();
 
-                lines.Add(new Line(
+                lines.Add(new Geometry.Line(
                     lastPoint,
                     nextPoint) { Layer = polyline.Layer.ToOpenNest() });
 
                 lastPoint = nextPoint;
             }
 
-            if (polyline.IsClosed)
-                lines.Add(new Line(lastPoint, polyline.Vertexes[0].ToOpenNest()) { Layer = polyline.Layer.ToOpenNest() });
+            var isClosed = (polyline.Flags & PolylineFlags.ClosedPolylineOrClosedPolygonMeshInM) != 0;
+
+            if (isClosed)
+                lines.Add(new Geometry.Line(lastPoint, polyline.Vertices[0].Location.ToOpenNest()) { Layer = polyline.Layer.ToOpenNest() });
 
             return lines;
         }
 
-        public static List<Line> ToOpenNest(this netDxf.Entities.Polyline2D polyline)
+        public static List<Geometry.Line> ToOpenNest(this LwPolyline polyline)
         {
-            var lines = new List<Line>();
+            var lines = new List<Geometry.Line>();
 
-            if (polyline.Vertexes.Count == 0)
+            if (polyline.Vertices.Count == 0)
                 return lines;
 
-            var lastPoint = polyline.Vertexes[0].ToOpenNest();
+            var lastPoint = polyline.Vertices[0].ToOpenNest();
 
-            for (int i = 1; i < polyline.Vertexes.Count; i++)
+            for (var i = 1; i < polyline.Vertices.Count; i++)
             {
-                var nextPoint = polyline.Vertexes[i].ToOpenNest();
+                var nextPoint = polyline.Vertices[i].ToOpenNest();
 
-                lines.Add(new Line(
+                lines.Add(new Geometry.Line(
                     lastPoint,
                     nextPoint) { Layer = polyline.Layer.ToOpenNest() });
 
                 lastPoint = nextPoint;
             }
 
-            if (polyline.IsClosed)
-                lines.Add(new Line(lastPoint, polyline.Vertexes[0].ToOpenNest()) { Layer = polyline.Layer.ToOpenNest() });
+            var isClosed = (polyline.Flags & LwPolylineFlags.Closed) != 0;
+
+            if (isClosed)
+                lines.Add(new Geometry.Line(lastPoint, polyline.Vertices[0].ToOpenNest()) { Layer = polyline.Layer.ToOpenNest() });
 
             return lines;
         }
 
-        public static List<Line> ToOpenNest(this netDxf.Entities.Ellipse ellipse, int precision = 200)
+        public static List<Geometry.Line> ToOpenNest(this ACadSharp.Entities.Ellipse ellipse, int precision = 200)
         {
-            var lines = ellipse.ToPolyline2D(precision).ToOpenNest();
+            var lines = new List<Geometry.Line>();
 
-            if (lines.Count < 2)
-                return lines;
+            var center = new Vector(ellipse.Center.X, ellipse.Center.Y);
+            var majorAxis = new Vector(ellipse.EndPoint.X, ellipse.EndPoint.Y);
+            var majorLength = System.Math.Sqrt(majorAxis.X * majorAxis.X + majorAxis.Y * majorAxis.Y);
+            var minorLength = majorLength * ellipse.RadiusRatio;
+            var rotation = System.Math.Atan2(majorAxis.Y, majorAxis.X);
 
-            var first = lines.First();
-            var last = lines.Last();
+            var startParam = ellipse.StartParameter;
+            var endParam = ellipse.EndParameter;
 
-            // workaround for ellipse.ToPolyline not connecting the last and first point.
-            lines.Add(new Line(last.EndPoint, first.StartPoint) { Layer = ellipse.Layer.ToOpenNest() });
+            if (endParam <= startParam)
+                endParam += System.Math.PI * 2.0;
 
-            return lines;
-        }
+            var step = (endParam - startParam) / precision;
 
-        public static Layer ToOpenNest(this netDxf.Tables.Layer layer)
-        {
-            return new Layer(layer.Name)
+            var points = new List<Vector>();
+
+            for (var i = 0; i <= precision; i++)
             {
-                Color = layer.Color.ToColor(),
-                IsVisible = layer.IsVisible
+                var t = startParam + step * i;
+                var x = majorLength * System.Math.Cos(t);
+                var y = minorLength * System.Math.Sin(t);
+
+                // Rotate by the major axis angle and translate to center
+                var cos = System.Math.Cos(rotation);
+                var sin = System.Math.Sin(rotation);
+                var px = center.X + x * cos - y * sin;
+                var py = center.Y + x * sin + y * cos;
+
+                points.Add(new Vector(px, py));
+            }
+
+            var layer = ellipse.Layer.ToOpenNest();
+
+            for (var i = 0; i < points.Count - 1; i++)
+            {
+                lines.Add(new Geometry.Line(points[i], points[i + 1]) { Layer = layer });
+            }
+
+            // Close the ellipse if it's a full ellipse
+            if (lines.Count >= 2)
+            {
+                var first = lines.First();
+                var last = lines.Last();
+                lines.Add(new Geometry.Line(last.EndPoint, first.StartPoint) { Layer = layer });
+            }
+
+            return lines;
+        }
+
+        public static Geometry.Layer ToOpenNest(this ACadSharp.Tables.Layer layer)
+        {
+            return new Geometry.Layer(layer.Name)
+            {
+                Color = Color.FromArgb(layer.Color.R, layer.Color.G, layer.Color.B),
+                IsVisible = layer.IsOn
             };
         }
 
-        public static netDxf.Vector2 ToNetDxf(this Vector v)
+        public static Vector ToOpenNest(this LwPolyline.Vertex v)
         {
-            return new netDxf.Vector2(v.X, v.Y);
+            return new Vector(v.Location.X, v.Location.Y);
+        }
+
+        public static XY ToAcad(this Vector v)
+        {
+            return new XY(v.X, v.Y);
+        }
+
+        public static XYZ ToAcadXYZ(this Vector v)
+        {
+            return new XYZ(v.X, v.Y, 0);
         }
     }
 }
