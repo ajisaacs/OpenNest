@@ -39,6 +39,7 @@ namespace OpenNest.Forms
             LoadPosts();
             EnableCheck();
             UpdateStatus();
+            UpdateGpuStatus();
         }
 
         private string GetNestName(DateTime date, int id)
@@ -189,6 +190,20 @@ namespace OpenNest.Forms
         {
             UpdateLocationStatus();
             UpdatePlateStatus();
+        }
+
+        private void UpdateGpuStatus()
+        {
+            if (GpuEvaluatorFactory.GpuAvailable)
+            {
+                gpuStatusLabel.Text = $"GPU : {GpuEvaluatorFactory.DeviceName}";
+                gpuStatusLabel.ForeColor = Color.DarkGreen;
+            }
+            else
+            {
+                gpuStatusLabel.Text = "GPU : None (CPU)";
+                gpuStatusLabel.ForeColor = Color.Gray;
+            }
         }
 
         private void UpdateLocationMode()

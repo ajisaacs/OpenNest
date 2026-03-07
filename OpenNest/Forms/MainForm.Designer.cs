@@ -59,6 +59,7 @@
             this.mnuViewZoomIn = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuViewZoomOut = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuTools = new System.Windows.Forms.ToolStripMenuItem();
+            this.mnuToolsBestFitViewer = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuToolsMeasureArea = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuToolsAlign = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuToolsAlignLeft = new System.Windows.Forms.ToolStripMenuItem();
@@ -129,6 +130,7 @@
             this.plateIndexStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.plateSizeStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.plateQtyStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            this.gpuStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.btnNew = new System.Windows.Forms.ToolStripButton();
             this.btnOpen = new System.Windows.Forms.ToolStripButton();
@@ -412,6 +414,7 @@
             // 
             this.mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.mnuToolsMeasureArea,
+            this.mnuToolsBestFitViewer,
             this.mnuToolsAlign,
             this.toolStripMenuItem14,
             this.mnuSetOffsetIncrement,
@@ -428,7 +431,14 @@
             this.mnuToolsMeasureArea.Size = new System.Drawing.Size(214, 22);
             this.mnuToolsMeasureArea.Text = "Measure Area";
             this.mnuToolsMeasureArea.Click += new System.EventHandler(this.MeasureArea_Click);
-            // 
+            //
+            // mnuToolsBestFitViewer
+            //
+            this.mnuToolsBestFitViewer.Name = "mnuToolsBestFitViewer";
+            this.mnuToolsBestFitViewer.Size = new System.Drawing.Size(214, 22);
+            this.mnuToolsBestFitViewer.Text = "Best-Fit Viewer";
+            this.mnuToolsBestFitViewer.Click += new System.EventHandler(this.BestFitViewer_Click);
+            //
             // mnuToolsAlign
             // 
             this.mnuToolsAlign.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -909,7 +919,8 @@
             this.spacerLabel,
             this.plateIndexStatusLabel,
             this.plateSizeStatusLabel,
-            this.plateQtyStatusLabel});
+            this.plateQtyStatusLabel,
+            this.gpuStatusLabel});
             this.statusStrip1.Location = new System.Drawing.Point(0, 543);
             this.statusStrip1.Name = "statusStrip1";
             this.statusStrip1.Size = new System.Drawing.Size(1098, 24);
@@ -961,7 +972,14 @@
             this.plateQtyStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
             this.plateQtyStatusLabel.Size = new System.Drawing.Size(55, 19);
             this.plateQtyStatusLabel.Text = "Qty : 0";
-            // 
+            //
+            // gpuStatusLabel
+            //
+            this.gpuStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            this.gpuStatusLabel.Name = "gpuStatusLabel";
+            this.gpuStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            this.gpuStatusLabel.Size = new System.Drawing.Size(55, 19);
+            //
             // toolStrip1
             // 
             this.toolStrip1.AutoSize = false;
@@ -1287,7 +1305,9 @@
         private System.Windows.Forms.ToolStripMenuItem manualSequenceToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem autoSequenceAllPlatesToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsMeasureArea;
+        private System.Windows.Forms.ToolStripMenuItem mnuToolsBestFitViewer;
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;
     }
 }
