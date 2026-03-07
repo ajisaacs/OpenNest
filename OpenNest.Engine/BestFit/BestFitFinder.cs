@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using OpenNest.Converters;
 using OpenNest.Engine.BestFit.Tiling;
 using OpenNest.Geometry;
@@ -9,12 +11,12 @@ namespace OpenNest.Engine.BestFit
 {
     public class BestFitFinder
     {
-        private readonly PairEvaluator _evaluator;
+        private readonly IPairEvaluator _evaluator;
         private readonly BestFitFilter _filter;
 
-        public BestFitFinder(double maxPlateWidth, double maxPlateHeight)
+        public BestFitFinder(double maxPlateWidth, double maxPlateHeight, IPairEvaluator evaluator = null)
         {
-            _evaluator = new PairEvaluator();
+            _evaluator = evaluator ?? new PairEvaluator();
             _filter = new BestFitFilter
             {
                 MaxPlateWidth = maxPlateWidth,
@@ -30,12 +32,16 @@ namespace OpenNest.Engine.BestFit
         {
             var strategies = BuildStrategies(drawing);
 
-            var allCandidates = new List<PairCandidate>();
+            var candidateBags = new ConcurrentBag<List<PairCandidate>>();
 
-            foreach (var strategy in strategies)
-                allCandidates.AddRange(strategy.GenerateCandidates(drawing, spacing, stepSize));
+            Parallel.ForEach(strategies, strategy =>
+            {
+                candidateBags.Add(strategy.GenerateCandidates(drawing, spacing, stepSize));
+            });
 
-            var results = allCandidates.Select(c => _evaluator.Evaluate(c)).ToList();
+            var allCandidates = candidateBags.SelectMany(c => c).ToList();
+
+            var results = _evaluator.EvaluateAll(allCandidates);
 
             _filter.Apply(results);
 
