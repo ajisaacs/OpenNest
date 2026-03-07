@@ -62,5 +62,76 @@ namespace OpenNest
 
             return bboxDim - slideDistance;
         }
+
+        /// <summary>
+        /// Fills a single row of identical parts along one axis using geometry-aware spacing.
+        /// Returns a Pattern containing all placed parts.
+        /// </summary>
+        public Pattern FillRow(Drawing drawing, double rotationAngle, NestDirection direction)
+        {
+            var pattern = new Pattern();
+
+            // Create the template part with rotation applied.
+            var template = new Part(drawing);
+
+            if (!rotationAngle.IsEqualTo(0))
+                template.Rotate(rotationAngle);
+
+            // Position template at work area origin.
+            var bbox = template.Program.BoundingBox();
+            template.Offset(WorkArea.Location - bbox.Location);
+            template.UpdateBounds();
+
+            // Check if the part fits in the work area at all.
+            if (template.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
+                template.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
+                return pattern;
+
+            pattern.Parts.Add(template);
+
+            // Find the geometry-aware copy distance.
+            var copyDistance = FindCopyDistance(template, direction);
+
+            if (copyDistance <= 0)
+            {
+                pattern.UpdateBounds();
+                return pattern;
+            }
+
+            // Fill the row by copying at the fixed interval.
+            double limit = direction == NestDirection.Horizontal
+                ? WorkArea.Right
+                : WorkArea.Top;
+
+            double partDim = direction == NestDirection.Horizontal
+                ? template.BoundingBox.Width
+                : template.BoundingBox.Height;
+
+            int count = 1;
+
+            while (true)
+            {
+                double nextPos = (direction == NestDirection.Horizontal
+                    ? template.BoundingBox.Left
+                    : template.BoundingBox.Bottom) + copyDistance * count;
+
+                // Check if the next part would exceed the work area.
+                if (nextPos + partDim > limit + Tolerance.Epsilon)
+                    break;
+
+                var offset = direction == NestDirection.Horizontal
+                    ? new Vector(copyDistance * count, 0)
+                    : new Vector(0, copyDistance * count);
+
+                var clone = (Part)template.Clone();
+                clone.Offset(offset);
+                pattern.Parts.Add(clone);
+
+                count++;
+            }
+
+            pattern.UpdateBounds();
+            return pattern;
+        }
     }
 }
