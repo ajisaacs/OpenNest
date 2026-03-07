@@ -42,6 +42,7 @@
     <Compile Include="CirclePacking\FillEndOdd.cs" />
     <Compile Include="CirclePacking\FillEngine.cs" />
     <Compile Include="CirclePacking\Item.cs" />
+    <Compile Include="FillLinear.cs" />
     <Compile Include="NestDirection.cs" />
     <Compile Include="NestEngine.cs" />
     <Compile Include="NestItem.cs" />
