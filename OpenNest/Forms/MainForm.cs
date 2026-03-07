@@ -436,6 +436,13 @@ namespace OpenNest.Forms
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
         }
 
+        private void ToggleDrawOffset_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+            activeForm.ToggleDrawOffset();
+            mnuViewDrawOffset.Checked = activeForm.PlateView.DrawOffset;
+        }
+
         private void ZoomToArea_Click(object sender, EventArgs e)
         {
             if (activeForm == null) return;

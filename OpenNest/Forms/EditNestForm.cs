@@ -378,6 +378,12 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
+        public void ToggleDrawOffset()
+        {
+            PlateView.DrawOffset = !PlateView.DrawOffset;
+            PlateView.Invalidate();
+        }
+
         public void ToggleFillParts()
         {
             PlateView.FillParts = !PlateView.FillParts;

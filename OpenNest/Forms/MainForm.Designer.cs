@@ -49,6 +49,7 @@
             this.mnuView = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuViewDrawRapids = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuViewDrawBounds = new System.Windows.Forms.ToolStripMenuItem();
+            this.mnuViewDrawOffset = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem5 = new System.Windows.Forms.ToolStripSeparator();
             this.mnuViewZoomTo = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuViewZoomToArea = new System.Windows.Forms.ToolStripMenuItem();
@@ -312,6 +313,7 @@
             this.mnuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.mnuViewDrawRapids,
             this.mnuViewDrawBounds,
+            this.mnuViewDrawOffset,
             this.toolStripMenuItem5,
             this.mnuViewZoomTo,
             this.mnuViewZoomIn,
@@ -334,7 +336,15 @@
             this.mnuViewDrawBounds.Size = new System.Drawing.Size(222, 22);
             this.mnuViewDrawBounds.Text = "Draw Bounds";
             this.mnuViewDrawBounds.Click += new System.EventHandler(this.ToggleDrawBounds_Click);
-            // 
+            //
+            // mnuViewDrawOffset
+            //
+            this.mnuViewDrawOffset.CheckOnClick = true;
+            this.mnuViewDrawOffset.Name = "mnuViewDrawOffset";
+            this.mnuViewDrawOffset.Size = new System.Drawing.Size(222, 22);
+            this.mnuViewDrawOffset.Text = "Draw Offset";
+            this.mnuViewDrawOffset.Click += new System.EventHandler(this.ToggleDrawOffset_Click);
+            //
             // toolStripMenuItem5
             // 
             this.toolStripMenuItem5.Name = "toolStripMenuItem5";
@@ -1182,6 +1192,7 @@
         private System.Windows.Forms.ToolStripMenuItem mnuView;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawRapids;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawBounds;
+        private System.Windows.Forms.ToolStripMenuItem mnuViewDrawOffset;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem5;
         private System.Windows.Forms.ToolStripMenuItem mnuTools;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsOptions;
