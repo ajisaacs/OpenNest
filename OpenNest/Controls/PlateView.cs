@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Collections;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using Action = OpenNest.Actions.Action;
@@ -73,6 +74,7 @@ namespace OpenNest.Controls
             DrawOrigin = true;
             DrawRapid = false;
             DrawBounds = true;
+            DrawOffset = false;
             FillParts = true;
             SetAction(typeof(ActionSelect));
 
@@ -92,6 +94,8 @@ namespace OpenNest.Controls
         public bool DrawRapid { get; set; }
 
         public bool DrawBounds { get; set; }
+
+        public bool DrawOffset { get; set; }
 
         public bool FillParts { get; set; }
 
@@ -425,6 +429,9 @@ namespace OpenNest.Controls
                 part.Draw(g, (i + 1).ToString());
             }
 
+            if (DrawOffset && Plate.PartSpacing > 0)
+                DrawOffsetGeometry(g);
+
             if (DrawBounds)
             {
                 var bounds = SelectedParts.Select(p => p.BasePart).ToList().GetBoundingBox();
@@ -433,6 +440,34 @@ namespace OpenNest.Controls
 
             if (DrawRapid)
                 DrawRapids(g);
+        }
+
+        private void DrawOffsetGeometry(Graphics g)
+        {
+            using (var offsetPen = new Pen(Color.FromArgb(120, 255, 100, 100)))
+            {
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    var part = parts[i].BasePart;
+                    var entities = ConvertProgram.ToGeometry(part.Program);
+                    var shapes = Helper.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+
+                    foreach (var shape in shapes)
+                    {
+                        var offsetEntity = shape.OffsetEntity(Plate.PartSpacing, OffsetSide.Left) as Shape;
+
+                        if (offsetEntity == null)
+                            continue;
+
+                        offsetEntity.Offset(part.Location);
+
+                        var path = GraphicsHelper.GetGraphicsPath(offsetEntity);
+                        path.Transform(Matrix);
+                        g.DrawPath(offsetPen, path);
+                        path.Dispose();
+                    }
+                }
+            }
         }
 
         private void DrawRapids(Graphics g)
