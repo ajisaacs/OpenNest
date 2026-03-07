@@ -139,7 +139,7 @@ namespace OpenNest.IO
             var lines = new List<Geometry.Line>();
 
             var center = new Vector(ellipse.Center.X, ellipse.Center.Y);
-            var majorAxis = new Vector(ellipse.EndPoint.X, ellipse.EndPoint.Y);
+            var majorAxis = new Vector(ellipse.MajorAxisEndPoint.X, ellipse.MajorAxisEndPoint.Y);
             var majorLength = System.Math.Sqrt(majorAxis.X * majorAxis.X + majorAxis.Y * majorAxis.Y);
             var minorLength = majorLength * ellipse.RadiusRatio;
             var rotation = System.Math.Atan2(majorAxis.Y, majorAxis.X);
