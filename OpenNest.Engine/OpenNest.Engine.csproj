@@ -41,7 +41,10 @@
     <Compile Include="BestFit\BestFitResult.cs" />
     <Compile Include="BestFit\IBestFitStrategy.cs" />
     <Compile Include="BestFit\PairEvaluator.cs" />
+    <Compile Include="BestFit\BestFitFilter.cs" />
     <Compile Include="BestFit\RotationSlideStrategy.cs" />
+    <Compile Include="BestFit\Tiling\TileResult.cs" />
+    <Compile Include="BestFit\Tiling\TileEvaluator.cs" />
     <Compile Include="CirclePacking\Bin.cs" />
     <Compile Include="CirclePacking\FillEndEven.cs" />
     <Compile Include="CirclePacking\FillEndOdd.cs" />
