@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Engine.BestFit;
@@ -21,8 +22,12 @@ namespace OpenNest
 
         public NestDirection NestDirection { get; set; }
 
+        public Func<Drawing, double, IPairEvaluator> CreateEvaluator { get; set; }
+
         public bool Fill(NestItem item)
         {
+            var sw = Stopwatch.StartNew();
+
             var workArea = Plate.WorkArea();
             var bestRotation = FindBestRotation(item);
 
@@ -37,22 +42,27 @@ namespace OpenNest
                 engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Vertical)
             };
 
-            // Pick the linear configuration with the most parts.
+            // Pick the best valid linear configuration.
             List<Part> linearBest = null;
 
             foreach (var config in configs)
             {
-                if (linearBest == null || config.Count > linearBest.Count)
+                if (IsBetterValidFill(config, linearBest))
                     linearBest = config;
             }
+
+            var linearMs = sw.ElapsedMilliseconds;
 
             // Try pair-based approach.
             var pairResult = FillWithPairs(item);
 
-            // Pick whichever produced more parts.
+            var pairMs = sw.ElapsedMilliseconds - linearMs;
+
+            // Pick whichever is the better fill.
+            Debug.WriteLine($"[NestEngine.Fill] Linear: {linearBest?.Count ?? 0} parts ({linearMs}ms) | Pair: {pairResult.Count} parts ({pairMs}ms) | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
             var best = linearBest;
 
-            if (pairResult.Count > (best?.Count ?? 0))
+            if (IsBetterFill(pairResult, best))
                 best = pairResult;
 
             if (best == null || best.Count == 0)
@@ -75,6 +85,15 @@ namespace OpenNest
             var engine = new FillLinear(workArea, Plate.PartSpacing);
             var angles = FindHullEdgeAngles(groupParts);
             var best = FillPattern(engine, groupParts, angles);
+
+            // For single-part groups, also try pair-based filling.
+            if (groupParts.Count == 1)
+            {
+                var pairResult = FillWithPairs(new NestItem { Drawing = groupParts[0].BaseDrawing });
+
+                if (IsBetterFill(pairResult, best))
+                    best = pairResult;
+            }
 
             if (best == null || best.Count == 0)
                 return false;
@@ -101,9 +120,19 @@ namespace OpenNest
 
             foreach (var config in configs)
             {
-                if (best == null || config.Count > best.Count)
+                if (IsBetterValidFill(config, best))
                     best = config;
             }
+
+            Debug.WriteLine($"[Fill(NestItem,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
+
+            // Try pair-based approach.
+            var pairResult = FillWithPairs(item, workArea);
+
+            Debug.WriteLine($"[Fill(NestItem,Box)] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best) ? "Pair" : "Linear")}");
+
+            if (IsBetterFill(pairResult, best))
+                best = pairResult;
 
             if (best == null || best.Count == 0)
                 return false;
@@ -123,6 +152,18 @@ namespace OpenNest
             var engine = new FillLinear(workArea, Plate.PartSpacing);
             var angles = FindHullEdgeAngles(groupParts);
             var best = FillPattern(engine, groupParts, angles);
+
+            Debug.WriteLine($"[Fill(groupParts,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
+
+            if (groupParts.Count == 1)
+            {
+                var pairResult = FillWithPairs(new NestItem { Drawing = groupParts[0].BaseDrawing }, workArea);
+
+                Debug.WriteLine($"[Fill(groupParts,Box)] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best) ? "Pair" : "Linear")}");
+
+                if (IsBetterFill(pairResult, best))
+                    best = pairResult;
+            }
 
             if (best == null || best.Count == 0)
                 return false;
@@ -223,14 +264,84 @@ namespace OpenNest
 
         private List<Part> FillWithPairs(NestItem item)
         {
-            var finder = new BestFitFinder(Plate.Size.Width, Plate.Size.Height);
-            var tileResults = finder.FindAndTile(item.Drawing, Plate, Plate.PartSpacing);
+            return FillWithPairs(item, Plate.WorkArea());
+        }
 
-            if (tileResults.Count == 0)
-                return new List<Part>();
+        private List<Part> FillWithPairs(NestItem item, Box workArea)
+        {
+            IPairEvaluator evaluator = null;
 
-            var bestTile = tileResults[0];
-            return ConvertTileResultToParts(bestTile, item.Drawing);
+            if (CreateEvaluator != null)
+            {
+                try { evaluator = CreateEvaluator(item.Drawing, Plate.PartSpacing); }
+                catch { /* GPU not available, fall back to geometry */ }
+            }
+
+            var finder = new BestFitFinder(Plate.Size.Width, Plate.Size.Height, evaluator);
+            var bestFits = finder.FindBestFits(item.Drawing, Plate.PartSpacing, stepSize: 0.25);
+
+            var keptResults = bestFits.Where(r => r.Keep).Take(50).ToList();
+            Debug.WriteLine($"[FillWithPairs] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {keptResults.Count}");
+
+            var resultBag = new System.Collections.Concurrent.ConcurrentBag<(int count, List<Part> parts)>();
+
+            System.Threading.Tasks.Parallel.For(0, keptResults.Count, i =>
+            {
+                var result = keptResults[i];
+                var pairParts = BuildPairParts(result, item.Drawing);
+                var angles = FindHullEdgeAngles(pairParts);
+                var engine = new FillLinear(workArea, Plate.PartSpacing);
+                var filled = FillPattern(engine, pairParts, angles);
+
+                if (filled != null && filled.Count > 0)
+                    resultBag.Add((filled.Count, filled));
+            });
+
+            List<Part> best = null;
+
+            foreach (var (count, parts) in resultBag)
+            {
+                if (best == null || count > best.Count)
+                    best = parts;
+            }
+
+            (evaluator as IDisposable)?.Dispose();
+
+            Debug.WriteLine($"[FillWithPairs] Best pair result: {best?.Count ?? 0} parts");
+            return best ?? new List<Part>();
+        }
+
+        public static List<Part> BuildPairParts(BestFitResult bestFit, Drawing drawing)
+        {
+            var candidate = bestFit.Candidate;
+
+            var part1 = new Part(drawing);
+            var bbox1 = part1.Program.BoundingBox();
+            part1.Offset(-bbox1.Location.X, -bbox1.Location.Y);
+            part1.UpdateBounds();
+
+            var part2 = new Part(drawing);
+            if (!candidate.Part2Rotation.IsEqualTo(0))
+                part2.Rotate(candidate.Part2Rotation);
+            var bbox2 = part2.Program.BoundingBox();
+            part2.Offset(-bbox2.Location.X, -bbox2.Location.Y);
+            part2.Location = candidate.Part2Offset;
+            part2.UpdateBounds();
+
+            if (!bestFit.OptimalRotation.IsEqualTo(0))
+            {
+                var pairBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+                var center = pairBounds.Center;
+                part1.Rotate(-bestFit.OptimalRotation, center);
+                part2.Rotate(-bestFit.OptimalRotation, center);
+            }
+
+            var finalBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+            var offset = new Vector(-finalBounds.Left, -finalBounds.Bottom);
+            part1.Offset(offset);
+            part2.Offset(offset);
+
+            return new List<Part> { part1, part2 };
         }
 
         private List<Part> ConvertTileResultToParts(TileResult tileResult, Drawing drawing)
@@ -293,6 +404,64 @@ namespace OpenNest
             }
 
             return parts;
+        }
+
+        private bool HasOverlaps(List<Part> parts, double spacing)
+        {
+            if (parts == null || parts.Count <= 1)
+                return false;
+
+            for (var i = 0; i < parts.Count; i++)
+            {
+                for (var j = i + 1; j < parts.Count; j++)
+                {
+                    List<Vector> pts;
+
+                    if (parts[i].Intersects(parts[j], out pts))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsBetterFill(List<Part> candidate, List<Part> current)
+        {
+            if (candidate == null || candidate.Count == 0)
+                return false;
+
+            if (current == null || current.Count == 0)
+                return true;
+
+            if (candidate.Count != current.Count)
+                return candidate.Count > current.Count;
+
+            // Same count: prefer smaller bounding box (more compact).
+            var candidateBox = ((IEnumerable<IBoundable>)candidate).GetBoundingBox();
+            var currentBox = ((IEnumerable<IBoundable>)current).GetBoundingBox();
+
+            return candidateBox.Area() < currentBox.Area();
+        }
+
+        private bool IsBetterValidFill(List<Part> candidate, List<Part> current)
+        {
+            if (candidate == null || candidate.Count == 0)
+                return false;
+
+            // Reject candidate if it has overlapping parts.
+            if (HasOverlaps(candidate, Plate.PartSpacing))
+                return false;
+
+            if (current == null || current.Count == 0)
+                return true;
+
+            if (candidate.Count != current.Count)
+                return candidate.Count > current.Count;
+
+            var candidateBox = ((IEnumerable<IBoundable>)candidate).GetBoundingBox();
+            var currentBox = ((IEnumerable<IBoundable>)current).GetBoundingBox();
+
+            return candidateBox.Area() < currentBox.Area();
         }
 
         private List<double> FindHullEdgeAngles(List<Part> parts)
@@ -376,10 +545,10 @@ namespace OpenNest
                 var h = engine.Fill(pattern, NestDirection.Horizontal);
                 var v = engine.Fill(pattern, NestDirection.Vertical);
 
-                if (best == null || h.Count > best.Count)
+                if (IsBetterValidFill(h, best))
                     best = h;
 
-                if (best == null || v.Count > best.Count)
+                if (IsBetterValidFill(v, best))
                     best = v;
             }
 

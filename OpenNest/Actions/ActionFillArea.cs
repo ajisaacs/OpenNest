@@ -25,10 +25,8 @@ namespace OpenNest.Actions
         private void FillArea()
         {
             var engine = new NestEngine(plateView.Plate);
-            engine.FillArea(SelectedArea, new NestItem
-            {
-                Drawing = drawing
-            });
+            engine.CreateEvaluator = GpuEvaluatorFactory.Create;
+            engine.Fill(new NestItem { Drawing = drawing }, SelectedArea);
 
             plateView.Invalidate();
             Update();
