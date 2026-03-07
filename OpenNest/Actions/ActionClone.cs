@@ -106,6 +106,17 @@ namespace OpenNest.Actions
             plateView.SelectedParts.AddRange(parts);
         }
 
+        public override void ConnectEvents()
+        {
+            plateView.KeyDown += plateView_KeyDown;
+            plateView.MouseMove += plateView_MouseMove;
+            plateView.MouseDown += plateView_MouseDown;
+            plateView.Paint += plateView_Paint;
+
+            plateView.SelectedParts.Clear();
+            plateView.SelectedParts.AddRange(parts);
+        }
+
         public override void DisconnectEvents()
         {
             plateView.KeyDown -= plateView_KeyDown;
@@ -159,9 +170,34 @@ namespace OpenNest.Actions
 
         private void Fill()
         {
-            var engine = new NestEngine(plateView.Plate);
+            var plate = plateView.Plate;
+            var engine = new NestEngine(plate);
             var groupParts = parts.Select(p => p.BasePart).ToList();
-            engine.Fill(groupParts);
+
+            var bounds = plate.WorkArea();
+
+            if (plate.Parts.Count == 0)
+            {
+                engine.Fill(groupParts);
+                return;
+            }
+
+            var boxes = new List<Box>();
+            foreach (var part in plate.Parts)
+                boxes.Add(part.BoundingBox.Offset(plate.PartSpacing));
+
+            var pt = plateView.CurrentPoint;
+            var vertical = Helper.GetLargestBoxVertically(pt, bounds, boxes);
+            var horizontal = Helper.GetLargestBoxHorizontally(pt, bounds, boxes);
+
+            var bestArea = vertical;
+            if (horizontal.Area() > vertical.Area())
+                bestArea = horizontal;
+
+            if (bestArea == Box.Empty)
+                return;
+
+            engine.Fill(groupParts, bestArea);
         }
     }
 }

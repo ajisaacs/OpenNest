@@ -62,22 +62,28 @@ namespace OpenNest
 
             var workArea = Plate.WorkArea();
             var engine = new FillLinear(workArea, Plate.PartSpacing);
+            var angles = FindHullEdgeAngles(groupParts);
+            var best = FillPattern(engine, groupParts, angles);
 
-            // Build a pattern from the group of parts.
-            var pattern = new Pattern();
-            foreach (var part in groupParts)
-            {
-                var clone = (Part)part.Clone();
-                clone.UpdateBounds();
-                pattern.Parts.Add(clone);
-            }
-            pattern.UpdateBounds();
+            if (best == null || best.Count == 0)
+                return false;
 
-            // Try 4 configurations: 2 axes x 2 orientations (horizontal/vertical).
+            Plate.Parts.AddRange(best);
+            return true;
+        }
+
+        public bool Fill(NestItem item, Box workArea)
+        {
+            var bestRotation = FindBestRotation(item);
+
+            var engine = new FillLinear(workArea, Plate.PartSpacing);
+
             var configs = new[]
             {
-                engine.Fill(pattern, NestDirection.Horizontal),
-                engine.Fill(pattern, NestDirection.Vertical)
+                engine.Fill(item.Drawing, bestRotation, NestDirection.Horizontal),
+                engine.Fill(item.Drawing, bestRotation, NestDirection.Vertical),
+                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Horizontal),
+                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Vertical)
             };
 
             List<Part> best = null;
@@ -87,6 +93,25 @@ namespace OpenNest
                 if (best == null || config.Count > best.Count)
                     best = config;
             }
+
+            if (best == null || best.Count == 0)
+                return false;
+
+            if (item.Quantity > 0 && best.Count > item.Quantity)
+                best = best.Take(item.Quantity).ToList();
+
+            Plate.Parts.AddRange(best);
+            return true;
+        }
+
+        public bool Fill(List<Part> groupParts, Box workArea)
+        {
+            if (groupParts == null || groupParts.Count == 0)
+                return false;
+
+            var engine = new FillLinear(workArea, Plate.PartSpacing);
+            var angles = FindHullEdgeAngles(groupParts);
+            var best = FillPattern(engine, groupParts, angles);
 
             if (best == null || best.Count == 0)
                 return false;
@@ -183,6 +208,97 @@ namespace OpenNest
             Plate.Parts.AddRange(parts);
 
             return parts.Count > 0;
+        }
+
+        private List<double> FindHullEdgeAngles(List<Part> parts)
+        {
+            var points = new List<Vector>();
+
+            foreach (var part in parts)
+            {
+                var entities = ConvertProgram.ToGeometry(part.Program)
+                    .Where(e => e.Layer != SpecialLayers.Rapid);
+
+                var shapes = Helper.GetShapes(entities);
+
+                foreach (var shape in shapes)
+                {
+                    var polygon = shape.ToPolygonWithTolerance(0.1);
+
+                    foreach (var vertex in polygon.Vertices)
+                        points.Add(vertex + part.Location);
+                }
+            }
+
+            if (points.Count < 3)
+                return new List<double> { 0 };
+
+            var hull = ConvexHull.Compute(points);
+            var vertices = hull.Vertices;
+            var n = hull.IsClosed() ? vertices.Count - 1 : vertices.Count;
+
+            var angles = new List<double> { 0 };
+
+            for (var i = 0; i < n; i++)
+            {
+                var next = (i + 1) % n;
+                var dx = vertices[next].X - vertices[i].X;
+                var dy = vertices[next].Y - vertices[i].Y;
+
+                if (dx * dx + dy * dy < Tolerance.Epsilon)
+                    continue;
+
+                var angle = -System.Math.Atan2(dy, dx);
+
+                if (!angles.Any(a => a.IsEqualTo(angle)))
+                    angles.Add(angle);
+            }
+
+            return angles;
+        }
+
+        private Pattern BuildRotatedPattern(List<Part> groupParts, double angle)
+        {
+            var pattern = new Pattern();
+            var center = ((IEnumerable<IBoundable>)groupParts).GetBoundingBox().Center;
+
+            foreach (var part in groupParts)
+            {
+                var clone = (Part)part.Clone();
+                clone.UpdateBounds();
+
+                if (!angle.IsEqualTo(0))
+                    clone.Rotate(angle, center);
+
+                pattern.Parts.Add(clone);
+            }
+
+            pattern.UpdateBounds();
+            return pattern;
+        }
+
+        private List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles)
+        {
+            List<Part> best = null;
+
+            foreach (var angle in angles)
+            {
+                var pattern = BuildRotatedPattern(groupParts, angle);
+
+                if (pattern.Parts.Count == 0)
+                    continue;
+
+                var h = engine.Fill(pattern, NestDirection.Horizontal);
+                var v = engine.Fill(pattern, NestDirection.Vertical);
+
+                if (best == null || h.Count > best.Count)
+                    best = h;
+
+                if (best == null || v.Count > best.Count)
+                    best = v;
+            }
+
+            return best;
         }
 
         private double FindBestRotation(NestItem item)
