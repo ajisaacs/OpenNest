@@ -61,7 +61,7 @@ namespace OpenNest
             if (slideDistance >= double.MaxValue || slideDistance < 0)
                 return bboxDim + PartSpacing;
 
-            return bboxDim - slideDistance + PartSpacing;
+            return bboxDim - slideDistance;
         }
 
         /// <summary>
@@ -76,7 +76,7 @@ namespace OpenNest
             partB.Offset(MakeOffset(direction, bboxDim));
 
             var opposite = Helper.OppositeDirection(pushDir);
-            var movingLines = Helper.GetPartLines(partB, pushDir);
+            var movingLines = Helper.GetOffsetPartLines(partB, PartSpacing, pushDir);
             var stationaryLines = Helper.GetPartLines(partA, opposite);
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
@@ -94,7 +94,7 @@ namespace OpenNest
             var patternB = patternA.Clone(MakeOffset(direction, bboxDim));
 
             var opposite = Helper.OppositeDirection(pushDir);
-            var movingLines = patternB.GetLines(pushDir);
+            var movingLines = patternB.GetOffsetLines(PartSpacing, pushDir);
             var stationaryLines = patternA.GetLines(opposite);
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
