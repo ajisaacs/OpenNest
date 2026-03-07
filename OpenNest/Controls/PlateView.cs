@@ -129,6 +129,8 @@ namespace OpenNest.Controls
 
             if (currentAction == null || !currentAction.SurvivesPlateChange)
                 SetAction(typeof(ActionSelect));
+            else
+                currentAction.OnPlateChanged();
         }
 
         public string Status

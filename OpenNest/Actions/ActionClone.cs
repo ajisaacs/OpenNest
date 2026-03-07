@@ -100,6 +100,12 @@ namespace OpenNest.Actions
 
         public override bool SurvivesPlateChange => true;
 
+        public override void OnPlateChanged()
+        {
+            plateView.SelectedParts.Clear();
+            plateView.SelectedParts.AddRange(parts);
+        }
+
         public override void DisconnectEvents()
         {
             plateView.KeyDown -= plateView_KeyDown;

@@ -13,6 +13,8 @@ namespace OpenNest.Actions
 
         public virtual bool SurvivesPlateChange => false;
 
+        public virtual void OnPlateChanged() { }
+
         public abstract void DisconnectEvents();
 
         public abstract void CancelAction();
