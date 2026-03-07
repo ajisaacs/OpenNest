@@ -40,6 +40,7 @@
     <Compile Include="BestFit\PairCandidate.cs" />
     <Compile Include="BestFit\BestFitResult.cs" />
     <Compile Include="BestFit\IBestFitStrategy.cs" />
+    <Compile Include="BestFit\PairEvaluator.cs" />
     <Compile Include="BestFit\RotationSlideStrategy.cs" />
     <Compile Include="CirclePacking\Bin.cs" />
     <Compile Include="CirclePacking\FillEndEven.cs" />
