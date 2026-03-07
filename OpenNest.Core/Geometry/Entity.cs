@@ -231,39 +231,60 @@ namespace OpenNest.Geometry
 
     public static class EntityExtensions
     {
-        public static double FindBestRotation(this List<Entity> entities, double stepAngle, double startAngle = 0, double endAngle = Angle.TwoPI)
+        public static BoundingRectangleResult FindBestRotation(this List<Entity> entities, double startAngle = 0, double endAngle = Angle.TwoPI)
         {
-            startAngle = Angle.NormalizeRad(startAngle);
+            var points = new List<Vector>();
 
-            if (!endAngle.IsEqualTo(Angle.TwoPI))
-                endAngle = Angle.NormalizeRad(endAngle);
-
-            if (stepAngle.IsEqualTo(0.0))
-                return startAngle;
-
-            entities.ForEach(e => e.Rotate(startAngle));
-
-            var bestAngle = startAngle;
-            var bestArea = entities.GetBoundingBox().Area();
-
-            var steps = startAngle < endAngle
-                ? (endAngle - startAngle) / stepAngle
-                : (endAngle + Angle.TwoPI) - startAngle / stepAngle;
-
-            for (int i = 1; i <= steps; ++i)
+            foreach (var entity in entities)
             {
-                entities.ForEach(e => e.Rotate(stepAngle));
-
-                var area = entities.GetBoundingBox().Area();
-
-                if (area < bestArea)
+                switch (entity.Type)
                 {
-                    bestArea = area;
-                    bestAngle = startAngle + stepAngle * i;
+                    case EntityType.Line:
+                        var line = (Line)entity;
+                        points.Add(line.StartPoint);
+                        points.Add(line.EndPoint);
+                        break;
+
+                    case EntityType.Arc:
+                        var arc = (Arc)entity;
+                        points.Add(arc.StartPoint());
+                        points.Add(arc.EndPoint());
+                        points.Add(arc.Center.Offset(arc.Radius, 0));
+                        points.Add(arc.Center.Offset(-arc.Radius, 0));
+                        points.Add(arc.Center.Offset(0, arc.Radius));
+                        points.Add(arc.Center.Offset(0, -arc.Radius));
+                        break;
+
+                    case EntityType.Circle:
+                        var circle = (Circle)entity;
+                        points.Add(circle.Center.Offset(circle.Radius, 0));
+                        points.Add(circle.Center.Offset(-circle.Radius, 0));
+                        points.Add(circle.Center.Offset(0, circle.Radius));
+                        points.Add(circle.Center.Offset(0, -circle.Radius));
+                        break;
+
+                    case EntityType.Polygon:
+                        var polygon = (Polygon)entity;
+                        points.AddRange(polygon.Vertices);
+                        break;
+
+                    case EntityType.Shape:
+                        var shape = (Shape)entity;
+                        var subResult = shape.Entities.FindBestRotation(startAngle, endAngle);
+                        return subResult;
                 }
             }
 
-            return bestAngle;
+            if (points.Count == 0)
+                return new BoundingRectangleResult(startAngle, 0, 0);
+
+            var hull = ConvexHull.Compute(points);
+
+            bool constrained = !startAngle.IsEqualTo(0) || !endAngle.IsEqualTo(Angle.TwoPI);
+
+            return constrained
+                ? RotatingCalipers.MinimumBoundingRectangle(hull, startAngle, endAngle)
+                : RotatingCalipers.MinimumBoundingRectangle(hull);
         }
     }
 }

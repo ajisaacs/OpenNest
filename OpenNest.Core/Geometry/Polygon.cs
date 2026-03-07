@@ -598,16 +598,15 @@ namespace OpenNest.Geometry
             }
         }
 
-        public double FindBestRotation(double stepAngle)
+        public BoundingRectangleResult FindBestRotation()
         {
-            var entities = new List<Entity>(ToLines());
-            return entities.FindBestRotation(stepAngle);
+            return RotatingCalipers.MinimumBoundingRectangle(Vertices);
         }
 
-        public double FindBestRotation(double stepAngle, double startAngle, double endAngle)
+        public BoundingRectangleResult FindBestRotation(double startAngle, double endAngle)
         {
-            var entities = new List<Entity>(ToLines());
-            return entities.FindBestRotation(stepAngle, startAngle, endAngle);
+            var hull = ConvexHull.Compute(Vertices);
+            return RotatingCalipers.MinimumBoundingRectangle(hull, startAngle, endAngle);
         }
     }
 }

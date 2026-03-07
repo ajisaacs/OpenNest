@@ -599,14 +599,14 @@ namespace OpenNest.Geometry
             get { return EntityType.Shape; }
         }
 
-        public double FindBestRotation(double stepAngle)
+        public BoundingRectangleResult FindBestRotation()
         {
-            return Entities.FindBestRotation(stepAngle);
+            return Entities.FindBestRotation();
         }
 
-        public double FindBestRotation(double stepAngle, double startAngle, double endAngle)
+        public BoundingRectangleResult FindBestRotation(double startAngle, double endAngle)
         {
-            return Entities.FindBestRotation(stepAngle, startAngle, endAngle);
+            return Entities.FindBestRotation(startAngle, endAngle);
         }
     }
 }
