@@ -789,6 +789,7 @@ namespace OpenNest
                     continue;
 
                 var polygon = offsetEntity.ToPolygonWithTolerance(PushChordTolerance);
+                polygon.RemoveSelfIntersections();
                 polygon.Offset(part.Location);
                 lines.AddRange(polygon.ToLines());
             }
@@ -810,6 +811,7 @@ namespace OpenNest
                     continue;
 
                 var polygon = offsetEntity.ToPolygonWithTolerance(PushChordTolerance);
+                polygon.RemoveSelfIntersections();
                 polygon.Offset(part.Location);
                 lines.AddRange(GetDirectionalLines(polygon, facingDirection));
             }

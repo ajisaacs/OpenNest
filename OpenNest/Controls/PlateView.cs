@@ -459,9 +459,20 @@ namespace OpenNest.Controls
                         if (offsetEntity == null)
                             continue;
 
-                        offsetEntity.Offset(part.Location);
+                        var polygon = offsetEntity.ToPolygonWithTolerance(0.01);
+                        polygon.RemoveSelfIntersections();
+                        polygon.Offset(part.Location);
 
-                        var path = GraphicsHelper.GetGraphicsPath(offsetEntity);
+                        if (polygon.Vertices.Count < 2)
+                            continue;
+
+                        var pts = new PointF[polygon.Vertices.Count];
+
+                        for (int j = 0; j < pts.Length; j++)
+                            pts[j] = new PointF((float)polygon.Vertices[j].X, (float)polygon.Vertices[j].Y);
+
+                        var path = new GraphicsPath();
+                        path.AddLines(pts);
                         path.Transform(Matrix);
                         g.DrawPath(offsetPen, path);
                         path.Dispose();

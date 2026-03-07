@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -471,6 +472,118 @@ namespace OpenNest.Geometry
         public override EntityType Type
         {
             get { return EntityType.Polygon; }
+        }
+
+        /// <summary>
+        /// Removes self-intersecting loops from the polygon by finding non-adjacent
+        /// edge crossings and keeping the larger contour at each crossing.
+        /// </summary>
+        public void RemoveSelfIntersections()
+        {
+            if (!IsClosed() || Vertices.Count < 5)
+                return;
+
+            bool found = true;
+
+            while (found)
+            {
+                found = false;
+                int n = Vertices.Count - 1; // exclude closing vertex
+
+                for (int i = 0; i < n && !found; i++)
+                {
+                    var a1 = Vertices[i];
+                    var a2 = Vertices[i + 1];
+
+                    for (int j = i + 2; j < n && !found; j++)
+                    {
+                        // Skip edges that share a vertex (first and last edge)
+                        if (i == 0 && j == n - 1)
+                            continue;
+
+                        var b1 = Vertices[j];
+                        var b2 = Vertices[j + 1];
+
+                        Vector pt;
+
+                        if (SegmentsIntersect(a1, a2, b1, b2, out pt))
+                        {
+                            // Two loops formed by the crossing:
+                            // Loop A: vertices[0..i], pt, vertices[j+1..n-1], close
+                            // Loop B: pt, vertices[i+1..j], close
+                            var loopA = new List<Vector>();
+
+                            for (int k = 0; k <= i; k++)
+                                loopA.Add(Vertices[k]);
+
+                            loopA.Add(pt);
+
+                            for (int k = j + 1; k < n; k++)
+                                loopA.Add(Vertices[k]);
+
+                            loopA.Add(loopA[0]);
+
+                            var loopB = new List<Vector>();
+                            loopB.Add(pt);
+
+                            for (int k = i + 1; k <= j; k++)
+                                loopB.Add(Vertices[k]);
+
+                            loopB.Add(pt);
+
+                            var areaA = System.Math.Abs(CalculateArea(loopA));
+                            var areaB = System.Math.Abs(CalculateArea(loopB));
+
+                            Vertices = areaA >= areaB ? loopA : loopB;
+                            found = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        private static bool SegmentsIntersect(Vector a1, Vector a2, Vector b1, Vector b2, out Vector pt)
+        {
+            var da = a2 - a1;
+            var db = b2 - b1;
+            var cross = da.X * db.Y - da.Y * db.X;
+
+            if (cross.IsEqualTo(0.0))
+            {
+                pt = Vector.Zero;
+                return false;
+            }
+
+            var dc = b1 - a1;
+            var t = (dc.X * db.Y - dc.Y * db.X) / cross;
+            var u = (dc.X * da.Y - dc.Y * da.X) / cross;
+
+            if (t > Tolerance.Epsilon && t < 1.0 - Tolerance.Epsilon &&
+                u > Tolerance.Epsilon && u < 1.0 - Tolerance.Epsilon)
+            {
+                pt = new Vector(a1.X + t * da.X, a1.Y + t * da.Y);
+                return true;
+            }
+
+            pt = Vector.Zero;
+            return false;
+        }
+
+        private static double CalculateArea(List<Vector> vertices)
+        {
+            double xsum = 0;
+            double ysum = 0;
+
+            for (int i = 0; i < vertices.Count - 1; i++)
+            {
+                var current = vertices[i];
+                var next = vertices[i + 1];
+
+                xsum += current.X * next.Y;
+                ysum += current.Y * next.X;
+            }
+
+            return (xsum - ysum) * 0.5;
         }
 
         internal void Cleanup()
