@@ -739,7 +739,7 @@ namespace OpenNest
             return pts.Count > 0;
         }
 
-        private const double PushChordTolerance = 0.08;
+        private const double PushChordTolerance = 0.03;
 
         public static List<Line> GetPartLines(Part part)
         {
@@ -765,7 +765,9 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var offsetEntity = shape.OffsetEntity(spacing, OffsetSide.Left) as Shape;
+                // Add chord tolerance to compensate for inscribed polygon chords
+                // being inside the actual offset arcs.
+                var offsetEntity = shape.OffsetEntity(spacing + PushChordTolerance, OffsetSide.Left) as Shape;
 
                 if (offsetEntity == null)
                     continue;
