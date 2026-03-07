@@ -45,6 +45,7 @@
     <Compile Include="NestDirection.cs" />
     <Compile Include="NestEngine.cs" />
     <Compile Include="NestItem.cs" />
+    <Compile Include="Pattern.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RectanglePacking\Bin.cs" />
     <Compile Include="RectanglePacking\FillBestFit.cs" />
