@@ -42,6 +42,7 @@
     <Compile Include="BestFit\IBestFitStrategy.cs" />
     <Compile Include="BestFit\PairEvaluator.cs" />
     <Compile Include="BestFit\BestFitFilter.cs" />
+    <Compile Include="BestFit\BestFitFinder.cs" />
     <Compile Include="BestFit\RotationSlideStrategy.cs" />
     <Compile Include="BestFit\Tiling\TileResult.cs" />
     <Compile Include="BestFit\Tiling\TileEvaluator.cs" />
