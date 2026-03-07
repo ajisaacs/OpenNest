@@ -22,13 +22,49 @@ namespace OpenNest
         public bool Fill(NestItem item)
         {
             var workArea = Plate.WorkArea();
-            return FillArea(workArea, item);
+            var bestRotation = FindBestRotation(item);
+
+            var engine = new FillLinear(workArea, Plate.PartSpacing);
+
+            // Try 4 configurations: 2 rotations x 2 axes.
+            var configs = new[]
+            {
+                engine.Fill(item.Drawing, bestRotation, NestDirection.Horizontal),
+                engine.Fill(item.Drawing, bestRotation, NestDirection.Vertical),
+                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Horizontal),
+                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Vertical)
+            };
+
+            // Pick the configuration with the most parts.
+            List<Part> best = null;
+
+            foreach (var config in configs)
+            {
+                if (best == null || config.Count > best.Count)
+                    best = config;
+            }
+
+            if (best == null || best.Count == 0)
+                return false;
+
+            // Limit to requested quantity if specified.
+            if (item.Quantity > 0 && best.Count > item.Quantity)
+                best = best.Take(item.Quantity).ToList();
+
+            Plate.Parts.AddRange(best);
+            return true;
         }
 
         public bool Fill(NestItem item, int maxCount)
         {
-            var workArea = Plate.WorkArea();
-            return FillArea(workArea, item, maxCount);
+            if (maxCount <= 0)
+                return false;
+
+            var savedQty = item.Quantity;
+            item.Quantity = maxCount;
+            var result = Fill(item);
+            item.Quantity = savedQty;
+            return result;
         }
 
         public bool FillArea(Box box, NestItem item)
@@ -107,42 +143,6 @@ namespace OpenNest
             Plate.Parts.AddRange(parts);
 
             return parts.Count > 0;
-        }
-
-        public bool FillLinear(NestItem item)
-        {
-            var workArea = Plate.WorkArea();
-            var bestRotation = FindBestRotation(item);
-
-            var engine = new FillLinear(workArea, Plate.PartSpacing);
-
-            // Try 4 configurations: 2 rotations x 2 axes.
-            var configs = new[]
-            {
-                engine.Fill(item.Drawing, bestRotation, NestDirection.Horizontal),
-                engine.Fill(item.Drawing, bestRotation, NestDirection.Vertical),
-                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Horizontal),
-                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Vertical)
-            };
-
-            // Pick the configuration with the most parts.
-            List<Part> best = null;
-
-            foreach (var config in configs)
-            {
-                if (best == null || config.Count > best.Count)
-                    best = config;
-            }
-
-            if (best == null || best.Count == 0)
-                return false;
-
-            // Limit to requested quantity if specified.
-            if (item.Quantity > 0 && best.Count > item.Quantity)
-                best = best.Take(item.Quantity).ToList();
-
-            Plate.Parts.AddRange(best);
-            return true;
         }
 
         private double FindBestRotation(NestItem item)
