@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using netDxf;
+using ACadSharp;
+using ACadSharp.IO;
 using OpenNest.Geometry;
 
 namespace OpenNest.IO
@@ -16,32 +16,45 @@ namespace OpenNest.IO
         {
         }
 
-        private List<Entity> GetGeometry(DxfDocument doc)
+        private List<Entity> GetGeometry(CadDocument doc)
         {
             var entities = new List<Entity>();
-            var lines = new List<Line>(doc.Entities.Lines.Count());
-            var arcs = new List<Arc>(doc.Entities.Arcs.Count());
+            var lines = new List<Line>();
+            var arcs = new List<Arc>();
 
-            foreach (var spline in doc.Entities.Splines)
-                lines.AddRange(spline.ToOpenNest(SplinePrecision));
+            foreach (var entity in doc.Entities)
+            {
+                switch (entity)
+                {
+                    case ACadSharp.Entities.Line line:
+                        lines.Add(line.ToOpenNest());
+                        break;
 
-            foreach (var polyline in doc.Entities.Polylines2D)
-                lines.AddRange(polyline.ToOpenNest());
+                    case ACadSharp.Entities.Arc arc:
+                        arcs.Add(arc.ToOpenNest());
+                        break;
 
-            foreach (var ellipse in doc.Entities.Ellipses)
-                lines.AddRange(ellipse.ToOpenNest(SplinePrecision));
+                    case ACadSharp.Entities.Circle circle:
+                        entities.Add(circle.ToOpenNest());
+                        break;
 
-            foreach (var line in doc.Entities.Lines)
-                lines.Add(line.ToOpenNest());
+                    case ACadSharp.Entities.Spline spline:
+                        lines.AddRange(spline.ToOpenNest());
+                        break;
 
-            foreach (var arc in doc.Entities.Arcs)
-                arcs.Add(arc.ToOpenNest());
+                    case ACadSharp.Entities.LwPolyline lwPolyline:
+                        lines.AddRange(lwPolyline.ToOpenNest());
+                        break;
 
-            foreach (var circle in doc.Entities.Circles)
-                entities.Add(circle.ToOpenNest());
+                    case ACadSharp.Entities.Polyline polyline:
+                        lines.AddRange(polyline.ToOpenNest());
+                        break;
 
-            foreach (var polyline in doc.Entities.Polylines3D)
-                lines.AddRange(polyline.ToOpenNest());
+                    case ACadSharp.Entities.Ellipse ellipse:
+                        lines.AddRange(ellipse.ToOpenNest(SplinePrecision));
+                        break;
+                }
+            }
 
             Helper.Optimize(lines);
             Helper.Optimize(arcs);
@@ -54,13 +67,16 @@ namespace OpenNest.IO
 
         public bool GetGeometry(Stream stream, out List<Entity> geometry)
         {
-            bool success = false;
+            var success = false;
 
             try
             {
-                var doc = DxfDocument.Load(stream);
-                geometry = GetGeometry(doc);
-                success = true;
+                using (var reader = new DxfReader(stream))
+                {
+                    var doc = reader.Read();
+                    geometry = GetGeometry(doc);
+                    success = true;
+                }
             }
             catch (Exception ex)
             {
@@ -78,24 +94,21 @@ namespace OpenNest.IO
 
         public bool GetGeometry(string path, out List<Entity> geometry)
         {
-            Stream stream = null;
-            bool success = false;
+            var success = false;
 
             try
             {
-                var doc = DxfDocument.Load(path);
-                geometry = GetGeometry(doc);
-                success = true;
+                using (var reader = new DxfReader(path))
+                {
+                    var doc = reader.Read();
+                    geometry = GetGeometry(doc);
+                    success = true;
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
                 geometry = new List<Entity>();
-            }
-            finally
-            {
-                if (stream != null)
-                    stream.Close();
             }
 
             return success;
