@@ -13,10 +13,17 @@ namespace OpenNest.IO
     public sealed class NestWriter
     {
         /// <summary>
-        /// Number of decimal places the output is round to. 
+        /// Number of decimal places the output is round to.
         /// This number must have more decimal places than Tolerance.Epsilon
         /// </summary>
         private const int OutputPrecision = 10;
+
+        /// <summary>
+        /// Fixed-point format string that avoids scientific notation.
+        /// ProgramReader treats 'E' as a code letter, so "6.66E-08" would be
+        /// split into X:"6.66" and E:"-08", corrupting the parsed value.
+        /// </summary>
+        private const string CoordinateFormat = "0.##########";
 
         private readonly Nest nest;
         private ZipArchive zipArchive;
@@ -284,7 +291,9 @@ namespace OpenNest.IO
                 var match = drawingDict.Where(dwg => dwg.Value == part.BaseDrawing).FirstOrDefault();
                 var id = match.Key;
 
-                writer.WriteLine("G00X{0}Y{1}", part.Location.X, part.Location.Y);
+                writer.WriteLine("G00X{0}Y{1}",
+                    part.Location.X.ToString(CoordinateFormat),
+                    part.Location.Y.ToString(CoordinateFormat));
                 writer.WriteLine("G65P{0}R{1}", id, Angle.ToDegrees(part.Rotation));
             }
 
@@ -317,22 +326,15 @@ namespace OpenNest.IO
                         var sb = new StringBuilder();
                         var arcMove = (ArcMove)code;
 
+                        var x = System.Math.Round(arcMove.EndPoint.X, OutputPrecision).ToString(CoordinateFormat);
+                        var y = System.Math.Round(arcMove.EndPoint.Y, OutputPrecision).ToString(CoordinateFormat);
+                        var i = System.Math.Round(arcMove.CenterPoint.X, OutputPrecision).ToString(CoordinateFormat);
+                        var j = System.Math.Round(arcMove.CenterPoint.Y, OutputPrecision).ToString(CoordinateFormat);
+
                         if (arcMove.Rotation == RotationType.CW)
-                        {
-                            sb.Append(string.Format("G02X{0}Y{1}I{2}J{3}",
-                                System.Math.Round(arcMove.EndPoint.X, OutputPrecision),
-                                System.Math.Round(arcMove.EndPoint.Y, OutputPrecision),
-                                System.Math.Round(arcMove.CenterPoint.X, OutputPrecision),
-                                System.Math.Round(arcMove.CenterPoint.Y, OutputPrecision)));
-                        }
+                            sb.Append(string.Format("G02X{0}Y{1}I{2}J{3}", x, y, i, j));
                         else
-                        {
-                            sb.Append(string.Format("G03X{0}Y{1}I{2}J{3}",
-                                System.Math.Round(arcMove.EndPoint.X, OutputPrecision),
-                                System.Math.Round(arcMove.EndPoint.Y, OutputPrecision),
-                                System.Math.Round(arcMove.CenterPoint.X, OutputPrecision),
-                                System.Math.Round(arcMove.CenterPoint.Y, OutputPrecision)));
-                        }
+                            sb.Append(string.Format("G03X{0}Y{1}I{2}J{3}", x, y, i, j));
 
                         if (arcMove.Layer != LayerType.Cut)
                             sb.Append(GetLayerString(arcMove.Layer));
@@ -352,8 +354,8 @@ namespace OpenNest.IO
                         var linearMove = (LinearMove)code;
 
                         sb.Append(string.Format("G01X{0}Y{1}",
-                            System.Math.Round(linearMove.EndPoint.X, OutputPrecision),
-                            System.Math.Round(linearMove.EndPoint.Y, OutputPrecision)));
+                            System.Math.Round(linearMove.EndPoint.X, OutputPrecision).ToString(CoordinateFormat),
+                            System.Math.Round(linearMove.EndPoint.Y, OutputPrecision).ToString(CoordinateFormat)));
 
                         if (linearMove.Layer != LayerType.Cut)
                             sb.Append(GetLayerString(linearMove.Layer));
@@ -366,8 +368,8 @@ namespace OpenNest.IO
                         var rapidMove = (RapidMove)code;
 
                         return string.Format("G00X{0}Y{1}",
-                            System.Math.Round(rapidMove.EndPoint.X, OutputPrecision),
-                            System.Math.Round(rapidMove.EndPoint.Y, OutputPrecision));
+                            System.Math.Round(rapidMove.EndPoint.X, OutputPrecision).ToString(CoordinateFormat),
+                            System.Math.Round(rapidMove.EndPoint.Y, OutputPrecision).ToString(CoordinateFormat));
                     }
 
                 case CodeType.SetFeedrate:
