@@ -792,9 +792,11 @@ namespace OpenNest.Controls
             var stationaryLines = new List<List<Line>>(stationaryParts.Count);
             var stationaryBoxes = new List<Box>(stationaryParts.Count);
 
+            var opposite = Helper.OppositeDirection(direction);
+
             foreach (var part in stationaryParts)
             {
-                stationaryLines.Add(Helper.GetPartLines(part.BasePart));
+                stationaryLines.Add(Helper.GetPartLines(part.BasePart, opposite));
                 stationaryBoxes.Add(part.BoundingBox);
             }
 
@@ -805,8 +807,8 @@ namespace OpenNest.Controls
             {
                 // Get offset lines for the moving part.
                 var movingLines = Plate.PartSpacing > 0
-                    ? Helper.GetOffsetPartLines(selected.BasePart, Plate.PartSpacing)
-                    : Helper.GetPartLines(selected.BasePart);
+                    ? Helper.GetOffsetPartLines(selected.BasePart, Plate.PartSpacing, direction)
+                    : Helper.GetPartLines(selected.BasePart, direction);
 
                 var movingBox = selected.BoundingBox;
 

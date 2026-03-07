@@ -739,7 +739,7 @@ namespace OpenNest
             return pts.Count > 0;
         }
 
-        private const double PushChordTolerance = 0.03;
+        private const double PushChordTolerance = 0.01;
 
         public static List<Line> GetPartLines(Part part)
         {
@@ -752,6 +752,22 @@ namespace OpenNest
                 var polygon = shape.ToPolygonWithTolerance(PushChordTolerance);
                 polygon.Offset(part.Location);
                 lines.AddRange(polygon.ToLines());
+            }
+
+            return lines;
+        }
+
+        public static List<Line> GetPartLines(Part part, PushDirection facingDirection)
+        {
+            var entities = ConvertProgram.ToGeometry(part.Program);
+            var shapes = GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var lines = new List<Line>();
+
+            foreach (var shape in shapes)
+            {
+                var polygon = shape.ToPolygonWithTolerance(PushChordTolerance);
+                polygon.Offset(part.Location);
+                lines.AddRange(GetDirectionalLines(polygon, facingDirection));
             }
 
             return lines;
@@ -780,6 +796,65 @@ namespace OpenNest
             return lines;
         }
 
+        public static List<Line> GetOffsetPartLines(Part part, double spacing, PushDirection facingDirection)
+        {
+            var entities = ConvertProgram.ToGeometry(part.Program);
+            var shapes = GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var lines = new List<Line>();
+
+            foreach (var shape in shapes)
+            {
+                var offsetEntity = shape.OffsetEntity(spacing + PushChordTolerance, OffsetSide.Left) as Shape;
+
+                if (offsetEntity == null)
+                    continue;
+
+                var polygon = offsetEntity.ToPolygonWithTolerance(PushChordTolerance);
+                polygon.Offset(part.Location);
+                lines.AddRange(GetDirectionalLines(polygon, facingDirection));
+            }
+
+            return lines;
+        }
+
+        /// <summary>
+        /// Returns only polygon edges whose outward normal faces the specified direction.
+        /// </summary>
+        private static List<Line> GetDirectionalLines(Polygon polygon, PushDirection facingDirection)
+        {
+            if (polygon.Vertices.Count < 3)
+                return polygon.ToLines();
+
+            var sign = polygon.RotationDirection() == RotationType.CCW ? 1.0 : -1.0;
+            var lines = new List<Line>();
+            var last = polygon.Vertices[0];
+
+            for (int i = 1; i < polygon.Vertices.Count; i++)
+            {
+                var current = polygon.Vertices[i];
+                var dx = current.X - last.X;
+                var dy = current.Y - last.Y;
+
+                bool keep;
+
+                switch (facingDirection)
+                {
+                    case PushDirection.Left:  keep = -sign * dy > 0; break;
+                    case PushDirection.Right: keep =  sign * dy > 0; break;
+                    case PushDirection.Up:    keep = -sign * dx > 0; break;
+                    case PushDirection.Down:  keep =  sign * dx > 0; break;
+                    default: keep = true; break;
+                }
+
+                if (keep)
+                    lines.Add(new Line(last, current));
+
+                last = current;
+            }
+
+            return lines;
+        }
+
         /// <summary>
         /// Finds the distance from a vertex to a line segment along a push axis.
         /// Returns double.MaxValue if the ray does not hit the segment.
@@ -803,7 +878,9 @@ namespace OpenNest
 
                     var ix = p1.X + t * (p2.X - p1.X);
                     var dist = vertex.X - ix; // positive if edge is to the left
-                    return dist > Tolerance.Epsilon ? dist : double.MaxValue;
+                    if (dist > Tolerance.Epsilon) return dist;
+                    if (dist >= -Tolerance.Epsilon) return 0; // touching
+                    return double.MaxValue; // edge is behind vertex
                 }
 
                 case PushDirection.Right:
@@ -817,7 +894,9 @@ namespace OpenNest
 
                     var ix = p1.X + t * (p2.X - p1.X);
                     var dist = ix - vertex.X;
-                    return dist > Tolerance.Epsilon ? dist : double.MaxValue;
+                    if (dist > Tolerance.Epsilon) return dist;
+                    if (dist >= -Tolerance.Epsilon) return 0; // touching
+                    return double.MaxValue; // edge is behind vertex
                 }
 
                 case PushDirection.Down:
@@ -832,7 +911,9 @@ namespace OpenNest
 
                     var iy = p1.Y + t * (p2.Y - p1.Y);
                     var dist = vertex.Y - iy;
-                    return dist > Tolerance.Epsilon ? dist : double.MaxValue;
+                    if (dist > Tolerance.Epsilon) return dist;
+                    if (dist >= -Tolerance.Epsilon) return 0; // touching
+                    return double.MaxValue; // edge is behind vertex
                 }
 
                 case PushDirection.Up:
@@ -846,7 +927,9 @@ namespace OpenNest
 
                     var iy = p1.Y + t * (p2.Y - p1.Y);
                     var dist = iy - vertex.Y;
-                    return dist > Tolerance.Epsilon ? dist : double.MaxValue;
+                    if (dist > Tolerance.Epsilon) return dist;
+                    if (dist >= -Tolerance.Epsilon) return 0; // touching
+                    return double.MaxValue; // edge is behind vertex
                 }
 
                 default:
@@ -872,6 +955,9 @@ namespace OpenNest
                 {
                     var d = RayEdgeDistance(movingLine.StartPoint, stationaryLines[j], direction);
                     if (d < minDist) minDist = d;
+
+                    d = RayEdgeDistance(movingLine.EndPoint, stationaryLines[j], direction);
+                    if (d < minDist) minDist = d;
                 }
             }
 
@@ -886,13 +972,16 @@ namespace OpenNest
                 {
                     var d = RayEdgeDistance(stationaryLine.StartPoint, movingLines[j], opposite);
                     if (d < minDist) minDist = d;
+
+                    d = RayEdgeDistance(stationaryLine.EndPoint, movingLines[j], opposite);
+                    if (d < minDist) minDist = d;
                 }
             }
 
             return minDist;
         }
 
-        private static PushDirection OppositeDirection(PushDirection direction)
+        public static PushDirection OppositeDirection(PushDirection direction)
         {
             switch (direction)
             {
