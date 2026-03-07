@@ -16,80 +16,146 @@ namespace OpenNest
 
         public double PartSpacing { get; }
 
+        private static Vector MakeOffset(NestDirection direction, double distance)
+        {
+            return direction == NestDirection.Horizontal
+                ? new Vector(distance, 0)
+                : new Vector(0, distance);
+        }
+
+        private static PushDirection GetPushDirection(NestDirection direction)
+        {
+            return direction == NestDirection.Horizontal
+                ? PushDirection.Left
+                : PushDirection.Down;
+        }
+
+        private static double GetDimension(Box box, NestDirection direction)
+        {
+            return direction == NestDirection.Horizontal ? box.Width : box.Height;
+        }
+
+        private static double GetStart(Box box, NestDirection direction)
+        {
+            return direction == NestDirection.Horizontal ? box.Left : box.Bottom;
+        }
+
+        private double GetLimit(NestDirection direction)
+        {
+            return direction == NestDirection.Horizontal ? WorkArea.Right : WorkArea.Top;
+        }
+
+        private static NestDirection PerpendicularAxis(NestDirection direction)
+        {
+            return direction == NestDirection.Horizontal
+                ? NestDirection.Vertical
+                : NestDirection.Horizontal;
+        }
+
+        /// <summary>
+        /// Computes the slide distance for the push algorithm, returning the
+        /// geometry-aware copy distance along the given axis.
+        /// </summary>
+        private double ComputeCopyDistance(double bboxDim, double slideDistance)
+        {
+            if (slideDistance >= double.MaxValue || slideDistance < 0)
+                return bboxDim + PartSpacing;
+
+            return bboxDim - slideDistance + PartSpacing;
+        }
+
         /// <summary>
         /// Finds the geometry-aware copy distance between two identical parts along an axis.
-        /// Places part B at bounding box offset from part A, then pushes B back toward A
-        /// using directional distance to find the tightest non-overlapping position.
         /// </summary>
         private double FindCopyDistance(Part partA, NestDirection direction)
         {
-            var bbox = partA.BoundingBox;
-            double bboxDim;
-            PushDirection pushDir;
-            Vector copyOffset;
+            var bboxDim = GetDimension(partA.BoundingBox, direction);
+            var pushDir = GetPushDirection(direction);
 
-            if (direction == NestDirection.Horizontal)
-            {
-                bboxDim = bbox.Width;
-                pushDir = PushDirection.Left;
-                copyOffset = new Vector(bboxDim, 0);
-            }
-            else
-            {
-                bboxDim = bbox.Height;
-                pushDir = PushDirection.Down;
-                copyOffset = new Vector(0, bboxDim);
-            }
-
-            // Create part B offset by bounding box dimension (guaranteed no overlap).
             var partB = (Part)partA.Clone();
-            partB.Offset(copyOffset);
+            partB.Offset(MakeOffset(direction, bboxDim));
 
-            // Get geometry lines for push calculation.
             var opposite = Helper.OppositeDirection(pushDir);
-
-            var movingLines = PartSpacing > 0
-                ? Helper.GetOffsetPartLines(partB, PartSpacing, pushDir)
-                : Helper.GetPartLines(partB, pushDir);
-
+            var movingLines = Helper.GetPartLines(partB, pushDir);
             var stationaryLines = Helper.GetPartLines(partA, opposite);
-
-            // Find how far B can slide toward A.
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
-            if (slideDistance >= double.MaxValue || slideDistance < 0)
-                return bboxDim;
+            return ComputeCopyDistance(bboxDim, slideDistance);
+        }
 
-            return bboxDim - slideDistance;
+        /// <summary>
+        /// Finds the geometry-aware copy distance between two identical patterns along an axis.
+        /// </summary>
+        private double FindPatternCopyDistance(Pattern patternA, NestDirection direction)
+        {
+            var bboxDim = GetDimension(patternA.BoundingBox, direction);
+            var pushDir = GetPushDirection(direction);
+
+            var patternB = patternA.Clone(MakeOffset(direction, bboxDim));
+
+            var opposite = Helper.OppositeDirection(pushDir);
+            var movingLines = patternB.GetLines(pushDir);
+            var stationaryLines = patternA.GetLines(opposite);
+            var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
+
+            return ComputeCopyDistance(bboxDim, slideDistance);
+        }
+
+        /// <summary>
+        /// Tiles a pattern along the given axis, returning the cloned parts
+        /// (does not include the original pattern's parts).
+        /// </summary>
+        private List<Part> TilePattern(Pattern basePattern, NestDirection direction)
+        {
+            var result = new List<Part>();
+            var copyDistance = FindPatternCopyDistance(basePattern, direction);
+
+            if (copyDistance <= 0)
+                return result;
+
+            var dim = GetDimension(basePattern.BoundingBox, direction);
+            var start = GetStart(basePattern.BoundingBox, direction);
+            var limit = GetLimit(direction);
+
+            var count = 1;
+
+            while (true)
+            {
+                var nextPos = start + copyDistance * count;
+
+                if (nextPos + dim > limit + Tolerance.Epsilon)
+                    break;
+
+                var clone = basePattern.Clone(MakeOffset(direction, copyDistance * count));
+                result.AddRange(clone.Parts);
+                count++;
+            }
+
+            return result;
         }
 
         /// <summary>
         /// Fills a single row of identical parts along one axis using geometry-aware spacing.
-        /// Returns a Pattern containing all placed parts.
         /// </summary>
         public Pattern FillRow(Drawing drawing, double rotationAngle, NestDirection direction)
         {
             var pattern = new Pattern();
 
-            // Create the template part with rotation applied.
             var template = new Part(drawing);
 
             if (!rotationAngle.IsEqualTo(0))
                 template.Rotate(rotationAngle);
 
-            // Position template at work area origin.
             var bbox = template.Program.BoundingBox();
             template.Offset(WorkArea.Location - bbox.Location);
             template.UpdateBounds();
 
-            // Check if the part fits in the work area at all.
             if (template.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
                 template.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
                 return pattern;
 
             pattern.Parts.Add(template);
 
-            // Find the geometry-aware copy distance.
             var copyDistance = FindCopyDistance(template, direction);
 
             if (copyDistance <= 0)
@@ -98,35 +164,22 @@ namespace OpenNest
                 return pattern;
             }
 
-            // Fill the row by copying at the fixed interval.
-            double limit = direction == NestDirection.Horizontal
-                ? WorkArea.Right
-                : WorkArea.Top;
+            var dim = GetDimension(template.BoundingBox, direction);
+            var start = GetStart(template.BoundingBox, direction);
+            var limit = GetLimit(direction);
 
-            double partDim = direction == NestDirection.Horizontal
-                ? template.BoundingBox.Width
-                : template.BoundingBox.Height;
-
-            int count = 1;
+            var count = 1;
 
             while (true)
             {
-                double nextPos = (direction == NestDirection.Horizontal
-                    ? template.BoundingBox.Left
-                    : template.BoundingBox.Bottom) + copyDistance * count;
+                var nextPos = start + copyDistance * count;
 
-                // Check if the next part would exceed the work area.
-                if (nextPos + partDim > limit + Tolerance.Epsilon)
+                if (nextPos + dim > limit + Tolerance.Epsilon)
                     break;
 
-                var offset = direction == NestDirection.Horizontal
-                    ? new Vector(copyDistance * count, 0)
-                    : new Vector(0, copyDistance * count);
-
                 var clone = (Part)template.Clone();
-                clone.Offset(offset);
+                clone.Offset(MakeOffset(direction, copyDistance * count));
                 pattern.Parts.Add(clone);
-
                 count++;
             }
 
@@ -135,45 +188,41 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Finds the geometry-aware copy distance between two identical patterns along an axis.
-        /// Same push algorithm as FindCopyDistance but operates on pattern line groups.
+        /// Fills the work area by tiling a pre-built pattern along both axes.
         /// </summary>
-        private double FindPatternCopyDistance(Pattern patternA, NestDirection direction)
+        public List<Part> Fill(Pattern pattern, NestDirection primaryAxis)
         {
-            var bbox = patternA.BoundingBox;
-            double bboxDim;
-            PushDirection pushDir;
-            Vector copyOffset;
+            var result = new List<Part>();
 
-            if (direction == NestDirection.Horizontal)
+            if (pattern.Parts.Count == 0)
+                return result;
+
+            var offset = WorkArea.Location - pattern.BoundingBox.Location;
+            var basePattern = pattern.Clone(offset);
+
+            if (basePattern.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
+                basePattern.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
+                return result;
+
+            result.AddRange(basePattern.Parts);
+
+            // Tile along the primary axis.
+            var primaryTiles = TilePattern(basePattern, primaryAxis);
+            result.AddRange(primaryTiles);
+
+            // Build a full-row pattern for perpendicular tiling.
+            if (primaryTiles.Count > 0)
             {
-                bboxDim = bbox.Width;
-                pushDir = PushDirection.Left;
-                copyOffset = new Vector(bboxDim, 0);
-            }
-            else
-            {
-                bboxDim = bbox.Height;
-                pushDir = PushDirection.Down;
-                copyOffset = new Vector(0, bboxDim);
+                var rowPattern = new Pattern();
+                rowPattern.Parts.AddRange(result);
+                rowPattern.UpdateBounds();
+                basePattern = rowPattern;
             }
 
-            var patternB = patternA.Clone(copyOffset);
+            // Tile along the perpendicular axis.
+            result.AddRange(TilePattern(basePattern, PerpendicularAxis(primaryAxis)));
 
-            var opposite = Helper.OppositeDirection(pushDir);
-
-            var movingLines = PartSpacing > 0
-                ? patternB.GetOffsetLines(PartSpacing, pushDir)
-                : patternB.GetLines(pushDir);
-
-            var stationaryLines = patternA.GetLines(opposite);
-
-            var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
-
-            if (slideDistance >= double.MaxValue || slideDistance < 0)
-                return bboxDim;
-
-            return bboxDim - slideDistance;
+            return result;
         }
 
         /// <summary>
@@ -182,55 +231,13 @@ namespace OpenNest
         /// </summary>
         public List<Part> Fill(Drawing drawing, double rotationAngle, NestDirection primaryAxis)
         {
-            var result = new List<Part>();
-
-            // Step 1: Build the row pattern along the primary axis.
             var rowPattern = FillRow(drawing, rotationAngle, primaryAxis);
 
             if (rowPattern.Parts.Count == 0)
-                return result;
+                return new List<Part>();
 
-            // Add the first row.
-            result.AddRange(rowPattern.Parts);
-
-            // Step 2: Tile the row pattern along the perpendicular axis.
-            var perpAxis = primaryAxis == NestDirection.Horizontal
-                ? NestDirection.Vertical
-                : NestDirection.Horizontal;
-
-            var copyDistance = FindPatternCopyDistance(rowPattern, perpAxis);
-
-            if (copyDistance <= 0)
-                return result;
-
-            double limit = perpAxis == NestDirection.Horizontal
-                ? WorkArea.Right
-                : WorkArea.Top;
-
-            double patternDim = perpAxis == NestDirection.Horizontal
-                ? rowPattern.BoundingBox.Width
-                : rowPattern.BoundingBox.Height;
-
-            int count = 1;
-
-            while (true)
-            {
-                double nextPos = (perpAxis == NestDirection.Horizontal
-                    ? rowPattern.BoundingBox.Left
-                    : rowPattern.BoundingBox.Bottom) + copyDistance * count;
-
-                if (nextPos + patternDim > limit + Tolerance.Epsilon)
-                    break;
-
-                var offset = perpAxis == NestDirection.Horizontal
-                    ? new Vector(copyDistance * count, 0)
-                    : new Vector(0, copyDistance * count);
-
-                var clone = rowPattern.Clone(offset);
-                result.AddRange(clone.Parts);
-
-                count++;
-            }
+            var result = new List<Part>(rowPattern.Parts);
+            result.AddRange(TilePattern(rowPattern, PerpendicularAxis(primaryAxis)));
 
             return result;
         }

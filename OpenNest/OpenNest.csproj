@@ -51,7 +51,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Actions\Action.cs" />
-    <Compile Include="Actions\ActionAddPart.cs" />
     <Compile Include="Actions\ActionClone.cs" />
     <Compile Include="Actions\ActionFillArea.cs" />
     <Compile Include="Actions\ActionSelect.cs" />

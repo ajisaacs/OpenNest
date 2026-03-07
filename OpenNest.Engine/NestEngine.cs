@@ -55,6 +55,46 @@ namespace OpenNest
             return true;
         }
 
+        public bool Fill(List<Part> groupParts)
+        {
+            if (groupParts == null || groupParts.Count == 0)
+                return false;
+
+            var workArea = Plate.WorkArea();
+            var engine = new FillLinear(workArea, Plate.PartSpacing);
+
+            // Build a pattern from the group of parts.
+            var pattern = new Pattern();
+            foreach (var part in groupParts)
+            {
+                var clone = (Part)part.Clone();
+                clone.UpdateBounds();
+                pattern.Parts.Add(clone);
+            }
+            pattern.UpdateBounds();
+
+            // Try 4 configurations: 2 axes x 2 orientations (horizontal/vertical).
+            var configs = new[]
+            {
+                engine.Fill(pattern, NestDirection.Horizontal),
+                engine.Fill(pattern, NestDirection.Vertical)
+            };
+
+            List<Part> best = null;
+
+            foreach (var config in configs)
+            {
+                if (best == null || config.Count > best.Count)
+                    best = config;
+            }
+
+            if (best == null || best.Count == 0)
+                return false;
+
+            Plate.Parts.AddRange(best);
+            return true;
+        }
+
         public bool Fill(NestItem item, int maxCount)
         {
             if (maxCount <= 0)
@@ -169,12 +209,17 @@ namespace OpenNest
                 }
             }
 
+            // Convert to polygon so arcs are properly represented as line segments.
+            // Shape.FindBestRotation() uses Entity cardinal points which are incorrect
+            // for arcs that don't sweep through all 4 cardinal directions.
+            var polygon = largest.ToPolygonWithTolerance(0.1);
+
             BoundingRectangleResult result;
 
             if (item.RotationStart.IsEqualTo(0) && item.RotationEnd.IsEqualTo(0))
-                result = largest.FindBestRotation();
+                result = polygon.FindBestRotation();
             else
-                result = largest.FindBestRotation(item.RotationStart, item.RotationEnd);
+                result = polygon.FindBestRotation(item.RotationStart, item.RotationEnd);
 
             // Negate the angle to align the minimum bounding rectangle with the axes.
             return -result.Angle;

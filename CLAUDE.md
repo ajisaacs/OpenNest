@@ -59,6 +59,14 @@ Nest files (`.zip`) contain:
 - `program-NNN` — G-code text for each drawing's cut program
 - `plate-NNN` — G-code text encoding part placements (G00 for position, G65 for sub-program call with rotation)
 
+## Tool Preferences
+
+Always use Roslyn Bridge MCP tools (`mcp__RoslynBridge__*`) as the primary method for exploring and analyzing this codebase. It is faster and more efficient than file-based searches. Use it for finding symbols, references, diagnostics, type hierarchies, and code navigation. Only fall back to Glob/Grep when Roslyn Bridge cannot fulfill the query.
+
+## Code Style
+
+- Always use `var` instead of explicit types (e.g., `var parts = new List<Part>();` not `List<Part> parts = new List<Part>();`).
+
 ## Key Patterns
 
 - OpenNest.Core uses multiple namespaces: `OpenNest` (root domain), `OpenNest.CNC`, `OpenNest.Geometry`, `OpenNest.Converters`, `OpenNest.Math`, `OpenNest.Collections`.

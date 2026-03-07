@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Geometry;
@@ -12,6 +13,11 @@ namespace OpenNest.Actions
         private readonly List<LayoutPart> parts;
 
         private double lastScale;
+
+        public ActionClone(PlateView plateView, Drawing drawing)
+            : this(plateView, new List<Part> { new Part(drawing) })
+        {
+        }
 
         public ActionClone(PlateView plateView, List<Part> partsToClone)
             : base(plateView)
@@ -52,6 +58,11 @@ namespace OpenNest.Actions
                 case Keys.F1:
                 case Keys.Enter:
                     Apply();
+                    break;
+
+                case Keys.F:
+                    if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+                        Fill();
                     break;
             }
         }
@@ -111,11 +122,38 @@ namespace OpenNest.Actions
         {
             if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
             {
-                plateView.PushSelected(PushDirection.Left);
-                plateView.PushSelected(PushDirection.Down);
+                switch (plateView.Plate.Quadrant)
+                {
+                    case 1:
+                        plateView.PushSelected(PushDirection.Left);
+                        plateView.PushSelected(PushDirection.Down);
+                        break;
+
+                    case 2:
+                        plateView.PushSelected(PushDirection.Right);
+                        plateView.PushSelected(PushDirection.Down);
+                        break;
+
+                    case 3:
+                        plateView.PushSelected(PushDirection.Right);
+                        plateView.PushSelected(PushDirection.Up);
+                        break;
+
+                    case 4:
+                        plateView.PushSelected(PushDirection.Left);
+                        plateView.PushSelected(PushDirection.Up);
+                        break;
+                }
             }
 
             parts.ForEach(p => plateView.Plate.Parts.Add(p.BasePart.Clone() as Part));
+        }
+
+        private void Fill()
+        {
+            var engine = new NestEngine(plateView.Plate);
+            var groupParts = parts.Select(p => p.BasePart).ToList();
+            engine.Fill(groupParts);
         }
     }
 }

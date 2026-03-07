@@ -687,7 +687,7 @@ namespace OpenNest.Forms
             if (drawing == null)
                 return;
 
-            PlateView.SetAction(typeof(ActionAddPart), drawing);
+            PlateView.SetAction(typeof(ActionClone), drawing);
 
             addPart = false;
         }
