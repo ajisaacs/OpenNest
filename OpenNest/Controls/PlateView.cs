@@ -127,7 +127,8 @@ namespace OpenNest.Controls
             foreach (var part in plate.Parts)
                 parts.Add(LayoutPart.Create(part, this));
 
-            SetAction(typeof(ActionSelect));
+            if (currentAction == null || !currentAction.SurvivesPlateChange)
+                SetAction(typeof(ActionSelect));
         }
 
         public string Status

@@ -11,6 +11,8 @@ namespace OpenNest.Actions
             this.plateView = plateView;
         }
 
+        public virtual bool SurvivesPlateChange => false;
+
         public abstract void DisconnectEvents();
 
         public abstract void CancelAction();

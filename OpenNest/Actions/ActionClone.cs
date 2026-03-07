@@ -98,6 +98,8 @@ namespace OpenNest.Actions
             plateView.Invalidate();
         }
 
+        public override bool SurvivesPlateChange => true;
+
         public override void DisconnectEvents()
         {
             plateView.KeyDown -= plateView_KeyDown;
