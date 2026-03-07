@@ -459,8 +459,10 @@ namespace OpenNest.Geometry
                 lastEntity = entity;
             }
 
+            var cutoutSide = side == OffsetSide.Left ? OffsetSide.Right : OffsetSide.Left;
+
             foreach (var cutout in definedShape.Cutouts)
-                offsetShape.Entities.AddRange(((Shape)cutout.OffsetEntity(distance, side)).Entities);
+                offsetShape.Entities.AddRange(((Shape)cutout.OffsetEntity(distance, cutoutSide)).Entities);
 
             return offsetShape;
         }
