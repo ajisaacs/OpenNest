@@ -26,6 +26,7 @@ namespace OpenNest.Controls
         private Plate plate;
         private Action currentAction;
         private List<LayoutPart> parts;
+        private Point middleMouseDownPoint;
 
         public List<LayoutPart> SelectedParts;
         public ReadOnlyCollection<LayoutPart> Parts;
@@ -164,6 +165,31 @@ namespace OpenNest.Controls
             var pt2 = PointControlToWorld(pt1);
 
             AddPartFromDrawing(dwg, pt2);
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Middle)
+                middleMouseDownPoint = e.Location;
+
+            base.OnMouseDown(e);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Middle && SelectedParts.Count > 0)
+            {
+                var dx = e.X - middleMouseDownPoint.X;
+                var dy = e.Y - middleMouseDownPoint.Y;
+
+                if (dx * dx + dy * dy < 25)
+                {
+                    RotateSelectedParts(Angle.ToRadians(90));
+                    Invalidate();
+                }
+            }
+
+            base.OnMouseUp(e);
         }
 
         protected override void OnMouseWheel(MouseEventArgs e)
