@@ -15,6 +15,8 @@ namespace OpenNest.Actions
 
         public virtual void OnPlateChanged() { }
 
+        public virtual void ConnectEvents() { }
+
         public abstract void DisconnectEvents();
 
         public abstract void CancelAction();

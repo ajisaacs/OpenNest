@@ -25,6 +25,7 @@ namespace OpenNest.Controls
         private string status;
         private Plate plate;
         private Action currentAction;
+        private Action previousAction;
         private List<LayoutPart> parts;
         private Point middleMouseDownPoint;
 
@@ -283,6 +284,8 @@ namespace OpenNest.Controls
                 case Keys.Escape:
                     if (currentAction.IsBusy())
                         currentAction.CancelAction();
+                    else if (currentAction is ActionSelect && previousAction != null)
+                        RestorePreviousAction();
                     else
                         SetAction(typeof(ActionSelect));
                     break;
@@ -650,6 +653,11 @@ namespace OpenNest.Controls
 
             if (currentAction != null)
             {
+                if (type == typeof(ActionSelect) && !(currentAction is ActionSelect))
+                    previousAction = currentAction;
+                else
+                    previousAction = null;
+
                 currentAction.CancelAction();
                 currentAction.DisconnectEvents();
                 currentAction = null;
@@ -664,6 +672,7 @@ namespace OpenNest.Controls
         {
             if (currentAction != null)
             {
+                previousAction = null;
                 currentAction.CancelAction();
                 currentAction.DisconnectEvents();
                 currentAction = null;
@@ -686,6 +695,20 @@ namespace OpenNest.Controls
             currentAction = action;
 
             Status = GetDisplayName(type);
+        }
+
+        private void RestorePreviousAction()
+        {
+            var action = previousAction;
+            previousAction = null;
+
+            currentAction.CancelAction();
+            currentAction.DisconnectEvents();
+
+            action.ConnectEvents();
+            currentAction = action;
+
+            Status = GetDisplayName(action.GetType());
         }
 
         public void AlignSelected(AlignType alignType)
