@@ -34,7 +34,7 @@ namespace OpenNest.Forms
             {
                 var dir = shape.ToPolygon(3).RotationDirection();
 
-                if (dir != RotationType.CW)
+                if (dir != rotation)
                     shape.Reverse();
             }
             catch { }
