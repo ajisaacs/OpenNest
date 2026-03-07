@@ -608,5 +608,29 @@ namespace OpenNest.Geometry
             var hull = ConvexHull.Compute(Vertices);
             return RotatingCalipers.MinimumBoundingRectangle(hull, startAngle, endAngle);
         }
+
+        public bool ContainsPoint(Vector pt)
+        {
+            var n = IsClosed() ? Vertices.Count - 1 : Vertices.Count;
+
+            if (n < 3)
+                return false;
+
+            var inside = false;
+
+            for (int i = 0, j = n - 1; i < n; j = i++)
+            {
+                var vi = Vertices[i];
+                var vj = Vertices[j];
+
+                if ((vi.Y > pt.Y) != (vj.Y > pt.Y) &&
+                    pt.X < (vj.X - vi.X) * (pt.Y - vi.Y) / (vj.Y - vi.Y) + vi.X)
+                {
+                    inside = !inside;
+                }
+            }
+
+            return inside;
+        }
     }
 }
