@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Converters;
+using OpenNest.Engine.BestFit;
+using OpenNest.Engine.BestFit.Tiling;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using OpenNest.RectanglePacking;
@@ -35,14 +37,23 @@ namespace OpenNest
                 engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Vertical)
             };
 
-            // Pick the configuration with the most parts.
-            List<Part> best = null;
+            // Pick the linear configuration with the most parts.
+            List<Part> linearBest = null;
 
             foreach (var config in configs)
             {
-                if (best == null || config.Count > best.Count)
-                    best = config;
+                if (linearBest == null || config.Count > linearBest.Count)
+                    linearBest = config;
             }
+
+            // Try pair-based approach.
+            var pairResult = FillWithPairs(item);
+
+            // Pick whichever produced more parts.
+            var best = linearBest;
+
+            if (pairResult.Count > (best?.Count ?? 0))
+                best = pairResult;
 
             if (best == null || best.Count == 0)
                 return false;
@@ -208,6 +219,80 @@ namespace OpenNest
             Plate.Parts.AddRange(parts);
 
             return parts.Count > 0;
+        }
+
+        private List<Part> FillWithPairs(NestItem item)
+        {
+            var finder = new BestFitFinder(Plate.Size.Width, Plate.Size.Height);
+            var tileResults = finder.FindAndTile(item.Drawing, Plate, Plate.PartSpacing);
+
+            if (tileResults.Count == 0)
+                return new List<Part>();
+
+            var bestTile = tileResults[0];
+            return ConvertTileResultToParts(bestTile, item.Drawing);
+        }
+
+        private List<Part> ConvertTileResultToParts(TileResult tileResult, Drawing drawing)
+        {
+            var parts = new List<Part>();
+            var bestFit = tileResult.BestFit;
+            var candidate = bestFit.Candidate;
+            var workArea = Plate.WorkArea();
+
+            foreach (var placement in tileResult.Placements)
+            {
+                // Build part1 at origin.
+                var part1 = new Part(drawing);
+                var bbox1 = part1.Program.BoundingBox();
+                part1.Offset(-bbox1.Location.X, -bbox1.Location.Y);
+                part1.UpdateBounds();
+
+                // Build part2 with rotation, positioned at offset.
+                var part2 = new Part(drawing);
+
+                if (!candidate.Part2Rotation.IsEqualTo(0))
+                    part2.Rotate(candidate.Part2Rotation);
+
+                var bbox2 = part2.Program.BoundingBox();
+                part2.Offset(-bbox2.Location.X, -bbox2.Location.Y);
+                part2.Location = candidate.Part2Offset;
+                part2.UpdateBounds();
+
+                // Apply optimal rotation to align pair to minimum bounding rectangle.
+                if (!bestFit.OptimalRotation.IsEqualTo(0))
+                {
+                    var pairBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+                    var center = pairBounds.Center;
+                    part1.Rotate(-bestFit.OptimalRotation, center);
+                    part2.Rotate(-bestFit.OptimalRotation, center);
+                }
+
+                // Apply 90 degree rotation if the tiler chose the rotated orientation.
+                if (tileResult.PairRotated)
+                {
+                    var pairBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+                    var center = pairBounds.Center;
+                    part1.Rotate(Angle.HalfPI, center);
+                    part2.Rotate(Angle.HalfPI, center);
+                }
+
+                // Normalize pair to origin.
+                var finalBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+                var normalizeOffset = new Vector(-finalBounds.Left, -finalBounds.Bottom);
+                part1.Offset(normalizeOffset);
+                part2.Offset(normalizeOffset);
+
+                // Offset to grid position plus work area origin.
+                var plateOffset = placement.Position + workArea.Location;
+                part1.Offset(plateOffset);
+                part2.Offset(plateOffset);
+
+                parts.Add(part1);
+                parts.Add(part2);
+            }
+
+            return parts;
         }
 
         private List<double> FindHullEdgeAngles(List<Part> parts)
