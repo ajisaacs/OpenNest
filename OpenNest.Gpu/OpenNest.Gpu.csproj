@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>OpenNest.Gpu</RootNamespace>
+    <AssemblyName>OpenNest.Gpu</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
+    <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ILGPU" Version="1.5.1" />
+    <PackageReference Include="ILGPU.Algorithms" Version="1.5.1" />
+  </ItemGroup>
+</Project>
