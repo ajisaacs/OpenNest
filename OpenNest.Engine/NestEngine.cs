@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using OpenNest.RectanglePacking;
@@ -105,6 +107,77 @@ namespace OpenNest
             Plate.Parts.AddRange(parts);
 
             return parts.Count > 0;
+        }
+
+        public bool FillLinear(NestItem item)
+        {
+            var workArea = Plate.WorkArea();
+            var bestRotation = FindBestRotation(item);
+
+            var engine = new FillLinear(workArea, Plate.PartSpacing);
+
+            // Try 4 configurations: 2 rotations x 2 axes.
+            var configs = new[]
+            {
+                engine.Fill(item.Drawing, bestRotation, NestDirection.Horizontal),
+                engine.Fill(item.Drawing, bestRotation, NestDirection.Vertical),
+                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Horizontal),
+                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Vertical)
+            };
+
+            // Pick the configuration with the most parts.
+            List<Part> best = null;
+
+            foreach (var config in configs)
+            {
+                if (best == null || config.Count > best.Count)
+                    best = config;
+            }
+
+            if (best == null || best.Count == 0)
+                return false;
+
+            // Limit to requested quantity if specified.
+            if (item.Quantity > 0 && best.Count > item.Quantity)
+                best = best.Take(item.Quantity).ToList();
+
+            Plate.Parts.AddRange(best);
+            return true;
+        }
+
+        private double FindBestRotation(NestItem item)
+        {
+            var entities = ConvertProgram.ToGeometry(item.Drawing.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid);
+
+            var shapes = Helper.GetShapes(entities);
+
+            if (shapes.Count == 0)
+                return 0;
+
+            // Find the largest shape (outer profile).
+            Shape largest = shapes[0];
+            double largestArea = largest.Area();
+
+            for (int i = 1; i < shapes.Count; i++)
+            {
+                var area = shapes[i].Area();
+                if (area > largestArea)
+                {
+                    largest = shapes[i];
+                    largestArea = area;
+                }
+            }
+
+            BoundingRectangleResult result;
+
+            if (item.RotationStart.IsEqualTo(0) && item.RotationEnd.IsEqualTo(0))
+                result = largest.FindBestRotation();
+            else
+                result = largest.FindBestRotation(item.RotationStart, item.RotationEnd);
+
+            // Negate the angle to align the minimum bounding rectangle with the axes.
+            return -result.Angle;
         }
 
         private List<Part> ConvertToParts(Bin bin, List<NestItem> items)
