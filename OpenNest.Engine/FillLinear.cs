@@ -8,13 +8,15 @@ namespace OpenNest
     {
         public FillLinear(Box workArea, double partSpacing)
         {
-            WorkArea = workArea;
             PartSpacing = partSpacing;
+            WorkArea = new Box(workArea.X, workArea.Y, workArea.Width, workArea.Height);
         }
 
         public Box WorkArea { get; }
 
         public double PartSpacing { get; }
+
+        public double HalfSpacing => PartSpacing / 2;
 
         private static Vector MakeOffset(NestDirection direction, double distance)
         {
@@ -66,18 +68,19 @@ namespace OpenNest
 
         /// <summary>
         /// Finds the geometry-aware copy distance between two identical parts along an axis.
+        /// Both parts are inflated by half-spacing for symmetric spacing.
         /// </summary>
-        private double FindCopyDistance(Part partA, NestDirection direction)
+        private double FindCopyDistance(Part partA, NestDirection direction, PartBoundary boundary)
         {
             var bboxDim = GetDimension(partA.BoundingBox, direction);
             var pushDir = GetPushDirection(direction);
+            var opposite = Helper.OppositeDirection(pushDir);
 
             var partB = (Part)partA.Clone();
             partB.Offset(MakeOffset(direction, bboxDim));
 
-            var opposite = Helper.OppositeDirection(pushDir);
-            var movingLines = Helper.GetOffsetPartLines(partB, PartSpacing, pushDir);
-            var stationaryLines = Helper.GetPartLines(partA, opposite);
+            var movingLines = boundary.GetLines(partB.Location, pushDir);
+            var stationaryLines = boundary.GetLines(partA.Location, opposite);
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
             return ComputeCopyDistance(bboxDim, slideDistance);
@@ -87,29 +90,30 @@ namespace OpenNest
         /// Finds the geometry-aware copy distance between two identical patterns along an axis.
         /// Checks every pair of parts across adjacent patterns so that multi-part
         /// patterns (e.g. interlocking pairs) maintain spacing between ALL parts.
+        /// Both sides are inflated by half-spacing for symmetric spacing.
         /// </summary>
-        private double FindPatternCopyDistance(Pattern patternA, NestDirection direction)
+        private double FindPatternCopyDistance(Pattern patternA, NestDirection direction, PartBoundary[] boundaries)
         {
             if (patternA.Parts.Count <= 1)
-                return FindSinglePartPatternCopyDistance(patternA, direction);
+                return FindSinglePartPatternCopyDistance(patternA, direction, boundaries[0]);
 
             var bboxDim = GetDimension(patternA.BoundingBox, direction);
             var pushDir = GetPushDirection(direction);
             var opposite = Helper.OppositeDirection(pushDir);
 
             // Compute a starting offset large enough that every part-pair in
-            // patternB has its offset geometry beyond patternA's raw geometry.
+            // patternB has its offset geometry beyond patternA's offset geometry.
             var startOffset = bboxDim;
 
-            foreach (var partA in patternA.Parts)
+            for (var i = 0; i < patternA.Parts.Count; i++)
             {
                 var aUpper = direction == NestDirection.Horizontal
-                    ? partA.BoundingBox.Right : partA.BoundingBox.Top;
+                    ? patternA.Parts[i].BoundingBox.Right : patternA.Parts[i].BoundingBox.Top;
 
-                foreach (var refB in patternA.Parts)
+                for (var j = 0; j < patternA.Parts.Count; j++)
                 {
                     var bLower = direction == NestDirection.Horizontal
-                        ? refB.BoundingBox.Left : refB.BoundingBox.Bottom;
+                        ? patternA.Parts[j].BoundingBox.Left : patternA.Parts[j].BoundingBox.Bottom;
 
                     var required = aUpper - bLower + PartSpacing + Tolerance.Epsilon;
 
@@ -120,19 +124,25 @@ namespace OpenNest
 
             var patternB = patternA.Clone(MakeOffset(direction, startOffset));
 
+            // Pre-compute stationary lines for patternA parts.
+            var stationaryCache = new List<Line>[patternA.Parts.Count];
+
+            for (var i = 0; i < patternA.Parts.Count; i++)
+                stationaryCache[i] = boundaries[i].GetLines(patternA.Parts[i].Location, opposite);
+
             var maxCopyDistance = 0.0;
 
-            foreach (var partB in patternB.Parts)
+            for (var j = 0; j < patternB.Parts.Count; j++)
             {
-                var movingLines = Helper.GetOffsetPartLines(partB, PartSpacing, pushDir);
+                var partB = patternB.Parts[j];
+                var movingLines = boundaries[j].GetLines(partB.Location, pushDir);
 
-                foreach (var partA in patternA.Parts)
+                for (var i = 0; i < patternA.Parts.Count; i++)
                 {
-                    var stationaryLines = Helper.GetPartLines(partA, opposite);
-                    var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
+                    var slideDistance = Helper.DirectionalDistance(movingLines, stationaryCache[i], pushDir);
 
                     if (slideDistance >= double.MaxValue || slideDistance < 0)
-                        continue; // No geometric interaction — pair doesn't constrain distance.
+                        continue;
 
                     var copyDist = startOffset - slideDistance;
 
@@ -152,29 +162,77 @@ namespace OpenNest
         /// <summary>
         /// Fast path for single-part patterns — no cross-part conflicts possible.
         /// </summary>
-        private double FindSinglePartPatternCopyDistance(Pattern patternA, NestDirection direction)
+        private double FindSinglePartPatternCopyDistance(Pattern patternA, NestDirection direction, PartBoundary boundary)
         {
             var bboxDim = GetDimension(patternA.BoundingBox, direction);
             var pushDir = GetPushDirection(direction);
+            var opposite = Helper.OppositeDirection(pushDir);
 
             var patternB = patternA.Clone(MakeOffset(direction, bboxDim));
 
-            var opposite = Helper.OppositeDirection(pushDir);
-            var movingLines = patternB.GetOffsetLines(PartSpacing, pushDir);
-            var stationaryLines = patternA.GetLines(opposite);
+            var movingLines = GetPatternLines(patternB, boundary, pushDir);
+            var stationaryLines = GetPatternLines(patternA, boundary, opposite);
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
             return ComputeCopyDistance(bboxDim, slideDistance);
         }
 
         /// <summary>
+        /// Gets offset boundary lines for all parts in a pattern using a shared boundary.
+        /// </summary>
+        private static List<Line> GetPatternLines(Pattern pattern, PartBoundary boundary, PushDirection direction)
+        {
+            var lines = new List<Line>();
+
+            foreach (var part in pattern.Parts)
+                lines.AddRange(boundary.GetLines(part.Location, direction));
+
+            return lines;
+        }
+
+        /// <summary>
+        /// Creates boundaries for all parts in a pattern. Parts that share the same
+        /// program geometry (same drawing and rotation) reuse the same boundary instance.
+        /// </summary>
+        private PartBoundary[] CreateBoundaries(Pattern pattern)
+        {
+            var boundaries = new PartBoundary[pattern.Parts.Count];
+            var cache = new List<(Drawing drawing, double rotation, PartBoundary boundary)>();
+
+            for (var i = 0; i < pattern.Parts.Count; i++)
+            {
+                var part = pattern.Parts[i];
+                PartBoundary found = null;
+
+                foreach (var entry in cache)
+                {
+                    if (entry.drawing == part.BaseDrawing && entry.rotation.IsEqualTo(part.Rotation))
+                    {
+                        found = entry.boundary;
+                        break;
+                    }
+                }
+
+                if (found == null)
+                {
+                    found = new PartBoundary(part, HalfSpacing);
+                    cache.Add((part.BaseDrawing, part.Rotation, found));
+                }
+
+                boundaries[i] = found;
+            }
+
+            return boundaries;
+        }
+
+        /// <summary>
         /// Tiles a pattern along the given axis, returning the cloned parts
         /// (does not include the original pattern's parts).
         /// </summary>
-        private List<Part> TilePattern(Pattern basePattern, NestDirection direction)
+        private List<Part> TilePattern(Pattern basePattern, NestDirection direction, PartBoundary[] boundaries)
         {
             var result = new List<Part>();
-            var copyDistance = FindPatternCopyDistance(basePattern, direction);
+            var copyDistance = FindPatternCopyDistance(basePattern, direction, boundaries);
 
             if (copyDistance <= 0)
                 return result;
@@ -220,9 +278,11 @@ namespace OpenNest
                 template.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
                 return pattern;
 
+            var boundary = new PartBoundary(template, HalfSpacing);
+
             pattern.Parts.Add(template);
 
-            var copyDistance = FindCopyDistance(template, direction);
+            var copyDistance = FindCopyDistance(template, direction, boundary);
 
             if (copyDistance <= 0)
             {
@@ -270,10 +330,12 @@ namespace OpenNest
                 basePattern.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
                 return result;
 
+            var boundaries = CreateBoundaries(basePattern);
+
             result.AddRange(basePattern.Parts);
 
             // Tile along the primary axis.
-            var primaryTiles = TilePattern(basePattern, primaryAxis);
+            var primaryTiles = TilePattern(basePattern, primaryAxis, boundaries);
             result.AddRange(primaryTiles);
 
             // Build a full-row pattern for perpendicular tiling.
@@ -283,10 +345,11 @@ namespace OpenNest
                 rowPattern.Parts.AddRange(result);
                 rowPattern.UpdateBounds();
                 basePattern = rowPattern;
+                boundaries = CreateBoundaries(basePattern);
             }
 
             // Tile along the perpendicular axis.
-            result.AddRange(TilePattern(basePattern, PerpendicularAxis(primaryAxis)));
+            result.AddRange(TilePattern(basePattern, PerpendicularAxis(primaryAxis), boundaries));
 
             return result;
         }
@@ -302,8 +365,9 @@ namespace OpenNest
             if (rowPattern.Parts.Count == 0)
                 return new List<Part>();
 
+            var boundaries = CreateBoundaries(rowPattern);
             var result = new List<Part>(rowPattern.Parts);
-            result.AddRange(TilePattern(rowPattern, PerpendicularAxis(primaryAxis)));
+            result.AddRange(TilePattern(rowPattern, PerpendicularAxis(primaryAxis), boundaries));
 
             return result;
         }
