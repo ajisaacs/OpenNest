@@ -33,8 +33,9 @@ namespace OpenNest.Gpu
             if (candidates.Count == 0)
                 return new List<BestFitResult>();
 
-            var dilation = _spacing / 2.0;
-            var bitmapA = PartBitmap.FromDrawing(_drawing, _cellSize, dilation);
+            // No dilation — candidate positions already include spacing
+            // (baked in by RotationSlideStrategy via half-spacing offset lines).
+            var bitmapA = PartBitmap.FromDrawing(_drawing, _cellSize);
 
             if (bitmapA.Width == 0 || bitmapA.Height == 0)
                 return candidates.Select(c => MakeEmptyResult(c)).ToList();
@@ -53,7 +54,7 @@ namespace OpenNest.Gpu
                 var groupItems = group.ToList();
 
                 // Rasterize B at this rotation
-                var bitmapB = PartBitmap.FromDrawingRotated(_drawing, rotation, _cellSize, dilation);
+                var bitmapB = PartBitmap.FromDrawingRotated(_drawing, rotation, _cellSize);
 
                 if (bitmapB.Width == 0 || bitmapB.Height == 0)
                 {
