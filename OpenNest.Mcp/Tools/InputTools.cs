@@ -10,6 +10,7 @@ using CncProgram = OpenNest.CNC.Program;
 
 namespace OpenNest.Mcp.Tools
 {
+    [McpServerToolType]
     public class InputTools
     {
         private readonly NestSession _session;

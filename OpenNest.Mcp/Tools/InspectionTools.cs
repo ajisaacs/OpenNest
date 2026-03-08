@@ -8,6 +8,7 @@ using OpenNest.Math;
 
 namespace OpenNest.Mcp.Tools
 {
+    [McpServerToolType]
     public class InspectionTools
     {
         private readonly NestSession _session;

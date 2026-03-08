@@ -7,6 +7,7 @@ using OpenNest.Geometry;
 
 namespace OpenNest.Mcp.Tools
 {
+    [McpServerToolType]
     public class NestingTools
     {
         private readonly NestSession _session;
