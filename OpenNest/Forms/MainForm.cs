@@ -537,7 +537,7 @@ namespace OpenNest.Forms
             {
                 if (form.ShowDialog(this) == DialogResult.OK && form.SelectedResult != null)
                 {
-                    var parts = NestEngine.BuildPairParts(form.SelectedResult, drawing);
+                    var parts = form.SelectedResult.BuildParts(drawing);
                     activeForm.PlateView.SetAction(typeof(ActionClone), parts);
                 }
             }

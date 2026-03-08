@@ -126,7 +126,7 @@ namespace OpenNest.Forms
                 result.BoundingWidth,
                 result.BoundingHeight);
 
-            var parts = NestEngine.BuildPairParts(result, drawing);
+            var parts = result.BuildParts(drawing);
 
             foreach (var part in parts)
                 view.Plate.Parts.Add(part);

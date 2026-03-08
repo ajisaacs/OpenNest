@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using OpenNest.Converters;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -35,7 +34,7 @@ namespace OpenNest
 
         public bool Fill(NestItem item, Box workArea)
         {
-            var bestRotation = FindBestRotation(item);
+            var bestRotation = RotationAnalysis.FindBestRotation(item);
 
             var engine = new FillLinear(workArea, Plate.PartSpacing);
 
@@ -89,7 +88,7 @@ namespace OpenNest
                 return false;
 
             var engine = new FillLinear(workArea, Plate.PartSpacing);
-            var angles = FindHullEdgeAngles(groupParts);
+            var angles = RotationAnalysis.FindHullEdgeAngles(groupParts);
             var best = FillPattern(engine, groupParts, angles);
 
             Debug.WriteLine($"[Fill(groupParts,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
@@ -127,21 +126,13 @@ namespace OpenNest
 
         public bool PackArea(Box box, List<NestItem> items)
         {
-            var binItems = ConvertToRectangleItems(items);
-
-            var bin = new Bin
-            {
-                Location = box.Location,
-                Size = box.Size
-            };
-
-            bin.Width += Plate.PartSpacing;
-            bin.Height += Plate.PartSpacing;
+            var binItems = BinConverter.ToItems(items, Plate.PartSpacing, Plate.Area());
+            var bin = BinConverter.CreateBin(box, Plate.PartSpacing);
 
             var engine = new PackBottomLeft(bin);
             engine.Pack(binItems);
 
-            var parts = ConvertToParts(bin, items);
+            var parts = BinConverter.ToParts(bin, items);
             Plate.Parts.AddRange(parts);
 
             return parts.Count > 0;
@@ -149,22 +140,13 @@ namespace OpenNest
 
         private List<Part> FillRectangleBestFit(NestItem item, Box workArea)
         {
-            var binItem = ConvertToRectangleItem(item);
-
-            var bin = new Bin
-            {
-                Location = workArea.Location,
-                Size = workArea.Size
-            };
-
-            bin.Width += Plate.PartSpacing;
-            bin.Height += Plate.PartSpacing;
+            var binItem = BinConverter.ToItem(item, Plate.PartSpacing);
+            var bin = BinConverter.CreateBin(workArea, Plate.PartSpacing);
 
             var engine = new FillBestFit(bin);
             engine.Fill(binItem);
 
-            var nestItems = new List<NestItem> { item };
-            return ConvertToParts(bin, nestItems);
+            return BinConverter.ToParts(bin, new List<NestItem> { item });
         }
 
         private List<Part> FillWithPairs(NestItem item, Box workArea)
@@ -188,8 +170,8 @@ namespace OpenNest
             System.Threading.Tasks.Parallel.For(0, keptResults.Count, i =>
             {
                 var result = keptResults[i];
-                var pairParts = BuildPairParts(result, item.Drawing);
-                var angles = FindHullEdgeAngles(pairParts);
+                var pairParts = result.BuildParts(item.Drawing);
+                var angles = RotationAnalysis.FindHullEdgeAngles(pairParts);
                 var engine = new FillLinear(workArea, Plate.PartSpacing);
                 var filled = FillPattern(engine, pairParts, angles);
 
@@ -209,32 +191,6 @@ namespace OpenNest
 
             Debug.WriteLine($"[FillWithPairs] Best pair result: {best?.Count ?? 0} parts");
             return best ?? new List<Part>();
-        }
-
-        public static List<Part> BuildPairParts(BestFitResult bestFit, Drawing drawing)
-        {
-            var candidate = bestFit.Candidate;
-
-            var part1 = Part.CreateAtOrigin(drawing);
-
-            var part2 = Part.CreateAtOrigin(drawing, candidate.Part2Rotation);
-            part2.Location = candidate.Part2Offset;
-            part2.UpdateBounds();
-
-            if (!bestFit.OptimalRotation.IsEqualTo(0))
-            {
-                var pairBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
-                var center = pairBounds.Center;
-                part1.Rotate(-bestFit.OptimalRotation, center);
-                part2.Rotate(-bestFit.OptimalRotation, center);
-            }
-
-            var finalBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
-            var offset = new Vector(-finalBounds.Left, -finalBounds.Bottom);
-            part1.Offset(offset);
-            part2.Offset(offset);
-
-            return new List<Part> { part1, part2 };
         }
 
         private bool HasOverlaps(List<Part> parts, double spacing)
@@ -282,53 +238,6 @@ namespace OpenNest
             return IsBetterFill(candidate, current);
         }
 
-        private List<double> FindHullEdgeAngles(List<Part> parts)
-        {
-            var points = new List<Vector>();
-
-            foreach (var part in parts)
-            {
-                var entities = ConvertProgram.ToGeometry(part.Program)
-                    .Where(e => e.Layer != SpecialLayers.Rapid);
-
-                var shapes = Helper.GetShapes(entities);
-
-                foreach (var shape in shapes)
-                {
-                    var polygon = shape.ToPolygonWithTolerance(0.1);
-
-                    foreach (var vertex in polygon.Vertices)
-                        points.Add(vertex + part.Location);
-                }
-            }
-
-            if (points.Count < 3)
-                return new List<double> { 0 };
-
-            var hull = ConvexHull.Compute(points);
-            var vertices = hull.Vertices;
-            var n = hull.IsClosed() ? vertices.Count - 1 : vertices.Count;
-
-            var angles = new List<double> { 0 };
-
-            for (var i = 0; i < n; i++)
-            {
-                var next = (i + 1) % n;
-                var dx = vertices[next].X - vertices[i].X;
-                var dy = vertices[next].Y - vertices[i].Y;
-
-                if (dx * dx + dy * dy < Tolerance.Epsilon)
-                    continue;
-
-                var angle = -System.Math.Atan2(dy, dx);
-
-                if (!angles.Any(a => a.IsEqualTo(angle)))
-                    angles.Add(angle);
-            }
-
-            return angles;
-        }
-
         private Pattern BuildRotatedPattern(List<Part> groupParts, double angle)
         {
             var pattern = new Pattern();
@@ -373,112 +282,5 @@ namespace OpenNest
             return best;
         }
 
-        private double FindBestRotation(NestItem item)
-        {
-            var entities = ConvertProgram.ToGeometry(item.Drawing.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid);
-
-            var shapes = Helper.GetShapes(entities);
-
-            if (shapes.Count == 0)
-                return 0;
-
-            // Find the largest shape (outer profile).
-            Shape largest = shapes[0];
-            double largestArea = largest.Area();
-
-            for (int i = 1; i < shapes.Count; i++)
-            {
-                var area = shapes[i].Area();
-                if (area > largestArea)
-                {
-                    largest = shapes[i];
-                    largestArea = area;
-                }
-            }
-
-            // Convert to polygon so arcs are properly represented as line segments.
-            // Shape.FindBestRotation() uses Entity cardinal points which are incorrect
-            // for arcs that don't sweep through all 4 cardinal directions.
-            var polygon = largest.ToPolygonWithTolerance(0.1);
-
-            BoundingRectangleResult result;
-
-            if (item.RotationStart.IsEqualTo(0) && item.RotationEnd.IsEqualTo(0))
-                result = polygon.FindBestRotation();
-            else
-                result = polygon.FindBestRotation(item.RotationStart, item.RotationEnd);
-
-            // Negate the angle to align the minimum bounding rectangle with the axes.
-            return -result.Angle;
-        }
-
-        private List<Part> ConvertToParts(Bin bin, List<NestItem> items)
-        {
-            var parts = new List<Part>();
-
-            foreach (var item in bin.Items)
-            {
-                var nestItem = items[item.Id];
-                var part = ConvertToPart(item, nestItem.Drawing);
-                parts.Add(part);
-            }
-
-            return parts;
-        }
-
-        private Part ConvertToPart(Item item, Drawing dwg)
-        {
-            var part = new Part(dwg);
-
-            if (item.IsRotated)
-                part.Rotate(Angle.HalfPI);
-
-            var boundingBox = part.Program.BoundingBox();
-            var offset = item.Location - boundingBox.Location;
-
-            part.Offset(offset);
-
-            return part;
-        }
-
-        private List<Item> ConvertToRectangleItems(List<NestItem> items)
-        {
-            var binItems = new List<Item>();
-
-            for (int i = 0; i < items.Count; i++)
-            {
-                var item = items[i];
-                var binItem = ConvertToRectangleItem(item, i);
-
-                int maxQty = (int)System.Math.Floor(Plate.Area() / binItem.Area());
-
-                int qty = item.Quantity < maxQty
-                    ? item.Quantity
-                    : maxQty;
-
-                for (int j = 0; j < qty; j++)
-                    binItems.Add(binItem.Clone() as Item);
-            }
-
-            return binItems;
-        }
-
-        private Item ConvertToRectangleItem(NestItem item, int id = 0)
-        {
-            var box = item.Drawing.Program.BoundingBox();
-
-            box.Width += Plate.PartSpacing;
-            box.Height += Plate.PartSpacing;
-
-            
-
-            return new Item
-            {
-                Id = id,
-                Location = box.Location,
-                Size = box.Size
-            };
-        }
     }
 }
