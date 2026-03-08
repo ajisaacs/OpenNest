@@ -6,7 +6,7 @@ using OpenNest.Geometry;
 
 namespace OpenNest.IO
 {
-    internal sealed class ProgramReader
+    public sealed class ProgramReader
     {
         private const int BufferSize = 200;
 
