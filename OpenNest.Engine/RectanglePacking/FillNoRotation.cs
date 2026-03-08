@@ -61,10 +61,7 @@ namespace OpenNest.RectanglePacking
                 columns = (int)System.Math.Ceiling((double)maxCount / rows);
             }
 
-            if (item.Width > item.Height)
-                VPattern(item, rows, columns, maxCount);
-            else
-                HPattern(item, rows, columns, maxCount);
+            Bin.Items.AddRange(FillGrid(item, rows, columns, maxCount, columnMajor: item.Width > item.Height));
         }
     }
 }

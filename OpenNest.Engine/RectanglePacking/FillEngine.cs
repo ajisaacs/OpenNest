@@ -16,61 +16,23 @@ namespace OpenNest.RectanglePacking
 
         public abstract void Fill(Item item, int maxCount);
 
-        /// <summary>
-        /// Vertical pattern.
-        /// </summary>
-        /// <param name="item"></param>
-        /// <param name="rows"></param>
-        /// <param name="columns"></param>
-        /// <param name="maxCount"></param>
-        protected List<Item> VPattern(Item item, int rows, int columns, int maxCount)
+        protected List<Item> FillGrid(Item item, int rows, int columns, int maxCount, bool columnMajor = true)
         {
             var items = new List<Item>();
 
-            for (int i = 0; i < columns; i++)
+            var outerCount = columnMajor ? columns : rows;
+            var innerCount = columnMajor ? rows : columns;
+
+            for (var i = 0; i < outerCount; i++)
             {
-                var x = item.Width * i + item.X;
-
-                for (int j = 0; j < rows; j++)
+                for (var j = 0; j < innerCount; j++)
                 {
-                    var y = item.Height * j + item.Y;
+                    var x = (columnMajor ? i : j) * item.Width + item.X;
+                    var y = (columnMajor ? j : i) * item.Height + item.Y;
 
-                    var addedItem = item.Clone() as Item;
-                    addedItem.Location = new Vector(x, y);
-
-                    items.Add(addedItem);
-
-                    if (items.Count == maxCount)
-                        return items;
-                }
-            }
-
-            return items;
-        }
-
-        /// <summary>
-        /// Horizontal pattern.
-        /// </summary>
-        /// <param name="item"></param>
-        /// <param name="rows"></param>
-        /// <param name="columns"></param>
-        /// <param name="maxCount"></param>
-        protected List<Item> HPattern(Item item, int rows, int columns, int maxCount)
-        {
-            var items = new List<Item>();
-
-            for (int i = 0; i < rows; i++)
-            {
-                var y = item.Height * i + item.Y;
-
-                for (int j = 0; j < rows; j++)
-                {
-                    var x = item.Width * j + item.X;
-
-                    var addedItem = item.Clone() as Item;
-                    addedItem.Location = new Vector(x, y);
-
-                    items.Add(addedItem);
+                    var clone = item.Clone() as Item;
+                    clone.Location = new Vector(x, y);
+                    items.Add(clone);
 
                     if (items.Count == maxCount)
                         return items;

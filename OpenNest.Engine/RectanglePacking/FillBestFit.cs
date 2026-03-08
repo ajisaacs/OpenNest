@@ -52,12 +52,12 @@ namespace OpenNest.RectanglePacking
 
             item.Location = bin.Location;
 
-            bin.Items.AddRange(VPattern(item, normalRows, normalColumns, int.MaxValue));
+            bin.Items.AddRange(FillGrid(item, normalRows, normalColumns, int.MaxValue));
 
             item.Location.X += item.Width * normalColumns;
             item.Rotate();
 
-            bin.Items.AddRange(VPattern(item, rotateRows, rotateColumns, int.MaxValue));
+            bin.Items.AddRange(FillGrid(item, rotateRows, rotateColumns, int.MaxValue));
 
             return bin;
         }
@@ -77,12 +77,12 @@ namespace OpenNest.RectanglePacking
 
             item.Location = bin.Location;
 
-            bin.Items.AddRange(VPattern(item, normalRows, normalColumns, int.MaxValue));
+            bin.Items.AddRange(FillGrid(item, normalRows, normalColumns, int.MaxValue));
 
             item.Location.Y += item.Height * normalRows;
             item.Rotate();
 
-            bin.Items.AddRange(VPattern(item, rotateRows, rotateColumns, int.MaxValue));
+            bin.Items.AddRange(FillGrid(item, rotateRows, rotateColumns, int.MaxValue));
 
             return bin;
         }
