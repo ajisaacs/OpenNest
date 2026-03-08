@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using ILGPU;
 using ILGPU.Runtime;
+using OpenNest.Converters;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Gpu
 {
@@ -101,27 +103,31 @@ namespace OpenNest.Gpu
                 _accelerator.Synchronize();
                 gpuResults.CopyToCPU(resultScores);
 
-                // Map results back
+                // Map results back — compute proper bounding metrics for valid candidates
                 for (var i = 0; i < candidateCount; i++)
                 {
                     var item = groupItems[i];
                     var score = resultScores[i];
                     var hasOverlap = score <= 0f;
 
-                    var combinedWidth = gridWidth * _cellSize;
-                    var combinedHeight = gridHeight * _cellSize;
-
-                    allResults[item.OriginalIndex] = new BestFitResult
+                    if (hasOverlap)
                     {
-                        Candidate = item.Candidate,
-                        RotatedArea = hasOverlap ? 0 : combinedWidth * combinedHeight,
-                        BoundingWidth = combinedWidth,
-                        BoundingHeight = combinedHeight,
-                        OptimalRotation = 0,
-                        TrueArea = trueArea,
-                        Keep = !hasOverlap,
-                        Reason = hasOverlap ? "Overlap detected" : "Valid"
-                    };
+                        allResults[item.OriginalIndex] = new BestFitResult
+                        {
+                            Candidate = item.Candidate,
+                            RotatedArea = 0,
+                            BoundingWidth = 0,
+                            BoundingHeight = 0,
+                            OptimalRotation = 0,
+                            TrueArea = trueArea,
+                            Keep = false,
+                            Reason = "Overlap detected"
+                        };
+                    }
+                    else
+                    {
+                        allResults[item.OriginalIndex] = ComputeBoundingResult(item.Candidate, trueArea);
+                    }
                 }
             }
 
@@ -188,6 +194,78 @@ namespace OpenNest.Gpu
             }
 
             return padded;
+        }
+
+        private const double ChordTolerance = 0.01;
+
+        private BestFitResult ComputeBoundingResult(PairCandidate candidate, double trueArea)
+        {
+            var part1 = new Part(_drawing);
+            var bbox1 = part1.Program.BoundingBox();
+            part1.Offset(-bbox1.Location.X, -bbox1.Location.Y);
+            part1.UpdateBounds();
+
+            var part2 = new Part(_drawing);
+            if (!candidate.Part2Rotation.IsEqualTo(0))
+                part2.Rotate(candidate.Part2Rotation);
+            var bbox2 = part2.Program.BoundingBox();
+            part2.Offset(-bbox2.Location.X, -bbox2.Location.Y);
+            part2.Location = candidate.Part2Offset;
+            part2.UpdateBounds();
+
+            var allPoints = GetPartVertices(part1);
+            allPoints.AddRange(GetPartVertices(part2));
+
+            double bestArea, bestWidth, bestHeight, bestRotation;
+
+            if (allPoints.Count >= 3)
+            {
+                var hull = ConvexHull.Compute(allPoints);
+                var result = RotatingCalipers.MinimumBoundingRectangle(hull);
+                bestArea = result.Area;
+                bestWidth = result.Width;
+                bestHeight = result.Height;
+                bestRotation = result.Angle;
+            }
+            else
+            {
+                var combinedBox = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+                bestArea = combinedBox.Area();
+                bestWidth = combinedBox.Width;
+                bestHeight = combinedBox.Height;
+                bestRotation = 0;
+            }
+
+            return new BestFitResult
+            {
+                Candidate = candidate,
+                RotatedArea = bestArea,
+                BoundingWidth = bestWidth,
+                BoundingHeight = bestHeight,
+                OptimalRotation = bestRotation,
+                TrueArea = trueArea,
+                Keep = true,
+                Reason = "Valid"
+            };
+        }
+
+        private static List<Vector> GetPartVertices(Part part)
+        {
+            var entities = ConvertProgram.ToGeometry(part.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid);
+            var shapes = Helper.GetShapes(entities);
+            var points = new List<Vector>();
+
+            foreach (var shape in shapes)
+            {
+                var polygon = shape.ToPolygonWithTolerance(ChordTolerance);
+                polygon.Offset(part.Location);
+
+                foreach (var vertex in polygon.Vertices)
+                    points.Add(vertex);
+            }
+
+            return points;
         }
 
         private static BestFitResult MakeEmptyResult(PairCandidate candidate)
