@@ -140,8 +140,21 @@ namespace OpenNest.Mcp.Tools
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
 
+            if (string.IsNullOrWhiteSpace(drawingNames))
+                return "Error: drawingNames is required";
+
+            if (string.IsNullOrWhiteSpace(quantities))
+                return "Error: quantities is required";
+
             var names = drawingNames.Split(',').Select(n => n.Trim()).ToArray();
-            var qtys = quantities.Split(',').Select(q => int.Parse(q.Trim())).ToArray();
+            var qtyStrings = quantities.Split(',').Select(q => q.Trim()).ToArray();
+            var qtys = new int[qtyStrings.Length];
+
+            for (var i = 0; i < qtyStrings.Length; i++)
+            {
+                if (!int.TryParse(qtyStrings[i], out qtys[i]))
+                    return $"Error: '{qtyStrings[i]}' is not a valid quantity";
+            }
 
             if (names.Length != qtys.Length)
                 return $"Error: drawing names count ({names.Length}) does not match quantities count ({qtys.Length})";
