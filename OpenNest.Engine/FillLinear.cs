@@ -85,8 +85,74 @@ namespace OpenNest
 
         /// <summary>
         /// Finds the geometry-aware copy distance between two identical patterns along an axis.
+        /// Checks every pair of parts across adjacent patterns so that multi-part
+        /// patterns (e.g. interlocking pairs) maintain spacing between ALL parts.
         /// </summary>
         private double FindPatternCopyDistance(Pattern patternA, NestDirection direction)
+        {
+            if (patternA.Parts.Count <= 1)
+                return FindSinglePartPatternCopyDistance(patternA, direction);
+
+            var bboxDim = GetDimension(patternA.BoundingBox, direction);
+            var pushDir = GetPushDirection(direction);
+            var opposite = Helper.OppositeDirection(pushDir);
+
+            // Compute a starting offset large enough that every part-pair in
+            // patternB has its offset geometry beyond patternA's raw geometry.
+            var startOffset = bboxDim;
+
+            foreach (var partA in patternA.Parts)
+            {
+                var aUpper = direction == NestDirection.Horizontal
+                    ? partA.BoundingBox.Right : partA.BoundingBox.Top;
+
+                foreach (var refB in patternA.Parts)
+                {
+                    var bLower = direction == NestDirection.Horizontal
+                        ? refB.BoundingBox.Left : refB.BoundingBox.Bottom;
+
+                    var required = aUpper - bLower + PartSpacing + Tolerance.Epsilon;
+
+                    if (required > startOffset)
+                        startOffset = required;
+                }
+            }
+
+            var patternB = patternA.Clone(MakeOffset(direction, startOffset));
+
+            var maxCopyDistance = 0.0;
+
+            foreach (var partB in patternB.Parts)
+            {
+                var movingLines = Helper.GetOffsetPartLines(partB, PartSpacing, pushDir);
+
+                foreach (var partA in patternA.Parts)
+                {
+                    var stationaryLines = Helper.GetPartLines(partA, opposite);
+                    var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
+
+                    if (slideDistance >= double.MaxValue || slideDistance < 0)
+                        continue; // No geometric interaction — pair doesn't constrain distance.
+
+                    var copyDist = startOffset - slideDistance;
+
+                    if (copyDist > maxCopyDistance)
+                        maxCopyDistance = copyDist;
+                }
+            }
+
+            // Fallback: if no pair interacted (shouldn't happen for real parts),
+            // use the simple bounding-box + spacing distance.
+            if (maxCopyDistance <= 0)
+                return bboxDim + PartSpacing;
+
+            return maxCopyDistance;
+        }
+
+        /// <summary>
+        /// Fast path for single-part patterns — no cross-part conflicts possible.
+        /// </summary>
+        private double FindSinglePartPatternCopyDistance(Pattern patternA, NestDirection direction)
         {
             var bboxDim = GetDimension(patternA.BoundingBox, direction);
             var pushDir = GetPushDirection(direction);
