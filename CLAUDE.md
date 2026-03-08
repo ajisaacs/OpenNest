@@ -14,13 +14,13 @@ This is a .NET 8 solution using SDK-style `.csproj` files targeting `net8.0-wind
 dotnet build OpenNest.sln
 ```
 
-NuGet dependency: `ACadSharp` 3.1.32 (DXF/DWG import/export), `System.Drawing.Common` 8.0.10.
+NuGet dependencies: `ACadSharp` 3.1.32 (DXF/DWG import/export, in OpenNest.IO), `System.Drawing.Common` 8.0.10, `ModelContextProtocol` + `Microsoft.Extensions.Hosting` (in OpenNest.Mcp).
 
 No test projects exist in this solution.
 
 ## Architecture
 
-Three projects form a layered architecture:
+Five projects form a layered architecture:
 
 ### OpenNest.Core (class library)
 Domain model, geometry, and CNC primitives organized into namespaces:
@@ -41,13 +41,29 @@ Nesting algorithms. `NestEngine` orchestrates filling plates with parts.
 - `NestItem`: Input to the engine — wraps a `Drawing` with quantity, priority, and rotation constraints.
 - `BestCombination`: Finds optimal mix of normal/rotated columns for grid fills.
 
-### OpenNest (WinForms WinExe, depends on Core + Engine)
+### OpenNest.IO (class library, depends on Core)
+File I/O and format conversion. Uses ACadSharp for DXF/DWG support.
+
+- `DxfImporter`/`DxfExporter` — DXF file import/export via ACadSharp.
+- `NestReader`/`NestWriter` — custom ZIP-based nest format (XML metadata + G-code programs).
+- `ProgramReader` — G-code text parser.
+- `Extensions` — conversion helpers between ACadSharp and OpenNest geometry types.
+
+### OpenNest.Mcp (console app, depends on Core + Engine + IO)
+MCP server for Claude Code integration. Exposes nesting operations as MCP tools over stdio transport. Published to `~/.claude/mcp/OpenNest.Mcp/`.
+
+- **Tools/InputTools**: `load_nest`, `import_dxf`, `create_drawing` (built-in shapes or G-code).
+- **Tools/SetupTools**: `create_plate`, `clear_plate`.
+- **Tools/NestingTools**: `fill_plate`, `fill_area`, `fill_remnants`, `pack_plate`.
+- **Tools/InspectionTools**: `get_plate_info`, `get_parts`, `check_overlaps`.
+- `NestSession` — in-memory state across tool calls (current Nest, standalone plates/drawings).
+
+### OpenNest (WinForms WinExe, depends on Core + Engine + IO)
 The UI application with MDI interface.
 
 - **Forms/**: `MainForm` (MDI parent), `EditNestForm` (MDI child per nest), plus dialogs for plate editing, auto-nesting, DXF conversion, cut parameters, etc.
 - **Controls/**: `PlateView` (2D plate renderer with zoom/pan), `DrawingListBox`, `DrawControl`, `QuadrantSelect`.
 - **Actions/**: User interaction modes — `ActionSelect`, `ActionAddPart`, `ActionClone`, `ActionFillArea`, `ActionZoomWindow`, `ActionSetSequence`.
-- **IO/**: `DxfImporter`/`DxfExporter` (via ACadSharp library), `NestReader`/`NestWriter` (custom ZIP-based format with XML metadata + G-code programs), `ProgramReader`.
 - **Post-processing**: `IPostProcessor` plugin interface loaded from DLLs in a `Posts/` directory at runtime.
 
 ## File Format

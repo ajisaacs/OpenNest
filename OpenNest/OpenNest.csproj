@@ -14,7 +14,7 @@
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
     <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
     <ProjectReference Include="..\OpenNest.Gpu\OpenNest.Gpu.csproj" />
-    <PackageReference Include="ACadSharp" Version="3.1.32" />
+    <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
   </ItemGroup>
   <ItemGroup>

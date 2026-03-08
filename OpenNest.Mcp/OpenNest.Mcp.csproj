@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>OpenNest.Mcp</RootNamespace>
+    <AssemblyName>OpenNest.Mcp</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
+    <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
+    <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
+    <PackageReference Include="ModelContextProtocol" Version="0.*-*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.*" />
+  </ItemGroup>
+
+</Project>
