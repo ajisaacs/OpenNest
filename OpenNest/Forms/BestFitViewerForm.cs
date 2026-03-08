@@ -1,11 +1,8 @@
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Engine.BestFit;
-using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest.Forms
 {
@@ -85,8 +82,8 @@ namespace OpenNest.Forms
                 for (var i = 0; i < count; i++)
                 {
                     var result = results[i];
-                    var view = CreateCellView(result, drawing, i + 1);
-                    gridPanel.Controls.Add(view, i % Columns, i / Columns);
+                    var cell = CreateCell(result, drawing, i + 1);
+                    gridPanel.Controls.Add(cell, i % Columns, i / Columns);
                 }
             }
             finally
@@ -99,7 +96,7 @@ namespace OpenNest.Forms
                 total, kept, findMs / 1000.0, sw.Elapsed.TotalSeconds, count);
         }
 
-        private PlateView CreateCellView(BestFitResult result, Drawing drawing, int rank)
+        private BestFitCell CreateCell(BestFitResult result, Drawing drawing, int rank)
         {
             var bgColor = result.Keep ? KeptColor : DroppedColor;
 
@@ -114,70 +111,27 @@ namespace OpenNest.Forms
                 EdgeSpacingColor = bgColor
             };
 
-            var view = new PlateView(colorScheme);
-            view.DrawOrigin = false;
-            view.DrawBounds = false;
-            view.AllowPan = false;
-            view.AllowSelect = false;
-            view.AllowZoom = false;
-            view.AllowDrop = false;
-            view.Dock = DockStyle.Fill;
-            view.Plate.Size = new Geometry.Size(
+            var cell = new BestFitCell(colorScheme);
+            cell.Dock = DockStyle.Fill;
+            cell.Plate.Size = new Geometry.Size(
                 result.BoundingWidth,
                 result.BoundingHeight);
 
             var parts = result.BuildParts(drawing);
 
             foreach (var part in parts)
-                view.Plate.Parts.Add(part);
+                cell.Plate.Parts.Add(part);
 
-            view.Paint += (sender, e) =>
-            {
-                PaintMetadata(e.Graphics, view, result, rank);
-            };
+            cell.SetMetadata(result, rank);
 
-            view.Resize += (sender, e) =>
-            {
-                view.ZoomToFit(false);
-            };
-
-            view.DoubleClick += (sender, e) =>
+            cell.DoubleClick += (sender, e) =>
             {
                 SelectedResult = result;
                 DialogResult = DialogResult.OK;
                 Close();
             };
 
-            view.Cursor = Cursors.Hand;
-
-            return view;
-        }
-
-        private void PaintMetadata(Graphics g, PlateView view, BestFitResult result, int rank)
-        {
-            var font = view.Font;
-            var brush = Brushes.White;
-            var lineHeight = font.GetHeight(g) + 1;
-
-            var lines = new[]
-            {
-                string.Format("#{0}  {1:F1}x{2:F1}  Area={3:F1}",
-                    rank, result.BoundingWidth, result.BoundingHeight, result.RotatedArea),
-                string.Format("Util={0:P1}  Rot={1:F1}\u00b0",
-                    result.Utilization,
-                    Angle.ToDegrees(result.OptimalRotation)),
-                result.Keep ? "" : result.Reason
-            };
-
-            var y = 2f;
-
-            foreach (var line in lines)
-            {
-                if (line.Length == 0)
-                    continue;
-                g.DrawString(line, font, brush, 2, y);
-                y += lineHeight;
-            }
+            return cell;
         }
     }
 }

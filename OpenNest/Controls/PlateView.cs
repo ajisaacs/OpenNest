@@ -370,7 +370,7 @@ namespace OpenNest.Controls
             Invalidate();
         }
 
-        private void DrawPlate(Graphics g)
+        protected void DrawPlate(Graphics g)
         {
             var plateRect = new RectangleF
             {
@@ -441,7 +441,7 @@ namespace OpenNest.Controls
                 plateRect.Height);
         }
 
-        private void DrawParts(Graphics g)
+        protected void DrawParts(Graphics g)
         {
             var viewBounds = new RectangleF(-origin.X, -origin.Y, Width, Height);
 
@@ -856,10 +856,13 @@ namespace OpenNest.Controls
             var stationaryBoxes = new List<Box>(stationaryParts.Count);
 
             var opposite = Helper.OppositeDirection(direction);
+            var halfSpacing = Plate.PartSpacing / 2;
 
             foreach (var part in stationaryParts)
             {
-                stationaryLines.Add(Helper.GetPartLines(part.BasePart, opposite));
+                stationaryLines.Add(halfSpacing > 0
+                    ? Helper.GetOffsetPartLines(part.BasePart, halfSpacing, opposite)
+                    : Helper.GetPartLines(part.BasePart, opposite));
                 stationaryBoxes.Add(part.BoundingBox);
             }
 
@@ -868,9 +871,9 @@ namespace OpenNest.Controls
 
             foreach (var selected in SelectedParts)
             {
-                // Get offset lines for the moving part.
-                var movingLines = Plate.PartSpacing > 0
-                    ? Helper.GetOffsetPartLines(selected.BasePart, Plate.PartSpacing, direction)
+                // Get offset lines for the moving part (half-spacing, symmetric with stationary).
+                var movingLines = halfSpacing > 0
+                    ? Helper.GetOffsetPartLines(selected.BasePart, halfSpacing, direction)
                     : Helper.GetPartLines(selected.BasePart, direction);
 
                 var movingBox = selected.BoundingBox;
