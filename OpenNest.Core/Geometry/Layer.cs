@@ -21,6 +21,8 @@ namespace OpenNest.Geometry
 
         public Color Color { get; set; }
 
+        public string LineTypeName { get; set; }
+
         public override string ToString()
         {
             return Name;
