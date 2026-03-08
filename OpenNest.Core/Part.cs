@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
@@ -130,8 +131,10 @@ namespace OpenNest
         {
             pts = new List<Vector>();
 
-            var entities1 = ConvertProgram.ToGeometry(Program);
-            var entities2 = ConvertProgram.ToGeometry(part.Program);
+            var entities1 = ConvertProgram.ToGeometry(Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid);
+            var entities2 = ConvertProgram.ToGeometry(part.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid);
 
             var shapes1 = Helper.GetShapes(entities1);
             var shapes2 = Helper.GetShapes(entities2);

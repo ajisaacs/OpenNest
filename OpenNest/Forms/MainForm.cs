@@ -39,6 +39,7 @@ namespace OpenNest.Forms
             LoadPosts();
             EnableCheck();
             UpdateStatus();
+            UpdateGpuStatus();
         }
 
         private string GetNestName(DateTime date, int id)
@@ -189,6 +190,20 @@ namespace OpenNest.Forms
         {
             UpdateLocationStatus();
             UpdatePlateStatus();
+        }
+
+        private void UpdateGpuStatus()
+        {
+            if (GpuEvaluatorFactory.GpuAvailable)
+            {
+                gpuStatusLabel.Text = $"GPU : {GpuEvaluatorFactory.DeviceName}";
+                gpuStatusLabel.ForeColor = Color.DarkGreen;
+            }
+            else
+            {
+                gpuStatusLabel.Text = "GPU : None (CPU)";
+                gpuStatusLabel.ForeColor = Color.Gray;
+            }
         }
 
         private void UpdateLocationMode()
@@ -501,6 +516,33 @@ namespace OpenNest.Forms
             activeForm.PlateView.SetAction(typeof(ActionSelectArea));
         }
 
+        private void BestFitViewer_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null)
+                return;
+
+            var plate = activeForm.PlateView.Plate;
+            var drawing = activeForm.Nest.Drawings.Count > 0
+                ? activeForm.Nest.Drawings.First()
+                : null;
+
+            if (drawing == null)
+            {
+                MessageBox.Show("No drawings available.", "Best-Fit Viewer",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var form = new BestFitViewerForm(drawing, plate))
+            {
+                if (form.ShowDialog(this) == DialogResult.OK && form.SelectedResult != null)
+                {
+                    var parts = NestEngine.BuildPairParts(form.SelectedResult, drawing);
+                    activeForm.PlateView.SetAction(typeof(ActionClone), parts);
+                }
+            }
+        }
+
         private void SetOffsetIncrement_Click(object sender, EventArgs e)
         {
             if (activeForm == null) return;
@@ -645,6 +687,7 @@ namespace OpenNest.Forms
                     : activeForm.PlateView.Plate;
 
                 var engine = new NestEngine(plate);
+                engine.CreateEvaluator = GpuEvaluatorFactory.Create;
 
                 if (!engine.Pack(items))
                     break;
@@ -718,6 +761,7 @@ namespace OpenNest.Forms
                 return;
 
             var engine = new NestEngine(activeForm.PlateView.Plate);
+            engine.CreateEvaluator = GpuEvaluatorFactory.Create;
             engine.Fill(new NestItem
             {
                 Drawing = drawing

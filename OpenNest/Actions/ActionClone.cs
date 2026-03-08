@@ -172,6 +172,7 @@ namespace OpenNest.Actions
         {
             var plate = plateView.Plate;
             var engine = new NestEngine(plate);
+            engine.CreateEvaluator = GpuEvaluatorFactory.Create;
             var groupParts = parts.Select(p => p.BasePart).ToList();
 
             var bounds = plate.WorkArea();

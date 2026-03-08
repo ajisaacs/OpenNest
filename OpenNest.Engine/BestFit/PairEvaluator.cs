@@ -1,14 +1,28 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
 namespace OpenNest.Engine.BestFit
 {
-    public class PairEvaluator
+    public class PairEvaluator : IPairEvaluator
     {
         private const double ChordTolerance = 0.01;
+
+        public List<BestFitResult> EvaluateAll(List<PairCandidate> candidates)
+        {
+            var resultBag = new ConcurrentBag<BestFitResult>();
+
+            Parallel.ForEach(candidates, c =>
+            {
+                resultBag.Add(Evaluate(c));
+            });
+
+            return resultBag.ToList();
+        }
 
         public BestFitResult Evaluate(PairCandidate candidate)
         {
