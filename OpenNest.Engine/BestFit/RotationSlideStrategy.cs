@@ -80,7 +80,12 @@ namespace OpenNest.Engine.BestFit
             // Pre-compute part1's offset lines (half-spacing outward)
             var part1Lines = Helper.GetOffsetPartLines(part1, halfSpacing);
 
-            for (var offset = perpMin; offset <= perpMax; offset += stepSize)
+            // Align sweep start to a multiple of stepSize so that offset=0 is always
+            // included. This ensures perfect grid arrangements (side-by-side, stacked)
+            // are generated for rectangular parts.
+            var alignedStart = System.Math.Ceiling(perpMin / stepSize) * stepSize;
+
+            for (var offset = alignedStart; offset <= perpMax; offset += stepSize)
             {
                 var part2 = (Part)part2Template.Clone();
 
