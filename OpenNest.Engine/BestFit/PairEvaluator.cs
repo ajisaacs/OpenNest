@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using OpenNest.Converters;
 using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -28,18 +27,9 @@ namespace OpenNest.Engine.BestFit
         {
             var drawing = candidate.Drawing;
 
-            // Build part1 at origin
-            var part1 = new Part(drawing);
-            var bbox1 = part1.Program.BoundingBox();
-            part1.Offset(-bbox1.Location.X, -bbox1.Location.Y);
-            part1.UpdateBounds();
+            var part1 = Part.CreateAtOrigin(drawing);
 
-            // Build part2 with rotation, normalized to origin, then positioned
-            var part2 = new Part(drawing);
-            if (!candidate.Part2Rotation.IsEqualTo(0))
-                part2.Rotate(candidate.Part2Rotation);
-            var bbox2 = part2.Program.BoundingBox();
-            part2.Offset(-bbox2.Location.X, -bbox2.Location.Y);
+            var part2 = Part.CreateAtOrigin(drawing, candidate.Part2Rotation);
             part2.Location = candidate.Part2Offset;
             part2.UpdateBounds();
 

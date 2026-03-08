@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -21,19 +20,8 @@ namespace OpenNest.Engine.BestFit
         {
             var candidates = new List<PairCandidate>();
 
-            // Build part1 at origin
-            var part1 = new Part(drawing);
-            var bbox1 = part1.Program.BoundingBox();
-            part1.Offset(-bbox1.Location.X, -bbox1.Location.Y);
-            part1.UpdateBounds();
-
-            // Build part2 template with rotation, normalized to origin
-            var part2Template = new Part(drawing);
-            if (!Part2Rotation.IsEqualTo(0))
-                part2Template.Rotate(Part2Rotation);
-            var bbox2 = part2Template.Program.BoundingBox();
-            part2Template.Offset(-bbox2.Location.X, -bbox2.Location.Y);
-            part2Template.UpdateBounds();
+            var part1 = Part.CreateAtOrigin(drawing);
+            var part2Template = Part.CreateAtOrigin(drawing, Part2Rotation);
 
             var testNumber = 0;
 

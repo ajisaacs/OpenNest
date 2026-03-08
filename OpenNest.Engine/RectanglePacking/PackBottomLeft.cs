@@ -75,31 +75,6 @@ namespace OpenNest.RectanglePacking
             return null;
         }
 
-        private Vector? FindPointHorizontal(Item item)
-        {
-            var pt = new Vector(double.MaxValue, double.MaxValue);
-
-            for (int i = 0; i < points.Count; i++)
-            {
-                var point = points[i];
-
-                item.Location = point;
-
-                if (!IsValid(item))
-                    continue;
-
-                if (point.Y < pt.Y)
-                    pt = point;
-                else if (point.Y.IsEqualTo(pt.Y) && point.X < pt.X)
-                    pt = point;
-            }
-
-            if (pt.X != double.MaxValue && pt.Y != double.MaxValue)
-                return pt;
-
-            return null;
-        }
-
         private bool IsValid(Item item)
         {
             if (!Bin.Contains(item))

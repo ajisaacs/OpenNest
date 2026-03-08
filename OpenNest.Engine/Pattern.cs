@@ -19,26 +19,6 @@ namespace OpenNest
             BoundingBox = Parts.GetBoundingBox();
         }
 
-        public List<Line> GetLines(PushDirection facingDirection)
-        {
-            var lines = new List<Line>();
-
-            foreach (var part in Parts)
-                lines.AddRange(Helper.GetPartLines(part, facingDirection));
-
-            return lines;
-        }
-
-        public List<Line> GetOffsetLines(double spacing, PushDirection facingDirection)
-        {
-            var lines = new List<Line>();
-
-            foreach (var part in Parts)
-                lines.AddRange(Helper.GetOffsetPartLines(part, spacing, facingDirection));
-
-            return lines;
-        }
-
         public Pattern Clone(Vector offset)
         {
             var pattern = new Pattern();

@@ -17,7 +17,6 @@ namespace OpenNest.RectanglePacking
         {
             var ycount = (int)System.Math.Floor((Bin.Height + Tolerance.Epsilon) / item.Height);
             var xcount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
-            var count = ycount * xcount;
 
             for (int i = 0; i < xcount; i++)
             {

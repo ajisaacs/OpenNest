@@ -104,6 +104,23 @@ namespace OpenNest
         }
 
         /// <summary>
+        /// Creates a part normalized to the origin with optional rotation.
+        /// </summary>
+        public static Part CreateAtOrigin(Drawing drawing, double rotation = 0)
+        {
+            var part = new Part(drawing);
+
+            if (!Math.Tolerance.IsEqualTo(rotation, 0))
+                part.Rotate(rotation);
+
+            var bbox = part.Program.BoundingBox();
+            part.Offset(-bbox.Location.X, -bbox.Location.Y);
+            part.UpdateBounds();
+
+            return part;
+        }
+
+        /// <summary>
         /// Updates the bounding box of the part.
         /// </summary>
         public void UpdateBounds()
