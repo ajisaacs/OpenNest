@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.Gpu;
 
 namespace OpenNest.Actions
 {

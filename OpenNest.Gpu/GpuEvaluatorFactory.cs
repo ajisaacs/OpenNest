@@ -3,11 +3,10 @@ using System.Diagnostics;
 using ILGPU;
 using ILGPU.Runtime;
 using OpenNest.Engine.BestFit;
-using OpenNest.Gpu;
 
-namespace OpenNest
+namespace OpenNest.Gpu
 {
-    internal static class GpuEvaluatorFactory
+    public static class GpuEvaluatorFactory
     {
         private static bool _probed;
         private static bool _gpuAvailable;

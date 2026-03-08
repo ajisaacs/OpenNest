@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
+using OpenNest.Gpu;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Properties;

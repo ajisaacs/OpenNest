@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Geometry;
+using OpenNest.Gpu;
 
 namespace OpenNest.Actions
 {
