@@ -35,6 +35,16 @@ namespace OpenNest.Engine.BestFit
                 part1, part2Template, drawing, spacing, stepSize,
                 PushDirection.Down, candidates, ref testNumber);
 
+            // Try pushing right (approach from left — finds concave interlocking)
+            GenerateCandidatesForAxis(
+                part1, part2Template, drawing, spacing, stepSize,
+                PushDirection.Right, candidates, ref testNumber);
+
+            // Try pushing up (approach from below — finds concave interlocking)
+            GenerateCandidatesForAxis(
+                part1, part2Template, drawing, spacing, stepSize,
+                PushDirection.Up, candidates, ref testNumber);
+
             return candidates;
         }
 
@@ -77,11 +87,15 @@ namespace OpenNest.Engine.BestFit
             {
                 var part2 = (Part)part2Template.Clone();
 
-                // Place part2 far away along push axis, at perpendicular offset
+                // Place part2 far away along push axis, at perpendicular offset.
+                // Left/Down: start on the positive side; Right/Up: start on the negative side.
+                var isPositiveStart = pushDir == PushDirection.Left || pushDir == PushDirection.Down;
+                var startPos = isPositiveStart ? pushStartOffset : -pushStartOffset;
+
                 if (isHorizontalPush)
-                    part2.Offset(pushStartOffset, offset);
+                    part2.Offset(startPos, offset);
                 else
-                    part2.Offset(offset, pushStartOffset);
+                    part2.Offset(offset, startPos);
 
                 // Get part2's offset lines (half-spacing outward)
                 var part2Lines = Helper.GetOffsetPartLines(part2, halfSpacing);

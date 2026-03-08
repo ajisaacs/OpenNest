@@ -4,7 +4,6 @@ using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Geometry;
-using OpenNest.Gpu;
 
 namespace OpenNest.Actions
 {
@@ -173,7 +172,6 @@ namespace OpenNest.Actions
         {
             var plate = plateView.Plate;
             var engine = new NestEngine(plate);
-            engine.CreateEvaluator = GpuEvaluatorFactory.Create;
             var groupParts = parts.Select(p => p.BasePart).ToList();
 
             var bounds = plate.WorkArea();

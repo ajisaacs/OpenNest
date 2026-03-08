@@ -1,7 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Windows.Forms;
 using OpenNest.Controls;
-using OpenNest.Gpu;
 
 namespace OpenNest.Actions
 {
@@ -26,7 +25,6 @@ namespace OpenNest.Actions
         private void FillArea()
         {
             var engine = new NestEngine(plateView.Plate);
-            engine.CreateEvaluator = GpuEvaluatorFactory.Create;
             engine.Fill(new NestItem { Drawing = drawing }, SelectedArea);
 
             plateView.Invalidate();

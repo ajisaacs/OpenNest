@@ -688,7 +688,6 @@ namespace OpenNest.Forms
                     : activeForm.PlateView.Plate;
 
                 var engine = new NestEngine(plate);
-                engine.CreateEvaluator = GpuEvaluatorFactory.Create;
 
                 if (!engine.Pack(items))
                     break;
@@ -762,7 +761,6 @@ namespace OpenNest.Forms
                 return;
 
             var engine = new NestEngine(activeForm.PlateView.Plate);
-            engine.CreateEvaluator = GpuEvaluatorFactory.Create;
             engine.Fill(new NestItem
             {
                 Drawing = drawing

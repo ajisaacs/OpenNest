@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using OpenNest.Engine.BestFit;
@@ -19,8 +18,6 @@ namespace OpenNest
         public Plate Plate { get; set; }
 
         public NestDirection NestDirection { get; set; }
-
-        public Func<Drawing, double, IPairEvaluator> CreateEvaluator { get; set; }
 
         public bool Fill(NestItem item)
         {
@@ -151,16 +148,9 @@ namespace OpenNest
 
         private List<Part> FillWithPairs(NestItem item, Box workArea)
         {
-            IPairEvaluator evaluator = null;
-
-            if (CreateEvaluator != null)
-            {
-                try { evaluator = CreateEvaluator(item.Drawing, Plate.PartSpacing); }
-                catch { /* GPU not available, fall back to geometry */ }
-            }
-
-            var finder = new BestFitFinder(Plate.Size.Width, Plate.Size.Height, evaluator);
-            var bestFits = finder.FindBestFits(item.Drawing, Plate.PartSpacing, stepSize: 0.25);
+            var bestFits = BestFitCache.GetOrCompute(
+                item.Drawing, Plate.Size.Width, Plate.Size.Height,
+                Plate.PartSpacing);
 
             var keptResults = bestFits.Where(r => r.Keep).Take(50).ToList();
             Debug.WriteLine($"[FillWithPairs] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {keptResults.Count}");
@@ -186,8 +176,6 @@ namespace OpenNest
                 if (best == null || count > best.Count)
                     best = parts;
             }
-
-            (evaluator as IDisposable)?.Dispose();
 
             Debug.WriteLine($"[FillWithPairs] Best pair result: {best?.Count ?? 0} parts");
             return best ?? new List<Part>();

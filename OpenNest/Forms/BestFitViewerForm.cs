@@ -11,7 +11,6 @@ namespace OpenNest.Forms
         private const int Columns = 5;
         private const int RowHeight = 300;
         private const int MaxResults = 50;
-        private const double ViewerStepSize = 1.0;
 
         private static readonly Color KeptColor = Color.FromArgb(0, 0, 100);
         private static readonly Color DroppedColor = Color.FromArgb(100, 0, 0);
@@ -56,8 +55,8 @@ namespace OpenNest.Forms
         {
             var sw = Stopwatch.StartNew();
 
-            var finder = new BestFitFinder(plate.Size.Width, plate.Size.Height);
-            var results = finder.FindBestFits(drawing, plate.PartSpacing, ViewerStepSize);
+            var results = BestFitCache.GetOrCompute(
+                drawing, plate.Size.Width, plate.Size.Height, plate.PartSpacing);
 
             var findMs = sw.ElapsedMilliseconds;
             var total = results.Count;
