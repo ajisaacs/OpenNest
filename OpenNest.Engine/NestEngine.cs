@@ -42,25 +42,35 @@ namespace OpenNest
                 engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Vertical)
             };
 
-            // Pick the best valid linear configuration.
+            // Pick the best linear configuration. FillLinear already ensures
+            // geometry-aware spacing, so skip the redundant overlap check that
+            // can produce false positives on arcs/curves.
             List<Part> linearBest = null;
 
             foreach (var config in configs)
             {
-                if (IsBetterValidFill(config, linearBest))
+                if (IsBetterFill(config, linearBest))
                     linearBest = config;
             }
 
             var linearMs = sw.ElapsedMilliseconds;
 
+            // Try rectangle best-fit (mixes orientations to fill remnant strips).
+            var rectResult = FillRectangleBestFit(item, workArea);
+
+            var rectMs = sw.ElapsedMilliseconds - linearMs;
+
             // Try pair-based approach.
             var pairResult = FillWithPairs(item);
 
-            var pairMs = sw.ElapsedMilliseconds - linearMs;
+            var pairMs = sw.ElapsedMilliseconds - linearMs - rectMs;
 
             // Pick whichever is the better fill.
-            Debug.WriteLine($"[NestEngine.Fill] Linear: {linearBest?.Count ?? 0} parts ({linearMs}ms) | Pair: {pairResult.Count} parts ({pairMs}ms) | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
+            Debug.WriteLine($"[NestEngine.Fill] Linear: {linearBest?.Count ?? 0} parts ({linearMs}ms) | Rect: {rectResult?.Count ?? 0} parts ({rectMs}ms) | Pair: {pairResult.Count} parts ({pairMs}ms) | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
             var best = linearBest;
+
+            if (IsBetterFill(rectResult, best))
+                best = rectResult;
 
             if (IsBetterFill(pairResult, best))
                 best = pairResult;
@@ -86,10 +96,16 @@ namespace OpenNest
             var angles = FindHullEdgeAngles(groupParts);
             var best = FillPattern(engine, groupParts, angles);
 
-            // For single-part groups, also try pair-based filling.
+            // For single-part groups, also try rectangle best-fit and pair-based filling.
             if (groupParts.Count == 1)
             {
-                var pairResult = FillWithPairs(new NestItem { Drawing = groupParts[0].BaseDrawing });
+                var nestItem = new NestItem { Drawing = groupParts[0].BaseDrawing };
+                var rectResult = FillRectangleBestFit(nestItem, workArea);
+
+                if (IsBetterFill(rectResult, best))
+                    best = rectResult;
+
+                var pairResult = FillWithPairs(nestItem);
 
                 if (IsBetterFill(pairResult, best))
                     best = pairResult;
@@ -120,11 +136,19 @@ namespace OpenNest
 
             foreach (var config in configs)
             {
-                if (IsBetterValidFill(config, best))
+                if (IsBetterFill(config, best))
                     best = config;
             }
 
             Debug.WriteLine($"[Fill(NestItem,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
+
+            // Try rectangle best-fit (mixes orientations to fill remnant strips).
+            var rectResult = FillRectangleBestFit(item, workArea);
+
+            Debug.WriteLine($"[Fill(NestItem,Box)] RectBestFit: {rectResult?.Count ?? 0} parts");
+
+            if (IsBetterFill(rectResult, best))
+                best = rectResult;
 
             // Try pair-based approach.
             var pairResult = FillWithPairs(item, workArea);
@@ -157,7 +181,15 @@ namespace OpenNest
 
             if (groupParts.Count == 1)
             {
-                var pairResult = FillWithPairs(new NestItem { Drawing = groupParts[0].BaseDrawing }, workArea);
+                var nestItem = new NestItem { Drawing = groupParts[0].BaseDrawing };
+                var rectResult = FillRectangleBestFit(nestItem, workArea);
+
+                Debug.WriteLine($"[Fill(groupParts,Box)] RectBestFit: {rectResult?.Count ?? 0} parts");
+
+                if (IsBetterFill(rectResult, best))
+                    best = rectResult;
+
+                var pairResult = FillWithPairs(nestItem, workArea);
 
                 Debug.WriteLine($"[Fill(groupParts,Box)] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best) ? "Pair" : "Linear")}");
 
@@ -260,6 +292,26 @@ namespace OpenNest
             Plate.Parts.AddRange(parts);
 
             return parts.Count > 0;
+        }
+
+        private List<Part> FillRectangleBestFit(NestItem item, Box workArea)
+        {
+            var binItem = ConvertToRectangleItem(item);
+
+            var bin = new Bin
+            {
+                Location = workArea.Location,
+                Size = workArea.Size
+            };
+
+            bin.Width += Plate.PartSpacing;
+            bin.Height += Plate.PartSpacing;
+
+            var engine = new FillBestFit(bin);
+            engine.Fill(binItem);
+
+            var nestItems = new List<NestItem> { item };
+            return ConvertToParts(bin, nestItems);
         }
 
         private List<Part> FillWithPairs(NestItem item)
