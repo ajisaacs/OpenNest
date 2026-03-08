@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Engine", "OpenNest
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Gpu", "OpenNest.Gpu\OpenNest.Gpu.csproj", "{1F0DD58E-9E83-4F78-A9D9-0557C0B2D96F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.IO", "OpenNest.IO\OpenNest.IO.csproj", "{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{1F0DD58E-9E83-4F78-A9D9-0557C0B2D96F}.Release|x64.Build.0 = Release|Any CPU
 		{1F0DD58E-9E83-4F78-A9D9-0557C0B2D96F}.Release|x86.ActiveCfg = Release|Any CPU
 		{1F0DD58E-9E83-4F78-A9D9-0557C0B2D96F}.Release|x86.Build.0 = Release|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Debug|x64.Build.0 = Debug|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Debug|x86.Build.0 = Debug|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Release|x64.ActiveCfg = Release|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Release|x64.Build.0 = Release|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Release|x86.ActiveCfg = Release|Any CPU
+		{1EFCF5FB-7ADE-4044-B55D-60F6F75C3A8B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>OpenNest.IO</RootNamespace>
+    <AssemblyName>OpenNest.IO</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
+    <PackageReference Include="ACadSharp" Version="3.1.32" />
+  </ItemGroup>
+</Project>
