@@ -46,6 +46,9 @@ namespace OpenNest.Forms
             entityView1.Entities.AddRange(item.Entities);
             entityView1.ZoomToFit();
 
+            item.Entities.ForEach(e => e.IsVisible = true);
+
+            // Layers
             checkedListBox1.Items.Clear();
 
             var layers = item.Entities
@@ -56,6 +59,27 @@ namespace OpenNest.Forms
 
             foreach (var layer in layers)
                 checkedListBox1.Items.Add(layer, true);
+
+            // Colors
+            checkedListBox2.Items.Clear();
+
+            var colors = item.Entities
+                .Select(e => e.Color.ToArgb())
+                .Distinct()
+                .Select(argb => new ColorItem(Color.FromArgb(argb)));
+
+            foreach (var color in colors)
+                checkedListBox2.Items.Add(color, false);
+
+            // Line Types
+            checkedListBox3.Items.Clear();
+
+            var lineTypes = item.Entities
+                .Select(e => e.LineTypeName ?? "Continuous")
+                .Distinct();
+
+            foreach (var lineType in lineTypes)
+                checkedListBox3.Items.Add(lineType, false);
         }
 
         private static Color GetNextColor()
@@ -77,7 +101,7 @@ namespace OpenNest.Forms
 
             foreach (var item in Items)
             {
-                var entities = item.Entities.Where(e => e.Layer.IsVisible).ToList();
+                var entities = item.Entities.Where(e => e.Layer.IsVisible && e.IsVisible).ToList();
 
                 if (entities.Count == 0)
                     continue;
@@ -216,6 +240,64 @@ namespace OpenNest.Forms
 
             entityView1.Invalidate();
         }
+
+        private void checkedListBox2_SelectedIndexChanged(object sender, System.EventArgs e)
+        {
+            UpdateEntityVisibility();
+        }
+
+        private void checkedListBox3_SelectedIndexChanged(object sender, System.EventArgs e)
+        {
+            UpdateEntityVisibility();
+        }
+
+        private void UpdateEntityVisibility()
+        {
+            var item = CurrentItem;
+            if (item == null) return;
+
+            var checkedColors = new HashSet<int>();
+            for (var i = 0; i < checkedListBox2.Items.Count; i++)
+            {
+                if (checkedListBox2.GetItemChecked(i))
+                    checkedColors.Add(((ColorItem)checkedListBox2.Items[i]).Argb);
+            }
+
+            var checkedLineTypes = new HashSet<string>();
+            for (var i = 0; i < checkedListBox3.Items.Count; i++)
+            {
+                if (checkedListBox3.GetItemChecked(i))
+                    checkedLineTypes.Add(checkedListBox3.Items[i].ToString());
+            }
+
+            item.Entities.ForEach(entity =>
+            {
+                entity.IsVisible = !checkedColors.Contains(entity.Color.ToArgb())
+                                && !checkedLineTypes.Contains(entity.LineTypeName ?? "Continuous");
+            });
+
+            entityView1.Invalidate();
+        }
+
+        private void checkedListBox2_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0) return;
+
+            e.DrawBackground();
+
+            var colorItem = (ColorItem)checkedListBox2.Items[e.Index];
+            var swatchRect = new Rectangle(e.Bounds.Left + 20, e.Bounds.Top + 2, 16, e.Bounds.Height - 4);
+
+            using (var brush = new SolidBrush(colorItem.Color))
+                e.Graphics.FillRectangle(brush, swatchRect);
+
+            e.Graphics.DrawRectangle(Pens.Gray, swatchRect);
+
+            var textRect = new Rectangle(swatchRect.Right + 4, e.Bounds.Top, e.Bounds.Width - swatchRect.Right - 4, e.Bounds.Height);
+            TextRenderer.DrawText(e.Graphics, colorItem.ToString(), e.Font, textRect, e.ForeColor, TextFormatFlags.VerticalCenter);
+
+            e.DrawFocusRectangle();
+        }
     }
 
     class CadConverterItem
@@ -231,6 +313,22 @@ namespace OpenNest.Forms
 
         [Browsable(false)]
         public List<Entity> Entities { get; set; }
+    }
+
+    class ColorItem
+    {
+        public int Argb { get; }
+        public Color Color { get; }
+
+        public ColorItem(Color color)
+        {
+            Color = color;
+            Argb = color.ToArgb();
+        }
+
+        public override string ToString() => $"RGB({Color.R}, {Color.G}, {Color.B})";
+        public override bool Equals(object obj) => obj is ColorItem other && Argb == other.Argb;
+        public override int GetHashCode() => Argb;
     }
 
     public class RandomColorGenerator

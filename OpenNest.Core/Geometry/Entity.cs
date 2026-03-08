@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Drawing;
 using OpenNest.Math;
 
 namespace OpenNest.Geometry
@@ -12,6 +13,21 @@ namespace OpenNest.Geometry
             Layer = OpenNest.Geometry.Layer.Default;
             boundingBox = new Box();
         }
+
+        /// <summary>
+        /// Entity color (resolved from DXF ByLayer/ByBlock to actual color).
+        /// </summary>
+        public Color Color { get; set; }
+
+        /// <summary>
+        /// Entity linetype name (e.g. "Continuous", "Center", "Dashed").
+        /// </summary>
+        public string LineTypeName { get; set; }
+
+        /// <summary>
+        /// Whether this entity is visible (used for color/linetype filtering).
+        /// </summary>
+        public bool IsVisible { get; set; } = true;
 
         /// <summary>
         /// Smallest box that contains the entity.

@@ -103,7 +103,7 @@ namespace OpenNest.Controls
 
         private void DrawEntity(Graphics g, Entity e, Pen pen)
         {
-            if (!e.Layer.IsVisible)
+            if (!e.Layer.IsVisible || !e.IsVisible)
                 return;
 
             switch (e.Type)
