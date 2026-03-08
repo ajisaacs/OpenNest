@@ -259,9 +259,10 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Fills a single row of identical parts along one axis using geometry-aware spacing.
+        /// Creates a seed pattern containing a single part positioned at the work area origin.
+        /// Returns an empty pattern if the part does not fit.
         /// </summary>
-        public Pattern FillRow(Drawing drawing, double rotationAngle, NestDirection direction)
+        private Pattern MakeSeedPattern(Drawing drawing, double rotationAngle)
         {
             var pattern = new Pattern();
 
@@ -278,17 +279,55 @@ namespace OpenNest
                 template.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
                 return pattern;
 
-            var boundary = new PartBoundary(template, HalfSpacing);
-
             pattern.Parts.Add(template);
+            pattern.UpdateBounds();
+            return pattern;
+        }
+
+        /// <summary>
+        /// Recursively fills the work area. At depth 0, tiles the pattern along the
+        /// primary axis, then recurses perpendicular. At depth 1, tiles and returns.
+        /// </summary>
+        private List<Part> FillRecursive(Pattern pattern, NestDirection direction, int depth)
+        {
+            var boundaries = CreateBoundaries(pattern);
+            var result = new List<Part>(pattern.Parts);
+            result.AddRange(TilePattern(pattern, direction, boundaries));
+
+            if (depth == 0 && result.Count > pattern.Parts.Count)
+            {
+                var rowPattern = new Pattern();
+                rowPattern.Parts.AddRange(result);
+                rowPattern.UpdateBounds();
+                return FillRecursive(rowPattern, PerpendicularAxis(direction), depth + 1);
+            }
+
+            if (depth == 0)
+            {
+                // Single part didn't tile along primary — still try perpendicular.
+                return FillRecursive(pattern, PerpendicularAxis(direction), depth + 1);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Fills a single row of identical parts along one axis using geometry-aware spacing.
+        /// </summary>
+        public Pattern FillRow(Drawing drawing, double rotationAngle, NestDirection direction)
+        {
+            var seed = MakeSeedPattern(drawing, rotationAngle);
+
+            if (seed.Parts.Count == 0)
+                return seed;
+
+            var template = seed.Parts[0];
+            var boundary = new PartBoundary(template, HalfSpacing);
 
             var copyDistance = FindCopyDistance(template, direction, boundary);
 
             if (copyDistance <= 0)
-            {
-                pattern.UpdateBounds();
-                return pattern;
-            }
+                return seed;
 
             var dim = GetDimension(template.BoundingBox, direction);
             var start = GetStart(template.BoundingBox, direction);
@@ -305,12 +344,12 @@ namespace OpenNest
 
                 var clone = (Part)template.Clone();
                 clone.Offset(MakeOffset(direction, copyDistance * count));
-                pattern.Parts.Add(clone);
+                seed.Parts.Add(clone);
                 count++;
             }
 
-            pattern.UpdateBounds();
-            return pattern;
+            seed.UpdateBounds();
+            return seed;
         }
 
         /// <summary>
@@ -318,58 +357,31 @@ namespace OpenNest
         /// </summary>
         public List<Part> Fill(Pattern pattern, NestDirection primaryAxis)
         {
-            var result = new List<Part>();
-
             if (pattern.Parts.Count == 0)
-                return result;
+                return new List<Part>();
 
             var offset = WorkArea.Location - pattern.BoundingBox.Location;
             var basePattern = pattern.Clone(offset);
 
             if (basePattern.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
                 basePattern.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
-                return result;
+                return new List<Part>();
 
-            var boundaries = CreateBoundaries(basePattern);
-
-            result.AddRange(basePattern.Parts);
-
-            // Tile along the primary axis.
-            var primaryTiles = TilePattern(basePattern, primaryAxis, boundaries);
-            result.AddRange(primaryTiles);
-
-            // Build a full-row pattern for perpendicular tiling.
-            if (primaryTiles.Count > 0)
-            {
-                var rowPattern = new Pattern();
-                rowPattern.Parts.AddRange(result);
-                rowPattern.UpdateBounds();
-                basePattern = rowPattern;
-                boundaries = CreateBoundaries(basePattern);
-            }
-
-            // Tile along the perpendicular axis.
-            result.AddRange(TilePattern(basePattern, PerpendicularAxis(primaryAxis), boundaries));
-
-            return result;
+            return FillRecursive(basePattern, primaryAxis, depth: 0);
         }
 
         /// <summary>
-        /// Fills the work area by creating a row along the primary axis,
-        /// then tiling that row pattern along the perpendicular axis.
+        /// Fills the work area by creating a seed part, then recursively tiling
+        /// along the primary axis and then the perpendicular axis.
         /// </summary>
         public List<Part> Fill(Drawing drawing, double rotationAngle, NestDirection primaryAxis)
         {
-            var rowPattern = FillRow(drawing, rotationAngle, primaryAxis);
+            var seed = MakeSeedPattern(drawing, rotationAngle);
 
-            if (rowPattern.Parts.Count == 0)
+            if (seed.Parts.Count == 0)
                 return new List<Part>();
 
-            var boundaries = CreateBoundaries(rowPattern);
-            var result = new List<Part>(rowPattern.Parts);
-            result.AddRange(TilePattern(rowPattern, PerpendicularAxis(primaryAxis), boundaries));
-
-            return result;
+            return FillRecursive(seed, primaryAxis, depth: 0);
         }
     }
 }
