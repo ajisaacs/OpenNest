@@ -115,7 +115,7 @@ namespace OpenNest.Engine.BestFit
 
             foreach (var shape in shapes)
             {
-                var polygon = shape.ToPolygonWithTolerance(0.1);
+                var polygon = shape.ToPolygonWithTolerance(0.01);
                 points.AddRange(polygon.Vertices);
             }
 

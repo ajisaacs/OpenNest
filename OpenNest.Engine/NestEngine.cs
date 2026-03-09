@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using OpenNest.Engine.BestFit;
@@ -35,23 +35,48 @@ namespace OpenNest
 
             var engine = new FillLinear(workArea, Plate.PartSpacing);
 
-            var configs = new[]
+            // Build candidate rotation angles — always try the best rotation and +90°.
+            var angles = new List<double> { bestRotation, bestRotation + Angle.HalfPI };
+
+            // When the work area is narrow relative to the part, sweep rotation
+            // angles so we can find one that fits the part into the tight strip.
+            var testPart = new Part(item.Drawing);
+
+            if (!bestRotation.IsEqualTo(0))
+                testPart.Rotate(bestRotation);
+
+            testPart.UpdateBounds();
+
+            var partLongestSide = System.Math.Max(testPart.BoundingBox.Width, testPart.BoundingBox.Height);
+            var workAreaShortSide = System.Math.Min(workArea.Width, workArea.Height);
+
+            if (workAreaShortSide < partLongestSide)
             {
-                engine.Fill(item.Drawing, bestRotation, NestDirection.Horizontal),
-                engine.Fill(item.Drawing, bestRotation, NestDirection.Vertical),
-                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Horizontal),
-                engine.Fill(item.Drawing, bestRotation + Angle.HalfPI, NestDirection.Vertical)
-            };
+                // Try every 5° from 0 to 175° to find rotations that fit.
+                var step = Angle.ToRadians(5);
+
+                for (var a = 0.0; a < System.Math.PI; a += step)
+                {
+                    if (!angles.Any(existing => existing.IsEqualTo(a)))
+                        angles.Add(a);
+                }
+            }
 
             List<Part> best = null;
 
-            foreach (var config in configs)
+            foreach (var angle in angles)
             {
-                if (IsBetterFill(config, best))
-                    best = config;
+                var h = engine.Fill(item.Drawing, angle, NestDirection.Horizontal);
+                var v = engine.Fill(item.Drawing, angle, NestDirection.Vertical);
+
+                if (IsBetterFill(h, best))
+                    best = h;
+
+                if (IsBetterFill(v, best))
+                    best = v;
             }
 
-            Debug.WriteLine($"[Fill(NestItem,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
+            Debug.WriteLine($"[Fill(NestItem,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1} | Angles: {angles.Count}");
 
             // Try rectangle best-fit (mixes orientations to fill remnant strips).
             var rectResult = FillRectangleBestFit(item, workArea);
@@ -152,14 +177,14 @@ namespace OpenNest
                 item.Drawing, Plate.Size.Width, Plate.Size.Height,
                 Plate.PartSpacing);
 
-            var keptResults = bestFits.Where(r => r.Keep).Take(50).ToList();
-            Debug.WriteLine($"[FillWithPairs] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {keptResults.Count}");
+            var candidates = SelectPairCandidates(bestFits, workArea);
+            Debug.WriteLine($"[FillWithPairs] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
 
             var resultBag = new System.Collections.Concurrent.ConcurrentBag<(int count, List<Part> parts)>();
 
-            System.Threading.Tasks.Parallel.For(0, keptResults.Count, i =>
+            System.Threading.Tasks.Parallel.For(0, candidates.Count, i =>
             {
-                var result = keptResults[i];
+                var result = candidates[i];
                 var pairParts = result.BuildParts(item.Drawing);
                 var angles = RotationAnalysis.FindHullEdgeAngles(pairParts);
                 var engine = new FillLinear(workArea, Plate.PartSpacing);
@@ -179,6 +204,41 @@ namespace OpenNest
 
             Debug.WriteLine($"[FillWithPairs] Best pair result: {best?.Count ?? 0} parts");
             return best ?? new List<Part>();
+        }
+
+        /// <summary>
+        /// Selects pair candidates to try for the given work area. Always includes
+        /// the top 50 by area. For narrow work areas, also includes all pairs whose
+        /// shortest side fits the strip width — these are candidates that can only
+        /// be evaluated by actually tiling them into the narrow space.
+        /// </summary>
+        private List<BestFitResult> SelectPairCandidates(List<BestFitResult> bestFits, Box workArea)
+        {
+            var kept = bestFits.Where(r => r.Keep).ToList();
+            var top = kept.Take(50).ToList();
+
+            var workShortSide = System.Math.Min(workArea.Width, workArea.Height);
+            var plateShortSide = System.Math.Min(Plate.Size.Width, Plate.Size.Height);
+
+            // When the work area is significantly narrower than the plate,
+            // include all pairs that fit the narrow dimension.
+            if (workShortSide < plateShortSide * 0.5)
+            {
+                var stripCandidates = kept
+                    .Where(r => r.ShortestSide <= workShortSide + Tolerance.Epsilon);
+
+                var existing = new HashSet<BestFitResult>(top);
+
+                foreach (var r in stripCandidates)
+                {
+                    if (existing.Add(r))
+                        top.Add(r);
+                }
+
+                Debug.WriteLine($"[SelectPairCandidates] Strip mode: {top.Count} candidates (shortSide <= {workShortSide:F1})");
+            }
+
+            return top;
         }
 
         private bool HasOverlaps(List<Part> parts, double spacing)

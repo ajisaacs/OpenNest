@@ -15,7 +15,7 @@ namespace OpenNest
         public Box WorkArea { get; }
 
         public double PartSpacing { get; }
-
+        
         public double HalfSpacing => PartSpacing / 2;
 
         private static Vector MakeOffset(NestDirection direction, double distance)
@@ -227,7 +227,9 @@ namespace OpenNest
 
         /// <summary>
         /// Tiles a pattern along the given axis, returning the cloned parts
-        /// (does not include the original pattern's parts).
+        /// (does not include the original pattern's parts). For multi-part
+        /// patterns, also adds individual parts from the next incomplete copy
+        /// that still fit within the work area.
         /// </summary>
         private List<Part> TilePattern(Pattern basePattern, NestDirection direction, PartBoundary[] boundaries)
         {
@@ -253,6 +255,26 @@ namespace OpenNest
                 var clone = basePattern.Clone(MakeOffset(direction, copyDistance * count));
                 result.AddRange(clone.Parts);
                 count++;
+            }
+
+            // For multi-part patterns, try to place individual parts from the
+            // next copy that didn't fit as a whole. This handles cases where
+            // e.g. a 2-part pair only partially fits — one part may still be
+            // within the work area even though the full pattern exceeds it.
+            if (basePattern.Parts.Count > 1)
+            {
+                var partialClone = basePattern.Clone(MakeOffset(direction, copyDistance * count));
+
+                foreach (var part in partialClone.Parts)
+                {
+                    if (part.BoundingBox.Right <= WorkArea.Right + Tolerance.Epsilon &&
+                        part.BoundingBox.Top <= WorkArea.Top + Tolerance.Epsilon &&
+                        part.BoundingBox.Left >= WorkArea.Left - Tolerance.Epsilon &&
+                        part.BoundingBox.Bottom >= WorkArea.Bottom - Tolerance.Epsilon)
+                    {
+                        result.Add(part);
+                    }
+                }
             }
 
             return result;
