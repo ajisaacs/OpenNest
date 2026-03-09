@@ -739,9 +739,7 @@ namespace OpenNest
             return pts.Count > 0;
         }
 
-        private const double PushChordTolerance = 0.01;
-
-        public static List<Line> GetPartLines(Part part)
+        public static List<Line> GetPartLines(Part part, double chordTolerance = 0.001)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
@@ -749,7 +747,7 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var polygon = shape.ToPolygonWithTolerance(PushChordTolerance);
+                var polygon = shape.ToPolygonWithTolerance(chordTolerance);
                 polygon.Offset(part.Location);
                 lines.AddRange(polygon.ToLines());
             }
@@ -757,7 +755,7 @@ namespace OpenNest
             return lines;
         }
 
-        public static List<Line> GetPartLines(Part part, PushDirection facingDirection)
+        public static List<Line> GetPartLines(Part part, PushDirection facingDirection, double chordTolerance = 0.001)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
@@ -765,7 +763,7 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var polygon = shape.ToPolygonWithTolerance(PushChordTolerance);
+                var polygon = shape.ToPolygonWithTolerance(chordTolerance);
                 polygon.Offset(part.Location);
                 lines.AddRange(GetDirectionalLines(polygon, facingDirection));
             }
@@ -773,7 +771,7 @@ namespace OpenNest
             return lines;
         }
 
-        public static List<Line> GetOffsetPartLines(Part part, double spacing)
+        public static List<Line> GetOffsetPartLines(Part part, double spacing, double chordTolerance = 0.001)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
@@ -783,12 +781,12 @@ namespace OpenNest
             {
                 // Add chord tolerance to compensate for inscribed polygon chords
                 // being inside the actual offset arcs.
-                var offsetEntity = shape.OffsetEntity(spacing + PushChordTolerance, OffsetSide.Left) as Shape;
+                var offsetEntity = shape.OffsetEntity(spacing + chordTolerance, OffsetSide.Left) as Shape;
 
                 if (offsetEntity == null)
                     continue;
 
-                var polygon = offsetEntity.ToPolygonWithTolerance(PushChordTolerance);
+                var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
                 polygon.RemoveSelfIntersections();
                 polygon.Offset(part.Location);
                 lines.AddRange(polygon.ToLines());
@@ -797,7 +795,7 @@ namespace OpenNest
             return lines;
         }
 
-        public static List<Line> GetOffsetPartLines(Part part, double spacing, PushDirection facingDirection)
+        public static List<Line> GetOffsetPartLines(Part part, double spacing, PushDirection facingDirection, double chordTolerance = 0.001)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
@@ -805,12 +803,12 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var offsetEntity = shape.OffsetEntity(spacing + PushChordTolerance, OffsetSide.Left) as Shape;
+                var offsetEntity = shape.OffsetEntity(spacing + chordTolerance, OffsetSide.Left) as Shape;
 
                 if (offsetEntity == null)
                     continue;
 
-                var polygon = offsetEntity.ToPolygonWithTolerance(PushChordTolerance);
+                var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
                 polygon.RemoveSelfIntersections();
                 polygon.Offset(part.Location);
                 lines.AddRange(GetDirectionalLines(polygon, facingDirection));

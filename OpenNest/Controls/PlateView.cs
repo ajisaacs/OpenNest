@@ -99,6 +99,8 @@ namespace OpenNest.Controls
 
         public bool DrawOffset { get; set; }
 
+        public double OffsetTolerance { get; set; } = 0.001;
+
         public bool FillParts { get; set; }
 
         public double RotateIncrementAngle { get; set; }
@@ -491,7 +493,7 @@ namespace OpenNest.Controls
                         if (offsetEntity == null)
                             continue;
 
-                        var polygon = offsetEntity.ToPolygonWithTolerance(0.01);
+                        var polygon = offsetEntity.ToPolygonWithTolerance(OffsetTolerance);
                         polygon.RemoveSelfIntersections();
                         polygon.Offset(part.Location);
 
@@ -861,8 +863,8 @@ namespace OpenNest.Controls
             foreach (var part in stationaryParts)
             {
                 stationaryLines.Add(halfSpacing > 0
-                    ? Helper.GetOffsetPartLines(part.BasePart, halfSpacing, opposite)
-                    : Helper.GetPartLines(part.BasePart, opposite));
+                    ? Helper.GetOffsetPartLines(part.BasePart, halfSpacing, opposite, OffsetTolerance)
+                    : Helper.GetPartLines(part.BasePart, opposite, OffsetTolerance));
                 stationaryBoxes.Add(part.BoundingBox);
             }
 
@@ -873,8 +875,8 @@ namespace OpenNest.Controls
             {
                 // Get offset lines for the moving part (half-spacing, symmetric with stationary).
                 var movingLines = halfSpacing > 0
-                    ? Helper.GetOffsetPartLines(selected.BasePart, halfSpacing, direction)
-                    : Helper.GetPartLines(selected.BasePart, direction);
+                    ? Helper.GetOffsetPartLines(selected.BasePart, halfSpacing, direction, OffsetTolerance)
+                    : Helper.GetPartLines(selected.BasePart, direction, OffsetTolerance);
 
                 var movingBox = selected.BoundingBox;
 
