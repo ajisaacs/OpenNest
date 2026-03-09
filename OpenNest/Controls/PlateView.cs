@@ -258,7 +258,7 @@ namespace OpenNest.Controls
         {
             base.OnMouseDoubleClick(e);
 
-            if (e.Button == MouseButtons.Middle)
+            if (e.Button == MouseButtons.Middle && SelectedParts.Count == 0)
                 ZoomToFit();
         }
 
@@ -268,6 +268,13 @@ namespace OpenNest.Controls
             {
                 case Keys.Delete:
                     RemoveSelectedParts();
+                    break;
+
+                case Keys.F:
+                    if ((ModifierKeys & Keys.Control) == 0)
+                        ZoomToFit();
+                    else
+                        base.OnKeyDown(e);
                     break;
 
                 default:
