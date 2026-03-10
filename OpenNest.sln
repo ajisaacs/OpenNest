@@ -15,8 +15,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.IO", "OpenNest.IO\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Mcp", "OpenNest.Mcp\OpenNest.Mcp.csproj", "{61CC6F65-8B70-408A-B49A-F4E5F34FFD01}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Test", "OpenNest.Test\OpenNest.Test.csproj", "{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -99,18 +97,6 @@ Global
 		{61CC6F65-8B70-408A-B49A-F4E5F34FFD01}.Release|x64.Build.0 = Release|Any CPU
 		{61CC6F65-8B70-408A-B49A-F4E5F34FFD01}.Release|x86.ActiveCfg = Release|Any CPU
 		{61CC6F65-8B70-408A-B49A-F4E5F34FFD01}.Release|x86.Build.0 = Release|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Debug|x64.Build.0 = Debug|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Debug|x86.Build.0 = Debug|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Release|x64.ActiveCfg = Release|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Release|x64.Build.0 = Release|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Release|x86.ActiveCfg = Release|Any CPU
-		{59F071B4-4CFD-43E8-A8CE-7594CC2C5AD0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
