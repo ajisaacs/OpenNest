@@ -273,8 +273,19 @@ namespace OpenNest
 
             for (var i = 0; i < parts.Count; i++)
             {
+                var box1 = parts[i].BoundingBox;
+
                 for (var j = i + 1; j < parts.Count; j++)
                 {
+                    var box2 = parts[j].BoundingBox;
+
+                    // Fast bounding box rejection — if boxes don't overlap,
+                    // the parts can't intersect. Eliminates nearly all pairs
+                    // in grid layouts.
+                    if (box1.Right < box2.Left || box2.Right < box1.Left ||
+                        box1.Top < box2.Bottom || box2.Top < box1.Bottom)
+                        continue;
+
                     List<Vector> pts;
 
                     if (parts[i].Intersects(parts[j], out pts))

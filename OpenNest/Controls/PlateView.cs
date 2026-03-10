@@ -139,7 +139,7 @@ namespace OpenNest.Controls
         public string Status
         {
             get { return status; }
-            protected set
+            set
             {
                 status = value;
 

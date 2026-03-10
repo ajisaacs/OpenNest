@@ -6,8 +6,8 @@ namespace OpenNest.Geometry
 {
     public class Line : Entity
     {
-        private Vector pt1;
-        private Vector pt2;
+        internal Vector pt1;
+        internal Vector pt2;
 
         public Line()
         {

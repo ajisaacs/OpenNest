@@ -861,22 +861,25 @@ namespace OpenNest
         /// </summary>
         private static double RayEdgeDistance(Vector vertex, Line edge, PushDirection direction)
         {
-            var p1 = edge.StartPoint;
-            var p2 = edge.EndPoint;
+            var p1x = edge.pt1.X;
+            var p1y = edge.pt1.Y;
+            var p2x = edge.pt2.X;
+            var p2y = edge.pt2.Y;
 
             switch (direction)
             {
                 case PushDirection.Left:
                 {
                     // Ray goes in -X direction. Need non-horizontal edge.
-                    if (p1.Y.IsEqualTo(p2.Y))
+                    var dy = p2y - p1y;
+                    if (dy > -Tolerance.Epsilon && dy < Tolerance.Epsilon)
                         return double.MaxValue; // horizontal edge, parallel to ray
 
-                    var t = (vertex.Y - p1.Y) / (p2.Y - p1.Y);
+                    var t = (vertex.Y - p1y) / dy;
                     if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
                         return double.MaxValue;
 
-                    var ix = p1.X + t * (p2.X - p1.X);
+                    var ix = p1x + t * (p2x - p1x);
                     var dist = vertex.X - ix; // positive if edge is to the left
                     if (dist > Tolerance.Epsilon) return dist;
                     if (dist >= -Tolerance.Epsilon) return 0; // touching
@@ -885,14 +888,15 @@ namespace OpenNest
 
                 case PushDirection.Right:
                 {
-                    if (p1.Y.IsEqualTo(p2.Y))
+                    var dy = p2y - p1y;
+                    if (dy > -Tolerance.Epsilon && dy < Tolerance.Epsilon)
                         return double.MaxValue;
 
-                    var t = (vertex.Y - p1.Y) / (p2.Y - p1.Y);
+                    var t = (vertex.Y - p1y) / dy;
                     if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
                         return double.MaxValue;
 
-                    var ix = p1.X + t * (p2.X - p1.X);
+                    var ix = p1x + t * (p2x - p1x);
                     var dist = ix - vertex.X;
                     if (dist > Tolerance.Epsilon) return dist;
                     if (dist >= -Tolerance.Epsilon) return 0; // touching
@@ -902,14 +906,15 @@ namespace OpenNest
                 case PushDirection.Down:
                 {
                     // Ray goes in -Y direction. Need non-vertical edge.
-                    if (p1.X.IsEqualTo(p2.X))
+                    var dx = p2x - p1x;
+                    if (dx > -Tolerance.Epsilon && dx < Tolerance.Epsilon)
                         return double.MaxValue; // vertical edge, parallel to ray
 
-                    var t = (vertex.X - p1.X) / (p2.X - p1.X);
+                    var t = (vertex.X - p1x) / dx;
                     if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
                         return double.MaxValue;
 
-                    var iy = p1.Y + t * (p2.Y - p1.Y);
+                    var iy = p1y + t * (p2y - p1y);
                     var dist = vertex.Y - iy;
                     if (dist > Tolerance.Epsilon) return dist;
                     if (dist >= -Tolerance.Epsilon) return 0; // touching
@@ -918,14 +923,15 @@ namespace OpenNest
 
                 case PushDirection.Up:
                 {
-                    if (p1.X.IsEqualTo(p2.X))
+                    var dx = p2x - p1x;
+                    if (dx > -Tolerance.Epsilon && dx < Tolerance.Epsilon)
                         return double.MaxValue;
 
-                    var t = (vertex.X - p1.X) / (p2.X - p1.X);
+                    var t = (vertex.X - p1x) / dx;
                     if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
                         return double.MaxValue;
 
-                    var iy = p1.Y + t * (p2.Y - p1.Y);
+                    var iy = p1y + t * (p2y - p1y);
                     var dist = iy - vertex.Y;
                     if (dist > Tolerance.Epsilon) return dist;
                     if (dist >= -Tolerance.Epsilon) return 0; // touching
@@ -949,14 +955,15 @@ namespace OpenNest
             // Case 1: Each moving vertex → each stationary edge
             for (int i = 0; i < movingLines.Count; i++)
             {
-                var movingLine = movingLines[i];
+                var movingStart = movingLines[i].pt1;
+                var movingEnd = movingLines[i].pt2;
 
                 for (int j = 0; j < stationaryLines.Count; j++)
                 {
-                    var d = RayEdgeDistance(movingLine.StartPoint, stationaryLines[j], direction);
+                    var d = RayEdgeDistance(movingStart, stationaryLines[j], direction);
                     if (d < minDist) minDist = d;
 
-                    d = RayEdgeDistance(movingLine.EndPoint, stationaryLines[j], direction);
+                    d = RayEdgeDistance(movingEnd, stationaryLines[j], direction);
                     if (d < minDist) minDist = d;
                 }
             }
@@ -966,14 +973,15 @@ namespace OpenNest
 
             for (int i = 0; i < stationaryLines.Count; i++)
             {
-                var stationaryLine = stationaryLines[i];
+                var stationaryStart = stationaryLines[i].pt1;
+                var stationaryEnd = stationaryLines[i].pt2;
 
                 for (int j = 0; j < movingLines.Count; j++)
                 {
-                    var d = RayEdgeDistance(stationaryLine.StartPoint, movingLines[j], opposite);
+                    var d = RayEdgeDistance(stationaryStart, movingLines[j], opposite);
                     if (d < minDist) minDist = d;
 
-                    d = RayEdgeDistance(stationaryLine.EndPoint, movingLines[j], opposite);
+                    d = RayEdgeDistance(stationaryEnd, movingLines[j], opposite);
                     if (d < minDist) minDist = d;
                 }
             }
