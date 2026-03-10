@@ -76,8 +76,7 @@ namespace OpenNest
             var pushDir = GetPushDirection(direction);
             var opposite = Helper.OppositeDirection(pushDir);
 
-            var partB = (Part)partA.Clone();
-            partB.Offset(MakeOffset(direction, bboxDim));
+            var partB = partA.CloneAtOffset(MakeOffset(direction, bboxDim));
 
             var movingLines = boundary.GetLines(partB.Location, pushDir);
             var stationaryLines = boundary.GetLines(partA.Location, opposite);
@@ -364,8 +363,7 @@ namespace OpenNest
                 if (nextPos + dim > limit + Tolerance.Epsilon)
                     break;
 
-                var clone = (Part)template.Clone();
-                clone.Offset(MakeOffset(direction, copyDistance * count));
+                var clone = template.CloneAtOffset(MakeOffset(direction, copyDistance * count));
                 seed.Parts.Add(clone);
                 count++;
             }

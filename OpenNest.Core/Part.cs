@@ -208,5 +208,29 @@ namespace OpenNest
 
             return part;
         }
+
+        /// <summary>
+        /// Creates an offset copy of the part. Clones from the already-rotated
+        /// program (skips re-rotation) and computes the bounding box arithmetically
+        /// (skips Program.BoundingBox walk).
+        /// </summary>
+        public Part CloneAtOffset(Vector offset)
+        {
+            var clonedProgram = Program.Clone() as Program;
+            var part = new Part(BaseDrawing, clonedProgram,
+                location + offset,
+                new Box(BoundingBox.X + offset.X, BoundingBox.Y + offset.Y,
+                    BoundingBox.Width, BoundingBox.Height));
+
+            return part;
+        }
+
+        private Part(Drawing baseDrawing, Program program, Vector location, Box boundingBox)
+        {
+            BaseDrawing = baseDrawing;
+            Program = program;
+            this.location = location;
+            BoundingBox = boundingBox;
+        }
     }
 }
