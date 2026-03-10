@@ -244,15 +244,17 @@ namespace OpenNest
         /// </summary>
         private List<Part> TilePattern(Pattern basePattern, NestDirection direction, PartBoundary[] boundaries)
         {
-            var result = new List<Part>();
             var copyDistance = FindPatternCopyDistance(basePattern, direction, boundaries);
 
             if (copyDistance <= 0)
-                return result;
+                return new List<Part>();
 
             var dim = GetDimension(basePattern.BoundingBox, direction);
             var start = GetStart(basePattern.BoundingBox, direction);
             var limit = GetLimit(direction);
+
+            var estimatedCopies = (int)((limit - start - dim) / copyDistance);
+            var result = new List<Part>(estimatedCopies * basePattern.Parts.Count);
 
             var count = 1;
 
@@ -309,9 +311,7 @@ namespace OpenNest
             if (!rotationAngle.IsEqualTo(0))
                 template.Rotate(rotationAngle);
 
-            var bbox = template.Program.BoundingBox();
-            template.Offset(WorkArea.Location - bbox.Location);
-            template.UpdateBounds();
+            template.Offset(WorkArea.Location - template.BoundingBox.Location);
 
             if (template.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
                 template.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
