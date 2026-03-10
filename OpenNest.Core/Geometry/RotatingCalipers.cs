@@ -48,9 +48,14 @@ namespace OpenNest.Geometry
                 return new BoundingRectangleResult(angle, length, 0);
             }
 
+            // Only need half the edges — opposite edges produce the same
+            // bounding rectangle (width/height swapped), so the minimum
+            // area repeats every 180°.
+            var edgeCount = (n + 1) / 2;
+
             BoundingRectangleResult best = null;
 
-            for (int i = 0; i < n; i++)
+            for (int i = 0; i < edgeCount; i++)
             {
                 int next = (i + 1) % n;
                 var edgeX = vertices[next].X - vertices[i].X;
