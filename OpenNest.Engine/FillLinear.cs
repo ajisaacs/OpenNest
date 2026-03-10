@@ -76,9 +76,9 @@ namespace OpenNest
             var pushDir = GetPushDirection(direction);
             var opposite = Helper.OppositeDirection(pushDir);
 
-            var partB = partA.CloneAtOffset(MakeOffset(direction, bboxDim));
+            var locationB = partA.Location + MakeOffset(direction, bboxDim);
 
-            var movingLines = boundary.GetLines(partB.Location, pushDir);
+            var movingLines = boundary.GetLines(locationB, pushDir);
             var stationaryLines = boundary.GetLines(partA.Location, opposite);
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
@@ -121,7 +121,7 @@ namespace OpenNest
                 }
             }
 
-            var patternB = patternA.Clone(MakeOffset(direction, startOffset));
+            var offset = MakeOffset(direction, startOffset);
 
             // Pre-compute stationary lines for patternA parts.
             var stationaryCache = new List<Line>[patternA.Parts.Count];
@@ -131,10 +131,10 @@ namespace OpenNest
 
             var maxCopyDistance = 0.0;
 
-            for (var j = 0; j < patternB.Parts.Count; j++)
+            for (var j = 0; j < patternA.Parts.Count; j++)
             {
-                var partB = patternB.Parts[j];
-                var movingLines = boundaries[j].GetLines(partB.Location, pushDir);
+                var locationB = patternA.Parts[j].Location + offset;
+                var movingLines = boundaries[j].GetLines(locationB, pushDir);
 
                 for (var i = 0; i < patternA.Parts.Count; i++)
                 {
@@ -167,9 +167,9 @@ namespace OpenNest
             var pushDir = GetPushDirection(direction);
             var opposite = Helper.OppositeDirection(pushDir);
 
-            var patternB = patternA.Clone(MakeOffset(direction, bboxDim));
+            var offset = MakeOffset(direction, bboxDim);
 
-            var movingLines = GetPatternLines(patternB, boundary, pushDir);
+            var movingLines = GetOffsetPatternLines(patternA, offset, boundary, pushDir);
             var stationaryLines = GetPatternLines(patternA, boundary, opposite);
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
@@ -185,6 +185,20 @@ namespace OpenNest
 
             foreach (var part in pattern.Parts)
                 lines.AddRange(boundary.GetLines(part.Location, direction));
+
+            return lines;
+        }
+
+        /// <summary>
+        /// Gets boundary lines for all parts in a pattern, with an additional
+        /// location offset applied. Avoids cloning the pattern.
+        /// </summary>
+        private static List<Line> GetOffsetPatternLines(Pattern pattern, Vector offset, PartBoundary boundary, PushDirection direction)
+        {
+            var lines = new List<Line>();
+
+            foreach (var part in pattern.Parts)
+                lines.AddRange(boundary.GetLines(part.Location + offset, direction));
 
             return lines;
         }
@@ -251,8 +265,11 @@ namespace OpenNest
                 if (nextPos + dim > limit + Tolerance.Epsilon)
                     break;
 
-                var clone = basePattern.Clone(MakeOffset(direction, copyDistance * count));
-                result.AddRange(clone.Parts);
+                var offset = MakeOffset(direction, copyDistance * count);
+
+                foreach (var part in basePattern.Parts)
+                    result.Add(part.CloneAtOffset(offset));
+
                 count++;
             }
 
@@ -262,10 +279,12 @@ namespace OpenNest
             // within the work area even though the full pattern exceeds it.
             if (basePattern.Parts.Count > 1)
             {
-                var partialClone = basePattern.Clone(MakeOffset(direction, copyDistance * count));
+                var offset = MakeOffset(direction, copyDistance * count);
 
-                foreach (var part in partialClone.Parts)
+                foreach (var basePart in basePattern.Parts)
                 {
+                    var part = basePart.CloneAtOffset(offset);
+
                     if (part.BoundingBox.Right <= WorkArea.Right + Tolerance.Epsilon &&
                         part.BoundingBox.Top <= WorkArea.Top + Tolerance.Epsilon &&
                         part.BoundingBox.Left >= WorkArea.Left - Tolerance.Epsilon &&
