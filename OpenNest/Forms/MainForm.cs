@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
+using OpenNest.Engine.BestFit;
 using OpenNest.Gpu;
 using OpenNest.Geometry;
 using OpenNest.IO;
@@ -41,6 +42,9 @@ namespace OpenNest.Forms
             EnableCheck();
             UpdateStatus();
             UpdateGpuStatus();
+
+            if (GpuEvaluatorFactory.GpuAvailable)
+                BestFitCache.CreateEvaluator = (drawing, spacing) => GpuEvaluatorFactory.Create(drawing, spacing);
         }
 
         private string GetNestName(DateTime date, int id)

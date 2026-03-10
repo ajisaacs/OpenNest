@@ -37,6 +37,34 @@ namespace OpenNest.Gpu
             return Rasterize(polygons, cellSize, spacingDilation);
         }
 
+        /// <summary>
+        /// Rasterizes a Part that was created with Part.CreateAtOrigin.
+        /// Extracts polygons from the Part's program and offsets by Location,
+        /// guaranteeing the bitmap matches the exact coordinate space used
+        /// by the CPU PairEvaluator.
+        /// </summary>
+        public static PartBitmap FromPart(Part part, double cellSize = DefaultCellSize)
+        {
+            var entities = ConvertProgram.ToGeometry(part.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid);
+            var shapes = Helper.GetShapes(entities);
+
+            var polygons = new List<Polygon>();
+
+            foreach (var shape in shapes)
+            {
+                if (!shape.IsClosed())
+                    continue;
+
+                var polygon = shape.ToPolygonWithTolerance(0.05);
+                polygon.Close();
+                polygon.Offset(part.Location);
+                polygons.Add(polygon);
+            }
+
+            return Rasterize(polygons, cellSize, 0);
+        }
+
         private static PartBitmap Rasterize(List<Polygon> polygons, double cellSize, double spacingDilation)
         {
             if (polygons.Count == 0)
@@ -124,6 +152,80 @@ namespace OpenNest.Gpu
             }
 
             return polygons;
+        }
+
+        /// <summary>
+        /// Blits two locally-rasterized bitmaps into a shared world-space grid.
+        /// B is placed at the given world-space offset. Returns two aligned int[]
+        /// arrays of identical dimensions with no fractional offset math.
+        /// </summary>
+        public static (int[] cellsA, int[] cellsB, int width, int height) BlitPair(
+            PartBitmap bitmapA, PartBitmap bitmapB, double offsetX, double offsetY)
+        {
+            var cellSize = bitmapA.CellSize;
+
+            // B's world-space origin when placed at the offset
+            var bWorldOriginX = bitmapB.OriginX + offsetX;
+            var bWorldOriginY = bitmapB.OriginY + offsetY;
+
+            // Combined world-space bounds
+            var combinedMinX = System.Math.Min(bitmapA.OriginX, bWorldOriginX);
+            var combinedMinY = System.Math.Min(bitmapA.OriginY, bWorldOriginY);
+            var combinedMaxX = System.Math.Max(
+                bitmapA.OriginX + bitmapA.Width * cellSize,
+                bWorldOriginX + bitmapB.Width * cellSize);
+            var combinedMaxY = System.Math.Max(
+                bitmapA.OriginY + bitmapA.Height * cellSize,
+                bWorldOriginY + bitmapB.Height * cellSize);
+
+            var sharedWidth = (int)System.Math.Ceiling((combinedMaxX - combinedMinX) / cellSize);
+            var sharedHeight = (int)System.Math.Ceiling((combinedMaxY - combinedMinY) / cellSize);
+
+            if (sharedWidth <= 0 || sharedHeight <= 0)
+                return (Array.Empty<int>(), Array.Empty<int>(), 0, 0);
+
+            var cellsA = new int[sharedWidth * sharedHeight];
+            var cellsB = new int[sharedWidth * sharedHeight];
+
+            // Integer cell offsets for A within the shared grid
+            var aOffX = (int)System.Math.Round((bitmapA.OriginX - combinedMinX) / cellSize);
+            var aOffY = (int)System.Math.Round((bitmapA.OriginY - combinedMinY) / cellSize);
+
+            // Integer cell offsets for B within the shared grid
+            var bOffX = (int)System.Math.Round((bWorldOriginX - combinedMinX) / cellSize);
+            var bOffY = (int)System.Math.Round((bWorldOriginY - combinedMinY) / cellSize);
+
+            // Blit A into the shared grid
+            for (var y = 0; y < bitmapA.Height; y++)
+            {
+                for (var x = 0; x < bitmapA.Width; x++)
+                {
+                    if (bitmapA.Cells[y * bitmapA.Width + x] == 1)
+                    {
+                        var sx = aOffX + x;
+                        var sy = aOffY + y;
+                        if (sx >= 0 && sx < sharedWidth && sy >= 0 && sy < sharedHeight)
+                            cellsA[sy * sharedWidth + sx] = 1;
+                    }
+                }
+            }
+
+            // Blit B into the shared grid
+            for (var y = 0; y < bitmapB.Height; y++)
+            {
+                for (var x = 0; x < bitmapB.Width; x++)
+                {
+                    if (bitmapB.Cells[y * bitmapB.Width + x] == 1)
+                    {
+                        var sx = bOffX + x;
+                        var sy = bOffY + y;
+                        if (sx >= 0 && sx < sharedWidth && sy >= 0 && sy < sharedHeight)
+                            cellsB[sy * sharedWidth + sx] = 1;
+                    }
+                }
+            }
+
+            return (cellsA, cellsB, sharedWidth, sharedHeight);
         }
 
         private static void Dilate(int[] cells, int width, int height, int radius)

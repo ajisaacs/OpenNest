@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ILGPU;
 using ILGPU.Runtime;
 using OpenNest.Converters;
@@ -33,12 +34,16 @@ namespace OpenNest.Gpu
             if (candidates.Count == 0)
                 return new List<BestFitResult>();
 
-            // No dilation — candidate positions already include spacing
-            // (baked in by RotationSlideStrategy via half-spacing offset lines).
-            var bitmapA = PartBitmap.FromDrawing(_drawing, _cellSize);
+            // Rasterize A from a Part created at the origin — guarantees the
+            // bitmap coordinate system exactly matches Part.CreateAtOrigin.
+            var partA = Part.CreateAtOrigin(_drawing);
+            var bitmapA = PartBitmap.FromPart(partA, _cellSize);
 
             if (bitmapA.Width == 0 || bitmapA.Height == 0)
                 return candidates.Select(c => MakeEmptyResult(c)).ToList();
+
+            // Pre-compute A vertices once for all rotation groups
+            var verticesA = GetPartVertices(partA);
 
             // Group candidates by Part2Rotation so we rasterize B once per unique rotation
             var groups = candidates
@@ -53,8 +58,9 @@ namespace OpenNest.Gpu
                 var rotation = group.Key;
                 var groupItems = group.ToList();
 
-                // Rasterize B at this rotation
-                var bitmapB = PartBitmap.FromDrawingRotated(_drawing, rotation, _cellSize);
+                // Rasterize B at this rotation from a Part created at origin
+                var partB = Part.CreateAtOrigin(_drawing, rotation);
+                var bitmapB = PartBitmap.FromPart(partB, _cellSize);
 
                 if (bitmapB.Width == 0 || bitmapB.Height == 0)
                 {
@@ -63,6 +69,10 @@ namespace OpenNest.Gpu
                     continue;
                 }
 
+                // Pre-compute B vertices at origin for this rotation group
+                var verticesB = GetPartVertices(partB);
+                var locationB = partB.Location;
+
                 // Use the max dimensions so both bitmaps fit on the same grid
                 var gridWidth = System.Math.Max(bitmapA.Width, bitmapB.Width);
                 var gridHeight = System.Math.Max(bitmapA.Height, bitmapB.Height);
@@ -70,20 +80,23 @@ namespace OpenNest.Gpu
                 var paddedA = PadBitmap(bitmapA, gridWidth, gridHeight);
                 var paddedB = PadBitmap(bitmapB, gridWidth, gridHeight);
 
-                // Pack candidate offsets: convert world offset to cell offset
+                // The CPU evaluator replaces partB.Location with Part2Offset,
+                // so the world-space shift from B's bitmap position is
+                // (Part2Offset - partB.Location). We convert that shift to
+                // pixel coordinates, adjusting for the bitmap origin difference.
                 var candidateCount = groupItems.Count;
-                var offsets = new float[candidateCount * 3];
+                var offsets = new int[candidateCount * 2];
 
                 for (var i = 0; i < candidateCount; i++)
                 {
                     var c = groupItems[i].Candidate;
-                    // Convert world-space offset to cell-space offset relative to bitmapA origin
-                    offsets[i * 3 + 0] = (float)((c.Part2Offset.X - bitmapA.OriginX + bitmapB.OriginX) / _cellSize);
-                    offsets[i * 3 + 1] = (float)((c.Part2Offset.Y - bitmapA.OriginY + bitmapB.OriginY) / _cellSize);
-                    offsets[i * 3 + 2] = (float)c.Part2Rotation;
+                    var shiftX = c.Part2Offset.X - locationB.X;
+                    var shiftY = c.Part2Offset.Y - locationB.Y;
+                    offsets[i * 2 + 0] = (int)System.Math.Round((shiftX + bitmapB.OriginX - bitmapA.OriginX) / _cellSize);
+                    offsets[i * 2 + 1] = (int)System.Math.Round((shiftY + bitmapB.OriginY - bitmapA.OriginY) / _cellSize);
                 }
 
-                var resultScores = new float[candidateCount];
+                var resultScores = new int[candidateCount];
 
                 using var gpuPaddedA = _accelerator.Allocate1D(paddedA);
                 using var gpuPaddedB = _accelerator.Allocate1D(paddedB);
@@ -94,9 +107,9 @@ namespace OpenNest.Gpu
                     Index1D,
                     ArrayView1D<int, Stride1D.Dense>,
                     ArrayView1D<int, Stride1D.Dense>,
-                    ArrayView1D<float, Stride1D.Dense>,
-                    ArrayView1D<float, Stride1D.Dense>,
-                    int, int>(NestingKernel);
+                    ArrayView1D<int, Stride1D.Dense>,
+                    ArrayView1D<int, Stride1D.Dense>,
+                    int, int>(OverlapKernel);
 
                 kernel(candidateCount, gpuPaddedA.View, gpuPaddedB.View,
                     gpuOffsets.View, gpuResults.View, gridWidth, gridHeight);
@@ -104,12 +117,13 @@ namespace OpenNest.Gpu
                 _accelerator.Synchronize();
                 gpuResults.CopyToCPU(resultScores);
 
-                // Map results back — compute proper bounding metrics for valid candidates
-                for (var i = 0; i < candidateCount; i++)
+                // Process results in parallel — pre-computed vertices avoid
+                // per-candidate Part creation, and Parallel.For matches the
+                // CPU evaluator's Parallel.ForEach concurrency.
+                Parallel.For(0, candidateCount, i =>
                 {
                     var item = groupItems[i];
-                    var score = resultScores[i];
-                    var hasOverlap = score <= 0f;
+                    var hasOverlap = resultScores[i] > 0;
 
                     if (hasOverlap)
                     {
@@ -127,56 +141,53 @@ namespace OpenNest.Gpu
                     }
                     else
                     {
-                        allResults[item.OriginalIndex] = ComputeBoundingResult(item.Candidate, trueArea);
+                        allResults[item.OriginalIndex] = ComputeBoundingResult(
+                            item.Candidate, trueArea, verticesA, verticesB, locationB);
                     }
-                }
+                });
             }
 
             return allResults.ToList();
         }
 
-        private static void NestingKernel(
+        /// <summary>
+        /// Overlap kernel using integer cell offsets pre-rounded on the CPU.
+        /// Shares one A and one B bitmap across all candidates — only the
+        /// integer offset varies per candidate.
+        /// </summary>
+        private static void OverlapKernel(
             Index1D index,
             ArrayView1D<int, Stride1D.Dense> partBitmapA,
             ArrayView1D<int, Stride1D.Dense> partBitmapB,
-            ArrayView1D<float, Stride1D.Dense> candidateOffsets,
-            ArrayView1D<float, Stride1D.Dense> results,
+            ArrayView1D<int, Stride1D.Dense> candidateOffsets,
+            ArrayView1D<int, Stride1D.Dense> results,
             int gridWidth,
             int gridHeight)
         {
-            var candidateIdx = index * 3;
-            var offsetX = candidateOffsets[candidateIdx];
-            var offsetY = candidateOffsets[candidateIdx + 1];
-            // rotation is already baked into partBitmapB, offset is what matters
+            var offsetX = candidateOffsets[index * 2];
+            var offsetY = candidateOffsets[index * 2 + 1];
 
             var overlapCount = 0;
-            var totalOccupied = 0;
 
             for (var y = 0; y < gridHeight; y++)
             {
                 for (var x = 0; x < gridWidth; x++)
                 {
                     var cellA = partBitmapA[y * gridWidth + x];
+                    if (cellA != 1) continue;
 
-                    // Apply offset to look up part B's cell
-                    var bx = (int)(x - offsetX);
-                    var by = (int)(y - offsetY);
+                    var bx = x - offsetX;
+                    var by = y - offsetY;
 
-                    var cellB = 0;
                     if (bx >= 0 && bx < gridWidth && by >= 0 && by < gridHeight)
-                        cellB = partBitmapB[by * gridWidth + bx];
-
-                    if (cellA == 1 && cellB == 1)
-                        overlapCount++;
-                    if (cellA == 1 || cellB == 1)
-                        totalOccupied++;
+                    {
+                        if (partBitmapB[by * gridWidth + bx] == 1)
+                            overlapCount++;
+                    }
                 }
             }
 
-            if (overlapCount > 0)
-                results[index] = 0f;
-            else
-                results[index] = (float)totalOccupied / (gridWidth * gridHeight);
+            results[index] = overlapCount;
         }
 
         private static int[] PadBitmap(PartBitmap bitmap, int targetWidth, int targetHeight)
@@ -199,23 +210,17 @@ namespace OpenNest.Gpu
 
         private const double ChordTolerance = 0.01;
 
-        private BestFitResult ComputeBoundingResult(PairCandidate candidate, double trueArea)
+        private static BestFitResult ComputeBoundingResult(
+            PairCandidate candidate, double trueArea,
+            List<Vector> verticesA, List<Vector> verticesB, Vector locationB)
         {
-            var part1 = new Part(_drawing);
-            var bbox1 = part1.Program.BoundingBox();
-            part1.Offset(-bbox1.Location.X, -bbox1.Location.Y);
-            part1.UpdateBounds();
+            var shift = candidate.Part2Offset - locationB;
 
-            var part2 = new Part(_drawing);
-            if (!candidate.Part2Rotation.IsEqualTo(0))
-                part2.Rotate(candidate.Part2Rotation);
-            var bbox2 = part2.Program.BoundingBox();
-            part2.Offset(-bbox2.Location.X, -bbox2.Location.Y);
-            part2.Location = candidate.Part2Offset;
-            part2.UpdateBounds();
+            var allPoints = new List<Vector>(verticesA.Count + verticesB.Count);
+            allPoints.AddRange(verticesA);
 
-            var allPoints = GetPartVertices(part1);
-            allPoints.AddRange(GetPartVertices(part2));
+            foreach (var v in verticesB)
+                allPoints.Add(v + shift);
 
             double bestArea, bestWidth, bestHeight, bestRotation;
 
@@ -230,10 +235,9 @@ namespace OpenNest.Gpu
             }
             else
             {
-                var combinedBox = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
-                bestArea = combinedBox.Area();
-                bestWidth = combinedBox.Width;
-                bestHeight = combinedBox.Height;
+                bestArea = 0;
+                bestWidth = 0;
+                bestHeight = 0;
                 bestRotation = 0;
             }
 
