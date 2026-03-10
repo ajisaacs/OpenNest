@@ -102,24 +102,22 @@ namespace OpenNest
 
             // Compute a starting offset large enough that every part-pair in
             // patternB has its offset geometry beyond patternA's offset geometry.
-            var startOffset = bboxDim;
+            // max(aUpper_i - bLower_j) = max(aUpper) - min(bLower).
+            var maxUpper = double.MinValue;
+            var minLower = double.MaxValue;
 
             for (var i = 0; i < patternA.Parts.Count; i++)
             {
-                var aUpper = direction == NestDirection.Horizontal
-                    ? patternA.Parts[i].BoundingBox.Right : patternA.Parts[i].BoundingBox.Top;
+                var bb = patternA.Parts[i].BoundingBox;
+                var upper = direction == NestDirection.Horizontal ? bb.Right : bb.Top;
+                var lower = direction == NestDirection.Horizontal ? bb.Left : bb.Bottom;
 
-                for (var j = 0; j < patternA.Parts.Count; j++)
-                {
-                    var bLower = direction == NestDirection.Horizontal
-                        ? patternA.Parts[j].BoundingBox.Left : patternA.Parts[j].BoundingBox.Bottom;
-
-                    var required = aUpper - bLower + PartSpacing + Tolerance.Epsilon;
-
-                    if (required > startOffset)
-                        startOffset = required;
-                }
+                if (upper > maxUpper) maxUpper = upper;
+                if (lower < minLower) minLower = lower;
             }
+
+            var startOffset = System.Math.Max(bboxDim,
+                maxUpper - minLower + PartSpacing + Tolerance.Epsilon);
 
             var offset = MakeOffset(direction, startOffset);
 
