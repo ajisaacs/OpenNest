@@ -338,14 +338,22 @@ namespace OpenNest
                 var rowPattern = new Pattern();
                 rowPattern.Parts.AddRange(result);
                 rowPattern.UpdateBounds();
-                var gridResult = FillRecursive(rowPattern, PerpendicularAxis(direction), depth + 1);
+                var perpAxis = PerpendicularAxis(direction);
+                var gridResult = FillRecursive(rowPattern, perpAxis, depth + 1);
 
                 // Fill the remaining strip (after the last full row/column)
                 // with individual parts from the seed pattern.
-                var remaining = FillRemainingStrip(gridResult, pattern, PerpendicularAxis(direction), direction);
+                var remaining = FillRemainingStrip(gridResult, pattern, perpAxis, direction);
 
                 if (remaining.Count > 0)
                     gridResult.AddRange(remaining);
+
+                // Try one fewer row/column — the larger remainder strip may
+                // fit more parts than the extra row contained.
+                var fewerResult = TryFewerRows(gridResult, rowPattern, pattern, perpAxis, direction);
+
+                if (fewerResult != null && fewerResult.Count > gridResult.Count)
+                    return fewerResult;
 
                 return gridResult;
             }
@@ -357,6 +365,35 @@ namespace OpenNest
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Tries removing the last row/column from the grid and re-filling the
+        /// larger remainder strip. Returns null if this doesn't improve the total.
+        /// </summary>
+        private List<Part> TryFewerRows(
+            List<Part> fullResult, Pattern rowPattern, Pattern seedPattern,
+            NestDirection tiledAxis, NestDirection primaryAxis)
+        {
+            var rowPartCount = rowPattern.Parts.Count;
+
+            // Need at least 2 rows for this to make sense (remove 1, keep 1+).
+            if (fullResult.Count < rowPartCount * 2)
+                return null;
+
+            // Remove the last row's worth of parts.
+            var fewerParts = new List<Part>(fullResult.Count - rowPartCount);
+
+            for (var i = 0; i < fullResult.Count - rowPartCount; i++)
+                fewerParts.Add(fullResult[i]);
+
+            var remaining = FillRemainingStrip(fewerParts, seedPattern, tiledAxis, primaryAxis);
+
+            if (remaining.Count <= rowPartCount)
+                return null;
+
+            fewerParts.AddRange(remaining);
+            return fewerParts;
         }
 
         /// <summary>
