@@ -247,7 +247,7 @@ namespace OpenNest.Geometry
         /// Converts the shape to a polygon using a chord tolerance to determine
         /// the number of segments per arc/circle.
         /// </summary>
-        public Polygon ToPolygonWithTolerance(double tolerance)
+        public Polygon ToPolygonWithTolerance(double tolerance, bool circumscribe = false)
         {
             var polygon = new Polygon();
 
@@ -257,7 +257,7 @@ namespace OpenNest.Geometry
                 {
                     case EntityType.Arc:
                         var arc = (Arc)entity;
-                        polygon.Vertices.AddRange(arc.ToPoints(arc.SegmentsForTolerance(tolerance)));
+                        polygon.Vertices.AddRange(arc.ToPoints(arc.SegmentsForTolerance(tolerance), circumscribe));
                         break;
 
                     case EntityType.Line:
@@ -271,7 +271,7 @@ namespace OpenNest.Geometry
 
                     case EntityType.Circle:
                         var circle = (Circle)entity;
-                        polygon.Vertices.AddRange(circle.ToPoints(circle.SegmentsForTolerance(tolerance)));
+                        polygon.Vertices.AddRange(circle.ToPoints(circle.SegmentsForTolerance(tolerance), circumscribe));
                         break;
 
                     default:

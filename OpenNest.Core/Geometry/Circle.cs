@@ -135,18 +135,22 @@ namespace OpenNest.Geometry
             return System.Math.Max(3, (int)System.Math.Ceiling(Angle.TwoPI / maxAngle));
         }
 
-        public List<Vector> ToPoints(int segments = 1000)
+        public List<Vector> ToPoints(int segments = 1000, bool circumscribe = false)
         {
             var points = new List<Vector>();
             var stepAngle = Angle.TwoPI / segments;
+
+            var r = circumscribe && segments > 0
+                ? Radius / System.Math.Cos(stepAngle / 2.0)
+                : Radius;
 
             for (int i = 0; i <= segments; ++i)
             {
                 var angle = stepAngle * i;
 
                 points.Add(new Vector(
-                    System.Math.Cos(angle) * Radius + Center.X,
-                    System.Math.Sin(angle) * Radius + Center.Y));
+                    System.Math.Cos(angle) * r + Center.X,
+                    System.Math.Sin(angle) * r + Center.Y));
             }
 
             return points;

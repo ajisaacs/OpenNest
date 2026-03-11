@@ -85,18 +85,31 @@ namespace OpenNest
                 }
             }
 
-            List<Part> best = null;
+            var linearBag = new System.Collections.Concurrent.ConcurrentBag<(FillScore score, List<Part> parts)>();
 
-            foreach (var angle in angles)
+            System.Threading.Tasks.Parallel.ForEach(angles, angle =>
             {
-                var h = engine.Fill(item.Drawing, angle, NestDirection.Horizontal);
-                var v = engine.Fill(item.Drawing, angle, NestDirection.Vertical);
+                var localEngine = new FillLinear(workArea, Plate.PartSpacing);
+                var h = localEngine.Fill(item.Drawing, angle, NestDirection.Horizontal);
+                var v = localEngine.Fill(item.Drawing, angle, NestDirection.Vertical);
 
-                if (IsBetterFill(h, best, workArea))
-                    best = h;
+                if (h != null && h.Count > 0)
+                    linearBag.Add((FillScore.Compute(h, workArea), h));
 
-                if (IsBetterFill(v, best, workArea))
-                    best = v;
+                if (v != null && v.Count > 0)
+                    linearBag.Add((FillScore.Compute(v, workArea), v));
+            });
+
+            List<Part> best = null;
+            var bestScore = default(FillScore);
+
+            foreach (var (score, parts) in linearBag)
+            {
+                if (best == null || score > bestScore)
+                {
+                    best = parts;
+                    bestScore = score;
+                }
             }
 
             var bestLinearScore = best != null ? FillScore.Compute(best, workArea) : default;
@@ -294,7 +307,14 @@ namespace OpenNest
                     List<Vector> pts;
 
                     if (parts[i].Intersects(parts[j], out pts))
+                    {
+                        var b1 = parts[i].BoundingBox;
+                        var b2 = parts[j].BoundingBox;
+                        Debug.WriteLine($"[HasOverlaps] Overlap: part[{i}] ({parts[i].BaseDrawing?.Name}) @ ({b1.Left:F2},{b1.Bottom:F2})-({b1.Right:F2},{b1.Top:F2}) rot={parts[i].Rotation:F2}" +
+                            $" vs part[{j}] ({parts[j].BaseDrawing?.Name}) @ ({b2.Left:F2},{b2.Bottom:F2})-({b2.Right:F2},{b2.Top:F2}) rot={parts[j].Rotation:F2}" +
+                            $" intersections={pts?.Count ?? 0}");
                         return true;
+                    }
                 }
             }
 
@@ -315,7 +335,10 @@ namespace OpenNest
         private bool IsBetterValidFill(List<Part> candidate, List<Part> current, Box workArea)
         {
             if (candidate != null && candidate.Count > 0 && HasOverlaps(candidate, Plate.PartSpacing))
+            {
+                Debug.WriteLine($"[IsBetterValidFill] REJECTED {candidate.Count} parts due to overlaps (current best: {current?.Count ?? 0})");
                 return false;
+            }
 
             return IsBetterFill(candidate, current, workArea);
         }
@@ -475,23 +498,36 @@ namespace OpenNest
 
         private List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
         {
-            List<Part> best = null;
+            var bag = new System.Collections.Concurrent.ConcurrentBag<(FillScore score, List<Part> parts)>();
 
-            foreach (var angle in angles)
+            System.Threading.Tasks.Parallel.ForEach(angles, angle =>
             {
                 var pattern = BuildRotatedPattern(groupParts, angle);
 
                 if (pattern.Parts.Count == 0)
-                    continue;
+                    return;
 
-                var h = engine.Fill(pattern, NestDirection.Horizontal);
-                var v = engine.Fill(pattern, NestDirection.Vertical);
+                var localEngine = new FillLinear(workArea, engine.PartSpacing);
+                var h = localEngine.Fill(pattern, NestDirection.Horizontal);
+                var v = localEngine.Fill(pattern, NestDirection.Vertical);
 
-                if (IsBetterValidFill(h, best, workArea))
-                    best = h;
+                if (h != null && h.Count > 0 && !HasOverlaps(h, engine.PartSpacing))
+                    bag.Add((FillScore.Compute(h, workArea), h));
 
-                if (IsBetterValidFill(v, best, workArea))
-                    best = v;
+                if (v != null && v.Count > 0 && !HasOverlaps(v, engine.PartSpacing))
+                    bag.Add((FillScore.Compute(v, workArea), v));
+            });
+
+            List<Part> best = null;
+            var bestScore = default(FillScore);
+
+            foreach (var (score, parts) in bag)
+            {
+                if (best == null || score > bestScore)
+                {
+                    best = parts;
+                    bestScore = score;
+                }
             }
 
             return best;

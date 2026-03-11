@@ -203,20 +203,24 @@ namespace OpenNest.Geometry
         /// </summary>
         /// <param name="segments">Number of parts to divide the arc into.</param>
         /// <returns></returns>
-        public List<Vector> ToPoints(int segments = 1000)
+        public List<Vector> ToPoints(int segments = 1000, bool circumscribe = false)
         {
             var points = new List<Vector>();
             var stepAngle = reversed
                 ? -SweepAngle() / segments
                 : SweepAngle() / segments;
 
+            var r = circumscribe && segments > 0
+                ? Radius / System.Math.Cos(System.Math.Abs(stepAngle) / 2.0)
+                : Radius;
+
             for (int i = 0; i <= segments; ++i)
             {
                 var angle = stepAngle * i + StartAngle;
 
                 points.Add(new Vector(
-                    System.Math.Cos(angle) * Radius + Center.X,
-                    System.Math.Sin(angle) * Radius + Center.Y));
+                    System.Math.Cos(angle) * r + Center.X,
+                    System.Math.Sin(angle) * r + Center.Y));
             }
 
             return points;

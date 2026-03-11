@@ -13,7 +13,7 @@ namespace OpenNest
     /// </summary>
     public class PartBoundary
     {
-        private const double ChordTolerance = 0.01;
+        private const double PolygonTolerance = 0.01;
 
         private readonly List<Polygon> _polygons;
         private readonly (Vector start, Vector end)[] _leftEdges;
@@ -29,12 +29,14 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var offsetEntity = shape.OffsetEntity(spacing + ChordTolerance, OffsetSide.Left) as Shape;
+                var offsetEntity = shape.OffsetEntity(spacing, OffsetSide.Left) as Shape;
 
                 if (offsetEntity == null)
                     continue;
 
-                var polygon = offsetEntity.ToPolygonWithTolerance(ChordTolerance);
+                // Circumscribe arcs so polygon vertices are always outside
+                // the true arc — guarantees the boundary never under-estimates.
+                var polygon = offsetEntity.ToPolygonWithTolerance(PolygonTolerance, circumscribe: true);
                 polygon.RemoveSelfIntersections();
                 _polygons.Add(polygon);
             }

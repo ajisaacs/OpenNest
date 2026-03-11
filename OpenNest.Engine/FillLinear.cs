@@ -63,7 +63,10 @@ namespace OpenNest
             if (slideDistance >= double.MaxValue || slideDistance < 0)
                 return bboxDim + PartSpacing;
 
-            return bboxDim - slideDistance;
+            // The geometry-aware slide can produce a copy distance smaller than
+            // the part itself when inflated corner/arc vertices interact spuriously.
+            // Clamp to bboxDim + PartSpacing to prevent bounding box overlap.
+            return System.Math.Max(bboxDim - slideDistance, bboxDim + PartSpacing);
         }
 
         /// <summary>
@@ -82,7 +85,9 @@ namespace OpenNest
             var stationaryLines = boundary.GetLines(partA.Location, opposite);
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
-            return ComputeCopyDistance(bboxDim, slideDistance);
+            var copyDist = ComputeCopyDistance(bboxDim, slideDistance);
+            System.Diagnostics.Debug.WriteLine($"[FindCopyDistance] dir={direction} bboxDim={bboxDim:F4} slide={slideDistance:F4} copyDist={copyDist:F4} spacing={PartSpacing:F4} locA={partA.Location} locB={locationB} movingEdges={movingLines.Count} stationaryEdges={stationaryLines.Count}");
+            return copyDist;
         }
 
         /// <summary>
@@ -171,7 +176,9 @@ namespace OpenNest
             var stationaryLines = GetPatternLines(patternA, boundary, opposite);
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
-            return ComputeCopyDistance(bboxDim, slideDistance);
+            var copyDist = ComputeCopyDistance(bboxDim, slideDistance);
+            System.Diagnostics.Debug.WriteLine($"[FindSinglePartPatternCopyDist] dir={direction} bboxDim={bboxDim:F4} slide={slideDistance:F4} copyDist={copyDist:F4} spacing={PartSpacing:F4} patternParts={patternA.Parts.Count} movingEdges={movingLines.Count} stationaryEdges={stationaryLines.Count}");
+            return copyDist;
         }
 
         /// <summary>
@@ -341,9 +348,13 @@ namespace OpenNest
                 var perpAxis = PerpendicularAxis(direction);
                 var gridResult = FillRecursive(rowPattern, perpAxis, depth + 1);
 
+                System.Diagnostics.Debug.WriteLine($"[FillRecursive] Grid: {gridResult.Count} parts, rowSize={rowPattern.Parts.Count}, dir={direction}");
+
                 // Fill the remaining strip (after the last full row/column)
                 // with individual parts from the seed pattern.
                 var remaining = FillRemainingStrip(gridResult, pattern, perpAxis, direction);
+
+                System.Diagnostics.Debug.WriteLine($"[FillRecursive] Remainder: {remaining.Count} parts");
 
                 if (remaining.Count > 0)
                     gridResult.AddRange(remaining);
@@ -351,6 +362,8 @@ namespace OpenNest
                 // Try one fewer row/column — the larger remainder strip may
                 // fit more parts than the extra row contained.
                 var fewerResult = TryFewerRows(gridResult, rowPattern, pattern, perpAxis, direction);
+
+                System.Diagnostics.Debug.WriteLine($"[FillRecursive] TryFewerRows: {fewerResult?.Count ?? -1} vs grid+remainder={gridResult.Count}");
 
                 if (fewerResult != null && fewerResult.Count > gridResult.Count)
                     return fewerResult;
@@ -377,9 +390,14 @@ namespace OpenNest
         {
             var rowPartCount = rowPattern.Parts.Count;
 
+            System.Diagnostics.Debug.WriteLine($"[TryFewerRows] fullResult={fullResult.Count}, rowPartCount={rowPartCount}, tiledAxis={tiledAxis}");
+
             // Need at least 2 rows for this to make sense (remove 1, keep 1+).
             if (fullResult.Count < rowPartCount * 2)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Skipped: too few parts for 2 rows");
                 return null;
+            }
 
             // Remove the last row's worth of parts.
             var fewerParts = new List<Part>(fullResult.Count - rowPartCount);
@@ -387,7 +405,21 @@ namespace OpenNest
             for (var i = 0; i < fullResult.Count - rowPartCount; i++)
                 fewerParts.Add(fullResult[i]);
 
+            // Find the top/right edge of the kept parts for logging.
+            var edge = double.MinValue;
+            foreach (var part in fewerParts)
+            {
+                var e = tiledAxis == NestDirection.Vertical
+                    ? part.BoundingBox.Top
+                    : part.BoundingBox.Right;
+                if (e > edge) edge = e;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Kept {fewerParts.Count} parts, edge={edge:F2}, workArea={WorkArea}");
+
             var remaining = FillRemainingStrip(fewerParts, seedPattern, tiledAxis, primaryAxis);
+
+            System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Remainder fill: {remaining.Count} parts (need > {rowPartCount} to improve)");
 
             if (remaining.Count <= rowPartCount)
                 return null;
@@ -493,16 +525,25 @@ namespace OpenNest
                     rotations.Add((seedPart.BaseDrawing, seedPart.Rotation));
             }
 
-            foreach (var (drawing, rotation) in rotations)
+            var bag = new System.Collections.Concurrent.ConcurrentBag<List<Part>>();
+
+            System.Threading.Tasks.Parallel.ForEach(rotations, entry =>
             {
-                var h = filler.Fill(drawing, rotation, NestDirection.Horizontal);
-                var v = filler.Fill(drawing, rotation, NestDirection.Vertical);
+                var localFiller = new FillLinear(remainingStrip, PartSpacing);
+                var h = localFiller.Fill(entry.drawing, entry.rotation, NestDirection.Horizontal);
+                var v = localFiller.Fill(entry.drawing, entry.rotation, NestDirection.Vertical);
 
-                if (h != null && h.Count > 0 && (best == null || h.Count > best.Count))
-                    best = h;
+                if (h != null && h.Count > 0)
+                    bag.Add(h);
 
-                if (v != null && v.Count > 0 && (best == null || v.Count > best.Count))
-                    best = v;
+                if (v != null && v.Count > 0)
+                    bag.Add(v);
+            });
+
+            foreach (var candidate in bag)
+            {
+                if (best == null || candidate.Count > best.Count)
+                    best = candidate;
             }
 
             return best ?? new List<Part>();
