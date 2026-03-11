@@ -325,6 +325,7 @@ namespace OpenNest
         /// <summary>
         /// Recursively fills the work area. At depth 0, tiles the pattern along the
         /// primary axis, then recurses perpendicular. At depth 1, tiles and returns.
+        /// After the grid is formed, fills the remaining strip with individual parts.
         /// </summary>
         private List<Part> FillRecursive(Pattern pattern, NestDirection direction, int depth)
         {
@@ -337,7 +338,16 @@ namespace OpenNest
                 var rowPattern = new Pattern();
                 rowPattern.Parts.AddRange(result);
                 rowPattern.UpdateBounds();
-                return FillRecursive(rowPattern, PerpendicularAxis(direction), depth + 1);
+                var gridResult = FillRecursive(rowPattern, PerpendicularAxis(direction), depth + 1);
+
+                // Fill the remaining strip (after the last full row/column)
+                // with individual parts from the seed pattern.
+                var remaining = FillRemainingStrip(gridResult, pattern, PerpendicularAxis(direction), direction);
+
+                if (remaining.Count > 0)
+                    gridResult.AddRange(remaining);
+
+                return gridResult;
             }
 
             if (depth == 0)
@@ -347,6 +357,118 @@ namespace OpenNest
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// After tiling full rows/columns, fills the remaining strip with individual
+        /// parts. The strip is the leftover space along the tiled axis between the
+        /// last full row/column and the work area boundary. Each unique drawing and
+        /// rotation from the seed pattern is tried in both directions.
+        /// </summary>
+        private List<Part> FillRemainingStrip(
+            List<Part> placedParts, Pattern seedPattern,
+            NestDirection tiledAxis, NestDirection primaryAxis)
+        {
+            // Find the furthest edge of placed parts along the tiled axis.
+            var placedEdge = double.MinValue;
+
+            foreach (var part in placedParts)
+            {
+                var edge = tiledAxis == NestDirection.Vertical
+                    ? part.BoundingBox.Top
+                    : part.BoundingBox.Right;
+
+                if (edge > placedEdge)
+                    placedEdge = edge;
+            }
+
+            // Build the remaining strip with a spacing gap from the last tiled row.
+            Box remainingStrip;
+
+            if (tiledAxis == NestDirection.Vertical)
+            {
+                var bottom = placedEdge + PartSpacing;
+                var height = WorkArea.Top - bottom;
+
+                if (height <= Tolerance.Epsilon)
+                    return new List<Part>();
+
+                remainingStrip = new Box(WorkArea.X, bottom, WorkArea.Width, height);
+            }
+            else
+            {
+                var left = placedEdge + PartSpacing;
+                var width = WorkArea.Right - left;
+
+                if (width <= Tolerance.Epsilon)
+                    return new List<Part>();
+
+                remainingStrip = new Box(left, WorkArea.Y, width, WorkArea.Height);
+            }
+
+            // Build rotation set: always try cardinal orientations (0° and 90°),
+            // plus any unique rotations from the seed pattern.
+            var filler = new FillLinear(remainingStrip, PartSpacing);
+            List<Part> best = null;
+            var rotations = new List<(Drawing drawing, double rotation)>();
+
+            // Cardinal rotations for each unique drawing.
+            var drawings = new List<Drawing>();
+
+            foreach (var seedPart in seedPattern.Parts)
+            {
+                var found = false;
+
+                foreach (var d in drawings)
+                {
+                    if (d == seedPart.BaseDrawing)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    drawings.Add(seedPart.BaseDrawing);
+            }
+
+            foreach (var drawing in drawings)
+            {
+                rotations.Add((drawing, 0));
+                rotations.Add((drawing, Angle.HalfPI));
+            }
+
+            // Add seed pattern rotations that aren't already covered.
+            foreach (var seedPart in seedPattern.Parts)
+            {
+                var skip = false;
+
+                foreach (var (d, r) in rotations)
+                {
+                    if (d == seedPart.BaseDrawing && r.IsEqualTo(seedPart.Rotation))
+                    {
+                        skip = true;
+                        break;
+                    }
+                }
+
+                if (!skip)
+                    rotations.Add((seedPart.BaseDrawing, seedPart.Rotation));
+            }
+
+            foreach (var (drawing, rotation) in rotations)
+            {
+                var h = filler.Fill(drawing, rotation, NestDirection.Horizontal);
+                var v = filler.Fill(drawing, rotation, NestDirection.Vertical);
+
+                if (h != null && h.Count > 0 && (best == null || h.Count > best.Count))
+                    best = h;
+
+                if (v != null && v.Count > 0 && (best == null || v.Count > best.Count))
+                    best = v;
+            }
+
+            return best ?? new List<Part>();
         }
 
         /// <summary>
