@@ -36,7 +36,7 @@ namespace OpenNest
             // Try improving by filling the remainder strip separately.
             var improved = TryRemainderImprovement(item, workArea, best);
 
-            if (IsBetterFill(improved, best))
+            if (IsBetterFill(improved, best, workArea))
             {
                 Debug.WriteLine($"[Fill] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
                 best = improved;
@@ -92,29 +92,30 @@ namespace OpenNest
                 var h = engine.Fill(item.Drawing, angle, NestDirection.Horizontal);
                 var v = engine.Fill(item.Drawing, angle, NestDirection.Vertical);
 
-                if (IsBetterFill(h, best))
+                if (IsBetterFill(h, best, workArea))
                     best = h;
 
-                if (IsBetterFill(v, best))
+                if (IsBetterFill(v, best, workArea))
                     best = v;
             }
 
-            Debug.WriteLine($"[FindBestFill] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1} | Angles: {angles.Count}");
+            var bestLinearScore = best != null ? FillScore.Compute(best, workArea) : default;
+            Debug.WriteLine($"[FindBestFill] Linear: {bestLinearScore.Count} parts, density={bestLinearScore.Density:P1} | WorkArea: {workArea.Width:F1}x{workArea.Height:F1} | Angles: {angles.Count}");
 
             // Try rectangle best-fit (mixes orientations to fill remnant strips).
             var rectResult = FillRectangleBestFit(item, workArea);
 
             Debug.WriteLine($"[FindBestFill] RectBestFit: {rectResult?.Count ?? 0} parts");
 
-            if (IsBetterFill(rectResult, best))
+            if (IsBetterFill(rectResult, best, workArea))
                 best = rectResult;
 
             // Try pair-based approach.
             var pairResult = FillWithPairs(item, workArea);
 
-            Debug.WriteLine($"[FindBestFill] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best) ? "Pair" : "Linear")}");
+            Debug.WriteLine($"[FindBestFill] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best, workArea) ? "Pair" : "Linear")}");
 
-            if (IsBetterFill(pairResult, best))
+            if (IsBetterFill(pairResult, best, workArea))
                 best = pairResult;
 
             return best;
@@ -127,7 +128,7 @@ namespace OpenNest
 
             var engine = new FillLinear(workArea, Plate.PartSpacing);
             var angles = RotationAnalysis.FindHullEdgeAngles(groupParts);
-            var best = FillPattern(engine, groupParts, angles);
+            var best = FillPattern(engine, groupParts, angles, workArea);
 
             Debug.WriteLine($"[Fill(groupParts,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
 
@@ -138,20 +139,20 @@ namespace OpenNest
 
                 Debug.WriteLine($"[Fill(groupParts,Box)] RectBestFit: {rectResult?.Count ?? 0} parts");
 
-                if (IsBetterFill(rectResult, best))
+                if (IsBetterFill(rectResult, best, workArea))
                     best = rectResult;
 
                 var pairResult = FillWithPairs(nestItem, workArea);
 
-                Debug.WriteLine($"[Fill(groupParts,Box)] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best) ? "Pair" : "Linear")}");
+                Debug.WriteLine($"[Fill(groupParts,Box)] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best, workArea) ? "Pair" : "Linear")}");
 
-                if (IsBetterFill(pairResult, best))
+                if (IsBetterFill(pairResult, best, workArea))
                     best = pairResult;
 
                 // Try improving by filling the remainder strip separately.
                 var improved = TryRemainderImprovement(nestItem, workArea, best);
 
-                if (IsBetterFill(improved, best))
+                if (IsBetterFill(improved, best, workArea))
                 {
                     Debug.WriteLine($"[Fill(groupParts,Box)] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
                     best = improved;
@@ -205,7 +206,7 @@ namespace OpenNest
             var candidates = SelectPairCandidates(bestFits, workArea);
             Debug.WriteLine($"[FillWithPairs] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
 
-            var resultBag = new System.Collections.Concurrent.ConcurrentBag<(int count, List<Part> parts)>();
+            var resultBag = new System.Collections.Concurrent.ConcurrentBag<(FillScore score, List<Part> parts)>();
 
             System.Threading.Tasks.Parallel.For(0, candidates.Count, i =>
             {
@@ -213,21 +214,25 @@ namespace OpenNest
                 var pairParts = result.BuildParts(item.Drawing);
                 var angles = RotationAnalysis.FindHullEdgeAngles(pairParts);
                 var engine = new FillLinear(workArea, Plate.PartSpacing);
-                var filled = FillPattern(engine, pairParts, angles);
+                var filled = FillPattern(engine, pairParts, angles, workArea);
 
                 if (filled != null && filled.Count > 0)
-                    resultBag.Add((filled.Count, filled));
+                    resultBag.Add((FillScore.Compute(filled, workArea), filled));
             });
 
             List<Part> best = null;
+            var bestScore = default(FillScore);
 
-            foreach (var (count, parts) in resultBag)
+            foreach (var (score, parts) in resultBag)
             {
-                if (best == null || count > best.Count)
+                if (best == null || score > bestScore)
+                {
                     best = parts;
+                    bestScore = score;
+                }
             }
 
-            Debug.WriteLine($"[FillWithPairs] Best pair result: {best?.Count ?? 0} parts");
+            Debug.WriteLine($"[FillWithPairs] Best pair result: {bestScore.Count} parts, remnant={bestScore.UsableRemnantArea:F1}, density={bestScore.Density:P1}");
             return best ?? new List<Part>();
         }
 
@@ -296,7 +301,7 @@ namespace OpenNest
             return false;
         }
 
-        private bool IsBetterFill(List<Part> candidate, List<Part> current)
+        private bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea)
         {
             if (candidate == null || candidate.Count == 0)
                 return false;
@@ -304,22 +309,15 @@ namespace OpenNest
             if (current == null || current.Count == 0)
                 return true;
 
-            if (candidate.Count != current.Count)
-                return candidate.Count > current.Count;
-
-            // Same count: prefer smaller bounding box (more compact).
-            var candidateBox = ((IEnumerable<IBoundable>)candidate).GetBoundingBox();
-            var currentBox = ((IEnumerable<IBoundable>)current).GetBoundingBox();
-
-            return candidateBox.Area() < currentBox.Area();
+            return FillScore.Compute(candidate, workArea) > FillScore.Compute(current, workArea);
         }
 
-        private bool IsBetterValidFill(List<Part> candidate, List<Part> current)
+        private bool IsBetterValidFill(List<Part> candidate, List<Part> current, Box workArea)
         {
             if (candidate != null && candidate.Count > 0 && HasOverlaps(candidate, Plate.PartSpacing))
                 return false;
 
-            return IsBetterFill(candidate, current);
+            return IsBetterFill(candidate, current, workArea);
         }
 
         /// <summary>
@@ -444,12 +442,12 @@ namespace OpenNest
 
             var hResult = TryStripRefill(item, workArea, currentBest, horizontal: true);
 
-            if (IsBetterFill(hResult, best))
+            if (IsBetterFill(hResult, best, workArea))
                 best = hResult;
 
             var vResult = TryStripRefill(item, workArea, currentBest, horizontal: false);
 
-            if (IsBetterFill(vResult, best))
+            if (IsBetterFill(vResult, best, workArea))
                 best = vResult;
 
             return best;
@@ -475,7 +473,7 @@ namespace OpenNest
             return pattern;
         }
 
-        private List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles)
+        private List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
         {
             List<Part> best = null;
 
@@ -489,10 +487,10 @@ namespace OpenNest
                 var h = engine.Fill(pattern, NestDirection.Horizontal);
                 var v = engine.Fill(pattern, NestDirection.Vertical);
 
-                if (IsBetterValidFill(h, best))
+                if (IsBetterValidFill(h, best, workArea))
                     best = h;
 
-                if (IsBetterValidFill(v, best))
+                if (IsBetterValidFill(v, best, workArea))
                     best = v;
             }
 
