@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>OpenNest.Console</RootNamespace>
+    <AssemblyName>OpenNest.Console</AssemblyName>
+    <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
+    <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
+    <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
+  </ItemGroup>
+</Project>
