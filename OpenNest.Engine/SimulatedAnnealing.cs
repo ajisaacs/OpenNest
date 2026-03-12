@@ -13,9 +13,9 @@ namespace OpenNest
     /// </summary>
     public class SimulatedAnnealing : INestOptimizer
     {
-        private const double DefaultCoolingRate = 0.997;
-        private const double DefaultMinTemperature = 0.01;
-        private const int DefaultMaxNoImprovement = 2000;
+        private const double DefaultCoolingRate = 0.995;
+        private const double DefaultMinTemperature = 0.1;
+        private const int DefaultMaxNoImprovement = 500;
 
         public NestResult Optimize(List<NestItem> items, Box workArea, NfpCache cache,
             Dictionary<int, List<double>> candidateRotations,

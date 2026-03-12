@@ -680,8 +680,9 @@ namespace OpenNest.Forms
                 return;
 
             var items = form.GetNestItems();
+            var maxPlates = 100;
 
-            while (true)
+            for (var plateCount = 0; plateCount < maxPlates; plateCount++)
             {
                 var remaining = items.Where(i => i.Quantity > 0).ToList();
 
@@ -698,14 +699,15 @@ namespace OpenNest.Forms
                     break;
 
                 plate.Parts.AddRange(parts);
-                activeForm.Nest.UpdateDrawingQuantities();
 
-                // Reduce remaining quantities by how many were placed per drawing.
+                // Deduct placed quantities using Drawing.Name to avoid reference issues.
                 foreach (var item in remaining)
                 {
-                    var placed = parts.Count(p => p.BaseDrawing == item.Drawing);
-                    item.Quantity -= placed;
+                    var placed = parts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
+                    item.Quantity = System.Math.Max(0, item.Quantity - placed);
                 }
+
+                activeForm.Nest.UpdateDrawingQuantities();
             }
         }
 
