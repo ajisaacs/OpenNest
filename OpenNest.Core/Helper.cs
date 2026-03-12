@@ -339,6 +339,8 @@ namespace OpenNest
 
         internal static Entity GetConnected(Vector pt, IEnumerable<Entity> geometry)
         {
+            var tol = Math.Tolerance.ChainTolerance;
+
             foreach (var geo in geometry)
             {
                 switch (geo.Type)
@@ -346,10 +348,10 @@ namespace OpenNest
                     case EntityType.Arc:
                         var arc = (Arc)geo;
 
-                        if (arc.StartPoint() == pt)
+                        if (arc.StartPoint().DistanceTo(pt) <= tol)
                             return arc;
 
-                        if (arc.EndPoint() == pt)
+                        if (arc.EndPoint().DistanceTo(pt) <= tol)
                         {
                             arc.Reverse();
                             return arc;
@@ -360,10 +362,10 @@ namespace OpenNest
                     case EntityType.Line:
                         var line = (Line)geo;
 
-                        if (line.StartPoint == pt)
+                        if (line.StartPoint.DistanceTo(pt) <= tol)
                             return line;
 
-                        if (line.EndPoint == pt)
+                        if (line.EndPoint.DistanceTo(pt) <= tol)
                         {
                             line.Reverse();
                             return line;

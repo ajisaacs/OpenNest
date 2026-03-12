@@ -26,6 +26,7 @@ namespace OpenNest.Geometry
             if (Entities.Count == 0)
                 return false;
 
+            var tol = Math.Tolerance.ChainTolerance;
             var first = Entities[0];
             Vector firstStartPoint;
             Vector firstEndPoint;
@@ -65,7 +66,7 @@ namespace OpenNest.Geometry
                     case EntityType.Arc:
                         var arc = (Arc)geo;
 
-                        if (arc.StartPoint() != endpt)
+                        if (arc.StartPoint().DistanceTo(endpt) > tol)
                             return false;
 
                         endpt = arc.EndPoint();
@@ -77,7 +78,7 @@ namespace OpenNest.Geometry
                     case EntityType.Line:
                         var line = (Line)geo;
 
-                        if (line.StartPoint != endpt)
+                        if (line.StartPoint.DistanceTo(endpt) > tol)
                             return false;
 
                         endpt = line.EndPoint;
@@ -112,7 +113,7 @@ namespace OpenNest.Geometry
                     return false;
             }
 
-            return lastEndPoint == firstStartPoint;
+            return lastEndPoint.DistanceTo(firstStartPoint) <= tol;
         }
 
         /// <summary>
