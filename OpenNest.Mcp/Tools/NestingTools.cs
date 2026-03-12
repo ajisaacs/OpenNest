@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using ModelContextProtocol.Server;
 using OpenNest.Geometry;
 
@@ -185,6 +186,63 @@ namespace OpenNest.Mcp.Tools
 
             // Breakdown by drawing
             var groups = plate.Parts.GroupBy(p => p.BaseDrawing.Name);
+            foreach (var group in groups)
+                sb.AppendLine($"  {group.Key}: {group.Count()}");
+
+            return sb.ToString();
+        }
+
+        [McpServerTool(Name = "autonest_plate")]
+        [Description("NFP-based mixed-part autonesting. Places multiple different drawings on a plate with geometry-aware collision avoidance and simulated annealing optimization. Produces tighter layouts than pack_plate by allowing parts to interlock.")]
+        public string AutoNestPlate(
+            [Description("Index of the plate")] int plateIndex,
+            [Description("Comma-separated drawing names")] string drawingNames,
+            [Description("Comma-separated quantities for each drawing")] string quantities)
+        {
+            var plate = _session.GetPlate(plateIndex);
+            if (plate == null)
+                return $"Error: plate {plateIndex} not found";
+
+            if (string.IsNullOrWhiteSpace(drawingNames))
+                return "Error: drawingNames is required";
+
+            if (string.IsNullOrWhiteSpace(quantities))
+                return "Error: quantities is required";
+
+            var names = drawingNames.Split(',').Select(n => n.Trim()).ToArray();
+            var qtyStrings = quantities.Split(',').Select(q => q.Trim()).ToArray();
+            var qtys = new int[qtyStrings.Length];
+
+            for (var i = 0; i < qtyStrings.Length; i++)
+            {
+                if (!int.TryParse(qtyStrings[i], out qtys[i]))
+                    return $"Error: '{qtyStrings[i]}' is not a valid quantity";
+            }
+
+            if (names.Length != qtys.Length)
+                return $"Error: drawing names count ({names.Length}) does not match quantities count ({qtys.Length})";
+
+            var items = new List<NestItem>();
+
+            for (var i = 0; i < names.Length; i++)
+            {
+                var drawing = _session.GetDrawing(names[i]);
+                if (drawing == null)
+                    return $"Error: drawing '{names[i]}' not found";
+
+                items.Add(new NestItem { Drawing = drawing, Quantity = qtys[i] });
+            }
+
+            var parts = NestEngine.AutoNest(items, plate);
+            plate.Parts.AddRange(parts);
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"AutoNest plate {plateIndex}: {(parts.Count > 0 ? "success" : "no parts placed")}");
+            sb.AppendLine($"  Parts placed: {parts.Count}");
+            sb.AppendLine($"  Total parts: {plate.Parts.Count}");
+            sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
+
+            var groups = parts.GroupBy(p => p.BaseDrawing.Name);
             foreach (var group in groups)
                 sb.AppendLine($"  {group.Key}: {group.Count()}");
 

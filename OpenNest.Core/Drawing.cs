@@ -1,5 +1,6 @@
 ﻿using System.Drawing;
 using System.Linq;
+using System.Threading;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
@@ -8,6 +9,7 @@ namespace OpenNest
 {
     public class Drawing
     {
+        private static int nextId;
         private Program program;
 
         public Drawing()
@@ -22,12 +24,15 @@ namespace OpenNest
 
         public Drawing(string name, Program pgm)
         {
+            Id = Interlocked.Increment(ref nextId);
             Name = name;
             Material = new Material();
             Program = pgm;
             Constraints = new NestConstraints();
             Source = new SourceInfo();
         }
+
+        public int Id { get; }
 
         public string Name { get; set; }
 
