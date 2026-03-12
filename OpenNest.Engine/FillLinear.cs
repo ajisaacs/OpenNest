@@ -86,7 +86,7 @@ namespace OpenNest
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
             var copyDist = ComputeCopyDistance(bboxDim, slideDistance);
-            System.Diagnostics.Debug.WriteLine($"[FindCopyDistance] dir={direction} bboxDim={bboxDim:F4} slide={slideDistance:F4} copyDist={copyDist:F4} spacing={PartSpacing:F4} locA={partA.Location} locB={locationB} movingEdges={movingLines.Count} stationaryEdges={stationaryLines.Count}");
+            //System.Diagnostics.Debug.WriteLine($"[FindCopyDistance] dir={direction} bboxDim={bboxDim:F4} slide={slideDistance:F4} copyDist={copyDist:F4} spacing={PartSpacing:F4} locA={partA.Location} locB={locationB} movingEdges={movingLines.Count} stationaryEdges={stationaryLines.Count}");
             return copyDist;
         }
 
@@ -177,7 +177,7 @@ namespace OpenNest
             var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
 
             var copyDist = ComputeCopyDistance(bboxDim, slideDistance);
-            System.Diagnostics.Debug.WriteLine($"[FindSinglePartPatternCopyDist] dir={direction} bboxDim={bboxDim:F4} slide={slideDistance:F4} copyDist={copyDist:F4} spacing={PartSpacing:F4} patternParts={patternA.Parts.Count} movingEdges={movingLines.Count} stationaryEdges={stationaryLines.Count}");
+            //System.Diagnostics.Debug.WriteLine($"[FindSinglePartPatternCopyDist] dir={direction} bboxDim={bboxDim:F4} slide={slideDistance:F4} copyDist={copyDist:F4} spacing={PartSpacing:F4} patternParts={patternA.Parts.Count} movingEdges={movingLines.Count} stationaryEdges={stationaryLines.Count}");
             return copyDist;
         }
 
@@ -348,13 +348,13 @@ namespace OpenNest
                 var perpAxis = PerpendicularAxis(direction);
                 var gridResult = FillRecursive(rowPattern, perpAxis, depth + 1);
 
-                System.Diagnostics.Debug.WriteLine($"[FillRecursive] Grid: {gridResult.Count} parts, rowSize={rowPattern.Parts.Count}, dir={direction}");
+                //System.Diagnostics.Debug.WriteLine($"[FillRecursive] Grid: {gridResult.Count} parts, rowSize={rowPattern.Parts.Count}, dir={direction}");
 
                 // Fill the remaining strip (after the last full row/column)
                 // with individual parts from the seed pattern.
                 var remaining = FillRemainingStrip(gridResult, pattern, perpAxis, direction);
 
-                System.Diagnostics.Debug.WriteLine($"[FillRecursive] Remainder: {remaining.Count} parts");
+                //System.Diagnostics.Debug.WriteLine($"[FillRecursive] Remainder: {remaining.Count} parts");
 
                 if (remaining.Count > 0)
                     gridResult.AddRange(remaining);
@@ -363,7 +363,7 @@ namespace OpenNest
                 // fit more parts than the extra row contained.
                 var fewerResult = TryFewerRows(gridResult, rowPattern, pattern, perpAxis, direction);
 
-                System.Diagnostics.Debug.WriteLine($"[FillRecursive] TryFewerRows: {fewerResult?.Count ?? -1} vs grid+remainder={gridResult.Count}");
+                //System.Diagnostics.Debug.WriteLine($"[FillRecursive] TryFewerRows: {fewerResult?.Count ?? -1} vs grid+remainder={gridResult.Count}");
 
                 if (fewerResult != null && fewerResult.Count > gridResult.Count)
                     return fewerResult;
@@ -390,12 +390,12 @@ namespace OpenNest
         {
             var rowPartCount = rowPattern.Parts.Count;
 
-            System.Diagnostics.Debug.WriteLine($"[TryFewerRows] fullResult={fullResult.Count}, rowPartCount={rowPartCount}, tiledAxis={tiledAxis}");
+            //System.Diagnostics.Debug.WriteLine($"[TryFewerRows] fullResult={fullResult.Count}, rowPartCount={rowPartCount}, tiledAxis={tiledAxis}");
 
             // Need at least 2 rows for this to make sense (remove 1, keep 1+).
             if (fullResult.Count < rowPartCount * 2)
             {
-                System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Skipped: too few parts for 2 rows");
+                //System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Skipped: too few parts for 2 rows");
                 return null;
             }
 
@@ -415,11 +415,11 @@ namespace OpenNest
                 if (e > edge) edge = e;
             }
 
-            System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Kept {fewerParts.Count} parts, edge={edge:F2}, workArea={WorkArea}");
+            //System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Kept {fewerParts.Count} parts, edge={edge:F2}, workArea={WorkArea}");
 
             var remaining = FillRemainingStrip(fewerParts, seedPattern, tiledAxis, primaryAxis);
 
-            System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Remainder fill: {remaining.Count} parts (need > {rowPartCount} to improve)");
+            //System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Remainder fill: {remaining.Count} parts (need > {rowPartCount} to improve)");
 
             if (remaining.Count <= rowPartCount)
                 return null;
