@@ -7,6 +7,7 @@ namespace OpenNest
         Linear,
         RectBestFit,
         Pairs,
+        Nfp,
         Remainder
     }
 

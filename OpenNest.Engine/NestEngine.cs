@@ -151,6 +151,13 @@ namespace OpenNest
             if (IsBetterFill(pairResult, best, workArea))
                 best = pairResult;
 
+            // NFP phase (non-rectangular parts only)
+            var nfpResult = FillNfpBestFit(item, workArea);
+            Debug.WriteLine($"[FindBestFill] NFP: {nfpResult?.Count ?? 0} parts");
+
+            if (IsBetterFill(nfpResult, best, workArea))
+                best = nfpResult;
+
             return best;
         }
 
@@ -238,6 +245,18 @@ namespace OpenNest
                     best = pairResult;
                     ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea);
                 }
+
+                token.ThrowIfCancellationRequested();
+
+                // NFP phase (non-rectangular parts only)
+                var nfpResult = FillNfpBestFit(item, workArea);
+                Debug.WriteLine($"[FindBestFill] NFP: {nfpResult?.Count ?? 0} parts");
+
+                if (IsBetterFill(nfpResult, best, workArea))
+                {
+                    best = nfpResult;
+                    ReportProgress(progress, NestPhase.Nfp, PlateNumber, best, workArea);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -299,6 +318,18 @@ namespace OpenNest
                     {
                         best = pairResult;
                         ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea);
+                    }
+
+                    token.ThrowIfCancellationRequested();
+
+                    // NFP phase (non-rectangular parts only)
+                    var nfpResult = FillNfpBestFit(nestItem, workArea);
+                    Debug.WriteLine($"[Fill(groupParts,Box)] NFP: {nfpResult?.Count ?? 0} parts");
+
+                    if (IsBetterFill(nfpResult, best, workArea))
+                    {
+                        best = nfpResult;
+                        ReportProgress(progress, NestPhase.Nfp, PlateNumber, best, workArea);
                     }
 
                     // Try improving by filling the remainder strip separately.
@@ -471,6 +502,88 @@ namespace OpenNest
             }
 
             return top;
+        }
+
+        private List<Part> FillNfpBestFit(NestItem item, Box workArea)
+        {
+            var halfSpacing = Plate.PartSpacing / 2.0;
+            var drawing = item.Drawing;
+
+            // Extract offset perimeter polygon.
+            var polygon = ExtractPerimeterPolygon(drawing, halfSpacing);
+
+            if (polygon == null)
+                return new List<Part>();
+
+            // Rectangularity gate: skip if bounding-box fill ratio > 0.95.
+            var polyArea = polygon.Area();
+            var bboxArea = polygon.BoundingBox.Area();
+
+            if (bboxArea > 0 && polyArea / bboxArea > 0.95)
+                return new List<Part>();
+
+            // Compute candidate rotations and filter by rotation constraints.
+            var rotations = ComputeCandidateRotations(item, polygon, workArea);
+
+            if (item.RotationStart != 0 || item.RotationEnd != 0)
+            {
+                rotations = rotations
+                    .Where(a => a >= item.RotationStart && a <= item.RotationEnd)
+                    .ToList();
+            }
+
+            if (rotations.Count == 0)
+                return new List<Part>();
+
+            // Build NFP cache with all rotation variants of this single drawing.
+            var nfpCache = new NfpCache();
+
+            foreach (var rotation in rotations)
+            {
+                var rotatedPolygon = RotatePolygon(polygon, rotation);
+                nfpCache.RegisterPolygon(drawing.Id, rotation, rotatedPolygon);
+            }
+
+            nfpCache.PreComputeAll();
+
+            // Estimate max copies that could fit.
+            var maxN = (int)(workArea.Area() / polyArea);
+            maxN = System.Math.Min(maxN, 500);
+
+            if (item.Quantity > 0)
+                maxN = System.Math.Min(maxN, item.Quantity);
+
+            if (maxN <= 0)
+                return new List<Part>();
+
+            // Try each rotation and keep the best BLF result.
+            List<Part> bestParts = null;
+            var bestScore = default(FillScore);
+
+            foreach (var rotation in rotations)
+            {
+                var sequence = new List<(int drawingId, double rotation, Drawing drawing)>();
+
+                for (var i = 0; i < maxN; i++)
+                    sequence.Add((drawing.Id, rotation, drawing));
+
+                var blf = new BottomLeftFill(workArea, nfpCache);
+                var placedParts = blf.Fill(sequence);
+
+                if (placedParts.Count == 0)
+                    continue;
+
+                var parts = BottomLeftFill.ToNestParts(placedParts);
+                var score = FillScore.Compute(parts, workArea);
+
+                if (bestParts == null || score > bestScore)
+                {
+                    bestParts = parts;
+                    bestScore = score;
+                }
+            }
+
+            return bestParts ?? new List<Part>();
         }
 
         private bool HasOverlaps(List<Part> parts, double spacing)
