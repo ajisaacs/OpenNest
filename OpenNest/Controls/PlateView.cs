@@ -2,14 +2,18 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Collections;
 using OpenNest.Converters;
+using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using Action = OpenNest.Actions.Action;
@@ -832,6 +836,50 @@ namespace OpenNest.Controls
 
             temporaryParts.Clear();
             return count;
+        }
+
+        public async void FillWithProgress(List<Part> groupParts, Box workArea)
+        {
+            var sw = Stopwatch.StartNew();
+            var cts = new CancellationTokenSource();
+            var progressForm = new NestProgressForm(cts, showPlateRow: false);
+
+            var progress = new Progress<NestProgress>(p =>
+            {
+                progressForm.UpdateProgress(p);
+                SetTemporaryParts(p.BestParts);
+            });
+
+            progressForm.Show(FindForm());
+
+            try
+            {
+                var engine = new NestEngine(Plate);
+                var parts = await Task.Run(() =>
+                    engine.Fill(groupParts, workArea, progress, cts.Token));
+
+                if (parts.Count > 0)
+                {
+                    AcceptTemporaryParts();
+                    sw.Stop();
+                    Status = $"Fill: {parts.Count} parts in {sw.ElapsedMilliseconds} ms";
+                }
+                else
+                {
+                    ClearTemporaryParts();
+                }
+
+                progressForm.ShowCompleted();
+            }
+            catch (Exception)
+            {
+                ClearTemporaryParts();
+            }
+            finally
+            {
+                progressForm.Close();
+                cts.Dispose();
+            }
         }
 
         public void RemoveSelectedParts()

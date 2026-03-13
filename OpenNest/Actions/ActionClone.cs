@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
@@ -171,19 +170,14 @@ namespace OpenNest.Actions
 
         private void Fill()
         {
-            var sw = Stopwatch.StartNew();
-
             var plate = plateView.Plate;
-            var engine = new NestEngine(plate);
             var groupParts = parts.Select(p => p.BasePart).ToList();
 
             var bounds = plate.WorkArea();
 
             if (plate.Parts.Count == 0)
             {
-                engine.Fill(groupParts);
-                sw.Stop();
-                plateView.Status = $"Fill: {plate.Parts.Count} parts in {sw.ElapsedMilliseconds} ms";
+                plateView.FillWithProgress(groupParts, bounds);
                 return;
             }
 
@@ -202,10 +196,7 @@ namespace OpenNest.Actions
             if (bestArea == Box.Empty)
                 return;
 
-            var before = plate.Parts.Count;
-            engine.Fill(groupParts, bestArea);
-            sw.Stop();
-            plateView.Status = $"Fill: {plate.Parts.Count - before} parts in {sw.ElapsedMilliseconds} ms";
+            plateView.FillWithProgress(groupParts, bestArea);
         }
     }
 }
