@@ -463,6 +463,8 @@ namespace OpenNest.Geometry
             var offsetShape = new Shape();
             var definedShape = new ShapeProfile(this);
 
+            Entity firstEntity = null;
+            Entity firstOffsetEntity = null;
             Entity lastEntity = null;
             Entity lastOffsetEntity = null;
 
@@ -473,6 +475,12 @@ namespace OpenNest.Geometry
                 if (offsetEntity == null)
                     continue;
 
+                if (firstEntity == null)
+                {
+                    firstEntity = entity;
+                    firstOffsetEntity = offsetEntity;
+                }
+
                 switch (entity.Type)
                 {
                     case EntityType.Line:
@@ -482,31 +490,10 @@ namespace OpenNest.Geometry
 
                             if (lastOffsetEntity != null && lastOffsetEntity.Type == EntityType.Line)
                             {
-                                var lastLine = lastEntity as Line;
-                                var lastOffsetLine = lastOffsetEntity as Line;
-
-                                if (lastLine == null || lastOffsetLine == null)
-                                    continue;
-
-                                Vector intersection;
-
-                                if (Helper.Intersects(offsetLine, lastOffsetLine, out intersection))
-                                {
-                                    offsetLine.StartPoint = intersection;
-                                    lastOffsetLine.EndPoint = intersection;
-                                }
-                                else
-                                {
-                                    var arc = new Arc(
-                                        line.StartPoint,
-                                        distance,
-                                        line.StartPoint.AngleTo(lastOffsetLine.EndPoint),
-                                        line.StartPoint.AngleTo(offsetLine.StartPoint), 
-                                        side == OffsetSide.Left
-                                        );
-
-                                    offsetShape.Entities.Add(arc);
-                                }
+                                JoinOffsetLines(
+                                    (Line)lastEntity, (Line)lastOffsetEntity,
+                                    line, offsetLine,
+                                    distance, side, offsetShape);
                             }
 
                             offsetShape.Entities.Add(offsetLine);
@@ -522,10 +509,48 @@ namespace OpenNest.Geometry
                 lastEntity = entity;
             }
 
+            // Close the shape: join last offset entity back to first
+            if (lastOffsetEntity != null && firstOffsetEntity != null
+                && lastOffsetEntity != firstOffsetEntity
+                && lastOffsetEntity.Type == EntityType.Line
+                && firstOffsetEntity.Type == EntityType.Line)
+            {
+                JoinOffsetLines(
+                    (Line)lastEntity, (Line)lastOffsetEntity,
+                    (Line)firstEntity, (Line)firstOffsetEntity,
+                    distance, side, offsetShape);
+            }
+
             foreach (var cutout in definedShape.Cutouts)
                 offsetShape.Entities.AddRange(((Shape)cutout.OffsetEntity(distance, side)).Entities);
 
             return offsetShape;
+        }
+
+        private static void JoinOffsetLines(
+            Line lastLine, Line lastOffsetLine,
+            Line line, Line offsetLine,
+            double distance, OffsetSide side, Shape offsetShape)
+        {
+            Vector intersection;
+
+            if (Helper.Intersects(offsetLine, lastOffsetLine, out intersection))
+            {
+                offsetLine.StartPoint = intersection;
+                lastOffsetLine.EndPoint = intersection;
+            }
+            else
+            {
+                var arc = new Arc(
+                    line.StartPoint,
+                    distance,
+                    line.StartPoint.AngleTo(lastOffsetLine.EndPoint),
+                    line.StartPoint.AngleTo(offsetLine.StartPoint),
+                    side == OffsetSide.Left
+                    );
+
+                offsetShape.Entities.Add(arc);
+            }
         }
 
         public override Entity OffsetEntity(double distance, Vector pt)

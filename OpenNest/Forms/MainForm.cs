@@ -47,6 +47,17 @@ namespace OpenNest.Forms
             //    BestFitCache.CreateEvaluator = (drawing, spacing) => GpuEvaluatorFactory.Create(drawing, spacing);
         }
 
+        private Nest CreateDefaultNest()
+        {
+            var nest = new Nest();
+            nest.Units = Properties.Settings.Default.DefaultUnit;
+            nest.PlateDefaults.EdgeSpacing = new Spacing(1, 1, 1, 1);
+            nest.PlateDefaults.PartSpacing = 1;
+            nest.PlateDefaults.Size = new OpenNest.Geometry.Size(100, 100);
+            nest.PlateDefaults.Quadrant = 1;
+            return nest;
+        }
+
         private string GetNestName(DateTime date, int id)
         {
             var month = date.Month.ToString().PadLeft(2, '0');
@@ -326,17 +337,24 @@ namespace OpenNest.Forms
 
             if (File.Exists(Properties.Settings.Default.NestTemplatePath))
             {
-                var reader = new NestReader(Properties.Settings.Default.NestTemplatePath);
-                nest = reader.Read();
+                try
+                {
+                    var reader = new NestReader(Properties.Settings.Default.NestTemplatePath);
+                    nest = reader.Read();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        $"Failed to load nest template:\n{ex.Message}\n\nA default nest will be created instead.",
+                        "Template Error",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    nest = CreateDefaultNest();
+                }
             }
             else
             {
-                nest = new Nest();
-                nest.Units = Properties.Settings.Default.DefaultUnit;
-                nest.PlateDefaults.EdgeSpacing = new Spacing(0, 0, 0, 0);
-                nest.PlateDefaults.PartSpacing = 0;
-                nest.PlateDefaults.Size = new OpenNest.Geometry.Size(100, 100);
-                nest.PlateDefaults.Quadrant = 1;
+                nest = CreateDefaultNest();
             }
 
             nest.DateCreated = DateTime.Now;
