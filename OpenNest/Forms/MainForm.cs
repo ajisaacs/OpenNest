@@ -861,7 +861,7 @@ namespace OpenNest.Forms
             activeForm.SetCurrentPlateAsNestDefault();
         }
 
-        private void FillPlate_Click(object sender, EventArgs e)
+        private async void FillPlate_Click(object sender, EventArgs e)
         {
             if (activeForm == null)
                 return;
@@ -877,13 +877,49 @@ namespace OpenNest.Forms
             if (drawing == null)
                 return;
 
-            var engine = new NestEngine(activeForm.PlateView.Plate);
-            engine.Fill(new NestItem
+            nestingCts = new CancellationTokenSource();
+            var token = nestingCts.Token;
+
+            var progressForm = new NestProgressForm(nestingCts, showPlateRow: false);
+
+            var progress = new Progress<NestProgress>(p =>
             {
-                Drawing = drawing
+                progressForm.UpdateProgress(p);
+                activeForm.PlateView.SetTemporaryParts(p.BestParts);
             });
 
-            activeForm.PlateView.Invalidate();
+            progressForm.Show(this);
+            SetNestingLockout(true);
+
+            try
+            {
+                var plate = activeForm.PlateView.Plate;
+                var engine = new NestEngine(plate);
+
+                var parts = await Task.Run(() =>
+                    engine.Fill(new NestItem { Drawing = drawing },
+                        plate.WorkArea(), progress, token));
+
+                if (parts.Count > 0)
+                    activeForm.PlateView.AcceptTemporaryParts();
+                else
+                    activeForm.PlateView.ClearTemporaryParts();
+
+                progressForm.ShowCompleted();
+            }
+            catch (Exception ex)
+            {
+                activeForm.PlateView.ClearTemporaryParts();
+                MessageBox.Show($"Nesting error: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                progressForm.Close();
+                SetNestingLockout(false);
+                nestingCts.Dispose();
+                nestingCts = null;
+            }
         }
 
         private void FillArea_Click(object sender, EventArgs e)
