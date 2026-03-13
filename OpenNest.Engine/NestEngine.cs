@@ -151,6 +151,13 @@ namespace OpenNest
             if (IsBetterFill(pairResult, best, workArea))
                 best = pairResult;
 
+            // NFP phase (non-rectangular parts only)
+            var nfpResult = FillNfpBestFit(item, workArea);
+            Debug.WriteLine($"[FindBestFill] NFP: {nfpResult?.Count ?? 0} parts");
+
+            if (IsBetterFill(nfpResult, best, workArea))
+                best = nfpResult;
+
             return best;
         }
 
