@@ -70,11 +70,11 @@ namespace OpenNest.CNC.CuttingStrategy
 
             return plate.Quadrant switch
             {
-                1 => new Vector(0, 0),        // Q1 TopRight origin -> exit BottomLeft
-                2 => new Vector(w, 0),         // Q2 TopLeft origin -> exit BottomRight
-                3 => new Vector(w, l),         // Q3 BottomLeft origin -> exit TopRight
-                4 => new Vector(0, l),         // Q4 BottomRight origin -> exit TopLeft
-                _ => new Vector(0, 0)
+                1 => new Vector(w, l),         // Q1 origin BottomLeft -> exit TopRight
+                2 => new Vector(0, l),         // Q2 origin BottomRight -> exit TopLeft
+                3 => new Vector(0, 0),         // Q3 origin TopRight -> exit BottomLeft
+                4 => new Vector(w, 0),         // Q4 origin TopLeft -> exit BottomRight
+                _ => new Vector(w, l)
             };
         }
 
