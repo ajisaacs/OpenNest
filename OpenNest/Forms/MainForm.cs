@@ -938,7 +938,34 @@ namespace OpenNest.Forms
             if (drawing == null)
                 return;
 
-            activeForm.PlateView.SetAction(typeof(ActionFillArea), drawing);
+            nestingCts = new CancellationTokenSource();
+
+            var progressForm = new NestProgressForm(nestingCts, showPlateRow: false);
+
+            var progress = new Progress<NestProgress>(p =>
+            {
+                progressForm.UpdateProgress(p);
+                activeForm.PlateView.SetTemporaryParts(p.BestParts);
+            });
+
+            Action<List<Part>> onComplete = parts =>
+            {
+                if (parts != null && parts.Count > 0)
+                    activeForm.PlateView.AcceptTemporaryParts();
+                else
+                    activeForm.PlateView.ClearTemporaryParts();
+
+                progressForm.Close();
+                SetNestingLockout(false);
+                nestingCts.Dispose();
+                nestingCts = null;
+            };
+
+            progressForm.Show(this);
+            SetNestingLockout(true);
+
+            activeForm.PlateView.SetAction(typeof(ActionFillArea),
+                drawing, progress, nestingCts, onComplete);
         }
 
         private void AddPlate_Click(object sender, EventArgs e)
