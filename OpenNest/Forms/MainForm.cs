@@ -314,6 +314,12 @@ namespace OpenNest.Forms
                 activeForm.PlateView.StatusChanged -= PlateView_StatusChanged;
             }
 
+            // If nesting is in progress and the active form changed, cancel nesting
+            if (nestingInProgress && nestingCts != null)
+            {
+                nestingCts.Cancel();
+            }
+
             activeForm = ActiveMdiChild as EditNestForm;
 
             EnableCheck();
