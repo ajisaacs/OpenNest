@@ -53,13 +53,15 @@ namespace OpenNest.Engine.BestFit
             double spacing, double stepSize, PushDirection pushDir,
             List<PairCandidate> candidates, ref int testNumber)
         {
+            const int CoarseMultiplier = 16;
+            const int MaxRegions = 5;
+
             var bbox1 = part1.BoundingBox;
             var bbox2 = part2Template.BoundingBox;
             var halfSpacing = spacing / 2;
 
             var isHorizontalPush = pushDir == PushDirection.Left || pushDir == PushDirection.Right;
 
-            // Perpendicular range: part2 slides across the full extent of part1
             double perpMin, perpMax, pushStartOffset;
 
             if (isHorizontalPush)
@@ -75,33 +77,102 @@ namespace OpenNest.Engine.BestFit
                 pushStartOffset = bbox1.Length + bbox2.Length + spacing * 2;
             }
 
-            // Pre-compute part1's offset lines (half-spacing outward)
             var part1Lines = Helper.GetOffsetPartLines(part1, halfSpacing);
 
-            // Align sweep start to a multiple of stepSize so that offset=0 is always
-            // included. This ensures perfect grid arrangements (side-by-side, stacked)
-            // are generated for rectangular parts.
-            var alignedStart = System.Math.Ceiling(perpMin / stepSize) * stepSize;
+            // Start with the full range as a single region.
+            var regions = new List<(double min, double max)> { (perpMin, perpMax) };
+            var currentStep = stepSize * CoarseMultiplier;
 
-            for (var offset = alignedStart; offset <= perpMax; offset += stepSize)
+            // Iterative halving: coarse sweep, select top regions, narrow, repeat.
+            while (currentStep > stepSize)
             {
-                var (slideDist, finalPosition) = ComputeSlideResult(
-                    part2Template, part1Lines, halfSpacing,
-                    offset, pushStartOffset, isHorizontalPush, pushDir);
+                var hits = new List<(double offset, double slideDist)>();
 
-                if (slideDist >= double.MaxValue || slideDist < 0)
-                    continue;
-
-                candidates.Add(new PairCandidate
+                foreach (var (regionMin, regionMax) in regions)
                 {
-                    Drawing = drawing,
-                    Part1Rotation = 0,
-                    Part2Rotation = Part2Rotation,
-                    Part2Offset = finalPosition,
-                    StrategyType = Type,
-                    TestNumber = testNumber++,
-                    Spacing = spacing
-                });
+                    var alignedStart = System.Math.Ceiling(regionMin / currentStep) * currentStep;
+
+                    for (var offset = alignedStart; offset <= regionMax; offset += currentStep)
+                    {
+                        var slideDist = ComputeSlideDistance(
+                            part2Template, part1Lines, halfSpacing,
+                            offset, pushStartOffset, isHorizontalPush, pushDir);
+
+                        if (slideDist >= double.MaxValue || slideDist < 0)
+                            continue;
+
+                        hits.Add((offset, slideDist));
+                    }
+                }
+
+                if (hits.Count == 0)
+                    return;
+
+                // Select top regions by tightest fit, deduplicating nearby hits.
+                hits.Sort((a, b) => a.slideDist.CompareTo(b.slideDist));
+
+                var selectedOffsets = new List<double>();
+
+                foreach (var (offset, _) in hits)
+                {
+                    var tooClose = false;
+
+                    foreach (var selected in selectedOffsets)
+                    {
+                        if (System.Math.Abs(offset - selected) < currentStep)
+                        {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+
+                    if (!tooClose)
+                    {
+                        selectedOffsets.Add(offset);
+
+                        if (selectedOffsets.Count >= MaxRegions)
+                            break;
+                    }
+                }
+
+                // Build narrowed regions around selected offsets.
+                regions = new List<(double min, double max)>();
+
+                foreach (var offset in selectedOffsets)
+                {
+                    var regionMin = System.Math.Max(perpMin, offset - currentStep);
+                    var regionMax = System.Math.Min(perpMax, offset + currentStep);
+                    regions.Add((regionMin, regionMax));
+                }
+
+                currentStep /= 2;
+            }
+
+            // Final pass: sweep refined regions at stepSize, generating candidates.
+            foreach (var (regionMin, regionMax) in regions)
+            {
+                var alignedStart = System.Math.Ceiling(regionMin / stepSize) * stepSize;
+
+                for (var offset = alignedStart; offset <= regionMax; offset += stepSize)
+                {
+                    var (slideDist, finalPosition) = ComputeSlideResult(
+                        part2Template, part1Lines, halfSpacing,
+                        offset, pushStartOffset, isHorizontalPush, pushDir);
+
+                    if (slideDist >= double.MaxValue || slideDist < 0)
+                        continue;
+
+                    candidates.Add(new PairCandidate
+                    {
+                        Drawing = drawing,
+                        Part1Rotation = 0,
+                        Part2Rotation = Part2Rotation,
+                        Part2Offset = finalPosition,
+                        StrategyType = Type,
+                        TestNumber = testNumber++,
+                        Spacing = spacing
+                    });
+                }
             }
         }
 
