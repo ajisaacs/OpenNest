@@ -29,9 +29,11 @@ OpenNest.Core/CNC/CuttingStrategy/
 │   ├── NormalTab.cs
 │   ├── BreakerTab.cs
 │   └── MachineTab.cs
+├── ContourType.cs
 ├── CuttingParameters.cs
 ├── ContourCuttingStrategy.cs
-└── SequenceParameters.cs
+├── SequenceParameters.cs
+└── AssignmentParameters.cs
 ```
 
 ## Namespace
@@ -57,13 +59,15 @@ The original spec used placeholder names. These are the correct codebase types:
 ```csharp
 public abstract class LeadIn
 {
-    public abstract List<ICode> Generate(Vector contourStartPoint, double contourNormalAngle);
+    public abstract List<ICode> Generate(Vector contourStartPoint, double contourNormalAngle,
+        RotationType winding = RotationType.CW);
     public abstract Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle);
 }
 ```
 
 - `contourStartPoint`: where the contour cut begins (first point of the part profile).
-- `contourNormalAngle`: inward-facing normal angle (radians) at the contour start point. For exterior contours this points away from the part; for interior contours it points into the scrap.
+- `contourNormalAngle`: normal angle (radians) at the contour start point, pointing **away from the part material** (outward from perimeter, into scrap for cutouts).
+- `winding`: contour winding direction — arc-based lead-ins use this for their `ArcMove` rotation.
 - `Generate` returns ICode instructions starting with a `RapidMove` to the pierce point, followed by cutting moves to reach the contour start.
 - `GetPiercePoint` computes where the head rapids to before firing — useful for visualization and collision detection.
 
@@ -77,11 +81,13 @@ Straight line approach.
 
 Properties:
 - `Length` (double): distance from pierce point to contour start (inches)
-- `Angle` (double): approach angle in degrees relative to contour tangent. 90 = perpendicular, 135 = acute angle (common for plasma). Default: 90.
+- `ApproachAngle` (double): approach angle in degrees relative to contour tangent. 90 = perpendicular, 135 = acute angle (common for plasma). Default: 90.
 
-Pierce point offset: `contourStartPoint + Length` along `contourNormalAngle + Angle.ToRadians(Angle)`.
+Pierce point offset: `contourStartPoint + Length` along `contourNormalAngle + Angle.ToRadians(ApproachAngle)`.
 
 Generates: `RapidMove(piercePoint)` → `LinearMove(contourStartPoint)`.
+
+> **Note:** Properties are named `ApproachAngle` (not `Angle`) to avoid shadowing the `OpenNest.Math.Angle` static class. This applies to all lead-in/lead-out/tab classes.
 
 ### LineArcLeadIn (Type 2)
 
@@ -89,12 +95,12 @@ Line followed by tangential arc meeting the contour. Most common for plasma.
 
 Properties:
 - `LineLength` (double): straight approach segment length
-- `Angle` (double): line angle relative to contour. Default: 135.
+- `ApproachAngle` (double): line angle relative to contour. Default: 135.
 - `ArcRadius` (double): radius of tangential arc
 
-Geometry: Pierce → [Line] → Arc start → [Arc CW] → Contour start. Arc center is at `contourStartPoint + ArcRadius` along normal.
+Geometry: Pierce → [Line] → Arc start → [Arc] → Contour start. Arc center is at `contourStartPoint + ArcRadius` along normal. Arc rotation direction matches contour winding (CW for CW contours, CCW for CCW).
 
-Generates: `RapidMove(piercePoint)` → `LinearMove(arcStart)` → `ArcMove(contourStartPoint, arcCenter, RotationType.CW)`.
+Generates: `RapidMove(piercePoint)` → `LinearMove(arcStart)` → `ArcMove(contourStartPoint, arcCenter, rotation)`.
 
 ### ArcLeadIn (Type 3)
 
@@ -105,7 +111,9 @@ Properties:
 
 Pierce point is diametrically opposite the contour start on the arc circle. Arc center at `contourStartPoint + Radius` along normal.
 
-Generates: `RapidMove(piercePoint)` → `ArcMove(contourStartPoint, arcCenter, RotationType.CW)`.
+Arc rotation direction matches contour winding.
+
+Generates: `RapidMove(piercePoint)` → `ArcMove(contourStartPoint, arcCenter, rotation)`.
 
 ### LineLineLeadIn (Type 5)
 
@@ -113,9 +121,9 @@ Two-segment straight line approach.
 
 Properties:
 - `Length1` (double): first segment length
-- `Angle1` (double): first segment angle. Default: 90.
+- `ApproachAngle1` (double): first segment angle. Default: 90.
 - `Length2` (double): second segment length
-- `Angle2` (double): direction change. Default: 90.
+- `ApproachAngle2` (double): direction change. Default: 90.
 
 Generates: `RapidMove(piercePoint)` → `LinearMove(midPoint)` → `LinearMove(contourStartPoint)`.
 
@@ -135,7 +143,8 @@ Properties:
 ```csharp
 public abstract class LeadOut
 {
-    public abstract List<ICode> Generate(Vector contourEndPoint, double contourNormalAngle);
+    public abstract List<ICode> Generate(Vector contourEndPoint, double contourNormalAngle,
+        RotationType winding = RotationType.CW);
 }
 ```
 
@@ -152,7 +161,7 @@ Straight line overcut past contour end.
 
 Properties:
 - `Length` (double): overcut distance
-- `Angle` (double): direction relative to contour tangent. Default: 90.
+- `ApproachAngle` (double): direction relative to contour tangent. Default: 90.
 
 Generates: `LinearMove(endPoint)` where endPoint is offset from contourEndPoint.
 
@@ -163,9 +172,9 @@ Arc overcut curving away from the part.
 Properties:
 - `Radius` (double)
 
-Arc center at `contourEndPoint + Radius` along normal. End point is a quarter turn away.
+Arc center at `contourEndPoint + Radius` along normal. End point is a quarter turn away. Arc rotation direction matches contour winding.
 
-Generates: `ArcMove(endPoint, arcCenter, RotationType.CW)`.
+Generates: `ArcMove(endPoint, arcCenter, rotation)`.
 
 ### MicrotabLeadOut (Type 4)
 
@@ -269,6 +278,7 @@ public class CuttingParameters
 ## SequenceParameters and AssignmentParameters
 
 ```csharp
+// Values match PEP Technology's numbering scheme (value 6 intentionally skipped)
 public enum SequenceMethod
 {
     RightSide = 1, LeastCode = 2, Advanced = 3,
@@ -300,16 +310,40 @@ public class AssignmentParameters
 
 The orchestrator. Uses `ShapeProfile` to decompose a part into perimeter + cutouts, then sequences and applies cutting parameters using nearest-neighbor chaining from an exit point.
 
+### Exit Point from Plate Quadrant
+
+The exit point is the **opposite corner** of the plate from the quadrant origin. This is where the head ends up after traversing the plate, and is the starting point for backwards nearest-neighbor sequencing.
+
+| Quadrant | Origin | Exit Point |
+|----------|--------|------------|
+| 1 | TopRight | BottomLeft (0, 0) |
+| 2 | TopLeft | BottomRight (width, 0) |
+| 3 | BottomLeft | TopRight (width, length) |
+| 4 | BottomRight | TopLeft (0, length) |
+
+The exit point is derived from `Plate.Quadrant` and `Plate.Size` — not passed in manually.
+
 ### Approach
 
 Instead of requiring `Program.GetStartPoint()` / `GetNormalAtStart()` (which don't exist), the strategy:
 
-1. Receives the **exit point** — where the head will be after cutting this part
+1. Computes the **exit point** from the plate's quadrant and size
 2. Converts the program to geometry via `Program.ToGeometry()`
 3. Builds a `ShapeProfile` from the geometry — gives `Perimeter` (Shape) and `Cutouts` (List&lt;Shape&gt;)
 4. Uses `Shape.ClosestPointTo(point, out Entity entity)` to find lead-in points and the entity for normal computation
-5. Chains cutouts by nearest-neighbor distance
+5. Chains cutouts by nearest-neighbor distance from the perimeter closest point
 6. Reverses the chain → cut order is cutouts first (nearest-last), perimeter last
+
+### Contour Re-Indexing
+
+After `ClosestPointTo` finds the lead-in point on a shape, the shape's entity list must be reordered so that cutting starts at that point. This means:
+
+1. Find which entity in `Shape.Entities` contains the closest point
+2. Split that entity at the closest point into two segments
+3. Reorder: second half of split entity → remaining entities in order → first half of split entity
+4. The contour now starts and ends at the lead-in point (for closed contours)
+
+This produces the `List<ICode>` for the contour body that goes between the lead-in and lead-out codes.
 
 ### ContourType Detection
 
@@ -322,10 +356,14 @@ Instead of requiring `Program.GetStartPoint()` / `GetNormalAtStart()` (which don
 
 Derived from the `out Entity` returned by `ClosestPointTo`:
 
-- **Line**: normal is perpendicular to line direction. Tangent = `endPoint.AngleFrom(startPoint)`, normal = tangent + π/2 (pointing inward for exterior, outward for interior).
-- **Arc**: normal is radial direction from arc center to the closest point. `closestPoint.AngleFrom(arc.Center)`.
+- **Line**: normal is perpendicular to line direction. Use the line's tangent angle, then add π/2 for the normal pointing away from the part interior.
+- **Arc/Circle**: normal is radial direction from arc center to the closest point: `closestPoint.AngleFrom(arc.Center)`.
 
-For interior contours the normal points into the scrap (away from part center). For exterior contours it points away from the part.
+Normal direction convention: always points **away from the part material** (outward from perimeter, inward toward scrap for cutouts). The lead-in approaches from this direction.
+
+### Arc Rotation Direction
+
+Lead-in/lead-out arcs must match the **contour winding direction**, not be hardcoded CW. Determine winding from the shape's entity traversal order. Pass the appropriate `RotationType` to `ArcMove`.
 
 ### Method Signature
 
@@ -338,17 +376,23 @@ public class ContourCuttingStrategy
     /// Apply cutting strategy to a part's program.
     /// </summary>
     /// <param name="partProgram">Original part program (unmodified).</param>
-    /// <param name="exitPoint">Where the head will be after cutting (for nearest-neighbor sequencing).</param>
+    /// <param name="plate">Plate for quadrant/size to compute exit point.</param>
     /// <returns>New Program with lead-ins, lead-outs, and tabs applied. Cutouts first, perimeter last.</returns>
-    public Program Apply(Program partProgram, Vector exitPoint)
+    public Program Apply(Program partProgram, Plate plate)
     {
-        // 1. Convert to geometry, build ShapeProfile
-        // 2. Find closest point on perimeter from exitPoint
-        // 3. Chain cutouts by nearest-neighbor from perimeter point
-        // 4. Reverse chain → cut order
-        // 5. For each contour: select lead-in/out by ContourType, generate codes
-        // 6. Handle MicrotabLeadOut by trimming last segment
-        // 7. Assemble and return new Program
+        // 1. Compute exit point from plate quadrant + size
+        // 2. Convert to geometry, build ShapeProfile
+        // 3. Find closest point on perimeter from exitPoint
+        // 4. Chain cutouts by nearest-neighbor from perimeter point
+        // 5. Reverse chain → cut order
+        // 6. For each contour:
+        //    a. Re-index shape entities to start at closest point
+        //    b. Detect ContourType
+        //    c. Compute normal angle from entity
+        //    d. Select lead-in/out from CuttingParameters by ContourType
+        //    e. Generate lead-in codes + contour body + lead-out codes
+        // 7. Handle MicrotabLeadOut by trimming last segment
+        // 8. Assemble and return new Program
     }
 }
 ```
