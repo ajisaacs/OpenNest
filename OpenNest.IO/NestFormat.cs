@@ -72,7 +72,7 @@ namespace OpenNest.IO
         public record SizeDto
         {
             public double Width { get; init; }
-            public double Height { get; init; }
+            public double Length { get; init; }
         }
 
         public record MaterialDto

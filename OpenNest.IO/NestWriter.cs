@@ -82,7 +82,7 @@ namespace OpenNest.IO
             var pd = nest.PlateDefaults;
             return new PlateDefaultsDto
             {
-                Size = new SizeDto { Width = pd.Size.Width, Height = pd.Size.Height },
+                Size = new SizeDto { Width = pd.Size.Width, Length = pd.Size.Height },
                 Thickness = pd.Thickness,
                 Quadrant = pd.Quadrant,
                 PartSpacing = pd.PartSpacing,
@@ -161,7 +161,7 @@ namespace OpenNest.IO
                 list.Add(new PlateDto
                 {
                     Id = i + 1,
-                    Size = new SizeDto { Width = plate.Size.Width, Height = plate.Size.Height },
+                    Size = new SizeDto { Width = plate.Size.Width, Length = plate.Size.Height },
                     Thickness = plate.Thickness,
                     Quadrant = plate.Quadrant,
                     Quantity = plate.Quantity,

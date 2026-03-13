@@ -113,7 +113,7 @@ namespace OpenNest.IO
 
             // Plate defaults
             var pd = dto.PlateDefaults;
-            nest.PlateDefaults.Size = new OpenNest.Geometry.Size(pd.Size.Width, pd.Size.Height);
+            nest.PlateDefaults.Size = new OpenNest.Geometry.Size(pd.Size.Width, pd.Size.Length);
             nest.PlateDefaults.Thickness = pd.Thickness;
             nest.PlateDefaults.Quadrant = pd.Quadrant;
             nest.PlateDefaults.PartSpacing = pd.PartSpacing;
@@ -128,7 +128,7 @@ namespace OpenNest.IO
             foreach (var p in dto.Plates.OrderBy(p => p.Id))
             {
                 var plate = new Plate();
-                plate.Size = new OpenNest.Geometry.Size(p.Size.Width, p.Size.Height);
+                plate.Size = new OpenNest.Geometry.Size(p.Size.Width, p.Size.Length);
                 plate.Thickness = p.Thickness;
                 plate.Quadrant = p.Quadrant;
                 plate.Quantity = p.Quantity;
