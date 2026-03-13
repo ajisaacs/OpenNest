@@ -12,7 +12,6 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Collections;
-using OpenNest.Converters;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -512,37 +511,17 @@ namespace OpenNest.Controls
         {
             using (var offsetPen = new Pen(Color.FromArgb(120, 255, 100, 100)))
             {
-                for (int i = 0; i < parts.Count; i++)
+                for (var i = 0; i < parts.Count; i++)
                 {
-                    var part = parts[i].BasePart;
-                    var entities = ConvertProgram.ToGeometry(part.Program);
-                    var shapes = Helper.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+                    var layoutPart = parts[i];
 
-                    foreach (var shape in shapes)
-                    {
-                        var offsetEntity = shape.OffsetEntity(Plate.PartSpacing, OffsetSide.Left) as Shape;
+                    if (layoutPart.IsDirty)
+                        layoutPart.Update(this);
 
-                        if (offsetEntity == null)
-                            continue;
+                    layoutPart.UpdateOffset(Plate.PartSpacing, OffsetTolerance, Matrix);
 
-                        var polygon = offsetEntity.ToPolygonWithTolerance(OffsetTolerance);
-                        polygon.RemoveSelfIntersections();
-                        polygon.Offset(part.Location);
-
-                        if (polygon.Vertices.Count < 2)
-                            continue;
-
-                        var pts = new PointF[polygon.Vertices.Count];
-
-                        for (int j = 0; j < pts.Length; j++)
-                            pts[j] = new PointF((float)polygon.Vertices[j].X, (float)polygon.Vertices[j].Y);
-
-                        var path = new GraphicsPath();
-                        path.AddLines(pts);
-                        path.Transform(Matrix);
-                        g.DrawPath(offsetPen, path);
-                        path.Dispose();
-                    }
+                    if (layoutPart.OffsetPath != null)
+                        g.DrawPath(offsetPen, layoutPart.OffsetPath);
                 }
             }
         }
@@ -1090,6 +1069,7 @@ namespace OpenNest.Controls
         {
             base.UpdateMatrix();
             parts.ForEach(p => p.Update(this));
+            temporaryParts.ForEach(p => p.Update(this));
         }
     }
 }

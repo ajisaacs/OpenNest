@@ -1,7 +1,10 @@
-﻿using System.Drawing;
+﻿using System.Collections.Generic;
+using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 
 namespace OpenNest
@@ -16,6 +19,11 @@ namespace OpenNest
         private Color color;
         private Brush brush;
         private Pen pen;
+
+        private List<PointF[]> _offsetPolygonPoints;
+        private double _cachedOffsetSpacing;
+        private double _cachedOffsetTolerance;
+        private double _cachedOffsetRotation = double.NaN;
 
         public readonly Part BasePart;
 
@@ -92,11 +100,93 @@ namespace OpenNest
             g.DrawString(id, programIdFont, Brushes.Black, pt.X, pt.Y);
         }
 
+        public GraphicsPath OffsetPath { get; private set; }
+
         public void Update(DrawControl plateView)
         {
             Path = GraphicsHelper.GetGraphicsPath(BasePart.Program, BasePart.Location);
             Path.Transform(plateView.Matrix);
             IsDirty = false;
+        }
+
+        public void UpdateOffset(double spacing, double tolerance, Matrix matrix)
+        {
+            if (_offsetPolygonPoints == null ||
+                spacing != _cachedOffsetSpacing ||
+                tolerance != _cachedOffsetTolerance ||
+                BasePart.Rotation != _cachedOffsetRotation)
+            {
+                _offsetPolygonPoints = ComputeOffsetPolygons(spacing, tolerance);
+                _cachedOffsetSpacing = spacing;
+                _cachedOffsetTolerance = tolerance;
+                _cachedOffsetRotation = BasePart.Rotation;
+            }
+
+            RebuildOffsetPath(matrix);
+        }
+
+        public void InvalidateOffset()
+        {
+            _offsetPolygonPoints = null;
+        }
+
+        private List<PointF[]> ComputeOffsetPolygons(double spacing, double tolerance)
+        {
+            var result = new List<PointF[]>();
+            var entities = ConvertProgram.ToGeometry(BasePart.Program);
+            var shapes = Helper.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+
+            foreach (var shape in shapes)
+            {
+                var offsetEntity = shape.OffsetEntity(spacing, OffsetSide.Left) as Shape;
+
+                if (offsetEntity == null)
+                    continue;
+
+                var polygon = offsetEntity.ToPolygonWithTolerance(tolerance);
+                polygon.RemoveSelfIntersections();
+
+                if (polygon.Vertices.Count < 2)
+                    continue;
+
+                var pts = new PointF[polygon.Vertices.Count];
+
+                for (var j = 0; j < pts.Length; j++)
+                    pts[j] = new PointF((float)polygon.Vertices[j].X, (float)polygon.Vertices[j].Y);
+
+                result.Add(pts);
+            }
+
+            return result;
+        }
+
+        private void RebuildOffsetPath(Matrix matrix)
+        {
+            OffsetPath?.Dispose();
+
+            if (_offsetPolygonPoints == null || _offsetPolygonPoints.Count == 0)
+            {
+                OffsetPath = null;
+                return;
+            }
+
+            var path = new GraphicsPath();
+            var dx = (float)BasePart.Location.X;
+            var dy = (float)BasePart.Location.Y;
+
+            foreach (var pts in _offsetPolygonPoints)
+            {
+                var offsetPts = new PointF[pts.Length];
+
+                for (var i = 0; i < pts.Length; i++)
+                    offsetPts[i] = new PointF(pts[i].X + dx, pts[i].Y + dy);
+
+                path.AddLines(offsetPts);
+                path.StartFigure();
+            }
+
+            path.Transform(matrix);
+            OffsetPath = path;
         }
 
         public static LayoutPart Create(Part part, PlateView plateView)
