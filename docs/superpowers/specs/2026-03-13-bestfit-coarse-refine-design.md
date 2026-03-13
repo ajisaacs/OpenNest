@@ -1,4 +1,4 @@
-# Coarse-then-Refine Sweep in RotationSlideStrategy
+# Iterative Halving Sweep in RotationSlideStrategy
 
 ## Problem
 
@@ -6,7 +6,7 @@
 
 ## Solution
 
-Replace the single fine sweep with a two-phase coarse-then-refine sweep inside `GenerateCandidatesForAxis`. The coarse pass identifies promising offsets using slide distance as a cheap quality signal, then the fine pass generates candidates only in narrow windows around those promising regions.
+Replace the single fine sweep with an iterative halving search inside `GenerateCandidatesForAxis`. Starting at a coarse step size (16× the fine step), each iteration identifies the best offset regions by slide distance, then halves the step and re-sweeps only within narrow windows around those regions. This converges to the optimal offsets in ~85 `DirectionalDistance` calls vs ~160 for a full fine sweep.
 
 ## Design
 
@@ -20,38 +20,57 @@ Located in `OpenNest.Engine/BestFit/RotationSlideStrategy.cs`. The public `Gener
 
 **New flow:**
 
-1. Compute `coarseStep = stepSize * 4`
-2. **Coarse sweep** from `alignedStart` (aligned to `coarseStep`) to `perpMax` at `coarseStep`:
-   - Clone part2, position at offset, compute offset lines
-   - Call `DirectionalDistance` to get `slideDist`
-   - If `slideDist >= double.MaxValue || slideDist < 0`, skip
-   - Store `(offset, slideDist)` in a list
-3. **Select refinement regions:**
-   - Sort coarse hits by `slideDist` ascending (tightest fit first)
-   - Take up to 5 hits, skipping any whose offset is within `coarseStep` of an already-selected hit (deduplicates overlapping windows)
-4. **Fine sweep** each selected region from `offset - coarseStep` to `offset + coarseStep` at `stepSize`:
-   - Clamp to `[alignedStart, perpMax]` so we don't sweep outside the original range
-   - Align the region start to a multiple of `stepSize` (ensures offset=0 is always tested when present in the region)
-   - At each fine offset: clone part2, position, compute offset lines, call `DirectionalDistance`, build `PairCandidate` (same logic as current code)
-   - This produces ~8 fine steps per region (2 × coarseStep / stepSize = 2 × 1.0 / 0.25 = 8)
+**Constants (local to the method):**
+- `CoarseMultiplier = 16` — initial step is `stepSize * 16`
+- `MaxRegions = 5` — top-N regions to keep per iteration
 
-**Coarse alignment:** `alignedStart` for the coarse pass is `Math.Ceiling(perpMin / coarseStep) * coarseStep`, ensuring offset=0 is always included (since `coarseStep` is a multiple of `stepSize`).
+**Algorithm:**
 
-**Constants:** The coarse multiplier (4) and max refinement regions (5) are local constants in the method, not configurable. These values balance coverage vs speed for the typical part sizes in this application.
+1. Compute `currentStep = stepSize * CoarseMultiplier`
+2. Set the initial sweep range to `[alignedStart, perpMax]` where `alignedStart = Math.Ceiling(perpMin / currentStep) * currentStep`
+3. **Iteration loop** — while `currentStep > stepSize`:
+   a. Sweep all active regions at `currentStep`, collecting `(offset, slideDist)` tuples:
+      - For each offset in each region: clone part2, position, compute offset lines, call `DirectionalDistance`
+      - Skip if `slideDist >= double.MaxValue || slideDist < 0`
+   b. Select top `MaxRegions` hits by `slideDist` ascending (tightest fit first), deduplicating any hits within `currentStep` of an already-selected hit
+   c. Build new regions: for each selected hit, the new region is `[offset - currentStep, offset + currentStep]`, clamped to `[perpMin, perpMax]`
+   d. Halve: `currentStep /= 2`
+   e. Align each region's start to a multiple of `currentStep`
+4. **Final pass** — sweep all active regions at `stepSize`, generating full `PairCandidate` objects (same logic as current code: clone part2, position, compute offset lines, `DirectionalDistance`, build candidate)
+
+**Iteration trace for a 20" range with `stepSize = 0.25`:**
+
+| Pass | Step | Regions | Samples per region | Total samples |
+|------|------|---------|--------------------|---------------|
+| 1 | 4.0 | 1 (full range) | ~5 | ~5 |
+| 2 | 2.0 | up to 5 | ~4 | ~20 |
+| 3 | 1.0 | up to 5 | ~4 | ~20 |
+| 4 | 0.5 | up to 5 | ~4 | ~20 |
+| 5 (final) | 0.25 | up to 5 | ~4 | ~20 (generates candidates) |
+| **Total** | | | | **~85** vs **~160 current** |
+
+**Alignment:** Each pass aligns its sweep start to a multiple of `currentStep`. Since `currentStep` is always a power-of-two multiple of `stepSize`, offset=0 is always a sample point when it falls within a region. This preserves perfect grid arrangements for rectangular parts.
+
+**Region deduplication:** When selecting top hits, any hit whose offset is within `currentStep` of a previously selected hit is skipped. This prevents overlapping refinement windows from wasting samples on the same area.
+
+### Integration points
+
+The changes are entirely within the private method `GenerateCandidatesForAxis`. The method signature, parameters, and return type (`List<PairCandidate>`) are unchanged. The only behavioral difference is that it generates fewer candidates overall (only from the promising regions), but those candidates cover the same quality range because the iterative search converges on the best offsets.
 
 ### Performance
 
 - Current: ~160 `DirectionalDistance` calls per direction (20" range / 0.25 step)
-- Coarse pass: ~40 calls (20" / 1.0 step) — 75% reduction
-- Refinement: ~40 calls total (5 regions × 8 steps)
-- Net: ~80 calls vs ~160 = ~50% reduction per direction, with the coarse pass being much cheaper since it only stores tuples rather than building full candidates
+- Iterative halving: ~85 calls (5 + 20 + 20 + 20 + 20)
+- ~47% reduction in `DirectionalDistance` calls per direction
+- Coarse passes are cheaper per-call since they only store `(offset, slideDist)` tuples rather than building full `PairCandidate` objects
 - Total across 4 directions × N angles: proportional reduction throughout
+- For larger parts (40"+ range), the savings are even greater since the coarse pass covers the range in very few samples
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `OpenNest.Engine/BestFit/RotationSlideStrategy.cs` | Replace single sweep in `GenerateCandidatesForAxis` with coarse-then-refine two-phase sweep |
+| `OpenNest.Engine/BestFit/RotationSlideStrategy.cs` | Replace single sweep in `GenerateCandidatesForAxis` with iterative halving sweep |
 
 ## What Doesn't Change
 
@@ -65,8 +84,9 @@ Located in `OpenNest.Engine/BestFit/RotationSlideStrategy.cs`. The public `Gener
 
 ## Edge Cases
 
-- **Part smaller than coarseStep:** The coarse sweep still works — it just produces fewer hits, and refinement still covers the full range around those hits
-- **Refinement regions overlap:** Deduplication in region selection prevents redundant fine sweeps
-- **No coarse hits (all offsets produce invalid slides):** No refinement regions selected, method returns empty list — same as current behavior when no valid candidates exist
-- **Fine sweep region extends past bounds:** Clamped to `[alignedStart, perpMax]`
-- **stepSize not evenly divisible into coarseStep:** `coarseStep` is always `stepSize * 4`, so it's always a clean multiple
+- **Part smaller than initial coarseStep:** The first pass produces very few samples (possibly 1-2), but each subsequent halving still narrows correctly. For tiny parts, the total range may be smaller than `coarseStep`, so the algorithm effectively skips to finer passes quickly.
+- **Refinement regions overlap after halving:** Deduplication at each iteration prevents selecting nearby hits. Even if two regions share a boundary after halving, at worst one offset is evaluated twice — negligible cost.
+- **No valid hits at any pass:** If all offsets at a given step produce invalid slide distances, the hit list is empty, no regions are generated, and subsequent passes produce no candidates. This matches current behavior for parts that can't pair in the given direction.
+- **Sweep region extends past bounds:** All regions are clamped to `[perpMin, perpMax]` at each iteration.
+- **Only one valid region found:** The algorithm works correctly with 1 region — it just refines a single window instead of 5. This is common for simple rectangular parts where there's one clear best offset.
+- **stepSize is not a power of two:** The halving produces steps like 4.0 → 2.0 → 1.0 → 0.5 → 0.25 regardless of whether `stepSize` is a power of two. The loop condition `currentStep > stepSize` terminates correctly because `currentStep` will eventually equal `stepSize` after enough halvings (since `CoarseMultiplier` is a power of 2).
