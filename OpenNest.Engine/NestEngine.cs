@@ -245,6 +245,18 @@ namespace OpenNest
                     best = pairResult;
                     ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea);
                 }
+
+                token.ThrowIfCancellationRequested();
+
+                // NFP phase (non-rectangular parts only)
+                var nfpResult = FillNfpBestFit(item, workArea);
+                Debug.WriteLine($"[FindBestFill] NFP: {nfpResult?.Count ?? 0} parts");
+
+                if (IsBetterFill(nfpResult, best, workArea))
+                {
+                    best = nfpResult;
+                    ReportProgress(progress, NestPhase.Nfp, PlateNumber, best, workArea);
+                }
             }
             catch (OperationCanceledException)
             {
