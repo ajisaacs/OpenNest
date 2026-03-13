@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add lead-in, lead-out, and tab classes to `OpenNest.Core` that generate `ICode` instructions for CNC cutting approach/exit geometry. These get injected into a `Program` at post-processing time — the original `Drawing`/`Program` geometry stays untouched.
+Add lead-in, lead-out, and tab classes to `OpenNest.Core` that generate `ICode` instructions for CNC cutting approach/exit geometry. The strategy runs at nest-time — `ContourCuttingStrategy.Apply()` produces a new `Program` with lead-ins, lead-outs, start points, and contour ordering baked in. This modified program is what gets saved to the nest file and later fed to the post-processor for machine-specific G-code translation. The original `Drawing.Program` stays untouched; the strategy output lives on the `Part`.
 
 All new code lives in `OpenNest.Core/CNC/CuttingStrategy/`.
 
@@ -408,9 +408,13 @@ public enum ContourType
 }
 ```
 
+## Integration Point
+
+`ContourCuttingStrategy.Apply()` runs at nest-time (when parts are placed or cutting parameters are assigned), not at post-processing time. The output `Program` — with lead-ins, lead-outs, start points, and contour ordering — is stored on the `Part` and saved through the normal `NestWriter` path. The post-processor receives this already-complete program and only translates it to machine-specific G-code.
+
 ## Out of Scope (Deferred)
 
 - **Serialization** of CuttingParameters (JSON/XML discriminators)
 - **UI integration** (parameter editor forms in WinForms app)
-- **Post-processor integration** (feeding strategy-applied programs to `IPostProcessor`)
+- **Part.CutProgram property** (storing the strategy-applied program on `Part`, separate from `Drawing.Program`)
 - **Tab insertion logic** (`InsertTabs` / `TrimLastSegment` — stubbed with `NotImplementedException`)
