@@ -19,24 +19,22 @@ Located in `NestEngine.cs`, private method alongside `FillRectangleBestFit` and 
 **Algorithm:**
 
 1. Compute `halfSpacing = Plate.PartSpacing / 2.0`
-2. Extract the offset perimeter polygon via `ExtractPerimeterPolygon(drawing, halfSpacing)` (already exists as a private static method in NestEngine)
-3. **Rectangularity gate:** compute `polygon.Area() / polygon.BoundingBox().Area()`. If ratio > 0.95, return empty list — grid strategies already handle rectangular parts optimally
-4. Compute candidate rotation angles:
-   - Start with hull edge angles via `ComputeHullEdgeAngles(polygon)` (already exists in NestEngine)
-   - Always include 0° and 90°
-   - Filter by `NestItem.RotationStart` / `NestItem.RotationEnd` window (keep angles where `RotationStart <= angle <= RotationEnd`; if both are 0, treat as unconstrained 0–360°)
+2. Extract the offset perimeter polygon via `ExtractPerimeterPolygon(drawing, halfSpacing)` (already exists as a private static method in NestEngine). Returns null if invalid — return empty list.
+3. **Rectangularity gate:** compute `polygon.Area() / polygon.BoundingBox.Area()`. If ratio > 0.95, return empty list — grid strategies already handle rectangular parts optimally. Note: `BoundingBox` is a property (set by `UpdateBounds()` which `ExtractPerimeterPolygon` calls before returning).
+4. Compute candidate rotation angles via `ComputeCandidateRotations(item, polygon, workArea)` (already exists in NestEngine — computes hull edge angles, adds 0° and 90°, adds narrow-area sweep). Then filter the results by `NestItem.RotationStart` / `NestItem.RotationEnd` window (keep angles where `RotationStart <= angle <= RotationEnd`; if both are 0, treat as unconstrained). This filtering is applied locally after `ComputeCandidateRotations` returns — the shared method is not modified, so `AutoNest` behavior is unchanged.
 5. Build an `NfpCache`:
-   - For each candidate rotation, rotate the polygon and register it via `nfpCache.RegisterPolygon(drawing.Id, rotation, rotatedPolygon)`
+   - For each candidate rotation, rotate the polygon via `RotatePolygon()` and register it via `nfpCache.RegisterPolygon(drawing.Id, rotation, rotatedPolygon)`
    - Call `nfpCache.PreComputeAll()` — since all entries share the same drawing ID, this computes NFPs between all rotation pairs of the single part shape
 6. For each candidate rotation, run `BottomLeftFill.Fill()`:
-   - Build a sequence of N copies of `(drawing.Id, rotation, drawing)` where N = `(int)(workArea.Area() / polygon.Area())` capped to a reasonable max
-   - Place via BLF which uses IFP minus NFP unions to find valid positions
-7. Score each rotation's result via `FillScore.Compute(parts, workArea)`
-8. Return the parts list from the highest-scoring rotation, converted via `BottomLeftFill.ToNestParts()`
+   - Build a sequence of N copies of `(drawing.Id, rotation, drawing)`
+   - N = `(int)(workArea.Area() / polygon.Area())`, capped to 500 max, and further capped to `item.Quantity` when Quantity > 0 (avoids wasting BLF cycles on parts that will be discarded)
+   - Convert BLF result via `BottomLeftFill.ToNestParts()` to get `List<Part>`
+   - Score via `FillScore.Compute(parts, workArea)`
+7. Return the parts list from the highest-scoring rotation
 
-### Integration into FindBestFill
+### Integration points
 
-Insert after the Pairs phase, before remainder improvement, in both overloads of `FindBestFill`:
+**Both `FindBestFill` overloads** — insert after the Pairs phase, before remainder improvement:
 
 ```csharp
 // NFP phase (non-rectangular parts only)
@@ -51,6 +49,8 @@ if (IsBetterFill(nfpResult, best, workArea))
 ```
 
 The progress-reporting overload also adds `token.ThrowIfCancellationRequested()` before the NFP phase.
+
+**`Fill(List<Part> groupParts, ...)` overload** — this method runs its own RectBestFit and Pairs phases inline when `groupParts.Count == 1`, bypassing `FindBestFill`. Add the NFP phase here too, after Pairs and before remainder improvement, following the same pattern.
 
 ### NestPhase enum
 
@@ -71,7 +71,7 @@ public enum NestPhase
 
 | File | Change |
 |------|--------|
-| `OpenNest.Engine/NestEngine.cs` | Add `FillNfpBestFit()` method; call from both `FindBestFill` overloads after Pairs phase |
+| `OpenNest.Engine/NestEngine.cs` | Add `FillNfpBestFit()` method; call from both `FindBestFill` overloads and the `Fill(List<Part>, ...)` single-drawing path, after Pairs phase |
 | `OpenNest.Engine/NestProgress.cs` | Add `Nfp` to `NestPhase` enum |
 
 ## What Doesn't Change
@@ -79,12 +79,16 @@ public enum NestPhase
 - `FillBestFit`, `FillLinear`, `FillWithPairs` — untouched
 - `AutoNest` — separate code path, untouched
 - `BottomLeftFill`, `NfpCache`, `NoFitPolygon`, `InnerFitPolygon` — reused as-is, no modifications
-- UI callers (`ActionFillArea`, `ActionClone`, `PlateView.FillWithProgress`) — no changes, they call `NestEngine.Fill()` which calls `FindBestFill()` internally
+- `ComputeCandidateRotations`, `ExtractPerimeterPolygon`, `RotatePolygon` — reused as-is
+- UI callers (`ActionFillArea`, `ActionClone`, `PlateView.FillWithProgress`) — no changes
 - MCP tools (`NestingTools`) — no changes
 
 ## Edge Cases
 
 - **Part with no valid perimeter polygon:** `ExtractPerimeterPolygon` returns null → return empty list
+- **Rectangularity ratio > 0.95:** skip NFP entirely, grid strategies are optimal
 - **All rotations filtered out by constraints:** no BLF runs → return empty list
 - **BLF places zero parts at a rotation:** skip that rotation, try others
 - **Very small work area where part doesn't fit:** IFP computation returns invalid polygon → BLF places nothing → return empty list
+- **Large plate with small part:** N capped to 500 to keep BLF O(N^2) cost manageable
+- **item.Quantity is set:** N further capped to Quantity to avoid placing parts that will be discarded
