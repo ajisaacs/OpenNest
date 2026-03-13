@@ -320,6 +320,18 @@ namespace OpenNest
                         ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea);
                     }
 
+                    token.ThrowIfCancellationRequested();
+
+                    // NFP phase (non-rectangular parts only)
+                    var nfpResult = FillNfpBestFit(nestItem, workArea);
+                    Debug.WriteLine($"[Fill(groupParts,Box)] NFP: {nfpResult?.Count ?? 0} parts");
+
+                    if (IsBetterFill(nfpResult, best, workArea))
+                    {
+                        best = nfpResult;
+                        ReportProgress(progress, NestPhase.Nfp, PlateNumber, best, workArea);
+                    }
+
                     // Try improving by filling the remainder strip separately.
                     var improved = TryRemainderImprovement(nestItem, workArea, best);
 
