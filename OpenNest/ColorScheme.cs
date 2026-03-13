@@ -11,6 +11,7 @@ namespace OpenNest
         private Color rapidColor;
         private Color originColor;
         private Color edgeSpacingColor;
+        private Color previewPartColor;
 
         public static readonly ColorScheme Default = new ColorScheme
         {
@@ -21,6 +22,7 @@ namespace OpenNest
             RapidColor = Color.DodgerBlue,
             OriginColor = Color.Gray,
             EdgeSpacingColor = Color.FromArgb(180, 180, 180),
+            PreviewPartColor = Color.FromArgb(255, 140, 0),
         };
 
         #region Pens/Brushes
@@ -36,6 +38,10 @@ namespace OpenNest
         public Pen OriginPen { get; private set; }
 
         public Pen EdgeSpacingPen { get; private set; }
+
+        public Pen PreviewPartPen { get; private set; }
+
+        public Brush PreviewPartBrush { get; private set; }
 
         #endregion Pens/Brushes
 
@@ -132,6 +138,24 @@ namespace OpenNest
                     DashPattern = new float[] { 3, 3 },
                     DashCap = DashCap.Flat
                 };
+            }
+        }
+
+        public Color PreviewPartColor
+        {
+            get { return previewPartColor; }
+            set
+            {
+                previewPartColor = value;
+
+                if (PreviewPartPen != null)
+                    PreviewPartPen.Dispose();
+
+                if (PreviewPartBrush != null)
+                    PreviewPartBrush.Dispose();
+
+                PreviewPartPen = new Pen(value, 1);
+                PreviewPartBrush = new SolidBrush(Color.FromArgb(60, value));
             }
         }
 
