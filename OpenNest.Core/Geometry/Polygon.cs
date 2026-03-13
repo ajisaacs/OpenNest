@@ -483,63 +483,54 @@ namespace OpenNest.Geometry
             if (!IsClosed() || Vertices.Count < 5)
                 return;
 
-            bool found = true;
-
-            while (found)
+            while (FindCrossing(out var edgeI, out var edgeJ, out var pt))
             {
-                found = false;
-                int n = Vertices.Count - 1; // exclude closing vertex
+                Vertices = SplitAtCrossing(edgeI, edgeJ, pt);
+            }
+        }
 
-                for (int i = 0; i < n && !found; i++)
+        private bool FindCrossing(out int edgeI, out int edgeJ, out Vector pt)
+        {
+            var n = Vertices.Count - 1;
+
+            for (var i = 0; i < n; i++)
+            {
+                for (var j = i + 2; j < n; j++)
                 {
-                    var a1 = Vertices[i];
-                    var a2 = Vertices[i + 1];
+                    if (i == 0 && j == n - 1)
+                        continue;
 
-                    for (int j = i + 2; j < n && !found; j++)
+                    if (SegmentsIntersect(Vertices[i], Vertices[i + 1], Vertices[j], Vertices[j + 1], out pt))
                     {
-                        // Skip edges that share a vertex (first and last edge)
-                        if (i == 0 && j == n - 1)
-                            continue;
-
-                        var b1 = Vertices[j];
-                        var b2 = Vertices[j + 1];
-
-                        Vector pt;
-
-                        if (SegmentsIntersect(a1, a2, b1, b2, out pt))
-                        {
-                            // Two loops formed by the crossing:
-                            // Loop A: vertices[0..i], pt, vertices[j+1..n-1], close
-                            // Loop B: pt, vertices[i+1..j], close
-                            var loopA = new List<Vector>();
-
-                            for (int k = 0; k <= i; k++)
-                                loopA.Add(Vertices[k]);
-
-                            loopA.Add(pt);
-
-                            for (int k = j + 1; k < n; k++)
-                                loopA.Add(Vertices[k]);
-
-                            loopA.Add(loopA[0]);
-
-                            var loopB = new List<Vector>();
-                            loopB.Add(pt);
-
-                            for (int k = i + 1; k <= j; k++)
-                                loopB.Add(Vertices[k]);
-
-                            loopB.Add(pt);
-
-                            var areaA = System.Math.Abs(CalculateArea(loopA));
-                            var areaB = System.Math.Abs(CalculateArea(loopB));
-
-                            Vertices = areaA >= areaB ? loopA : loopB;
-                            found = true;
-                        }
+                        edgeI = i;
+                        edgeJ = j;
+                        return true;
                     }
                 }
             }
+
+            edgeI = edgeJ = -1;
+            pt = Vector.Zero;
+            return false;
+        }
+
+        private List<Vector> SplitAtCrossing(int edgeI, int edgeJ, Vector pt)
+        {
+            var n = Vertices.Count - 1;
+
+            var loopA = Vertices.GetRange(0, edgeI + 1);
+            loopA.Add(pt);
+            loopA.AddRange(Vertices.GetRange(edgeJ + 1, n - edgeJ - 1));
+            loopA.Add(loopA[0]);
+
+            var loopB = new List<Vector> { pt };
+            loopB.AddRange(Vertices.GetRange(edgeI + 1, edgeJ - edgeI));
+            loopB.Add(pt);
+
+            var areaA = System.Math.Abs(CalculateArea(loopA));
+            var areaB = System.Math.Abs(CalculateArea(loopB));
+
+            return areaA >= areaB ? loopA : loopB;
         }
 
         private static bool SegmentsIntersect(Vector a1, Vector a2, Vector b1, Vector b2, out Vector pt)
