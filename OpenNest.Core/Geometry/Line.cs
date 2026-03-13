@@ -415,6 +415,25 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Splits the line at the given point, returning two sub-lines.
+        /// Either half may be null if the split point coincides with an endpoint.
+        /// </summary>
+        /// <param name="point">The point at which to split the line.</param>
+        /// <returns>A tuple of (first, second) sub-lines.</returns>
+        public (Line first, Line second) SplitAt(Vector point)
+        {
+            var first = point.DistanceTo(StartPoint) < Tolerance.Epsilon
+                ? null
+                : new Line(StartPoint, point);
+
+            var second = point.DistanceTo(EndPoint) < Tolerance.Epsilon
+                ? null
+                : new Line(point, EndPoint);
+
+            return (first, second);
+        }
+
+        /// <summary>
         /// Gets the closest point on the line to the given point.
         /// </summary>
         /// <param name="pt"></param>
