@@ -156,6 +156,28 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Splits the arc at the given point, returning two sub-arcs.
+        /// Either half may be null if the split point coincides with an endpoint.
+        /// </summary>
+        /// <param name="point">The point at which to split the arc.</param>
+        /// <returns>A tuple of (first, second) sub-arcs.</returns>
+        public (Arc first, Arc second) SplitAt(Vector point)
+        {
+            if (point.DistanceTo(StartPoint()) < Tolerance.Epsilon)
+                return (null, new Arc(Center, Radius, StartAngle, EndAngle, IsReversed));
+
+            if (point.DistanceTo(EndPoint()) < Tolerance.Epsilon)
+                return (new Arc(Center, Radius, StartAngle, EndAngle, IsReversed), null);
+
+            var splitAngle = Angle.NormalizeRad(Center.AngleTo(point));
+
+            var firstArc = new Arc(Center, Radius, StartAngle, splitAngle, IsReversed);
+            var secondArc = new Arc(Center, Radius, splitAngle, EndAngle, IsReversed);
+
+            return (firstArc, secondArc);
+        }
+
+        /// <summary>
         /// Returns true if the given arc has the same center point and radius as this.
         /// </summary>
         /// <param name="arc"></param>
