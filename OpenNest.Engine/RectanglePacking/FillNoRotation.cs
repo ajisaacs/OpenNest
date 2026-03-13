@@ -15,7 +15,7 @@ namespace OpenNest.RectanglePacking
 
         public override void Fill(Item item)
         {
-            var ycount = (int)System.Math.Floor((Bin.Height + Tolerance.Epsilon) / item.Height);
+            var ycount = (int)System.Math.Floor((Bin.Length + Tolerance.Epsilon) / item.Length);
             var xcount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
 
             for (int i = 0; i < xcount; i++)
@@ -24,7 +24,7 @@ namespace OpenNest.RectanglePacking
 
                 for (int j = 0; j < ycount; j++)
                 {
-                    var y = item.Height * j + Bin.Y;
+                    var y = item.Length * j + Bin.Y;
 
                     var addedItem = item.Clone() as Item;
                     addedItem.Location = new Vector(x, y);
@@ -36,7 +36,7 @@ namespace OpenNest.RectanglePacking
 
         public override void Fill(Item item, int maxCount)
         {
-            var ycount = (int)System.Math.Floor((Bin.Height + Tolerance.Epsilon) / item.Height);
+            var ycount = (int)System.Math.Floor((Bin.Length + Tolerance.Epsilon) / item.Length);
             var xcount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
             var count = ycount * xcount;
 
@@ -60,7 +60,7 @@ namespace OpenNest.RectanglePacking
                 columns = (int)System.Math.Ceiling((double)maxCount / rows);
             }
 
-            Bin.Items.AddRange(FillGrid(item, rows, columns, maxCount, columnMajor: item.Width > item.Height));
+            Bin.Items.AddRange(FillGrid(item, rows, columns, maxCount, columnMajor: item.Width > item.Length));
         }
     }
 }

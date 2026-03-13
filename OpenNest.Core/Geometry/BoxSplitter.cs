@@ -23,7 +23,7 @@
             var x = large.Left;
             var y = large.Bottom;
             var w = small.Left - x;
-            var h = large.Height;
+            var h = large.Length;
 
             return new Box(x, y, w, h);
         }
@@ -49,7 +49,7 @@
             var x = small.Right;
             var y = large.Bottom;
             var w = large.Right - x;
-            var h = large.Height;
+            var h = large.Length;
 
             return new Box(x, y, w, h);
         }

@@ -202,6 +202,68 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Returns a new shape with entities reordered so that the given point on
+        /// the given entity becomes the new start point of the contour.
+        /// </summary>
+        /// <param name="point">The point on the entity to reindex at.</param>
+        /// <param name="entity">The entity containing the point.</param>
+        /// <returns>A new reindexed shape.</returns>
+        public Shape ReindexAt(Vector point, Entity entity)
+        {
+            // Circle case: return a new shape with just the circle
+            if (entity is Circle)
+            {
+                var result = new Shape();
+                result.Entities.Add(entity);
+                return result;
+            }
+
+            var i = Entities.IndexOf(entity);
+            if (i < 0)
+                throw new ArgumentException("Entity not found in shape", nameof(entity));
+
+            // Split the entity at the point
+            Entity firstHalf = null;
+            Entity secondHalf = null;
+
+            if (entity is Line line)
+            {
+                var (f, s) = line.SplitAt(point);
+                firstHalf = f;
+                secondHalf = s;
+            }
+            else if (entity is Arc arc)
+            {
+                var (f, s) = arc.SplitAt(point);
+                firstHalf = f;
+                secondHalf = s;
+            }
+
+            // Build reindexed entity list
+            var entities = new List<Entity>();
+
+            // secondHalf of split entity (if not null)
+            if (secondHalf != null)
+                entities.Add(secondHalf);
+
+            // Entities after the split index (wrapping)
+            for (var j = i + 1; j < Entities.Count; j++)
+                entities.Add(Entities[j]);
+
+            // Entities before the split index (wrapping)
+            for (var j = 0; j < i; j++)
+                entities.Add(Entities[j]);
+
+            // firstHalf of split entity (if not null)
+            if (firstHalf != null)
+                entities.Add(firstHalf);
+
+            var reindexed = new Shape();
+            reindexed.Entities.AddRange(entities);
+            return reindexed;
+        }
+
+        /// <summary>
         /// Converts the shape to a polygon.
         /// </summary>
         /// <returns></returns>
@@ -399,7 +461,7 @@ namespace OpenNest.Geometry
         public override Entity OffsetEntity(double distance, OffsetSide side)
         {
             var offsetShape = new Shape();
-            var definedShape = new DefinedShape(this);
+            var definedShape = new ShapeProfile(this);
 
             Entity lastEntity = null;
             Entity lastOffsetEntity = null;

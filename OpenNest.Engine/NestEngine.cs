@@ -70,8 +70,8 @@ namespace OpenNest
 
             testPart.UpdateBounds();
 
-            var partLongestSide = System.Math.Max(testPart.BoundingBox.Width, testPart.BoundingBox.Height);
-            var workAreaShortSide = System.Math.Min(workArea.Width, workArea.Height);
+            var partLongestSide = System.Math.Max(testPart.BoundingBox.Width, testPart.BoundingBox.Length);
+            var workAreaShortSide = System.Math.Min(workArea.Width, workArea.Length);
 
             if (workAreaShortSide < partLongestSide)
             {
@@ -113,7 +113,7 @@ namespace OpenNest
             }
 
             var bestLinearScore = best != null ? FillScore.Compute(best, workArea) : default;
-            Debug.WriteLine($"[FindBestFill] Linear: {bestLinearScore.Count} parts, density={bestLinearScore.Density:P1} | WorkArea: {workArea.Width:F1}x{workArea.Height:F1} | Angles: {angles.Count}");
+            Debug.WriteLine($"[FindBestFill] Linear: {bestLinearScore.Count} parts, density={bestLinearScore.Density:P1} | WorkArea: {workArea.Width:F1}x{workArea.Length:F1} | Angles: {angles.Count}");
 
             // Try rectangle best-fit (mixes orientations to fill remnant strips).
             var rectResult = FillRectangleBestFit(item, workArea);
@@ -143,7 +143,7 @@ namespace OpenNest
             var angles = RotationAnalysis.FindHullEdgeAngles(groupParts);
             var best = FillPattern(engine, groupParts, angles, workArea);
 
-            Debug.WriteLine($"[Fill(groupParts,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Height:F1}");
+            Debug.WriteLine($"[Fill(groupParts,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Length:F1}");
 
             if (groupParts.Count == 1)
             {
@@ -213,7 +213,7 @@ namespace OpenNest
         private List<Part> FillWithPairs(NestItem item, Box workArea)
         {
             var bestFits = BestFitCache.GetOrCompute(
-                item.Drawing, Plate.Size.Width, Plate.Size.Height,
+                item.Drawing, Plate.Size.Width, Plate.Size.Length,
                 Plate.PartSpacing);
 
             var candidates = SelectPairCandidates(bestFits, workArea);
@@ -260,8 +260,8 @@ namespace OpenNest
             var kept = bestFits.Where(r => r.Keep).ToList();
             var top = kept.Take(50).ToList();
 
-            var workShortSide = System.Math.Min(workArea.Width, workArea.Height);
-            var plateShortSide = System.Math.Min(Plate.Size.Width, Plate.Size.Height);
+            var workShortSide = System.Math.Min(workArea.Width, workArea.Length);
+            var plateShortSide = System.Math.Min(Plate.Size.Width, Plate.Size.Length);
 
             // When the work area is significantly narrower than the plate,
             // include all pairs that fit the narrow dimension.
@@ -356,7 +356,7 @@ namespace OpenNest
 
             var refDim = horizontal
                 ? sorted.Max(p => p.BoundingBox.Width)
-                : sorted.Max(p => p.BoundingBox.Height);
+                : sorted.Max(p => p.BoundingBox.Length);
             var gapThreshold = refDim * 0.5;
 
             var clusters = new List<List<Part>>();
@@ -425,7 +425,7 @@ namespace OpenNest
                 if (stripWidth <= 0)
                     return null;
 
-                stripBox = new Box(stripLeft, workArea.Y, stripWidth, workArea.Height);
+                stripBox = new Box(stripLeft, workArea.Y, stripWidth, workArea.Length);
             }
             else
             {
@@ -438,7 +438,7 @@ namespace OpenNest
                 stripBox = new Box(workArea.X, stripBottom, workArea.Width, stripHeight);
             }
 
-            Debug.WriteLine($"[TryStripRefill] Strip: {stripBox.Width:F1}x{stripBox.Height:F1} at ({stripBox.X:F1},{stripBox.Y:F1})");
+            Debug.WriteLine($"[TryStripRefill] Strip: {stripBox.Width:F1}x{stripBox.Length:F1} at ({stripBox.X:F1},{stripBox.Y:F1})");
 
             var stripParts = FindBestFill(item, stripBox);
 

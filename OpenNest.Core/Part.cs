@@ -220,7 +220,7 @@ namespace OpenNest
             var part = new Part(BaseDrawing, clonedProgram,
                 location + offset,
                 new Box(BoundingBox.X + offset.X, BoundingBox.Y + offset.Y,
-                    BoundingBox.Width, BoundingBox.Height));
+                    BoundingBox.Width, BoundingBox.Length));
 
             return part;
         }

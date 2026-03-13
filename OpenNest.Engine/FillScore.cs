@@ -80,7 +80,7 @@ namespace OpenNest
             if (maxRight < workArea.Right)
             {
                 var width = workArea.Right - maxRight;
-                var height = workArea.Height;
+                var height = workArea.Length;
 
                 if (System.Math.Min(width, height) >= MinRemnantDimension)
                     largest = System.Math.Max(largest, width * height);

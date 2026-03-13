@@ -56,7 +56,7 @@ namespace OpenNest.Forms
             var sw = Stopwatch.StartNew();
 
             var results = BestFitCache.GetOrCompute(
-                drawing, plate.Size.Width, plate.Size.Height, plate.PartSpacing);
+                drawing, plate.Size.Width, plate.Size.Length, plate.PartSpacing);
 
             var findMs = sw.ElapsedMilliseconds;
             var total = results.Count;

@@ -201,3 +201,6 @@ FakesAssemblies/
 
 # Git worktrees
 .worktrees/
+
+# Claude Code
+.claude/

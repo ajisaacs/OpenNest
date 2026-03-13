@@ -71,12 +71,12 @@ namespace OpenNest.CirclePacking
                 Bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
                 Bin.Top - item.BoundingBox.Top + Tolerance.Epsilon);
 
-            var count = System.Math.Floor((bin.Height + Tolerance.Epsilon) / item.Diameter);
+            var count = System.Math.Floor((bin.Length + Tolerance.Epsilon) / item.Diameter);
 
             if (count == 0)
                 return bin;
 
-            var yoffset = (bin.Height - item.Diameter) / (count - 1);
+            var yoffset = (bin.Length - item.Diameter) / (count - 1);
             var xoffset = Trigonometry.Base(yoffset * 0.5, item.Diameter);
 
             int column = 0;

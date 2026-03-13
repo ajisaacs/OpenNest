@@ -9,7 +9,7 @@ namespace OpenNest
         public FillLinear(Box workArea, double partSpacing)
         {
             PartSpacing = partSpacing;
-            WorkArea = new Box(workArea.X, workArea.Y, workArea.Width, workArea.Height);
+            WorkArea = new Box(workArea.X, workArea.Y, workArea.Width, workArea.Length);
         }
 
         public Box WorkArea { get; }
@@ -34,7 +34,7 @@ namespace OpenNest
 
         private static double GetDimension(Box box, NestDirection direction)
         {
-            return direction == NestDirection.Horizontal ? box.Width : box.Height;
+            return direction == NestDirection.Horizontal ? box.Width : box.Length;
         }
 
         private static double GetStart(Box box, NestDirection direction)
@@ -321,7 +321,7 @@ namespace OpenNest
             template.Offset(WorkArea.Location - template.BoundingBox.Location);
 
             if (template.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
-                template.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
+                template.BoundingBox.Length > WorkArea.Length + Tolerance.Epsilon)
                 return pattern;
 
             pattern.Parts.Add(template);
@@ -472,7 +472,7 @@ namespace OpenNest
                 if (width <= Tolerance.Epsilon)
                     return new List<Part>();
 
-                remainingStrip = new Box(left, WorkArea.Y, width, WorkArea.Height);
+                remainingStrip = new Box(left, WorkArea.Y, width, WorkArea.Length);
             }
 
             // Build rotation set: always try cardinal orientations (0° and 90°),
@@ -601,7 +601,7 @@ namespace OpenNest
             var basePattern = pattern.Clone(offset);
 
             if (basePattern.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
-                basePattern.BoundingBox.Height > WorkArea.Height + Tolerance.Epsilon)
+                basePattern.BoundingBox.Length > WorkArea.Length + Tolerance.Epsilon)
                 return new List<Part>();
 
             return FillRecursive(basePattern, primaryAxis, depth: 0);

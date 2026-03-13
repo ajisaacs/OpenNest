@@ -17,10 +17,10 @@ namespace OpenNest.CirclePacking
                 Bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
                 Bin.Top - item.BoundingBox.Top + Tolerance.Epsilon);
 
-            var rows = System.Math.Floor((Bin.Height + Tolerance.Epsilon) / (item.Diameter));
+            var rows = System.Math.Floor((Bin.Length + Tolerance.Epsilon) / (item.Diameter));
 
             var diameter = item.Diameter;
-            var remaining = Bin.Height - diameter * rows;
+            var remaining = Bin.Length - diameter * rows;
             var radius = diameter * 0.5;
 
             if (remaining < radius)
@@ -47,7 +47,7 @@ namespace OpenNest.CirclePacking
             }
             else
             {
-                var yoffset = (Bin.Height - diameter) / (2 * rows - 1);
+                var yoffset = (Bin.Length - diameter) / (2 * rows - 1);
                 var xoffset = Trigonometry.Base(yoffset, diameter);
 
                 var yodd = Bin.Y + yoffset;

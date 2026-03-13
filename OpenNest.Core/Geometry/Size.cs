@@ -1,16 +1,16 @@
-﻿using System;
+using System;
 
 namespace OpenNest.Geometry
 {
     public struct Size
     {
-        public Size(double width, double height)
+        public Size(double width, double length)
         {
-            Height = height;
+            Length = length;
             Width = width;
         }
 
-        public double Height;
+        public double Length;
 
         public double Width;
 
@@ -21,10 +21,10 @@ namespace OpenNest.Geometry
             if (a.Length > 2)
                 throw new FormatException("Invalid size format.");
 
-            var height = double.Parse(a[0]);
+            var length = double.Parse(a[0]);
             var width = double.Parse(a[1]);
 
-            return new Size(width, height);
+            return new Size(width, length);
         }
 
         public static bool TryParse(string s, out Size size)
@@ -44,12 +44,12 @@ namespace OpenNest.Geometry
 
         public override string ToString()
         {
-            return string.Format("{0} x {1}", Height, Width);
+            return string.Format("{0} x {1}", Length, Width);
         }
 
         public string ToString(int decimalPlaces)
         {
-            return string.Format("{0} x {1}", System.Math.Round(Height, decimalPlaces), System.Math.Round(Width, decimalPlaces));
+            return string.Format("{0} x {1}", System.Math.Round(Length, decimalPlaces), System.Math.Round(Width, decimalPlaces));
         }
     }
 }

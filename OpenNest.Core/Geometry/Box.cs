@@ -15,14 +15,14 @@ namespace OpenNest.Geometry
         {
             Location = new Vector(x, y);
             Width = w;
-            Height = h;
+            Length = h;
         }
 
         public Vector Location;
 
         public Vector Center
         {
-            get { return new Vector(X + Width * 0.5, Y + Height * 0.5); }
+            get { return new Vector(X + Width * 0.5, Y + Length * 0.5); }
         }
 
         public Size Size;
@@ -45,10 +45,10 @@ namespace OpenNest.Geometry
             set { Size.Width = value; }
         }
 
-        public double Height
+        public double Length
         {
-            get { return Size.Height; }
-            set { Size.Height = value; }
+            get { return Size.Length; }
+            set { Size.Length = value; }
         }
 
         public void MoveTo(double x, double y)
@@ -86,7 +86,7 @@ namespace OpenNest.Geometry
 
         public double Top
         {
-            get { return Y + Height; }
+            get { return Y + Length; }
         }
 
         public double Bottom
@@ -96,12 +96,12 @@ namespace OpenNest.Geometry
 
         public double Area()
         {
-            return Width * Height;
+            return Width * Length;
         }
 
         public double Perimeter()
         {
-            return Width * 2 + Height * 2;
+            return Width * 2 + Length * 2;
         }
 
         public bool Intersects(Box box)
@@ -197,12 +197,12 @@ namespace OpenNest.Geometry
 
         public Box Offset(double d)
         {
-            return new Box(X - d, Y - d, Width + d * 2, Height + d * 2);
+            return new Box(X - d, Y - d, Width + d * 2, Length + d * 2);
         }
 
         public override string ToString()
         {
-            return string.Format("[Box: X={0}, Y={1}, Width={2}, Height={3}]", X, Y, Width, Height);
+            return string.Format("[Box: X={0}, Y={1}, Width={2}, Length={3}]", X, Y, Width, Length);
         }
     }
 }

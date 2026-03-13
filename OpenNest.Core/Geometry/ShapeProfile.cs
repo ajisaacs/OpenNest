@@ -2,14 +2,14 @@
 
 namespace OpenNest.Geometry
 {
-    public class DefinedShape
+    public class ShapeProfile
     {
-        public DefinedShape(Shape shape)
+        public ShapeProfile(Shape shape)
         {
             Update(shape.Entities);
         }
 
-        public DefinedShape(List<Entity> entities)
+        public ShapeProfile(List<Entity> entities)
         {
             Update(entities);
         }

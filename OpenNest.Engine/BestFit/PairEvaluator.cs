@@ -57,7 +57,7 @@ namespace OpenNest.Engine.BestFit
                 var combinedBox = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
                 bestArea = combinedBox.Area();
                 bestWidth = combinedBox.Width;
-                bestHeight = combinedBox.Height;
+                bestHeight = combinedBox.Length;
                 bestRotation = 0;
             }
 

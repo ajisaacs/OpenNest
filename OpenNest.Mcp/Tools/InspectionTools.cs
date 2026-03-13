@@ -32,13 +32,13 @@ namespace OpenNest.Mcp.Tools
 
             var sb = new StringBuilder();
             sb.AppendLine($"Plate {plateIndex}:");
-            sb.AppendLine($"  Size: {plate.Size.Width:F1} x {plate.Size.Height:F1}");
+            sb.AppendLine($"  Size: {plate.Size.Width:F1} x {plate.Size.Length:F1}");
             sb.AppendLine($"  Quadrant: {plate.Quadrant}");
             sb.AppendLine($"  Thickness: {plate.Thickness:F2}");
             sb.AppendLine($"  Material: {plate.Material.Name}");
             sb.AppendLine($"  Part spacing: {plate.PartSpacing:F2}");
             sb.AppendLine($"  Edge spacing: L={plate.EdgeSpacing.Left:F2} B={plate.EdgeSpacing.Bottom:F2} R={plate.EdgeSpacing.Right:F2} T={plate.EdgeSpacing.Top:F2}");
-            sb.AppendLine($"  Work area: {work.X:F1},{work.Y:F1} {work.Width:F1}x{work.Height:F1}");
+            sb.AppendLine($"  Work area: {work.X:F1},{work.Y:F1} {work.Width:F1}x{work.Length:F1}");
             sb.AppendLine($"  Parts: {plate.Parts.Count}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
             sb.AppendLine($"  Quantity: {plate.Quantity}");
@@ -57,7 +57,7 @@ namespace OpenNest.Mcp.Tools
             for (var i = 0; i < remnants.Count; i++)
             {
                 var r = remnants[i];
-                sb.AppendLine($"    Remnant {i}: ({r.X:F1},{r.Y:F1}) {r.Width:F1}x{r.Height:F1}, area={r.Area():F1}");
+                sb.AppendLine($"    Remnant {i}: ({r.X:F1},{r.Y:F1}) {r.Width:F1}x{r.Length:F1}, area={r.Area():F1}");
             }
 
             return sb.ToString();
@@ -90,7 +90,7 @@ namespace OpenNest.Mcp.Tools
                 sb.AppendLine($"  [{i}] {part.BaseDrawing.Name}: " +
                               $"loc=({part.Location.X:F2},{part.Location.Y:F2}), " +
                               $"rot={rotDeg:F1} deg, " +
-                              $"bbox=({bbox.X:F2},{bbox.Y:F2} {bbox.Width:F2}x{bbox.Height:F2})");
+                              $"bbox=({bbox.X:F2},{bbox.Y:F2} {bbox.Width:F2}x{bbox.Length:F2})");
             }
 
             if (plate.Parts.Count > limit)

@@ -205,7 +205,7 @@ namespace OpenNest.Controls
 
         public virtual void ZoomToArea(Box box, bool redraw = true)
         {
-            ZoomToArea(box.X, box.Y, box.Width, box.Height, redraw);
+            ZoomToArea(box.X, box.Y, box.Width, box.Length, redraw);
         }
 
         public virtual void ZoomToArea(double x, double y, double width, double height, bool redraw = true)

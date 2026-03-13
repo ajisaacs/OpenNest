@@ -135,7 +135,7 @@ if (!keepParts)
     plate.Parts.Clear();
 
 Console.WriteLine($"Nest: {nest.Name}");
-Console.WriteLine($"Plate: {plateIndex} ({plate.Size.Width:F1} x {plate.Size.Height:F1}), spacing={plate.PartSpacing:F2}");
+Console.WriteLine($"Plate: {plateIndex} ({plate.Size.Width:F1} x {plate.Size.Length:F1}), spacing={plate.PartSpacing:F2}");
 Console.WriteLine($"Drawing: {drawing.Name}");
 
 if (!keepParts)

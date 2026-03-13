@@ -15,7 +15,7 @@ namespace OpenNest.RectanglePacking
             };
 
             bin.Width += partSpacing;
-            bin.Height += partSpacing;
+            bin.Length += partSpacing;
 
             return bin;
         }
@@ -25,7 +25,7 @@ namespace OpenNest.RectanglePacking
             var box = item.Drawing.Program.BoundingBox();
 
             box.Width += partSpacing;
-            box.Height += partSpacing;
+            box.Length += partSpacing;
 
             return new Item
             {

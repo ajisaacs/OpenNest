@@ -381,12 +381,12 @@ namespace OpenNest.Geometry
             if (StartPoint.Y < EndPoint.Y)
             {
                 boundingBox.Y = StartPoint.Y;
-                boundingBox.Height = EndPoint.Y - StartPoint.Y;
+                boundingBox.Length = EndPoint.Y - StartPoint.Y;
             }
             else
             {
                 boundingBox.Y = EndPoint.Y;
-                boundingBox.Height = StartPoint.Y - EndPoint.Y;
+                boundingBox.Length = StartPoint.Y - EndPoint.Y;
             }
         }
 
@@ -412,6 +412,25 @@ namespace OpenNest.Geometry
             var side = c < 0 ? OffsetSide.Left : OffsetSide.Right;
 
             return OffsetEntity(distance, side);
+        }
+
+        /// <summary>
+        /// Splits the line at the given point, returning two sub-lines.
+        /// Either half may be null if the split point coincides with an endpoint.
+        /// </summary>
+        /// <param name="point">The point at which to split the line.</param>
+        /// <returns>A tuple of (first, second) sub-lines.</returns>
+        public (Line first, Line second) SplitAt(Vector point)
+        {
+            var first = point.DistanceTo(StartPoint) < Tolerance.Epsilon
+                ? null
+                : new Line(StartPoint, point);
+
+            var second = point.DistanceTo(EndPoint) < Tolerance.Epsilon
+                ? null
+                : new Line(point, EndPoint);
+
+            return (first, second);
         }
 
         /// <summary>

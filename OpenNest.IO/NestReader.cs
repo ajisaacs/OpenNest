@@ -1,45 +1,28 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Text.RegularExpressions;
-using System.Xml;
+using System.Text.Json;
 using OpenNest.CNC;
 using OpenNest.Geometry;
-using OpenNest.Math;
+using static OpenNest.IO.NestFormat;
 
 namespace OpenNest.IO
 {
     public sealed class NestReader
     {
-        private ZipArchive zipArchive;
-        private Dictionary<int, Plate> plateDict;
-        private Dictionary<int, Drawing> drawingDict;
-        private Dictionary<int, Program> programDict;
-        private Dictionary<int, Program> plateProgramDict;
-        private Stream stream;
-        private Nest nest;
-
-        private NestReader()
-        {
-            plateDict = new Dictionary<int, Plate>();
-            drawingDict = new Dictionary<int, Drawing>();
-            programDict = new Dictionary<int, Program>();
-            plateProgramDict = new Dictionary<int, Program>();
-            nest = new Nest();
-        }
+        private readonly Stream stream;
+        private readonly ZipArchive zipArchive;
 
         public NestReader(string file)
-            : this()
         {
             stream = new FileStream(file, FileMode.Open, FileAccess.Read);
             zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
         }
 
         public NestReader(Stream stream)
-            : this()
         {
             this.stream = stream;
             zipArchive = new ZipArchive(stream, ZipArchiveMode.Read);
@@ -47,52 +30,12 @@ namespace OpenNest.IO
 
         public Nest Read()
         {
-            const string plateExtensionPattern = "plate-\\d\\d\\d";
-            const string programExtensionPattern = "program-\\d\\d\\d";
+            var nestJson = ReadEntry("nest.json");
+            var dto = JsonSerializer.Deserialize<NestDto>(nestJson, JsonOptions);
 
-            foreach (var entry in zipArchive.Entries)
-            {
-                var memstream = new MemoryStream();
-                using (var entryStream = entry.Open())
-                {
-                    entryStream.CopyTo(memstream);
-                }
-
-                memstream.Position = 0;
-
-                switch (entry.FullName)
-                {
-                    case "info":
-                        ReadNestInfo(memstream);
-                        continue;
-
-                    case "drawing-info":
-                        ReadDrawingInfo(memstream);
-                        continue;
-
-                    case "plate-info":
-                        ReadPlateInfo(memstream);
-                        continue;
-                }
-
-                if (Regex.IsMatch(entry.FullName, programExtensionPattern))
-                {
-                    ReadProgram(memstream, entry.FullName);
-                    continue;
-                }
-
-                if (Regex.IsMatch(entry.FullName, plateExtensionPattern))
-                {
-                    ReadPlate(memstream, entry.FullName);
-                    continue;
-                }
-            }
-
-            LinkProgramsToDrawings();
-            LinkPartsToPlates();
-
-            AddPlatesToNest();
-            AddDrawingsToNest();
+            var programs = ReadPrograms(dto.Drawings.Count);
+            var drawingMap = BuildDrawings(dto, programs);
+            var nest = BuildNest(dto, drawingMap);
 
             zipArchive.Dispose();
             stream.Close();
@@ -100,374 +43,114 @@ namespace OpenNest.IO
             return nest;
         }
 
-        private void ReadNestInfo(Stream stream)
+        private string ReadEntry(string name)
         {
-            var reader = XmlReader.Create(stream);
-            var spacing = new Spacing();
+            var entry = zipArchive.GetEntry(name)
+                ?? throw new InvalidDataException($"Nest file is missing required entry '{name}'.");
+            using var entryStream = entry.Open();
+            using var reader = new StreamReader(entryStream);
+            return reader.ReadToEnd();
+        }
 
-            while (reader.Read())
+        private Dictionary<int, Program> ReadPrograms(int count)
+        {
+            var programs = new Dictionary<int, Program>();
+            for (var i = 1; i <= count; i++)
             {
-                if (!reader.IsStartElement())
-                    continue;
+                var entry = zipArchive.GetEntry($"programs/program-{i}");
+                if (entry == null) continue;
 
-                switch (reader.Name)
+                using var entryStream = entry.Open();
+                var memStream = new MemoryStream();
+                entryStream.CopyTo(memStream);
+                memStream.Position = 0;
+
+                var reader = new ProgramReader(memStream);
+                programs[i] = reader.Read();
+            }
+            return programs;
+        }
+
+        private Dictionary<int, Drawing> BuildDrawings(NestDto dto, Dictionary<int, Program> programs)
+        {
+            var map = new Dictionary<int, Drawing>();
+            foreach (var d in dto.Drawings)
+            {
+                var drawing = new Drawing(d.Name);
+                drawing.Customer = d.Customer;
+                drawing.Color = Color.FromArgb(d.Color.A, d.Color.R, d.Color.G, d.Color.B);
+                drawing.Quantity.Required = d.Quantity.Required;
+                drawing.Priority = d.Priority;
+                drawing.Constraints.StepAngle = d.Constraints.StepAngle;
+                drawing.Constraints.StartAngle = d.Constraints.StartAngle;
+                drawing.Constraints.EndAngle = d.Constraints.EndAngle;
+                drawing.Constraints.Allow180Equivalent = d.Constraints.Allow180Equivalent;
+                drawing.Material = new Material(d.Material.Name, d.Material.Grade, d.Material.Density);
+                drawing.Source.Path = d.Source.Path;
+                drawing.Source.Offset = new Vector(d.Source.Offset.X, d.Source.Offset.Y);
+
+                if (programs.TryGetValue(d.Id, out var pgm))
+                    drawing.Program = pgm;
+
+                map[d.Id] = drawing;
+            }
+            return map;
+        }
+
+        private Nest BuildNest(NestDto dto, Dictionary<int, Drawing> drawingMap)
+        {
+            var nest = new Nest();
+            nest.Name = dto.Name;
+
+            Units units;
+            if (Enum.TryParse(dto.Units, true, out units))
+                nest.Units = units;
+
+            nest.Customer = dto.Customer;
+            nest.DateCreated = DateTime.Parse(dto.DateCreated);
+            nest.DateLastModified = DateTime.Parse(dto.DateLastModified);
+            nest.Notes = dto.Notes;
+
+            // Plate defaults
+            var pd = dto.PlateDefaults;
+            nest.PlateDefaults.Size = new OpenNest.Geometry.Size(pd.Size.Width, pd.Size.Length);
+            nest.PlateDefaults.Thickness = pd.Thickness;
+            nest.PlateDefaults.Quadrant = pd.Quadrant;
+            nest.PlateDefaults.PartSpacing = pd.PartSpacing;
+            nest.PlateDefaults.Material = new Material(pd.Material.Name, pd.Material.Grade, pd.Material.Density);
+            nest.PlateDefaults.EdgeSpacing = new Spacing(pd.EdgeSpacing.Left, pd.EdgeSpacing.Bottom, pd.EdgeSpacing.Right, pd.EdgeSpacing.Top);
+
+            // Drawings
+            foreach (var d in drawingMap.OrderBy(k => k.Key))
+                nest.Drawings.Add(d.Value);
+
+            // Plates
+            foreach (var p in dto.Plates.OrderBy(p => p.Id))
+            {
+                var plate = new Plate();
+                plate.Size = new OpenNest.Geometry.Size(p.Size.Width, p.Size.Length);
+                plate.Thickness = p.Thickness;
+                plate.Quadrant = p.Quadrant;
+                plate.Quantity = p.Quantity;
+                plate.PartSpacing = p.PartSpacing;
+                plate.Material = new Material(p.Material.Name, p.Material.Grade, p.Material.Density);
+                plate.EdgeSpacing = new Spacing(p.EdgeSpacing.Left, p.EdgeSpacing.Bottom, p.EdgeSpacing.Right, p.EdgeSpacing.Top);
+
+                foreach (var partDto in p.Parts)
                 {
-                    case "Nest":
-                        nest.Name = reader["name"];
-                        break;
+                    if (!drawingMap.TryGetValue(partDto.DrawingId, out var dwg))
+                        continue;
 
-                    case "Units":
-                        Units units;
-                        TryParseEnum<Units>(reader.ReadString(), out units);
-                        nest.Units = units;
-                        break;
-
-                    case "Customer":
-                        nest.Customer = reader.ReadString();
-                        break;
-
-                    case "DateCreated":
-                        nest.DateCreated = DateTime.Parse(reader.ReadString());
-                        break;
-
-                    case "DateLastModified":
-                        nest.DateLastModified = DateTime.Parse(reader.ReadString());
-                        break;
-
-                    case "Notes":
-                        nest.Notes = Uri.UnescapeDataString(reader.ReadString());
-                        break;
-
-                    case "Size":
-                        nest.PlateDefaults.Size = OpenNest.Geometry.Size.Parse(reader.ReadString());
-                        break;
-
-                    case "Thickness":
-                        nest.PlateDefaults.Thickness = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Quadrant":
-                        nest.PlateDefaults.Quadrant = int.Parse(reader.ReadString());
-                        break;
-
-                    case "PartSpacing":
-                        nest.PlateDefaults.PartSpacing = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Name":
-                        nest.PlateDefaults.Material.Name = reader.ReadString();
-                        break;
-
-                    case "Grade":
-                        nest.PlateDefaults.Material.Grade = reader.ReadString();
-                        break;
-
-                    case "Density":
-                        nest.PlateDefaults.Material.Density = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Left":
-                        spacing.Left = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Right":
-                        spacing.Right = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Top":
-                        spacing.Top = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Bottom":
-                        spacing.Bottom = double.Parse(reader.ReadString());
-                        break;
+                    var part = new Part(dwg);
+                    part.Rotate(partDto.Rotation);
+                    part.Offset(new Vector(partDto.X, partDto.Y));
+                    plate.Parts.Add(part);
                 }
+
+                nest.Plates.Add(plate);
             }
 
-            reader.Close();
-            nest.PlateDefaults.EdgeSpacing = spacing;
-        }
-
-        private void ReadDrawingInfo(Stream stream)
-        {
-            var reader = XmlReader.Create(stream);
-            Drawing drawing = null;
-
-            while (reader.Read())
-            {
-                if (!reader.IsStartElement())
-                    continue;
-
-                switch (reader.Name)
-                {
-                    case "Drawing":
-                        var id = int.Parse(reader["id"]);
-                        var name = reader["name"];
-
-                        drawingDict.Add(id, (drawing = new Drawing(name)));
-                        break;
-
-                    case "Customer":
-                        drawing.Customer = reader.ReadString();
-                        break;
-
-                    case "Color":
-                        {
-                            var parts = reader.ReadString().Split(',');
-                        
-                            if (parts.Length == 3)
-                            {
-                                byte r = byte.Parse(parts[0]);
-                                byte g = byte.Parse(parts[1]);
-                                byte b = byte.Parse(parts[2]);
-
-                                drawing.Color = Color.FromArgb(r, g, b);
-                            }
-                            else if (parts.Length == 4)
-                            {
-                                byte a = byte.Parse(parts[0]);
-                                byte r = byte.Parse(parts[1]);
-                                byte g = byte.Parse(parts[2]);
-                                byte b = byte.Parse(parts[3]);
-
-                                drawing.Color = Color.FromArgb(a, r, g, b);
-                            }
-                        }
-                        break;
-
-                    case "Required":
-                        drawing.Quantity.Required = int.Parse(reader.ReadString());
-                        break;
-
-                    case "Name":
-                        drawing.Material.Name = reader.ReadString();
-                        break;
-
-                    case "Grade":
-                        drawing.Material.Grade = reader.ReadString();
-                        break;
-
-                    case "Density":
-                        drawing.Material.Density = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Path":
-                        drawing.Source.Path = reader.ReadString();
-                        break;
-
-                    case "Offset":
-                        {
-                            var parts = reader.ReadString().Split(',');
-
-                            if (parts.Length != 2)
-                                continue;
-
-                            drawing.Source.Offset = new Vector(double.Parse(parts[0]), double.Parse(parts[1]));
-                        }
-                        break;
-                }
-            }
-
-            reader.Close();
-        }
-
-        private void ReadPlateInfo(Stream stream)
-        {
-            var reader = XmlReader.Create(stream);
-            var spacing = new Spacing();
-            Plate plate = null;
-
-            while (reader.Read())
-            {
-                if (!reader.IsStartElement())
-                    continue;
-
-                switch (reader.Name)
-                {
-                    case "Plate":
-                        var id = int.Parse(reader["id"]);
-
-                        if (plate != null)
-                            plate.EdgeSpacing = spacing;
-
-                        plateDict.Add(id, (plate = new Plate()));
-                        break;
-
-                    case "Size":
-                        plate.Size = OpenNest.Geometry.Size.Parse(reader.ReadString());
-                        break;
-
-                    case "Qty":
-                        plate.Quantity = int.Parse(reader.ReadString());
-                        break;
-
-                    case "Thickness":
-                        plate.Thickness = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Quadrant":
-                        plate.Quadrant = int.Parse(reader.ReadString());
-                        break;
-
-                    case "PartSpacing":
-                        plate.PartSpacing = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Name":
-                        plate.Material.Name = reader.ReadString();
-                        break;
-
-                    case "Grade":
-                        plate.Material.Grade = reader.ReadString();
-                        break;
-
-                    case "Density":
-                        plate.Material.Density = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Left":
-                        spacing.Left = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Right":
-                        spacing.Right = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Top":
-                        spacing.Top = double.Parse(reader.ReadString());
-                        break;
-
-                    case "Bottom":
-                        spacing.Bottom = double.Parse(reader.ReadString());
-                        break;
-                }
-            }
-
-            if (plate != null)
-                plate.EdgeSpacing = spacing;
-        }
-
-        private void ReadProgram(Stream stream, string name)
-        {
-            var id = GetProgramId(name);
-            var reader = new ProgramReader(stream);
-            var pgm = reader.Read();
-            programDict.Add(id, pgm);
-        }
-
-        private void ReadPlate(Stream stream, string name)
-        {
-            var id = GetPlateId(name);
-            var reader = new ProgramReader(stream);
-            var pgm = reader.Read();
-            plateProgramDict.Add(id, pgm);
-        }
-
-        private void LinkProgramsToDrawings()
-        {
-            foreach (var drawingItem in drawingDict)
-            {
-                Program pgm;
-
-                if (programDict.TryGetValue(drawingItem.Key, out pgm))
-                    drawingItem.Value.Program = pgm;
-            }
-        }
-
-        private void LinkPartsToPlates()
-        {
-            foreach (var plateProgram in plateProgramDict)
-            {
-                var parts = CreateParts(plateProgram.Value);
-
-                Plate plate;
-
-                if (!plateDict.TryGetValue(plateProgram.Key, out plate))
-                    plate = new Plate();
-
-                plate.Parts.AddRange(parts);
-                plateDict[plateProgram.Key] = plate;
-            }
-        }
-
-        private void AddPlatesToNest()
-        {
-            var plates = plateDict.OrderBy(i => i.Key).Select(i => i.Value).ToList();
-            nest.Plates.AddRange(plates);
-        }
-
-        private void AddDrawingsToNest()
-        {
-            var drawings = drawingDict.OrderBy(i => i.Key).Select(i => i.Value).ToList();
-            drawings.ForEach(d => nest.Drawings.Add(d));
-        }
-
-        private List<Part> CreateParts(Program pgm)
-        {
-            var parts = new List<Part>();
-            var pos = Vector.Zero;
-
-            for (int i = 0; i < pgm.Codes.Count; i++)
-            {
-                var code = pgm.Codes[i];
-
-                switch (code.Type)
-                {
-                    case CodeType.RapidMove:
-                        pos = ((RapidMove)code).EndPoint;
-                        break;
-
-                    case CodeType.SubProgramCall:
-                        var subpgm = (SubProgramCall)code;
-                        var dwg = drawingDict[subpgm.Id];
-                        var part = new Part(dwg);
-                        part.Rotate(Angle.ToRadians(subpgm.Rotation));
-                        part.Offset(pos);
-                        parts.Add(part);
-                        break;
-                }
-            }
-
-            return parts;
-        }
-
-        private int GetPlateId(string name)
-        {
-            return int.Parse(name.Replace("plate-", ""));
-        }
-
-        private int GetProgramId(string name)
-        {
-            return int.Parse(name.Replace("program-", ""));
-        }
-
-        public static T ParseEnum<T>(string value)
-        {
-            return (T)Enum.Parse(typeof(T), value, true);
-        }
-
-        public static bool TryParseEnum<T>(string value, out T e)
-        {
-            try
-            {
-                e = ParseEnum<T>(value);
-                return true;
-            }
-            catch
-            {
-                e = ParseEnum<T>(typeof(T).GetEnumValues().GetValue(0).ToString());
-            }
-
-            return false;
-        }
-
-        private enum NestInfoSection
-        {
-            None,
-            DefaultPlate,
-            Material,
-            EdgeSpacing,
-            Source
+            return nest;
         }
     }
 }

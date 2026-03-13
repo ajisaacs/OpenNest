@@ -384,13 +384,13 @@ namespace OpenNest.Controls
             var plateRect = new RectangleF
             {
                 Width = LengthWorldToGui(Plate.Size.Width),
-                Height = LengthWorldToGui(Plate.Size.Height)
+                Height = LengthWorldToGui(Plate.Size.Length)
             };
 
             var edgeSpacingRect = new RectangleF
             {
                 Width = LengthWorldToGui(Plate.Size.Width - Plate.EdgeSpacing.Left - Plate.EdgeSpacing.Right),
-                Height = LengthWorldToGui(Plate.Size.Height - Plate.EdgeSpacing.Top - Plate.EdgeSpacing.Bottom)
+                Height = LengthWorldToGui(Plate.Size.Length - Plate.EdgeSpacing.Top - Plate.EdgeSpacing.Bottom)
             };
 
             switch (Plate.Quadrant)
@@ -410,17 +410,17 @@ namespace OpenNest.Controls
                     break;
 
                 case 3:
-                    plateRect.Location = PointWorldToGraph(-Plate.Size.Width, -Plate.Size.Height);
+                    plateRect.Location = PointWorldToGraph(-Plate.Size.Width, -Plate.Size.Length);
                     edgeSpacingRect.Location = PointWorldToGraph(
                         Plate.EdgeSpacing.Left - Plate.Size.Width,
-                        Plate.EdgeSpacing.Bottom - Plate.Size.Height);
+                        Plate.EdgeSpacing.Bottom - Plate.Size.Length);
                     break;
 
                 case 4:
-                    plateRect.Location = PointWorldToGraph(0, -Plate.Size.Height);
+                    plateRect.Location = PointWorldToGraph(0, -Plate.Size.Length);
                     edgeSpacingRect.Location = PointWorldToGraph(
                         Plate.EdgeSpacing.Left,
-                        Plate.EdgeSpacing.Bottom - Plate.Size.Height);
+                        Plate.EdgeSpacing.Bottom - Plate.Size.Length);
                     break;
 
                 default:
@@ -590,7 +590,7 @@ namespace OpenNest.Controls
             {
                 Location = PointWorldToGraph(box.Location),
                 Width = LengthWorldToGui(box.Width),
-                Height = LengthWorldToGui(box.Height)
+                Height = LengthWorldToGui(box.Length)
             };
 
             g.DrawRectangle(ColorScheme.BoundingBoxPen, rect.X, rect.Y - rect.Height, rect.Width, rect.Height);

@@ -117,7 +117,7 @@ namespace OpenNest
         {
             const double oneAndHalfPI = System.Math.PI * 1.5;
 
-            Size = new Size(Size.Height, Size.Width);
+            Size = new Size(Size.Length, Size.Width);
 
             if (rotationDirection == RotationType.CW)
             {
@@ -128,7 +128,7 @@ namespace OpenNest
                     switch (Quadrant)
                     {
                         case 1:
-                            Offset(0, Size.Height);
+                            Offset(0, Size.Length);
                             break;
 
                         case 2:
@@ -136,7 +136,7 @@ namespace OpenNest
                             break;
 
                         case 3:
-                            Offset(0, -Size.Height);
+                            Offset(0, -Size.Length);
                             break;
 
                         case 4:
@@ -165,7 +165,7 @@ namespace OpenNest
                             break;
 
                         case 2:
-                            Offset(0, Size.Height);
+                            Offset(0, Size.Length);
                             break;
 
                         case 3:
@@ -173,7 +173,7 @@ namespace OpenNest
                             break;
 
                         case 4:
-                            Offset(0, -Size.Height);
+                            Offset(0, -Size.Length);
                             break;
 
                         default:
@@ -200,19 +200,19 @@ namespace OpenNest
                 switch (Quadrant)
                 {
                     case 1:
-                        centerpt = new Vector(Size.Width * 0.5, Size.Height * 0.5);
+                        centerpt = new Vector(Size.Width * 0.5, Size.Length * 0.5);
                         break;
 
                     case 2:
-                        centerpt = new Vector(-Size.Width * 0.5, Size.Height * 0.5);
+                        centerpt = new Vector(-Size.Width * 0.5, Size.Length * 0.5);
                         break;
 
                     case 3:
-                        centerpt = new Vector(-Size.Width * 0.5, -Size.Height * 0.5);
+                        centerpt = new Vector(-Size.Width * 0.5, -Size.Length * 0.5);
                         break;
 
                     case 4:
-                        centerpt = new Vector(Size.Width * 0.5, -Size.Height * 0.5);
+                        centerpt = new Vector(Size.Width * 0.5, -Size.Length * 0.5);
                         break;
 
                     default:
@@ -308,12 +308,12 @@ namespace OpenNest
 
                 case 3:
                     plateBox.X = (float)-Size.Width;
-                    plateBox.Y = (float)-Size.Height;
+                    plateBox.Y = (float)-Size.Length;
                     break;
 
                 case 4:
                     plateBox.X = 0;
-                    plateBox.Y = (float)-Size.Height;
+                    plateBox.Y = (float)-Size.Length;
                     break;
 
                 default:
@@ -321,7 +321,7 @@ namespace OpenNest
             }
 
             plateBox.Width = Size.Width;
-            plateBox.Height = Size.Height;
+            plateBox.Length = Size.Length;
 
             if (!includeParts)
                 return plateBox;
@@ -341,7 +341,7 @@ namespace OpenNest
                 ? partsBox.Right - boundingBox.X
                 : plateBox.Right - boundingBox.X;
 
-            boundingBox.Height = partsBox.Top > plateBox.Top
+            boundingBox.Length = partsBox.Top > plateBox.Top
                 ? partsBox.Top - boundingBox.Y
                 : plateBox.Top - boundingBox.Y;
 
@@ -359,7 +359,7 @@ namespace OpenNest
             box.X += EdgeSpacing.Left;
             box.Y += EdgeSpacing.Bottom;
             box.Width -= EdgeSpacing.Left + EdgeSpacing.Right;
-            box.Height -= EdgeSpacing.Top + EdgeSpacing.Bottom;
+            box.Length -= EdgeSpacing.Top + EdgeSpacing.Bottom;
 
             return box;
         }
@@ -383,28 +383,28 @@ namespace OpenNest
             var bounds = Parts.GetBoundingBox();
 
             double width;
-            double height;
+            double length;
 
             switch (Quadrant)
             {
                 case 1:
                     width = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
-                    height = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    length = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
                     break;
 
                 case 2:
                     width = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
-                    height = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    length = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
                     break;
 
                 case 3:
                     width = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
-                    height = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    length = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
                     break;
 
                 case 4:
                     width = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
-                    height = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    length = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
                     break;
 
                 default:
@@ -413,7 +413,7 @@ namespace OpenNest
 
             Size = new Size(
                 Helper.RoundUpToNearest(width, roundingFactor),
-                Helper.RoundUpToNearest(height, roundingFactor));
+                Helper.RoundUpToNearest(length, roundingFactor));
         }
 
         /// <summary>
@@ -422,7 +422,7 @@ namespace OpenNest
         /// <returns></returns>
         public double Area()
         {
-            return Size.Width * Size.Height;
+            return Size.Width * Size.Length;
         }
 
         /// <summary>
@@ -503,7 +503,7 @@ namespace OpenNest
 
             if (maxRight < work.Right)
             {
-                var strip = new Box(maxRight, work.Bottom, work.Right - maxRight, work.Height);
+                var strip = new Box(maxRight, work.Bottom, work.Right - maxRight, work.Length);
                 if (strip.Area() > 1.0)
                     results.Add(strip);
             }
@@ -548,7 +548,7 @@ namespace OpenNest
 
             if (minLeft > work.Left)
             {
-                var strip = new Box(work.Left, work.Bottom, minLeft - work.Left, work.Height);
+                var strip = new Box(work.Left, work.Bottom, minLeft - work.Left, work.Length);
                 if (strip.Area() > 1.0)
                     results.Add(strip);
             }
