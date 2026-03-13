@@ -36,9 +36,9 @@ namespace OpenNest.CNC.CuttingStrategy
                 var leadOut = SelectLeadOut(contourType);
 
                 result.Codes.AddRange(leadIn.Generate(closestPt, normal, winding));
-                // Contour re-indexing: split shape entities at closestPt so cutting
-                // starts there, convert to ICode, and add to result.Codes
-                throw new System.NotImplementedException("Contour re-indexing not yet implemented");
+                var reindexed = cutout.ReindexAt(closestPt, entity);
+                result.Codes.AddRange(ConvertShapeToMoves(reindexed, closestPt));
+                // TODO: MicrotabLeadOut — trim last cutting move by GapSize
                 result.Codes.AddRange(leadOut.Generate(closestPt, normal, winding));
 
                 currentPoint = closestPt;
@@ -54,7 +54,9 @@ namespace OpenNest.CNC.CuttingStrategy
                 var leadOut = SelectLeadOut(ContourType.External);
 
                 result.Codes.AddRange(leadIn.Generate(perimeterPt, normal, winding));
-                throw new System.NotImplementedException("Contour re-indexing not yet implemented");
+                var reindexed = profile.Perimeter.ReindexAt(perimeterPt, perimeterEntity);
+                result.Codes.AddRange(ConvertShapeToMoves(reindexed, perimeterPt));
+                // TODO: MicrotabLeadOut — trim last cutting move by GapSize
                 result.Codes.AddRange(leadOut.Generate(perimeterPt, normal, winding));
             }
 
@@ -172,6 +174,33 @@ namespace OpenNest.CNC.CuttingStrategy
                 ContourType.Internal => Parameters.InternalLeadOut,
                 _ => Parameters.ExternalLeadOut
             };
+        }
+
+        private List<ICode> ConvertShapeToMoves(Shape shape, Vector startPoint)
+        {
+            var moves = new List<ICode>();
+
+            foreach (var entity in shape.Entities)
+            {
+                if (entity is Line line)
+                {
+                    moves.Add(new LinearMove(line.EndPoint));
+                }
+                else if (entity is Arc arc)
+                {
+                    moves.Add(new ArcMove(arc.EndPoint(), arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW));
+                }
+                else if (entity is Circle circle)
+                {
+                    moves.Add(new ArcMove(startPoint, circle.Center, circle.Rotation));
+                }
+                else
+                {
+                    throw new System.InvalidOperationException($"Unsupported entity type: {entity.Type}");
+                }
+            }
+
+            return moves;
         }
     }
 }
