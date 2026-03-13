@@ -12,7 +12,7 @@ namespace OpenNest.RectanglePacking
 
         public void Rotate()
         {
-            Generic.Swap(ref Size.Width, ref Size.Height);
+            Generic.Swap(ref Size.Width, ref Size.Length);
             IsRotated = !IsRotated;
         }
 
@@ -38,7 +38,7 @@ namespace OpenNest.RectanglePacking
             double minX = items[0].X;
             double minY = items[0].Y;
             double maxX = items[0].X + items[0].Width;
-            double maxY = items[0].Y + items[0].Height;
+            double maxY = items[0].Y + items[0].Length;
 
             foreach (var box in items)
             {

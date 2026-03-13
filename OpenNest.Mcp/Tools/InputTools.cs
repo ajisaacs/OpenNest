@@ -40,10 +40,10 @@ namespace OpenNest.Mcp.Tools
             {
                 var plate = nest.Plates[i];
                 var work = plate.WorkArea();
-                sb.AppendLine($"  Plate {i}: {plate.Size.Width:F1} x {plate.Size.Height:F1}, " +
+                sb.AppendLine($"  Plate {i}: {plate.Size.Width:F1} x {plate.Size.Length:F1}, " +
                               $"parts={plate.Parts.Count}, " +
                               $"utilization={plate.Utilization():P1}, " +
-                              $"work area={work.Width:F1} x {work.Height:F1}");
+                              $"work area={work.Width:F1} x {work.Length:F1}");
             }
 
             sb.AppendLine($"Drawings: {nest.Drawings.Count}");
@@ -51,7 +51,7 @@ namespace OpenNest.Mcp.Tools
             foreach (var dwg in nest.Drawings)
             {
                 var bbox = dwg.Program.BoundingBox();
-                sb.AppendLine($"  {dwg.Name}: bbox={bbox.Width:F2} x {bbox.Height:F2}, " +
+                sb.AppendLine($"  {dwg.Name}: bbox={bbox.Width:F2} x {bbox.Length:F2}, " +
                               $"required={dwg.Quantity.Required}, nested={dwg.Quantity.Nested}");
             }
 
@@ -85,7 +85,7 @@ namespace OpenNest.Mcp.Tools
             _session.Drawings.Add(drawing);
 
             var bbox = pgm.BoundingBox();
-            return $"Imported drawing '{drawingName}': bbox={bbox.Width:F2} x {bbox.Height:F2}";
+            return $"Imported drawing '{drawingName}': bbox={bbox.Width:F2} x {bbox.Length:F2}";
         }
 
         [McpServerTool(Name = "create_drawing")]
@@ -134,7 +134,7 @@ namespace OpenNest.Mcp.Tools
             _session.Drawings.Add(drawing);
 
             var bbox = pgm.BoundingBox();
-            return $"Created drawing '{name}': bbox={bbox.Width:F2} x {bbox.Height:F2}";
+            return $"Created drawing '{name}': bbox={bbox.Width:F2} x {bbox.Length:F2}";
         }
 
         private static CncProgram CreateRectangle(double width, double height)

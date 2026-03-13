@@ -44,11 +44,11 @@ namespace OpenNest.RectanglePacking
             int normalColumns = 0;
             int rotateColumns = 0;
 
-            if (!BestCombination.FindFrom2(item.Width, item.Height, bin.Width, out normalColumns, out rotateColumns))
+            if (!BestCombination.FindFrom2(item.Width, item.Length, bin.Width, out normalColumns, out rotateColumns))
                 return bin;
 
-            var normalRows = (int)System.Math.Floor((bin.Height + Tolerance.Epsilon) / item.Height);
-            var rotateRows = (int)System.Math.Floor((bin.Height + Tolerance.Epsilon) / item.Width);
+            var normalRows = (int)System.Math.Floor((bin.Length + Tolerance.Epsilon) / item.Length);
+            var rotateRows = (int)System.Math.Floor((bin.Length + Tolerance.Epsilon) / item.Width);
 
             item.Location = bin.Location;
 
@@ -69,17 +69,17 @@ namespace OpenNest.RectanglePacking
             int normalRows = 0;
             int rotateRows = 0;
 
-            if (!BestCombination.FindFrom2(item.Height, item.Width, Bin.Height, out normalRows, out rotateRows))
+            if (!BestCombination.FindFrom2(item.Length, item.Width, Bin.Length, out normalRows, out rotateRows))
                 return bin;
 
             var normalColumns = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
-            var rotateColumns = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Height);
+            var rotateColumns = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Length);
 
             item.Location = bin.Location;
 
             bin.Items.AddRange(FillGrid(item, normalRows, normalColumns, int.MaxValue));
 
-            item.Location.Y += item.Height * normalRows;
+            item.Location.Y += item.Length * normalRows;
             item.Rotate();
 
             bin.Items.AddRange(FillGrid(item, rotateRows, rotateColumns, int.MaxValue));

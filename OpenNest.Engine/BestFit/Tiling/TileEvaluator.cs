@@ -9,7 +9,7 @@ namespace OpenNest.Engine.BestFit.Tiling
         public TileResult Evaluate(BestFitResult bestFit, Plate plate)
         {
             var plateWidth = plate.Size.Width - plate.EdgeSpacing.Left - plate.EdgeSpacing.Right;
-            var plateHeight = plate.Size.Height - plate.EdgeSpacing.Top - plate.EdgeSpacing.Bottom;
+            var plateHeight = plate.Size.Length - plate.EdgeSpacing.Top - plate.EdgeSpacing.Bottom;
 
             var result1 = TryTile(bestFit, plateWidth, plateHeight, false);
             var result2 = TryTile(bestFit, plateWidth, plateHeight, true);

@@ -41,11 +41,11 @@ namespace OpenNest.Mcp.Tools
             var work = plate.WorkArea();
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Created plate {index}: {plate.Size.Width:F1} x {plate.Size.Height:F1}");
+            sb.AppendLine($"Created plate {index}: {plate.Size.Width:F1} x {plate.Size.Length:F1}");
             sb.AppendLine($"  Quadrant: {plate.Quadrant}");
             sb.AppendLine($"  Part spacing: {plate.PartSpacing:F2}");
             sb.AppendLine($"  Edge spacing: L={plate.EdgeSpacing.Left:F2} B={plate.EdgeSpacing.Bottom:F2} R={plate.EdgeSpacing.Right:F2} T={plate.EdgeSpacing.Top:F2}");
-            sb.AppendLine($"  Work area: {work.Width:F1} x {work.Height:F1}");
+            sb.AppendLine($"  Work area: {work.Width:F1} x {work.Length:F1}");
 
             return sb.ToString();
         }

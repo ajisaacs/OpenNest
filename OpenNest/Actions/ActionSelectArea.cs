@@ -95,7 +95,7 @@ namespace OpenNest.Actions
             var location = plateView.PointWorldToGraph(SelectedArea.Location);
             var size = new SizeF(
                 plateView.LengthWorldToGui(SelectedArea.Width), 
-                plateView.LengthWorldToGui(SelectedArea.Height));
+                plateView.LengthWorldToGui(SelectedArea.Length));
 
             var rect = new System.Drawing.RectangleF(location.X, location.Y - size.Height, size.Width, size.Height);
 

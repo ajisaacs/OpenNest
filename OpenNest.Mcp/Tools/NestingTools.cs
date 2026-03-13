@@ -121,7 +121,7 @@ namespace OpenNest.Mcp.Tools
                 var added = plate.Parts.Count - countBefore;
                 totalAdded += added;
 
-                sb.AppendLine($"  Remnant {i}: ({remnant.X:F1},{remnant.Y:F1} {remnant.Width:F1}x{remnant.Height:F1}) -> {added} parts {(success ? "" : "(no fit)")}");
+                sb.AppendLine($"  Remnant {i}: ({remnant.X:F1},{remnant.Y:F1} {remnant.Width:F1}x{remnant.Length:F1}) -> {added} parts {(success ? "" : "(no fit)")}");
             }
 
             sb.AppendLine($"Total parts added: {totalAdded}");

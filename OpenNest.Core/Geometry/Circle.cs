@@ -263,7 +263,7 @@ namespace OpenNest.Geometry
             boundingBox.X = Center.X - Radius;
             boundingBox.Y = Center.Y - Radius;
             boundingBox.Width = Diameter;
-            boundingBox.Height = Diameter;
+            boundingBox.Length = Diameter;
         }
 
         public override Entity OffsetEntity(double distance, OffsetSide side)

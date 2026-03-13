@@ -64,15 +64,15 @@ namespace OpenNest.Engine.BestFit
 
             if (isHorizontalPush)
             {
-                perpMin = -(bbox2.Height + spacing);
-                perpMax = bbox1.Height + bbox2.Height + spacing;
+                perpMin = -(bbox2.Length + spacing);
+                perpMax = bbox1.Length + bbox2.Length + spacing;
                 pushStartOffset = bbox1.Width + bbox2.Width + spacing * 2;
             }
             else
             {
                 perpMin = -(bbox2.Width + spacing);
                 perpMax = bbox1.Width + bbox2.Width + spacing;
-                pushStartOffset = bbox1.Height + bbox2.Height + spacing * 2;
+                pushStartOffset = bbox1.Length + bbox2.Length + spacing * 2;
             }
 
             // Pre-compute part1's offset lines (half-spacing outward)

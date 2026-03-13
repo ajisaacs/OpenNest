@@ -381,12 +381,12 @@ namespace OpenNest.Geometry
             if (StartPoint.Y < EndPoint.Y)
             {
                 boundingBox.Y = StartPoint.Y;
-                boundingBox.Height = EndPoint.Y - StartPoint.Y;
+                boundingBox.Length = EndPoint.Y - StartPoint.Y;
             }
             else
             {
                 boundingBox.Y = EndPoint.Y;
-                boundingBox.Height = StartPoint.Y - EndPoint.Y;
+                boundingBox.Length = StartPoint.Y - EndPoint.Y;
             }
         }
 

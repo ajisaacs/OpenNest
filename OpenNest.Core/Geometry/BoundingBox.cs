@@ -13,7 +13,7 @@ namespace OpenNest.Geometry
             double minX = boxes[0].X;
             double minY = boxes[0].Y;
             double maxX = boxes[0].X + boxes[0].Width;
-            double maxY = boxes[0].Y + boxes[0].Height;
+            double maxY = boxes[0].Y + boxes[0].Length;
 
             foreach (var box in boxes)
             {

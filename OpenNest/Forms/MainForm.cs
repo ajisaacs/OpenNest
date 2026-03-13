@@ -43,8 +43,8 @@ namespace OpenNest.Forms
             UpdateStatus();
             UpdateGpuStatus();
 
-            if (GpuEvaluatorFactory.GpuAvailable)
-                BestFitCache.CreateEvaluator = (drawing, spacing) => GpuEvaluatorFactory.Create(drawing, spacing);
+            //if (GpuEvaluatorFactory.GpuAvailable)
+            //    BestFitCache.CreateEvaluator = (drawing, spacing) => GpuEvaluatorFactory.Create(drawing, spacing);
         }
 
         private string GetNestName(DateTime date, int id)

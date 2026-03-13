@@ -16,11 +16,11 @@ namespace OpenNest.RectanglePacking
 
         public override void Pack(List<Item> items)
         {
-            items = items.OrderBy(i => -i.Height).ToList();
+            items = items.OrderBy(i => -i.Length).ToList();
 
             foreach (var item in items)
             {
-                if (item.Height > Bin.Height)
+                if (item.Length > Bin.Length)
                     continue;
 
                 var level = FindLevel(item);
@@ -36,7 +36,7 @@ namespace OpenNest.RectanglePacking
         {
             foreach (var level in levels)
             {
-                if (level.Height < item.Height)
+                if (level.Height < item.Length)
                     continue;
 
                 if (level.RemainingWidth < item.Width)
@@ -58,12 +58,12 @@ namespace OpenNest.RectanglePacking
 
             var remaining = Bin.Top - y;
 
-            if (remaining < item.Height)
+            if (remaining < item.Length)
                 return null;
 
             var level = new Level(Bin);
             level.Y = y;
-            level.Height = item.Height;
+            level.Height = item.Length;
 
             levels.Add(level);
 

@@ -145,7 +145,7 @@ namespace OpenNest.Forms
                 return;
             }
 
-            if (TopSpacing + BottomSpacing >= size.Height)
+            if (TopSpacing + BottomSpacing >= size.Length)
             {
                 applyButton.Enabled = false;
                 return;
