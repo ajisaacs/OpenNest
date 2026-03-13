@@ -680,26 +680,42 @@ namespace OpenNest.Forms
                 return;
 
             var items = form.GetNestItems();
-            var qty = new int[items.Count];
 
-            while (true)
+            while (items.Any(it => it.Quantity > 0))
             {
-                for (int i = 0; i < items.Count; i++)
-                    qty[i] = items[i].Drawing.Quantity.Remaining;
-
                 var plate = activeForm.PlateView.Plate.Parts.Count > 0
                     ? activeForm.Nest.CreatePlate()
                     : activeForm.PlateView.Plate;
 
                 var engine = new NestEngine(plate);
+                var filled = false;
 
-                if (!engine.Pack(items))
+                foreach (var item in items)
+                {
+                    if (item.Quantity <= 0)
+                        continue;
+
+                    if (engine.Fill(item))
+                        filled = true;
+                }
+
+                if (!filled)
                     break;
 
-                activeForm.Nest.UpdateDrawingQuantities();
+                // Decrement requested quantities by counting parts actually
+                // placed on this plate, grouped by drawing.
+                foreach (var group in plate.Parts.GroupBy(p => p.BaseDrawing))
+                {
+                    var placed = group.Count();
 
-                for (int i = 0; i < items.Count; i++)
-                    items[i].Quantity -= qty[i] - items[i].Drawing.Quantity.Remaining;
+                    foreach (var item in items)
+                    {
+                        if (item.Drawing == group.Key)
+                            item.Quantity -= placed;
+                    }
+                }
+
+                activeForm.Nest.UpdateDrawingQuantities();
             }
         }
 
