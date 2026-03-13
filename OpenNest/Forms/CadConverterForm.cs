@@ -112,7 +112,7 @@ namespace OpenNest.Forms
                 drawing.Source.Path = item.Path;
                 drawing.Quantity.Required = item.Quantity;
 
-                var shape = new DefinedShape(entities);
+                var shape = new ShapeProfile(entities);
 
                 SetRotation(shape.Perimeter, RotationType.CW);
 

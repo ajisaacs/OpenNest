@@ -398,7 +398,7 @@ namespace OpenNest.Geometry
         public override Entity OffsetEntity(double distance, OffsetSide side)
         {
             var offsetShape = new Shape();
-            var definedShape = new DefinedShape(this);
+            var definedShape = new ShapeProfile(this);
 
             Entity lastEntity = null;
             Entity lastOffsetEntity = null;
