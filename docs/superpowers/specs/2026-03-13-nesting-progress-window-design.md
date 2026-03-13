@@ -18,12 +18,12 @@ A class carrying progress updates from the engine to the UI:
 - `PlateNumber` (int): Current plate number (for auto-nest multi-plate loop)
 - `BestPartCount` (int): Part count of current best result
 - `BestDensity` (double): Density percentage of current best
-- `BestRemnantArea` (double): Usable remnant area of current best
+- `UsableRemnantArea` (double): Usable remnant area of current best (matches `FillScore.UsableRemnantArea`)
 - `BestParts` (List\<Part\>): Cloned snapshot of the best parts for preview
 
 `Phase` uses a `NestPhase` enum (defined in the same file) to prevent typos and allow the progress form to map to display-friendly text (e.g., `NestPhase.Pairs` → "Trying pairs...").
 
-`BestParts` must be a cloned list (using `Part.Clone()`) so the UI thread can safely read it while the engine continues on the background thread. Progress is reported only after each phase completes (3-4 reports per fill call), so the cloning cost is negligible.
+`BestParts` must be a cloned list (using `Part.Clone()`) so the UI thread can safely read it while the engine continues on the background thread. The clones share `BaseDrawing` references (not deep copies of drawings) since drawings are read-only templates during nesting. Progress is reported only after each phase completes (3-4 reports per fill call), so the cloning cost is negligible.
 
 ## Engine Changes
 
@@ -45,6 +45,8 @@ New signatures:
 - `List<Part> Fill(NestItem item, Box workArea, IProgress<NestProgress> progress, CancellationToken token)`
 - `List<Part> Fill(List<Part> groupParts, Box workArea, IProgress<NestProgress> progress, CancellationToken token)`
 
+**Note on `Fill(List<Part>, ...)` overload:** When `groupParts.Count > 1`, only the Linear phase runs (no RectBestFit, Pairs, or Remainder). The additional phases only apply when `groupParts.Count == 1`, matching the existing engine behavior.
+
 Inside `FindBestFill`, after each strategy completes:
 
 1. **Linear phase**: Try all rotation angles (already uses `Parallel.ForEach`). If new best found, report progress with `Phase=Linear`. Check cancellation token.
@@ -55,6 +57,8 @@ Inside `FindBestFill`, after each strategy completes:
 ### Cancellation Behavior
 
 On cancellation, the engine returns its current best result (not null/empty). `OperationCanceledException` is caught internally so the caller always gets a usable result. This enables "stop early, keep best result."
+
+The `CancellationToken` is also passed into `ParallelOptions` for the existing `Parallel.ForEach` (linear phase) and `Parallel.For` (pairs phase) loops, so cancellation is responsive even mid-phase rather than only at phase boundaries.
 
 ## PlateView Temporary Parts
 
@@ -68,7 +72,7 @@ private List<LayoutPart> temporaryParts = new List<LayoutPart>();
 
 ### Drawing
 
-In `DrawParts`, after drawing real parts, iterate `temporaryParts` and draw them using a distinct preview color (semi-transparent orange or cyan). Same drawing logic, different pen/brush.
+In `DrawParts`, after drawing real parts, iterate `temporaryParts` and draw them using a distinct preview color. The preview color is added to `ColorScheme` (e.g., `PreviewPart`) so it follows the existing theming pattern. Same drawing logic, different pen/brush.
 
 ### Public API
 
@@ -124,7 +128,7 @@ The Plate row shows just the current plate number (no total — the total is not
 4. `Task.Run` with the multi-plate loop. The background work computes results only — all UI/plate mutation happens on the UI thread via `Progress<T>` callbacks and the `await` continuation:
    - The loop iterates items, calling the new `Fill(item, workArea, progress, token)` overloads which return `List<Part>` without modifying the plate.
    - Progress callbacks update the preview via `SetTemporaryParts()` on the UI thread.
-   - When a plate's fill completes, the continuation (back on the UI thread) calls `AcceptTemporaryParts()` to commit parts to the plate, decrements `NestItem.Quantity`, and calls `Nest.CreatePlate()` for the next plate if needed.
+   - When a plate's fill completes, the continuation (back on the UI thread) counts the returned parts per drawing (from the last `NestProgress.BestParts`) to decrement `NestItem.Quantity`, then calls `AcceptTemporaryParts()` to commit to the plate. `Nest.CreatePlate()` for the next plate also happens on the UI thread.
    - On cancellation, breaks out of the loop and commits whatever was last previewed.
 5. On completion, call `Nest.UpdateDrawingQuantities()`, close progress form
 6. Disable nesting-related menu items while running, re-enable on completion
@@ -136,7 +140,9 @@ Same pattern but simpler — no plate loop, single fill call with progress/cance
 
 ### UI Lockout
 
-While the engine runs, the user can pan/zoom the PlateView (read-only interaction) but editing actions (add/remove parts, change plates, etc.) are disabled. Re-enabled when nesting completes or is stopped.
+While the engine runs, the user can pan/zoom the PlateView (read-only interaction) but editing actions (add/remove parts, change plates, plate navigation) are disabled. Plate navigation is locked during auto-nest to prevent the PlateView from switching away from the plate being filled. Re-enabled when nesting completes or is stopped.
+
+If the user closes the `EditNestForm` (MDI child) while nesting is running, the cancellation token is triggered and the progress form is closed. No partial results are committed.
 
 ### Error Handling
 
