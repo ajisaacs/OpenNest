@@ -735,22 +735,19 @@ namespace OpenNest.Forms
             nestingCts = new CancellationTokenSource();
             var token = nestingCts.Token;
 
-            var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
-            var plateNumber = 1;
-
-            var progress = new Progress<NestProgress>(p =>
-            {
-                progressForm.UpdateProgress(p);
-                activeForm.PlateView.SetTemporaryParts(p.BestParts);
-            });
-
-            progressForm.Show(this);
             SetNestingLockout(true);
 
             try
             {
-                while (items.Any(it => it.Quantity > 0))
+                var maxPlates = 100;
+
+                for (var plateCount = 0; plateCount < maxPlates; plateCount++)
                 {
+                    var remaining = items.Where(i => i.Quantity > 0).ToList();
+
+                    if (remaining.Count == 0)
+                        break;
+
                     if (token.IsCancellationRequested)
                         break;
 
@@ -758,64 +755,35 @@ namespace OpenNest.Forms
                         ? activeForm.Nest.CreatePlate()
                         : activeForm.PlateView.Plate;
 
-                    // If a new plate was created, switch to it
                     if (plate != activeForm.PlateView.Plate)
                         activeForm.LoadLastPlate();
 
-                    var engine = new NestEngine(plate) { PlateNumber = plateNumber };
-                    var filled = false;
+                    var parts = await Task.Run(() =>
+                        NestEngine.AutoNest(remaining, plate, token));
 
-                    foreach (var item in items)
-                    {
-                        if (item.Quantity <= 0)
-                            continue;
-
-                        if (token.IsCancellationRequested)
-                            break;
-
-                        // Run the engine on a background thread
-                        var parts = await Task.Run(() =>
-                            engine.Fill(item, plate.WorkArea(), progress, token));
-
-                        if (parts.Count == 0)
-                            continue;
-
-                        filled = true;
-
-                        // Count parts per drawing before accepting (for quantity tracking)
-                        foreach (var group in parts.GroupBy(p => p.BaseDrawing))
-                        {
-                            var placed = group.Count();
-
-                            foreach (var ni in items)
-                            {
-                                if (ni.Drawing == group.Key)
-                                    ni.Quantity -= placed;
-                            }
-                        }
-
-                        // Accept the preview parts into the real plate
-                        activeForm.PlateView.AcceptTemporaryParts();
-                    }
-
-                    if (!filled)
+                    if (parts.Count == 0)
                         break;
 
-                    plateNumber++;
+                    plate.Parts.AddRange(parts);
+                    activeForm.PlateView.Invalidate();
+
+                    // Deduct placed quantities using Drawing.Name to avoid reference issues.
+                    foreach (var item in remaining)
+                    {
+                        var placed = parts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
+                        item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                    }
                 }
 
                 activeForm.Nest.UpdateDrawingQuantities();
-                progressForm.ShowCompleted();
             }
             catch (Exception ex)
             {
-                activeForm.PlateView.ClearTemporaryParts();
                 MessageBox.Show($"Nesting error: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
-                progressForm.Close();
                 SetNestingLockout(false);
                 nestingCts.Dispose();
                 nestingCts = null;

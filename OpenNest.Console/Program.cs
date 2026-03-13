@@ -20,6 +20,7 @@ var checkOverlaps = false;
 var noSave = false;
 var noLog = false;
 var keepParts = false;
+var autoNest = false;
 
 for (var i = 0; i < args.Length; i++)
 {
@@ -59,6 +60,9 @@ for (var i = 0; i < args.Length; i++)
             break;
         case "--keep-parts":
             keepParts = true;
+            break;
+        case "--autonest":
+            autoNest = true;
             break;
         case "--help":
         case "-h":
@@ -145,11 +149,38 @@ else
 
 Console.WriteLine("---");
 
-// Run fill.
+// Run fill or autonest.
 var sw = Stopwatch.StartNew();
-var engine = new NestEngine(plate);
-var item = new NestItem { Drawing = drawing, Quantity = quantity };
-var success = engine.Fill(item);
+bool success;
+
+if (autoNest)
+{
+    // AutoNest: use all drawings (or specific drawing if --drawing given).
+    var nestItems = new List<NestItem>();
+
+    if (drawingName != null)
+    {
+        nestItems.Add(new NestItem { Drawing = drawing, Quantity = quantity > 0 ? quantity : 1 });
+    }
+    else
+    {
+        foreach (var d in nest.Drawings)
+            nestItems.Add(new NestItem { Drawing = d, Quantity = quantity > 0 ? quantity : 1 });
+    }
+
+    Console.WriteLine($"AutoNest: {nestItems.Count} drawing(s), {nestItems.Sum(i => i.Quantity)} total parts");
+
+    var parts = NestEngine.AutoNest(nestItems, plate);
+    plate.Parts.AddRange(parts);
+    success = parts.Count > 0;
+}
+else
+{
+    var engine = new NestEngine(plate);
+    var item = new NestItem { Drawing = drawing, Quantity = quantity };
+    success = engine.Fill(item);
+}
+
 sw.Stop();
 
 // Check overlaps.
@@ -208,6 +239,7 @@ void PrintUsage()
     Console.Error.WriteLine("  --spacing <value>      Override part spacing");
     Console.Error.WriteLine("  --size <WxH>           Override plate size (e.g. 120x60)");
     Console.Error.WriteLine("  --output <path>        Output nest file path (default: <input>-result.zip)");
+    Console.Error.WriteLine("  --autonest             Use NFP-based mixed-part autonesting instead of linear fill");
     Console.Error.WriteLine("  --keep-parts           Don't clear existing parts before filling");
     Console.Error.WriteLine("  --check-overlaps       Run overlap detection after fill (exit code 1 if found)");
     Console.Error.WriteLine("  --no-save              Skip saving output file");
