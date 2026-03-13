@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
@@ -18,6 +21,8 @@ namespace OpenNest.Forms
     {
         private EditNestForm activeForm;
         private bool clickUpdateLocation;
+        private bool nestingInProgress;
+        private CancellationTokenSource nestingCts;
 
         private const float ZoomInFactor = 1.5f;
         private const float ZoomOutFactor = 1.0f / ZoomInFactor;
@@ -163,6 +168,25 @@ namespace OpenNest.Forms
                 mnuNestLastPlate.Enabled = activeForm.PlateCount > 0 && !activeForm.IsLastPlate();
                 btnLastPlate.Enabled = activeForm.PlateCount > 0 && !activeForm.IsLastPlate();
             }
+        }
+
+        private void SetNestingLockout(bool locked)
+        {
+            nestingInProgress = locked;
+
+            // Disable nesting-related menus while running
+            mnuNest.Enabled = !locked;
+            mnuPlate.Enabled = !locked;
+
+            // Lock plate navigation
+            mnuNestPreviousPlate.Enabled = !locked && activeForm != null && !activeForm.IsFirstPlate();
+            btnPreviousPlate.Enabled = mnuNestPreviousPlate.Enabled;
+            mnuNestNextPlate.Enabled = !locked && activeForm != null && !activeForm.IsLastPlate();
+            btnNextPlate.Enabled = mnuNestNextPlate.Enabled;
+            mnuNestFirstPlate.Enabled = !locked && activeForm != null && activeForm.PlateCount > 0 && !activeForm.IsFirstPlate();
+            btnFirstPlate.Enabled = mnuNestFirstPlate.Enabled;
+            mnuNestLastPlate.Enabled = !locked && activeForm != null && activeForm.PlateCount > 0 && !activeForm.IsLastPlate();
+            btnLastPlate.Enabled = mnuNestLastPlate.Enabled;
         }
 
         private void UpdateLocationStatus()
@@ -689,7 +713,7 @@ namespace OpenNest.Forms
             activeForm.LoadNextPlate();
         }
 
-        private void RunAutoNest_Click(object sender, EventArgs e)
+        private async void RunAutoNest_Click(object sender, EventArgs e)
         {
             var form = new AutoNestForm(activeForm.Nest);
             form.AllowPlateCreation = true;
@@ -699,41 +723,96 @@ namespace OpenNest.Forms
 
             var items = form.GetNestItems();
 
-            while (items.Any(it => it.Quantity > 0))
+            if (!items.Any(it => it.Quantity > 0))
+                return;
+
+            nestingCts = new CancellationTokenSource();
+            var token = nestingCts.Token;
+
+            var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
+            var plateNumber = 1;
+
+            var progress = new Progress<NestProgress>(p =>
             {
-                var plate = activeForm.PlateView.Plate.Parts.Count > 0
-                    ? activeForm.Nest.CreatePlate()
-                    : activeForm.PlateView.Plate;
+                progressForm.UpdateProgress(p);
+                activeForm.PlateView.SetTemporaryParts(p.BestParts);
+            });
 
-                var engine = new NestEngine(plate);
-                var filled = false;
+            progressForm.Show(this);
+            SetNestingLockout(true);
 
-                foreach (var item in items)
+            try
+            {
+                while (items.Any(it => it.Quantity > 0))
                 {
-                    if (item.Quantity <= 0)
-                        continue;
+                    if (token.IsCancellationRequested)
+                        break;
 
-                    if (engine.Fill(item))
-                        filled = true;
-                }
+                    var plate = activeForm.PlateView.Plate.Parts.Count > 0
+                        ? activeForm.Nest.CreatePlate()
+                        : activeForm.PlateView.Plate;
 
-                if (!filled)
-                    break;
+                    // If a new plate was created, switch to it
+                    if (plate != activeForm.PlateView.Plate)
+                        activeForm.LoadLastPlate();
 
-                // Decrement requested quantities by counting parts actually
-                // placed on this plate, grouped by drawing.
-                foreach (var group in plate.Parts.GroupBy(p => p.BaseDrawing))
-                {
-                    var placed = group.Count();
+                    var engine = new NestEngine(plate) { PlateNumber = plateNumber };
+                    var filled = false;
 
                     foreach (var item in items)
                     {
-                        if (item.Drawing == group.Key)
-                            item.Quantity -= placed;
+                        if (item.Quantity <= 0)
+                            continue;
+
+                        if (token.IsCancellationRequested)
+                            break;
+
+                        // Run the engine on a background thread
+                        var parts = await Task.Run(() =>
+                            engine.Fill(item, plate.WorkArea(), progress, token));
+
+                        if (parts.Count == 0)
+                            continue;
+
+                        filled = true;
+
+                        // Count parts per drawing before accepting (for quantity tracking)
+                        foreach (var group in parts.GroupBy(p => p.BaseDrawing))
+                        {
+                            var placed = group.Count();
+
+                            foreach (var ni in items)
+                            {
+                                if (ni.Drawing == group.Key)
+                                    ni.Quantity -= placed;
+                            }
+                        }
+
+                        // Accept the preview parts into the real plate
+                        activeForm.PlateView.AcceptTemporaryParts();
                     }
+
+                    if (!filled)
+                        break;
+
+                    plateNumber++;
                 }
 
                 activeForm.Nest.UpdateDrawingQuantities();
+                progressForm.ShowCompleted();
+            }
+            catch (Exception ex)
+            {
+                activeForm.PlateView.ClearTemporaryParts();
+                MessageBox.Show($"Nesting error: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                progressForm.Close();
+                SetNestingLockout(false);
+                nestingCts.Dispose();
+                nestingCts = null;
             }
         }
 
