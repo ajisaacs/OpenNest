@@ -85,30 +85,12 @@ namespace OpenNest.Engine.BestFit
 
             for (var offset = alignedStart; offset <= perpMax; offset += stepSize)
             {
-                var part2 = (Part)part2Template.Clone();
-
-                // Place part2 far away along push axis, at perpendicular offset.
-                // Left/Down: start on the positive side; Right/Up: start on the negative side.
-                var isPositiveStart = pushDir == PushDirection.Left || pushDir == PushDirection.Down;
-                var startPos = isPositiveStart ? pushStartOffset : -pushStartOffset;
-
-                if (isHorizontalPush)
-                    part2.Offset(startPos, offset);
-                else
-                    part2.Offset(offset, startPos);
-
-                // Get part2's offset lines (half-spacing outward)
-                var part2Lines = Helper.GetOffsetPartLines(part2, halfSpacing);
-
-                // Find contact distance
-                var slideDist = Helper.DirectionalDistance(part2Lines, part1Lines, pushDir);
+                var (slideDist, finalPosition) = ComputeSlideResult(
+                    part2Template, part1Lines, halfSpacing,
+                    offset, pushStartOffset, isHorizontalPush, pushDir);
 
                 if (slideDist >= double.MaxValue || slideDist < 0)
                     continue;
-
-                // Move part2 to contact position
-                var pushVector = GetPushVector(pushDir, slideDist);
-                var finalPosition = part2.Location + pushVector;
 
                 candidates.Add(new PairCandidate
                 {
@@ -133,6 +115,49 @@ namespace OpenNest.Engine.BestFit
                 case PushDirection.Up: return new Vector(0, distance);
                 default: return Vector.Zero;
             }
+        }
+        private static double ComputeSlideDistance(
+            Part part2Template, List<Line> part1Lines, double halfSpacing,
+            double offset, double pushStartOffset,
+            bool isHorizontalPush, PushDirection pushDir)
+        {
+            var part2 = (Part)part2Template.Clone();
+
+            var isPositiveStart = pushDir == PushDirection.Left || pushDir == PushDirection.Down;
+            var startPos = isPositiveStart ? pushStartOffset : -pushStartOffset;
+
+            if (isHorizontalPush)
+                part2.Offset(startPos, offset);
+            else
+                part2.Offset(offset, startPos);
+
+            var part2Lines = Helper.GetOffsetPartLines(part2, halfSpacing);
+
+            return Helper.DirectionalDistance(part2Lines, part1Lines, pushDir);
+        }
+
+        private static (double slideDist, Vector finalPosition) ComputeSlideResult(
+            Part part2Template, List<Line> part1Lines, double halfSpacing,
+            double offset, double pushStartOffset,
+            bool isHorizontalPush, PushDirection pushDir)
+        {
+            var part2 = (Part)part2Template.Clone();
+
+            var isPositiveStart = pushDir == PushDirection.Left || pushDir == PushDirection.Down;
+            var startPos = isPositiveStart ? pushStartOffset : -pushStartOffset;
+
+            if (isHorizontalPush)
+                part2.Offset(startPos, offset);
+            else
+                part2.Offset(offset, startPos);
+
+            var part2Lines = Helper.GetOffsetPartLines(part2, halfSpacing);
+            var slideDist = Helper.DirectionalDistance(part2Lines, part1Lines, pushDir);
+
+            var pushVector = GetPushVector(pushDir, slideDist);
+            var finalPosition = part2.Location + pushVector;
+
+            return (slideDist, finalPosition);
         }
     }
 }
