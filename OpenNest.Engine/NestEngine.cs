@@ -35,7 +35,22 @@ namespace OpenNest
 
         public bool Fill(NestItem item, Box workArea)
         {
-            var best = FindBestFill(item, workArea);
+            var parts = Fill(item, workArea, null, CancellationToken.None);
+
+            if (parts == null || parts.Count == 0)
+                return false;
+
+            Plate.Parts.AddRange(parts);
+            return true;
+        }
+
+        public List<Part> Fill(NestItem item, Box workArea,
+            IProgress<NestProgress> progress, CancellationToken token)
+        {
+            var best = FindBestFill(item, workArea, progress, token);
+
+            if (token.IsCancellationRequested)
+                return best ?? new List<Part>();
 
             // Try improving by filling the remainder strip separately.
             var improved = TryRemainderImprovement(item, workArea, best);
@@ -44,16 +59,16 @@ namespace OpenNest
             {
                 Debug.WriteLine($"[Fill] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
                 best = improved;
+                ReportProgress(progress, NestPhase.Remainder, PlateNumber, best, workArea);
             }
 
             if (best == null || best.Count == 0)
-                return false;
+                return new List<Part>();
 
             if (item.Quantity > 0 && best.Count > item.Quantity)
                 best = best.Take(item.Quantity).ToList();
 
-            Plate.Parts.AddRange(best);
-            return true;
+            return best;
         }
 
         private List<Part> FindBestFill(NestItem item, Box workArea)
@@ -233,8 +248,20 @@ namespace OpenNest
 
         public bool Fill(List<Part> groupParts, Box workArea)
         {
-            if (groupParts == null || groupParts.Count == 0)
+            var parts = Fill(groupParts, workArea, null, CancellationToken.None);
+
+            if (parts == null || parts.Count == 0)
                 return false;
+
+            Plate.Parts.AddRange(parts);
+            return true;
+        }
+
+        public List<Part> Fill(List<Part> groupParts, Box workArea,
+            IProgress<NestProgress> progress, CancellationToken token)
+        {
+            if (groupParts == null || groupParts.Count == 0)
+                return new List<Part>();
 
             var engine = new FillLinear(workArea, Plate.PartSpacing);
             var angles = RotationAnalysis.FindHullEdgeAngles(groupParts);
@@ -242,38 +269,54 @@ namespace OpenNest
 
             Debug.WriteLine($"[Fill(groupParts,Box)] Linear: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Length:F1}");
 
+            ReportProgress(progress, NestPhase.Linear, PlateNumber, best, workArea);
+
             if (groupParts.Count == 1)
             {
-                var nestItem = new NestItem { Drawing = groupParts[0].BaseDrawing };
-                var rectResult = FillRectangleBestFit(nestItem, workArea);
-
-                Debug.WriteLine($"[Fill(groupParts,Box)] RectBestFit: {rectResult?.Count ?? 0} parts");
-
-                if (IsBetterFill(rectResult, best, workArea))
-                    best = rectResult;
-
-                var pairResult = FillWithPairs(nestItem, workArea);
-
-                Debug.WriteLine($"[Fill(groupParts,Box)] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best, workArea) ? "Pair" : "Linear")}");
-
-                if (IsBetterFill(pairResult, best, workArea))
-                    best = pairResult;
-
-                // Try improving by filling the remainder strip separately.
-                var improved = TryRemainderImprovement(nestItem, workArea, best);
-
-                if (IsBetterFill(improved, best, workArea))
+                try
                 {
-                    Debug.WriteLine($"[Fill(groupParts,Box)] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
-                    best = improved;
+                    token.ThrowIfCancellationRequested();
+
+                    var nestItem = new NestItem { Drawing = groupParts[0].BaseDrawing };
+                    var rectResult = FillRectangleBestFit(nestItem, workArea);
+
+                    Debug.WriteLine($"[Fill(groupParts,Box)] RectBestFit: {rectResult?.Count ?? 0} parts");
+
+                    if (IsBetterFill(rectResult, best, workArea))
+                    {
+                        best = rectResult;
+                        ReportProgress(progress, NestPhase.RectBestFit, PlateNumber, best, workArea);
+                    }
+
+                    token.ThrowIfCancellationRequested();
+
+                    var pairResult = FillWithPairs(nestItem, workArea, token);
+
+                    Debug.WriteLine($"[Fill(groupParts,Box)] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best, workArea) ? "Pair" : "Linear")}");
+
+                    if (IsBetterFill(pairResult, best, workArea))
+                    {
+                        best = pairResult;
+                        ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea);
+                    }
+
+                    // Try improving by filling the remainder strip separately.
+                    var improved = TryRemainderImprovement(nestItem, workArea, best);
+
+                    if (IsBetterFill(improved, best, workArea))
+                    {
+                        Debug.WriteLine($"[Fill(groupParts,Box)] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
+                        best = improved;
+                        ReportProgress(progress, NestPhase.Remainder, PlateNumber, best, workArea);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    Debug.WriteLine("[Fill(groupParts,Box)] Cancelled, returning current best");
                 }
             }
 
-            if (best == null || best.Count == 0)
-                return false;
-
-            Plate.Parts.AddRange(best);
-            return true;
+            return best ?? new List<Part>();
         }
 
         public bool Pack(List<NestItem> items)
