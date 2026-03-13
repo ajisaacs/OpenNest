@@ -27,6 +27,7 @@ namespace OpenNest.Controls
         private Action currentAction;
         private Action previousAction;
         private List<LayoutPart> parts;
+        private List<LayoutPart> temporaryParts = new List<LayoutPart>();
         private Point middleMouseDownPoint;
 
         public List<LayoutPart> SelectedParts;
@@ -120,6 +121,7 @@ namespace OpenNest.Controls
                 plate.PartAdded -= plate_PartAdded;
                 plate.PartRemoved -= plate_PartRemoved;
                 parts.Clear();
+                temporaryParts.Clear();
                 SelectedParts.Clear();
             }
 
@@ -376,6 +378,7 @@ namespace OpenNest.Controls
         public override void Refresh()
         {
             parts.ForEach(p => p.Update(this));
+            temporaryParts.ForEach(p => p.Update(this));
             Invalidate();
         }
 
@@ -468,6 +471,24 @@ namespace OpenNest.Controls
                     continue;
 
                 part.Draw(g, (i + 1).ToString());
+            }
+
+            // Draw temporary (preview) parts
+            for (var i = 0; i < temporaryParts.Count; i++)
+            {
+                var temp = temporaryParts[i];
+
+                if (temp.IsDirty)
+                    temp.Update(this);
+
+                var path = temp.Path;
+                var pathBounds = path.GetBounds();
+
+                if (!pathBounds.IntersectsWith(viewBounds))
+                    continue;
+
+                g.FillPath(ColorScheme.PreviewPartBrush, path);
+                g.DrawPath(ColorScheme.PreviewPartPen, path);
             }
 
             if (DrawOffset && Plate.PartSpacing > 0)
@@ -781,6 +802,36 @@ namespace OpenNest.Controls
                 part.Location.Y - part.BoundingBox.Center.Y);
 
             Plate.Parts.Add(part);
+        }
+
+        public void SetTemporaryParts(List<Part> parts)
+        {
+            temporaryParts.Clear();
+
+            if (parts != null)
+            {
+                foreach (var part in parts)
+                    temporaryParts.Add(LayoutPart.Create(part, this));
+            }
+
+            Invalidate();
+        }
+
+        public void ClearTemporaryParts()
+        {
+            temporaryParts.Clear();
+            Invalidate();
+        }
+
+        public int AcceptTemporaryParts()
+        {
+            var count = temporaryParts.Count;
+
+            foreach (var layoutPart in temporaryParts)
+                Plate.Parts.Add(layoutPart.BasePart);
+
+            temporaryParts.Clear();
+            return count;
         }
 
         public void RemoveSelectedParts()
