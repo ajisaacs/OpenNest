@@ -13,6 +13,7 @@ namespace OpenNest.Engine.ML
         public double AspectRatio { get; set; }      // Width / Length
         public double BoundingBoxFill { get; set; }  // Area / (Width * Length)
         public double Circularity { get; set; }      // 4 * PI * Area / Perimeter^2
+        public double PerimeterToAreaRatio { get; set; } // Perimeter / Area — spacing sensitivity
         public int VertexCount { get; set; }
 
         // --- Normalized Bitmask (32x32 = 1024 features) ---
@@ -20,7 +21,7 @@ namespace OpenNest.Engine.ML
 
         public override string ToString()
         {
-            return $"{Area:F2},{Convexity:F4},{AspectRatio:F4},{BoundingBoxFill:F4},{Circularity:F4},{VertexCount}";
+            return $"{Area:F2},{Convexity:F4},{AspectRatio:F4},{BoundingBoxFill:F4},{Circularity:F4},{PerimeterToAreaRatio:F4},{VertexCount}";
         }
     }
 
@@ -57,6 +58,7 @@ namespace OpenNest.Engine.ML
             // Circularity = 4 * PI * Area / Perimeter^2
             var perimeterLen = polygon.Perimeter();
             features.Circularity = (4 * System.Math.PI * drawing.Area) / (perimeterLen * perimeterLen);
+            features.PerimeterToAreaRatio = drawing.Area > 0 ? perimeterLen / drawing.Area : 0;
 
             return features;
         }
