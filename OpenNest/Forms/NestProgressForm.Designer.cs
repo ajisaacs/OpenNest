@@ -39,6 +39,8 @@ namespace OpenNest.Forms
             this.densityValue = new System.Windows.Forms.Label();
             this.remnantLabel = new System.Windows.Forms.Label();
             this.remnantValue = new System.Windows.Forms.Label();
+            this.elapsedLabel = new System.Windows.Forms.Label();
+            this.elapsedValue = new System.Windows.Forms.Label();
             this.stopButton = new System.Windows.Forms.Button();
             this.buttonPanel = new System.Windows.Forms.FlowLayoutPanel();
             this.table.SuspendLayout();
@@ -60,18 +62,21 @@ namespace OpenNest.Forms
             this.table.Controls.Add(this.densityValue, 1, 3);
             this.table.Controls.Add(this.remnantLabel, 0, 4);
             this.table.Controls.Add(this.remnantValue, 1, 4);
+            this.table.Controls.Add(this.elapsedLabel, 0, 5);
+            this.table.Controls.Add(this.elapsedValue, 1, 5);
             this.table.Dock = System.Windows.Forms.DockStyle.Top;
             this.table.Location = new System.Drawing.Point(0, 0);
             this.table.Name = "table";
             this.table.Padding = new System.Windows.Forms.Padding(8);
-            this.table.RowCount = 5;
+            this.table.RowCount = 6;
+            this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.AutoSize = true;
-            this.table.Size = new System.Drawing.Size(264, 130);
+            this.table.Size = new System.Drawing.Size(264, 156);
             this.table.TabIndex = 0;
             //
             // phaseLabel
@@ -140,7 +145,7 @@ namespace OpenNest.Forms
             this.remnantLabel.Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold);
             this.remnantLabel.Margin = new System.Windows.Forms.Padding(4);
             this.remnantLabel.Name = "remnantLabel";
-            this.remnantLabel.Text = "Remnant:";
+            this.remnantLabel.Text = "Unused:";
             //
             // remnantValue
             //
@@ -148,6 +153,21 @@ namespace OpenNest.Forms
             this.remnantValue.Margin = new System.Windows.Forms.Padding(4);
             this.remnantValue.Name = "remnantValue";
             this.remnantValue.Text = "\u2014";
+            //
+            // elapsedLabel
+            //
+            this.elapsedLabel.AutoSize = true;
+            this.elapsedLabel.Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold);
+            this.elapsedLabel.Margin = new System.Windows.Forms.Padding(4);
+            this.elapsedLabel.Name = "elapsedLabel";
+            this.elapsedLabel.Text = "Elapsed:";
+            //
+            // elapsedValue
+            //
+            this.elapsedValue.AutoSize = true;
+            this.elapsedValue.Margin = new System.Windows.Forms.Padding(4);
+            this.elapsedValue.Name = "elapsedValue";
+            this.elapsedValue.Text = "0:00";
             //
             // stopButton
             //
@@ -174,7 +194,7 @@ namespace OpenNest.Forms
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(264, 181);
+            this.ClientSize = new System.Drawing.Size(264, 207);
             this.Controls.Add(this.buttonPanel);
             this.Controls.Add(this.table);
             this.Controls.SetChildIndex(this.table, 0);
@@ -206,6 +226,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label densityValue;
         private System.Windows.Forms.Label remnantLabel;
         private System.Windows.Forms.Label remnantValue;
+        private System.Windows.Forms.Label elapsedLabel;
+        private System.Windows.Forms.Label elapsedValue;
         private System.Windows.Forms.Button stopButton;
         private System.Windows.Forms.FlowLayoutPanel buttonPanel;
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -7,6 +8,8 @@ namespace OpenNest.Forms
     public partial class NestProgressForm : Form
     {
         private readonly CancellationTokenSource cts;
+        private readonly Stopwatch stopwatch = Stopwatch.StartNew();
+        private readonly System.Windows.Forms.Timer elapsedTimer;
 
         public NestProgressForm(CancellationTokenSource cts, bool showPlateRow = true)
         {
@@ -18,6 +21,10 @@ namespace OpenNest.Forms
                 plateLabel.Visible = false;
                 plateValue.Visible = false;
             }
+
+            elapsedTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            elapsedTimer.Tick += (s, e) => UpdateElapsed();
+            elapsedTimer.Start();
         }
 
         public void UpdateProgress(NestProgress progress)
@@ -37,11 +44,26 @@ namespace OpenNest.Forms
             if (IsDisposed || !IsHandleCreated)
                 return;
 
+            stopwatch.Stop();
+            elapsedTimer.Stop();
+            UpdateElapsed();
+
             phaseValue.Text = "Done";
             stopButton.Text = "Close";
             stopButton.Enabled = true;
             stopButton.Click -= StopButton_Click;
             stopButton.Click += (s, e) => Close();
+        }
+
+        private void UpdateElapsed()
+        {
+            if (IsDisposed || !IsHandleCreated)
+                return;
+
+            var elapsed = stopwatch.Elapsed;
+            elapsedValue.Text = elapsed.TotalHours >= 1
+                ? elapsed.ToString(@"h\:mm\:ss")
+                : elapsed.ToString(@"m\:ss");
         }
 
         private void StopButton_Click(object sender, EventArgs e)
@@ -53,6 +75,10 @@ namespace OpenNest.Forms
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            elapsedTimer.Stop();
+            elapsedTimer.Dispose();
+            stopwatch.Stop();
+
             if (!cts.IsCancellationRequested)
                 cts.Cancel();
 
