@@ -42,6 +42,7 @@ namespace OpenNest.Engine.BestFit
 
             // Find optimal bounding rectangle via rotating calipers
             double bestArea, bestWidth, bestHeight, bestRotation;
+            List<double> hullAngles = null;
 
             if (allPoints.Count >= 3)
             {
@@ -51,6 +52,7 @@ namespace OpenNest.Engine.BestFit
                 bestWidth = result.Width;
                 bestHeight = result.Height;
                 bestRotation = result.Angle;
+                hullAngles = RotationAnalysis.GetHullEdgeAngles(hull);
             }
             else
             {
@@ -59,6 +61,7 @@ namespace OpenNest.Engine.BestFit
                 bestWidth = combinedBox.Width;
                 bestHeight = combinedBox.Length;
                 bestRotation = 0;
+                hullAngles = new List<double> { 0 };
             }
 
             var trueArea = drawing.Area * 2;
@@ -71,6 +74,7 @@ namespace OpenNest.Engine.BestFit
                 BoundingHeight = bestHeight,
                 OptimalRotation = bestRotation,
                 TrueArea = trueArea,
+                HullAngles = hullAngles,
                 Keep = !overlaps,
                 Reason = overlaps ? "Overlap detected" : "Valid"
             };

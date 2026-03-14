@@ -80,6 +80,11 @@ namespace OpenNest
                 return new List<double> { 0 };
 
             var hull = ConvexHull.Compute(points);
+            return GetHullEdgeAngles(hull);
+        }
+
+        public static List<double> GetHullEdgeAngles(Polygon hull)
+        {
             var vertices = hull.Vertices;
             var n = hull.IsClosed() ? vertices.Count - 1 : vertices.Count;
 
