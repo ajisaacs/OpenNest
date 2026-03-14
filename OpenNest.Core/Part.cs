@@ -216,8 +216,9 @@ namespace OpenNest
         /// </summary>
         public Part CloneAtOffset(Vector offset)
         {
-            var clonedProgram = Program.Clone() as Program;
-            var part = new Part(BaseDrawing, clonedProgram,
+            // Share the Program instance — offset-only copies don't modify the program codes.
+            // This is a major performance win for tiling large patterns.
+            var part = new Part(BaseDrawing, Program,
                 location + offset,
                 new Box(BoundingBox.X + offset.X, BoundingBox.Y + offset.Y,
                     BoundingBox.Width, BoundingBox.Length));
