@@ -6,6 +6,11 @@ using System.Linq;
 using OpenNest;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using Color = System.Drawing.Color;
+using OpenNest.Console;
+using OpenNest.Engine.BestFit;
+using OpenNest.Engine.ML;
+using OpenNest.Gpu;
 
 // Parse arguments.
 var nestFile = (string)null;
@@ -21,11 +26,27 @@ var noSave = false;
 var noLog = false;
 var keepParts = false;
 var autoNest = false;
+var collectDataDir = (string)null;
+var dbPath = "nesting_training.db";
+var saveNestsDir = (string)null;
+var templateFile = (string)null;
 
 for (var i = 0; i < args.Length; i++)
 {
     switch (args[i])
     {
+        case "--db" when i + 1 < args.Length:
+            dbPath = args[++i];
+            break;
+        case "--save-nests" when i + 1 < args.Length:
+            saveNestsDir = args[++i];
+            break;
+        case "--template" when i + 1 < args.Length:
+            templateFile = args[++i];
+            break;
+        case "--collect" when i + 1 < args.Length:
+            collectDataDir = args[++i];
+            break;
         case "--drawing" when i + 1 < args.Length:
             drawingName = args[++i];
             break;
@@ -73,6 +94,22 @@ for (var i = 0; i < args.Length; i++)
                 nestFile = args[i];
             break;
     }
+}
+
+// Initialize GPU if available.
+if (GpuEvaluatorFactory.GpuAvailable)
+{
+    BestFitCache.CreateSlideComputer = () => GpuEvaluatorFactory.CreateSlideComputer();
+    Console.WriteLine($"GPU: {GpuEvaluatorFactory.DeviceName}");
+}
+else
+{
+    Console.WriteLine("GPU: not available (using CPU)");
+}
+
+if (collectDataDir != null)
+{
+    return RunDataCollection(collectDataDir, dbPath, saveNestsDir, spacing ?? 0.5, templateFile);
 }
 
 if (string.IsNullOrEmpty(nestFile) || !File.Exists(nestFile))
@@ -225,24 +262,177 @@ if (!noSave)
 
 return checkOverlaps && overlapCount > 0 ? 1 : 0;
 
+int RunDataCollection(string dir, string dbPath, string saveDir, double s, string template)
+{
+    if (!Directory.Exists(dir))
+    {
+        Console.Error.WriteLine($"Error: Directory not found: {dir}");
+        return 1;
+    }
+
+    // Load template nest for plate defaults if provided.
+    Nest templateNest = null;
+    if (template != null)
+    {
+        if (!File.Exists(template))
+        {
+            Console.Error.WriteLine($"Error: Template not found: {template}");
+            return 1;
+        }
+        templateNest = new NestReader(template).Read();
+        Console.WriteLine($"Using template: {template}");
+    }
+
+    var PartColors = new[]
+    {
+        Color.FromArgb(205, 92, 92),
+        Color.FromArgb(148, 103, 189),
+        Color.FromArgb(75, 180, 175),
+        Color.FromArgb(210, 190, 75),
+        Color.FromArgb(190, 85, 175),
+        Color.FromArgb(185, 115, 85),
+        Color.FromArgb(120, 100, 190),
+        Color.FromArgb(200, 100, 140),
+        Color.FromArgb(80, 175, 155),
+        Color.FromArgb(195, 160, 85),
+        Color.FromArgb(175, 95, 160),
+        Color.FromArgb(215, 130, 130),
+    };
+
+    var dxfFiles = Directory.GetFiles(dir, "*.dxf", SearchOption.AllDirectories);
+    Console.WriteLine($"Found {dxfFiles.Length} DXF files. Initializing SQLite database at: {dbPath}");
+
+    using var db = new TrainingDatabase(dbPath);
+
+    var sheetSuite = new[]
+    {
+        new Size(96, 48), new Size(120, 48), new Size(144, 48),
+        new Size(96, 60), new Size(120, 60), new Size(144, 60),
+        new Size(96, 72), new Size(120, 72), new Size(144, 72),
+        new Size(48, 24), new Size(120, 10)
+    };
+
+    var importer = new DxfImporter();
+    var colorIndex = 0;
+    var processed = 0;
+
+    foreach (var file in dxfFiles)
+    {
+        try
+        {
+            if (!importer.GetGeometry(file, out var entities)) continue;
+
+            var partNo = Path.GetFileNameWithoutExtension(file);
+            var drawing = new Drawing(Path.GetFileName(file));
+            drawing.Program = OpenNest.Converters.ConvertGeometry.ToProgram(entities);
+            drawing.UpdateArea();
+            drawing.Color = PartColors[colorIndex % PartColors.Length];
+            colorIndex++;
+
+            var features = FeatureExtractor.Extract(drawing);
+            if (features == null) continue;
+
+            using var txn = db.BeginTransaction();
+
+            var partId = db.GetOrAddPart(Path.GetFileName(file), features, drawing.Program.ToString());
+
+            foreach (var size in sheetSuite)
+            {
+                Plate runPlate;
+                if (templateNest != null)
+                {
+                    runPlate = templateNest.PlateDefaults.CreateNew();
+                    runPlate.Size = size;
+                    runPlate.PartSpacing = s;
+                }
+                else
+                {
+                    runPlate = new Plate { Size = size, PartSpacing = s };
+                }
+
+                var result = BruteForceRunner.Run(drawing, runPlate);
+                if (result == null) continue;
+
+                string savedFilePath = null;
+                if (saveDir != null)
+                {
+                    // Deterministic bucket (00-FF) based on filename hash
+                    uint hash = 0;
+                    foreach (char c in partNo) hash = (hash * 31) + c;
+                    var bucket = (hash % 256).ToString("X2");
+
+                    var partDir = Path.Combine(saveDir, bucket, partNo);
+                    Directory.CreateDirectory(partDir);
+
+                    var fileName = $"{partNo}-{size.Length}x{size.Width}-{result.PartCount}pcs.zip";
+                    savedFilePath = Path.Combine(partDir, fileName);
+
+                    // Create nest from template or from scratch
+                    Nest nestObj;
+                    if (templateNest != null)
+                    {
+                        nestObj = new Nest(partNo)
+                        {
+                            Units = templateNest.Units,
+                            DateCreated = DateTime.Now
+                        };
+                        nestObj.PlateDefaults.SetFromExisting(templateNest.PlateDefaults.CreateNew());
+                    }
+                    else
+                    {
+                        nestObj = new Nest(partNo) { Units = Units.Inches, DateCreated = DateTime.Now };
+                    }
+
+                    nestObj.Drawings.Add(drawing);
+                    var plateObj = nestObj.CreatePlate();
+                    plateObj.Size = size;
+                    plateObj.PartSpacing = s;
+                    plateObj.Parts.AddRange(result.PlacedParts);
+
+                    var writer = new NestWriter(nestObj);
+                    writer.Write(savedFilePath);
+                }
+
+                db.AddRun(partId, size.Width, size.Length, s, result, savedFilePath);
+            }
+
+            txn.Commit();
+            processed++;
+            if (processed % 10 == 0) Console.WriteLine($"Processed {processed}/{dxfFiles.Length} parts across all sheet sizes...");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error processing {file}: {ex.Message}");
+        }
+    }
+
+    Console.WriteLine($"Done! Brute-force data for {processed} parts saved to {dbPath}");
+    return 0;
+}
+
 void PrintUsage()
 {
     Console.Error.WriteLine("Usage: OpenNest.Console <nest-file> [options]");
+    Console.Error.WriteLine("       OpenNest.Console --collect <dxf-dir> [options]");
     Console.Error.WriteLine();
     Console.Error.WriteLine("Arguments:");
     Console.Error.WriteLine("  nest-file              Path to a .zip nest file");
     Console.Error.WriteLine();
     Console.Error.WriteLine("Options:");
     Console.Error.WriteLine("  --drawing <name>       Drawing name to fill with (default: first drawing)");
-    Console.Error.WriteLine("  --plate <index>        Plate index to fill (default: 0)");
-    Console.Error.WriteLine("  --quantity <n>          Max parts to place (default: 0 = unlimited)");
-    Console.Error.WriteLine("  --spacing <value>      Override part spacing");
-    Console.Error.WriteLine("  --size <WxH>           Override plate size (e.g. 120x60)");
-    Console.Error.WriteLine("  --output <path>        Output nest file path (default: <input>-result.zip)");
-    Console.Error.WriteLine("  --autonest             Use NFP-based mixed-part autonesting instead of linear fill");
-    Console.Error.WriteLine("  --keep-parts           Don't clear existing parts before filling");
-    Console.Error.WriteLine("  --check-overlaps       Run overlap detection after fill (exit code 1 if found)");
-    Console.Error.WriteLine("  --no-save              Skip saving output file");
-    Console.Error.WriteLine("  --no-log               Skip writing debug log file");
-    Console.Error.WriteLine("  -h, --help             Show this help");
+    Console.WriteLine("  --plate <index>        Plate index to fill (default: 0)");
+    Console.WriteLine("  --quantity <n>          Max parts to place (default: 0 = unlimited)");
+    Console.WriteLine("  --spacing <value>      Override part spacing");
+    Console.WriteLine("  --size <WxH>           Override plate size (e.g. 120x60)");
+    Console.WriteLine("  --output <path>        Output nest file path (default: <input>-result.zip)");
+    Console.WriteLine("  --autonest             Use NFP-based mixed-part autonesting instead of linear fill");
+    Console.WriteLine("  --keep-parts           Don't clear existing parts before filling");
+    Console.WriteLine("  --check-overlaps       Run overlap detection after fill (exit code 1 if found)");
+    Console.WriteLine("  --no-save              Skip saving output file");
+    Console.WriteLine("  --no-log               Skip writing debug log file");
+    Console.WriteLine("  --collect <dir>        Brute-force process all DXFs in directory to SQLite");
+    Console.WriteLine("  --db <path>            Path to the SQLite training database (default: nesting_training.db)");
+    Console.WriteLine("  --save-nests <dir>     Directory to save individual .zip nests for each winner");
+    Console.WriteLine("  --template <path>      Nest template (.nstdot) for plate defaults");
+    Console.WriteLine("  -h, --help             Show this help");
 }
