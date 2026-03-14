@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using OpenNest.Converters;
 using OpenNest.Geometry;
@@ -84,6 +84,23 @@ namespace OpenNest.CNC
             Rotation = Angle.NormalizeRad(Rotation + angle);
         }
 
+        public override string ToString()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine(mode == Mode.Absolute ? "G90" : "G91");
+            foreach (var code in Codes)
+            {
+                if (code is Motion m)
+                {
+                    var cmd = m is RapidMove ? "G00" : (m is ArcMove am ? (am.Rotation == RotationType.CW ? "G02" : "G03") : "G01");
+                    sb.Append($"{cmd}X{m.EndPoint.X:F4}Y{m.EndPoint.Y:F4}");
+                    if (m is ArcMove arc) sb.Append($"I{arc.CenterPoint.X:F4}J{arc.CenterPoint.Y:F4}");
+                    sb.AppendLine();
+                }
+            }
+            return sb.ToString();
+        }
+
         public virtual void Rotate(double angle, Vector origin)
         {
             var mode = Mode;
@@ -99,7 +116,7 @@ namespace OpenNest.CNC
                     var subpgm = (SubProgramCall)code;
 
                     if (subpgm.Program != null)
-                        subpgm.Program.Rotate(angle);
+                        subpgm.Program.Rotate(angle, origin);
                 }
 
                 if (code is Motion == false)
