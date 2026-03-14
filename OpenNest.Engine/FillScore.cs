@@ -41,39 +41,32 @@ namespace OpenNest
                 return default;
 
             var totalPartArea = 0.0;
+            var minX = double.MaxValue;
+            var minY = double.MaxValue;
+            var maxX = double.MinValue;
+            var maxY = double.MinValue;
 
             foreach (var part in parts)
+            {
                 totalPartArea += part.BaseDrawing.Area;
+                var bb = part.BoundingBox;
 
-            var bbox = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
-            var bboxArea = bbox.Area();
+                if (bb.Left < minX) minX = bb.Left;
+                if (bb.Bottom < minY) minY = bb.Bottom;
+                if (bb.Right > maxX) maxX = bb.Right;
+                if (bb.Top > maxY) maxY = bb.Top;
+            }
+
+            var bboxArea = (maxX - minX) * (maxY - minY);
             var density = bboxArea > 0 ? totalPartArea / bboxArea : 0;
 
-            var usableRemnantArea = ComputeUsableRemnantArea(parts, workArea);
+            var usableRemnantArea = ComputeUsableRemnantArea(maxX, maxY, workArea);
 
             return new FillScore(parts.Count, usableRemnantArea, density);
         }
 
-        /// <summary>
-        /// Finds the largest usable remnant (short side >= MinRemnantDimension)
-        /// by checking right and top edge strips between placed parts and the work area boundary.
-        /// </summary>
-        private static double ComputeUsableRemnantArea(List<Part> parts, Box workArea)
+        private static double ComputeUsableRemnantArea(double maxRight, double maxTop, Box workArea)
         {
-            var maxRight = double.MinValue;
-            var maxTop = double.MinValue;
-
-            foreach (var part in parts)
-            {
-                var bb = part.BoundingBox;
-
-                if (bb.Right > maxRight)
-                    maxRight = bb.Right;
-
-                if (bb.Top > maxTop)
-                    maxTop = bb.Top;
-            }
-
             var largest = 0.0;
 
             // Right strip
