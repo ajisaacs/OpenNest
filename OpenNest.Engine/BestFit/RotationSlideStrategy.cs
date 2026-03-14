@@ -5,11 +5,20 @@ namespace OpenNest.Engine.BestFit
 {
     public class RotationSlideStrategy : IBestFitStrategy
     {
-        public RotationSlideStrategy(double part2Rotation, int type, string description)
+        private readonly ISlideComputer _slideComputer;
+
+        private static readonly PushDirection[] AllDirections =
+        {
+            PushDirection.Left, PushDirection.Down, PushDirection.Right, PushDirection.Up
+        };
+
+        public RotationSlideStrategy(double part2Rotation, int type, string description,
+            ISlideComputer slideComputer = null)
         {
             Part2Rotation = part2Rotation;
             Type = type;
             Description = description;
+            _slideComputer = slideComputer;
         }
 
         public double Part2Rotation { get; }
@@ -23,43 +32,66 @@ namespace OpenNest.Engine.BestFit
             var part1 = Part.CreateAtOrigin(drawing);
             var part2Template = Part.CreateAtOrigin(drawing, Part2Rotation);
 
+            var halfSpacing = spacing / 2;
+            var part1Lines = Helper.GetOffsetPartLines(part1, halfSpacing);
+            var part2TemplateLines = Helper.GetOffsetPartLines(part2Template, halfSpacing);
+
+            var bbox1 = part1.BoundingBox;
+            var bbox2 = part2Template.BoundingBox;
+
+            // Collect offsets and directions across all 4 axes
+            var allDx = new List<double>();
+            var allDy = new List<double>();
+            var allDirs = new List<PushDirection>();
+
+            foreach (var pushDir in AllDirections)
+                BuildOffsets(bbox1, bbox2, spacing, stepSize, pushDir, allDx, allDy, allDirs);
+
+            if (allDx.Count == 0)
+                return candidates;
+
+            // Compute all distances — single GPU dispatch or CPU loop
+            var distances = ComputeAllDistances(
+                part1Lines, part2TemplateLines, allDx, allDy, allDirs);
+
+            // Create candidates from valid results
             var testNumber = 0;
 
-            // Try pushing left (horizontal slide)
-            GenerateCandidatesForAxis(
-                part1, part2Template, drawing, spacing, stepSize,
-                PushDirection.Left, candidates, ref testNumber);
+            for (var i = 0; i < allDx.Count; i++)
+            {
+                var slideDist = distances[i];
+                if (slideDist >= double.MaxValue || slideDist < 0)
+                    continue;
 
-            // Try pushing down (vertical slide)
-            GenerateCandidatesForAxis(
-                part1, part2Template, drawing, spacing, stepSize,
-                PushDirection.Down, candidates, ref testNumber);
+                var dx = allDx[i];
+                var dy = allDy[i];
+                var pushVector = GetPushVector(allDirs[i], slideDist);
+                var finalPosition = new Vector(
+                    part2Template.Location.X + dx + pushVector.X,
+                    part2Template.Location.Y + dy + pushVector.Y);
 
-            // Try pushing right (approach from left — finds concave interlocking)
-            GenerateCandidatesForAxis(
-                part1, part2Template, drawing, spacing, stepSize,
-                PushDirection.Right, candidates, ref testNumber);
-
-            // Try pushing up (approach from below — finds concave interlocking)
-            GenerateCandidatesForAxis(
-                part1, part2Template, drawing, spacing, stepSize,
-                PushDirection.Up, candidates, ref testNumber);
+                candidates.Add(new PairCandidate
+                {
+                    Drawing = drawing,
+                    Part1Rotation = 0,
+                    Part2Rotation = Part2Rotation,
+                    Part2Offset = finalPosition,
+                    StrategyType = Type,
+                    TestNumber = testNumber++,
+                    Spacing = spacing
+                });
+            }
 
             return candidates;
         }
 
-        private void GenerateCandidatesForAxis(
-            Part part1, Part part2Template, Drawing drawing,
-            double spacing, double stepSize, PushDirection pushDir,
-            List<PairCandidate> candidates, ref int testNumber)
+        private static void BuildOffsets(
+            Box bbox1, Box bbox2, double spacing, double stepSize,
+            PushDirection pushDir, List<double> allDx, List<double> allDy,
+            List<PushDirection> allDirs)
         {
-            var bbox1 = part1.BoundingBox;
-            var bbox2 = part2Template.BoundingBox;
-            var halfSpacing = spacing / 2;
-
             var isHorizontalPush = pushDir == PushDirection.Left || pushDir == PushDirection.Right;
 
-            // Perpendicular range: part2 slides across the full extent of part1
             double perpMin, perpMax, pushStartOffset;
 
             if (isHorizontalPush)
@@ -75,52 +107,53 @@ namespace OpenNest.Engine.BestFit
                 pushStartOffset = bbox1.Length + bbox2.Length + spacing * 2;
             }
 
-            // Pre-compute part1's offset lines (half-spacing outward)
-            var part1Lines = Helper.GetOffsetPartLines(part1, halfSpacing);
-
-            // Align sweep start to a multiple of stepSize so that offset=0 is always
-            // included. This ensures perfect grid arrangements (side-by-side, stacked)
-            // are generated for rectangular parts.
             var alignedStart = System.Math.Ceiling(perpMin / stepSize) * stepSize;
+            var isPositiveStart = pushDir == PushDirection.Left || pushDir == PushDirection.Down;
+            var startPos = isPositiveStart ? pushStartOffset : -pushStartOffset;
 
             for (var offset = alignedStart; offset <= perpMax; offset += stepSize)
             {
-                var part2 = (Part)part2Template.Clone();
-
-                // Place part2 far away along push axis, at perpendicular offset.
-                // Left/Down: start on the positive side; Right/Up: start on the negative side.
-                var isPositiveStart = pushDir == PushDirection.Left || pushDir == PushDirection.Down;
-                var startPos = isPositiveStart ? pushStartOffset : -pushStartOffset;
-
-                if (isHorizontalPush)
-                    part2.Offset(startPos, offset);
-                else
-                    part2.Offset(offset, startPos);
-
-                // Get part2's offset lines (half-spacing outward)
-                var part2Lines = Helper.GetOffsetPartLines(part2, halfSpacing);
-
-                // Find contact distance
-                var slideDist = Helper.DirectionalDistance(part2Lines, part1Lines, pushDir);
-
-                if (slideDist >= double.MaxValue || slideDist < 0)
-                    continue;
-
-                // Move part2 to contact position
-                var pushVector = GetPushVector(pushDir, slideDist);
-                var finalPosition = part2.Location + pushVector;
-
-                candidates.Add(new PairCandidate
-                {
-                    Drawing = drawing,
-                    Part1Rotation = 0,
-                    Part2Rotation = Part2Rotation,
-                    Part2Offset = finalPosition,
-                    StrategyType = Type,
-                    TestNumber = testNumber++,
-                    Spacing = spacing
-                });
+                allDx.Add(isHorizontalPush ? startPos : offset);
+                allDy.Add(isHorizontalPush ? offset : startPos);
+                allDirs.Add(pushDir);
             }
+        }
+
+        private double[] ComputeAllDistances(
+            List<Line> part1Lines, List<Line> part2TemplateLines,
+            List<double> allDx, List<double> allDy, List<PushDirection> allDirs)
+        {
+            var count = allDx.Count;
+
+            if (_slideComputer != null)
+            {
+                var stationarySegments = Helper.FlattenLines(part1Lines);
+                var movingSegments = Helper.FlattenLines(part2TemplateLines);
+                var offsets = new double[count * 2];
+                var directions = new int[count];
+
+                for (var i = 0; i < count; i++)
+                {
+                    offsets[i * 2] = allDx[i];
+                    offsets[i * 2 + 1] = allDy[i];
+                    directions[i] = (int)allDirs[i];
+                }
+
+                return _slideComputer.ComputeBatchMultiDir(
+                    stationarySegments, part1Lines.Count,
+                    movingSegments, part2TemplateLines.Count,
+                    offsets, count, directions);
+            }
+
+            var results = new double[count];
+
+            for (var i = 0; i < count; i++)
+            {
+                results[i] = Helper.DirectionalDistance(
+                    part2TemplateLines, allDx[i], allDy[i], part1Lines, allDirs[i]);
+            }
+
+            return results;
         }
 
         private static Vector GetPushVector(PushDirection direction, double distance)

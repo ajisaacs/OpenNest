@@ -50,6 +50,9 @@ namespace OpenNest.Forms
 
             //if (GpuEvaluatorFactory.GpuAvailable)
             //    BestFitCache.CreateEvaluator = (drawing, spacing) => GpuEvaluatorFactory.Create(drawing, spacing);
+
+            if (GpuEvaluatorFactory.GpuAvailable)
+                BestFitCache.CreateSlideComputer = () => GpuEvaluatorFactory.CreateSlideComputer();
         }
 
         private Nest CreateDefaultNest()

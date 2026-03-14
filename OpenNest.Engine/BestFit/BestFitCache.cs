@@ -13,6 +13,7 @@ namespace OpenNest.Engine.BestFit
             new ConcurrentDictionary<CacheKey, List<BestFitResult>>();
 
         public static Func<Drawing, double, IPairEvaluator> CreateEvaluator { get; set; }
+        public static Func<ISlideComputer> CreateSlideComputer { get; set; }
 
         public static List<BestFitResult> GetOrCompute(
             Drawing drawing, double plateWidth, double plateHeight,
@@ -24,6 +25,7 @@ namespace OpenNest.Engine.BestFit
                 return cached;
 
             IPairEvaluator evaluator = null;
+            ISlideComputer slideComputer = null;
 
             try
             {
@@ -33,7 +35,13 @@ namespace OpenNest.Engine.BestFit
                     catch { /* fall back to default evaluator */ }
                 }
 
-                var finder = new BestFitFinder(plateWidth, plateHeight, evaluator);
+                if (CreateSlideComputer != null)
+                {
+                    try { slideComputer = CreateSlideComputer(); }
+                    catch { /* fall back to CPU slide computation */ }
+                }
+
+                var finder = new BestFitFinder(plateWidth, plateHeight, evaluator, slideComputer);
                 var results = finder.FindBestFits(drawing, spacing, StepSize);
 
                 _cache.TryAdd(key, results);
@@ -42,6 +50,7 @@ namespace OpenNest.Engine.BestFit
             finally
             {
                 (evaluator as IDisposable)?.Dispose();
+                // Slide computer is managed by the factory as a singleton — don't dispose here
             }
         }
 
