@@ -863,81 +863,55 @@ namespace OpenNest
         /// </summary>
         private static double RayEdgeDistance(Vector vertex, Line edge, PushDirection direction)
         {
-            var p1x = edge.pt1.X;
-            var p1y = edge.pt1.Y;
-            var p2x = edge.pt2.X;
-            var p2y = edge.pt2.Y;
+            return RayEdgeDistance(
+                vertex.X, vertex.Y,
+                edge.pt1.X, edge.pt1.Y, edge.pt2.X, edge.pt2.Y,
+                direction);
+        }
 
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static double RayEdgeDistance(
+            double vx, double vy,
+            double p1x, double p1y, double p2x, double p2y,
+            PushDirection direction)
+        {
             switch (direction)
             {
                 case PushDirection.Left:
-                {
-                    // Ray goes in -X direction. Need non-horizontal edge.
-                    var dy = p2y - p1y;
-                    if (dy > -Tolerance.Epsilon && dy < Tolerance.Epsilon)
-                        return double.MaxValue; // horizontal edge, parallel to ray
-
-                    var t = (vertex.Y - p1y) / dy;
-                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
-                        return double.MaxValue;
-
-                    var ix = p1x + t * (p2x - p1x);
-                    var dist = vertex.X - ix; // positive if edge is to the left
-                    if (dist > Tolerance.Epsilon) return dist;
-                    if (dist >= -Tolerance.Epsilon) return 0; // touching
-                    return double.MaxValue; // edge is behind vertex
-                }
-
                 case PushDirection.Right:
                 {
                     var dy = p2y - p1y;
                     if (dy > -Tolerance.Epsilon && dy < Tolerance.Epsilon)
                         return double.MaxValue;
 
-                    var t = (vertex.Y - p1y) / dy;
+                    var t = (vy - p1y) / dy;
                     if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
                         return double.MaxValue;
 
                     var ix = p1x + t * (p2x - p1x);
-                    var dist = ix - vertex.X;
+                    var dist = direction == PushDirection.Left ? vx - ix : ix - vx;
                     if (dist > Tolerance.Epsilon) return dist;
-                    if (dist >= -Tolerance.Epsilon) return 0; // touching
-                    return double.MaxValue; // edge is behind vertex
+                    if (dist >= -Tolerance.Epsilon) return 0;
+                    return double.MaxValue;
                 }
 
                 case PushDirection.Down:
-                {
-                    // Ray goes in -Y direction. Need non-vertical edge.
-                    var dx = p2x - p1x;
-                    if (dx > -Tolerance.Epsilon && dx < Tolerance.Epsilon)
-                        return double.MaxValue; // vertical edge, parallel to ray
-
-                    var t = (vertex.X - p1x) / dx;
-                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
-                        return double.MaxValue;
-
-                    var iy = p1y + t * (p2y - p1y);
-                    var dist = vertex.Y - iy;
-                    if (dist > Tolerance.Epsilon) return dist;
-                    if (dist >= -Tolerance.Epsilon) return 0; // touching
-                    return double.MaxValue; // edge is behind vertex
-                }
-
                 case PushDirection.Up:
                 {
                     var dx = p2x - p1x;
                     if (dx > -Tolerance.Epsilon && dx < Tolerance.Epsilon)
                         return double.MaxValue;
 
-                    var t = (vertex.X - p1x) / dx;
+                    var t = (vx - p1x) / dx;
                     if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
                         return double.MaxValue;
 
                     var iy = p1y + t * (p2y - p1y);
-                    var dist = iy - vertex.Y;
+                    var dist = direction == PushDirection.Down ? vy - iy : iy - vy;
                     if (dist > Tolerance.Epsilon) return dist;
-                    if (dist >= -Tolerance.Epsilon) return 0; // touching
-                    return double.MaxValue; // edge is behind vertex
+                    if (dist >= -Tolerance.Epsilon) return 0;
+                    return double.MaxValue;
                 }
 
                 default:
@@ -989,6 +963,82 @@ namespace OpenNest
             }
 
             return minDist;
+        }
+
+        /// <summary>
+        /// Computes the minimum directional distance with the moving lines translated
+        /// by (movingDx, movingDy) without creating new Line objects.
+        /// </summary>
+        public static double DirectionalDistance(
+            List<Line> movingLines, double movingDx, double movingDy,
+            List<Line> stationaryLines, PushDirection direction)
+        {
+            var minDist = double.MaxValue;
+
+            // Case 1: Each moving vertex → each stationary edge
+            for (int i = 0; i < movingLines.Count; i++)
+            {
+                var ml = movingLines[i];
+                var mx1 = ml.pt1.X + movingDx;
+                var my1 = ml.pt1.Y + movingDy;
+                var mx2 = ml.pt2.X + movingDx;
+                var my2 = ml.pt2.Y + movingDy;
+
+                for (int j = 0; j < stationaryLines.Count; j++)
+                {
+                    var se = stationaryLines[j];
+                    var d = RayEdgeDistance(mx1, my1, se.pt1.X, se.pt1.Y, se.pt2.X, se.pt2.Y, direction);
+                    if (d < minDist) minDist = d;
+
+                    d = RayEdgeDistance(mx2, my2, se.pt1.X, se.pt1.Y, se.pt2.X, se.pt2.Y, direction);
+                    if (d < minDist) minDist = d;
+                }
+            }
+
+            // Case 2: Each stationary vertex → each moving edge (opposite direction)
+            var opposite = OppositeDirection(direction);
+
+            for (int i = 0; i < stationaryLines.Count; i++)
+            {
+                var sl = stationaryLines[i];
+
+                for (int j = 0; j < movingLines.Count; j++)
+                {
+                    var me = movingLines[j];
+                    var d = RayEdgeDistance(
+                        sl.pt1.X, sl.pt1.Y,
+                        me.pt1.X + movingDx, me.pt1.Y + movingDy,
+                        me.pt2.X + movingDx, me.pt2.Y + movingDy,
+                        opposite);
+                    if (d < minDist) minDist = d;
+
+                    d = RayEdgeDistance(
+                        sl.pt2.X, sl.pt2.Y,
+                        me.pt1.X + movingDx, me.pt1.Y + movingDy,
+                        me.pt2.X + movingDx, me.pt2.Y + movingDy,
+                        opposite);
+                    if (d < minDist) minDist = d;
+                }
+            }
+
+            return minDist;
+        }
+
+        /// <summary>
+        /// Packs line segments into a flat double array [x1,y1,x2,y2, ...] for GPU transfer.
+        /// </summary>
+        public static double[] FlattenLines(List<Line> lines)
+        {
+            var result = new double[lines.Count * 4];
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                result[i * 4] = line.pt1.X;
+                result[i * 4 + 1] = line.pt1.Y;
+                result[i * 4 + 2] = line.pt2.X;
+                result[i * 4 + 3] = line.pt2.Y;
+            }
+            return result;
         }
 
         public static PushDirection OppositeDirection(PushDirection direction)
