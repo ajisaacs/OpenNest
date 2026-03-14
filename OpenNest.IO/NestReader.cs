@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using OpenNest.CNC;
+using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using static OpenNest.IO.NestFormat;
 
@@ -35,6 +36,7 @@ namespace OpenNest.IO
 
             var programs = ReadPrograms(dto.Drawings.Count);
             var drawingMap = BuildDrawings(dto, programs);
+            ReadBestFits(drawingMap);
             var nest = BuildNest(dto, drawingMap);
 
             zipArchive.Dispose();
@@ -95,6 +97,54 @@ namespace OpenNest.IO
                 map[d.Id] = drawing;
             }
             return map;
+        }
+
+        private void ReadBestFits(Dictionary<int, Drawing> drawingMap)
+        {
+            foreach (var kvp in drawingMap)
+            {
+                var entry = zipArchive.GetEntry($"bestfits/bestfit-{kvp.Key}");
+                if (entry == null) continue;
+
+                using var entryStream = entry.Open();
+                using var reader = new StreamReader(entryStream);
+                var json = reader.ReadToEnd();
+
+                var sets = JsonSerializer.Deserialize<List<BestFitSetDto>>(json, JsonOptions);
+                if (sets == null) continue;
+
+                PopulateBestFitSets(kvp.Value, sets);
+            }
+        }
+
+        private void PopulateBestFitSets(Drawing drawing, List<BestFitSetDto> sets)
+        {
+            foreach (var set in sets)
+            {
+                var results = set.Results.Select(r => new BestFitResult
+                {
+                    Candidate = new PairCandidate
+                    {
+                        Drawing = drawing,
+                        Part1Rotation = r.Part1Rotation,
+                        Part2Rotation = r.Part2Rotation,
+                        Part2Offset = new Vector(r.Part2OffsetX, r.Part2OffsetY),
+                        StrategyType = r.StrategyType,
+                        TestNumber = r.TestNumber,
+                        Spacing = r.CandidateSpacing
+                    },
+                    RotatedArea = r.RotatedArea,
+                    BoundingWidth = r.BoundingWidth,
+                    BoundingHeight = r.BoundingHeight,
+                    OptimalRotation = r.OptimalRotation,
+                    Keep = r.Keep,
+                    Reason = r.Reason,
+                    TrueArea = r.TrueArea,
+                    HullAngles = r.HullAngles
+                }).ToList();
+
+                BestFitCache.Populate(drawing, set.PlateWidth, set.PlateHeight, set.Spacing, results);
+            }
         }
 
         private Nest BuildNest(NestDto dto, Dictionary<int, Drawing> drawingMap)

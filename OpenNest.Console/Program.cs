@@ -299,11 +299,6 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
         Color.FromArgb(215, 130, 130),
     };
 
-    var dxfFiles = Directory.GetFiles(dir, "*.dxf", SearchOption.AllDirectories);
-    Console.WriteLine($"Found {dxfFiles.Length} DXF files. Initializing SQLite database at: {dbPath}");
-
-    using var db = new TrainingDatabase(dbPath);
-
     var sheetSuite = new[]
     {
         new Size(96, 48), new Size(120, 48), new Size(144, 48),
@@ -312,17 +307,48 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
         new Size(48, 24), new Size(120, 10)
     };
 
+    var dxfFiles = Directory.GetFiles(dir, "*.dxf", SearchOption.AllDirectories);
+    Console.WriteLine($"Found {dxfFiles.Length} DXF files");
+    Console.WriteLine($"Database: {Path.GetFullPath(dbPath)}");
+    Console.WriteLine($"Sheet sizes: {sheetSuite.Length} configurations");
+    Console.WriteLine($"Spacing: {s:F2}");
+    if (saveDir != null) Console.WriteLine($"Saving nests to: {saveDir}");
+    Console.WriteLine("---");
+
+    using var db = new TrainingDatabase(dbPath);
+
     var importer = new DxfImporter();
     var colorIndex = 0;
     var processed = 0;
+    var skippedGeometry = 0;
+    var skippedFeatures = 0;
+    var skippedExisting = 0;
+    var totalRuns = 0;
+    var totalSw = Stopwatch.StartNew();
 
     foreach (var file in dxfFiles)
     {
+        var fileNum = processed + skippedGeometry + skippedFeatures + skippedExisting + 1;
+        var partNo = Path.GetFileNameWithoutExtension(file);
+        Console.Write($"[{fileNum}/{dxfFiles.Length}] {partNo}");
+
         try
         {
-            if (!importer.GetGeometry(file, out var entities)) continue;
+            var existingRuns = db.RunCount(Path.GetFileName(file));
+            if (existingRuns >= sheetSuite.Length)
+            {
+                Console.WriteLine(" - SKIP (all sizes done)");
+                skippedExisting++;
+                continue;
+            }
 
-            var partNo = Path.GetFileNameWithoutExtension(file);
+            if (!importer.GetGeometry(file, out var entities))
+            {
+                Console.WriteLine(" - SKIP (no geometry)");
+                skippedGeometry++;
+                continue;
+            }
+
             var drawing = new Drawing(Path.GetFileName(file));
             drawing.Program = OpenNest.Converters.ConvertGeometry.ToProgram(entities);
             drawing.UpdateArea();
@@ -330,14 +356,38 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
             colorIndex++;
 
             var features = FeatureExtractor.Extract(drawing);
-            if (features == null) continue;
+            if (features == null)
+            {
+                Console.WriteLine(" - SKIP (feature extraction failed)");
+                skippedFeatures++;
+                continue;
+            }
+
+            Console.WriteLine($" (area={features.Area:F1}, verts={features.VertexCount})");
+
+            // Precompute best-fits once for all sheet sizes.
+            var sizes = sheetSuite.Select(sz => (sz.Width, sz.Length)).ToList();
+            var bfSw = Stopwatch.StartNew();
+            BestFitCache.ComputeForSizes(drawing, s, sizes);
+            bfSw.Stop();
+            Console.WriteLine($"  Best-fits computed in {bfSw.ElapsedMilliseconds}ms");
 
             using var txn = db.BeginTransaction();
 
             var partId = db.GetOrAddPart(Path.GetFileName(file), features, drawing.Program.ToString());
+            var partSw = Stopwatch.StartNew();
+            var runsThisPart = 0;
+            var bestUtil = 0.0;
+            var bestCount = 0;
 
             foreach (var size in sheetSuite)
             {
+                if (db.HasRun(Path.GetFileName(file), size.Width, size.Length, s))
+                {
+                    Console.WriteLine($"  {size.Length}x{size.Width} - skip (exists)");
+                    continue;
+                }
+
                 Plate runPlate;
                 if (templateNest != null)
                 {
@@ -350,8 +400,23 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                     runPlate = new Plate { Size = size, PartSpacing = s };
                 }
 
+                var sizeSw = Stopwatch.StartNew();
                 var result = BruteForceRunner.Run(drawing, runPlate);
-                if (result == null) continue;
+                sizeSw.Stop();
+
+                if (result == null)
+                {
+                    Console.WriteLine($"  {size.Length}x{size.Width} - no fit");
+                    continue;
+                }
+
+                if (result.Utilization > bestUtil)
+                {
+                    bestUtil = result.Utilization;
+                    bestCount = result.PartCount;
+                }
+
+                Console.WriteLine($"  {size.Length}x{size.Width} - {result.PartCount}pcs, {result.Utilization:P1}, {sizeSw.ElapsedMilliseconds}ms");
 
                 string savedFilePath = null;
                 if (saveDir != null)
@@ -364,14 +429,15 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                     var partDir = Path.Combine(saveDir, bucket, partNo);
                     Directory.CreateDirectory(partDir);
 
-                    var fileName = $"{partNo}-{size.Length}x{size.Width}-{result.PartCount}pcs.zip";
+                    var nestName = $"{partNo}-{size.Length}x{size.Width}-{result.PartCount}pcs";
+                    var fileName = nestName + ".zip";
                     savedFilePath = Path.Combine(partDir, fileName);
 
                     // Create nest from template or from scratch
                     Nest nestObj;
                     if (templateNest != null)
                     {
-                        nestObj = new Nest(partNo)
+                        nestObj = new Nest(nestName)
                         {
                             Units = templateNest.Units,
                             DateCreated = DateTime.Now
@@ -380,7 +446,7 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                     }
                     else
                     {
-                        nestObj = new Nest(partNo) { Units = Units.Inches, DateCreated = DateTime.Now };
+                        nestObj = new Nest(nestName) { Units = Units.Inches, DateCreated = DateTime.Now };
                     }
 
                     nestObj.Drawings.Add(drawing);
@@ -394,19 +460,29 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                 }
 
                 db.AddRun(partId, size.Width, size.Length, s, result, savedFilePath);
+                runsThisPart++;
+                totalRuns++;
             }
 
             txn.Commit();
+            BestFitCache.Invalidate(drawing);
+            partSw.Stop();
             processed++;
-            if (processed % 10 == 0) Console.WriteLine($"Processed {processed}/{dxfFiles.Length} parts across all sheet sizes...");
+            Console.WriteLine($"  Total: {runsThisPart} runs, best={bestCount}pcs @ {bestUtil:P1}, {partSw.ElapsedMilliseconds}ms");
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error processing {file}: {ex.Message}");
+            Console.WriteLine();
+            Console.Error.WriteLine($"  ERROR: {ex.Message}");
         }
     }
 
-    Console.WriteLine($"Done! Brute-force data for {processed} parts saved to {dbPath}");
+    totalSw.Stop();
+    Console.WriteLine("---");
+    Console.WriteLine($"Processed: {processed} parts, {totalRuns} total runs");
+    Console.WriteLine($"Skipped:   {skippedExisting} (existing) + {skippedGeometry} (no geometry) + {skippedFeatures} (no features)");
+    Console.WriteLine($"Time:      {totalSw.Elapsed:h\\:mm\\:ss}");
+    Console.WriteLine($"Database:  {Path.GetFullPath(dbPath)}");
     return 0;
 }
 

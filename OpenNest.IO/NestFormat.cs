@@ -122,5 +122,32 @@ namespace OpenNest.IO
             public double X { get; init; }
             public double Y { get; init; }
         }
+
+        public record BestFitSetDto
+        {
+            public double PlateWidth { get; init; }
+            public double PlateHeight { get; init; }
+            public double Spacing { get; init; }
+            public List<BestFitResultDto> Results { get; init; } = new();
+        }
+
+        public record BestFitResultDto
+        {
+            public double Part1Rotation { get; init; }
+            public double Part2Rotation { get; init; }
+            public double Part2OffsetX { get; init; }
+            public double Part2OffsetY { get; init; }
+            public int StrategyType { get; init; }
+            public int TestNumber { get; init; }
+            public double CandidateSpacing { get; init; }
+            public double RotatedArea { get; init; }
+            public double BoundingWidth { get; init; }
+            public double BoundingHeight { get; init; }
+            public double OptimalRotation { get; init; }
+            public bool Keep { get; init; }
+            public string Reason { get; init; } = "";
+            public double TrueArea { get; init; }
+            public List<double> HullAngles { get; init; } = new();
+        }
     }
 }
