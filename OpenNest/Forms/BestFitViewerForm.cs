@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
@@ -9,7 +10,8 @@ namespace OpenNest.Forms
     public partial class BestFitViewerForm : Form
     {
         private const int Columns = 5;
-        private const int RowHeight = 300;
+        private const int Rows = 2;
+        private const int ItemsPerPage = Columns * Rows;
         private const int MaxResults = 50;
 
         private static readonly Color KeptColor = Color.FromArgb(0, 0, 100);
@@ -17,6 +19,14 @@ namespace OpenNest.Forms
 
         private readonly Drawing drawing;
         private readonly Plate plate;
+
+        private List<BestFitResult> results;
+        private int totalResults;
+        private int keptCount;
+        private double computeSeconds;
+        private double totalSeconds;
+        private int currentPage;
+        private int pageCount;
 
         public BestFitResult SelectedResult { get; private set; }
 
@@ -33,7 +43,8 @@ namespace OpenNest.Forms
             Cursor = Cursors.WaitCursor;
             try
             {
-                PopulateGrid(drawing, plate);
+                ComputeResults();
+                ShowPage(0);
             }
             finally
             {
@@ -48,51 +59,84 @@ namespace OpenNest.Forms
                 Close();
                 return true;
             }
+            if (keyData == Keys.Left || keyData == Keys.PageUp)
+            {
+                NavigatePage(-1);
+                return true;
+            }
+            if (keyData == Keys.Right || keyData == Keys.PageDown)
+            {
+                NavigatePage(1);
+                return true;
+            }
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        private void PopulateGrid(Drawing drawing, Plate plate)
+        private void ComputeResults()
         {
             var sw = Stopwatch.StartNew();
 
-            var results = BestFitCache.GetOrCompute(
+            var all = BestFitCache.GetOrCompute(
                 drawing, plate.Size.Width, plate.Size.Length, plate.PartSpacing);
 
-            var findMs = sw.ElapsedMilliseconds;
-            var total = results.Count;
-            var kept = 0;
+            computeSeconds = sw.ElapsedMilliseconds / 1000.0;
+            totalResults = all.Count;
+            keptCount = 0;
 
-            foreach (var r in results)
+            foreach (var r in all)
             {
-                if (r.Keep) kept++;
+                if (r.Keep) keptCount++;
             }
 
-            var count = System.Math.Min(total, MaxResults);
-            var rows = (int)System.Math.Ceiling(count / (double)Columns);
-            gridPanel.RowCount = rows;
-            gridPanel.RowStyles.Clear();
-
-            for (var i = 0; i < rows; i++)
-                gridPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, RowHeight));
-
-            gridPanel.SuspendLayout();
-            try
-            {
-                for (var i = 0; i < count; i++)
-                {
-                    var result = results[i];
-                    var cell = CreateCell(result, drawing, i + 1);
-                    gridPanel.Controls.Add(cell, i % Columns, i / Columns);
-                }
-            }
-            finally
-            {
-                gridPanel.ResumeLayout(true);
-            }
+            var count = System.Math.Min(totalResults, MaxResults);
+            results = all.GetRange(0, count);
+            pageCount = System.Math.Max(1, (int)System.Math.Ceiling(count / (double)ItemsPerPage));
 
             sw.Stop();
-            Text = string.Format("Best-Fit Viewer — {0} candidates ({1} kept) | Compute: {2:F1}s | Total: {3:F1}s | Showing {4}",
-                total, kept, findMs / 1000.0, sw.Elapsed.TotalSeconds, count);
+            totalSeconds = sw.Elapsed.TotalSeconds;
+        }
+
+        private void ShowPage(int page)
+        {
+            currentPage = page;
+            var start = page * ItemsPerPage;
+            var count = System.Math.Min(ItemsPerPage, results.Count - start);
+
+            gridPanel.SuspendLayout();
+            gridPanel.Controls.Clear();
+
+            gridPanel.RowCount = Rows;
+            gridPanel.RowStyles.Clear();
+            for (var i = 0; i < Rows; i++)
+                gridPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / Rows));
+
+            for (var i = 0; i < count; i++)
+            {
+                var result = results[start + i];
+                var cell = CreateCell(result, drawing, start + i + 1);
+                gridPanel.Controls.Add(cell, i % Columns, i / Columns);
+            }
+
+            gridPanel.ResumeLayout(true);
+
+            btnPrev.Enabled = currentPage > 0;
+            btnNext.Enabled = currentPage < pageCount - 1;
+            lblPage.Text = string.Format("Page {0} / {1}", currentPage + 1, pageCount);
+
+            Text = string.Format("Best-Fit Viewer — {0} candidates ({1} kept) | Compute: {2:F1}s | Total: {3:F1}s | Showing {4}-{5} of {6}",
+                totalResults, keptCount, computeSeconds, totalSeconds,
+                start + 1, start + count, results.Count);
+        }
+
+        private void btnPrev_Click(object sender, System.EventArgs e) => NavigatePage(-1);
+
+        private void btnNext_Click(object sender, System.EventArgs e) => NavigatePage(1);
+
+        private void NavigatePage(int delta)
+        {
+            var newPage = currentPage + delta;
+            if (newPage >= 0 && newPage < pageCount)
+                ShowPage(newPage);
         }
 
         private BestFitCell CreateCell(BestFitResult result, Drawing drawing, int rank)
