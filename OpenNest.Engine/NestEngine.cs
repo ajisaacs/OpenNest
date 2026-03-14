@@ -723,9 +723,13 @@ namespace OpenNest
 
             var score = FillScore.Compute(best, workArea);
             var clonedParts = new List<Part>(best.Count);
+            var totalPartArea = 0.0;
 
             foreach (var part in best)
+            {
                 clonedParts.Add((Part)part.Clone());
+                totalPartArea += part.BaseDrawing.Area;
+            }
 
             progress.Report(new NestProgress
             {
@@ -733,7 +737,7 @@ namespace OpenNest
                 PlateNumber = plateNumber,
                 BestPartCount = score.Count,
                 BestDensity = score.Density,
-                UsableRemnantArea = score.UsableRemnantArea,
+                UsableRemnantArea = workArea.Area() - totalPartArea,
                 BestParts = clonedParts
             });
         }
