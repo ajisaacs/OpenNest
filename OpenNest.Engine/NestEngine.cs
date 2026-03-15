@@ -24,6 +24,14 @@ namespace OpenNest
 
         public int PlateNumber { get; set; }
 
+        public NestPhase WinnerPhase { get; private set; }
+
+        public List<PhaseResult> PhaseResults { get; } = new();
+
+        public bool ForceFullAngleSweep { get; set; }
+
+        public List<AngleResult> AngleResults { get; } = new();
+
         public bool Fill(NestItem item)
         {
             return Fill(item, Plate.WorkArea());
@@ -48,18 +56,24 @@ namespace OpenNest
         public List<Part> Fill(NestItem item, Box workArea,
             IProgress<NestProgress> progress, CancellationToken token)
         {
+            PhaseResults.Clear();
+            AngleResults.Clear();
             var best = FindBestFill(item, workArea, progress, token);
 
             if (token.IsCancellationRequested)
                 return best ?? new List<Part>();
 
             // Try improving by filling the remainder strip separately.
+            var remainderSw = Stopwatch.StartNew();
             var improved = TryRemainderImprovement(item, workArea, best);
+            remainderSw.Stop();
 
             if (IsBetterFill(improved, best, workArea))
             {
                 Debug.WriteLine($"[Fill] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
                 best = improved;
+                WinnerPhase = NestPhase.Remainder;
+                PhaseResults.Add(new PhaseResult(NestPhase.Remainder, improved.Count, remainderSw.ElapsedMilliseconds));
                 ReportProgress(progress, NestPhase.Remainder, PlateNumber, best, workArea);
             }
 
@@ -98,6 +112,16 @@ namespace OpenNest
                 // Try every 5° from 0 to 175° to find rotations that fit.
                 var step = Angle.ToRadians(5);
 
+                for (var a = 0.0; a < System.Math.PI; a += step)
+                {
+                    if (!angles.Any(existing => existing.IsEqualTo(a)))
+                        angles.Add(a);
+                }
+            }
+
+            if (ForceFullAngleSweep)
+            {
+                var step = Angle.ToRadians(5);
                 for (var a = 0.0; a < System.Math.PI; a += step)
                 {
                     if (!angles.Any(existing => existing.IsEqualTo(a)))
@@ -180,17 +204,33 @@ namespace OpenNest
                     }
                 }
 
+                if (ForceFullAngleSweep)
+                {
+                    var step = Angle.ToRadians(5);
+                    for (var a = 0.0; a < System.Math.PI; a += step)
+                    {
+                        if (!angles.Any(existing => existing.IsEqualTo(a)))
+                            angles.Add(a);
+                    }
+                }
+
                 // Pairs phase first
-                var pairResult = FillWithPairs(item, workArea, token);
+                var pairSw = Stopwatch.StartNew();
+                var pairResult = FillWithPairs(item, workArea, token, progress);
+                pairSw.Stop();
                 best = pairResult;
                 var bestScore = FillScore.Compute(best, workArea);
+                WinnerPhase = NestPhase.Pairs;
+                PhaseResults.Add(new PhaseResult(NestPhase.Pairs, pairResult.Count, pairSw.ElapsedMilliseconds));
 
                 Debug.WriteLine($"[FindBestFill] Pair: {bestScore.Count} parts");
                 ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea);
                 token.ThrowIfCancellationRequested();
 
                 // Linear phase
+                var linearSw = Stopwatch.StartNew();
                 var linearBag = new System.Collections.Concurrent.ConcurrentBag<(FillScore score, List<Part> parts)>();
+                var angleBag = new System.Collections.Concurrent.ConcurrentBag<AngleResult>();
 
                 System.Threading.Tasks.Parallel.ForEach(angles,
                     new System.Threading.Tasks.ParallelOptions { CancellationToken = token },
@@ -200,20 +240,43 @@ namespace OpenNest
                         var h = localEngine.Fill(item.Drawing, angle, NestDirection.Horizontal);
                         var v = localEngine.Fill(item.Drawing, angle, NestDirection.Vertical);
 
+                        var angleDeg = Angle.ToDegrees(angle);
                         if (h != null && h.Count > 0)
+                        {
                             linearBag.Add((FillScore.Compute(h, workArea), h));
+                            angleBag.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Horizontal, PartCount = h.Count });
+                        }
                         if (v != null && v.Count > 0)
+                        {
                             linearBag.Add((FillScore.Compute(v, workArea), v));
-                    });
+                            angleBag.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Vertical, PartCount = v.Count });
+                        }
 
+                        var bestDir = (h?.Count ?? 0) >= (v?.Count ?? 0) ? "H" : "V";
+                        var bestCount = System.Math.Max(h?.Count ?? 0, v?.Count ?? 0);
+                        progress?.Report(new NestProgress
+                        {
+                            Phase = NestPhase.Linear,
+                            PlateNumber = PlateNumber,
+                            Description = $"Linear: {angleDeg:F0}° {bestDir} - {bestCount} parts"
+                        });
+                    });
+                linearSw.Stop();
+                AngleResults.AddRange(angleBag);
+
+                var bestLinearCount = 0;
                 foreach (var (score, parts) in linearBag)
                 {
+                    if (parts.Count > bestLinearCount)
+                        bestLinearCount = parts.Count;
                     if (score > bestScore)
                     {
                         best = parts;
                         bestScore = score;
+                        WinnerPhase = NestPhase.Linear;
                     }
                 }
+                PhaseResults.Add(new PhaseResult(NestPhase.Linear, bestLinearCount, linearSw.ElapsedMilliseconds));
 
                 Debug.WriteLine($"[FindBestFill] Linear: {bestScore.Count} parts, density={bestScore.Density:P1} | WorkArea: {workArea.Width:F1}x{workArea.Length:F1} | Angles: {angles.Count}");
 
@@ -221,13 +284,17 @@ namespace OpenNest
                 token.ThrowIfCancellationRequested();
 
                 // RectBestFit phase
+                var rectSw = Stopwatch.StartNew();
                 var rectResult = FillRectangleBestFit(item, workArea);
+                rectSw.Stop();
                 var rectScore = rectResult != null ? FillScore.Compute(rectResult, workArea) : default;
                 Debug.WriteLine($"[FindBestFill] RectBestFit: {rectScore.Count} parts");
+                PhaseResults.Add(new PhaseResult(NestPhase.RectBestFit, rectResult?.Count ?? 0, rectSw.ElapsedMilliseconds));
 
                 if (rectScore > bestScore)
                 {
                     best = rectResult;
+                    WinnerPhase = NestPhase.RectBestFit;
                     ReportProgress(progress, NestPhase.RectBestFit, PlateNumber, best, workArea);
                 }
             }
@@ -382,7 +449,7 @@ namespace OpenNest
             return best ?? new List<Part>();
         }
 
-        private List<Part> FillWithPairs(NestItem item, Box workArea, CancellationToken token)
+        private List<Part> FillWithPairs(NestItem item, Box workArea, CancellationToken token, IProgress<NestProgress> progress = null)
         {
             var bestFits = BestFitCache.GetOrCompute(
                 item.Drawing, Plate.Size.Width, Plate.Size.Length,
@@ -407,6 +474,13 @@ namespace OpenNest
 
                         if (filled != null && filled.Count > 0)
                             resultBag.Add((FillScore.Compute(filled, workArea), filled));
+
+                        progress?.Report(new NestProgress
+                        {
+                            Phase = NestPhase.Pairs,
+                            PlateNumber = PlateNumber,
+                            Description = $"Pairs: candidate {i + 1}/{candidates.Count} - {filled?.Count ?? 0} parts"
+                        });
                     });
             }
             catch (OperationCanceledException)
