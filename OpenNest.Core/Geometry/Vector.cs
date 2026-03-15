@@ -3,7 +3,7 @@ using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
-    public struct Vector
+    public struct Vector : IEquatable<Vector>
     {
         public static readonly Vector Invalid = new Vector(double.NaN, double.NaN);
         public static readonly Vector Zero = new Vector(0, 0);
@@ -15,6 +15,29 @@ namespace OpenNest.Geometry
         {
             X = x;
             Y = y;
+        }
+
+        public bool Equals(Vector other)
+        {
+            return X.IsEqualTo(other.X) && Y.IsEqualTo(other.Y);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is Vector other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                // Use a simple but effective hash combine. 
+                // We use a small epsilon-safe rounding if needed, but for uniqueness in HashSet
+                // during a single operation, raw bits or slightly rounded is usually fine.
+                // However, IsEqualTo uses Tolerance.Epsilon, so we should probably round to some precision.
+                // But typically for these geometric algorithms, exact matches (or very close) are what we want to prune.
+                return (X.GetHashCode() * 397) ^ Y.GetHashCode();
+            }
         }
 
         public double DistanceTo(Vector pt)
@@ -184,21 +207,6 @@ namespace OpenNest.Geometry
         public Vector Clone()
         {
             return new Vector(X, Y);
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (!(obj is Vector))
-                return false;
-
-            var pt = (Vector)obj;
-
-            return (X.IsEqualTo(pt.X)) && (Y.IsEqualTo(pt.Y));
-        }
-
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
         }
 
         public override string ToString()

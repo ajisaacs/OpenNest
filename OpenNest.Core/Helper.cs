@@ -882,7 +882,7 @@ namespace OpenNest
                 case PushDirection.Right:
                 {
                     var dy = p2y - p1y;
-                    if (dy > -Tolerance.Epsilon && dy < Tolerance.Epsilon)
+                    if (System.Math.Abs(dy) < Tolerance.Epsilon)
                         return double.MaxValue;
 
                     var t = (vy - p1y) / dy;
@@ -891,6 +891,7 @@ namespace OpenNest
 
                     var ix = p1x + t * (p2x - p1x);
                     var dist = direction == PushDirection.Left ? vx - ix : ix - vx;
+                    
                     if (dist > Tolerance.Epsilon) return dist;
                     if (dist >= -Tolerance.Epsilon) return 0;
                     return double.MaxValue;
@@ -900,7 +901,7 @@ namespace OpenNest
                 case PushDirection.Up:
                 {
                     var dx = p2x - p1x;
-                    if (dx > -Tolerance.Epsilon && dx < Tolerance.Epsilon)
+                    if (System.Math.Abs(dx) < Tolerance.Epsilon)
                         return double.MaxValue;
 
                     var t = (vx - p1x) / dx;
@@ -909,6 +910,7 @@ namespace OpenNest
 
                     var iy = p1y + t * (p2y - p1y);
                     var dist = direction == PushDirection.Down ? vy - iy : iy - vy;
+
                     if (dist > Tolerance.Epsilon) return dist;
                     if (dist >= -Tolerance.Epsilon) return 0;
                     return double.MaxValue;
@@ -928,38 +930,52 @@ namespace OpenNest
         {
             var minDist = double.MaxValue;
 
-            // Case 1: Each moving vertex → each stationary edge
+            // Case 1: Each moving vertex -> each stationary edge
+            var movingVertices = new HashSet<Vector>();
             for (int i = 0; i < movingLines.Count; i++)
             {
-                var movingStart = movingLines[i].pt1;
-                var movingEnd = movingLines[i].pt2;
-
-                for (int j = 0; j < stationaryLines.Count; j++)
-                {
-                    var d = RayEdgeDistance(movingStart, stationaryLines[j], direction);
-                    if (d < minDist) minDist = d;
-
-                    d = RayEdgeDistance(movingEnd, stationaryLines[j], direction);
-                    if (d < minDist) minDist = d;
-                }
+                movingVertices.Add(movingLines[i].pt1);
+                movingVertices.Add(movingLines[i].pt2);
             }
 
-            // Case 2: Each stationary vertex → each moving edge (opposite direction)
-            var opposite = OppositeDirection(direction);
+            var stationaryEdges = new (Vector start, Vector end)[stationaryLines.Count];
+            for (int i = 0; i < stationaryLines.Count; i++)
+                stationaryEdges[i] = (stationaryLines[i].pt1, stationaryLines[i].pt2);
 
+            // Sort edges for pruning if not already sorted (usually they aren't here)
+            if (direction == PushDirection.Left || direction == PushDirection.Right)
+                stationaryEdges = stationaryEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
+            else
+                stationaryEdges = stationaryEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
+
+            foreach (var mv in movingVertices)
+            {
+                var d = OneWayDistance(mv, stationaryEdges, Vector.Zero, direction);
+                if (d < minDist) minDist = d;
+            }
+
+            // Case 2: Each stationary vertex -> each moving edge (opposite direction)
+            var opposite = OppositeDirection(direction);
+            var stationaryVertices = new HashSet<Vector>();
             for (int i = 0; i < stationaryLines.Count; i++)
             {
-                var stationaryStart = stationaryLines[i].pt1;
-                var stationaryEnd = stationaryLines[i].pt2;
+                stationaryVertices.Add(stationaryLines[i].pt1);
+                stationaryVertices.Add(stationaryLines[i].pt2);
+            }
 
-                for (int j = 0; j < movingLines.Count; j++)
-                {
-                    var d = RayEdgeDistance(stationaryStart, movingLines[j], opposite);
-                    if (d < minDist) minDist = d;
+            var movingEdges = new (Vector start, Vector end)[movingLines.Count];
+            for (int i = 0; i < movingLines.Count; i++)
+                movingEdges[i] = (movingLines[i].pt1, movingLines[i].pt2);
 
-                    d = RayEdgeDistance(stationaryEnd, movingLines[j], opposite);
-                    if (d < minDist) minDist = d;
-                }
+            if (opposite == PushDirection.Left || opposite == PushDirection.Right)
+                movingEdges = movingEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
+            else
+                movingEdges = movingEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
+
+            foreach (var sv in stationaryVertices)
+            {
+                var d = OneWayDistance(sv, movingEdges, Vector.Zero, opposite);
+                if (d < minDist) minDist = d;
             }
 
             return minDist;
@@ -974,51 +990,53 @@ namespace OpenNest
             List<Line> stationaryLines, PushDirection direction)
         {
             var minDist = double.MaxValue;
+            var movingOffset = new Vector(movingDx, movingDy);
 
-            // Case 1: Each moving vertex → each stationary edge
+            // Case 1: Each moving vertex -> each stationary edge
+            var movingVertices = new HashSet<Vector>();
             for (int i = 0; i < movingLines.Count; i++)
             {
-                var ml = movingLines[i];
-                var mx1 = ml.pt1.X + movingDx;
-                var my1 = ml.pt1.Y + movingDy;
-                var mx2 = ml.pt2.X + movingDx;
-                var my2 = ml.pt2.Y + movingDy;
-
-                for (int j = 0; j < stationaryLines.Count; j++)
-                {
-                    var se = stationaryLines[j];
-                    var d = RayEdgeDistance(mx1, my1, se.pt1.X, se.pt1.Y, se.pt2.X, se.pt2.Y, direction);
-                    if (d < minDist) minDist = d;
-
-                    d = RayEdgeDistance(mx2, my2, se.pt1.X, se.pt1.Y, se.pt2.X, se.pt2.Y, direction);
-                    if (d < minDist) minDist = d;
-                }
+                movingVertices.Add(movingLines[i].pt1 + movingOffset);
+                movingVertices.Add(movingLines[i].pt2 + movingOffset);
             }
 
-            // Case 2: Each stationary vertex → each moving edge (opposite direction)
-            var opposite = OppositeDirection(direction);
+            var stationaryEdges = new (Vector start, Vector end)[stationaryLines.Count];
+            for (int i = 0; i < stationaryLines.Count; i++)
+                stationaryEdges[i] = (stationaryLines[i].pt1, stationaryLines[i].pt2);
 
+            if (direction == PushDirection.Left || direction == PushDirection.Right)
+                stationaryEdges = stationaryEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
+            else
+                stationaryEdges = stationaryEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
+
+            foreach (var mv in movingVertices)
+            {
+                var d = OneWayDistance(mv, stationaryEdges, Vector.Zero, direction);
+                if (d < minDist) minDist = d;
+            }
+
+            // Case 2: Each stationary vertex -> each moving edge (opposite direction)
+            var opposite = OppositeDirection(direction);
+            var stationaryVertices = new HashSet<Vector>();
             for (int i = 0; i < stationaryLines.Count; i++)
             {
-                var sl = stationaryLines[i];
+                stationaryVertices.Add(stationaryLines[i].pt1);
+                stationaryVertices.Add(stationaryLines[i].pt2);
+            }
 
-                for (int j = 0; j < movingLines.Count; j++)
-                {
-                    var me = movingLines[j];
-                    var d = RayEdgeDistance(
-                        sl.pt1.X, sl.pt1.Y,
-                        me.pt1.X + movingDx, me.pt1.Y + movingDy,
-                        me.pt2.X + movingDx, me.pt2.Y + movingDy,
-                        opposite);
-                    if (d < minDist) minDist = d;
+            var movingEdges = new (Vector start, Vector end)[movingLines.Count];
+            for (int i = 0; i < movingLines.Count; i++)
+                movingEdges[i] = (movingLines[i].pt1, movingLines[i].pt2);
 
-                    d = RayEdgeDistance(
-                        sl.pt2.X, sl.pt2.Y,
-                        me.pt1.X + movingDx, me.pt1.Y + movingDy,
-                        me.pt2.X + movingDx, me.pt2.Y + movingDy,
-                        opposite);
-                    if (d < minDist) minDist = d;
-                }
+            if (opposite == PushDirection.Left || opposite == PushDirection.Right)
+                movingEdges = movingEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
+            else
+                movingEdges = movingEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
+
+            foreach (var sv in stationaryVertices)
+            {
+                var d = OneWayDistance(sv, movingEdges, movingOffset, opposite);
+                if (d < minDist) minDist = d;
             }
 
             return minDist;
@@ -1039,6 +1057,105 @@ namespace OpenNest
                 result[i * 4 + 3] = line.pt2.Y;
             }
             return result;
+        }
+
+        /// <summary>
+        /// Computes the minimum directional distance using raw edge arrays and location offsets
+        /// to avoid all intermediate object allocations.
+        /// </summary>
+        public static double DirectionalDistance(
+            (Vector start, Vector end)[] movingEdges, Vector movingOffset,
+            (Vector start, Vector end)[] stationaryEdges, Vector stationaryOffset,
+            PushDirection direction)
+        {
+            var minDist = double.MaxValue;
+
+            // Extract unique vertices from moving edges.
+            var movingVertices = new HashSet<Vector>();
+            for (var i = 0; i < movingEdges.Length; i++)
+            {
+                movingVertices.Add(movingEdges[i].start + movingOffset);
+                movingVertices.Add(movingEdges[i].end + movingOffset);
+            }
+
+            // Case 1: Each moving vertex -> each stationary edge
+            foreach (var mv in movingVertices)
+            {
+                var d = OneWayDistance(mv, stationaryEdges, stationaryOffset, direction);
+                if (d < minDist) minDist = d;
+            }
+
+            // Case 2: Each stationary vertex -> each moving edge (opposite direction)
+            var opposite = OppositeDirection(direction);
+            var stationaryVertices = new HashSet<Vector>();
+            for (var i = 0; i < stationaryEdges.Length; i++)
+            {
+                stationaryVertices.Add(stationaryEdges[i].start + stationaryOffset);
+                stationaryVertices.Add(stationaryEdges[i].end + stationaryOffset);
+            }
+
+            foreach (var sv in stationaryVertices)
+            {
+                var d = OneWayDistance(sv, movingEdges, movingOffset, opposite);
+                if (d < minDist) minDist = d;
+            }
+
+            return minDist;
+        }
+
+        private static double OneWayDistance(
+            Vector vertex, (Vector start, Vector end)[] edges, Vector edgeOffset,
+            PushDirection direction)
+        {
+            var minDist = double.MaxValue;
+            var vx = vertex.X;
+            var vy = vertex.Y;
+
+            // Pruning: edges are sorted by their perpendicular min-coordinate in PartBoundary.
+            if (direction == PushDirection.Left || direction == PushDirection.Right)
+            {
+                for (var i = 0; i < edges.Length; i++)
+                {
+                    var e1 = edges[i].start + edgeOffset;
+                    var e2 = edges[i].end + edgeOffset;
+
+                    var minY = e1.Y < e2.Y ? e1.Y : e2.Y;
+                    var maxY = e1.Y > e2.Y ? e1.Y : e2.Y;
+
+                    // Since edges are sorted by minY, if vy < minY, then vy < all subsequent minY.
+                    if (vy < minY - Tolerance.Epsilon)
+                        break;
+
+                    if (vy > maxY + Tolerance.Epsilon)
+                        continue;
+
+                    var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
+                    if (d < minDist) minDist = d;
+                }
+            }
+            else // Up/Down
+            {
+                for (var i = 0; i < edges.Length; i++)
+                {
+                    var e1 = edges[i].start + edgeOffset;
+                    var e2 = edges[i].end + edgeOffset;
+
+                    var minX = e1.X < e2.X ? e1.X : e2.X;
+                    var maxX = e1.X > e2.X ? e1.X : e2.X;
+
+                    // Since edges are sorted by minX, if vx < minX, then vx < all subsequent minX.
+                    if (vx < minX - Tolerance.Epsilon)
+                        break;
+
+                    if (vx > maxX + Tolerance.Epsilon)
+                        continue;
+
+                    var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
+                    if (d < minDist) minDist = d;
+                }
+            }
+
+            return minDist;
         }
 
         public static PushDirection OppositeDirection(PushDirection direction)

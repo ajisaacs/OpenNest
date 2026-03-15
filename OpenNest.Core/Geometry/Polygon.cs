@@ -493,12 +493,36 @@ namespace OpenNest.Geometry
         {
             var n = Vertices.Count - 1;
 
+            // Pre-calculate edge bounding boxes to speed up intersection checks.
+            var edgeBounds = new (double minX, double maxX, double minY, double maxY)[n];
             for (var i = 0; i < n; i++)
             {
+                var v1 = Vertices[i];
+                var v2 = Vertices[i + 1];
+                edgeBounds[i] = (
+                    System.Math.Min(v1.X, v2.X) - Tolerance.Epsilon,
+                    System.Math.Max(v1.X, v2.X) + Tolerance.Epsilon,
+                    System.Math.Min(v1.Y, v2.Y) - Tolerance.Epsilon,
+                    System.Math.Max(v1.Y, v2.Y) + Tolerance.Epsilon
+                );
+            }
+
+            for (var i = 0; i < n; i++)
+            {
+                var bi = edgeBounds[i];
                 for (var j = i + 2; j < n; j++)
                 {
                     if (i == 0 && j == n - 1)
                         continue;
+
+                    var bj = edgeBounds[j];
+
+                    // Prune with bounding box check.
+                    if (bi.maxX < bj.minX || bj.maxX < bi.minX ||
+                        bi.maxY < bj.minY || bj.maxY < bi.minY)
+                    {
+                        continue;
+                    }
 
                     if (SegmentsIntersect(Vertices[i], Vertices[i + 1], Vertices[j], Vertices[j + 1], out pt))
                     {
