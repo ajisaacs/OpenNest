@@ -93,10 +93,15 @@ namespace OpenNest
             var workArea = plate.WorkArea();
             var distance = double.MaxValue;
 
+            // BB gap at which offset geometries are expected to be touching.
+            var contactGap = (halfSpacing + ChordTolerance) * 2;
+
             foreach (var moving in movingParts)
             {
                 var edgeDist = Helper.EdgeDistance(moving.BoundingBox, workArea, direction);
-                if (edgeDist > 0 && edgeDist < distance)
+                if (edgeDist <= 0)
+                    distance = 0;
+                else if (edgeDist < distance)
                     distance = edgeDist;
 
                 var movingBox = moving.BoundingBox;
@@ -104,8 +109,16 @@ namespace OpenNest
 
                 for (var i = 0; i < obstacleBoxes.Length; i++)
                 {
+                    // Use the reverse-direction gap to check if the obstacle is entirely
+                    // behind the moving part. The forward gap (gap < 0) is unreliable for
+                    // irregular shapes whose bounding boxes overlap even when the actual
+                    // geometry still has a valid contact in the push direction.
+                    var reverseGap = Helper.DirectionalGap(movingBox, obstacleBoxes[i], opposite);
+                    if (reverseGap > 0)
+                        continue;
+
                     var gap = Helper.DirectionalGap(movingBox, obstacleBoxes[i], direction);
-                    if (gap < 0 || gap >= distance)
+                    if (gap >= distance)
                         continue;
 
                     var perpOverlap = isHorizontal
