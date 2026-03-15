@@ -58,21 +58,21 @@ namespace OpenNest
             AngleResults.Clear();
             var best = FindBestFill(item, workArea, progress, token);
 
-            if (token.IsCancellationRequested)
-                return best ?? new List<Part>();
-
-            // Try improving by filling the remainder strip separately.
-            var remainderSw = Stopwatch.StartNew();
-            var improved = TryRemainderImprovement(item, workArea, best);
-            remainderSw.Stop();
-
-            if (IsBetterFill(improved, best, workArea))
+            if (!token.IsCancellationRequested)
             {
-                Debug.WriteLine($"[Fill] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
-                best = improved;
-                WinnerPhase = NestPhase.Remainder;
-                PhaseResults.Add(new PhaseResult(NestPhase.Remainder, improved.Count, remainderSw.ElapsedMilliseconds));
-                ReportProgress(progress, NestPhase.Remainder, PlateNumber, best, workArea, BuildProgressSummary());
+                // Try improving by filling the remainder strip separately.
+                var remainderSw = Stopwatch.StartNew();
+                var improved = TryRemainderImprovement(item, workArea, best);
+                remainderSw.Stop();
+
+                if (IsBetterFill(improved, best, workArea))
+                {
+                    Debug.WriteLine($"[Fill] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
+                    best = improved;
+                    WinnerPhase = NestPhase.Remainder;
+                    PhaseResults.Add(new PhaseResult(NestPhase.Remainder, improved.Count, remainderSw.ElapsedMilliseconds));
+                    ReportProgress(progress, NestPhase.Remainder, PlateNumber, best, workArea, BuildProgressSummary());
+                }
             }
 
             if (best == null || best.Count == 0)
@@ -82,6 +82,69 @@ namespace OpenNest
                 best = best.Take(item.Quantity).ToList();
 
             return best;
+        }
+
+        /// <summary>
+        /// Binary-searches for the smallest sub-area (one dimension fixed) that fits
+        /// exactly item.Quantity parts. Returns the best parts list and the dimension
+        /// value that achieved it.
+        /// </summary>
+        private (List<Part> parts, double usedDim) BinarySearchFill(
+            NestItem item, Box workArea, bool shrinkWidth,
+            CancellationToken token)
+        {
+            var quantity = item.Quantity;
+            var partBox = item.Drawing.Program.BoundingBox();
+            var partArea = item.Drawing.Area;
+
+            // Fixed and variable dimensions.
+            var fixedDim = shrinkWidth ? workArea.Length : workArea.Width;
+            var highDim = shrinkWidth ? workArea.Width : workArea.Length;
+
+            // Estimate starting point: target area at 50% utilization.
+            var targetArea = partArea * quantity / 0.5;
+            var minPartDim = shrinkWidth
+                ? partBox.Width + Plate.PartSpacing
+                : partBox.Length + Plate.PartSpacing;
+            var estimatedDim = System.Math.Max(minPartDim, targetArea / fixedDim);
+
+            var low = estimatedDim;
+            var high = highDim;
+
+            List<Part> bestParts = null;
+            var bestDim = high;
+
+            for (var iter = 0; iter < 8; iter++)
+            {
+                if (token.IsCancellationRequested)
+                    break;
+
+                if (high - low < Plate.PartSpacing)
+                    break;
+
+                var mid = (low + high) / 2.0;
+
+                var testBox = shrinkWidth
+                    ? new Box(workArea.X, workArea.Y, mid, workArea.Length)
+                    : new Box(workArea.X, workArea.Y, workArea.Width, mid);
+
+                var result = Fill(item, testBox, null, token);
+
+                if (result.Count >= quantity)
+                {
+                    bestParts = result.Count > quantity
+                        ? result.Take(quantity).ToList()
+                        : result;
+                    bestDim = mid;
+                    high = mid;
+                }
+                else
+                {
+                    low = mid;
+                }
+            }
+
+            return (bestParts, bestDim);
         }
 
         public bool Fill(List<Part> groupParts)
