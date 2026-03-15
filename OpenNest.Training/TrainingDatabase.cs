@@ -21,6 +21,7 @@ namespace OpenNest.Training
 
             _db = new TrainingDbContext(dbPath);
             _db.Database.EnsureCreated();
+            MigrateSchema();
         }
 
         public long GetOrAddPart(string fileName, PartFeatures features, string geometryData)
@@ -61,7 +62,7 @@ namespace OpenNest.Training
             return _db.Runs.Count(r => r.Part.FileName == fileName);
         }
 
-        public void AddRun(long partId, double w, double h, double s, BruteForceResult result, string filePath)
+        public void AddRun(long partId, double w, double h, double s, BruteForceResult result, string filePath, List<AngleResult> angleResults = null)
         {
             var run = new TrainingRun
             {
@@ -73,10 +74,33 @@ namespace OpenNest.Training
                 Utilization = result.Utilization,
                 TimeMs = result.TimeMs,
                 LayoutData = result.LayoutData ?? "",
-                FilePath = filePath ?? ""
+                FilePath = filePath ?? "",
+                WinnerEngine = result.WinnerEngine ?? "",
+                WinnerTimeMs = result.WinnerTimeMs,
+                RunnerUpEngine = result.RunnerUpEngine ?? "",
+                RunnerUpPartCount = result.RunnerUpPartCount,
+                RunnerUpTimeMs = result.RunnerUpTimeMs,
+                ThirdPlaceEngine = result.ThirdPlaceEngine ?? "",
+                ThirdPlacePartCount = result.ThirdPlacePartCount,
+                ThirdPlaceTimeMs = result.ThirdPlaceTimeMs
             };
 
             _db.Runs.Add(run);
+
+            if (angleResults != null && angleResults.Count > 0)
+            {
+                foreach (var ar in angleResults)
+                {
+                    _db.AngleResults.Add(new Data.TrainingAngleResult
+                    {
+                        Run = run,
+                        AngleDeg = ar.AngleDeg,
+                        Direction = ar.Direction.ToString(),
+                        PartCount = ar.PartCount
+                    });
+                }
+            }
+
             _db.SaveChanges();
         }
 
@@ -116,6 +140,52 @@ namespace OpenNest.Training
             }
 
             return updated;
+        }
+
+        private void MigrateSchema()
+        {
+            var columns = new[]
+            {
+                ("WinnerEngine", "TEXT NOT NULL DEFAULT ''"),
+                ("WinnerTimeMs", "INTEGER NOT NULL DEFAULT 0"),
+                ("RunnerUpEngine", "TEXT NOT NULL DEFAULT ''"),
+                ("RunnerUpPartCount", "INTEGER NOT NULL DEFAULT 0"),
+                ("RunnerUpTimeMs", "INTEGER NOT NULL DEFAULT 0"),
+                ("ThirdPlaceEngine", "TEXT NOT NULL DEFAULT ''"),
+                ("ThirdPlacePartCount", "INTEGER NOT NULL DEFAULT 0"),
+                ("ThirdPlaceTimeMs", "INTEGER NOT NULL DEFAULT 0"),
+            };
+
+            foreach (var (name, type) in columns)
+            {
+                try
+                {
+                    _db.Database.ExecuteSqlRaw($"ALTER TABLE Runs ADD COLUMN {name} {type}");
+                }
+                catch
+                {
+                    // Column already exists.
+                }
+            }
+
+            try
+            {
+                _db.Database.ExecuteSqlRaw(@"
+                    CREATE TABLE IF NOT EXISTS AngleResults (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        RunId INTEGER NOT NULL,
+                        AngleDeg REAL NOT NULL,
+                        Direction TEXT NOT NULL,
+                        PartCount INTEGER NOT NULL,
+                        FOREIGN KEY (RunId) REFERENCES Runs(Id)
+                    )");
+                _db.Database.ExecuteSqlRaw(
+                    "CREATE INDEX IF NOT EXISTS idx_angleresults_runid ON AngleResults (RunId)");
+            }
+            catch
+            {
+                // Table already exists or other non-fatal issue.
+            }
         }
 
         public void SaveChanges()
