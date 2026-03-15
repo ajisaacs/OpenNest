@@ -285,6 +285,8 @@ namespace OpenNest
                 var linearBag = new System.Collections.Concurrent.ConcurrentBag<(FillScore score, List<Part> parts)>();
                 var angleBag = new System.Collections.Concurrent.ConcurrentBag<AngleResult>();
 
+                long lastLinearReport = 0;
+
                 System.Threading.Tasks.Parallel.ForEach(angles,
                     new System.Threading.Tasks.ParallelOptions { CancellationToken = token },
                     angle =>
@@ -305,14 +307,19 @@ namespace OpenNest
                             angleBag.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Vertical, PartCount = v.Count });
                         }
 
-                        var bestDir = (h?.Count ?? 0) >= (v?.Count ?? 0) ? "H" : "V";
-                        var bestCount = System.Math.Max(h?.Count ?? 0, v?.Count ?? 0);
-                        progress?.Report(new NestProgress
+                        var now = linearSw.ElapsedMilliseconds;
+                        if (progress != null && now - Interlocked.Read(ref lastLinearReport) >= 150)
                         {
-                            Phase = NestPhase.Linear,
-                            PlateNumber = PlateNumber,
-                            Description = $"Linear: {angleDeg:F0}° {bestDir} - {bestCount} parts"
-                        });
+                            Interlocked.Exchange(ref lastLinearReport, now);
+                            var bestDir = (h?.Count ?? 0) >= (v?.Count ?? 0) ? "H" : "V";
+                            var bestCount = System.Math.Max(h?.Count ?? 0, v?.Count ?? 0);
+                            progress.Report(new NestProgress
+                            {
+                                Phase = NestPhase.Linear,
+                                PlateNumber = PlateNumber,
+                                Description = $"Linear: {angleDeg:F0}° {bestDir} - {bestCount} parts"
+                            });
+                        }
                     });
                 linearSw.Stop();
                 AngleResults.AddRange(angleBag);
@@ -515,6 +522,9 @@ namespace OpenNest
 
             try
             {
+                var pairsSw = Stopwatch.StartNew();
+                long lastPairsReport = 0;
+
                 System.Threading.Tasks.Parallel.For(0, candidates.Count,
                     new System.Threading.Tasks.ParallelOptions { CancellationToken = token },
                     i =>
@@ -528,12 +538,17 @@ namespace OpenNest
                         if (filled != null && filled.Count > 0)
                             resultBag.Add((FillScore.Compute(filled, workArea), filled));
 
-                        progress?.Report(new NestProgress
+                        var now = pairsSw.ElapsedMilliseconds;
+                        if (progress != null && now - Interlocked.Read(ref lastPairsReport) >= 150)
                         {
-                            Phase = NestPhase.Pairs,
-                            PlateNumber = PlateNumber,
-                            Description = $"Pairs: candidate {i + 1}/{candidates.Count} - {filled?.Count ?? 0} parts"
-                        });
+                            Interlocked.Exchange(ref lastPairsReport, now);
+                            progress.Report(new NestProgress
+                            {
+                                Phase = NestPhase.Pairs,
+                                PlateNumber = PlateNumber,
+                                Description = $"Pairs: candidate {i + 1}/{candidates.Count} - {filled?.Count ?? 0} parts"
+                            });
+                        }
                     });
             }
             catch (OperationCanceledException)
