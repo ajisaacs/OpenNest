@@ -186,8 +186,8 @@ namespace OpenNest.Actions
                 boxes.Add(part.BoundingBox.Offset(plate.PartSpacing));
 
             var pt = plateView.CurrentPoint;
-            var vertical = Helper.GetLargestBoxVertically(pt, bounds, boxes);
-            var horizontal = Helper.GetLargestBoxHorizontally(pt, bounds, boxes);
+            var vertical = SpatialQuery.GetLargestBoxVertically(pt, bounds, boxes);
+            var horizontal = SpatialQuery.GetLargestBoxHorizontally(pt, bounds, boxes);
 
             var bestArea = vertical;
             if (horizontal.Area() > vertical.Area())

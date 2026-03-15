@@ -82,9 +82,9 @@ namespace OpenNest
             var locationBOffset = MakeOffset(direction, bboxDim);
 
             // Use the most efficient array-based overload to avoid all allocations.
-            var slideDistance = Helper.DirectionalDistance(
+            var slideDistance = SpatialQuery.DirectionalDistance(
                 boundary.GetEdges(pushDir), partA.Location + locationBOffset,
-                boundary.GetEdges(Helper.OppositeDirection(pushDir)), partA.Location,
+                boundary.GetEdges(SpatialQuery.OppositeDirection(pushDir)), partA.Location,
                 pushDir);
 
             return ComputeCopyDistance(bboxDim, slideDistance);
@@ -103,7 +103,7 @@ namespace OpenNest
 
             var bboxDim = GetDimension(patternA.BoundingBox, direction);
             var pushDir = GetPushDirection(direction);
-            var opposite = Helper.OppositeDirection(pushDir);
+            var opposite = SpatialQuery.OppositeDirection(pushDir);
 
             // Compute a starting offset large enough that every part-pair in
             // patternB has its offset geometry beyond patternA's offset geometry.
@@ -143,7 +143,7 @@ namespace OpenNest
 
                 for (var i = 0; i < patternA.Parts.Count; i++)
                 {
-                    var slideDistance = Helper.DirectionalDistance(
+                    var slideDistance = SpatialQuery.DirectionalDistance(
                         movingEdges[j], locationB,
                         stationaryEdges[i], patternA.Parts[i].Location,
                         pushDir);

@@ -87,9 +87,9 @@ namespace OpenNest
             for (var i = 0; i < obstacleParts.Count; i++)
                 obstacleBoxes[i] = obstacleParts[i].BoundingBox;
 
-            var opposite = Helper.OppositeDirection(direction);
+            var opposite = SpatialQuery.OppositeDirection(direction);
             var halfSpacing = plate.PartSpacing / 2;
-            var isHorizontal = Helper.IsHorizontalDirection(direction);
+            var isHorizontal = SpatialQuery.IsHorizontalDirection(direction);
             var workArea = plate.WorkArea();
             var distance = double.MaxValue;
 
@@ -98,7 +98,7 @@ namespace OpenNest
 
             foreach (var moving in movingParts)
             {
-                var edgeDist = Helper.EdgeDistance(moving.BoundingBox, workArea, direction);
+                var edgeDist = SpatialQuery.EdgeDistance(moving.BoundingBox, workArea, direction);
                 if (edgeDist <= 0)
                     distance = 0;
                 else if (edgeDist < distance)
@@ -113,11 +113,11 @@ namespace OpenNest
                     // behind the moving part. The forward gap (gap < 0) is unreliable for
                     // irregular shapes whose bounding boxes overlap even when the actual
                     // geometry still has a valid contact in the push direction.
-                    var reverseGap = Helper.DirectionalGap(movingBox, obstacleBoxes[i], opposite);
+                    var reverseGap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], opposite);
                     if (reverseGap > 0)
                         continue;
 
-                    var gap = Helper.DirectionalGap(movingBox, obstacleBoxes[i], direction);
+                    var gap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], direction);
                     if (gap >= distance)
                         continue;
 
@@ -136,7 +136,7 @@ namespace OpenNest
                         ? PartGeometry.GetOffsetPartLines(obstacleParts[i], halfSpacing, opposite, ChordTolerance)
                         : PartGeometry.GetPartLines(obstacleParts[i], opposite, ChordTolerance);
 
-                    var d = Helper.DirectionalDistance(movingLines, obstacleLines[i], direction);
+                    var d = SpatialQuery.DirectionalDistance(movingLines, obstacleLines[i], direction);
                     if (d < distance)
                         distance = d;
                 }
@@ -144,7 +144,7 @@ namespace OpenNest
 
             if (distance < double.MaxValue && distance > 0)
             {
-                var offset = Helper.DirectionToOffset(direction, distance);
+                var offset = SpatialQuery.DirectionToOffset(direction, distance);
                 foreach (var moving in movingParts)
                     moving.Offset(offset);
                 return distance;

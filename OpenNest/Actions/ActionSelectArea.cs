@@ -150,8 +150,8 @@ namespace OpenNest.Actions
         private void UpdateSelectedArea()
         {
             SelectedArea = altSelect
-                ? Helper.GetLargestBoxHorizontally(plateView.CurrentPoint, Bounds, boxes)
-                : Helper.GetLargestBoxVertically(plateView.CurrentPoint, Bounds, boxes);
+                ? SpatialQuery.GetLargestBoxHorizontally(plateView.CurrentPoint, Bounds, boxes)
+                : SpatialQuery.GetLargestBoxVertically(plateView.CurrentPoint, Bounds, boxes);
 
             plateView.Invalidate();
         }

@@ -128,8 +128,8 @@ namespace OpenNest.Engine.BestFit
 
             if (_slideComputer != null)
             {
-                var stationarySegments = Helper.FlattenLines(part1Lines);
-                var movingSegments = Helper.FlattenLines(part2TemplateLines);
+                var stationarySegments = SpatialQuery.FlattenLines(part1Lines);
+                var movingSegments = SpatialQuery.FlattenLines(part2TemplateLines);
                 var offsets = new double[count * 2];
                 var directions = new int[count];
 
@@ -182,7 +182,7 @@ namespace OpenNest.Engine.BestFit
                     sEdges = sEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
                 stationaryEdgesByDir[dir] = sEdges;
 
-                var opposite = Helper.OppositeDirection(dir);
+                var opposite = SpatialQuery.OppositeDirection(dir);
                 var mEdges = new (Vector start, Vector end)[part2TemplateLines.Count];
                 for (var i = 0; i < part2TemplateLines.Count; i++)
                     mEdges[i] = (part2TemplateLines[i].StartPoint, part2TemplateLines[i].EndPoint);
@@ -204,21 +204,21 @@ namespace OpenNest.Engine.BestFit
 
                 var sEdges = stationaryEdgesByDir[dir];
                 var mEdges = movingEdgesByDir[dir];
-                var opposite = Helper.OppositeDirection(dir);
+                var opposite = SpatialQuery.OppositeDirection(dir);
 
                 var minDist = double.MaxValue;
 
                 // Case 1: Moving vertices -> Stationary edges
                 foreach (var mv in movingVerticesArray)
                 {
-                    var d = Helper.OneWayDistance(mv + movingOffset, sEdges, Vector.Zero, dir);
+                    var d = SpatialQuery.OneWayDistance(mv + movingOffset, sEdges, Vector.Zero, dir);
                     if (d < minDist) minDist = d;
                 }
 
                 // Case 2: Stationary vertices -> Moving edges (translated)
                 foreach (var sv in stationaryVerticesArray)
                 {
-                    var d = Helper.OneWayDistance(sv, mEdges, movingOffset, opposite);
+                    var d = SpatialQuery.OneWayDistance(sv, mEdges, movingOffset, opposite);
                     if (d < minDist) minDist = d;
                 }
 
