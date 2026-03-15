@@ -865,7 +865,8 @@ namespace OpenNest
                 BestPartCount = score.Count,
                 BestDensity = score.Density,
                 UsableRemnantArea = workArea.Area() - totalPartArea,
-                BestParts = clonedParts
+                BestParts = clonedParts,
+                Description = $"{phase}: {score.Count} parts, {score.Density:P1}"
             });
         }
 
