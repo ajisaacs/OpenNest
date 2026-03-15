@@ -807,14 +807,16 @@ namespace OpenNest.Forms
                         if (parts.Count > 0)
                         {
                             plate.Parts.AddRange(parts);
-                            Compactor.Compact(parts, plate);
+                            // TODO: Compactor.Compact(parts, plate);
                             activeForm.PlateView.Invalidate();
                             anyPlaced = true;
 
                             item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
 
-                            // Compute remainder strip for the next drawing.
-                            workArea = ComputeRemainderStrip(plate);
+                            // Compute remainder within the current work area based on
+                            // what was just placed — not the full plate bounding box.
+                            var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
+                            workArea = ComputeRemainderWithin(workArea, placedBox, plate.PartSpacing);
                         }
                     }
 
@@ -867,22 +869,16 @@ namespace OpenNest.Forms
             }
         }
 
-        private static Box ComputeRemainderStrip(Plate plate)
+        private static Box ComputeRemainderWithin(Box workArea, Box usedBox, double spacing)
         {
-            if (plate.Parts.Count == 0)
-                return plate.WorkArea();
-
-            var usedBox = plate.Parts.Cast<IBoundable>().GetBoundingBox();
-            var fullArea = plate.WorkArea();
-
-            var hWidth = fullArea.Right - usedBox.Right - plate.PartSpacing;
+            var hWidth = workArea.Right - usedBox.Right - spacing;
             var hStrip = hWidth > 0
-                ? new Box(usedBox.Right + plate.PartSpacing, fullArea.Y, hWidth, fullArea.Length)
+                ? new Box(usedBox.Right + spacing, workArea.Y, hWidth, workArea.Length)
                 : Box.Empty;
 
-            var vHeight = fullArea.Top - usedBox.Top - plate.PartSpacing;
+            var vHeight = workArea.Top - usedBox.Top - spacing;
             var vStrip = vHeight > 0
-                ? new Box(fullArea.X, usedBox.Top + plate.PartSpacing, fullArea.Width, vHeight)
+                ? new Box(workArea.X, usedBox.Top + spacing, workArea.Width, vHeight)
                 : Box.Empty;
 
             return hStrip.Area() >= vStrip.Area() ? hStrip : vStrip;
