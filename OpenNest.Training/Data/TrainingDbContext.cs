@@ -6,6 +6,7 @@ namespace OpenNest.Training.Data
     {
         public DbSet<TrainingPart> Parts { get; set; }
         public DbSet<TrainingRun> Runs { get; set; }
+        public DbSet<TrainingAngleResult> AngleResults { get; set; }
 
         private readonly string _dbPath;
 
@@ -32,6 +33,14 @@ namespace OpenNest.Training.Data
                 e.HasOne(r => r.Part)
                     .WithMany(p => p.Runs)
                     .HasForeignKey(r => r.PartId);
+            });
+
+            modelBuilder.Entity<TrainingAngleResult>(e =>
+            {
+                e.HasIndex(a => a.RunId).HasDatabaseName("idx_angleresults_runid");
+                e.HasOne(a => a.Run)
+                    .WithMany(r => r.AngleResults)
+                    .HasForeignKey(a => a.RunId);
             });
         }
     }
