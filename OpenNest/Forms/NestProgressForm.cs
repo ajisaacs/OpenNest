@@ -38,9 +38,8 @@ namespace OpenNest.Forms
             densityValue.Text = progress.BestDensity.ToString("P1");
             remnantValue.Text = $"{progress.UsableRemnantArea:F1} sq in";
 
-            descriptionValue.Text = !string.IsNullOrEmpty(progress.Description)
-                ? progress.Description
-                : "\u2014";
+            if (!string.IsNullOrEmpty(progress.Description))
+                descriptionValue.Text = progress.Description;
         }
 
         public void ShowCompleted()
@@ -53,6 +52,7 @@ namespace OpenNest.Forms
             UpdateElapsed();
 
             phaseValue.Text = "Done";
+            descriptionValue.Text = "\u2014";
             stopButton.Text = "Close";
             stopButton.Enabled = true;
             stopButton.Click -= StopButton_Click;
