@@ -129,12 +129,12 @@ namespace OpenNest
                         continue;
 
                     movingLines ??= halfSpacing > 0
-                        ? Helper.GetOffsetPartLines(moving, halfSpacing, direction, ChordTolerance)
-                        : Helper.GetPartLines(moving, direction, ChordTolerance);
+                        ? PartGeometry.GetOffsetPartLines(moving, halfSpacing, direction, ChordTolerance)
+                        : PartGeometry.GetPartLines(moving, direction, ChordTolerance);
 
                     obstacleLines[i] ??= halfSpacing > 0
-                        ? Helper.GetOffsetPartLines(obstacleParts[i], halfSpacing, opposite, ChordTolerance)
-                        : Helper.GetPartLines(obstacleParts[i], opposite, ChordTolerance);
+                        ? PartGeometry.GetOffsetPartLines(obstacleParts[i], halfSpacing, opposite, ChordTolerance)
+                        : PartGeometry.GetPartLines(obstacleParts[i], opposite, ChordTolerance);
 
                     var d = Helper.DirectionalDistance(movingLines, obstacleLines[i], direction);
                     if (d < distance)

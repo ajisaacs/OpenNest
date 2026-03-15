@@ -34,8 +34,8 @@ namespace OpenNest.Engine.BestFit
             var part2Template = Part.CreateAtOrigin(drawing, Part2Rotation);
 
             var halfSpacing = spacing / 2;
-            var part1Lines = Helper.GetOffsetPartLines(part1, halfSpacing);
-            var part2TemplateLines = Helper.GetOffsetPartLines(part2Template, halfSpacing);
+            var part1Lines = PartGeometry.GetOffsetPartLines(part1, halfSpacing);
+            var part2TemplateLines = PartGeometry.GetOffsetPartLines(part2Template, halfSpacing);
 
             var bbox1 = part1.BoundingBox;
             var bbox2 = part2Template.BoundingBox;
