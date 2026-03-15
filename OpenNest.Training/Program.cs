@@ -200,7 +200,7 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                 }
 
                 var sizeSw = Stopwatch.StartNew();
-                var result = BruteForceRunner.Run(drawing, runPlate);
+                var result = BruteForceRunner.Run(drawing, runPlate, forceFullAngleSweep: true);
                 sizeSw.Stop();
 
                 if (result == null)
@@ -215,7 +215,12 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                     bestCount = result.PartCount;
                 }
 
-                Console.WriteLine($"  {size.Length}x{size.Width} - {result.PartCount}pcs, {result.Utilization:P1}, {sizeSw.ElapsedMilliseconds}ms");
+                var engineInfo = $"{result.WinnerEngine}({result.WinnerTimeMs}ms)";
+                if (!string.IsNullOrEmpty(result.RunnerUpEngine))
+                    engineInfo += $", 2nd={result.RunnerUpEngine}({result.RunnerUpPartCount}pcs/{result.RunnerUpTimeMs}ms)";
+                if (!string.IsNullOrEmpty(result.ThirdPlaceEngine))
+                    engineInfo += $", 3rd={result.ThirdPlaceEngine}({result.ThirdPlacePartCount}pcs/{result.ThirdPlaceTimeMs}ms)";
+                Console.WriteLine($"  {size.Length}x{size.Width} - {result.PartCount}pcs, {result.Utilization:P1}, {sizeSw.ElapsedMilliseconds}ms [{engineInfo}] angles={result.AngleResults.Count}");
 
                 string savedFilePath = null;
                 if (saveDir != null)
@@ -258,7 +263,7 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                     writer.Write(savedFilePath);
                 }
 
-                db.AddRun(partId, size.Width, size.Length, s, result, savedFilePath);
+                db.AddRun(partId, size.Width, size.Length, s, result, savedFilePath, result.AngleResults);
                 runsThisPart++;
                 totalRuns++;
             }

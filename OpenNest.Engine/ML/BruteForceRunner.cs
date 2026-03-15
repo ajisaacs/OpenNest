@@ -25,9 +25,10 @@ namespace OpenNest.Engine.ML
 
     public static class BruteForceRunner
     {
-        public static BruteForceResult Run(Drawing drawing, Plate plate)
+        public static BruteForceResult Run(Drawing drawing, Plate plate, bool forceFullAngleSweep = false)
         {
             var engine = new NestEngine(plate);
+            engine.ForceFullAngleSweep = forceFullAngleSweep;
             var item = new NestItem { Drawing = drawing };
 
             var sw = Stopwatch.StartNew();
