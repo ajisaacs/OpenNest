@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.Converters;
 using OpenNest.Engine.BestFit;
+using OpenNest.Engine.ML;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using OpenNest.RectanglePacking;
@@ -129,6 +130,32 @@ namespace OpenNest
                 }
             }
 
+            // When the work area triggers a full sweep (and we're not forcing it for training),
+            // try ML angle prediction to reduce the sweep.
+            if (!ForceFullAngleSweep && angles.Count > 2)
+            {
+                var features = FeatureExtractor.Extract(item.Drawing);
+                if (features != null)
+                {
+                    var predicted = AnglePredictor.PredictAngles(
+                        features, workArea.Width, workArea.Length);
+
+                    if (predicted != null)
+                    {
+                        // Use predicted angles, but always keep bestRotation and bestRotation + 90.
+                        var mlAngles = new List<double>(predicted);
+
+                        if (!mlAngles.Any(a => a.IsEqualTo(bestRotation)))
+                            mlAngles.Add(bestRotation);
+                        if (!mlAngles.Any(a => a.IsEqualTo(bestRotation + Angle.HalfPI)))
+                            mlAngles.Add(bestRotation + Angle.HalfPI);
+
+                        Debug.WriteLine($"[FindBestFill] ML: {angles.Count} angles -> {mlAngles.Count} predicted");
+                        angles = mlAngles;
+                    }
+                }
+            }
+
             // Try pair-based approach first.
             var pairResult = FillWithPairs(item, workArea);
             var best = pairResult;
@@ -211,6 +238,32 @@ namespace OpenNest
                     {
                         if (!angles.Any(existing => existing.IsEqualTo(a)))
                             angles.Add(a);
+                    }
+                }
+
+                // When the work area triggers a full sweep (and we're not forcing it for training),
+                // try ML angle prediction to reduce the sweep.
+                if (!ForceFullAngleSweep && angles.Count > 2)
+                {
+                    var features = FeatureExtractor.Extract(item.Drawing);
+                    if (features != null)
+                    {
+                        var predicted = AnglePredictor.PredictAngles(
+                            features, workArea.Width, workArea.Length);
+
+                        if (predicted != null)
+                        {
+                            // Use predicted angles, but always keep bestRotation and bestRotation + 90.
+                            var mlAngles = new List<double>(predicted);
+
+                            if (!mlAngles.Any(a => a.IsEqualTo(bestRotation)))
+                                mlAngles.Add(bestRotation);
+                            if (!mlAngles.Any(a => a.IsEqualTo(bestRotation + Angle.HalfPI)))
+                                mlAngles.Add(bestRotation + Angle.HalfPI);
+
+                            Debug.WriteLine($"[FindBestFill] ML: {angles.Count} angles -> {mlAngles.Count} predicted");
+                            angles = mlAngles;
+                        }
                     }
                 }
 
