@@ -364,7 +364,7 @@ namespace OpenNest.Geometry
         public override bool Intersects(Arc arc)
         {
             List<Vector> pts;
-            return Helper.Intersects(arc, this, out pts);
+            return Intersect.Intersects(arc, this, out pts);
         }
 
         /// <summary>
@@ -375,7 +375,7 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public override bool Intersects(Arc arc, out List<Vector> pts)
         {
-            return Helper.Intersects(arc, this, out pts);
+            return Intersect.Intersects(arc, this, out pts);
         }
 
         /// <summary>
@@ -386,7 +386,7 @@ namespace OpenNest.Geometry
         public override bool Intersects(Circle circle)
         {
             List<Vector> pts;
-            return Helper.Intersects(circle, this, out pts);
+            return Intersect.Intersects(circle, this, out pts);
         }
 
         /// <summary>
@@ -397,7 +397,7 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public override bool Intersects(Circle circle, out List<Vector> pts)
         {
-            return Helper.Intersects(circle, this, out pts);
+            return Intersect.Intersects(circle, this, out pts);
         }
 
         /// <summary>
@@ -408,7 +408,7 @@ namespace OpenNest.Geometry
         public override bool Intersects(Line line)
         {
             List<Vector> pts;
-            return Helper.Intersects(line, this, out pts);
+            return Intersect.Intersects(line, this, out pts);
         }
 
         /// <summary>
@@ -419,7 +419,7 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public override bool Intersects(Line line, out List<Vector> pts)
         {
-            return Helper.Intersects(line, this, out pts);
+            return Intersect.Intersects(line, this, out pts);
         }
 
         /// <summary>
@@ -430,7 +430,7 @@ namespace OpenNest.Geometry
         public override bool Intersects(Polygon polygon)
         {
             List<Vector> pts;
-            return Helper.Intersects(this, polygon, out pts);
+            return Intersect.Intersects(this, polygon, out pts);
         }
 
         /// <summary>
@@ -441,7 +441,7 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public override bool Intersects(Polygon polygon, out List<Vector> pts)
         {
-            return Helper.Intersects(this, polygon, out pts);
+            return Intersect.Intersects(this, polygon, out pts);
         }
 
         /// <summary>
@@ -452,7 +452,7 @@ namespace OpenNest.Geometry
         public override bool Intersects(Shape shape)
         {
             List<Vector> pts;
-            return Helper.Intersects(shape, this, out pts);
+            return Intersect.Intersects(shape, this, out pts);
         }
 
         /// <summary>
@@ -463,7 +463,7 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public override bool Intersects(Shape shape, out List<Vector> pts)
         {
-            return Helper.Intersects(shape, this, out pts);
+            return Intersect.Intersects(shape, this, out pts);
         }
 
         /// <summary>
