@@ -18,49 +18,91 @@ namespace OpenNest
         /// Everything already on the plate (excluding movingParts) is treated
         /// as stationary obstacles.
         /// </summary>
+        private const double RepeatThreshold = 0.01;
+        private const int MaxIterations = 20;
+
         public static void Compact(List<Part> movingParts, Plate plate)
         {
             if (movingParts == null || movingParts.Count == 0)
                 return;
 
-            Push(movingParts, plate, PushDirection.Left);
-            Push(movingParts, plate, PushDirection.Down);
+            var savedPositions = SavePositions(movingParts);
+
+            // Try left-first.
+            var leftFirst = CompactLoop(movingParts, plate, PushDirection.Left, PushDirection.Down);
+
+            // Restore and try down-first.
+            RestorePositions(movingParts, savedPositions);
+            var downFirst = CompactLoop(movingParts, plate, PushDirection.Down, PushDirection.Left);
+
+            // Keep left-first if it traveled further.
+            if (leftFirst > downFirst)
+            {
+                RestorePositions(movingParts, savedPositions);
+                CompactLoop(movingParts, plate, PushDirection.Left, PushDirection.Down);
+            }
         }
 
-        private static void Push(List<Part> movingParts, Plate plate, PushDirection direction)
+        private static double CompactLoop(List<Part> parts, Plate plate,
+            PushDirection first, PushDirection second)
         {
-            // Start with parts already on the plate (excluding the moving group).
+            var total = 0.0;
+
+            for (var i = 0; i < MaxIterations; i++)
+            {
+                var a = Push(parts, plate, first);
+                var b = Push(parts, plate, second);
+                total += a + b;
+
+                if (a <= RepeatThreshold && b <= RepeatThreshold)
+                    break;
+            }
+
+            return total;
+        }
+
+        private static Vector[] SavePositions(List<Part> parts)
+        {
+            var positions = new Vector[parts.Count];
+            for (var i = 0; i < parts.Count; i++)
+                positions[i] = parts[i].Location;
+            return positions;
+        }
+
+        private static void RestorePositions(List<Part> parts, Vector[] positions)
+        {
+            for (var i = 0; i < parts.Count; i++)
+                parts[i].Location = positions[i];
+        }
+
+        public static double Push(List<Part> movingParts, Plate plate, PushDirection direction)
+        {
             var obstacleParts = plate.Parts
                 .Where(p => !movingParts.Contains(p))
                 .ToList();
 
-            var obstacleBoxes = new List<Box>(obstacleParts.Count + movingParts.Count);
-            var obstacleLines = new List<List<Line>>(obstacleParts.Count + movingParts.Count);
+            var obstacleBoxes = new Box[obstacleParts.Count];
+            var obstacleLines = new List<Line>[obstacleParts.Count];
 
             for (var i = 0; i < obstacleParts.Count; i++)
-            {
-                obstacleBoxes.Add(obstacleParts[i].BoundingBox);
-                obstacleLines.Add(null); // lazy
-            }
+                obstacleBoxes[i] = obstacleParts[i].BoundingBox;
 
             var opposite = Helper.OppositeDirection(direction);
             var halfSpacing = plate.PartSpacing / 2;
             var isHorizontal = Helper.IsHorizontalDirection(direction);
             var workArea = plate.WorkArea();
+            var distance = double.MaxValue;
 
             foreach (var moving in movingParts)
             {
-                var distance = double.MaxValue;
-                var movingBox = moving.BoundingBox;
-
-                // Plate edge distance.
-                var edgeDist = Helper.EdgeDistance(movingBox, workArea, direction);
+                var edgeDist = Helper.EdgeDistance(moving.BoundingBox, workArea, direction);
                 if (edgeDist > 0 && edgeDist < distance)
                     distance = edgeDist;
 
+                var movingBox = moving.BoundingBox;
                 List<Line> movingLines = null;
 
-                for (var i = 0; i < obstacleBoxes.Count; i++)
+                for (var i = 0; i < obstacleBoxes.Length; i++)
                 {
                     var gap = Helper.DirectionalGap(movingBox, obstacleBoxes[i], direction);
                     if (gap < 0 || gap >= distance)
@@ -77,32 +119,25 @@ namespace OpenNest
                         ? Helper.GetOffsetPartLines(moving, halfSpacing, direction, ChordTolerance)
                         : Helper.GetPartLines(moving, direction, ChordTolerance);
 
-                    var obstaclePart = i < obstacleParts.Count ? obstacleParts[i] : null;
-
-                    obstacleLines[i] ??= obstaclePart != null
-                        ? (halfSpacing > 0
-                            ? Helper.GetOffsetPartLines(obstaclePart, halfSpacing, opposite, ChordTolerance)
-                            : Helper.GetPartLines(obstaclePart, opposite, ChordTolerance))
-                        : (halfSpacing > 0
-                            ? Helper.GetOffsetPartLines(moving, halfSpacing, opposite, ChordTolerance)
-                            : Helper.GetPartLines(moving, opposite, ChordTolerance));
+                    obstacleLines[i] ??= halfSpacing > 0
+                        ? Helper.GetOffsetPartLines(obstacleParts[i], halfSpacing, opposite, ChordTolerance)
+                        : Helper.GetPartLines(obstacleParts[i], opposite, ChordTolerance);
 
                     var d = Helper.DirectionalDistance(movingLines, obstacleLines[i], direction);
                     if (d < distance)
                         distance = d;
                 }
-
-                if (distance < double.MaxValue && distance > 0)
-                {
-                    var offset = Helper.DirectionToOffset(direction, distance);
-                    moving.Offset(offset);
-                }
-
-                // This part is now an obstacle for subsequent moving parts.
-                obstacleBoxes.Add(moving.BoundingBox);
-                obstacleParts.Add(moving);
-                obstacleLines.Add(null); // will be lazily computed if needed
             }
+
+            if (distance < double.MaxValue && distance > 0)
+            {
+                var offset = Helper.DirectionToOffset(direction, distance);
+                foreach (var moving in movingParts)
+                    moving.Offset(offset);
+                return distance;
+            }
+
+            return 0;
         }
     }
 }

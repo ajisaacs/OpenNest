@@ -837,7 +837,7 @@ namespace OpenNest.Controls
                 var parts = await Task.Run(() =>
                     engine.Fill(groupParts, workArea, progress, cts.Token));
 
-                if (parts.Count > 0)
+                if (parts.Count > 0 && !cts.IsCancellationRequested)
                 {
                     AcceptTemporaryParts();
                     sw.Stop();
@@ -937,65 +937,9 @@ namespace OpenNest.Controls
 
         public void PushSelected(PushDirection direction)
         {
-            var stationaryParts = parts.Where(p => !p.IsSelected && !SelectedParts.Contains(p)).ToList();
-            var stationaryBoxes = new Box[stationaryParts.Count];
-            var stationaryLines = new List<Line>[stationaryParts.Count];
-
-            var opposite = Helper.OppositeDirection(direction);
-            var halfSpacing = Plate.PartSpacing / 2;
-            var isHorizontal = Helper.IsHorizontalDirection(direction);
-
-            for (var i = 0; i < stationaryParts.Count; i++)
-                stationaryBoxes[i] = stationaryParts[i].BoundingBox;
-
-            var workArea = Plate.WorkArea();
-            var distance = double.MaxValue;
-
-            foreach (var selected in SelectedParts)
-            {
-                // Check plate edge first to tighten the upper bound.
-                var edgeDist = Helper.EdgeDistance(selected.BoundingBox, workArea, direction);
-                if (edgeDist > 0 && edgeDist < distance)
-                    distance = edgeDist;
-
-                var movingBox = selected.BoundingBox;
-                List<Line> movingLines = null;
-
-                for (var i = 0; i < stationaryBoxes.Length; i++)
-                {
-                    // Skip parts not ahead in the push direction or further than current best.
-                    var gap = Helper.DirectionalGap(movingBox, stationaryBoxes[i], direction);
-                    if (gap < 0 || gap >= distance)
-                        continue;
-
-                    var perpOverlap = isHorizontal
-                        ? movingBox.IsHorizontalTo(stationaryBoxes[i], out _)
-                        : movingBox.IsVerticalTo(stationaryBoxes[i], out _);
-
-                    if (!perpOverlap)
-                        continue;
-
-                    // Compute lines lazily — only for parts that survive bounding box checks.
-                    movingLines ??= halfSpacing > 0
-                        ? Helper.GetOffsetPartLines(selected.BasePart, halfSpacing, direction, OffsetTolerance)
-                        : Helper.GetPartLines(selected.BasePart, direction, OffsetTolerance);
-
-                    stationaryLines[i] ??= halfSpacing > 0
-                        ? Helper.GetOffsetPartLines(stationaryParts[i].BasePart, halfSpacing, opposite, OffsetTolerance)
-                        : Helper.GetPartLines(stationaryParts[i].BasePart, opposite, OffsetTolerance);
-
-                    var d = Helper.DirectionalDistance(movingLines, stationaryLines[i], direction);
-                    if (d < distance)
-                        distance = d;
-                }
-            }
-
-            if (distance < double.MaxValue && distance > 0)
-            {
-                var offset = Helper.DirectionToOffset(direction, distance);
-                SelectedParts.ForEach(p => p.Offset(offset));
-                Invalidate();
-            }
+            var movingParts = SelectedParts.Select(p => p.BasePart).ToList();
+            Compactor.Push(movingParts, Plate, direction);
+            Invalidate();
         }
 
         private string GetDisplayName(Type type)
