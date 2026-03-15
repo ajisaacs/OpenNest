@@ -1,5 +1,3 @@
-using OpenNest.Math;
-
 namespace OpenNest.Math
 {
     public static class Rounding
