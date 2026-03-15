@@ -10,4 +10,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.17.3" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Models\**" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Models')" />
+  </ItemGroup>
 </Project>

@@ -12,7 +12,7 @@ namespace OpenNest.Engine.ML
     public static class AnglePredictor
     {
         private static InferenceSession _session;
-        private static bool _loadAttempted;
+        private static volatile bool _loadAttempted;
         private static readonly object _lock = new();
 
         public static List<double> PredictAngles(
