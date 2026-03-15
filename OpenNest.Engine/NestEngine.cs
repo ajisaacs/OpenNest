@@ -594,12 +594,16 @@ namespace OpenNest
             {
                 var stripCandidates = bestFits
                     .Where(r => r.ShortestSide <= workShortSide + Tolerance.Epsilon
-                             && r.Utilization >= 0.3);
+                             && r.Utilization >= 0.3)
+                    .OrderByDescending(r => r.Utilization);
 
                 var existing = new HashSet<BestFitResult>(top);
 
                 foreach (var r in stripCandidates)
                 {
+                    if (top.Count >= 100)
+                        break;
+
                     if (existing.Add(r))
                         top.Add(r);
                 }
