@@ -9,7 +9,7 @@ namespace OpenNest.Converters
     {
         public static Program ToProgram(IList<Entity> geometry)
         {
-            var shapes = Helper.GetShapes(geometry);
+            var shapes = ShapeBuilder.GetShapes(geometry);
 
             if (shapes.Count == 0)
                 return null;

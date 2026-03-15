@@ -116,7 +116,7 @@ namespace OpenNest.Engine.BestFit
         {
             var entities = ConvertProgram.ToGeometry(drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
-            var shapes = Helper.GetShapes(entities);
+            var shapes = ShapeBuilder.GetShapes(entities);
 
             var points = new List<Vector>();
 

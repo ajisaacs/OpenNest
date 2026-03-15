@@ -17,7 +17,7 @@ namespace OpenNest
             var entities = ConvertProgram.ToGeometry(item.Drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
 
-            var shapes = Helper.GetShapes(entities);
+            var shapes = ShapeBuilder.GetShapes(entities);
 
             if (shapes.Count == 0)
                 return 0;
@@ -65,7 +65,7 @@ namespace OpenNest
                 var entities = ConvertProgram.ToGeometry(part.Program)
                     .Where(e => e.Layer != SpecialLayers.Rapid);
 
-                var shapes = Helper.GetShapes(entities);
+                var shapes = ShapeBuilder.GetShapes(entities);
 
                 foreach (var shape in shapes)
                 {

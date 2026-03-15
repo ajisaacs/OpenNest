@@ -16,7 +16,7 @@ namespace OpenNest.Geometry
 
         private void Update(List<Entity> entities)
         {
-            var shapes = Helper.GetShapes(entities);
+            var shapes = ShapeBuilder.GetShapes(entities);
 
             Perimeter = shapes[0];
             Cutouts = new List<Shape>();

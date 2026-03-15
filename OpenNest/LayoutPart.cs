@@ -134,7 +134,7 @@ namespace OpenNest
         {
             var result = new List<PointF[]>();
             var entities = ConvertProgram.ToGeometry(BasePart.Program);
-            var shapes = Helper.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var shapes = ShapeBuilder.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
 
             foreach (var shape in shapes)
             {

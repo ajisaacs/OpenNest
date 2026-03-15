@@ -103,7 +103,7 @@ namespace OpenNest.Engine.BestFit
         {
             var entities = ConvertProgram.ToGeometry(part.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
-            var shapes = Helper.GetShapes(entities);
+            var shapes = ShapeBuilder.GetShapes(entities);
             shapes.ForEach(s => s.Offset(part.Location));
             return shapes;
         }
@@ -112,7 +112,7 @@ namespace OpenNest.Engine.BestFit
         {
             var entities = ConvertProgram.ToGeometry(part.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
-            var shapes = Helper.GetShapes(entities);
+            var shapes = ShapeBuilder.GetShapes(entities);
             var points = new List<Vector>();
 
             foreach (var shape in shapes)

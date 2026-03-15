@@ -11,7 +11,7 @@ namespace OpenNest
         public static TimingInfo GetTimingInfo(Program pgm)
         {
             var entities = ConvertProgram.ToGeometry(pgm);
-            var shapes = Helper.GetShapes(entities.Where(entity => entity.Layer != SpecialLayers.Rapid));
+            var shapes = ShapeBuilder.GetShapes(entities.Where(entity => entity.Layer != SpecialLayers.Rapid));
             var info = new TimingInfo { PierceCount = shapes.Count };
 
             var last = entities[0];

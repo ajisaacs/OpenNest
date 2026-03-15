@@ -65,7 +65,7 @@ namespace OpenNest
         public void UpdateArea()
         {
             var geometry = ConvertProgram.ToGeometry(Program).Where(entity => entity.Layer != SpecialLayers.Rapid);
-            var shapes = Helper.GetShapes(geometry);
+            var shapes = ShapeBuilder.GetShapes(geometry);
 
             if (shapes.Count == 0)
                 return;
