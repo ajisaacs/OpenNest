@@ -77,17 +77,16 @@ namespace OpenNest
         {
             var bboxDim = GetDimension(partA.BoundingBox, direction);
             var pushDir = GetPushDirection(direction);
-            var opposite = Helper.OppositeDirection(pushDir);
 
-            var locationB = partA.Location + MakeOffset(direction, bboxDim);
+            var locationBOffset = MakeOffset(direction, bboxDim);
 
-            var movingLines = boundary.GetLines(locationB, pushDir);
-            var stationaryLines = boundary.GetLines(partA.Location, opposite);
-            var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
+            // Use the most efficient array-based overload to avoid all allocations.
+            var slideDistance = Helper.DirectionalDistance(
+                boundary.GetEdges(pushDir), partA.Location + locationBOffset,
+                boundary.GetEdges(Helper.OppositeDirection(pushDir)), partA.Location,
+                pushDir);
 
-            var copyDist = ComputeCopyDistance(bboxDim, slideDistance);
-            //System.Diagnostics.Debug.WriteLine($"[FindCopyDistance] dir={direction} bboxDim={bboxDim:F4} slide={slideDistance:F4} copyDist={copyDist:F4} spacing={PartSpacing:F4} locA={partA.Location} locB={locationB} movingEdges={movingLines.Count} stationaryEdges={stationaryLines.Count}");
-            return copyDist;
+            return ComputeCopyDistance(bboxDim, slideDistance);
         }
 
         /// <summary>
@@ -107,7 +106,6 @@ namespace OpenNest
 
             // Compute a starting offset large enough that every part-pair in
             // patternB has its offset geometry beyond patternA's offset geometry.
-            // max(aUpper_i - bLower_j) = max(aUpper) - min(bLower).
             var maxUpper = double.MinValue;
             var minLower = double.MaxValue;
 
@@ -126,22 +124,28 @@ namespace OpenNest
 
             var offset = MakeOffset(direction, startOffset);
 
-            // Pre-compute stationary lines for patternA parts.
-            var stationaryCache = new List<Line>[patternA.Parts.Count];
+            // Pre-cache edge arrays.
+            var movingEdges = new (Vector start, Vector end)[patternA.Parts.Count][];
+            var stationaryEdges = new (Vector start, Vector end)[patternA.Parts.Count][];
 
             for (var i = 0; i < patternA.Parts.Count; i++)
-                stationaryCache[i] = boundaries[i].GetLines(patternA.Parts[i].Location, opposite);
+            {
+                movingEdges[i] = boundaries[i].GetEdges(pushDir);
+                stationaryEdges[i] = boundaries[i].GetEdges(opposite);
+            }
 
             var maxCopyDistance = 0.0;
 
             for (var j = 0; j < patternA.Parts.Count; j++)
             {
                 var locationB = patternA.Parts[j].Location + offset;
-                var movingLines = boundaries[j].GetLines(locationB, pushDir);
 
                 for (var i = 0; i < patternA.Parts.Count; i++)
                 {
-                    var slideDistance = Helper.DirectionalDistance(movingLines, stationaryCache[i], pushDir);
+                    var slideDistance = Helper.DirectionalDistance(
+                        movingEdges[j], locationB,
+                        stationaryEdges[i], patternA.Parts[i].Location,
+                        pushDir);
 
                     if (slideDistance >= double.MaxValue || slideDistance < 0)
                         continue;
@@ -153,9 +157,7 @@ namespace OpenNest
                 }
             }
 
-            // Fallback: if no pair interacted (shouldn't happen for real parts),
-            // use the simple bounding-box + spacing distance.
-            if (maxCopyDistance <= 0)
+            if (maxCopyDistance < Tolerance.Epsilon)
                 return bboxDim + PartSpacing;
 
             return maxCopyDistance;
@@ -166,19 +168,8 @@ namespace OpenNest
         /// </summary>
         private double FindSinglePartPatternCopyDistance(Pattern patternA, NestDirection direction, PartBoundary boundary)
         {
-            var bboxDim = GetDimension(patternA.BoundingBox, direction);
-            var pushDir = GetPushDirection(direction);
-            var opposite = Helper.OppositeDirection(pushDir);
-
-            var offset = MakeOffset(direction, bboxDim);
-
-            var movingLines = GetOffsetPatternLines(patternA, offset, boundary, pushDir);
-            var stationaryLines = GetPatternLines(patternA, boundary, opposite);
-            var slideDistance = Helper.DirectionalDistance(movingLines, stationaryLines, pushDir);
-
-            var copyDist = ComputeCopyDistance(bboxDim, slideDistance);
-            //System.Diagnostics.Debug.WriteLine($"[FindSinglePartPatternCopyDist] dir={direction} bboxDim={bboxDim:F4} slide={slideDistance:F4} copyDist={copyDist:F4} spacing={PartSpacing:F4} patternParts={patternA.Parts.Count} movingEdges={movingLines.Count} stationaryEdges={stationaryLines.Count}");
-            return copyDist;
+            var template = patternA.Parts[0];
+            return FindCopyDistance(template, direction, boundary);
         }
 
         /// <summary>
@@ -330,54 +321,46 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Recursively fills the work area. At depth 0, tiles the pattern along the
-        /// primary axis, then recurses perpendicular. At depth 1, tiles and returns.
+        /// Fills the work area by tiling the pattern along the primary axis to form
+        /// a row, then tiling that row along the perpendicular axis to form a grid.
         /// After the grid is formed, fills the remaining strip with individual parts.
         /// </summary>
-        private List<Part> FillRecursive(Pattern pattern, NestDirection direction, int depth)
+        private List<Part> FillGrid(Pattern pattern, NestDirection direction)
         {
+            var perpAxis = PerpendicularAxis(direction);
             var boundaries = CreateBoundaries(pattern);
-            var result = new List<Part>(pattern.Parts);
-            result.AddRange(TilePattern(pattern, direction, boundaries));
 
-            if (depth == 0 && result.Count > pattern.Parts.Count)
+            // Step 1: Tile along primary axis
+            var row = new List<Part>(pattern.Parts);
+            row.AddRange(TilePattern(pattern, direction, boundaries));
+
+            // If primary tiling didn't produce copies, just tile along perpendicular
+            if (row.Count <= pattern.Parts.Count)
             {
-                var rowPattern = new Pattern();
-                rowPattern.Parts.AddRange(result);
-                rowPattern.UpdateBounds();
-                var perpAxis = PerpendicularAxis(direction);
-                var gridResult = FillRecursive(rowPattern, perpAxis, depth + 1);
-
-                //System.Diagnostics.Debug.WriteLine($"[FillRecursive] Grid: {gridResult.Count} parts, rowSize={rowPattern.Parts.Count}, dir={direction}");
-
-                // Fill the remaining strip (after the last full row/column)
-                // with individual parts from the seed pattern.
-                var remaining = FillRemainingStrip(gridResult, pattern, perpAxis, direction);
-
-                //System.Diagnostics.Debug.WriteLine($"[FillRecursive] Remainder: {remaining.Count} parts");
-
-                if (remaining.Count > 0)
-                    gridResult.AddRange(remaining);
-
-                // Try one fewer row/column — the larger remainder strip may
-                // fit more parts than the extra row contained.
-                var fewerResult = TryFewerRows(gridResult, rowPattern, pattern, perpAxis, direction);
-
-                //System.Diagnostics.Debug.WriteLine($"[FillRecursive] TryFewerRows: {fewerResult?.Count ?? -1} vs grid+remainder={gridResult.Count}");
-
-                if (fewerResult != null && fewerResult.Count > gridResult.Count)
-                    return fewerResult;
-
-                return gridResult;
+                row.AddRange(TilePattern(pattern, perpAxis, boundaries));
+                return row;
             }
 
-            if (depth == 0)
-            {
-                // Single part didn't tile along primary — still try perpendicular.
-                return FillRecursive(pattern, PerpendicularAxis(direction), depth + 1);
-            }
+            // Step 2: Build row pattern and tile along perpendicular axis
+            var rowPattern = new Pattern();
+            rowPattern.Parts.AddRange(row);
+            rowPattern.UpdateBounds();
 
-            return result;
+            var rowBoundaries = CreateBoundaries(rowPattern);
+            var gridResult = new List<Part>(rowPattern.Parts);
+            gridResult.AddRange(TilePattern(rowPattern, perpAxis, rowBoundaries));
+
+            // Step 3: Fill remaining strip
+            var remaining = FillRemainingStrip(gridResult, pattern, perpAxis, direction);
+            if (remaining.Count > 0)
+                gridResult.AddRange(remaining);
+
+            // Step 4: Try fewer rows optimization
+            var fewerResult = TryFewerRows(gridResult, rowPattern, pattern, perpAxis, direction);
+            if (fewerResult != null && fewerResult.Count > gridResult.Count)
+                return fewerResult;
+
+            return gridResult;
         }
 
         /// <summary>
@@ -390,36 +373,15 @@ namespace OpenNest
         {
             var rowPartCount = rowPattern.Parts.Count;
 
-            //System.Diagnostics.Debug.WriteLine($"[TryFewerRows] fullResult={fullResult.Count}, rowPartCount={rowPartCount}, tiledAxis={tiledAxis}");
-
-            // Need at least 2 rows for this to make sense (remove 1, keep 1+).
             if (fullResult.Count < rowPartCount * 2)
-            {
-                //System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Skipped: too few parts for 2 rows");
                 return null;
-            }
 
-            // Remove the last row's worth of parts.
             var fewerParts = new List<Part>(fullResult.Count - rowPartCount);
 
             for (var i = 0; i < fullResult.Count - rowPartCount; i++)
                 fewerParts.Add(fullResult[i]);
 
-            // Find the top/right edge of the kept parts for logging.
-            var edge = double.MinValue;
-            foreach (var part in fewerParts)
-            {
-                var e = tiledAxis == NestDirection.Vertical
-                    ? part.BoundingBox.Top
-                    : part.BoundingBox.Right;
-                if (e > edge) edge = e;
-            }
-
-            //System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Kept {fewerParts.Count} parts, edge={edge:F2}, workArea={WorkArea}");
-
             var remaining = FillRemainingStrip(fewerParts, seedPattern, tiledAxis, primaryAxis);
-
-            //System.Diagnostics.Debug.WriteLine($"[TryFewerRows] Remainder fill: {remaining.Count} parts (need > {rowPartCount} to improve)");
 
             if (remaining.Count <= rowPartCount)
                 return null;
@@ -438,7 +400,18 @@ namespace OpenNest
             List<Part> placedParts, Pattern seedPattern,
             NestDirection tiledAxis, NestDirection primaryAxis)
         {
-            // Find the furthest edge of placed parts along the tiled axis.
+            var placedEdge = FindPlacedEdge(placedParts, tiledAxis);
+            var remainingStrip = BuildRemainingStrip(placedEdge, tiledAxis);
+
+            if (remainingStrip == null)
+                return new List<Part>();
+
+            var rotations = BuildRotationSet(seedPattern);
+            return FindBestFill(rotations, remainingStrip);
+        }
+
+        private static double FindPlacedEdge(List<Part> placedParts, NestDirection tiledAxis)
+        {
             var placedEdge = double.MinValue;
 
             foreach (var part in placedParts)
@@ -451,18 +424,20 @@ namespace OpenNest
                     placedEdge = edge;
             }
 
-            // Build the remaining strip with a spacing gap from the last tiled row.
-            Box remainingStrip;
+            return placedEdge;
+        }
 
+        private Box BuildRemainingStrip(double placedEdge, NestDirection tiledAxis)
+        {
             if (tiledAxis == NestDirection.Vertical)
             {
                 var bottom = placedEdge + PartSpacing;
                 var height = WorkArea.Top - bottom;
 
                 if (height <= Tolerance.Epsilon)
-                    return new List<Part>();
+                    return null;
 
-                remainingStrip = new Box(WorkArea.X, bottom, WorkArea.Width, height);
+                return new Box(WorkArea.X, bottom, WorkArea.Width, height);
             }
             else
             {
@@ -470,18 +445,20 @@ namespace OpenNest
                 var width = WorkArea.Right - left;
 
                 if (width <= Tolerance.Epsilon)
-                    return new List<Part>();
+                    return null;
 
-                remainingStrip = new Box(left, WorkArea.Y, width, WorkArea.Length);
+                return new Box(left, WorkArea.Y, width, WorkArea.Length);
             }
+        }
 
-            // Build rotation set: always try cardinal orientations (0° and 90°),
-            // plus any unique rotations from the seed pattern.
-            var filler = new FillLinear(remainingStrip, PartSpacing);
-            List<Part> best = null;
+        /// <summary>
+        /// Builds a set of (drawing, rotation) candidates: cardinal orientations
+        /// (0° and 90°) for each unique drawing, plus any seed pattern rotations
+        /// not already covered.
+        /// </summary>
+        private static List<(Drawing drawing, double rotation)> BuildRotationSet(Pattern seedPattern)
+        {
             var rotations = new List<(Drawing drawing, double rotation)>();
-
-            // Cardinal rotations for each unique drawing.
             var drawings = new List<Drawing>();
 
             foreach (var seedPart in seedPattern.Parts)
@@ -507,7 +484,6 @@ namespace OpenNest
                 rotations.Add((drawing, Angle.HalfPI));
             }
 
-            // Add seed pattern rotations that aren't already covered.
             foreach (var seedPart in seedPattern.Parts)
             {
                 var skip = false;
@@ -525,20 +501,31 @@ namespace OpenNest
                     rotations.Add((seedPart.BaseDrawing, seedPart.Rotation));
             }
 
+            return rotations;
+        }
+
+        /// <summary>
+        /// Tries all rotation candidates in both directions in parallel, returns the
+        /// fill with the most parts.
+        /// </summary>
+        private List<Part> FindBestFill(List<(Drawing drawing, double rotation)> rotations, Box strip)
+        {
             var bag = new System.Collections.Concurrent.ConcurrentBag<List<Part>>();
 
-            System.Threading.Tasks.Parallel.ForEach(rotations, entry =>
+            foreach (var entry in rotations)
             {
-                var localFiller = new FillLinear(remainingStrip, PartSpacing);
-                var h = localFiller.Fill(entry.drawing, entry.rotation, NestDirection.Horizontal);
-                var v = localFiller.Fill(entry.drawing, entry.rotation, NestDirection.Vertical);
+                var filler = new FillLinear(strip, PartSpacing);
+                var h = filler.Fill(entry.drawing, entry.rotation, NestDirection.Horizontal);
+                var v = filler.Fill(entry.drawing, entry.rotation, NestDirection.Vertical);
 
                 if (h != null && h.Count > 0)
                     bag.Add(h);
 
                 if (v != null && v.Count > 0)
                     bag.Add(v);
-            });
+            }
+
+            List<Part> best = null;
 
             foreach (var candidate in bag)
             {
@@ -604,7 +591,7 @@ namespace OpenNest
                 basePattern.BoundingBox.Length > WorkArea.Length + Tolerance.Epsilon)
                 return new List<Part>();
 
-            return FillRecursive(basePattern, primaryAxis, depth: 0);
+            return FillGrid(basePattern, primaryAxis);
         }
 
         /// <summary>
@@ -618,7 +605,7 @@ namespace OpenNest
             if (seed.Parts.Count == 0)
                 return new List<Part>();
 
-            return FillRecursive(seed, primaryAxis, depth: 0);
+            return FillGrid(seed, primaryAxis);
         }
     }
 }
