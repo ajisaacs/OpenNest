@@ -121,9 +121,9 @@ namespace OpenNest
 
             // Binary search: try shrinking each dimension.
             Debug.WriteLine($"[FillExact] Starting binary search (capacity={capacity} > target={item.Quantity})");
-            var (lengthFound, lengthDim) = BinarySearchFill(item, workArea, shrinkWidth: false, token);
+            var (lengthFound, lengthDim) = BinarySearchFill(item, workArea, shrinkWidth: false, progress, token);
             Debug.WriteLine($"[FillExact] Shrink-length: found={lengthFound}, dim={lengthDim:F1}");
-            var (widthFound, widthDim) = BinarySearchFill(item, workArea, shrinkWidth: true, token);
+            var (widthFound, widthDim) = BinarySearchFill(item, workArea, shrinkWidth: true, progress, token);
             Debug.WriteLine($"[FillExact] Shrink-width: found={widthFound}, dim={widthDim:F1}");
 
             // Pick winner by smallest test box area. Tie-break: prefer shrink-length.
@@ -159,7 +159,7 @@ namespace OpenNest
         /// </summary>
         private (bool found, double usedDim) BinarySearchFill(
             NestItem item, Box workArea, bool shrinkWidth,
-            CancellationToken token)
+            IProgress<NestProgress> progress, CancellationToken token)
         {
             var quantity = item.Quantity;
             var partBox = item.Drawing.Program.BoundingBox();
@@ -204,7 +204,7 @@ namespace OpenNest
                 // Fill with unlimited qty to get the true count for this box size.
                 // After the first iteration, angle pruning kicks in and makes this fast.
                 var searchItem = new NestItem { Drawing = item.Drawing, Quantity = 0 };
-                var result = Fill(searchItem, testBox, null, token);
+                var result = Fill(searchItem, testBox, progress, token);
 
                 if (result.Count >= quantity)
                 {
