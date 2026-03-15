@@ -1170,6 +1170,47 @@ namespace OpenNest
             }
         }
 
+        public static bool IsHorizontalDirection(PushDirection direction)
+        {
+            return direction is PushDirection.Left or PushDirection.Right;
+        }
+
+        public static double EdgeDistance(Box box, Box boundary, PushDirection direction)
+        {
+            switch (direction)
+            {
+                case PushDirection.Left:  return box.Left - boundary.Left;
+                case PushDirection.Right: return boundary.Right - box.Right;
+                case PushDirection.Up:    return boundary.Top - box.Top;
+                case PushDirection.Down:  return box.Bottom - boundary.Bottom;
+                default: return double.MaxValue;
+            }
+        }
+
+        public static Vector DirectionToOffset(PushDirection direction, double distance)
+        {
+            switch (direction)
+            {
+                case PushDirection.Left:  return new Vector(-distance, 0);
+                case PushDirection.Right: return new Vector(distance, 0);
+                case PushDirection.Up:    return new Vector(0, distance);
+                case PushDirection.Down:  return new Vector(0, -distance);
+                default: return new Vector();
+            }
+        }
+
+        public static double DirectionalGap(Box from, Box to, PushDirection direction)
+        {
+            switch (direction)
+            {
+                case PushDirection.Left:  return from.Left - to.Right;
+                case PushDirection.Right: return to.Left - from.Right;
+                case PushDirection.Up:    return to.Bottom - from.Top;
+                case PushDirection.Down:  return from.Bottom - to.Top;
+                default: return double.MaxValue;
+            }
+        }
+
         public static double ClosestDistanceLeft(Box box, List<Box> boxes)
         {
             var closestDistance = double.MaxValue;
