@@ -33,6 +33,10 @@ namespace OpenNest
 
         public List<AngleResult> AngleResults { get; } = new();
 
+        // Angles that have produced results across multiple Fill calls.
+        // Populated after each Fill; used to prune subsequent fills.
+        private readonly HashSet<double> knownGoodAngles = new();
+
         // --- Public Fill API ---
 
         public bool Fill(NestItem item)
@@ -96,50 +100,56 @@ namespace OpenNest
             if (item.Quantity <= 1)
                 return Fill(item, workArea, progress, token);
 
-            // Full fill to establish upper bound.
-            var fullResult = Fill(item, workArea, progress, token);
+            // Quick capacity check: estimate how many parts fit via bounding box.
+            var partBox = item.Drawing.Program.BoundingBox();
+            var cols = (int)(workArea.Width / (partBox.Width + Plate.PartSpacing));
+            var rows = (int)(workArea.Length / (partBox.Length + Plate.PartSpacing));
+            var capacity = System.Math.Max(cols * rows, 1);
 
-            if (fullResult.Count <= item.Quantity)
-                return fullResult;
+            // Also check rotated orientation.
+            var colsR = (int)(workArea.Width / (partBox.Length + Plate.PartSpacing));
+            var rowsR = (int)(workArea.Length / (partBox.Width + Plate.PartSpacing));
+            capacity = System.Math.Max(capacity, colsR * rowsR);
+
+            Debug.WriteLine($"[FillExact] Capacity estimate: {capacity}, target: {item.Quantity}, workArea: {workArea.Width:F1}x{workArea.Length:F1}");
+
+            if (capacity <= item.Quantity)
+            {
+                // Plate can't fit more than requested — do a normal fill.
+                return Fill(item, workArea, progress, token);
+            }
 
             // Binary search: try shrinking each dimension.
-            var (lengthParts, lengthDim) = BinarySearchFill(item, workArea, shrinkWidth: false, token);
-            var (widthParts, widthDim) = BinarySearchFill(item, workArea, shrinkWidth: true, token);
+            Debug.WriteLine($"[FillExact] Starting binary search (capacity={capacity} > target={item.Quantity})");
+            var (lengthFound, lengthDim) = BinarySearchFill(item, workArea, shrinkWidth: false, token);
+            Debug.WriteLine($"[FillExact] Shrink-length: found={lengthFound}, dim={lengthDim:F1}");
+            var (widthFound, widthDim) = BinarySearchFill(item, workArea, shrinkWidth: true, token);
+            Debug.WriteLine($"[FillExact] Shrink-width: found={widthFound}, dim={widthDim:F1}");
 
             // Pick winner by smallest test box area. Tie-break: prefer shrink-length.
-            List<Part> winner;
             Box winnerBox;
 
-            var lengthArea = lengthParts != null ? workArea.Width * lengthDim : double.MaxValue;
-            var widthArea = widthParts != null ? widthDim * workArea.Length : double.MaxValue;
+            var lengthArea = lengthFound ? workArea.Width * lengthDim : double.MaxValue;
+            var widthArea = widthFound ? widthDim * workArea.Length : double.MaxValue;
 
-            if (lengthParts != null && lengthArea <= widthArea)
+            if (lengthFound && lengthArea <= widthArea)
             {
-                winner = lengthParts;
                 winnerBox = new Box(workArea.X, workArea.Y, workArea.Width, lengthDim);
             }
-            else if (widthParts != null)
+            else if (widthFound)
             {
-                winner = widthParts;
                 winnerBox = new Box(workArea.X, workArea.Y, widthDim, workArea.Length);
             }
             else
             {
-                // Neither search found the exact quantity — return full fill truncated.
-                return fullResult.Take(item.Quantity).ToList();
+                // Neither search found the exact quantity — do a normal fill.
+                return Fill(item, workArea, progress, token);
             }
 
-            // Re-run the winner with progress so PhaseResults/WinnerPhase are correct
-            // and the progress form shows the final result.
-            var finalResult = Fill(item, winnerBox, progress, token);
+            Debug.WriteLine($"[FillExact] Winner box: {winnerBox.Width:F1}x{winnerBox.Length:F1}");
 
-            if (finalResult.Count >= item.Quantity)
-                return finalResult.Count > item.Quantity
-                    ? finalResult.Take(item.Quantity).ToList()
-                    : finalResult;
-
-            // Fallback: return the binary search result if the re-run produced fewer.
-            return winner;
+            // Run the full Fill on the winning box with progress.
+            return Fill(item, winnerBox, progress, token);
         }
 
         /// <summary>
@@ -147,7 +157,7 @@ namespace OpenNest
         /// exactly item.Quantity parts. Returns the best parts list and the dimension
         /// value that achieved it.
         /// </summary>
-        private (List<Part> parts, double usedDim) BinarySearchFill(
+        private (bool found, double usedDim) BinarySearchFill(
             NestItem item, Box workArea, bool shrinkWidth,
             CancellationToken token)
         {
@@ -159,18 +169,23 @@ namespace OpenNest
             var fixedDim = shrinkWidth ? workArea.Length : workArea.Width;
             var highDim = shrinkWidth ? workArea.Width : workArea.Length;
 
-            // Estimate starting point: target area at 50% utilization.
-            var targetArea = partArea * quantity / 0.5;
+            // Estimate search range from part area and utilization assumptions.
             var minPartDim = shrinkWidth
                 ? partBox.Width + Plate.PartSpacing
                 : partBox.Length + Plate.PartSpacing;
-            var estimatedDim = System.Math.Max(minPartDim, targetArea / fixedDim);
 
-            var low = estimatedDim;
-            var high = highDim;
+            // Low: tight estimate at 70% utilization.
+            var lowEstimate = System.Math.Max(minPartDim, partArea * quantity / (0.7 * fixedDim));
+            // High: generous estimate at 25% utilization, capped to work area.
+            var highEstimate = System.Math.Min(highDim, partArea * quantity / (0.25 * fixedDim));
+            // Ensure high is at least low.
+            highEstimate = System.Math.Max(highEstimate, lowEstimate + Plate.PartSpacing);
 
-            List<Part> bestParts = null;
-            var bestDim = high;
+            var low = lowEstimate;
+            var high = highEstimate;
+
+            var found = false;
+            var bestDim = highEstimate;
 
             for (var iter = 0; iter < 8; iter++)
             {
@@ -186,14 +201,15 @@ namespace OpenNest
                     ? new Box(workArea.X, workArea.Y, mid, workArea.Length)
                     : new Box(workArea.X, workArea.Y, workArea.Width, mid);
 
-                var result = Fill(item, testBox, null, token);
+                // Fill with unlimited qty to get the true count for this box size.
+                // After the first iteration, angle pruning kicks in and makes this fast.
+                var searchItem = new NestItem { Drawing = item.Drawing, Quantity = 0 };
+                var result = Fill(searchItem, testBox, null, token);
 
                 if (result.Count >= quantity)
                 {
-                    bestParts = result.Count > quantity
-                        ? result.Take(quantity).ToList()
-                        : result;
                     bestDim = mid;
+                    found = true;
                     high = mid;
                 }
                 else
@@ -202,7 +218,7 @@ namespace OpenNest
                 }
             }
 
-            return (bestParts, bestDim);
+            return (found, bestDim);
         }
 
         public bool Fill(List<Part> groupParts)
@@ -381,6 +397,13 @@ namespace OpenNest
                 linearSw.Stop();
                 PhaseResults.Add(new PhaseResult(NestPhase.Linear, bestLinearCount, linearSw.ElapsedMilliseconds));
 
+                // Record productive angles for future fills.
+                foreach (var ar in AngleResults)
+                {
+                    if (ar.PartCount > 0)
+                        knownGoodAngles.Add(Angle.ToRadians(ar.AngleDeg));
+                }
+
                 Debug.WriteLine($"[FindBestFill] Linear: {bestScore.Count} parts, density={bestScore.Density:P1} | WorkArea: {workArea.Width:F1}x{workArea.Length:F1} | Angles: {angles.Count}");
 
                 ReportProgress(progress, NestPhase.Linear, PlateNumber, best, workArea, BuildProgressSummary());
@@ -459,6 +482,23 @@ namespace OpenNest
                         angles = mlAngles;
                     }
                 }
+            }
+
+            // If we have known-good angles from previous fills, use only those
+            // plus the defaults (bestRotation + 90°). This prunes the expensive
+            // angle sweep after the first fill.
+            if (knownGoodAngles.Count > 0 && !ForceFullAngleSweep)
+            {
+                var pruned = new List<double> { bestRotation, bestRotation + Angle.HalfPI };
+
+                foreach (var a in knownGoodAngles)
+                {
+                    if (!pruned.Any(existing => existing.IsEqualTo(a)))
+                        pruned.Add(a);
+                }
+
+                Debug.WriteLine($"[BuildCandidateAngles] Pruned: {angles.Count} -> {pruned.Count} angles (known-good)");
+                return pruned;
             }
 
             return angles;
