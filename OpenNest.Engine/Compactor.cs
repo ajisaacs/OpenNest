@@ -29,16 +29,20 @@ namespace OpenNest
 
         private static void Push(List<Part> movingParts, Plate plate, PushDirection direction)
         {
-            var stationaryParts = plate.Parts
+            // Start with parts already on the plate (excluding the moving group).
+            var obstacleParts = plate.Parts
                 .Where(p => !movingParts.Contains(p))
                 .ToList();
 
-            var stationaryBoxes = new Box[stationaryParts.Count];
+            var obstacleBoxes = new List<Box>(obstacleParts.Count + movingParts.Count);
+            var obstacleLines = new List<List<Line>>(obstacleParts.Count + movingParts.Count);
 
-            for (var i = 0; i < stationaryParts.Count; i++)
-                stationaryBoxes[i] = stationaryParts[i].BoundingBox;
+            for (var i = 0; i < obstacleParts.Count; i++)
+            {
+                obstacleBoxes.Add(obstacleParts[i].BoundingBox);
+                obstacleLines.Add(null); // lazy
+            }
 
-            var stationaryLines = new List<Line>[stationaryParts.Count];
             var opposite = Helper.OppositeDirection(direction);
             var halfSpacing = plate.PartSpacing / 2;
             var isHorizontal = Helper.IsHorizontalDirection(direction);
@@ -56,15 +60,15 @@ namespace OpenNest
 
                 List<Line> movingLines = null;
 
-                for (var i = 0; i < stationaryBoxes.Length; i++)
+                for (var i = 0; i < obstacleBoxes.Count; i++)
                 {
-                    var gap = Helper.DirectionalGap(movingBox, stationaryBoxes[i], direction);
+                    var gap = Helper.DirectionalGap(movingBox, obstacleBoxes[i], direction);
                     if (gap < 0 || gap >= distance)
                         continue;
 
                     var perpOverlap = isHorizontal
-                        ? movingBox.IsHorizontalTo(stationaryBoxes[i], out _)
-                        : movingBox.IsVerticalTo(stationaryBoxes[i], out _);
+                        ? movingBox.IsHorizontalTo(obstacleBoxes[i], out _)
+                        : movingBox.IsVerticalTo(obstacleBoxes[i], out _);
 
                     if (!perpOverlap)
                         continue;
@@ -73,11 +77,17 @@ namespace OpenNest
                         ? Helper.GetOffsetPartLines(moving, halfSpacing, direction, ChordTolerance)
                         : Helper.GetPartLines(moving, direction, ChordTolerance);
 
-                    stationaryLines[i] ??= halfSpacing > 0
-                        ? Helper.GetOffsetPartLines(stationaryParts[i], halfSpacing, opposite, ChordTolerance)
-                        : Helper.GetPartLines(stationaryParts[i], opposite, ChordTolerance);
+                    var obstaclePart = i < obstacleParts.Count ? obstacleParts[i] : null;
 
-                    var d = Helper.DirectionalDistance(movingLines, stationaryLines[i], direction);
+                    obstacleLines[i] ??= obstaclePart != null
+                        ? (halfSpacing > 0
+                            ? Helper.GetOffsetPartLines(obstaclePart, halfSpacing, opposite, ChordTolerance)
+                            : Helper.GetPartLines(obstaclePart, opposite, ChordTolerance))
+                        : (halfSpacing > 0
+                            ? Helper.GetOffsetPartLines(moving, halfSpacing, opposite, ChordTolerance)
+                            : Helper.GetPartLines(moving, opposite, ChordTolerance));
+
+                    var d = Helper.DirectionalDistance(movingLines, obstacleLines[i], direction);
                     if (d < distance)
                         distance = d;
                 }
@@ -87,6 +97,11 @@ namespace OpenNest
                     var offset = Helper.DirectionToOffset(direction, distance);
                     moving.Offset(offset);
                 }
+
+                // This part is now an obstacle for subsequent moving parts.
+                obstacleBoxes.Add(moving.BoundingBox);
+                obstacleParts.Add(moving);
+                obstacleLines.Add(null); // will be lazily computed if needed
             }
         }
     }
