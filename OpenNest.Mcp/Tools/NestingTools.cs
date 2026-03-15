@@ -193,7 +193,7 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "autonest_plate")]
-        [Description("NFP-based mixed-part autonesting. Places multiple different drawings on a plate with geometry-aware collision avoidance and simulated annealing optimization. Produces tighter layouts than pack_plate by allowing parts to interlock.")]
+        [Description("Mixed-part autonesting. Fills the plate with multiple different drawings using iterative per-drawing fills with remainder-strip packing.")]
         public string AutoNestPlate(
             [Description("Index of the plate")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
@@ -233,20 +233,81 @@ namespace OpenNest.Mcp.Tools
                 items.Add(new NestItem { Drawing = drawing, Quantity = qtys[i] });
             }
 
-            var parts = AutoNester.Nest(items, plate);
-            plate.Parts.AddRange(parts);
+            var fillItems = items
+                .Where(i => i.Quantity > 1)
+                .OrderBy(i => i.Priority)
+                .ThenByDescending(i => i.Drawing.Area)
+                .ToList();
+
+            var packItems = items
+                .Where(i => i.Quantity == 1)
+                .ToList();
+
+            var workArea = plate.WorkArea();
+            var totalPlaced = 0;
+
+            // Phase 1: Fill multi-quantity drawings with NestEngine.
+            foreach (var item in fillItems)
+            {
+                if (item.Quantity <= 0 || workArea.Width <= 0 || workArea.Length <= 0)
+                    continue;
+
+                var engine = new NestEngine(plate);
+                var parts = engine.FillExact(item, workArea, null, CancellationToken.None);
+
+                if (parts.Count > 0)
+                {
+                    plate.Parts.AddRange(parts);
+                    Compactor.Compact(parts, plate);
+                    item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
+                    totalPlaced += parts.Count;
+                    workArea = ComputeRemainderStrip(plate);
+                }
+            }
+
+            // Phase 2: Pack single-quantity items into remaining space.
+            packItems = packItems.Where(i => i.Quantity > 0).ToList();
+
+            if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0)
+            {
+                var before = plate.Parts.Count;
+                var engine = new NestEngine(plate);
+                engine.PackArea(workArea, packItems);
+                totalPlaced += plate.Parts.Count - before;
+            }
 
             var sb = new StringBuilder();
-            sb.AppendLine($"AutoNest plate {plateIndex}: {(parts.Count > 0 ? "success" : "no parts placed")}");
-            sb.AppendLine($"  Parts placed: {parts.Count}");
+            sb.AppendLine($"AutoNest plate {plateIndex}: {(totalPlaced > 0 ? "success" : "no parts placed")}");
+            sb.AppendLine($"  Parts placed: {totalPlaced}");
             sb.AppendLine($"  Total parts: {plate.Parts.Count}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
 
-            var groups = parts.GroupBy(p => p.BaseDrawing.Name);
+            var groups = plate.Parts.GroupBy(p => p.BaseDrawing.Name);
             foreach (var group in groups)
                 sb.AppendLine($"  {group.Key}: {group.Count()}");
 
             return sb.ToString();
+        }
+
+        private static Box ComputeRemainderStrip(Plate plate)
+        {
+            if (plate.Parts.Count == 0)
+                return plate.WorkArea();
+
+            var usedBox = plate.Parts.Cast<IBoundable>().GetBoundingBox();
+            var fullArea = plate.WorkArea();
+
+            var hWidth = fullArea.Right - usedBox.Right - plate.PartSpacing;
+            var hStrip = hWidth > 0
+                ? new Box(usedBox.Right + plate.PartSpacing, fullArea.Y, hWidth, fullArea.Length)
+                : Box.Empty;
+
+            var vHeight = fullArea.Top - usedBox.Top - plate.PartSpacing;
+            var vStrip = vHeight > 0
+                ? new Box(fullArea.X, usedBox.Top + plate.PartSpacing, fullArea.Width, vHeight)
+                : Box.Empty;
+
+            return hStrip.Area() >= vStrip.Area() ? hStrip : vStrip;
         }
     }
 }
