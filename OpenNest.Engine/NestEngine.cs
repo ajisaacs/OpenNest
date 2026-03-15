@@ -85,6 +85,64 @@ namespace OpenNest
         }
 
         /// <summary>
+        /// Finds the smallest sub-area of workArea that fits exactly item.Quantity parts.
+        /// Uses binary search on both orientations and picks the tightest fit.
+        /// Falls through to standard Fill for unlimited (0) or single (1) quantities.
+        /// </summary>
+        public List<Part> FillExact(NestItem item, Box workArea,
+            IProgress<NestProgress> progress, CancellationToken token)
+        {
+            // Early exits: unlimited or single quantity — no benefit from area search.
+            if (item.Quantity <= 1)
+                return Fill(item, workArea, progress, token);
+
+            // Full fill to establish upper bound.
+            var fullResult = Fill(item, workArea, progress, token);
+
+            if (fullResult.Count <= item.Quantity)
+                return fullResult;
+
+            // Binary search: try shrinking each dimension.
+            var (lengthParts, lengthDim) = BinarySearchFill(item, workArea, shrinkWidth: false, token);
+            var (widthParts, widthDim) = BinarySearchFill(item, workArea, shrinkWidth: true, token);
+
+            // Pick winner by smallest test box area. Tie-break: prefer shrink-length.
+            List<Part> winner;
+            Box winnerBox;
+
+            var lengthArea = lengthParts != null ? workArea.Width * lengthDim : double.MaxValue;
+            var widthArea = widthParts != null ? widthDim * workArea.Length : double.MaxValue;
+
+            if (lengthParts != null && lengthArea <= widthArea)
+            {
+                winner = lengthParts;
+                winnerBox = new Box(workArea.X, workArea.Y, workArea.Width, lengthDim);
+            }
+            else if (widthParts != null)
+            {
+                winner = widthParts;
+                winnerBox = new Box(workArea.X, workArea.Y, widthDim, workArea.Length);
+            }
+            else
+            {
+                // Neither search found the exact quantity — return full fill truncated.
+                return fullResult.Take(item.Quantity).ToList();
+            }
+
+            // Re-run the winner with progress so PhaseResults/WinnerPhase are correct
+            // and the progress form shows the final result.
+            var finalResult = Fill(item, winnerBox, progress, token);
+
+            if (finalResult.Count >= item.Quantity)
+                return finalResult.Count > item.Quantity
+                    ? finalResult.Take(item.Quantity).ToList()
+                    : finalResult;
+
+            // Fallback: return the binary search result if the re-run produced fewer.
+            return winner;
+        }
+
+        /// <summary>
         /// Binary-searches for the smallest sub-area (one dimension fixed) that fits
         /// exactly item.Quantity parts. Returns the best parts list and the dimension
         /// value that achieved it.
