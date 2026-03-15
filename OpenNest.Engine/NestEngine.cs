@@ -723,12 +723,17 @@ namespace OpenNest
                 totalPartArea += part.BaseDrawing.Area;
             }
 
+            var bounds = best.GetBoundingBox();
+
             progress.Report(new NestProgress
             {
                 Phase = phase,
                 PlateNumber = plateNumber,
                 BestPartCount = score.Count,
                 BestDensity = score.Density,
+                NestedWidth = bounds.Width,
+                NestedLength = bounds.Length,
+                NestedArea = totalPartArea,
                 UsableRemnantArea = workArea.Area() - totalPartArea,
                 BestParts = clonedParts,
                 Description = description
