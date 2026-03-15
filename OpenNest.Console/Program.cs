@@ -327,7 +327,7 @@ static class NestConsole
 
             Console.WriteLine($"AutoNest: {nestItems.Count} drawing(s), {nestItems.Sum(i => i.Quantity)} total parts");
 
-            var nestParts = NestEngine.AutoNest(nestItems, plate);
+            var nestParts = AutoNester.Nest(nestItems, plate);
             plate.Parts.AddRange(nestParts);
             success = nestParts.Count > 0;
         }

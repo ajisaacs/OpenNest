@@ -233,7 +233,7 @@ namespace OpenNest.Mcp.Tools
                 items.Add(new NestItem { Drawing = drawing, Quantity = qtys[i] });
             }
 
-            var parts = NestEngine.AutoNest(items, plate);
+            var parts = AutoNester.Nest(items, plate);
             plate.Parts.AddRange(parts);
 
             var sb = new StringBuilder();

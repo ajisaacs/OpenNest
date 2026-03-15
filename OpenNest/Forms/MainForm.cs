@@ -762,7 +762,7 @@ namespace OpenNest.Forms
                         activeForm.LoadLastPlate();
 
                     var parts = await Task.Run(() =>
-                        NestEngine.AutoNest(remaining, plate, token));
+                        AutoNester.Nest(remaining, plate, token));
 
                     if (parts.Count == 0)
                         break;
@@ -862,7 +862,9 @@ namespace OpenNest.Forms
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
-                activeForm.PlateView.SetTemporaryParts(p.BestParts);
+
+                if (p.BestParts != null)
+                    activeForm.PlateView.SetTemporaryParts(p.BestParts);
             });
 
             progressForm.Show(this);
@@ -922,7 +924,9 @@ namespace OpenNest.Forms
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
-                activeForm.PlateView.SetTemporaryParts(p.BestParts);
+
+                if (p.BestParts != null)
+                    activeForm.PlateView.SetTemporaryParts(p.BestParts);
             });
 
             Action<List<Part>> onComplete = parts =>
