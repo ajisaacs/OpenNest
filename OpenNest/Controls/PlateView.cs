@@ -939,6 +939,7 @@ namespace OpenNest.Controls
         {
             var movingParts = SelectedParts.Select(p => p.BasePart).ToList();
             Compactor.Push(movingParts, Plate, direction);
+            SelectedParts.ForEach(p => p.IsDirty = true);
             Invalidate();
         }
 
