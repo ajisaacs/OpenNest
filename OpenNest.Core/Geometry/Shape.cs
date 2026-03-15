@@ -159,8 +159,8 @@ namespace OpenNest.Geometry
                 }
             }
 
-            Helper.Optimize(lines);
-            Helper.Optimize(arcs);
+            GeometryOptimizer.Optimize(lines);
+            GeometryOptimizer.Optimize(arcs);
         }
 
         /// <summary>
