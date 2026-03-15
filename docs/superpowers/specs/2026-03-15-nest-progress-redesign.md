@@ -7,7 +7,7 @@ The current `NestProgressForm` is a flat list of label/value pairs with no visua
 ## Solution
 
 Redesign the form with three changes:
-1. A custom-drawn **phase stepper** control showing which nesting phase is active
+1. A custom-drawn **phase stepper** control showing which nesting phases have been visited
 2. **Grouped sections** separating results from status information
 3. **Modern styling** — Segoe UI fonts, subtle background contrast, better spacing
 
@@ -15,27 +15,36 @@ Redesign the form with three changes:
 
 **New file: `OpenNest/Controls/PhaseStepperControl.cs`**
 
-A custom `UserControl` that draws 4 connected circles with labels beneath:
+A custom `UserControl` that draws 4 circles with labels beneath, connected by lines:
 
 ```
   ●━━━━━━━●━━━━━━━○━━━━━━━○
 Linear   BestFit   Pairs   Remainder
 ```
 
+### Non-sequential design
+
+The engine does **not** execute phases in a fixed order. `FindBestFill` runs Pairs → Linear → BestFit → Remainder, while the group fill path runs Linear → BestFit → Pairs → Remainder. Some phases may not execute at all (e.g., multi-part fills only run Linear).
+
+The stepper therefore tracks **which phases have been visited**, not a left-to-right progression. Each circle independently lights up when its phase reports progress, regardless of position. The connecting lines between circles are purely decorative (always light gray) — they do not indicate sequential flow.
+
 ### Visual States
 
-- **Completed:** Filled circle with accent color, bold label
-- **Active:** Filled circle with accent color and slightly larger radius, bold label
-- **Pending:** Hollow circle with border only, dimmed label text
+- **Completed/visited:** Filled circle with accent color, bold label — the phase has reported at least one progress update
+- **Active:** Filled circle with accent color and slightly larger radius, bold label — the phase currently executing
+- **Pending:** Hollow circle with border only, dimmed label text — the phase has not yet reported progress
+- **Skipped:** Same as Pending — phases that never execute simply remain hollow. No special "skipped" visual needed.
 - **All complete:** All 4 circles filled (used when `ShowCompleted()` is called)
+- **Initial state (before first `UpdateProgress`):** All 4 circles in Pending (hollow) state
 
 ### Implementation
 
-- Single `OnPaint` override. Circles evenly spaced across control width. Connecting lines drawn between circle centers — completed segments use accent color, pending segments use a light gray.
-- Colors defined as `static readonly Color` fields at the top of the class for easy tweaking.
-- Exposes a `CurrentPhase` property (type `NestPhase?`). Setting it calls `Invalidate()`. A `null` value means no phase is active yet. An additional `bool IsComplete` property marks all phases as done.
+- Single `OnPaint` override. Circles evenly spaced across control width. Connecting lines drawn between circle centers in light gray.
+- Colors and fonts defined as `static readonly` fields at the top of the class. Fonts are cached (not created per paint call) to avoid GDI handle leaks during frequent progress updates.
+- Tracks state via a `HashSet<NestPhase> VisitedPhases` and a `NestPhase? ActivePhase` property. When `ActivePhase` is set, it is added to `VisitedPhases` and `Invalidate()` is called. A `bool IsComplete` property marks all phases as done.
 - `DoubleBuffered = true` to prevent flicker on repaint.
 - Fixed height (~60px), docks to fill width.
+- Namespace: `OpenNest.Controls` (follows existing convention, e.g., `QuadrantSelect`).
 
 ## Form Layout
 
@@ -80,12 +89,16 @@ Group panels use `Color.White` (or very light gray) `BackColor` against the form
 ### Sizing
 
 - Width: ~450px (slightly wider than current 425px for breathing room)
-- Height: auto-sizes to content via `AutoSize = true` on the table panels
+- Height: fixed `ClientSize` calculated to fit stepper (~60px) + results group (~110px) + status group (~90px) + button bar (~45px) + padding. The form uses `FixedToolWindow` which does not auto-resize, so the height is set explicitly in the designer.
 - `FormBorderStyle.FixedToolWindow`, `StartPosition.CenterParent`, `ShowInTaskbar = false`
 
 ### Plate Row Visibility
 
 The Plate row in the Status group is hidden when `showPlateRow: false` is passed to the constructor (same as current behavior).
+
+### Phase description text
+
+The current form's `FormatPhase()` method produces friendly text like "Trying rotations..." which was displayed in the Phase row. Since the phase stepper replaces the Phase row visually, this descriptive text moves to the **Detail** row. `UpdateProgress` writes `FormatPhase(progress.Phase)` to the Detail value when `progress.Description` is empty, and writes `progress.Description` when it's set (the engine's per-iteration descriptions like "Linear: 3/12 angles" take precedence).
 
 ## Public API
 
@@ -97,11 +110,15 @@ No signature changes. The form remains a drop-in replacement.
 
 ### UpdateProgress(NestProgress progress)
 
-Same as today, plus sets `phaseStepperControl.CurrentPhase = progress.Phase` to advance the stepper visual.
+Same as today, plus:
+- Sets `phaseStepperControl.ActivePhase = progress.Phase` to update the stepper
+- Writes `FormatPhase(progress.Phase)` to the Detail row as a fallback when `progress.Description` is empty
 
 ### ShowCompleted()
 
 Same as today (stops timer, changes button to "Close"), plus sets `phaseStepperControl.IsComplete = true` to fill all circles.
+
+Note: `MainForm.FillArea_Click` currently calls `progressForm.Close()` without calling `ShowCompleted()` first. This is existing behavior and is fine — the form closes immediately so the "all complete" visual is not needed in that path.
 
 ## No External Changes
 
