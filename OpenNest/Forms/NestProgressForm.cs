@@ -37,6 +37,9 @@ namespace OpenNest.Forms
             partsValue.Text = progress.BestPartCount.ToString();
             densityValue.Text = progress.BestDensity.ToString("P1");
             remnantValue.Text = $"{progress.UsableRemnantArea:F1} sq in";
+
+            if (!string.IsNullOrEmpty(progress.Description))
+                descriptionValue.Text = progress.Description;
         }
 
         public void ShowCompleted()

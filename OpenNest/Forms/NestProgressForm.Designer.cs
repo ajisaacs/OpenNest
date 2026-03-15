@@ -41,6 +41,8 @@ namespace OpenNest.Forms
             this.remnantValue = new System.Windows.Forms.Label();
             this.elapsedLabel = new System.Windows.Forms.Label();
             this.elapsedValue = new System.Windows.Forms.Label();
+            this.descriptionLabel = new System.Windows.Forms.Label();
+            this.descriptionValue = new System.Windows.Forms.Label();
             this.stopButton = new System.Windows.Forms.Button();
             this.buttonPanel = new System.Windows.Forms.FlowLayoutPanel();
             this.table.SuspendLayout();
@@ -64,11 +66,14 @@ namespace OpenNest.Forms
             this.table.Controls.Add(this.remnantValue, 1, 4);
             this.table.Controls.Add(this.elapsedLabel, 0, 5);
             this.table.Controls.Add(this.elapsedValue, 1, 5);
+            this.table.Controls.Add(this.descriptionLabel, 0, 6);
+            this.table.Controls.Add(this.descriptionValue, 1, 6);
             this.table.Dock = System.Windows.Forms.DockStyle.Top;
             this.table.Location = new System.Drawing.Point(0, 0);
             this.table.Name = "table";
             this.table.Padding = new System.Windows.Forms.Padding(8);
-            this.table.RowCount = 6;
+            this.table.RowCount = 7;
+            this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
             this.table.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
@@ -169,6 +174,21 @@ namespace OpenNest.Forms
             this.elapsedValue.Name = "elapsedValue";
             this.elapsedValue.Text = "0:00";
             //
+            // descriptionLabel
+            //
+            this.descriptionLabel.AutoSize = true;
+            this.descriptionLabel.Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold);
+            this.descriptionLabel.Margin = new System.Windows.Forms.Padding(4);
+            this.descriptionLabel.Name = "descriptionLabel";
+            this.descriptionLabel.Text = "Detail:";
+            //
+            // descriptionValue
+            //
+            this.descriptionValue.AutoSize = true;
+            this.descriptionValue.Margin = new System.Windows.Forms.Padding(4);
+            this.descriptionValue.Name = "descriptionValue";
+            this.descriptionValue.Text = "\u2014";
+            //
             // stopButton
             //
             this.stopButton.Anchor = System.Windows.Forms.AnchorStyles.None;
@@ -194,7 +214,7 @@ namespace OpenNest.Forms
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(264, 207);
+            this.ClientSize = new System.Drawing.Size(264, 230);
             this.Controls.Add(this.buttonPanel);
             this.Controls.Add(this.table);
             this.Controls.SetChildIndex(this.table, 0);
@@ -228,6 +248,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label remnantValue;
         private System.Windows.Forms.Label elapsedLabel;
         private System.Windows.Forms.Label elapsedValue;
+        private System.Windows.Forms.Label descriptionLabel;
+        private System.Windows.Forms.Label descriptionValue;
         private System.Windows.Forms.Button stopButton;
         private System.Windows.Forms.FlowLayoutPanel buttonPanel;
     }
