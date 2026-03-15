@@ -1103,7 +1103,7 @@ namespace OpenNest
             return minDist;
         }
 
-        private static double OneWayDistance(
+        public static double OneWayDistance(
             Vector vertex, (Vector start, Vector end)[] edges, Vector edgeOffset,
             PushDirection direction)
         {

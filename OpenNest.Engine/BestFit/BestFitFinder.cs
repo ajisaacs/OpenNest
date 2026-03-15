@@ -20,10 +20,13 @@ namespace OpenNest.Engine.BestFit
         {
             _evaluator = evaluator ?? new PairEvaluator();
             _slideComputer = slideComputer;
+            var plateAspect = System.Math.Max(maxPlateWidth, maxPlateHeight) /
+                              System.Math.Max(System.Math.Min(maxPlateWidth, maxPlateHeight), 0.001);
             _filter = new BestFitFilter
             {
                 MaxPlateWidth = maxPlateWidth,
-                MaxPlateHeight = maxPlateHeight
+                MaxPlateHeight = maxPlateHeight,
+                MaxAspectRatio = System.Math.Max(5.0, plateAspect)
             };
         }
 

@@ -98,8 +98,8 @@ static class NestConsole
                     var parts = args[++i].Split('x');
                     if (parts.Length == 2)
                     {
-                        o.PlateWidth = double.Parse(parts[0]);
-                        o.PlateHeight = double.Parse(parts[1]);
+                        o.PlateHeight = double.Parse(parts[0]);
+                        o.PlateWidth = double.Parse(parts[1]);
                     }
                     break;
                 case "--check-overlaps":
@@ -297,7 +297,8 @@ static class NestConsole
     static void PrintHeader(Nest nest, Plate plate, Drawing drawing, int existingCount, Options options)
     {
         Console.WriteLine($"Nest: {nest.Name}");
-        Console.WriteLine($"Plate: {options.PlateIndex} ({plate.Size.Width:F1} x {plate.Size.Length:F1}), spacing={plate.PartSpacing:F2}");
+        var wa = plate.WorkArea();
+        Console.WriteLine($"Plate: {options.PlateIndex} ({plate.Size.Length:F1} x {plate.Size.Width:F1}), spacing={plate.PartSpacing:F2}, edge=({plate.EdgeSpacing.Left},{plate.EdgeSpacing.Bottom},{plate.EdgeSpacing.Right},{plate.EdgeSpacing.Top}), workArea={wa.Length:F1}x{wa.Width:F1}");
         Console.WriteLine($"Drawing: {drawing.Name}");
         Console.WriteLine(options.KeepParts
             ? $"Keeping {existingCount} existing parts"
@@ -386,7 +387,7 @@ static class NestConsole
         Console.Error.WriteLine();
         Console.Error.WriteLine("Modes:");
         Console.Error.WriteLine("  <nest.zip>             Load nest and fill (existing behavior)");
-        Console.Error.WriteLine("  <part.dxf> --size WxH  Import DXF, create plate, and fill");
+        Console.Error.WriteLine("  <part.dxf> --size LxW  Import DXF, create plate, and fill");
         Console.Error.WriteLine("  <nest.zip> <part.dxf>  Load nest and add imported DXF drawings");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Options:");
@@ -394,7 +395,7 @@ static class NestConsole
         Console.Error.WriteLine("  --plate <index>        Plate index to fill (default: 0)");
         Console.Error.WriteLine("  --quantity <n>          Max parts to place (default: 0 = unlimited)");
         Console.Error.WriteLine("  --spacing <value>      Override part spacing");
-        Console.Error.WriteLine("  --size <WxH>           Override plate size (e.g. 120x60); required for DXF-only mode");
+        Console.Error.WriteLine("  --size <LxW>           Override plate size (e.g. 120x60); required for DXF-only mode");
         Console.Error.WriteLine("  --output <path>        Output nest file path (default: <input>-result.zip)");
         Console.Error.WriteLine("  --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)");
         Console.Error.WriteLine("  --autonest             Use NFP-based mixed-part autonesting instead of linear fill");

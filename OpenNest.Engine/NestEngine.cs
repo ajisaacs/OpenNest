@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.ML;
 using OpenNest.Geometry;
@@ -215,54 +216,48 @@ namespace OpenNest
 
                 // Linear phase
                 var linearSw = Stopwatch.StartNew();
-                var linearBag = new System.Collections.Concurrent.ConcurrentBag<(FillScore score, List<Part> parts)>();
-                var angleBag = new System.Collections.Concurrent.ConcurrentBag<AngleResult>();
-                var anglesCompleted = 0;
-
-                System.Threading.Tasks.Parallel.ForEach(angles,
-                    new System.Threading.Tasks.ParallelOptions { CancellationToken = token },
-                    angle =>
-                    {
-                        var localEngine = new FillLinear(workArea, Plate.PartSpacing);
-                        var h = localEngine.Fill(item.Drawing, angle, NestDirection.Horizontal);
-                        var v = localEngine.Fill(item.Drawing, angle, NestDirection.Vertical);
-
-                        var angleDeg = Angle.ToDegrees(angle);
-                        if (h != null && h.Count > 0)
-                        {
-                            linearBag.Add((FillScore.Compute(h, workArea), h));
-                            angleBag.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Horizontal, PartCount = h.Count });
-                        }
-                        if (v != null && v.Count > 0)
-                        {
-                            linearBag.Add((FillScore.Compute(v, workArea), v));
-                            angleBag.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Vertical, PartCount = v.Count });
-                        }
-
-                        var done = Interlocked.Increment(ref anglesCompleted);
-                        var bestCount = System.Math.Max(h?.Count ?? 0, v?.Count ?? 0);
-                        progress?.Report(new NestProgress
-                        {
-                            Phase = NestPhase.Linear,
-                            PlateNumber = PlateNumber,
-                            Description = $"Linear: {done}/{angles.Count} angles, {angleDeg:F0}° = {bestCount} parts"
-                        });
-                    });
-                linearSw.Stop();
-                AngleResults.AddRange(angleBag);
-
                 var bestLinearCount = 0;
-                foreach (var (score, parts) in linearBag)
+
+                for (var ai = 0; ai < angles.Count; ai++)
                 {
-                    if (parts.Count > bestLinearCount)
-                        bestLinearCount = parts.Count;
-                    if (score > bestScore)
+                    token.ThrowIfCancellationRequested();
+
+                    var angle = angles[ai];
+                    var localEngine = new FillLinear(workArea, Plate.PartSpacing);
+                    var h = localEngine.Fill(item.Drawing, angle, NestDirection.Horizontal);
+                    var v = localEngine.Fill(item.Drawing, angle, NestDirection.Vertical);
+
+                    var angleDeg = Angle.ToDegrees(angle);
+                    if (h != null && h.Count > 0)
                     {
-                        best = parts;
-                        bestScore = score;
-                        WinnerPhase = NestPhase.Linear;
+                        var scoreH = FillScore.Compute(h, workArea);
+                        AngleResults.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Horizontal, PartCount = h.Count });
+                        if (h.Count > bestLinearCount) bestLinearCount = h.Count;
+                        if (scoreH > bestScore)
+                        {
+                            best = h;
+                            bestScore = scoreH;
+                            WinnerPhase = NestPhase.Linear;
+                        }
                     }
+                    if (v != null && v.Count > 0)
+                    {
+                        var scoreV = FillScore.Compute(v, workArea);
+                        AngleResults.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Vertical, PartCount = v.Count });
+                        if (v.Count > bestLinearCount) bestLinearCount = v.Count;
+                        if (scoreV > bestScore)
+                        {
+                            best = v;
+                            bestScore = scoreV;
+                            WinnerPhase = NestPhase.Linear;
+                        }
+                    }
+
+                    ReportProgress(progress, NestPhase.Linear, PlateNumber, best, workArea,
+                        $"Linear: {ai + 1}/{angles.Count} angles, {angleDeg:F0}° best = {bestScore.Count} parts");
                 }
+
+                linearSw.Stop();
                 PhaseResults.Add(new PhaseResult(NestPhase.Linear, bestLinearCount, linearSw.ElapsedMilliseconds));
 
                 Debug.WriteLine($"[FindBestFill] Linear: {bestScore.Count} parts, density={bestScore.Density:P1} | WorkArea: {workArea.Width:F1}x{workArea.Length:F1} | Angles: {angles.Count}");
@@ -369,56 +364,51 @@ namespace OpenNest
                 Plate.PartSpacing);
 
             var candidates = SelectPairCandidates(bestFits, workArea);
-            Debug.WriteLine($"[FillWithPairs] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
+            var diagMsg = $"[FillWithPairs] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {candidates.Count}\n" +
+                          $"[FillWithPairs] Plate: {Plate.Size.Width:F2}x{Plate.Size.Length:F2}, WorkArea: {workArea.Width:F2}x{workArea.Length:F2}";
+            Debug.WriteLine(diagMsg);
+            try { System.IO.File.AppendAllText(
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log"),
+                $"{DateTime.Now:HH:mm:ss} {diagMsg}\n"); } catch { }
 
-            var resultBag = new System.Collections.Concurrent.ConcurrentBag<(FillScore score, List<Part> parts)>();
+            List<Part> best = null;
+            var bestScore = default(FillScore);
 
             try
             {
-                var pairsCompleted = 0;
-                var pairsBestCount = 0;
+                for (var i = 0; i < candidates.Count; i++)
+                {
+                    token.ThrowIfCancellationRequested();
 
-                System.Threading.Tasks.Parallel.For(0, candidates.Count,
-                    new System.Threading.Tasks.ParallelOptions { CancellationToken = token },
-                    i =>
+                    var result = candidates[i];
+                    var pairParts = result.BuildParts(item.Drawing);
+                    var angles = result.HullAngles;
+                    var engine = new FillLinear(workArea, Plate.PartSpacing);
+                    var filled = FillPattern(engine, pairParts, angles, workArea);
+
+                    if (filled != null && filled.Count > 0)
                     {
-                        var result = candidates[i];
-                        var pairParts = result.BuildParts(item.Drawing);
-                        var angles = result.HullAngles;
-                        var engine = new FillLinear(workArea, Plate.PartSpacing);
-                        var filled = FillPattern(engine, pairParts, angles, workArea);
-
-                        if (filled != null && filled.Count > 0)
-                            resultBag.Add((FillScore.Compute(filled, workArea), filled));
-
-                        var done = Interlocked.Increment(ref pairsCompleted);
-                        InterlockedMax(ref pairsBestCount, filled?.Count ?? 0);
-                        progress?.Report(new NestProgress
+                        var score = FillScore.Compute(filled, workArea);
+                        if (best == null || score > bestScore)
                         {
-                            Phase = NestPhase.Pairs,
-                            PlateNumber = PlateNumber,
-                            Description = $"Pairs: {done}/{candidates.Count} candidates, best = {pairsBestCount} parts"
-                        });
-                    });
+                            best = filled;
+                            bestScore = score;
+                        }
+                    }
+
+                    ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea,
+                        $"Pairs: {i + 1}/{candidates.Count} candidates, best = {bestScore.Count} parts");
+                }
             }
             catch (OperationCanceledException)
             {
                 Debug.WriteLine("[FillWithPairs] Cancelled mid-phase, using results so far");
             }
 
-            List<Part> best = null;
-            var bestScore = default(FillScore);
-
-            foreach (var (score, parts) in resultBag)
-            {
-                if (best == null || score > bestScore)
-                {
-                    best = parts;
-                    bestScore = score;
-                }
-            }
-
             Debug.WriteLine($"[FillWithPairs] Best pair result: {bestScore.Count} parts, remnant={bestScore.UsableRemnantArea:F1}, density={bestScore.Density:P1}");
+            try { System.IO.File.AppendAllText(
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log"),
+                $"{DateTime.Now:HH:mm:ss} [FillWithPairs] Best: {bestScore.Count} parts, density={bestScore.Density:P1}\n"); } catch { }
             return best ?? new List<Part>();
         }
 
@@ -436,11 +426,14 @@ namespace OpenNest
             var plateShortSide = System.Math.Min(Plate.Size.Width, Plate.Size.Length);
 
             // When the work area is significantly narrower than the plate,
-            // include all pairs that fit the narrow dimension.
+            // search ALL candidates (not just kept) for pairs that fit the
+            // narrow dimension. Pairs rejected by aspect ratio for the full
+            // plate may be exactly what's needed for a narrow remainder strip.
             if (workShortSide < plateShortSide * 0.5)
             {
-                var stripCandidates = kept
-                    .Where(r => r.ShortestSide <= workShortSide + Tolerance.Epsilon);
+                var stripCandidates = bestFits
+                    .Where(r => r.ShortestSide <= workShortSide + Tolerance.Epsilon
+                             && r.Utilization >= 0.3);
 
                 var existing = new HashSet<BestFitResult>(top);
 
@@ -480,32 +473,33 @@ namespace OpenNest
 
         private List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
         {
-            List<Part> best = null;
-            var bestScore = default(FillScore);
+            var results = new System.Collections.Concurrent.ConcurrentBag<(List<Part> Parts, FillScore Score)>();
 
-            foreach (var angle in angles)
+            Parallel.ForEach(angles, angle =>
             {
                 var pattern = BuildRotatedPattern(groupParts, angle);
 
                 if (pattern.Parts.Count == 0)
-                    continue;
+                    return;
 
                 var h = engine.Fill(pattern, NestDirection.Horizontal);
-                var scoreH = h != null && h.Count > 0 ? FillScore.Compute(h, workArea) : default;
-
-                if (scoreH.Count > 0 && (best == null || scoreH > bestScore))
-                {
-                    best = h;
-                    bestScore = scoreH;
-                }
+                if (h != null && h.Count > 0)
+                    results.Add((h, FillScore.Compute(h, workArea)));
 
                 var v = engine.Fill(pattern, NestDirection.Vertical);
-                var scoreV = v != null && v.Count > 0 ? FillScore.Compute(v, workArea) : default;
+                if (v != null && v.Count > 0)
+                    results.Add((v, FillScore.Compute(v, workArea)));
+            });
 
-                if (scoreV.Count > 0 && (best == null || scoreV > bestScore))
+            List<Part> best = null;
+            var bestScore = default(FillScore);
+
+            foreach (var res in results)
+            {
+                if (best == null || res.Score > bestScore)
                 {
-                    best = v;
-                    bestScore = scoreV;
+                    best = res.Parts;
+                    bestScore = res.Score;
                 }
             }
 
@@ -764,18 +758,6 @@ namespace OpenNest
                 case NestPhase.Remainder: return "Remainder";
                 default: return phase.ToString();
             }
-        }
-
-        // --- Utilities ---
-
-        private static void InterlockedMax(ref int location, int value)
-        {
-            int current;
-            do
-            {
-                current = location;
-                if (value <= current) return;
-            } while (Interlocked.CompareExchange(ref location, value, current) != current);
         }
 
     }

@@ -153,6 +153,9 @@ namespace OpenNest.Engine.BestFit
         public static void Populate(Drawing drawing, double plateWidth, double plateHeight,
             double spacing, List<BestFitResult> results)
         {
+            if (results == null || results.Count == 0)
+                return;
+
             var key = new CacheKey(drawing, plateWidth, plateHeight, spacing);
             _cache.TryAdd(key, results);
         }

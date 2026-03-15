@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.BestFit
@@ -147,11 +148,82 @@ namespace OpenNest.Engine.BestFit
 
             var results = new double[count];
 
-            for (var i = 0; i < count; i++)
+            // Pre-calculate moving vertices in local space.
+            var movingVerticesLocal = new HashSet<Vector>();
+            for (var i = 0; i < part2TemplateLines.Count; i++)
             {
-                results[i] = Helper.DirectionalDistance(
-                    part2TemplateLines, allDx[i], allDy[i], part1Lines, allDirs[i]);
+                movingVerticesLocal.Add(part2TemplateLines[i].StartPoint);
+                movingVerticesLocal.Add(part2TemplateLines[i].EndPoint);
             }
+            var movingVerticesArray = movingVerticesLocal.ToArray();
+
+            // Pre-calculate stationary vertices in local space.
+            var stationaryVerticesLocal = new HashSet<Vector>();
+            for (var i = 0; i < part1Lines.Count; i++)
+            {
+                stationaryVerticesLocal.Add(part1Lines[i].StartPoint);
+                stationaryVerticesLocal.Add(part1Lines[i].EndPoint);
+            }
+            var stationaryVerticesArray = stationaryVerticesLocal.ToArray();
+
+            // Pre-sort stationary and moving edges for all 4 directions.
+            var stationaryEdgesByDir = new Dictionary<PushDirection, (Vector start, Vector end)[]>();
+            var movingEdgesByDir = new Dictionary<PushDirection, (Vector start, Vector end)[]>();
+
+            foreach (var dir in AllDirections)
+            {
+                var sEdges = new (Vector start, Vector end)[part1Lines.Count];
+                for (var i = 0; i < part1Lines.Count; i++)
+                    sEdges[i] = (part1Lines[i].StartPoint, part1Lines[i].EndPoint);
+
+                if (dir == PushDirection.Left || dir == PushDirection.Right)
+                    sEdges = sEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
+                else
+                    sEdges = sEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
+                stationaryEdgesByDir[dir] = sEdges;
+
+                var opposite = Helper.OppositeDirection(dir);
+                var mEdges = new (Vector start, Vector end)[part2TemplateLines.Count];
+                for (var i = 0; i < part2TemplateLines.Count; i++)
+                    mEdges[i] = (part2TemplateLines[i].StartPoint, part2TemplateLines[i].EndPoint);
+
+                if (opposite == PushDirection.Left || opposite == PushDirection.Right)
+                    mEdges = mEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
+                else
+                    mEdges = mEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
+                movingEdgesByDir[dir] = mEdges;
+            }
+
+            // Use Parallel.For for the heavy lifting.
+            System.Threading.Tasks.Parallel.For(0, count, i =>
+            {
+                var dx = allDx[i];
+                var dy = allDy[i];
+                var dir = allDirs[i];
+                var movingOffset = new Vector(dx, dy);
+
+                var sEdges = stationaryEdgesByDir[dir];
+                var mEdges = movingEdgesByDir[dir];
+                var opposite = Helper.OppositeDirection(dir);
+
+                var minDist = double.MaxValue;
+
+                // Case 1: Moving vertices -> Stationary edges
+                foreach (var mv in movingVerticesArray)
+                {
+                    var d = Helper.OneWayDistance(mv + movingOffset, sEdges, Vector.Zero, dir);
+                    if (d < minDist) minDist = d;
+                }
+
+                // Case 2: Stationary vertices -> Moving edges (translated)
+                foreach (var sv in stationaryVerticesArray)
+                {
+                    var d = Helper.OneWayDistance(sv, mEdges, movingOffset, opposite);
+                    if (d < minDist) minDist = d;
+                }
+
+                results[i] = minDist;
+            });
 
             return results;
         }

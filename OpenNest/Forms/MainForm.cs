@@ -862,9 +862,7 @@ namespace OpenNest.Forms
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
-
-                if (p.BestParts != null)
-                    activeForm.PlateView.SetTemporaryParts(p.BestParts);
+                activeForm.PlateView.SetTemporaryParts(p.BestParts);
             });
 
             progressForm.Show(this);
@@ -924,9 +922,7 @@ namespace OpenNest.Forms
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
-
-                if (p.BestParts != null)
-                    activeForm.PlateView.SetTemporaryParts(p.BestParts);
+                activeForm.PlateView.SetTemporaryParts(p.BestParts);
             });
 
             Action<List<Part>> onComplete = parts =>

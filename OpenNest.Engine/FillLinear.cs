@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -512,7 +513,7 @@ namespace OpenNest
         {
             var bag = new System.Collections.Concurrent.ConcurrentBag<List<Part>>();
 
-            foreach (var entry in rotations)
+            Parallel.ForEach(rotations, entry =>
             {
                 var filler = new FillLinear(strip, PartSpacing);
                 var h = filler.Fill(entry.drawing, entry.rotation, NestDirection.Horizontal);
@@ -523,7 +524,7 @@ namespace OpenNest
 
                 if (v != null && v.Count > 0)
                     bag.Add(v);
-            }
+            });
 
             List<Part> best = null;
 
