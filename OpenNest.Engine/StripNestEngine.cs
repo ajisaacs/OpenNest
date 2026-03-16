@@ -261,6 +261,12 @@ namespace OpenNest
                 var finder = new RemnantFinder(workArea, obstacles);
                 var madeProgress = true;
 
+                // Track quantities locally so we don't mutate the shared NestItem objects.
+                // TryOrientation is called twice (bottom, left) with the same items.
+                var localQty = new Dictionary<string, int>();
+                foreach (var item in effectiveRemainder)
+                    localQty[item.Drawing.Name] = item.Quantity;
+
                 while (madeProgress && !token.IsCancellationRequested)
                 {
                     madeProgress = false;
@@ -274,7 +280,8 @@ namespace OpenNest
                         if (token.IsCancellationRequested)
                             break;
 
-                        if (item.Quantity == 0)
+                        var qty = localQty[item.Drawing.Name];
+                        if (qty == 0)
                             continue;
 
                         var itemBbox = item.Drawing.Program.BoundingBox();
@@ -287,13 +294,13 @@ namespace OpenNest
 
                             var remnantInner = new DefaultNestEngine(Plate);
                             var remnantParts = remnantInner.Fill(
-                                new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
+                                new NestItem { Drawing = item.Drawing, Quantity = qty },
                                 box, remnantProgress, token);
 
                             if (remnantParts != null && remnantParts.Count > 0)
                             {
                                 allParts.AddRange(remnantParts);
-                                item.Quantity = System.Math.Max(0, item.Quantity - remnantParts.Count);
+                                localQty[item.Drawing.Name] = System.Math.Max(0, qty - remnantParts.Count);
 
                                 // Update obstacles and re-discover remnants
                                 foreach (var p in remnantParts)
