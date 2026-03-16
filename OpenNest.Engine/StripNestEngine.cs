@@ -229,9 +229,13 @@ namespace OpenNest
                 .ToList();
 
             // Fill remnant with remainder items, shrinking the available area after each.
+            // Wrap progress so remnant fills include the strip parts already found.
             if (remnantBox.Width > 0 && remnantBox.Length > 0)
             {
                 var currentRemnant = remnantBox;
+                var remnantProgress = progress != null
+                    ? new AccumulatingProgress(progress, allParts)
+                    : null;
 
                 foreach (var item in effectiveRemainder)
                 {
@@ -244,7 +248,7 @@ namespace OpenNest
                     var remnantInner = new DefaultNestEngine(Plate);
                     var remnantParts = remnantInner.Fill(
                         new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
-                        currentRemnant, progress, token);
+                        currentRemnant, remnantProgress, token);
 
                     if (remnantParts != null && remnantParts.Count > 0)
                     {
@@ -268,5 +272,34 @@ namespace OpenNest
         }
 
         // ComputeRemainderWithin inherited from NestEngineBase
+        /// <summary>
+        /// Wraps an IProgress to prepend previously placed parts to each report,
+        /// so the UI shows the full picture (strip + remnant) during remnant fills.
+        /// </summary>
+        private class AccumulatingProgress : IProgress<NestProgress>
+        {
+            private readonly IProgress<NestProgress> inner;
+            private readonly List<Part> previousParts;
+
+            public AccumulatingProgress(IProgress<NestProgress> inner, List<Part> previousParts)
+            {
+                this.inner = inner;
+                this.previousParts = previousParts;
+            }
+
+            public void Report(NestProgress value)
+            {
+                if (value.BestParts != null && previousParts.Count > 0)
+                {
+                    var combined = new List<Part>(previousParts.Count + value.BestParts.Count);
+                    combined.AddRange(previousParts);
+                    combined.AddRange(value.BestParts);
+                    value.BestParts = combined;
+                    value.BestPartCount = combined.Count;
+                }
+
+                inner.Report(value);
+            }
+        }
     }
 }
