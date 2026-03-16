@@ -145,6 +145,9 @@
             this.btnZoomOut = new System.Windows.Forms.ToolStripButton();
             this.btnZoomIn = new System.Windows.Forms.ToolStripButton();
             this.btnZoomToFit = new System.Windows.Forms.ToolStripButton();
+            this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
+            this.engineLabel = new System.Windows.Forms.ToolStripLabel();
+            this.engineComboBox = new System.Windows.Forms.ToolStripComboBox();
             this.pEPToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.openNestToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
@@ -996,7 +999,10 @@
             this.toolStripSeparator3,
             this.btnZoomOut,
             this.btnZoomIn,
-            this.btnZoomToFit});
+            this.btnZoomToFit,
+            this.toolStripSeparator4,
+            this.engineLabel,
+            this.engineComboBox});
             this.toolStrip1.Location = new System.Drawing.Point(0, 24);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(1098, 35);
@@ -1149,7 +1155,24 @@
             this.btnZoomToFit.Size = new System.Drawing.Size(38, 32);
             this.btnZoomToFit.Text = "Zoom To Fit";
             this.btnZoomToFit.Click += new System.EventHandler(this.ZoomToFit_Click);
-            // 
+            //
+            // toolStripSeparator4
+            //
+            this.toolStripSeparator4.Name = "toolStripSeparator4";
+            this.toolStripSeparator4.Size = new System.Drawing.Size(6, 35);
+            //
+            // engineLabel
+            //
+            this.engineLabel.Name = "engineLabel";
+            this.engineLabel.Size = new System.Drawing.Size(46, 32);
+            this.engineLabel.Text = "Engine:";
+            //
+            // engineComboBox
+            //
+            this.engineComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.engineComboBox.Name = "engineComboBox";
+            this.engineComboBox.Size = new System.Drawing.Size(100, 35);
+            //
             // pEPToolStripMenuItem
             // 
             this.pEPToolStripMenuItem.Name = "pEPToolStripMenuItem";
@@ -1309,5 +1332,8 @@
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
+        private System.Windows.Forms.ToolStripLabel engineLabel;
+        private System.Windows.Forms.ToolStripComboBox engineComboBox;
     }
 }

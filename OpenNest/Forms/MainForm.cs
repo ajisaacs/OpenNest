@@ -56,6 +56,12 @@ namespace OpenNest.Forms
 
             var enginesDir = Path.Combine(Application.StartupPath, "Engines");
             NestEngineRegistry.LoadPlugins(enginesDir);
+
+            foreach (var engine in NestEngineRegistry.AvailableEngines)
+                engineComboBox.Items.Add(engine.Name);
+
+            engineComboBox.SelectedItem = NestEngineRegistry.ActiveEngineName;
+            engineComboBox.SelectedIndexChanged += EngineComboBox_SelectedIndexChanged;
         }
 
         private Nest CreateDefaultNest()
@@ -250,6 +256,12 @@ namespace OpenNest.Forms
                 gpuStatusLabel.Text = "GPU : None (CPU)";
                 gpuStatusLabel.ForeColor = Color.Gray;
             }
+        }
+
+        private void EngineComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (engineComboBox.SelectedItem is string name)
+                NestEngineRegistry.ActiveEngineName = name;
         }
 
         private void UpdateLocationMode()
