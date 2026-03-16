@@ -270,7 +270,23 @@ namespace OpenNest
                 while (madeProgress && !token.IsCancellationRequested)
                 {
                     madeProgress = false;
-                    var freeBoxes = finder.FindRemnants(spacing);
+
+                    // Minimum remnant size = smallest remaining part dimension
+                    var minRemnantDim = double.MaxValue;
+                    foreach (var item in effectiveRemainder)
+                    {
+                        if (localQty[item.Drawing.Name] <= 0)
+                            continue;
+                        var bb = item.Drawing.Program.BoundingBox();
+                        var dim = System.Math.Min(bb.Width, bb.Length);
+                        if (dim < minRemnantDim)
+                            minRemnantDim = dim;
+                    }
+
+                    if (minRemnantDim == double.MaxValue)
+                        break; // No items with remaining quantity
+
+                    var freeBoxes = finder.FindRemnants(minRemnantDim);
 
                     if (freeBoxes.Count == 0)
                         break;
