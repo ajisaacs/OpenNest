@@ -461,8 +461,8 @@ namespace OpenNest.Forms
             var ordered = sequencer.Sequence(plate.Parts.ToList(), plate);
 
             plate.Parts.Clear();
-            foreach (var s in ordered)
-                plate.Parts.Add(s.Part);
+            for (var i = ordered.Count - 1; i >= 0; i--)
+                plate.Parts.Add(ordered[i].Part);
         }
 
         public void CalculateCurrentPlateCutTime()
