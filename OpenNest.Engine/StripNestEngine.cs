@@ -298,7 +298,6 @@ namespace OpenNest
             result.StripBox = direction == StripDirection.Bottom
                 ? new Box(workArea.X, workArea.Y, workArea.Width, bestDim)
                 : new Box(workArea.X, workArea.Y, bestDim, workArea.Length);
-            result.RemnantBox = remnantBox;
             result.Score = FillScore.Compute(allParts, workArea);
 
             return result;
