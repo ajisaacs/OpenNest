@@ -92,7 +92,7 @@ namespace OpenNest
         /// in both bottom and left orientations, fills remnants with remaining drawings,
         /// and returns the denser result.
         /// </summary>
-        public List<Part> Nest(List<NestItem> items,
+        public override List<Part> Nest(List<NestItem> items,
             IProgress<NestProgress> progress, CancellationToken token)
         {
             if (items == null || items.Count == 0)
@@ -256,23 +256,6 @@ namespace OpenNest
             return result;
         }
 
-        /// <summary>
-        /// Computes the largest usable remainder within a work area after a portion has been used.
-        /// Picks whichever is larger: the horizontal strip to the right, or the vertical strip above.
-        /// </summary>
-        private static Box ComputeRemainderWithin(Box workArea, Box usedBox, double spacing)
-        {
-            var hWidth = workArea.Right - usedBox.Right - spacing;
-            var hStrip = hWidth > 0
-                ? new Box(usedBox.Right + spacing, workArea.Y, hWidth, workArea.Length)
-                : Box.Empty;
-
-            var vHeight = workArea.Top - usedBox.Top - spacing;
-            var vStrip = vHeight > 0
-                ? new Box(workArea.X, usedBox.Top + spacing, workArea.Width, vHeight)
-                : Box.Empty;
-
-            return hStrip.Area() >= vStrip.Area() ? hStrip : vStrip;
-        }
+        // ComputeRemainderWithin inherited from NestEngineBase
     }
 }

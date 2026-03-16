@@ -787,104 +787,19 @@ namespace OpenNest.Forms
 
                     var anyPlaced = false;
 
-                    // Strip engine: use Nest() for multi-drawing strategy.
-                    if (NestEngineRegistry.Create(plate) is StripNestEngine)
+                    var engine = NestEngineRegistry.Create(plate);
+                    engine.PlateNumber = plateCount;
+
+                    var nestParts = await Task.Run(() =>
+                        engine.Nest(remaining, progress, token));
+
+                    activeForm.PlateView.ClearTemporaryParts();
+
+                    if (nestParts.Count > 0 && !token.IsCancellationRequested)
                     {
-                        var stripEngine = new StripNestEngine(plate);
-                        var stripParts = await Task.Run(() =>
-                            stripEngine.Nest(remaining, progress, token));
-
-                        activeForm.PlateView.ClearTemporaryParts();
-
-                        if (stripParts.Count > 0 && !token.IsCancellationRequested)
-                        {
-                            plate.Parts.AddRange(stripParts);
-                            activeForm.PlateView.Invalidate();
-                            anyPlaced = true;
-
-                            // Deduct placed quantities.
-                            foreach (var item in remaining)
-                            {
-                                var placed = stripParts.Count(p =>
-                                    p.BaseDrawing.Name == item.Drawing.Name);
-                                item.Quantity = System.Math.Max(0, item.Quantity - placed);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Default: sequential Fill + Pack.
-                        var fillItems = remaining
-                            .Where(i => i.Quantity > 1)
-                            .OrderBy(i => i.Priority)
-                            .ThenByDescending(i => i.Drawing.Area)
-                            .ToList();
-
-                        var packItems = remaining
-                            .Where(i => i.Quantity == 1)
-                            .ToList();
-
-                        var workArea = plate.WorkArea();
-
-                        // Phase 1: Fill each multi-quantity drawing with NestEngine.
-                        foreach (var item in fillItems)
-                        {
-                            if (item.Quantity <= 0 || token.IsCancellationRequested)
-                                continue;
-
-                            if (workArea.Width <= 0 || workArea.Length <= 0)
-                                break;
-
-                            var engine = NestEngineRegistry.Create(plate);
-                            engine.PlateNumber = plateCount;
-
-                            var parts = await Task.Run(() =>
-                                engine.FillExact(item, workArea, progress, token));
-
-                            activeForm.PlateView.ClearTemporaryParts();
-
-                            if (token.IsCancellationRequested)
-                                break;
-
-                            if (parts.Count > 0)
-                            {
-                                plate.Parts.AddRange(parts);
-                                // TODO: Compactor.Compact(parts, plate);
-                                activeForm.PlateView.Invalidate();
-                                anyPlaced = true;
-
-                                item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
-
-                                var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
-                                workArea = ComputeRemainderWithin(workArea, placedBox, plate.PartSpacing);
-                            }
-                        }
-
-                        // Phase 2: Pack single-quantity items into remaining space.
-                        packItems = packItems.Where(i => i.Quantity > 0).ToList();
-
-                        if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0
-                            && !token.IsCancellationRequested)
-                        {
-                            var engine = NestEngineRegistry.Create(plate);
-                            var packParts = engine.PackArea(workArea, packItems, null, CancellationToken.None);
-                            plate.Parts.AddRange(packParts);
-                            var packed = packParts.Count;
-
-                            if (packed > 0)
-                            {
-                                activeForm.PlateView.Invalidate();
-                                anyPlaced = true;
-
-                                foreach (var item in packItems)
-                                {
-                                    var placed = plate.Parts.Count(p =>
-                                        p.BaseDrawing.Name == item.Drawing.Name);
-                                    item.Quantity = System.Math.Max(0,
-                                        item.Quantity - placed);
-                                }
-                            }
-                        }
+                        plate.Parts.AddRange(nestParts);
+                        activeForm.PlateView.Invalidate();
+                        anyPlaced = true;
                     }
 
                     if (!anyPlaced)
@@ -907,21 +822,6 @@ namespace OpenNest.Forms
                 nestingCts.Dispose();
                 nestingCts = null;
             }
-        }
-
-        private static Box ComputeRemainderWithin(Box workArea, Box usedBox, double spacing)
-        {
-            var hWidth = workArea.Right - usedBox.Right - spacing;
-            var hStrip = hWidth > 0
-                ? new Box(usedBox.Right + spacing, workArea.Y, hWidth, workArea.Length)
-                : Box.Empty;
-
-            var vHeight = workArea.Top - usedBox.Top - spacing;
-            var vStrip = vHeight > 0
-                ? new Box(workArea.X, usedBox.Top + spacing, workArea.Width, vHeight)
-                : Box.Empty;
-
-            return hStrip.Area() >= vStrip.Area() ? hStrip : vStrip;
         }
 
         private void SequenceAllPlates_Click(object sender, EventArgs e)

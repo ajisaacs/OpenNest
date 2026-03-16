@@ -329,51 +329,10 @@ static class NestConsole
 
             Console.WriteLine($"AutoNest: {nestItems.Count} drawing(s), {nestItems.Sum(i => i.Quantity)} total parts");
 
-            var fillItems = nestItems
-                .Where(i => i.Quantity > 1)
-                .OrderBy(i => i.Priority)
-                .ThenByDescending(i => i.Drawing.Area)
-                .ToList();
-
-            var packItems = nestItems
-                .Where(i => i.Quantity == 1)
-                .ToList();
-
-            var workArea = plate.WorkArea();
-            success = false;
-
-            // Phase 1: Fill multi-quantity drawings with NestEngine.
-            foreach (var item in fillItems)
-            {
-                if (item.Quantity <= 0 || workArea.Width <= 0 || workArea.Length <= 0)
-                    continue;
-
-                var engine = NestEngineRegistry.Create(plate);
-                var parts = engine.FillExact(item, workArea, null, CancellationToken.None);
-
-                if (parts.Count > 0)
-                {
-                    plate.Parts.AddRange(parts);
-                    // TODO: Compactor.Compact(parts, plate);
-                    item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
-                    success = true;
-                    var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
-                    workArea = ComputeRemainderWithin(workArea, placedBox, plate.PartSpacing);
-                }
-            }
-
-            // Phase 2: Pack single-quantity items into remaining space.
-            packItems = packItems.Where(i => i.Quantity > 0).ToList();
-
-            if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0)
-            {
-                var engine = NestEngineRegistry.Create(plate);
-                var packParts = engine.PackArea(workArea, packItems, null, CancellationToken.None);
-                plate.Parts.AddRange(packParts);
-
-                if (packParts.Count > 0)
-                    success = true;
-            }
+            var engine = NestEngineRegistry.Create(plate);
+            var nestParts = engine.Nest(nestItems, null, CancellationToken.None);
+            plate.Parts.AddRange(nestParts);
+            success = nestParts.Count > 0;
         }
         else
         {
@@ -384,21 +343,6 @@ static class NestConsole
 
         sw.Stop();
         return (success, sw.ElapsedMilliseconds);
-    }
-
-    static Box ComputeRemainderWithin(Box workArea, Box usedBox, double spacing)
-    {
-        var hWidth = workArea.Right - usedBox.Right - spacing;
-        var hStrip = hWidth > 0
-            ? new Box(usedBox.Right + spacing, workArea.Y, hWidth, workArea.Length)
-            : Box.Empty;
-
-        var vHeight = workArea.Top - usedBox.Top - spacing;
-        var vStrip = vHeight > 0
-            ? new Box(workArea.X, usedBox.Top + spacing, workArea.Width, vHeight)
-            : Box.Empty;
-
-        return hStrip.Area() >= vStrip.Area() ? hStrip : vStrip;
     }
 
     static int CheckOverlaps(Plate plate, Options options)

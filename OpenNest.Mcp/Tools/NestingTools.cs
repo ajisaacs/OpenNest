@@ -233,81 +233,22 @@ namespace OpenNest.Mcp.Tools
                 items.Add(new NestItem { Drawing = drawing, Quantity = qtys[i] });
             }
 
-            // Strategy 1: Strip nesting
-            var stripEngine = new StripNestEngine(plate);
-            var stripResult = stripEngine.Nest(items, null, CancellationToken.None);
-            var stripScore = FillScore.Compute(stripResult, plate.WorkArea());
-
-            // Strategy 2: Current sequential fill
-            var seqResult = SequentialFill(plate, items);
-            var seqScore = FillScore.Compute(seqResult, plate.WorkArea());
-
-            // Pick winner and apply to plate.
-            var winner = stripScore >= seqScore ? stripResult : seqResult;
-            var winnerName = stripScore >= seqScore ? "strip" : "sequential";
-            plate.Parts.AddRange(winner);
-            var totalPlaced = winner.Count;
+            var engine = NestEngineRegistry.Create(plate);
+            var nestParts = engine.Nest(items, null, CancellationToken.None);
+            plate.Parts.AddRange(nestParts);
+            var totalPlaced = nestParts.Count;
 
             var sb = new StringBuilder();
-            sb.AppendLine($"AutoNest plate {plateIndex} ({winnerName} strategy): {(totalPlaced > 0 ? "success" : "no parts placed")}");
+            sb.AppendLine($"AutoNest plate {plateIndex} ({engine.Name} engine): {(totalPlaced > 0 ? "success" : "no parts placed")}");
             sb.AppendLine($"  Parts placed: {totalPlaced}");
             sb.AppendLine($"  Total parts: {plate.Parts.Count}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
-            sb.AppendLine($"  Strip score: {stripScore.Count} parts, density {stripScore.Density:P1}");
-            sb.AppendLine($"  Sequential score: {seqScore.Count} parts, density {seqScore.Density:P1}");
 
             var groups = plate.Parts.GroupBy(p => p.BaseDrawing.Name);
             foreach (var group in groups)
                 sb.AppendLine($"  {group.Key}: {group.Count()}");
 
             return sb.ToString();
-        }
-
-        private static List<Part> SequentialFill(Plate plate, List<NestItem> items)
-        {
-            var fillItems = items
-                .Where(i => i.Quantity != 1)
-                .OrderBy(i => i.Priority)
-                .ThenByDescending(i => i.Drawing.Area)
-                .ToList();
-
-            var workArea = plate.WorkArea();
-            var allParts = new List<Part>();
-
-            foreach (var item in fillItems)
-            {
-                if (item.Quantity == 0 || workArea.Width <= 0 || workArea.Length <= 0)
-                    continue;
-
-                var engine = new DefaultNestEngine(plate);
-                var parts = engine.Fill(
-                    new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
-                    workArea, null, CancellationToken.None);
-
-                if (parts.Count > 0)
-                {
-                    allParts.AddRange(parts);
-                    var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
-                    workArea = ComputeRemainderWithin(workArea, placedBox, plate.PartSpacing);
-                }
-            }
-
-            return allParts;
-        }
-
-        private static Box ComputeRemainderWithin(Box workArea, Box usedBox, double spacing)
-        {
-            var hWidth = workArea.Right - usedBox.Right - spacing;
-            var hStrip = hWidth > 0
-                ? new Box(usedBox.Right + spacing, workArea.Y, hWidth, workArea.Length)
-                : Box.Empty;
-
-            var vHeight = workArea.Top - usedBox.Top - spacing;
-            var vStrip = vHeight > 0
-                ? new Box(workArea.X, usedBox.Top + spacing, workArea.Width, vHeight)
-                : Box.Empty;
-
-            return hStrip.Area() >= vStrip.Area() ? hStrip : vStrip;
         }
     }
 }

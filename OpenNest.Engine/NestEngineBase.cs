@@ -50,6 +50,88 @@ namespace OpenNest
             return new List<Part>();
         }
 
+        // --- Nest: multi-item strategy (virtual, side-effect-free) ---
+
+        public virtual List<Part> Nest(List<NestItem> items,
+            IProgress<NestProgress> progress, CancellationToken token)
+        {
+            if (items == null || items.Count == 0)
+                return new List<Part>();
+
+            var workArea = Plate.WorkArea();
+            var allParts = new List<Part>();
+
+            var fillItems = items
+                .Where(i => i.Quantity != 1)
+                .OrderBy(i => i.Priority)
+                .ThenByDescending(i => i.Drawing.Area)
+                .ToList();
+
+            var packItems = items
+                .Where(i => i.Quantity == 1)
+                .ToList();
+
+            // Phase 1: Fill multi-quantity drawings sequentially.
+            foreach (var item in fillItems)
+            {
+                if (token.IsCancellationRequested)
+                    break;
+
+                if (item.Quantity <= 0 || workArea.Width <= 0 || workArea.Length <= 0)
+                    continue;
+
+                var parts = FillExact(
+                    new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
+                    workArea, progress, token);
+
+                if (parts.Count > 0)
+                {
+                    allParts.AddRange(parts);
+                    item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
+                    var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
+                    workArea = ComputeRemainderWithin(workArea, placedBox, Plate.PartSpacing);
+                }
+            }
+
+            // Phase 2: Pack single-quantity items into remaining space.
+            packItems = packItems.Where(i => i.Quantity > 0).ToList();
+
+            if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0
+                && !token.IsCancellationRequested)
+            {
+                var packParts = PackArea(workArea, packItems, progress, token);
+
+                if (packParts.Count > 0)
+                {
+                    allParts.AddRange(packParts);
+
+                    foreach (var item in packItems)
+                    {
+                        var placed = packParts.Count(p =>
+                            p.BaseDrawing.Name == item.Drawing.Name);
+                        item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                    }
+                }
+            }
+
+            return allParts;
+        }
+
+        protected static Box ComputeRemainderWithin(Box workArea, Box usedBox, double spacing)
+        {
+            var hWidth = workArea.Right - usedBox.Right - spacing;
+            var hStrip = hWidth > 0
+                ? new Box(usedBox.Right + spacing, workArea.Y, hWidth, workArea.Length)
+                : Box.Empty;
+
+            var vHeight = workArea.Top - usedBox.Top - spacing;
+            var vStrip = vHeight > 0
+                ? new Box(workArea.X, usedBox.Top + spacing, workArea.Width, vHeight)
+                : Box.Empty;
+
+            return hStrip.Area() >= vStrip.Area() ? hStrip : vStrip;
+        }
+
         // --- FillExact (non-virtual, delegates to virtual Fill) ---
 
         public List<Part> FillExact(NestItem item, Box workArea,
