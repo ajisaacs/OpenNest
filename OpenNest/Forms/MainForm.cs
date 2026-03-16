@@ -53,6 +53,9 @@ namespace OpenNest.Forms
 
             if (GpuEvaluatorFactory.GpuAvailable)
                 BestFitCache.CreateSlideComputer = () => GpuEvaluatorFactory.CreateSlideComputer();
+
+            var enginesDir = Path.Combine(Application.StartupPath, "Engines");
+            NestEngineRegistry.LoadPlugins(enginesDir);
         }
 
         private Nest CreateDefaultNest()
@@ -794,7 +797,8 @@ namespace OpenNest.Forms
                         if (workArea.Width <= 0 || workArea.Length <= 0)
                             break;
 
-                        var engine = new NestEngine(plate) { PlateNumber = plateCount };
+                        var engine = NestEngineRegistry.Create(plate);
+                        engine.PlateNumber = plateCount;
 
                         var parts = await Task.Run(() =>
                             engine.FillExact(item, workArea, progress, token));
@@ -826,10 +830,10 @@ namespace OpenNest.Forms
                     if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0
                         && !token.IsCancellationRequested)
                     {
-                        var engine = new NestEngine(plate);
-                        var partsBefore = plate.Parts.Count;
-                        engine.PackArea(workArea, packItems);
-                        var packed = plate.Parts.Count - partsBefore;
+                        var engine = NestEngineRegistry.Create(plate);
+                        var packParts = engine.PackArea(workArea, packItems, null, CancellationToken.None);
+                        plate.Parts.AddRange(packParts);
+                        var packed = packParts.Count;
 
                         if (packed > 0)
                         {
@@ -962,7 +966,7 @@ namespace OpenNest.Forms
             try
             {
                 var plate = activeForm.PlateView.Plate;
-                var engine = new NestEngine(plate);
+                var engine = NestEngineRegistry.Create(plate);
 
                 var parts = await Task.Run(() =>
                     engine.Fill(new NestItem { Drawing = drawing },

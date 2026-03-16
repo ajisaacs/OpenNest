@@ -833,7 +833,7 @@ namespace OpenNest.Controls
 
             try
             {
-                var engine = new NestEngine(Plate);
+                var engine = NestEngineRegistry.Create(Plate);
                 var parts = await Task.Run(() =>
                     engine.Fill(groupParts, workArea, progress, cts.Token));
 
