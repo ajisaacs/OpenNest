@@ -2,17 +2,19 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement a strip-based multi-drawing nesting strategy that dedicates a tight strip to the largest-area drawing and fills the remnant with remaining drawings.
+**Goal:** Implement a strip-based multi-drawing nesting strategy as a `NestEngineBase` subclass that dedicates a tight strip to the largest-area drawing and fills the remnant with remaining drawings.
 
-**Architecture:** New `StripNester` class in `OpenNest.Engine` that orchestrates strip optimization using `NestEngine.Fill` as a building block. Tries bottom and left strip orientations, finds the tightest strip via a shrink loop, fills remnants with remaining items, and picks the denser result. Integrated into `NestingTools` MCP as an additional strategy in `autonest_plate`.
+**Architecture:** `StripNestEngine` extends `NestEngineBase`, uses `DefaultNestEngine` internally (composition) for individual fills. Registered in `NestEngineRegistry`. For single-item fills, delegates to `DefaultNestEngine`. For multi-drawing nesting, orchestrates the strip+remnant strategy. The MCP `autonest_plate` tool always runs `StripNestEngine` as a competitor alongside the current sequential approach, picking the denser result.
 
 **Tech Stack:** C# / .NET 8, OpenNest.Engine, OpenNest.Mcp
 
 **Spec:** `docs/superpowers/specs/2026-03-15-strip-nester-design.md`
 
+**Depends on:** `docs/superpowers/plans/2026-03-15-abstract-nest-engine.md` (must be implemented first — provides `NestEngineBase`, `DefaultNestEngine`, `NestEngineRegistry`)
+
 ---
 
-## Chunk 1: Core StripNester
+## Chunk 1: Core StripNestEngine
 
 ### Task 1: Create StripDirection enum
 
@@ -84,14 +86,14 @@ git commit -m "feat: add StripNestResult internal class"
 
 ---
 
-### Task 3: Create StripNester class — strip item selection and initial strip height estimation
+### Task 3: Create StripNestEngine — class skeleton with selection and estimation helpers
 
 **Files:**
-- Create: `OpenNest.Engine/StripNester.cs`
+- Create: `OpenNest.Engine/StripNestEngine.cs`
 
-This task creates the class with the constructor and the helper methods for selecting the strip item and estimating the initial strip dimensions. The main `Nest` method is added in the next task.
+This task creates the class extending `NestEngineBase`, with `Name`/`Description` overrides, the single-item `Fill` override that delegates to `DefaultNestEngine`, and the helper methods for strip item selection and dimension estimation. The main `Nest` method is added in the next task.
 
-- [ ] **Step 1: Create StripNester with selection and estimation logic**
+- [ ] **Step 1: Create StripNestEngine with skeleton and helpers**
 
 ```csharp
 using System;
@@ -103,16 +105,28 @@ using OpenNest.Math;
 
 namespace OpenNest
 {
-    public class StripNester
+    public class StripNestEngine : NestEngineBase
     {
         private const int MaxShrinkIterations = 20;
 
-        public StripNester(Plate plate)
+        public StripNestEngine(Plate plate) : base(plate)
         {
-            Plate = plate;
         }
 
-        public Plate Plate { get; }
+        public override string Name => "Strip";
+
+        public override string Description => "Strip-based nesting for mixed-drawing layouts";
+
+        /// <summary>
+        /// Single-item fill delegates to DefaultNestEngine.
+        /// The strip strategy adds value for multi-drawing nesting, not single-item fills.
+        /// </summary>
+        public override List<Part> Fill(NestItem item, Box workArea,
+            IProgress<NestProgress> progress, CancellationToken token)
+        {
+            var inner = new DefaultNestEngine(Plate);
+            return inner.Fill(item, workArea, progress, token);
+        }
 
         /// <summary>
         /// Selects the item that consumes the most plate area (bounding box area x quantity).
@@ -145,7 +159,7 @@ namespace OpenNest
         /// Estimates the strip dimension (height for bottom, width for left) needed
         /// to fit the target quantity. Tries 0 deg and 90 deg rotations and picks the shorter.
         /// This is only an estimate for the shrink loop starting point — the actual fill
-        /// uses NestEngine.Fill which tries many rotation angles internally.
+        /// uses DefaultNestEngine.Fill which tries many rotation angles internally.
         /// </summary>
         private static double EstimateStripDimension(NestItem item, double stripLength, double maxDimension)
         {
@@ -181,26 +195,32 @@ Expected: Build succeeded
 - [ ] **Step 3: Commit**
 
 ```bash
-git add OpenNest.Engine/StripNester.cs
-git commit -m "feat: add StripNester with strip selection and estimation"
+git add OpenNest.Engine/StripNestEngine.cs
+git commit -m "feat: add StripNestEngine skeleton with Fill delegate and estimation helpers"
 ```
 
 ---
 
-### Task 4: Add the core Nest method and TryOrientation
+### Task 4: Add the Nest method and TryOrientation
 
 **Files:**
-- Modify: `OpenNest.Engine/StripNester.cs`
+- Modify: `OpenNest.Engine/StripNestEngine.cs`
 
-This is the main algorithm: tries both orientations, fills strip + remnant, compares results.
+This is the main multi-drawing algorithm: tries both orientations, fills strip + remnant, compares results. Uses `DefaultNestEngine` internally for all fill operations (composition pattern per the abstract engine spec).
 
-Key detail: The remnant fill must shrink the remnant box after each item fill using `ComputeRemainderWithin` (same pattern as `AutoNestPlate` in `NestingTools.cs:293-306`) to prevent overlapping placements.
+Key detail: The remnant fill shrinks the remnant box after each item fill using `ComputeRemainderWithin` to prevent overlapping placements.
 
 - [ ] **Step 1: Add Nest, TryOrientation, and ComputeRemainderWithin methods**
 
-Add these methods to the `StripNester` class, after the `EstimateStripDimension` method:
+Add these methods to the `StripNestEngine` class, after the `EstimateStripDimension` method:
 
 ```csharp
+        /// <summary>
+        /// Multi-drawing strip nesting strategy.
+        /// Picks the largest-area drawing for strip treatment, finds the tightest strip
+        /// in both bottom and left orientations, fills remnants with remaining drawings,
+        /// and returns the denser result.
+        /// </summary>
         public List<Part> Nest(List<NestItem> items,
             IProgress<NestProgress> progress, CancellationToken token)
         {
@@ -243,9 +263,9 @@ Add these methods to the `StripNester` class, after the `EstimateStripDimension`
                 ? new Box(workArea.X, workArea.Y, workArea.Width, estimatedDim)
                 : new Box(workArea.X, workArea.Y, estimatedDim, workArea.Length);
 
-            // Initial fill (does NOT add to plate — uses the 4-arg overload).
-            var engine = new NestEngine(Plate);
-            var stripParts = engine.Fill(
+            // Initial fill using DefaultNestEngine (composition, not inheritance).
+            var inner = new DefaultNestEngine(Plate);
+            var stripParts = inner.Fill(
                 new NestItem { Drawing = stripItem.Drawing, Quantity = stripItem.Quantity },
                 stripBox, null, token);
 
@@ -276,8 +296,8 @@ Add these methods to the `StripNester` class, after the `EstimateStripDimension`
                     ? new Box(workArea.X, workArea.Y, workArea.Width, trialDim)
                     : new Box(workArea.X, workArea.Y, trialDim, workArea.Length);
 
-                var trialEngine = new NestEngine(Plate);
-                var trialParts = trialEngine.Fill(
+                var trialInner = new DefaultNestEngine(Plate);
+                var trialParts = trialInner.Fill(
                     new NestItem { Drawing = stripItem.Drawing, Quantity = stripItem.Quantity },
                     trialBox, null, token);
 
@@ -339,8 +359,8 @@ Add these methods to the `StripNester` class, after the `EstimateStripDimension`
                     if (currentRemnant.Width <= 0 || currentRemnant.Length <= 0)
                         break;
 
-                    var remnantEngine = new NestEngine(Plate);
-                    var remnantParts = remnantEngine.Fill(
+                    var remnantInner = new DefaultNestEngine(Plate);
+                    var remnantParts = remnantInner.Fill(
                         new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
                         currentRemnant, null, token);
 
@@ -393,31 +413,62 @@ Expected: Build succeeded
 - [ ] **Step 3: Commit**
 
 ```bash
-git add OpenNest.Engine/StripNester.cs
-git commit -m "feat: add StripNester.Nest with strip fill, shrink loop, and remnant fill"
+git add OpenNest.Engine/StripNestEngine.cs
+git commit -m "feat: add StripNestEngine.Nest with strip fill, shrink loop, and remnant fill"
+```
+
+---
+
+### Task 5: Register StripNestEngine in NestEngineRegistry
+
+**Files:**
+- Modify: `OpenNest.Engine/NestEngineRegistry.cs`
+
+- [ ] **Step 1: Add Strip registration**
+
+In `NestEngineRegistry.cs`, add the strip engine registration in the static constructor, after the Default registration:
+
+```csharp
+            Register("Strip",
+                "Strip-based nesting for mixed-drawing layouts",
+                plate => new StripNestEngine(plate));
+```
+
+- [ ] **Step 2: Build to verify**
+
+Run: `dotnet build OpenNest.Engine/OpenNest.Engine.csproj`
+Expected: Build succeeded
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add OpenNest.Engine/NestEngineRegistry.cs
+git commit -m "feat: register StripNestEngine in NestEngineRegistry"
 ```
 
 ---
 
 ## Chunk 2: MCP Integration
 
-### Task 5: Integrate StripNester into autonest_plate MCP tool
+### Task 6: Integrate StripNestEngine into autonest_plate MCP tool
 
 **Files:**
 - Modify: `OpenNest.Mcp/Tools/NestingTools.cs`
 
-Run the strip nester alongside the existing sequential approach. Both use the 4-arg `Fill` overload (no side effects), then the winner's parts are added to the plate.
+Run the strip nester alongside the existing sequential approach. Both use side-effect-free fills (4-arg `Fill` returning `List<Part>`), then the winner's parts are added to the plate.
+
+Note: After the abstract engine migration, callsites already use `NestEngineRegistry.Create(plate)`. The `autonest_plate` tool creates a `StripNestEngine` directly for the strip strategy competition (it's always tried, regardless of active engine selection).
 
 - [ ] **Step 1: Refactor AutoNestPlate to run both strategies**
 
-In `NestingTools.cs`, replace the fill/pack logic in `AutoNestPlate` (lines 236-278) with a strategy competition. The existing sequential logic is extracted to a `SequentialFill` helper.
+In `NestingTools.cs`, replace the fill/pack logic in `AutoNestPlate` (the section after the items list is built) with a strategy competition.
 
-Replace lines 236-278 with:
+Replace the fill/pack logic with:
 
 ```csharp
             // Strategy 1: Strip nesting
-            var stripNester = new StripNester(plate);
-            var stripResult = stripNester.Nest(items, null, CancellationToken.None);
+            var stripEngine = new StripNestEngine(plate);
+            var stripResult = stripEngine.Nest(items, null, CancellationToken.None);
             var stripScore = FillScore.Compute(stripResult, plate.WorkArea());
 
             // Strategy 2: Current sequential fill
@@ -431,7 +482,7 @@ Replace lines 236-278 with:
             var totalPlaced = winner.Count;
 ```
 
-Update the output section (around line 280):
+Update the output section:
 
 ```csharp
             var sb = new StringBuilder();
@@ -451,7 +502,7 @@ Update the output section (around line 280):
 
 - [ ] **Step 2: Add the SequentialFill helper method**
 
-Add this private method to `NestingTools`. It mirrors the existing `AutoNestPlate` fill phase using the 4-arg `Fill` overload for side-effect-free comparison.
+Add this private method to `NestingTools`. It mirrors the existing sequential fill phase using side-effect-free fills.
 
 ```csharp
         private static List<Part> SequentialFill(Plate plate, List<NestItem> items)
@@ -470,7 +521,7 @@ Add this private method to `NestingTools`. It mirrors the existing `AutoNestPlat
                 if (item.Quantity == 0 || workArea.Width <= 0 || workArea.Length <= 0)
                     continue;
 
-                var engine = new NestEngine(plate);
+                var engine = new DefaultNestEngine(plate);
                 var parts = engine.Fill(
                     new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
                     workArea, null, CancellationToken.None);
@@ -500,14 +551,14 @@ Expected: Build succeeded
 
 ```bash
 git add OpenNest.Mcp/Tools/NestingTools.cs
-git commit -m "feat: integrate StripNester into autonest_plate MCP tool"
+git commit -m "feat: integrate StripNestEngine into autonest_plate MCP tool"
 ```
 
 ---
 
 ## Chunk 3: Publish and Test
 
-### Task 6: Publish MCP server and test with real parts
+### Task 7: Publish MCP server and test with real parts
 
 **Files:**
 - No code changes — publish and manual testing
