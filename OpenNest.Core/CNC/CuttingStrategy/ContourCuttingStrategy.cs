@@ -7,9 +7,9 @@ namespace OpenNest.CNC.CuttingStrategy
     {
         public CuttingParameters Parameters { get; set; }
 
-        public Program Apply(Program partProgram, Plate plate)
+        public CuttingResult Apply(Program partProgram, Vector approachPoint)
         {
-            var exitPoint = GetExitPoint(plate);
+            var exitPoint = approachPoint;
             var entities = partProgram.ToGeometry();
             var profile = new ShapeProfile(entities);
 
@@ -44,9 +44,12 @@ namespace OpenNest.CNC.CuttingStrategy
                 currentPoint = closestPt;
             }
 
+            var lastCutPoint = exitPoint;
+
             // Perimeter last
             {
                 var perimeterPt = profile.Perimeter.ClosestPointTo(currentPoint, out perimeterEntity);
+                lastCutPoint = perimeterPt;
                 var normal = ComputeNormal(perimeterPt, perimeterEntity, ContourType.External);
                 var winding = DetermineWinding(profile.Perimeter);
 
@@ -60,21 +63,10 @@ namespace OpenNest.CNC.CuttingStrategy
                 result.Codes.AddRange(leadOut.Generate(perimeterPt, normal, winding));
             }
 
-            return result;
-        }
-
-        private Vector GetExitPoint(Plate plate)
-        {
-            var w = plate.Size.Width;
-            var l = plate.Size.Length;
-
-            return plate.Quadrant switch
+            return new CuttingResult
             {
-                1 => new Vector(w, l),         // Q1 origin BottomLeft -> exit TopRight
-                2 => new Vector(0, l),         // Q2 origin BottomRight -> exit TopLeft
-                3 => new Vector(0, 0),         // Q3 origin TopRight -> exit BottomLeft
-                4 => new Vector(w, 0),         // Q4 origin TopLeft -> exit BottomRight
-                _ => new Vector(w, l)
+                Program = result,
+                LastCutPoint = lastCutPoint
             };
         }
 
