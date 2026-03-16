@@ -28,7 +28,7 @@ namespace OpenNest.Mcp.Tools
                 return $"Error: plate {plateIndex} not found";
 
             var work = plate.WorkArea();
-            var remnants = plate.GetRemnants();
+            var remnants = RemnantFinder.FromPlate(plate).FindRemnants();
 
             var sb = new StringBuilder();
             sb.AppendLine($"Plate {plateIndex}:");

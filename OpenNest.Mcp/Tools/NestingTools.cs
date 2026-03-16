@@ -102,7 +102,8 @@ namespace OpenNest.Mcp.Tools
             if (drawing == null)
                 return $"Error: drawing '{drawingName}' not found";
 
-            var remnants = plate.GetRemnants();
+            var finder = RemnantFinder.FromPlate(plate);
+            var remnants = finder.FindRemnants();
 
             if (remnants.Count == 0)
                 return $"No remnant areas found on plate {plateIndex}";
