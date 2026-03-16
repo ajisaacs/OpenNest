@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -42,5 +43,6 @@ namespace OpenNest
         public double NestedArea { get; set; }
         public List<Part> BestParts { get; set; }
         public string Description { get; set; }
+        public Box ActiveWorkArea { get; set; }
     }
 }
