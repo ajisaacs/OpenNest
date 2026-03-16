@@ -33,8 +33,10 @@ Domain model, geometry, and CNC primitives organized into namespaces:
 - **Quadrant system**: Plates use quadrants 1-4 (like Cartesian quadrants) to determine coordinate origin placement. This affects bounding box calculation, rotation, and part positioning.
 
 ### OpenNest.Engine (class library, depends on Core)
-Nesting algorithms. `NestEngine` orchestrates filling plates with parts. `AutoNester` handles multi-plate auto-nesting.
+Nesting algorithms with a pluggable engine architecture. `NestEngineBase` is the abstract base class; `DefaultNestEngine` (formerly `NestEngine`) provides the multi-phase fill strategy. `NestEngineRegistry` manages available engines (built-in + plugins from `Engines/` directory) and the globally active engine. `AutoNester` handles mixed-part NFP-based nesting with simulated annealing (not yet integrated into the registry).
 
+- **Engine hierarchy**: `NestEngineBase` (abstract) → `DefaultNestEngine` (Linear, Pairs, RectBestFit, Remainder phases). Custom engines subclass `NestEngineBase` and register via `NestEngineRegistry.Register()` or as plugin DLLs in `Engines/`.
+- **NestEngineRegistry**: Static registry — `Create(Plate)` factory, `ActiveEngineName` global selection, `LoadPlugins(directory)` for DLL discovery. All callsites use `NestEngineRegistry.Create(plate)` except `BruteForceRunner` which uses `new DefaultNestEngine(plate)` directly for training consistency.
 - **BestFit/**: NFP-based pair evaluation pipeline — `BestFitFinder` orchestrates angle sweeps, `PairEvaluator`/`IPairEvaluator` scores part pairs, `RotationSlideStrategy`/`ISlideComputer` computes slide distances. `BestFitCache` and `BestFitFilter` optimize repeated lookups.
 - **RectanglePacking/**: `FillBestFit` (single-item fill, tries horizontal and vertical orientations), `PackBottomLeft` (multi-item bin packing, sorts by area descending). Both operate on `Bin`/`Item` abstractions.
 - **CirclePacking/**: Alternative packing for circular parts.
