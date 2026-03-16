@@ -51,6 +51,8 @@ namespace OpenNest
 
         public Program Program { get; private set; }
 
+        public bool HasManualLeadIns { get; set; }
+
         /// <summary>
         /// Gets the rotation of the part in radians.
         /// </summary>
