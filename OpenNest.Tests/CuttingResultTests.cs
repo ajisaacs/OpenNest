@@ -3,7 +3,7 @@ using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
 using Xunit;
 
-namespace OpenNest.Engine.Tests;
+namespace OpenNest.Tests;
 
 public class CuttingResultTests
 {
