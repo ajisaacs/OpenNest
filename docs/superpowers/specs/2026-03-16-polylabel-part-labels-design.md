@@ -9,7 +9,7 @@ Part ID labels in `PlateView` are drawn at `PathPoints[0]` — the first point o
 
 ## Solution
 
-Implement the polylabel algorithm (pole of inaccessibility) to find the point inside each part's polygon with maximum distance from all edges. Draw the part ID label centered on that point.
+Implement the polylabel algorithm (pole of inaccessibility) to find the point inside each part's polygon with maximum distance from all edges, including hole edges. Draw the part ID label centered on that point.
 
 ## Design
 
@@ -22,15 +22,15 @@ Add `PolyLabel` static class in `OpenNest.Geometry` namespace (file: `OpenNest.C
 ```csharp
 public static class PolyLabel
 {
-    public static Vector Find(Polygon polygon, double precision = 1.0);
+    public static Vector Find(Polygon outer, IList<Polygon> holes = null, double precision = 0.5);
 }
 ```
 
 **Algorithm:**
 
-1. Compute bounding box of the polygon.
+1. Compute bounding box of the outer polygon.
 2. Divide into a grid of cells (cell size = shorter bbox dimension).
-3. For each cell, compute signed distance from cell center to nearest polygon edge (negative if outside polygon).
+3. For each cell, compute signed distance from cell center to nearest edge on any ring (outer boundary + all holes). Use `Polygon.ContainsPoint` for sign (negative if outside outer polygon or inside a hole).
 4. Track the best interior point found so far.
 5. Use a priority queue (sorted list) ordered by maximum possible distance for each cell.
 6. Subdivide promising cells that could beat the current best; discard the rest.
@@ -38,8 +38,10 @@ public static class PolyLabel
 
 **Dependencies within codebase:**
 
-- `Polygon.Contains(Vector)` or ray-casting point-in-polygon test (already exists via `Intersect`).
-- Point-to-segment distance calculation (already exists via `Line`/`Intersect`).
+- `Polygon.ContainsPoint(Vector)` — ray-casting point-in-polygon test (already exists).
+- Point-to-segment distance — compute from `Line` or inline (distance from point to each polygon edge).
+
+**Fallback:** If the polygon is degenerate (< 3 vertices) or the program has no geometry, fall back to the bounding box center.
 
 **No external dependencies.**
 
@@ -49,20 +51,19 @@ Modify `LayoutPart` in `OpenNest/LayoutPart.cs`.
 
 **Changes:**
 
-1. Add a cached `PointF? _labelPoint` field, invalidated when `IsDirty` is set.
-2. In `Draw(Graphics g, string id)`:
-   - If `_labelPoint` is null, compute it:
-     - Convert the part's `Program` to geometry via `ConvertProgram.ToGeometry`.
-     - Build shapes via `ShapeBuilder.GetShapes`.
-     - Convert the outer shape to a `Polygon`.
-     - Run `PolyLabel.Find()` on the polygon.
-     - Offset by `BasePart.Location`.
-     - Transform through the view matrix.
-     - Cache the resulting `PointF`.
-   - Draw the ID string centered on `_labelPoint` using `StringFormat` with `Alignment = Center` and `LineAlignment = Center`.
-3. Invalidate `_labelPoint` when `IsDirty` is set (already triggers recompute on next draw).
+1. Add a cached `Vector? _labelPoint` field in **program-local coordinates** (pre-transform). Invalidated when `IsDirty` is set.
+2. When computing the label point (on first draw after invalidation):
+   - Convert the part's `Program` to geometry via `ConvertProgram.ToGeometry`.
+   - Build shapes via `ShapeBuilder.GetShapes`.
+   - Identify the outer contour using `ShapeProfile` (the `Perimeter` shape) and convert cutouts to hole polygons.
+   - Run `PolyLabel.Find(outer, holes)` on the result.
+   - Cache the `Vector` in program-local coordinates.
+3. In `Draw(Graphics g, string id)`:
+   - Offset the cached label point by `BasePart.Location`.
+   - Transform through the current view matrix (handles zoom/pan without cache invalidation).
+   - Draw the ID string centered using `StringFormat` with `Alignment = Center` and `LineAlignment = Center`.
 
-**Coordinate pipeline:** polylabel runs in program-local coordinates (pre-transform), result is offset by `Location`, then transformed by the view matrix — same pipeline the existing `Path` uses.
+**Coordinate pipeline:** polylabel runs once in program-local coordinates (expensive, cached). Location offset + matrix transform happen every frame (cheap, no caching needed). This matches how the existing `GraphicsPath` pipeline works and avoids stale cache on zoom/pan.
 
 ## Scope
 
@@ -71,5 +72,11 @@ Modify `LayoutPart` in `OpenNest/LayoutPart.cs`.
 
 ## Testing
 
-- Unit tests for `PolyLabel.Find()` with known polygons: square, L-shape, C-shape, triangle.
+- Unit tests for `PolyLabel.Find()` with known polygons:
+  - Square — label at center.
+  - L-shape — label in the larger lobe.
+  - C-shape — label inside the concavity, not at bounding box center.
+  - Triangle — label at incenter.
+  - Thin rectangle (10:1 aspect ratio) — label centered along the short axis.
+  - Square with large centered hole — label avoids the hole.
 - Verify the returned point is inside the polygon and has the expected distance from edges.
