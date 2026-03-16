@@ -6,8 +6,12 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Actions;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Controls;
+using OpenNest.Engine;
+using OpenNest.Engine.RapidPlanning;
+using OpenNest.Engine.Sequencing;
 using OpenNest.IO;
 using OpenNest.Math;
 using OpenNest.Properties;
@@ -438,25 +442,26 @@ namespace OpenNest.Forms
 
         public void AutoSequenceCurrentPlate()
         {
-            var seq = new SequenceByNearest();
-            var parts = seq.SequenceParts(PlateView.Plate.Parts);
-
-            PlateView.Plate.Parts.Clear();
-            PlateView.Plate.Parts.AddRange(parts);
+            SequencePlate(PlateView.Plate);
+            PlateView.Invalidate();
         }
 
         public void AutoSequenceAllPlates()
         {
-            var seq = new SequenceByNearest();
-
             foreach (var plate in Nest.Plates)
-            {
-                var parts = seq.SequenceParts(plate.Parts);
-                plate.Parts.Clear();
-                plate.Parts.AddRange(parts);
-            }
+                SequencePlate(plate);
 
             PlateView.Invalidate();
+        }
+
+        private static void SequencePlate(Plate plate)
+        {
+            var parameters = new SequenceParameters();
+            var sequencer = PartSequencerFactory.Create(parameters);
+            var ordered = sequencer.Sequence(plate.Parts.ToList(), plate);
+
+            plate.Parts.Clear();
+            plate.Parts.AddRange(ordered.Select(s => s.Part));
         }
 
         public void CalculateCurrentPlateCutTime()
