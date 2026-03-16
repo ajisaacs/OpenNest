@@ -292,8 +292,7 @@ namespace OpenNest
                             if (System.Math.Min(box.Width, box.Length) < minItemDim)
                                 continue;
 
-                            var remnantInner = new DefaultNestEngine(Plate);
-                            var remnantParts = remnantInner.Fill(
+                            var remnantParts = ShrinkFill(
                                 new NestItem { Drawing = item.Drawing, Quantity = qty },
                                 box, remnantProgress, token);
 
@@ -324,6 +323,73 @@ namespace OpenNest
             result.Score = FillScore.Compute(allParts, workArea);
 
             return result;
+        }
+
+        /// <summary>
+        /// Fill a box and then shrink it to the tightest area that still fits
+        /// the same number of parts. This maximizes leftover space for subsequent fills.
+        /// </summary>
+        private List<Part> ShrinkFill(NestItem item, Box box,
+            IProgress<NestProgress> progress, CancellationToken token)
+        {
+            var inner = new DefaultNestEngine(Plate);
+            var parts = inner.Fill(item, box, progress, token);
+
+            if (parts == null || parts.Count < 2)
+                return parts;
+
+            var targetCount = parts.Count;
+            var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
+
+            // Try shrinking horizontally
+            var bestParts = parts;
+            var shrunkWidth = placedBox.Right - box.X;
+            var shrunkHeight = placedBox.Top - box.Y;
+
+            for (var i = 0; i < MaxShrinkIterations; i++)
+            {
+                if (token.IsCancellationRequested)
+                    break;
+
+                var trialWidth = shrunkWidth - Plate.PartSpacing;
+                if (trialWidth <= 0)
+                    break;
+
+                var trialBox = new Box(box.X, box.Y, trialWidth, box.Length);
+                var trialInner = new DefaultNestEngine(Plate);
+                var trialParts = trialInner.Fill(item, trialBox, null, token);
+
+                if (trialParts == null || trialParts.Count < targetCount)
+                    break;
+
+                bestParts = trialParts;
+                var trialPlacedBox = trialParts.Cast<IBoundable>().GetBoundingBox();
+                shrunkWidth = trialPlacedBox.Right - box.X;
+            }
+
+            // Try shrinking vertically
+            for (var i = 0; i < MaxShrinkIterations; i++)
+            {
+                if (token.IsCancellationRequested)
+                    break;
+
+                var trialHeight = shrunkHeight - Plate.PartSpacing;
+                if (trialHeight <= 0)
+                    break;
+
+                var trialBox = new Box(box.X, box.Y, box.Width, trialHeight);
+                var trialInner = new DefaultNestEngine(Plate);
+                var trialParts = trialInner.Fill(item, trialBox, null, token);
+
+                if (trialParts == null || trialParts.Count < targetCount)
+                    break;
+
+                bestParts = trialParts;
+                var trialPlacedBox = trialParts.Cast<IBoundable>().GetBoundingBox();
+                shrunkHeight = trialPlacedBox.Top - box.Y;
+            }
+
+            return bestParts;
         }
 
         /// <summary>
