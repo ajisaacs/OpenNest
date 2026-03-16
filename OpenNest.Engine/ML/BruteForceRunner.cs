@@ -27,7 +27,7 @@ namespace OpenNest.Engine.ML
     {
         public static BruteForceResult Run(Drawing drawing, Plate plate, bool forceFullAngleSweep = false)
         {
-            var engine = new NestEngine(plate);
+            var engine = new DefaultNestEngine(plate);
             engine.ForceFullAngleSweep = forceFullAngleSweep;
             var item = new NestItem { Drawing = drawing };
 

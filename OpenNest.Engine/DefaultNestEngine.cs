@@ -12,26 +12,15 @@ using OpenNest.RectanglePacking;
 
 namespace OpenNest
 {
-    public class NestEngine
+    public class DefaultNestEngine : NestEngineBase
     {
-        public NestEngine(Plate plate)
-        {
-            Plate = plate;
-        }
+        public DefaultNestEngine(Plate plate) : base(plate) { }
 
-        public Plate Plate { get; set; }
+        public override string Name => "Default";
 
-        public NestDirection NestDirection { get; set; }
-
-        public int PlateNumber { get; set; }
-
-        public NestPhase WinnerPhase { get; private set; }
-
-        public List<PhaseResult> PhaseResults { get; } = new();
+        public override string Description => "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)";
 
         public bool ForceFullAngleSweep { get; set; }
-
-        public List<AngleResult> AngleResults { get; } = new();
 
         // Angles that have produced results across multiple Fill calls.
         // Populated after each Fill; used to prune subsequent fills.
@@ -39,23 +28,7 @@ namespace OpenNest
 
         // --- Public Fill API ---
 
-        public bool Fill(NestItem item)
-        {
-            return Fill(item, Plate.WorkArea());
-        }
-
-        public bool Fill(NestItem item, Box workArea)
-        {
-            var parts = Fill(item, workArea, null, CancellationToken.None);
-
-            if (parts == null || parts.Count == 0)
-                return false;
-
-            Plate.Parts.AddRange(parts);
-            return true;
-        }
-
-        public List<Part> Fill(NestItem item, Box workArea,
+        public override List<Part> Fill(NestItem item, Box workArea,
             IProgress<NestProgress> progress, CancellationToken token)
         {
             PhaseResults.Clear();
@@ -89,155 +62,60 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Finds the smallest sub-area of workArea that fits exactly item.Quantity parts.
-        /// Uses binary search on both orientations and picks the tightest fit.
-        /// Falls through to standard Fill for unlimited (0) or single (1) quantities.
+        /// Fast fill count using linear fill with two angles plus the top cached
+        /// pair candidates. Used by binary search to estimate capacity at a given
+        /// box size without running the full Fill pipeline.
         /// </summary>
-        public List<Part> FillExact(NestItem item, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
+        private int QuickFillCount(Drawing drawing, Box testBox, double bestRotation)
         {
-            // Early exits: unlimited or single quantity — no benefit from area search.
-            if (item.Quantity <= 1)
-                return Fill(item, workArea, progress, token);
+            var engine = new FillLinear(testBox, Plate.PartSpacing);
+            var bestCount = 0;
 
-            // Quick capacity check: estimate how many parts fit via bounding box.
-            var partBox = item.Drawing.Program.BoundingBox();
-            var cols = (int)(workArea.Width / (partBox.Width + Plate.PartSpacing));
-            var rows = (int)(workArea.Length / (partBox.Length + Plate.PartSpacing));
-            var capacity = System.Math.Max(cols * rows, 1);
+            // Single-part linear fills.
+            var angles = new[] { bestRotation, bestRotation + Angle.HalfPI };
 
-            // Also check rotated orientation.
-            var colsR = (int)(workArea.Width / (partBox.Length + Plate.PartSpacing));
-            var rowsR = (int)(workArea.Length / (partBox.Width + Plate.PartSpacing));
-            capacity = System.Math.Max(capacity, colsR * rowsR);
-
-            Debug.WriteLine($"[FillExact] Capacity estimate: {capacity}, target: {item.Quantity}, workArea: {workArea.Width:F1}x{workArea.Length:F1}");
-
-            if (capacity <= item.Quantity)
+            foreach (var angle in angles)
             {
-                // Plate can't fit more than requested — do a normal fill.
-                return Fill(item, workArea, progress, token);
+                var h = engine.Fill(drawing, angle, NestDirection.Horizontal);
+                if (h != null && h.Count > bestCount)
+                    bestCount = h.Count;
+
+                var v = engine.Fill(drawing, angle, NestDirection.Vertical);
+                if (v != null && v.Count > bestCount)
+                    bestCount = v.Count;
             }
 
-            // Binary search: try shrinking each dimension.
-            Debug.WriteLine($"[FillExact] Starting binary search (capacity={capacity} > target={item.Quantity})");
-            var (lengthFound, lengthDim) = BinarySearchFill(item, workArea, shrinkWidth: false, progress, token);
-            Debug.WriteLine($"[FillExact] Shrink-length: found={lengthFound}, dim={lengthDim:F1}");
-            var (widthFound, widthDim) = BinarySearchFill(item, workArea, shrinkWidth: true, progress, token);
-            Debug.WriteLine($"[FillExact] Shrink-width: found={widthFound}, dim={widthDim:F1}");
+            // Top pair candidates — check if pairs tile better in this box.
+            var bestFits = BestFitCache.GetOrCompute(
+                drawing, Plate.Size.Width, Plate.Size.Length, Plate.PartSpacing);
+            var topPairs = bestFits.Where(r => r.Keep).Take(3);
 
-            // Pick winner by smallest test box area. Tie-break: prefer shrink-length.
-            Box winnerBox;
-
-            var lengthArea = lengthFound ? workArea.Width * lengthDim : double.MaxValue;
-            var widthArea = widthFound ? widthDim * workArea.Length : double.MaxValue;
-
-            if (lengthFound && lengthArea <= widthArea)
+            foreach (var pair in topPairs)
             {
-                winnerBox = new Box(workArea.X, workArea.Y, workArea.Width, lengthDim);
-            }
-            else if (widthFound)
-            {
-                winnerBox = new Box(workArea.X, workArea.Y, widthDim, workArea.Length);
-            }
-            else
-            {
-                // Neither search found the exact quantity — do a normal fill.
-                return Fill(item, workArea, progress, token);
-            }
+                var pairParts = pair.BuildParts(drawing);
+                var pairAngles = pair.HullAngles ?? new List<double> { 0 };
+                var pairEngine = new FillLinear(testBox, Plate.PartSpacing);
 
-            Debug.WriteLine($"[FillExact] Winner box: {winnerBox.Width:F1}x{winnerBox.Length:F1}");
-
-            // Run the full Fill on the winning box with progress.
-            return Fill(item, winnerBox, progress, token);
-        }
-
-        /// <summary>
-        /// Binary-searches for the smallest sub-area (one dimension fixed) that fits
-        /// exactly item.Quantity parts. Returns the best parts list and the dimension
-        /// value that achieved it.
-        /// </summary>
-        private (bool found, double usedDim) BinarySearchFill(
-            NestItem item, Box workArea, bool shrinkWidth,
-            IProgress<NestProgress> progress, CancellationToken token)
-        {
-            var quantity = item.Quantity;
-            var partBox = item.Drawing.Program.BoundingBox();
-            var partArea = item.Drawing.Area;
-
-            // Fixed and variable dimensions.
-            var fixedDim = shrinkWidth ? workArea.Length : workArea.Width;
-            var highDim = shrinkWidth ? workArea.Width : workArea.Length;
-
-            // Estimate search range from part area and utilization assumptions.
-            var minPartDim = shrinkWidth
-                ? partBox.Width + Plate.PartSpacing
-                : partBox.Length + Plate.PartSpacing;
-
-            // Low: tight estimate at 70% utilization.
-            var lowEstimate = System.Math.Max(minPartDim, partArea * quantity / (0.7 * fixedDim));
-            // High: generous estimate at 25% utilization, capped to work area.
-            var highEstimate = System.Math.Min(highDim, partArea * quantity / (0.25 * fixedDim));
-            // Ensure high is at least low.
-            highEstimate = System.Math.Max(highEstimate, lowEstimate + Plate.PartSpacing);
-
-            var low = lowEstimate;
-            var high = highEstimate;
-
-            var found = false;
-            var bestDim = highEstimate;
-
-            for (var iter = 0; iter < 8; iter++)
-            {
-                if (token.IsCancellationRequested)
-                    break;
-
-                if (high - low < Plate.PartSpacing)
-                    break;
-
-                var mid = (low + high) / 2.0;
-
-                var testBox = shrinkWidth
-                    ? new Box(workArea.X, workArea.Y, mid, workArea.Length)
-                    : new Box(workArea.X, workArea.Y, workArea.Width, mid);
-
-                // Fill with unlimited qty to get the true count for this box size.
-                // After the first iteration, angle pruning kicks in and makes this fast.
-                var searchItem = new NestItem { Drawing = item.Drawing, Quantity = 0 };
-                var result = Fill(searchItem, testBox, progress, token);
-
-                if (result.Count >= quantity)
+                foreach (var angle in pairAngles)
                 {
-                    bestDim = mid;
-                    found = true;
-                    high = mid;
-                }
-                else
-                {
-                    low = mid;
+                    var pattern = BuildRotatedPattern(pairParts, angle);
+                    if (pattern.Parts.Count == 0)
+                        continue;
+
+                    var h = pairEngine.Fill(pattern, NestDirection.Horizontal);
+                    if (h != null && h.Count > bestCount)
+                        bestCount = h.Count;
+
+                    var v = pairEngine.Fill(pattern, NestDirection.Vertical);
+                    if (v != null && v.Count > bestCount)
+                        bestCount = v.Count;
                 }
             }
 
-            return (found, bestDim);
+            return bestCount;
         }
 
-        public bool Fill(List<Part> groupParts)
-        {
-            return Fill(groupParts, Plate.WorkArea());
-        }
-
-        public bool Fill(List<Part> groupParts, Box workArea)
-        {
-            var parts = Fill(groupParts, workArea, null, CancellationToken.None);
-
-            if (parts == null || parts.Count == 0)
-                return false;
-
-            Plate.Parts.AddRange(parts);
-            return true;
-        }
-
-        public List<Part> Fill(List<Part> groupParts, Box workArea,
+        public override List<Part> Fill(List<Part> groupParts, Box workArea,
             IProgress<NestProgress> progress, CancellationToken token)
         {
             if (groupParts == null || groupParts.Count == 0)
@@ -306,13 +184,8 @@ namespace OpenNest
 
         // --- Pack API ---
 
-        public bool Pack(List<NestItem> items)
-        {
-            var workArea = Plate.WorkArea();
-            return PackArea(workArea, items);
-        }
-
-        public bool PackArea(Box box, List<NestItem> items)
+        public override List<Part> PackArea(Box box, List<NestItem> items,
+            IProgress<NestProgress> progress, CancellationToken token)
         {
             var binItems = BinConverter.ToItems(items, Plate.PartSpacing, Plate.Area());
             var bin = BinConverter.CreateBin(box, Plate.PartSpacing);
@@ -320,10 +193,7 @@ namespace OpenNest
             var engine = new PackBottomLeft(bin);
             engine.Pack(binItems);
 
-            var parts = BinConverter.ToParts(bin, items);
-            Plate.Parts.AddRange(parts);
-
-            return parts.Count > 0;
+            return BinConverter.ToParts(bin, items);
         }
 
         // --- FindBestFill: core orchestration ---
@@ -534,6 +404,7 @@ namespace OpenNest
 
             List<Part> best = null;
             var bestScore = default(FillScore);
+            var sinceImproved = 0;
 
             try
             {
@@ -554,11 +425,27 @@ namespace OpenNest
                         {
                             best = filled;
                             bestScore = score;
+                            sinceImproved = 0;
                         }
+                        else
+                        {
+                            sinceImproved++;
+                        }
+                    }
+                    else
+                    {
+                        sinceImproved++;
                     }
 
                     ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea,
                         $"Pairs: {i + 1}/{candidates.Count} candidates, best = {bestScore.Count} parts");
+
+                    // Early exit: stop if we've tried enough candidates without improvement.
+                    if (i >= 9 && sinceImproved >= 10)
+                    {
+                        Debug.WriteLine($"[FillWithPairs] Early exit at {i + 1}/{candidates.Count} — no improvement in last {sinceImproved} candidates");
+                        break;
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -804,130 +691,6 @@ namespace OpenNest
 
             clusters.Add(current);
             return clusters;
-        }
-
-        // --- Scoring / comparison ---
-
-        private bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea)
-        {
-            if (candidate == null || candidate.Count == 0)
-                return false;
-
-            if (current == null || current.Count == 0)
-                return true;
-
-            return FillScore.Compute(candidate, workArea) > FillScore.Compute(current, workArea);
-        }
-
-        private bool IsBetterValidFill(List<Part> candidate, List<Part> current, Box workArea)
-        {
-            if (candidate != null && candidate.Count > 0 && HasOverlaps(candidate, Plate.PartSpacing))
-            {
-                Debug.WriteLine($"[IsBetterValidFill] REJECTED {candidate.Count} parts due to overlaps (current best: {current?.Count ?? 0})");
-                return false;
-            }
-
-            return IsBetterFill(candidate, current, workArea);
-        }
-
-        private bool HasOverlaps(List<Part> parts, double spacing)
-        {
-            if (parts == null || parts.Count <= 1)
-                return false;
-
-            for (var i = 0; i < parts.Count; i++)
-            {
-                var box1 = parts[i].BoundingBox;
-
-                for (var j = i + 1; j < parts.Count; j++)
-                {
-                    var box2 = parts[j].BoundingBox;
-
-                    // Fast bounding box rejection.
-                    if (box1.Right < box2.Left || box2.Right < box1.Left ||
-                        box1.Top < box2.Bottom || box2.Top < box1.Bottom)
-                        continue;
-
-                    List<Vector> pts;
-
-                    if (parts[i].Intersects(parts[j], out pts))
-                    {
-                        var b1 = parts[i].BoundingBox;
-                        var b2 = parts[j].BoundingBox;
-                        Debug.WriteLine($"[HasOverlaps] Overlap: part[{i}] ({parts[i].BaseDrawing?.Name}) @ ({b1.Left:F2},{b1.Bottom:F2})-({b1.Right:F2},{b1.Top:F2}) rot={parts[i].Rotation:F2}" +
-                            $" vs part[{j}] ({parts[j].BaseDrawing?.Name}) @ ({b2.Left:F2},{b2.Bottom:F2})-({b2.Right:F2},{b2.Top:F2}) rot={parts[j].Rotation:F2}" +
-                            $" intersections={pts?.Count ?? 0}");
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        // --- Progress reporting ---
-
-        private static void ReportProgress(
-            IProgress<NestProgress> progress,
-            NestPhase phase,
-            int plateNumber,
-            List<Part> best,
-            Box workArea,
-            string description)
-        {
-            if (progress == null || best == null || best.Count == 0)
-                return;
-
-            var score = FillScore.Compute(best, workArea);
-            var clonedParts = new List<Part>(best.Count);
-            var totalPartArea = 0.0;
-
-            foreach (var part in best)
-            {
-                clonedParts.Add((Part)part.Clone());
-                totalPartArea += part.BaseDrawing.Area;
-            }
-
-            var bounds = best.GetBoundingBox();
-
-            progress.Report(new NestProgress
-            {
-                Phase = phase,
-                PlateNumber = plateNumber,
-                BestPartCount = score.Count,
-                BestDensity = score.Density,
-                NestedWidth = bounds.Width,
-                NestedLength = bounds.Length,
-                NestedArea = totalPartArea,
-                UsableRemnantArea = workArea.Area() - totalPartArea,
-                BestParts = clonedParts,
-                Description = description
-            });
-        }
-
-        private string BuildProgressSummary()
-        {
-            if (PhaseResults.Count == 0)
-                return null;
-
-            var parts = new List<string>(PhaseResults.Count);
-
-            foreach (var r in PhaseResults)
-                parts.Add($"{FormatPhaseName(r.Phase)}: {r.PartCount}");
-
-            return string.Join(" | ", parts);
-        }
-
-        private static string FormatPhaseName(NestPhase phase)
-        {
-            switch (phase)
-            {
-                case NestPhase.Pairs: return "Pairs";
-                case NestPhase.Linear: return "Linear";
-                case NestPhase.RectBestFit: return "BestFit";
-                case NestPhase.Remainder: return "Remainder";
-                default: return phase.ToString();
-            }
         }
 
     }
