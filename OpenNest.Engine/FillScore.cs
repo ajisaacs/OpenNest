@@ -1,34 +1,20 @@
 using System.Collections.Generic;
-using System.Linq;
 using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest
 {
     public readonly struct FillScore : System.IComparable<FillScore>
     {
-        /// <summary>
-        /// Minimum short-side dimension for a remnant to be considered usable.
-        /// </summary>
-        public const double MinRemnantDimension = 12.0;
-
         public int Count { get; }
-
-        /// <summary>
-        /// Area of the largest remnant whose short side >= MinRemnantDimension.
-        /// Zero if no usable remnant exists.
-        /// </summary>
-        public double UsableRemnantArea { get; }
 
         /// <summary>
         /// Total part area / bounding box area of all placed parts.
         /// </summary>
         public double Density { get; }
 
-        public FillScore(int count, double usableRemnantArea, double density)
+        public FillScore(int count, double density)
         {
             Count = count;
-            UsableRemnantArea = usableRemnantArea;
             Density = density;
         }
 
@@ -60,49 +46,15 @@ namespace OpenNest
             var bboxArea = (maxX - minX) * (maxY - minY);
             var density = bboxArea > 0 ? totalPartArea / bboxArea : 0;
 
-            var usableRemnantArea = ComputeUsableRemnantArea(maxX, maxY, workArea);
-
-            return new FillScore(parts.Count, usableRemnantArea, density);
-        }
-
-        private static double ComputeUsableRemnantArea(double maxRight, double maxTop, Box workArea)
-        {
-            var largest = 0.0;
-
-            // Right strip
-            if (maxRight < workArea.Right)
-            {
-                var width = workArea.Right - maxRight;
-                var height = workArea.Length;
-
-                if (System.Math.Min(width, height) >= MinRemnantDimension)
-                    largest = System.Math.Max(largest, width * height);
-            }
-
-            // Top strip
-            if (maxTop < workArea.Top)
-            {
-                var width = workArea.Width;
-                var height = workArea.Top - maxTop;
-
-                if (System.Math.Min(width, height) >= MinRemnantDimension)
-                    largest = System.Math.Max(largest, width * height);
-            }
-
-            return largest;
+            return new FillScore(parts.Count, density);
         }
 
         /// <summary>
-        /// Lexicographic comparison: count, then usable remnant area, then density.
+        /// Lexicographic comparison: count, then density.
         /// </summary>
         public int CompareTo(FillScore other)
         {
             var c = Count.CompareTo(other.Count);
-
-            if (c != 0)
-                return c;
-
-            c = UsableRemnantArea.CompareTo(other.UsableRemnantArea);
 
             if (c != 0)
                 return c;
