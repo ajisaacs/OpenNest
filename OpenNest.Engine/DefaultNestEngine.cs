@@ -453,7 +453,7 @@ namespace OpenNest
                 Debug.WriteLine("[FillWithPairs] Cancelled mid-phase, using results so far");
             }
 
-            Debug.WriteLine($"[FillWithPairs] Best pair result: {bestScore.Count} parts, remnant={bestScore.UsableRemnantArea:F1}, density={bestScore.Density:P1}");
+            Debug.WriteLine($"[FillWithPairs] Best pair result: {bestScore.Count} parts, density={bestScore.Density:P1}");
             try { System.IO.File.AppendAllText(
                 System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log"),
                 $"{DateTime.Now:HH:mm:ss} [FillWithPairs] Best: {bestScore.Count} parts, density={bestScore.Density:P1}\n"); } catch { }
