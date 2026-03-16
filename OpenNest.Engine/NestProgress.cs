@@ -7,8 +7,7 @@ namespace OpenNest
         Linear,
         RectBestFit,
         Pairs,
-        Nfp,
-        Remainder
+        Nfp
     }
 
     public class PhaseResult

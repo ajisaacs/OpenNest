@@ -96,7 +96,6 @@ namespace OpenNest.Forms
                 case NestPhase.Linear: return "Trying rotations...";
                 case NestPhase.RectBestFit: return "Trying best fit...";
                 case NestPhase.Pairs: return "Trying pairs...";
-                case NestPhase.Remainder: return "Filling remainder...";
                 default: return phase.ToString();
             }
         }
