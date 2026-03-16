@@ -785,80 +785,104 @@ namespace OpenNest.Forms
                     if (plate != activeForm.PlateView.Plate)
                         activeForm.LoadLastPlate();
 
-                    // Split items: Fill produces great results for qty > 1,
-                    // Pack is fast for single-quantity items.
-                    var fillItems = remaining
-                        .Where(i => i.Quantity > 1)
-                        .OrderBy(i => i.Priority)
-                        .ThenByDescending(i => i.Drawing.Area)
-                        .ToList();
-
-                    var packItems = remaining
-                        .Where(i => i.Quantity == 1)
-                        .ToList();
-
-                    var workArea = plate.WorkArea();
                     var anyPlaced = false;
 
-                    // Phase 1: Fill each multi-quantity drawing with NestEngine.
-                    foreach (var item in fillItems)
+                    // Strip engine: use Nest() for multi-drawing strategy.
+                    if (NestEngineRegistry.Create(plate) is StripNestEngine)
                     {
-                        if (item.Quantity <= 0 || token.IsCancellationRequested)
-                            continue;
-
-                        if (workArea.Width <= 0 || workArea.Length <= 0)
-                            break;
-
-                        var engine = NestEngineRegistry.Create(plate);
-                        engine.PlateNumber = plateCount;
-
-                        var parts = await Task.Run(() =>
-                            engine.FillExact(item, workArea, progress, token));
+                        var stripEngine = new StripNestEngine(plate);
+                        var stripParts = await Task.Run(() =>
+                            stripEngine.Nest(remaining, progress, token));
 
                         activeForm.PlateView.ClearTemporaryParts();
 
-                        if (token.IsCancellationRequested)
-                            break;
-
-                        if (parts.Count > 0)
+                        if (stripParts.Count > 0 && !token.IsCancellationRequested)
                         {
-                            plate.Parts.AddRange(parts);
-                            // TODO: Compactor.Compact(parts, plate);
+                            plate.Parts.AddRange(stripParts);
                             activeForm.PlateView.Invalidate();
                             anyPlaced = true;
 
-                            item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
-
-                            // Compute remainder within the current work area based on
-                            // what was just placed — not the full plate bounding box.
-                            var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
-                            workArea = ComputeRemainderWithin(workArea, placedBox, plate.PartSpacing);
+                            // Deduct placed quantities.
+                            foreach (var item in remaining)
+                            {
+                                var placed = stripParts.Count(p =>
+                                    p.BaseDrawing.Name == item.Drawing.Name);
+                                item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                            }
                         }
                     }
-
-                    // Phase 2: Pack single-quantity items into remaining space.
-                    packItems = packItems.Where(i => i.Quantity > 0).ToList();
-
-                    if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0
-                        && !token.IsCancellationRequested)
+                    else
                     {
-                        var engine = NestEngineRegistry.Create(plate);
-                        var packParts = engine.PackArea(workArea, packItems, null, CancellationToken.None);
-                        plate.Parts.AddRange(packParts);
-                        var packed = packParts.Count;
+                        // Default: sequential Fill + Pack.
+                        var fillItems = remaining
+                            .Where(i => i.Quantity > 1)
+                            .OrderBy(i => i.Priority)
+                            .ThenByDescending(i => i.Drawing.Area)
+                            .ToList();
 
-                        if (packed > 0)
+                        var packItems = remaining
+                            .Where(i => i.Quantity == 1)
+                            .ToList();
+
+                        var workArea = plate.WorkArea();
+
+                        // Phase 1: Fill each multi-quantity drawing with NestEngine.
+                        foreach (var item in fillItems)
                         {
-                            activeForm.PlateView.Invalidate();
-                            anyPlaced = true;
+                            if (item.Quantity <= 0 || token.IsCancellationRequested)
+                                continue;
 
-                            // Deduct packed quantities.
-                            foreach (var item in packItems)
+                            if (workArea.Width <= 0 || workArea.Length <= 0)
+                                break;
+
+                            var engine = NestEngineRegistry.Create(plate);
+                            engine.PlateNumber = plateCount;
+
+                            var parts = await Task.Run(() =>
+                                engine.FillExact(item, workArea, progress, token));
+
+                            activeForm.PlateView.ClearTemporaryParts();
+
+                            if (token.IsCancellationRequested)
+                                break;
+
+                            if (parts.Count > 0)
                             {
-                                var placed = plate.Parts.Count(p =>
-                                    p.BaseDrawing.Name == item.Drawing.Name);
-                                item.Quantity = System.Math.Max(0,
-                                    item.Quantity - placed);
+                                plate.Parts.AddRange(parts);
+                                // TODO: Compactor.Compact(parts, plate);
+                                activeForm.PlateView.Invalidate();
+                                anyPlaced = true;
+
+                                item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
+
+                                var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
+                                workArea = ComputeRemainderWithin(workArea, placedBox, plate.PartSpacing);
+                            }
+                        }
+
+                        // Phase 2: Pack single-quantity items into remaining space.
+                        packItems = packItems.Where(i => i.Quantity > 0).ToList();
+
+                        if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0
+                            && !token.IsCancellationRequested)
+                        {
+                            var engine = NestEngineRegistry.Create(plate);
+                            var packParts = engine.PackArea(workArea, packItems, null, CancellationToken.None);
+                            plate.Parts.AddRange(packParts);
+                            var packed = packParts.Count;
+
+                            if (packed > 0)
+                            {
+                                activeForm.PlateView.Invalidate();
+                                anyPlaced = true;
+
+                                foreach (var item in packItems)
+                                {
+                                    var placed = plate.Parts.Count(p =>
+                                        p.BaseDrawing.Name == item.Drawing.Name);
+                                    item.Quantity = System.Math.Max(0,
+                                        item.Quantity - placed);
+                                }
                             }
                         }
                     }
