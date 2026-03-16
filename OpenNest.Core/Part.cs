@@ -51,6 +51,8 @@ namespace OpenNest
 
         public Program Program { get; private set; }
 
+        public bool HasManualLeadIns { get; set; }
+
         /// <summary>
         /// Gets the rotation of the part in radians.
         /// </summary>
@@ -149,31 +151,25 @@ namespace OpenNest
             pts = new List<Vector>();
 
             var entities1 = ConvertProgram.ToGeometry(Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid);
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
             var entities2 = ConvertProgram.ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid);
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
 
-            var shapes1 = Helper.GetShapes(entities1);
-            var shapes2 = Helper.GetShapes(entities2);
+            if (entities1.Count == 0 || entities2.Count == 0)
+                return false;
 
-            shapes1.ForEach(shape => shape.Offset(Location));
-            shapes2.ForEach(shape => shape.Offset(part.Location));
+            var perimeter1 = new ShapeProfile(entities1).Perimeter;
+            var perimeter2 = new ShapeProfile(entities2).Perimeter;
 
-            for (int i = 0; i < shapes1.Count; i++)
-            {
-                var shape1 = shapes1[i];
+            if (perimeter1 == null || perimeter2 == null)
+                return false;
 
-                for (int j = 0; j < shapes2.Count; j++)
-                {
-                    var shape2 = shapes2[j];
-                    List<Vector> pts2;
+            perimeter1.Offset(Location);
+            perimeter2.Offset(part.Location);
 
-                    if (shape1.Intersects(shape2, out pts2))
-                        pts.AddRange(pts2);
-                }
-            }
-
-            return pts.Count > 0;
+            return perimeter1.Intersects(perimeter2, out pts);
         }
 
         public double Left
@@ -216,8 +212,9 @@ namespace OpenNest
         /// </summary>
         public Part CloneAtOffset(Vector offset)
         {
-            var clonedProgram = Program.Clone() as Program;
-            var part = new Part(BaseDrawing, clonedProgram,
+            // Share the Program instance — offset-only copies don't modify the program codes.
+            // This is a major performance win for tiling large patterns.
+            var part = new Part(BaseDrawing, Program,
                 location + offset,
                 new Box(BoundingBox.X + offset.X, BoundingBox.Y + offset.Y,
                     BoundingBox.Width, BoundingBox.Length));

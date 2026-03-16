@@ -202,5 +202,9 @@ FakesAssemblies/
 # Git worktrees
 .worktrees/
 
+# SQLite databases
+*.db
+*.db-journal
+
 # Claude Code
 .claude/

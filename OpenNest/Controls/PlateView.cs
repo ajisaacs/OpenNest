@@ -833,11 +833,11 @@ namespace OpenNest.Controls
 
             try
             {
-                var engine = new NestEngine(Plate);
+                var engine = NestEngineRegistry.Create(Plate);
                 var parts = await Task.Run(() =>
                     engine.Fill(groupParts, workArea, progress, cts.Token));
 
-                if (parts.Count > 0)
+                if (parts.Count > 0 && !cts.IsCancellationRequested)
                 {
                     AcceptTemporaryParts();
                     sw.Stop();
@@ -937,97 +937,10 @@ namespace OpenNest.Controls
 
         public void PushSelected(PushDirection direction)
         {
-            // Build line segments for all stationary parts.
-            var stationaryParts = parts.Where(p => !p.IsSelected && !SelectedParts.Contains(p)).ToList();
-            var stationaryLines = new List<List<Line>>(stationaryParts.Count);
-            var stationaryBoxes = new List<Box>(stationaryParts.Count);
-
-            var opposite = Helper.OppositeDirection(direction);
-            var halfSpacing = Plate.PartSpacing / 2;
-
-            foreach (var part in stationaryParts)
-            {
-                stationaryLines.Add(halfSpacing > 0
-                    ? Helper.GetOffsetPartLines(part.BasePart, halfSpacing, opposite, OffsetTolerance)
-                    : Helper.GetPartLines(part.BasePart, opposite, OffsetTolerance));
-                stationaryBoxes.Add(part.BoundingBox);
-            }
-
-            var workArea = Plate.WorkArea();
-            var distance = double.MaxValue;
-
-            foreach (var selected in SelectedParts)
-            {
-                // Get offset lines for the moving part (half-spacing, symmetric with stationary).
-                var movingLines = halfSpacing > 0
-                    ? Helper.GetOffsetPartLines(selected.BasePart, halfSpacing, direction, OffsetTolerance)
-                    : Helper.GetPartLines(selected.BasePart, direction, OffsetTolerance);
-
-                var movingBox = selected.BoundingBox;
-
-                // Check geometry distance against each stationary part.
-                for (int i = 0; i < stationaryLines.Count; i++)
-                {
-                    // Early-out: skip if bounding boxes don't overlap on the perpendicular axis.
-                    var stBox = stationaryBoxes[i];
-                    bool perpOverlap;
-
-                    switch (direction)
-                    {
-                        case PushDirection.Left:
-                        case PushDirection.Right:
-                            perpOverlap = !(movingBox.Bottom >= stBox.Top || movingBox.Top <= stBox.Bottom);
-                            break;
-                        default: // Up, Down
-                            perpOverlap = !(movingBox.Left >= stBox.Right || movingBox.Right <= stBox.Left);
-                            break;
-                    }
-
-                    if (!perpOverlap)
-                        continue;
-
-                    var d = Helper.DirectionalDistance(movingLines, stationaryLines[i], direction);
-                    if (d < distance)
-                        distance = d;
-                }
-
-                // Check distance to plate edge (actual geometry bbox, not offset).
-                double edgeDist;
-                switch (direction)
-                {
-                    case PushDirection.Left:
-                        edgeDist = selected.Left - workArea.Left;
-                        break;
-                    case PushDirection.Right:
-                        edgeDist = workArea.Right - selected.Right;
-                        break;
-                    case PushDirection.Up:
-                        edgeDist = workArea.Top - selected.Top;
-                        break;
-                    default: // Down
-                        edgeDist = selected.Bottom - workArea.Bottom;
-                        break;
-                }
-
-                if (edgeDist > 0 && edgeDist < distance)
-                    distance = edgeDist;
-            }
-
-            if (distance < double.MaxValue && distance > 0)
-            {
-                var offset = new Vector();
-
-                switch (direction)
-                {
-                    case PushDirection.Left:  offset.X = -distance; break;
-                    case PushDirection.Right: offset.X =  distance; break;
-                    case PushDirection.Up:    offset.Y =  distance; break;
-                    case PushDirection.Down:  offset.Y = -distance; break;
-                }
-
-                SelectedParts.ForEach(p => p.Offset(offset));
-                Invalidate();
-            }
+            var movingParts = SelectedParts.Select(p => p.BasePart).ToList();
+            Compactor.Push(movingParts, Plate, direction);
+            SelectedParts.ForEach(p => p.IsDirty = true);
+            Invalidate();
         }
 
         private string GetDisplayName(Type type)

@@ -412,8 +412,8 @@ namespace OpenNest
             }
 
             Size = new Size(
-                Helper.RoundUpToNearest(width, roundingFactor),
-                Helper.RoundUpToNearest(length, roundingFactor));
+                Rounding.RoundUpToNearest(width, roundingFactor),
+                Rounding.RoundUpToNearest(length, roundingFactor));
         }
 
         /// <summary>

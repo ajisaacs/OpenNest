@@ -14,6 +14,7 @@ namespace OpenNest.Engine.BestFit
         public bool Keep { get; set; }
         public string Reason { get; set; }
         public double TrueArea { get; set; }
+        public List<double> HullAngles { get; set; }
 
         public double Utilization
         {

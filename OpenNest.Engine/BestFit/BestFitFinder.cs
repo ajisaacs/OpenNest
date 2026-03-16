@@ -12,15 +12,21 @@ namespace OpenNest.Engine.BestFit
     public class BestFitFinder
     {
         private readonly IPairEvaluator _evaluator;
+        private readonly ISlideComputer _slideComputer;
         private readonly BestFitFilter _filter;
 
-        public BestFitFinder(double maxPlateWidth, double maxPlateHeight, IPairEvaluator evaluator = null)
+        public BestFitFinder(double maxPlateWidth, double maxPlateHeight,
+            IPairEvaluator evaluator = null, ISlideComputer slideComputer = null)
         {
             _evaluator = evaluator ?? new PairEvaluator();
+            _slideComputer = slideComputer;
+            var plateAspect = System.Math.Max(maxPlateWidth, maxPlateHeight) /
+                              System.Math.Max(System.Math.Min(maxPlateWidth, maxPlateHeight), 0.001);
             _filter = new BestFitFilter
             {
                 MaxPlateWidth = maxPlateWidth,
-                MaxPlateHeight = maxPlateHeight
+                MaxPlateHeight = maxPlateHeight,
+                MaxAspectRatio = System.Math.Max(5.0, plateAspect)
             };
         }
 
@@ -78,7 +84,7 @@ namespace OpenNest.Engine.BestFit
             foreach (var angle in angles)
             {
                 var desc = string.Format("{0:F1} deg rotated, offset slide", Angle.ToDegrees(angle));
-                strategies.Add(new RotationSlideStrategy(angle, type++, desc));
+                strategies.Add(new RotationSlideStrategy(angle, type++, desc, _slideComputer));
             }
 
             return strategies;
@@ -102,6 +108,7 @@ namespace OpenNest.Engine.BestFit
                 AddUniqueAngle(angles, Angle.NormalizeRad(hullAngle + System.Math.PI));
             }
 
+            angles.Sort();
             return angles;
         }
 
@@ -109,14 +116,30 @@ namespace OpenNest.Engine.BestFit
         {
             var entities = ConvertProgram.ToGeometry(drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
-            var shapes = Helper.GetShapes(entities);
+            var shapes = ShapeBuilder.GetShapes(entities);
 
             var points = new List<Vector>();
 
             foreach (var shape in shapes)
             {
-                var polygon = shape.ToPolygonWithTolerance(0.01);
-                points.AddRange(polygon.Vertices);
+                // Extract key points from original geometry — line endpoints
+                // plus arc endpoints and cardinal extreme points. This avoids
+                // tessellating arcs into many chords that flood the hull with
+                // near-duplicate edge angles.
+                foreach (var entity in shape.Entities)
+                {
+                    if (entity is Line line)
+                    {
+                        points.Add(line.StartPoint);
+                        points.Add(line.EndPoint);
+                    }
+                    else if (entity is Arc arc)
+                    {
+                        points.Add(arc.StartPoint());
+                        points.Add(arc.EndPoint());
+                        AddArcExtremes(points, arc);
+                    }
+                }
             }
 
             if (points.Count < 3)
@@ -143,13 +166,49 @@ namespace OpenNest.Engine.BestFit
             return hullAngles;
         }
 
+        /// <summary>
+        /// Adds the cardinal extreme points of an arc (0°, 90°, 180°, 270°)
+        /// if they fall within the arc's angular span.
+        /// </summary>
+        private static void AddArcExtremes(List<Vector> points, Arc arc)
+        {
+            var a1 = arc.StartAngle;
+            var a2 = arc.EndAngle;
+
+            if (arc.IsReversed)
+                Generic.Swap(ref a1, ref a2);
+
+            // Right (0°)
+            if (Angle.IsBetweenRad(Angle.TwoPI, a1, a2))
+                points.Add(new Vector(arc.Center.X + arc.Radius, arc.Center.Y));
+
+            // Top (90°)
+            if (Angle.IsBetweenRad(Angle.HalfPI, a1, a2))
+                points.Add(new Vector(arc.Center.X, arc.Center.Y + arc.Radius));
+
+            // Left (180°)
+            if (Angle.IsBetweenRad(System.Math.PI, a1, a2))
+                points.Add(new Vector(arc.Center.X - arc.Radius, arc.Center.Y));
+
+            // Bottom (270°)
+            if (Angle.IsBetweenRad(System.Math.PI * 1.5, a1, a2))
+                points.Add(new Vector(arc.Center.X, arc.Center.Y - arc.Radius));
+        }
+
+        /// <summary>
+        /// Minimum angular separation (radians) between hull-derived rotation candidates.
+        /// Tessellated arcs produce many hull edges with nearly identical angles;
+        /// a 1° threshold collapses those into a single representative.
+        /// </summary>
+        private const double AngleTolerance = System.Math.PI / 36; // 5 degrees
+
         private static void AddUniqueAngle(List<double> angles, double angle)
         {
             angle = Angle.NormalizeRad(angle);
 
             foreach (var existing in angles)
             {
-                if (existing.IsEqualTo(angle))
+                if (existing.IsEqualTo(angle, AngleTolerance))
                     return;
             }
 

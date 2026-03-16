@@ -56,8 +56,8 @@ namespace OpenNest.IO
                 }
             }
 
-            Helper.Optimize(lines);
-            Helper.Optimize(arcs);
+            GeometryOptimizer.Optimize(lines);
+            GeometryOptimizer.Optimize(arcs);
 
             entities.AddRange(lines);
             entities.AddRange(arcs);

@@ -11,6 +11,8 @@ namespace OpenNest.Gpu
         private static bool _probed;
         private static bool _gpuAvailable;
         private static string _deviceName;
+        private static GpuSlideComputer _slideComputer;
+        private static readonly object _slideLock = new object();
 
         public static bool GpuAvailable
         {
@@ -43,6 +45,29 @@ namespace OpenNest.Gpu
             {
                 Debug.WriteLine($"[GpuEvaluatorFactory] GPU evaluator failed: {ex.Message}");
                 return null;
+            }
+        }
+
+        public static ISlideComputer CreateSlideComputer()
+        {
+            if (!GpuAvailable)
+                return null;
+
+            lock (_slideLock)
+            {
+                if (_slideComputer != null)
+                    return _slideComputer;
+
+                try
+                {
+                    _slideComputer = new GpuSlideComputer();
+                    return _slideComputer;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[GpuEvaluatorFactory] GPU slide computer failed: {ex.Message}");
+                    return null;
+                }
             }
         }
 

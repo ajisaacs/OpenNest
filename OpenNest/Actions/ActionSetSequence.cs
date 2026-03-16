@@ -52,7 +52,7 @@ namespace OpenNest.Actions
             {
                 var entities = ConvertProgram.ToGeometry(part.Program).Where(e => e.Layer == SpecialLayers.Cut).ToList();
                 entities.ForEach(entity => entity.Offset(part.Location));
-                var shapes = Helper.GetShapes(entities);
+                var shapes = ShapeBuilder.GetShapes(entities);
                 var shape = new Shape();
                 shape.Entities.AddRange(shapes);
                 ShapePartPairs.Add(new Pair() { Part = part, Shape = shape });

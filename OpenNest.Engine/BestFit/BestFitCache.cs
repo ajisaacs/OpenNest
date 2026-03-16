@@ -13,6 +13,7 @@ namespace OpenNest.Engine.BestFit
             new ConcurrentDictionary<CacheKey, List<BestFitResult>>();
 
         public static Func<Drawing, double, IPairEvaluator> CreateEvaluator { get; set; }
+        public static Func<ISlideComputer> CreateSlideComputer { get; set; }
 
         public static List<BestFitResult> GetOrCompute(
             Drawing drawing, double plateWidth, double plateHeight,
@@ -24,6 +25,7 @@ namespace OpenNest.Engine.BestFit
                 return cached;
 
             IPairEvaluator evaluator = null;
+            ISlideComputer slideComputer = null;
 
             try
             {
@@ -33,11 +35,105 @@ namespace OpenNest.Engine.BestFit
                     catch { /* fall back to default evaluator */ }
                 }
 
-                var finder = new BestFitFinder(plateWidth, plateHeight, evaluator);
+                if (CreateSlideComputer != null)
+                {
+                    try { slideComputer = CreateSlideComputer(); }
+                    catch { /* fall back to CPU slide computation */ }
+                }
+
+                var finder = new BestFitFinder(plateWidth, plateHeight, evaluator, slideComputer);
                 var results = finder.FindBestFits(drawing, spacing, StepSize);
 
                 _cache.TryAdd(key, results);
                 return results;
+            }
+            finally
+            {
+                (evaluator as IDisposable)?.Dispose();
+                // Slide computer is managed by the factory as a singleton — don't dispose here
+            }
+        }
+
+        public static void ComputeForSizes(
+            Drawing drawing, double spacing,
+            IEnumerable<(double Width, double Height)> plateSizes)
+        {
+            // Skip sizes that are already cached.
+            var needed = new List<(double Width, double Height)>();
+            foreach (var size in plateSizes)
+            {
+                var key = new CacheKey(drawing, size.Width, size.Height, spacing);
+                if (!_cache.ContainsKey(key))
+                    needed.Add(size);
+            }
+
+            if (needed.Count == 0)
+                return;
+
+            // Find the largest plate to use for the initial computation — this
+            // keeps the filter maximally permissive so we don't discard results
+            // that a smaller plate might still use after re-filtering.
+            var maxWidth = 0.0;
+            var maxHeight = 0.0;
+            foreach (var size in needed)
+            {
+                if (size.Width > maxWidth) maxWidth = size.Width;
+                if (size.Height > maxHeight) maxHeight = size.Height;
+            }
+
+            IPairEvaluator evaluator = null;
+            ISlideComputer slideComputer = null;
+
+            try
+            {
+                if (CreateEvaluator != null)
+                {
+                    try { evaluator = CreateEvaluator(drawing, spacing); }
+                    catch { /* fall back to default evaluator */ }
+                }
+
+                if (CreateSlideComputer != null)
+                {
+                    try { slideComputer = CreateSlideComputer(); }
+                    catch { /* fall back to CPU slide computation */ }
+                }
+
+                // Compute candidates and evaluate once with the largest plate.
+                var finder = new BestFitFinder(maxWidth, maxHeight, evaluator, slideComputer);
+                var baseResults = finder.FindBestFits(drawing, spacing, StepSize);
+
+                // Cache a filtered copy for each plate size.
+                foreach (var size in needed)
+                {
+                    var filter = new BestFitFilter
+                    {
+                        MaxPlateWidth = size.Width,
+                        MaxPlateHeight = size.Height
+                    };
+
+                    var copy = new List<BestFitResult>(baseResults.Count);
+                    for (var i = 0; i < baseResults.Count; i++)
+                    {
+                        var r = baseResults[i];
+                        copy.Add(new BestFitResult
+                        {
+                            Candidate = r.Candidate,
+                            RotatedArea = r.RotatedArea,
+                            BoundingWidth = r.BoundingWidth,
+                            BoundingHeight = r.BoundingHeight,
+                            OptimalRotation = r.OptimalRotation,
+                            TrueArea = r.TrueArea,
+                            HullAngles = r.HullAngles,
+                            Keep = r.Keep,
+                            Reason = r.Reason
+                        });
+                    }
+
+                    filter.Apply(copy);
+
+                    var key = new CacheKey(drawing, size.Width, size.Height, spacing);
+                    _cache.TryAdd(key, copy);
+                }
             }
             finally
             {
@@ -52,6 +148,28 @@ namespace OpenNest.Engine.BestFit
                 if (ReferenceEquals(key.Drawing, drawing))
                     _cache.TryRemove(key, out _);
             }
+        }
+
+        public static void Populate(Drawing drawing, double plateWidth, double plateHeight,
+            double spacing, List<BestFitResult> results)
+        {
+            if (results == null || results.Count == 0)
+                return;
+
+            var key = new CacheKey(drawing, plateWidth, plateHeight, spacing);
+            _cache.TryAdd(key, results);
+        }
+
+        public static Dictionary<(double PlateWidth, double PlateHeight, double Spacing), List<BestFitResult>>
+            GetAllForDrawing(Drawing drawing)
+        {
+            var result = new Dictionary<(double, double, double), List<BestFitResult>>();
+            foreach (var kvp in _cache)
+            {
+                if (ReferenceEquals(kvp.Key.Drawing, drawing))
+                    result[(kvp.Key.PlateWidth, kvp.Key.PlateHeight, kvp.Key.Spacing)] = kvp.Value;
+            }
+            return result;
         }
 
         public static void Clear()

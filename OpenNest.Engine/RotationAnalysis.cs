@@ -17,7 +17,7 @@ namespace OpenNest
             var entities = ConvertProgram.ToGeometry(item.Drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
 
-            var shapes = Helper.GetShapes(entities);
+            var shapes = ShapeBuilder.GetShapes(entities);
 
             if (shapes.Count == 0)
                 return 0;
@@ -65,7 +65,7 @@ namespace OpenNest
                 var entities = ConvertProgram.ToGeometry(part.Program)
                     .Where(e => e.Layer != SpecialLayers.Rapid);
 
-                var shapes = Helper.GetShapes(entities);
+                var shapes = ShapeBuilder.GetShapes(entities);
 
                 foreach (var shape in shapes)
                 {
@@ -80,6 +80,11 @@ namespace OpenNest
                 return new List<double> { 0 };
 
             var hull = ConvexHull.Compute(points);
+            return GetHullEdgeAngles(hull);
+        }
+
+        public static List<double> GetHullEdgeAngles(Polygon hull)
+        {
             var vertices = hull.Vertices;
             var n = hull.IsClosed() ? vertices.Count - 1 : vertices.Count;
 

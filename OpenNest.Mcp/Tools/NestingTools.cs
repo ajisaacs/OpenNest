@@ -34,7 +34,7 @@ namespace OpenNest.Mcp.Tools
                 return $"Error: drawing '{drawingName}' not found";
 
             var countBefore = plate.Parts.Count;
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
             var success = engine.Fill(item);
 
@@ -70,7 +70,7 @@ namespace OpenNest.Mcp.Tools
                 return $"Error: drawing '{drawingName}' not found";
 
             var countBefore = plate.Parts.Count;
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
             var area = new Box(x, y, width, height);
             var success = engine.Fill(item, area);
@@ -111,7 +111,7 @@ namespace OpenNest.Mcp.Tools
             sb.AppendLine($"Found {remnants.Count} remnant area(s) on plate {plateIndex}");
 
             var totalAdded = 0;
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
 
             for (var i = 0; i < remnants.Count; i++)
             {
@@ -173,7 +173,7 @@ namespace OpenNest.Mcp.Tools
             }
 
             var countBefore = plate.Parts.Count;
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
             var success = engine.Pack(items);
             var countAfter = plate.Parts.Count;
             var added = countAfter - countBefore;
@@ -193,7 +193,7 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "autonest_plate")]
-        [Description("NFP-based mixed-part autonesting. Places multiple different drawings on a plate with geometry-aware collision avoidance and simulated annealing optimization. Produces tighter layouts than pack_plate by allowing parts to interlock.")]
+        [Description("Mixed-part autonesting. Fills the plate with multiple different drawings using iterative per-drawing fills with remainder-strip packing.")]
         public string AutoNestPlate(
             [Description("Index of the plate")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
@@ -233,16 +233,18 @@ namespace OpenNest.Mcp.Tools
                 items.Add(new NestItem { Drawing = drawing, Quantity = qtys[i] });
             }
 
-            var parts = NestEngine.AutoNest(items, plate);
-            plate.Parts.AddRange(parts);
+            var engine = NestEngineRegistry.Create(plate);
+            var nestParts = engine.Nest(items, null, CancellationToken.None);
+            plate.Parts.AddRange(nestParts);
+            var totalPlaced = nestParts.Count;
 
             var sb = new StringBuilder();
-            sb.AppendLine($"AutoNest plate {plateIndex}: {(parts.Count > 0 ? "success" : "no parts placed")}");
-            sb.AppendLine($"  Parts placed: {parts.Count}");
+            sb.AppendLine($"AutoNest plate {plateIndex} ({engine.Name} engine): {(totalPlaced > 0 ? "success" : "no parts placed")}");
+            sb.AppendLine($"  Parts placed: {totalPlaced}");
             sb.AppendLine($"  Total parts: {plate.Parts.Count}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
 
-            var groups = parts.GroupBy(p => p.BaseDrawing.Name);
+            var groups = plate.Parts.GroupBy(p => p.BaseDrawing.Name);
             foreach (var group in groups)
                 sb.AppendLine($"  {group.Key}: {group.Count()}");
 

@@ -23,22 +23,26 @@ namespace OpenNest
 
         public PartBoundary(Part part, double spacing)
         {
-            var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = Helper.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var entities = ConvertProgram.ToGeometry(part.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
+
+            var definedShape = new ShapeProfile(entities);
+            var perimeter = definedShape.Perimeter;
             _polygons = new List<Polygon>();
 
-            foreach (var shape in shapes)
+            if (perimeter != null)
             {
-                var offsetEntity = shape.OffsetEntity(spacing, OffsetSide.Left) as Shape;
+                var offsetEntity = perimeter.OffsetEntity(spacing, OffsetSide.Left) as Shape;
 
-                if (offsetEntity == null)
-                    continue;
-
-                // Circumscribe arcs so polygon vertices are always outside
-                // the true arc — guarantees the boundary never under-estimates.
-                var polygon = offsetEntity.ToPolygonWithTolerance(PolygonTolerance, circumscribe: true);
-                polygon.RemoveSelfIntersections();
-                _polygons.Add(polygon);
+                if (offsetEntity != null)
+                {
+                    // Circumscribe arcs so polygon vertices are always outside
+                    // the true arc — guarantees the boundary never under-estimates.
+                    var polygon = offsetEntity.ToPolygonWithTolerance(PolygonTolerance, circumscribe: true);
+                    polygon.RemoveSelfIntersections();
+                    _polygons.Add(polygon);
+                }
             }
 
             PrecomputeDirectionalEdges(
@@ -89,10 +93,10 @@ namespace OpenNest
                 }
             }
 
-            leftEdges = left.ToArray();
-            rightEdges = right.ToArray();
-            upEdges = up.ToArray();
-            downEdges = down.ToArray();
+            leftEdges = left.OrderBy(e => System.Math.Min(e.Item1.Y, e.Item2.Y)).ToArray();
+            rightEdges = right.OrderBy(e => System.Math.Min(e.Item1.Y, e.Item2.Y)).ToArray();
+            upEdges = up.OrderBy(e => System.Math.Min(e.Item1.X, e.Item2.X)).ToArray();
+            downEdges = down.OrderBy(e => System.Math.Min(e.Item1.X, e.Item2.X)).ToArray();
         }
 
         /// <summary>
@@ -147,6 +151,15 @@ namespace OpenNest
                 case PushDirection.Down:  return _downEdges;
                 default:                  return _leftEdges;
             }
+        }
+
+        /// <summary>
+        /// Returns the pre-computed edge arrays for the given direction.
+        /// These are in part-local coordinates (no translation applied).
+        /// </summary>
+        public (Vector start, Vector end)[] GetEdges(PushDirection direction)
+        {
+            return GetDirectionalEdges(direction);
         }
     }
 }

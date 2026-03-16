@@ -47,7 +47,7 @@ namespace OpenNest.Actions
             {
                 try
                 {
-                    var engine = new NestEngine(plateView.Plate);
+                    var engine = NestEngineRegistry.Create(plateView.Plate);
                     var parts = await Task.Run(() =>
                         engine.Fill(new NestItem { Drawing = drawing },
                             SelectedArea, progress, cts.Token));
@@ -61,7 +61,7 @@ namespace OpenNest.Actions
             }
             else
             {
-                var engine = new NestEngine(plateView.Plate);
+                var engine = NestEngineRegistry.Create(plateView.Plate);
                 engine.Fill(new NestItem { Drawing = drawing }, SelectedArea);
                 plateView.Invalidate();
             }

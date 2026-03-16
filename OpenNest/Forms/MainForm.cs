@@ -50,6 +50,18 @@ namespace OpenNest.Forms
 
             //if (GpuEvaluatorFactory.GpuAvailable)
             //    BestFitCache.CreateEvaluator = (drawing, spacing) => GpuEvaluatorFactory.Create(drawing, spacing);
+
+            if (GpuEvaluatorFactory.GpuAvailable)
+                BestFitCache.CreateSlideComputer = () => GpuEvaluatorFactory.CreateSlideComputer();
+
+            var enginesDir = Path.Combine(Application.StartupPath, "Engines");
+            NestEngineRegistry.LoadPlugins(enginesDir);
+
+            foreach (var engine in NestEngineRegistry.AvailableEngines)
+                engineComboBox.Items.Add(engine.Name);
+
+            engineComboBox.SelectedItem = NestEngineRegistry.ActiveEngineName;
+            engineComboBox.SelectedIndexChanged += EngineComboBox_SelectedIndexChanged;
         }
 
         private Nest CreateDefaultNest()
@@ -244,6 +256,12 @@ namespace OpenNest.Forms
                 gpuStatusLabel.Text = "GPU : None (CPU)";
                 gpuStatusLabel.ForeColor = Color.Gray;
             }
+        }
+
+        private void EngineComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (engineComboBox.SelectedItem is string name)
+                NestEngineRegistry.ActiveEngineName = name;
         }
 
         private void UpdateLocationMode()
@@ -735,6 +753,15 @@ namespace OpenNest.Forms
             nestingCts = new CancellationTokenSource();
             var token = nestingCts.Token;
 
+            var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
+
+            var progress = new Progress<NestProgress>(p =>
+            {
+                progressForm.UpdateProgress(p);
+                activeForm.PlateView.SetTemporaryParts(p.BestParts);
+            });
+
+            progressForm.Show(this);
             SetNestingLockout(true);
 
             try
@@ -758,32 +785,39 @@ namespace OpenNest.Forms
                     if (plate != activeForm.PlateView.Plate)
                         activeForm.LoadLastPlate();
 
-                    var parts = await Task.Run(() =>
-                        NestEngine.AutoNest(remaining, plate, token));
+                    var anyPlaced = false;
 
-                    if (parts.Count == 0)
-                        break;
+                    var engine = NestEngineRegistry.Create(plate);
+                    engine.PlateNumber = plateCount;
 
-                    plate.Parts.AddRange(parts);
-                    activeForm.PlateView.Invalidate();
+                    var nestParts = await Task.Run(() =>
+                        engine.Nest(remaining, progress, token));
 
-                    // Deduct placed quantities using Drawing.Name to avoid reference issues.
-                    foreach (var item in remaining)
+                    activeForm.PlateView.ClearTemporaryParts();
+
+                    if (nestParts.Count > 0 && !token.IsCancellationRequested)
                     {
-                        var placed = parts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
-                        item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                        plate.Parts.AddRange(nestParts);
+                        activeForm.PlateView.Invalidate();
+                        anyPlaced = true;
                     }
+
+                    if (!anyPlaced)
+                        break;
                 }
 
                 activeForm.Nest.UpdateDrawingQuantities();
+                progressForm.ShowCompleted();
             }
             catch (Exception ex)
             {
+                activeForm.PlateView.ClearTemporaryParts();
                 MessageBox.Show($"Nesting error: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
+                progressForm.Close();
                 SetNestingLockout(false);
                 nestingCts.Dispose();
                 nestingCts = null;
@@ -868,7 +902,7 @@ namespace OpenNest.Forms
             try
             {
                 var plate = activeForm.PlateView.Plate;
-                var engine = new NestEngine(plate);
+                var engine = NestEngineRegistry.Create(plate);
 
                 var parts = await Task.Run(() =>
                     engine.Fill(new NestItem { Drawing = drawing },

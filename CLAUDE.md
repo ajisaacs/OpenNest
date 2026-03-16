@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-OpenNest is a Windows desktop application for CNC nesting — arranging 2D parts on material plates to minimize waste. It imports DXF drawings, places parts onto plates using rectangle-packing algorithms, and can export nest layouts as DXF or post-process them to G-code for CNC cutting machines.
+OpenNest is a Windows desktop application for CNC nesting — arranging 2D parts on material plates to minimize waste. It imports DXF drawings, places parts onto plates using NFP-based (No Fit Polygon) and rectangle-packing algorithms, and can export nest layouts as DXF or post-process them to G-code for CNC cutting machines.
 
 ## Build
 
@@ -14,40 +14,56 @@ This is a .NET 8 solution using SDK-style `.csproj` files targeting `net8.0-wind
 dotnet build OpenNest.sln
 ```
 
-NuGet dependencies: `ACadSharp` 3.1.32 (DXF/DWG import/export, in OpenNest.IO), `System.Drawing.Common` 8.0.10, `ModelContextProtocol` + `Microsoft.Extensions.Hosting` (in OpenNest.Mcp).
-
-No test projects exist in this solution.
+NuGet dependencies: `ACadSharp` 3.1.32 (DXF/DWG import/export, in OpenNest.IO), `System.Drawing.Common` 8.0.10, `ModelContextProtocol` + `Microsoft.Extensions.Hosting` (in OpenNest.Mcp), `Microsoft.ML.OnnxRuntime` (in OpenNest.Engine for ML angle prediction), `Microsoft.EntityFrameworkCore.Sqlite` (in OpenNest.Training).
 
 ## Architecture
 
-Five projects form a layered architecture:
+Eight projects form a layered architecture:
 
 ### OpenNest.Core (class library)
 Domain model, geometry, and CNC primitives organized into namespaces:
 
-- **Root** (`namespace OpenNest`): Domain model — `Nest` → `Plate[]` → `Part[]` → `Drawing` → `Program`. A `Nest` is the top-level container. Each `Plate` has a size, material, quadrant, spacing, and contains placed `Part` instances. Each `Part` references a `Drawing` (the template) and has its own location/rotation. A `Drawing` wraps a CNC `Program`. Also contains utilities: `Helper`, `Align`, `Sequence`, `Timing`.
+- **Root** (`namespace OpenNest`): Domain model — `Nest` → `Plate[]` → `Part[]` → `Drawing` → `Program`. A `Nest` is the top-level container. Each `Plate` has a size, material, quadrant, spacing, and contains placed `Part` instances. Each `Part` references a `Drawing` (the template) and has its own location/rotation. A `Drawing` wraps a CNC `Program`. Also contains utilities: `PartGeometry`, `Align`, `Sequence`, `Timing`.
 - **CNC** (`CNC/`, `namespace OpenNest.CNC`): `Program` holds a list of `ICode` instructions (G-code-like: `RapidMove`, `LinearMove`, `ArcMove`, `SubProgramCall`). Programs support absolute/incremental mode conversion, rotation, offset, bounding box calculation, and cloning.
-- **Geometry** (`Geometry/`, `namespace OpenNest.Geometry`): Spatial primitives (`Vector`, `Box`, `Size`, `Spacing`, `BoundingBox`, `IBoundable`) and higher-level shapes (`Line`, `Arc`, `Circle`, `Polygon`, `Shape`) used for intersection detection, area calculation, and DXF conversion.
+- **Geometry** (`Geometry/`, `namespace OpenNest.Geometry`): Spatial primitives (`Vector`, `Box`, `Size`, `Spacing`, `BoundingBox`, `IBoundable`) and higher-level shapes (`Line`, `Arc`, `Circle`, `Polygon`, `Shape`) used for intersection detection, area calculation, and DXF conversion. Also contains `Intersect` (intersection algorithms), `ShapeBuilder` (entity chaining), `GeometryOptimizer` (line/arc merging), `SpatialQuery` (directional distance, ray casting, box queries), `ShapeProfile` (perimeter/area analysis), `NoFitPolygon`, `InnerFitPolygon`, `ConvexHull`, `ConvexDecomposition`, and `RotatingCalipers`.
 - **Converters** (`Converters/`, `namespace OpenNest.Converters`): Bridges between CNC and Geometry — `ConvertProgram` (CNC→Geometry), `ConvertGeometry` (Geometry→CNC), `ConvertMode` (absolute↔incremental).
-- **Math** (`Math/`, `namespace OpenNest.Math`): `Angle` (radian/degree conversion), `Tolerance` (floating-point comparison), `Trigonometry`, `Generic` (swap utility), `EvenOdd`. Note: `OpenNest.Math` shadows `System.Math` — use `System.Math` fully qualified where both are needed.
+- **Math** (`Math/`, `namespace OpenNest.Math`): `Angle` (radian/degree conversion), `Tolerance` (floating-point comparison), `Trigonometry`, `Generic` (swap utility), `EvenOdd`, `Rounding` (factor-based rounding). Note: `OpenNest.Math` shadows `System.Math` — use `System.Math` fully qualified where both are needed.
+- **CNC/CuttingStrategy** (`CNC/CuttingStrategy/`, `namespace OpenNest.CNC`): `ContourCuttingStrategy` orchestrates cut ordering, lead-ins/lead-outs, and tabs. Includes `LeadIn`/`LeadOut` hierarchies (line, arc, clean-hole variants), `Tab` hierarchy (normal, machine, breaker), and `CuttingParameters`/`AssignmentParameters`/`SequenceParameters` configuration.
 - **Collections** (`Collections/`, `namespace OpenNest.Collections`): `ObservableList<T>`, `DrawingCollection`.
 - **Quadrant system**: Plates use quadrants 1-4 (like Cartesian quadrants) to determine coordinate origin placement. This affects bounding box calculation, rotation, and part positioning.
 
 ### OpenNest.Engine (class library, depends on Core)
-Nesting algorithms. `NestEngine` orchestrates filling plates with parts.
+Nesting algorithms with a pluggable engine architecture. `NestEngineBase` is the abstract base class; `DefaultNestEngine` (formerly `NestEngine`) provides the multi-phase fill strategy. `NestEngineRegistry` manages available engines (built-in + plugins from `Engines/` directory) and the globally active engine. `AutoNester` handles mixed-part NFP-based nesting with simulated annealing (not yet integrated into the registry).
 
+- **Engine hierarchy**: `NestEngineBase` (abstract) → `DefaultNestEngine` (Linear, Pairs, RectBestFit, Remainder phases). Custom engines subclass `NestEngineBase` and register via `NestEngineRegistry.Register()` or as plugin DLLs in `Engines/`.
+- **NestEngineRegistry**: Static registry — `Create(Plate)` factory, `ActiveEngineName` global selection, `LoadPlugins(directory)` for DLL discovery. All callsites use `NestEngineRegistry.Create(plate)` except `BruteForceRunner` which uses `new DefaultNestEngine(plate)` directly for training consistency.
+- **BestFit/**: NFP-based pair evaluation pipeline — `BestFitFinder` orchestrates angle sweeps, `PairEvaluator`/`IPairEvaluator` scores part pairs, `RotationSlideStrategy`/`ISlideComputer` computes slide distances. `BestFitCache` and `BestFitFilter` optimize repeated lookups.
 - **RectanglePacking/**: `FillBestFit` (single-item fill, tries horizontal and vertical orientations), `PackBottomLeft` (multi-item bin packing, sorts by area descending). Both operate on `Bin`/`Item` abstractions.
 - **CirclePacking/**: Alternative packing for circular parts.
+- **ML/**: `AnglePredictor` (ONNX model for predicting good rotation angles), `FeatureExtractor` (part geometry features), `BruteForceRunner` (full angle sweep for training data).
+- `FillLinear`: Grid-based fill with directional sliding.
+- `Compactor`: Post-fill gravity compaction — pushes parts toward a plate edge to close gaps.
+- `FillScore`: Lexicographic comparison struct for fill results (count > utilization > compactness).
 - `NestItem`: Input to the engine — wraps a `Drawing` with quantity, priority, and rotation constraints.
-- `BestCombination`: Finds optimal mix of normal/rotated columns for grid fills.
+- `NestProgress`: Progress reporting model with `NestPhase` enum for UI feedback.
+- `RotationAnalysis`: Analyzes part geometry to determine valid rotation angles.
 
 ### OpenNest.IO (class library, depends on Core)
 File I/O and format conversion. Uses ACadSharp for DXF/DWG support.
 
 - `DxfImporter`/`DxfExporter` — DXF file import/export via ACadSharp.
-- `NestReader`/`NestWriter` — custom ZIP-based nest format (XML metadata + G-code programs).
+- `NestReader`/`NestWriter` — custom ZIP-based nest format (JSON metadata + G-code programs, v2 format).
 - `ProgramReader` — G-code text parser.
 - `Extensions` — conversion helpers between ACadSharp and OpenNest geometry types.
+
+### OpenNest.Console (console app, depends on Core + Engine + IO)
+Command-line interface for batch nesting. Supports DXF import, plate configuration, linear fill, and NFP-based auto-nesting (`--autonest`).
+
+### OpenNest.Gpu (class library, depends on Core + Engine)
+GPU-accelerated pair evaluation for best-fit nesting. `GpuPairEvaluator` implements `IPairEvaluator`, `GpuSlideComputer` implements `ISlideComputer`, and `PartBitmap` handles rasterization. `GpuEvaluatorFactory` provides factory methods.
+
+### OpenNest.Training (console app, depends on Core + Engine)
+Training data collection for ML angle prediction. `TrainingDatabase` stores per-angle nesting results in SQLite via EF Core for offline model training.
 
 ### OpenNest.Mcp (console app, depends on Core + Engine + IO)
 MCP server for Claude Code integration. Exposes nesting operations as MCP tools over stdio transport. Published to `~/.claude/mcp/OpenNest.Mcp/`.
@@ -62,16 +78,16 @@ MCP server for Claude Code integration. Exposes nesting operations as MCP tools 
 The UI application with MDI interface.
 
 - **Forms/**: `MainForm` (MDI parent), `EditNestForm` (MDI child per nest), plus dialogs for plate editing, auto-nesting, DXF conversion, cut parameters, etc.
-- **Controls/**: `PlateView` (2D plate renderer with zoom/pan), `DrawingListBox`, `DrawControl`, `QuadrantSelect`.
-- **Actions/**: User interaction modes — `ActionSelect`, `ActionAddPart`, `ActionClone`, `ActionFillArea`, `ActionZoomWindow`, `ActionSetSequence`.
+- **Controls/**: `PlateView` (2D plate renderer with zoom/pan, supports temporary preview parts), `DrawingListBox`, `DrawControl`, `QuadrantSelect`.
+- **Actions/**: User interaction modes — `ActionSelect`, `ActionClone`, `ActionFillArea`, `ActionSelectArea`, `ActionZoomWindow`, `ActionSetSequence`.
 - **Post-processing**: `IPostProcessor` plugin interface loaded from DLLs in a `Posts/` directory at runtime.
 
 ## File Format
 
-Nest files (`.zip`) contain:
-- `info` — XML with nest metadata and plate defaults
-- `drawing-info` — XML with drawing metadata (name, material, quantities, colors)
-- `plate-info` — XML with plate metadata (size, material, spacing)
+Nest files (`.nest`, ZIP-based) use v2 JSON format:
+- `info.json` — nest metadata and plate defaults
+- `drawing-info.json` — drawing metadata (name, material, quantities, colors)
+- `plate-info.json` — plate metadata (size, material, spacing)
 - `program-NNN` — G-code text for each drawing's cut program
 - `plate-NNN` — G-code text encoding part placements (G00 for position, G65 for sub-program call with rotation)
 
@@ -89,3 +105,6 @@ Always use Roslyn Bridge MCP tools (`mcp__RoslynBridge__*`) as the primary metho
 - `ObservableList<T>` provides ItemAdded/ItemRemoved/ItemChanged events used for automatic quantity tracking between plates and drawings.
 - Angles throughout the codebase are in **radians** (use `Angle.ToRadians()`/`Angle.ToDegrees()` for conversion).
 - `Tolerance.Epsilon` is used for floating-point comparisons across geometry operations.
+- Nesting uses async progress/cancellation: `IProgress<NestProgress>` and `CancellationToken` flow through the engine to the UI's `NestProgressForm`.
+- `Compactor` performs post-fill gravity compaction — after filling, parts are pushed toward a plate edge using directional distance calculations to close gaps between irregular shapes.
+- `FillScore` uses lexicographic comparison (count > utilization > compactness) to rank fill results consistently across all fill strategies.
