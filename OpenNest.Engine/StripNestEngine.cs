@@ -106,18 +106,29 @@ namespace OpenNest
             var remainderItems = items.Where((_, i) => i != stripIndex).ToList();
 
             // Try both orientations.
-            var bottomResult = TryOrientation(StripDirection.Bottom, stripItem, remainderItems, workArea, token);
-            var leftResult = TryOrientation(StripDirection.Left, stripItem, remainderItems, workArea, token);
+            var bottomResult = TryOrientation(StripDirection.Bottom, stripItem, remainderItems, workArea, progress, token);
+            var leftResult = TryOrientation(StripDirection.Left, stripItem, remainderItems, workArea, progress, token);
 
             // Pick the better result.
-            if (bottomResult.Score >= leftResult.Score)
-                return bottomResult.Parts;
+            var winner = bottomResult.Score >= leftResult.Score
+                ? bottomResult.Parts
+                : leftResult.Parts;
 
-            return leftResult.Parts;
+            // Deduct placed quantities from the original items.
+            foreach (var item in items)
+            {
+                if (item.Quantity <= 0)
+                    continue;
+
+                var placed = winner.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
+                item.Quantity = System.Math.Max(0, item.Quantity - placed);
+            }
+
+            return winner;
         }
 
         private StripNestResult TryOrientation(StripDirection direction, NestItem stripItem,
-            List<NestItem> remainderItems, Box workArea, CancellationToken token)
+            List<NestItem> remainderItems, Box workArea, IProgress<NestProgress> progress, CancellationToken token)
         {
             var result = new StripNestResult { Direction = direction };
 
@@ -138,7 +149,7 @@ namespace OpenNest
             var inner = new DefaultNestEngine(Plate);
             var stripParts = inner.Fill(
                 new NestItem { Drawing = stripItem.Drawing, Quantity = stripItem.Quantity },
-                stripBox, null, token);
+                stripBox, progress, token);
 
             if (stripParts == null || stripParts.Count == 0)
                 return result;
@@ -170,7 +181,7 @@ namespace OpenNest
                 var trialInner = new DefaultNestEngine(Plate);
                 var trialParts = trialInner.Fill(
                     new NestItem { Drawing = stripItem.Drawing, Quantity = stripItem.Quantity },
-                    trialBox, null, token);
+                    trialBox, progress, token);
 
                 if (trialParts == null || trialParts.Count < targetCount)
                     break;
@@ -233,7 +244,7 @@ namespace OpenNest
                     var remnantInner = new DefaultNestEngine(Plate);
                     var remnantParts = remnantInner.Fill(
                         new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
-                        currentRemnant, null, token);
+                        currentRemnant, progress, token);
 
                     if (remnantParts != null && remnantParts.Count > 0)
                     {
