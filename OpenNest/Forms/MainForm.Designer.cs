@@ -148,6 +148,7 @@
             this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
             this.engineLabel = new System.Windows.Forms.ToolStripLabel();
             this.engineComboBox = new System.Windows.Forms.ToolStripComboBox();
+            this.btnAutoNest = new System.Windows.Forms.ToolStripButton();
             this.pEPToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.openNestToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
@@ -1002,7 +1003,8 @@
             this.btnZoomToFit,
             this.toolStripSeparator4,
             this.engineLabel,
-            this.engineComboBox});
+            this.engineComboBox,
+            this.btnAutoNest});
             this.toolStrip1.Location = new System.Drawing.Point(0, 24);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(1098, 35);
@@ -1173,6 +1175,14 @@
             this.engineComboBox.Name = "engineComboBox";
             this.engineComboBox.Size = new System.Drawing.Size(100, 35);
             //
+            // btnAutoNest
+            //
+            this.btnAutoNest.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.btnAutoNest.Name = "btnAutoNest";
+            this.btnAutoNest.Size = new System.Drawing.Size(64, 32);
+            this.btnAutoNest.Text = "Auto Nest";
+            this.btnAutoNest.Click += new System.EventHandler(this.RunAutoNest_Click);
+            //
             // pEPToolStripMenuItem
             // 
             this.pEPToolStripMenuItem.Name = "pEPToolStripMenuItem";
@@ -1335,5 +1345,6 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
         private System.Windows.Forms.ToolStripLabel engineLabel;
         private System.Windows.Forms.ToolStripComboBox engineComboBox;
+        private System.Windows.Forms.ToolStripButton btnAutoNest;
     }
 }
