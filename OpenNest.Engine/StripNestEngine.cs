@@ -248,48 +248,64 @@ namespace OpenNest
                 })
                 .ToList();
 
-            // Fill remnant with remainder items using free-rectangle tracking.
-            // After each fill, the consumed box is split into two non-overlapping
-            // sub-rectangles (guillotine cut) so no usable area is lost.
+            // Fill remnant areas iteratively using RemnantFinder.
+            // After each fill, re-discover all free rectangles and try again
+            // until no more items can be placed.
             if (remnantBox.Width > 0 && remnantBox.Length > 0)
             {
-                var freeBoxes = new List<Box> { remnantBox };
                 var remnantProgress = progress != null
                     ? new AccumulatingProgress(progress, allParts)
                     : null;
 
-                foreach (var item in effectiveRemainder)
+                var obstacles = allParts.Select(p => p.BoundingBox.Offset(spacing)).ToList();
+                var finder = new RemnantFinder(workArea, obstacles);
+                var madeProgress = true;
+
+                while (madeProgress && !token.IsCancellationRequested)
                 {
-                    if (token.IsCancellationRequested || freeBoxes.Count == 0)
+                    madeProgress = false;
+                    var freeBoxes = finder.FindRemnants(spacing);
+
+                    if (freeBoxes.Count == 0)
                         break;
 
-                    var itemBbox = item.Drawing.Program.BoundingBox();
-                    var minItemDim = System.Math.Min(itemBbox.Width, itemBbox.Length);
-
-                    // Try free boxes from largest to smallest.
-                    freeBoxes.Sort((a, b) => b.Area().CompareTo(a.Area()));
-
-                    for (var i = 0; i < freeBoxes.Count; i++)
+                    foreach (var item in effectiveRemainder)
                     {
-                        var box = freeBoxes[i];
+                        if (token.IsCancellationRequested)
+                            break;
 
-                        if (System.Math.Min(box.Width, box.Length) < minItemDim)
+                        if (item.Quantity == 0)
                             continue;
 
-                        var remnantInner = new DefaultNestEngine(Plate);
-                        var remnantParts = remnantInner.Fill(
-                            new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
-                            box, remnantProgress, token);
+                        var itemBbox = item.Drawing.Program.BoundingBox();
+                        var minItemDim = System.Math.Min(itemBbox.Width, itemBbox.Length);
 
-                        if (remnantParts != null && remnantParts.Count > 0)
+                        foreach (var box in freeBoxes)
                         {
-                            allParts.AddRange(remnantParts);
-                            freeBoxes.RemoveAt(i);
+                            if (System.Math.Min(box.Width, box.Length) < minItemDim)
+                                continue;
 
-                            var usedBox = remnantParts.Cast<IBoundable>().GetBoundingBox();
-                            SplitFreeBox(box, usedBox, spacing, freeBoxes);
-                            break;
+                            var remnantInner = new DefaultNestEngine(Plate);
+                            var remnantParts = remnantInner.Fill(
+                                new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
+                                box, remnantProgress, token);
+
+                            if (remnantParts != null && remnantParts.Count > 0)
+                            {
+                                allParts.AddRange(remnantParts);
+                                item.Quantity = System.Math.Max(0, item.Quantity - remnantParts.Count);
+
+                                // Update obstacles and re-discover remnants
+                                foreach (var p in remnantParts)
+                                    finder.AddObstacle(p.BoundingBox.Offset(spacing));
+
+                                madeProgress = true;
+                                break; // Re-discover free boxes with updated obstacles
+                            }
                         }
+
+                        if (madeProgress)
+                            break; // Restart the outer loop to re-discover remnants
                     }
                 }
             }
@@ -301,44 +317,6 @@ namespace OpenNest
             result.Score = FillScore.Compute(allParts, workArea);
 
             return result;
-        }
-
-        private static void SplitFreeBox(Box parent, Box used, double spacing, List<Box> freeBoxes)
-        {
-            var hWidth = parent.Right - used.Right - spacing;
-            var vHeight = parent.Top - used.Top - spacing;
-
-            if (hWidth > spacing && vHeight > spacing)
-            {
-                // Guillotine split: give the overlapping corner to the larger strip.
-                var hFullArea = hWidth * parent.Length;
-                var vFullArea = parent.Width * vHeight;
-
-                if (hFullArea >= vFullArea)
-                {
-                    // hStrip gets full height; vStrip truncated to left of split line.
-                    freeBoxes.Add(new Box(used.Right + spacing, parent.Y, hWidth, parent.Length));
-                    var vWidth = used.Right + spacing - parent.X;
-                    if (vWidth > spacing)
-                        freeBoxes.Add(new Box(parent.X, used.Top + spacing, vWidth, vHeight));
-                }
-                else
-                {
-                    // vStrip gets full width; hStrip truncated below split line.
-                    freeBoxes.Add(new Box(parent.X, used.Top + spacing, parent.Width, vHeight));
-                    var hHeight = used.Top + spacing - parent.Y;
-                    if (hHeight > spacing)
-                        freeBoxes.Add(new Box(used.Right + spacing, parent.Y, hWidth, hHeight));
-                }
-            }
-            else if (hWidth > spacing)
-            {
-                freeBoxes.Add(new Box(used.Right + spacing, parent.Y, hWidth, parent.Length));
-            }
-            else if (vHeight > spacing)
-            {
-                freeBoxes.Add(new Box(parent.X, used.Top + spacing, parent.Width, vHeight));
-            }
         }
 
         /// <summary>

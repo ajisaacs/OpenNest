@@ -625,9 +625,9 @@ namespace OpenNest.Controls
             };
             rect.Y -= rect.Height;
 
-            using var pen = new Pen(Color.Orange, 2f)
+            using var pen = new Pen(Color.Red, 1f)
             {
-                DashStyle = DashStyle.Dash
+                DashStyle = DashStyle.Dot
             };
             g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
         }
