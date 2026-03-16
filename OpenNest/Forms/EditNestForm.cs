@@ -456,12 +456,13 @@ namespace OpenNest.Forms
 
         private static void SequencePlate(Plate plate)
         {
-            var parameters = new SequenceParameters();
+            var parameters = new SequenceParameters { Method = SequenceMethod.LeastCode };
             var sequencer = PartSequencerFactory.Create(parameters);
             var ordered = sequencer.Sequence(plate.Parts.ToList(), plate);
 
             plate.Parts.Clear();
-            plate.Parts.AddRange(ordered.Select(s => s.Part));
+            foreach (var s in ordered)
+                plate.Parts.Add(s.Part);
         }
 
         public void CalculateCurrentPlateCutTime()
