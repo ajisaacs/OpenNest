@@ -32,6 +32,17 @@ namespace OpenNest.Controls
         private List<LayoutPart> parts;
         private List<LayoutPart> temporaryParts = new List<LayoutPart>();
         private Point middleMouseDownPoint;
+        private Box activeWorkArea;
+
+        public Box ActiveWorkArea
+        {
+            get => activeWorkArea;
+            set
+            {
+                activeWorkArea = value;
+                Invalidate();
+            }
+        }
 
         public List<LayoutPart> SelectedParts;
         public ReadOnlyCollection<LayoutPart> Parts;
@@ -362,6 +373,7 @@ namespace OpenNest.Controls
 
             DrawPlate(e.Graphics);
             DrawParts(e.Graphics);
+            DrawActiveWorkArea(e.Graphics);
 
             base.OnPaint(e);
         }
@@ -598,6 +610,26 @@ namespace OpenNest.Controls
             };
 
             g.DrawRectangle(ColorScheme.BoundingBoxPen, rect.X, rect.Y - rect.Height, rect.Width, rect.Height);
+        }
+
+        private void DrawActiveWorkArea(Graphics g)
+        {
+            if (activeWorkArea == null)
+                return;
+
+            var rect = new RectangleF
+            {
+                Location = PointWorldToGraph(activeWorkArea.Location),
+                Width = LengthWorldToGui(activeWorkArea.Width),
+                Height = LengthWorldToGui(activeWorkArea.Length)
+            };
+            rect.Y -= rect.Height;
+
+            using var pen = new Pen(Color.Orange, 2f)
+            {
+                DashStyle = DashStyle.Dash
+            };
+            g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
         }
 
         public LayoutPart GetPartAtControlPoint(Point pt)
