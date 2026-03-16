@@ -34,7 +34,7 @@ namespace OpenNest.Mcp.Tools
                 return $"Error: drawing '{drawingName}' not found";
 
             var countBefore = plate.Parts.Count;
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
             var success = engine.Fill(item);
 
@@ -70,7 +70,7 @@ namespace OpenNest.Mcp.Tools
                 return $"Error: drawing '{drawingName}' not found";
 
             var countBefore = plate.Parts.Count;
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
             var area = new Box(x, y, width, height);
             var success = engine.Fill(item, area);
@@ -111,7 +111,7 @@ namespace OpenNest.Mcp.Tools
             sb.AppendLine($"Found {remnants.Count} remnant area(s) on plate {plateIndex}");
 
             var totalAdded = 0;
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
 
             for (var i = 0; i < remnants.Count; i++)
             {
@@ -173,7 +173,7 @@ namespace OpenNest.Mcp.Tools
             }
 
             var countBefore = plate.Parts.Count;
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
             var success = engine.Pack(items);
             var countAfter = plate.Parts.Count;
             var added = countAfter - countBefore;
@@ -252,7 +252,7 @@ namespace OpenNest.Mcp.Tools
                 if (item.Quantity <= 0 || workArea.Width <= 0 || workArea.Length <= 0)
                     continue;
 
-                var engine = new NestEngine(plate);
+                var engine = NestEngineRegistry.Create(plate);
                 var parts = engine.FillExact(item, workArea, null, CancellationToken.None);
 
                 if (parts.Count > 0)
@@ -271,10 +271,13 @@ namespace OpenNest.Mcp.Tools
 
             if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0)
             {
-                var before = plate.Parts.Count;
-                var engine = new NestEngine(plate);
-                engine.PackArea(workArea, packItems);
-                totalPlaced += plate.Parts.Count - before;
+                var engine = NestEngineRegistry.Create(plate);
+                var packParts = engine.PackArea(workArea, packItems, null, CancellationToken.None);
+                if (packParts.Count > 0)
+                {
+                    plate.Parts.AddRange(packParts);
+                    totalPlaced += packParts.Count;
+                }
             }
 
             var sb = new StringBuilder();
