@@ -132,6 +132,12 @@ var remnants = finder.FindRemnants(minDimension);
 
 Any caller that previously relied on `TryRemainderImprovement` getting called automatically inside `Fill()` will need to implement the iterative loop: fill -> find remnants -> fill remnant -> repeat.
 
+## PlateView Remnant Visualization
+
+When a remnant is being filled (during the iterative workflow), the `PlateView` control should display the active remnant's outline as a dashed rectangle in a contrasting color (orange). The outline persists while that remnant is being filled and disappears when the next remnant starts or the fill completes.
+
+**Implementation:** Add a `Box? ActiveRemnant` property to `PlateView`. When set, the paint handler draws a dashed rectangle at that location. The caller sets it before filling a remnant and clears it (sets to `null`) when done or moving to the next remnant. The `NestProgress` class gets a new `Box? ActiveRemnant` property so the progress pipeline can carry the current remnant box from the engine caller to the UI.
+
 ## Future
 
 The edge projection algorithm is embarrassingly parallel — each candidate rectangle's overlap check is independent. This makes it a natural fit for GPU acceleration via `OpenNest.Gpu` in the future.
