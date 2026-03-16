@@ -81,6 +81,12 @@ namespace OpenNest
                 .Where(p => !movingParts.Contains(p))
                 .ToList();
 
+            return Push(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, direction);
+        }
+
+        public static double Push(List<Part> movingParts, List<Part> obstacleParts,
+            Box workArea, double partSpacing, PushDirection direction)
+        {
             var obstacleBoxes = new Box[obstacleParts.Count];
             var obstacleLines = new List<Line>[obstacleParts.Count];
 
@@ -88,9 +94,8 @@ namespace OpenNest
                 obstacleBoxes[i] = obstacleParts[i].BoundingBox;
 
             var opposite = SpatialQuery.OppositeDirection(direction);
-            var halfSpacing = plate.PartSpacing / 2;
+            var halfSpacing = partSpacing / 2;
             var isHorizontal = SpatialQuery.IsHorizontalDirection(direction);
-            var workArea = plate.WorkArea();
             var distance = double.MaxValue;
 
             // BB gap at which offset geometries are expected to be touching.
@@ -151,6 +156,61 @@ namespace OpenNest
             }
 
             return 0;
+        }
+
+        /// <summary>
+        /// Compacts parts individually toward the bottom-left of the work area.
+        /// Each part is pushed against all others as obstacles, closing geometry-based gaps.
+        /// Does not require parts to be on a plate.
+        /// </summary>
+        public static void CompactIndividual(List<Part> parts, Box workArea, double partSpacing)
+        {
+            if (parts == null || parts.Count < 2)
+                return;
+
+            var savedPositions = SavePositions(parts);
+
+            var leftFirst = CompactIndividualLoop(parts, workArea, partSpacing,
+                PushDirection.Left, PushDirection.Down);
+
+            RestorePositions(parts, savedPositions);
+            var downFirst = CompactIndividualLoop(parts, workArea, partSpacing,
+                PushDirection.Down, PushDirection.Left);
+
+            if (leftFirst > downFirst)
+            {
+                RestorePositions(parts, savedPositions);
+                CompactIndividualLoop(parts, workArea, partSpacing,
+                    PushDirection.Left, PushDirection.Down);
+            }
+        }
+
+        private static double CompactIndividualLoop(List<Part> parts, Box workArea,
+            double partSpacing, PushDirection first, PushDirection second)
+        {
+            var total = 0.0;
+
+            for (var pass = 0; pass < MaxIterations; pass++)
+            {
+                var moved = 0.0;
+
+                foreach (var part in parts)
+                {
+                    var single = new List<Part>(1) { part };
+                    var obstacles = new List<Part>(parts.Count - 1);
+                    foreach (var p in parts)
+                        if (p != part) obstacles.Add(p);
+
+                    moved += Push(single, obstacles, workArea, partSpacing, first);
+                    moved += Push(single, obstacles, workArea, partSpacing, second);
+                }
+
+                total += moved;
+                if (moved <= RepeatThreshold)
+                    break;
+            }
+
+            return total;
         }
     }
 }

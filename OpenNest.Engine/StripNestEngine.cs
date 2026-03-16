@@ -214,6 +214,16 @@ namespace OpenNest
                     : trialPlacedBox.Right - workArea.X;
             }
 
+            // TODO: Compact strip parts individually to close geometry-based gaps.
+            // Disabled pending investigation — remnant finder picks up gaps created
+            // by compaction and scatters parts into them.
+            // Compactor.CompactIndividual(bestParts, workArea, Plate.PartSpacing);
+            //
+            // var compactedBox = bestParts.Cast<IBoundable>().GetBoundingBox();
+            // bestDim = direction == StripDirection.Bottom
+            //     ? compactedBox.Top - workArea.Y
+            //     : compactedBox.Right - workArea.X;
+
             // Build remnant box with spacing gap.
             var spacing = Plate.PartSpacing;
             var remnantBox = direction == StripDirection.Bottom
