@@ -625,9 +625,9 @@ namespace OpenNest.Controls
             };
             rect.Y -= rect.Height;
 
-            using var pen = new Pen(Color.Red, 1f)
+            using var pen = new Pen(Color.Red, 1.5f)
             {
-                DashStyle = DashStyle.Dot
+                DashStyle = DashStyle.Dash
             };
             g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
         }
@@ -994,22 +994,28 @@ namespace OpenNest.Controls
 
         public void RotateSelectedParts(double angle)
         {
-            var pt1 = SelectedParts.Select(p => p.BasePart).ToList().GetBoundingBox().Location;
+            var parts = SelectedParts.Select(p => p.BasePart).ToList();
+            var bounds = parts.GetBoundingBox();
+            var center = bounds.Center;
+            var anchor = bounds.Location;
+            var rotatedPrograms = new HashSet<Program>();
 
             for (int i = 0; i < SelectedParts.Count; ++i)
             {
                 var part = SelectedParts[i];
-                part.Rotate(angle);
+                var basePart = part.BasePart;
+
+                if (rotatedPrograms.Add(basePart.Program))
+                    basePart.Program.Rotate(angle);
+
+                part.Location = part.Location.Rotate(angle, center);
+                basePart.UpdateBounds();
             }
 
-            var pt2 = SelectedParts.Select(p => p.BasePart).ToList().GetBoundingBox().Location;
-            var diff = pt1 - pt2;
+            var diff = anchor - parts.GetBoundingBox().Location;
 
             for (int i = 0; i < SelectedParts.Count; ++i)
-            {
-                var part = SelectedParts[i];
-                part.Offset(diff);
-            }
+                SelectedParts[i].Offset(diff);
         }
 
         protected override void UpdateMatrix()
