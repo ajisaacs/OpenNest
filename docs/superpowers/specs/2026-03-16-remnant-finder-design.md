@@ -132,11 +132,11 @@ var remnants = finder.FindRemnants(minDimension);
 
 Any caller that previously relied on `TryRemainderImprovement` getting called automatically inside `Fill()` will need to implement the iterative loop: fill -> find remnants -> fill remnant -> repeat.
 
-## PlateView Remnant Visualization
+## PlateView Work Area Visualization
 
-When a remnant is being filled (during the iterative workflow), the `PlateView` control should display the active remnant's outline as a dashed rectangle in a contrasting color (orange). The outline persists while that remnant is being filled and disappears when the next remnant starts or the fill completes.
+When an area is being filled (during the iterative workflow), the `PlateView` control displays the active work area's outline as a dashed orange rectangle. The outline persists while that area is being filled and disappears when the fill completes.
 
-**Implementation:** Add a `Box? ActiveRemnant` property to `PlateView`. When set, the paint handler draws a dashed rectangle at that location. The caller sets it before filling a remnant and clears it (sets to `null`) when done or moving to the next remnant. The `NestProgress` class gets a new `Box? ActiveRemnant` property so the progress pipeline can carry the current remnant box from the engine caller to the UI.
+**Implementation:** Add a `Box ActiveWorkArea` property to `PlateView` (`Box` is a reference type, so `null` means no overlay). When set, the paint handler draws a dashed rectangle at that location. The `NestProgress` class gets a new `Box ActiveWorkArea` property so the progress pipeline carries the current work area from the engine to the UI. The existing progress callbacks in `PlateView.FillWithProgress` and `MainForm` set `PlateView.ActiveWorkArea` from the progress object, alongside the existing `SetTemporaryParts` calls. `NestEngineBase.ReportProgress` populates `ActiveWorkArea` from its `workArea` parameter.
 
 ## Future
 
