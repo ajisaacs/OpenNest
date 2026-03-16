@@ -88,8 +88,12 @@ namespace OpenNest
                 {
                     allParts.AddRange(parts);
                     item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
-                    var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
-                    workArea = ComputeRemainderWithin(workArea, placedBox, Plate.PartSpacing);
+                    var placedObstacles = parts.Select(p => p.BoundingBox.Offset(Plate.PartSpacing)).ToList();
+                    var finder = new RemnantFinder(workArea, placedObstacles);
+                    var remnants = finder.FindRemnants();
+                    if (remnants.Count == 0)
+                        break;
+                    workArea = remnants[0]; // Largest remnant
                 }
             }
 
@@ -115,21 +119,6 @@ namespace OpenNest
             }
 
             return allParts;
-        }
-
-        protected static Box ComputeRemainderWithin(Box workArea, Box usedBox, double spacing)
-        {
-            var hWidth = workArea.Right - usedBox.Right - spacing;
-            var hStrip = hWidth > 0
-                ? new Box(usedBox.Right + spacing, workArea.Y, hWidth, workArea.Length)
-                : Box.Empty;
-
-            var vHeight = workArea.Top - usedBox.Top - spacing;
-            var vStrip = vHeight > 0
-                ? new Box(workArea.X, usedBox.Top + spacing, workArea.Width, vHeight)
-                : Box.Empty;
-
-            return hStrip.Area() >= vStrip.Area() ? hStrip : vStrip;
         }
 
         // --- FillExact (non-virtual, delegates to virtual Fill) ---
