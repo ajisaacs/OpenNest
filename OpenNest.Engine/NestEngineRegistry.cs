@@ -16,6 +16,10 @@ namespace OpenNest
             Register("Default",
                 "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)",
                 plate => new DefaultNestEngine(plate));
+
+            Register("Strip",
+                "Strip-based nesting for mixed-drawing layouts",
+                plate => new StripNestEngine(plate));
         }
 
         public static IReadOnlyList<NestEngineInfo> AvailableEngines => engines;
