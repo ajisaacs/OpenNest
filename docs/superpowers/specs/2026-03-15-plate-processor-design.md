@@ -123,6 +123,10 @@ Sequencers that need configuration accept it through their constructor:
 - `AdvancedSequencer(SequenceParameters parameters)` — row/column grouping config
 - Directional sequencers and `EdgeStartSequencer` need no configuration
 
+### Factory
+
+A static `PartSequencerFactory.Create(SequenceParameters parameters)` method in `OpenNest.Engine/Sequencing/` maps `parameters.Method` to the correct `IPartSequencer` implementation, passing constructor args as needed. Throws `NotSupportedException` for `RightSideAlt`.
+
 ## Stage 2: ContourCuttingStrategy
 
 Already exists in `OpenNest.Core/CNC/CuttingStrategy/`. Only the signature and return type change:
@@ -153,7 +157,7 @@ All coordinates are in plate space.
 ### RapidPath
 
 ```csharp
-public struct RapidPath
+public readonly struct RapidPath
 {
     public bool HeadUp { get; init; }
     public List<Vector> Waypoints { get; init; }
@@ -272,7 +276,7 @@ public class PlateResult
     public List<ProcessedPart> Parts { get; init; }
 }
 
-public struct ProcessedPart
+public readonly struct ProcessedPart
 {
     public Part Part { get; init; }
     public Program ProcessedProgram { get; init; }  // with lead-ins applied (original Part.Program unchanged)
