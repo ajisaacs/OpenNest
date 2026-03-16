@@ -31,6 +31,26 @@ namespace OpenNest
         }
 
         /// <summary>
+        /// Group-parts fill delegates to DefaultNestEngine.
+        /// </summary>
+        public override List<Part> Fill(List<Part> groupParts, Box workArea,
+            IProgress<NestProgress> progress, CancellationToken token)
+        {
+            var inner = new DefaultNestEngine(Plate);
+            return inner.Fill(groupParts, workArea, progress, token);
+        }
+
+        /// <summary>
+        /// Pack delegates to DefaultNestEngine.
+        /// </summary>
+        public override List<Part> PackArea(Box box, List<NestItem> items,
+            IProgress<NestProgress> progress, CancellationToken token)
+        {
+            var inner = new DefaultNestEngine(Plate);
+            return inner.PackArea(box, items, progress, token);
+        }
+
+        /// <summary>
         /// Selects the item that consumes the most plate area (bounding box area x quantity).
         /// Returns the index into the items list.
         /// </summary>
