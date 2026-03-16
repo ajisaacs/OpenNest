@@ -41,7 +41,6 @@ namespace OpenNest
         public double NestedWidth { get; set; }
         public double NestedLength { get; set; }
         public double NestedArea { get; set; }
-        public double UsableRemnantArea { get; set; }
         public List<Part> BestParts { get; set; }
         public string Description { get; set; }
     }

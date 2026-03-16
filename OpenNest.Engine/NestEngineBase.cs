@@ -229,7 +229,6 @@ namespace OpenNest
                 NestedWidth = bounds.Width,
                 NestedLength = bounds.Length,
                 NestedArea = totalPartArea,
-                UsableRemnantArea = workArea.Area() - totalPartArea,
                 BestParts = clonedParts,
                 Description = description
             });

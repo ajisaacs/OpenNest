@@ -37,7 +37,6 @@ namespace OpenNest.Forms
             partsValue.Text = progress.BestPartCount.ToString();
             densityValue.Text = progress.BestDensity.ToString("P1");
             nestedAreaValue.Text = $"{progress.NestedWidth:F1} x {progress.NestedLength:F1} ({progress.NestedArea:F1} sq in)";
-            remnantValue.Text = $"{progress.UsableRemnantArea:F1} sq in";
 
             if (!string.IsNullOrEmpty(progress.Description))
                 descriptionValue.Text = progress.Description;
