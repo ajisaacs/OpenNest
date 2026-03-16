@@ -18,7 +18,7 @@ namespace OpenNest
 
         public override string Name => "Default";
 
-        public override string Description => "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)";
+        public override string Description => "Multi-phase nesting (Linear, Pairs, RectBestFit)";
 
         public bool ForceFullAngleSweep { get; set; }
 
@@ -34,23 +34,6 @@ namespace OpenNest
             PhaseResults.Clear();
             AngleResults.Clear();
             var best = FindBestFill(item, workArea, progress, token);
-
-            if (!token.IsCancellationRequested)
-            {
-                // Try improving by filling the remainder strip separately.
-                var remainderSw = Stopwatch.StartNew();
-                var improved = TryRemainderImprovement(item, workArea, best);
-                remainderSw.Stop();
-
-                if (IsBetterFill(improved, best, workArea))
-                {
-                    Debug.WriteLine($"[Fill] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
-                    best = improved;
-                    WinnerPhase = NestPhase.Remainder;
-                    PhaseResults.Add(new PhaseResult(NestPhase.Remainder, improved.Count, remainderSw.ElapsedMilliseconds));
-                    ReportProgress(progress, NestPhase.Remainder, PlateNumber, best, workArea, BuildProgressSummary());
-                }
-            }
 
             if (best == null || best.Count == 0)
                 return new List<Part>();
@@ -160,17 +143,6 @@ namespace OpenNest
                     {
                         best = pairResult;
                         ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea, BuildProgressSummary());
-                    }
-
-                    // Try improving by filling the remainder strip separately.
-                    var improved = TryRemainderImprovement(nestItem, workArea, best);
-
-                    if (IsBetterFill(improved, best, workArea))
-                    {
-                        Debug.WriteLine($"[Fill(groupParts,Box)] Remainder improvement: {improved.Count} parts (was {best?.Count ?? 0})");
-                        best = improved;
-                        PhaseResults.Add(new PhaseResult(NestPhase.Remainder, improved.Count, 0));
-                        ReportProgress(progress, NestPhase.Remainder, PlateNumber, best, workArea, BuildProgressSummary());
                     }
                 }
                 catch (OperationCanceledException)
@@ -556,141 +528,6 @@ namespace OpenNest
             }
 
             return best;
-        }
-
-        // --- Remainder improvement ---
-
-        private List<Part> TryRemainderImprovement(NestItem item, Box workArea, List<Part> currentBest)
-        {
-            if (currentBest == null || currentBest.Count < 3)
-                return null;
-
-            List<Part> best = null;
-
-            var hResult = TryStripRefill(item, workArea, currentBest, horizontal: true);
-
-            if (IsBetterFill(hResult, best, workArea))
-                best = hResult;
-
-            var vResult = TryStripRefill(item, workArea, currentBest, horizontal: false);
-
-            if (IsBetterFill(vResult, best, workArea))
-                best = vResult;
-
-            return best;
-        }
-
-        private List<Part> TryStripRefill(NestItem item, Box workArea, List<Part> parts, bool horizontal)
-        {
-            if (parts == null || parts.Count < 3)
-                return null;
-
-            var clusters = ClusterParts(parts, horizontal);
-
-            if (clusters.Count < 2)
-                return null;
-
-            // Determine the mode (most common) cluster count, excluding the last cluster.
-            var mainClusters = clusters.Take(clusters.Count - 1).ToList();
-            var modeCount = mainClusters
-                .GroupBy(c => c.Count)
-                .OrderByDescending(g => g.Count())
-                .First()
-                .Key;
-
-            var lastCluster = clusters[clusters.Count - 1];
-
-            // Only attempt refill if the last cluster is smaller than the mode.
-            if (lastCluster.Count >= modeCount)
-                return null;
-
-            Debug.WriteLine($"[TryStripRefill] {(horizontal ? "H" : "V")} clusters: {clusters.Count}, mode: {modeCount}, last: {lastCluster.Count}");
-
-            // Build the main parts list (everything except the last cluster).
-            var mainParts = clusters.Take(clusters.Count - 1).SelectMany(c => c).ToList();
-            var mainBox = ((IEnumerable<IBoundable>)mainParts).GetBoundingBox();
-
-            // Compute the strip box from the main grid edge to the work area edge.
-            Box stripBox;
-
-            if (horizontal)
-            {
-                var stripLeft = mainBox.Right + Plate.PartSpacing;
-                var stripWidth = workArea.Right - stripLeft;
-
-                if (stripWidth <= 0)
-                    return null;
-
-                stripBox = new Box(stripLeft, workArea.Y, stripWidth, workArea.Length);
-            }
-            else
-            {
-                var stripBottom = mainBox.Top + Plate.PartSpacing;
-                var stripHeight = workArea.Top - stripBottom;
-
-                if (stripHeight <= 0)
-                    return null;
-
-                stripBox = new Box(workArea.X, stripBottom, workArea.Width, stripHeight);
-            }
-
-            Debug.WriteLine($"[TryStripRefill] Strip: {stripBox.Width:F1}x{stripBox.Length:F1} at ({stripBox.X:F1},{stripBox.Y:F1})");
-
-            var stripParts = FindBestFill(item, stripBox);
-
-            if (stripParts == null || stripParts.Count <= lastCluster.Count)
-            {
-                Debug.WriteLine($"[TryStripRefill] No improvement: strip={stripParts?.Count ?? 0} vs oddball={lastCluster.Count}");
-                return null;
-            }
-
-            Debug.WriteLine($"[TryStripRefill] Improvement: strip={stripParts.Count} vs oddball={lastCluster.Count}");
-
-            var combined = new List<Part>(mainParts.Count + stripParts.Count);
-            combined.AddRange(mainParts);
-            combined.AddRange(stripParts);
-            return combined;
-        }
-
-        /// <summary>
-        /// Groups parts into positional clusters along the given axis.
-        /// Parts whose center positions are separated by more than half
-        /// the part dimension start a new cluster.
-        /// </summary>
-        private static List<List<Part>> ClusterParts(List<Part> parts, bool horizontal)
-        {
-            var sorted = horizontal
-                ? parts.OrderBy(p => p.BoundingBox.Center.X).ToList()
-                : parts.OrderBy(p => p.BoundingBox.Center.Y).ToList();
-
-            var refDim = horizontal
-                ? sorted.Max(p => p.BoundingBox.Width)
-                : sorted.Max(p => p.BoundingBox.Length);
-            var gapThreshold = refDim * 0.5;
-
-            var clusters = new List<List<Part>>();
-            var current = new List<Part> { sorted[0] };
-
-            for (var i = 1; i < sorted.Count; i++)
-            {
-                var prevCenter = horizontal
-                    ? sorted[i - 1].BoundingBox.Center.X
-                    : sorted[i - 1].BoundingBox.Center.Y;
-                var currCenter = horizontal
-                    ? sorted[i].BoundingBox.Center.X
-                    : sorted[i].BoundingBox.Center.Y;
-
-                if (currCenter - prevCenter > gapThreshold)
-                {
-                    clusters.Add(current);
-                    current = new List<Part>();
-                }
-
-                current.Add(sorted[i]);
-            }
-
-            clusters.Add(current);
-            return clusters;
         }
 
     }
