@@ -759,6 +759,7 @@ namespace OpenNest.Forms
             {
                 progressForm.UpdateProgress(p);
                 activeForm.PlateView.SetTemporaryParts(p.BestParts);
+                activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
 
             progressForm.Show(this);
@@ -817,6 +818,7 @@ namespace OpenNest.Forms
             }
             finally
             {
+                activeForm.PlateView.ActiveWorkArea = null;
                 progressForm.Close();
                 SetNestingLockout(false);
                 nestingCts.Dispose();
@@ -894,6 +896,7 @@ namespace OpenNest.Forms
             {
                 progressForm.UpdateProgress(p);
                 activeForm.PlateView.SetTemporaryParts(p.BestParts);
+                activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
 
             progressForm.Show(this);
@@ -923,6 +926,7 @@ namespace OpenNest.Forms
             }
             finally
             {
+                activeForm.PlateView.ActiveWorkArea = null;
                 progressForm.Close();
                 SetNestingLockout(false);
                 nestingCts.Dispose();
@@ -954,6 +958,7 @@ namespace OpenNest.Forms
             {
                 progressForm.UpdateProgress(p);
                 activeForm.PlateView.SetTemporaryParts(p.BestParts);
+                activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
 
             Action<List<Part>> onComplete = parts =>
@@ -963,6 +968,7 @@ namespace OpenNest.Forms
                 else
                     activeForm.PlateView.ClearTemporaryParts();
 
+                activeForm.PlateView.ActiveWorkArea = null;
                 progressForm.Close();
                 SetNestingLockout(false);
                 nestingCts.Dispose();

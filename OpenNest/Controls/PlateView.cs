@@ -859,6 +859,7 @@ namespace OpenNest.Controls
             {
                 progressForm.UpdateProgress(p);
                 SetTemporaryParts(p.BestParts);
+                ActiveWorkArea = p.ActiveWorkArea;
             });
 
             progressForm.Show(FindForm());
@@ -888,6 +889,7 @@ namespace OpenNest.Controls
             }
             finally
             {
+                ActiveWorkArea = null;
                 progressForm.Close();
                 cts.Dispose();
             }
