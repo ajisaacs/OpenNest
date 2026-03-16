@@ -348,7 +348,7 @@ static class NestConsole
                 if (item.Quantity <= 0 || workArea.Width <= 0 || workArea.Length <= 0)
                     continue;
 
-                var engine = new NestEngine(plate);
+                var engine = NestEngineRegistry.Create(plate);
                 var parts = engine.FillExact(item, workArea, null, CancellationToken.None);
 
                 if (parts.Count > 0)
@@ -367,17 +367,17 @@ static class NestConsole
 
             if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0)
             {
-                var engine = new NestEngine(plate);
-                var before = plate.Parts.Count;
-                engine.PackArea(workArea, packItems);
+                var engine = NestEngineRegistry.Create(plate);
+                var packParts = engine.PackArea(workArea, packItems, null, CancellationToken.None);
+                plate.Parts.AddRange(packParts);
 
-                if (plate.Parts.Count > before)
+                if (packParts.Count > 0)
                     success = true;
             }
         }
         else
         {
-            var engine = new NestEngine(plate);
+            var engine = NestEngineRegistry.Create(plate);
             var item = new NestItem { Drawing = drawing, Quantity = options.Quantity };
             success = engine.Fill(item);
         }
