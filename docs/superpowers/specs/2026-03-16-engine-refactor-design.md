@@ -21,6 +21,7 @@ public class PairFiller
     public PairFiller(Size plateSize, double partSpacing) { }
 
     public List<Part> Fill(NestItem item, Box workArea,
+        int plateNumber = 0,
         CancellationToken token = default,
         IProgress<NestProgress> progress = null);
 }
@@ -88,7 +89,7 @@ public class ShrinkResult
 
 **Details:**
 - `fillFunc` delegate decouples ShrinkFiller from any specific engine — the caller provides how to fill.
-- `ShrinkAxis` determines which dimension to reduce. `TryOrientation` passes the axis matching its strip direction. `ShrinkFill` calls `Shrink` twice (width then height).
+- `ShrinkAxis` determines which dimension to reduce. `TryOrientation` maps strip direction to axis: `StripDirection.Bottom` → `ShrinkAxis.Height`, `StripDirection.Left` → `ShrinkAxis.Width`. `ShrinkFill` calls `Shrink` twice (width then height).
 - Loop logic: fill initial box, measure placed bounding box, reduce dimension by `spacing`, retry until count drops below initial count. Dimension is measured as `placedBox.Right - box.X` for Width or `placedBox.Top - box.Y` for Height.
 - Returns both the best parts and the final tight dimension (needed by `TryOrientation` to compute the remnant box).
 - **Two-axis independence:** When `ShrinkFill` calls `Shrink` twice, each axis shrinks against the **original** box dimensions, not the result of the prior axis. This preserves the current behavior where width and height are shrunk independently.
