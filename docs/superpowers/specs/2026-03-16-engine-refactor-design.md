@@ -12,7 +12,7 @@ Extract five classes from the two engines. No new interfaces or strategy pattern
 
 ### 1. PairFiller
 
-**Source:** DefaultNestEngine lines 362-462 (`FillWithPairs`, `SelectPairCandidates`, `BuildRemainderPatterns`, `MinPairCandidates`, `PairTimeLimit`).
+**Source:** DefaultNestEngine lines 362-489 (`FillWithPairs`, `SelectPairCandidates`, `BuildRemainderPatterns`, `MinPairCandidates`, `PairTimeLimit`).
 
 **API:**
 ```csharp
@@ -32,6 +32,7 @@ public class PairFiller
 - Uses `BestFitCache.GetOrCompute()` internally (same as today).
 - Calls `BuildRotatedPattern` and `FillPattern` — these become `internal static` methods on DefaultNestEngine so PairFiller can call them without ceremony.
 - Returns `List<Part>` (empty list if no result), same contract as today.
+- Progress reporting: PairFiller accepts `IProgress<NestProgress>` and `int plateNumber` in its `Fill` method to maintain per-candidate progress updates. The caller passes these through from the engine.
 
 **Caller:** `DefaultNestEngine.FindBestFill` replaces `this.FillWithPairs(...)` with `new PairFiller(Plate.Size, Plate.PartSpacing).Fill(...)`.
 
@@ -55,9 +56,9 @@ public class AngleCandidateBuilder
 - Owns `knownGoodAngles` state — lives as long as the engine instance so pruning accumulates across fills.
 - `Build()` encapsulates the full pipeline: base angles, sweep check, ML prediction, known-good pruning.
 - `RecordProductive()` replaces the inline loop that feeds `knownGoodAngles` after the linear phase.
-- `ForceFullAngleSweep` moves from DefaultNestEngine to here as `ForceFullSweep`.
+- `ForceFullAngleSweep` moves from DefaultNestEngine to `AngleCandidateBuilder.ForceFullSweep`. DefaultNestEngine keeps a forwarding property `ForceFullAngleSweep` that delegates to its `AngleCandidateBuilder` instance, so `BruteForceRunner` (which sets `engine.ForceFullAngleSweep = true`) continues to work without changes.
 
-**Caller:** DefaultNestEngine creates one `AngleCandidateBuilder` instance in its constructor (or as a field) and calls `Build()`/`RecordProductive()` from `FindBestFill`.
+**Caller:** DefaultNestEngine creates one `AngleCandidateBuilder` instance as a field and calls `Build()`/`RecordProductive()` from `FindBestFill`.
 
 ### 3. ShrinkFiller
 
@@ -88,8 +89,9 @@ public class ShrinkResult
 **Details:**
 - `fillFunc` delegate decouples ShrinkFiller from any specific engine — the caller provides how to fill.
 - `ShrinkAxis` determines which dimension to reduce. `TryOrientation` passes the axis matching its strip direction. `ShrinkFill` calls `Shrink` twice (width then height).
-- Loop logic: fill initial box, measure placed bounding box, reduce dimension by `spacing`, retry until count drops below initial count.
+- Loop logic: fill initial box, measure placed bounding box, reduce dimension by `spacing`, retry until count drops below initial count. Dimension is measured as `placedBox.Right - box.X` for Width or `placedBox.Top - box.Y` for Height.
 - Returns both the best parts and the final tight dimension (needed by `TryOrientation` to compute the remnant box).
+- **Two-axis independence:** When `ShrinkFill` calls `Shrink` twice, each axis shrinks against the **original** box dimensions, not the result of the prior axis. This preserves the current behavior where width and height are shrunk independently.
 
 **Callers:**
 - `StripNestEngine.TryOrientation` replaces its inline shrink loop.
@@ -97,7 +99,7 @@ public class ShrinkResult
 
 ### 4. RemnantFiller
 
-**Source:** StripNestEngine remnant loop (lines 262-342) and the simpler version in NestEngineBase.Nest (lines 74-97).
+**Source:** StripNestEngine remnant loop (lines 253-343) and the simpler version in NestEngineBase.Nest (lines 74-97).
 
 **API:**
 ```csharp
@@ -125,7 +127,9 @@ public class RemnantFiller
 
 **Callers:**
 - `StripNestEngine.TryOrientation` replaces its inline remnant loop with `RemnantFiller.FillItems(...)`.
-- `NestEngineBase.Nest` replaces its hand-rolled largest-remnant loop, gaining multi-remnant and minimum-size filtering for free.
+- `NestEngineBase.Nest` replaces its hand-rolled largest-remnant loop. **Note:** This is a deliberate behavioral improvement — the base class currently uses only the single largest remnant, while `RemnantFiller` tries all remnants iteratively with minimum-size filtering. This may produce better fill results for engines that rely on the base `Nest` method.
+
+**Unchanged:** `NestEngineBase.Nest` phase 2 (bin-packing single-quantity items via `PackArea`, lines 100-119) is not affected by this change.
 
 ### 5. AccumulatingProgress
 
@@ -187,5 +191,6 @@ OpenNest.Engine/
 - No new interfaces or strategy patterns.
 - No changes to FillLinear, FillBestFit, PackBottomLeft, or any other existing algorithm.
 - No changes to NestEngineRegistry or the plugin system.
-- No changes to public API surface — all existing callers continue to work unchanged.
+- No changes to public API surface — all existing callers continue to work unchanged. One deliberate behavioral improvement: `NestEngineBase.Nest` gains multi-remnant filling (see RemnantFiller section).
 - PatternHelper extraction deferred — `BuildRotatedPattern`/`FillPattern` become `internal static` on DefaultNestEngine for now. Extract if a third consumer appears.
+- StripNestEngine continues to create fresh `DefaultNestEngine` instances per fill call. Sharing an `AngleCandidateBuilder` across sub-fills to enable angle pruning is a potential future optimization, not part of this refactor.
