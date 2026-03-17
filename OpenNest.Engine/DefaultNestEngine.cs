@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenNest.Engine.BestFit;
-using OpenNest.Engine.ML;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using OpenNest.RectanglePacking;
