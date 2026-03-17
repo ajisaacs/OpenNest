@@ -122,7 +122,9 @@ namespace OpenNest
             var entities = ConvertProgram.ToGeometry(BasePart.Program);
             var nonRapid = entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList();
 
-            if (nonRapid.Count == 0)
+            var shapes = ShapeBuilder.GetShapes(nonRapid);
+
+            if (shapes.Count == 0)
             {
                 var bbox = BasePart.Program.BoundingBox();
                 return new Vector(bbox.Location.X + bbox.Width / 2, bbox.Location.Y + bbox.Length / 2);
