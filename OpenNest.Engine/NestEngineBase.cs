@@ -177,7 +177,7 @@ namespace OpenNest
 
         // --- Protected utilities ---
 
-        protected static void ReportProgress(
+        internal static void ReportProgress(
             IProgress<NestProgress> progress,
             NestPhase phase,
             int plateNumber,
