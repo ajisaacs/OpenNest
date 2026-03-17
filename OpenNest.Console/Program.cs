@@ -121,6 +121,9 @@ static class NestConsole
                 case "--autonest":
                     o.AutoNest = true;
                     break;
+                case "--engine" when i + 1 < args.Length:
+                    NestEngineRegistry.ActiveEngineName = args[++i];
+                    break;
                 case "--help":
                 case "-h":
                     PrintUsage();
