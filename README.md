@@ -2,7 +2,7 @@
 
 A Windows desktop app for CNC nesting — imports DXF drawings, arranges parts on plates and exports layouts as DXF or G-code for cutting.
 
-<!-- TODO: Add screenshot of main window with a nested plate -->
+![OpenNest - parts nested on a 36x36 plate](screenshots/screenshot-nest-1.png)
 
 OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and arranges the parts to make efficient use of material. The result can be exported as DXF files or post-processed into G-code that your CNC cutting machine understands.
 
@@ -18,7 +18,7 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 - **Interactive Editing** — Zoom, pan, select, clone, and manually arrange parts on the plate view
 - **Lead-in/Lead-out & Tabs** — Configure cutting parameters like approach paths and holding tabs
 
-<!-- TODO: Add screenshot showing parts arranged on a plate -->
+![OpenNest - 44 parts nested on a 60x120 plate](screenshots/screenshot-nest-2.png)
 
 ## Prerequisites
 
