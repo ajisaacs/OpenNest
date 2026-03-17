@@ -83,6 +83,14 @@ For most users, only the first four matter:
 |-----|--------|
 | `Ctrl+F` | Fill the area around the cursor with the selected drawing |
 | `F` | Zoom to fit the plate view |
+| `Shift` + Mouse Wheel | Rotate parts when a drawing is selected |
+| `Shift` + Left Click | Push the selected group of parts to the bottom-left most point |
+| `X` | Push selected parts left (negative X) |
+| `Shift+X` | Push selected parts right (positive X) |
+| `Y` | Push selected parts down (negative Y) |
+| `Shift+Y` | Push selected parts up (positive Y) |
+| Arrow Keys | Nudge selected parts by an increment |
+| `Shift` + Arrow Keys | Push selected parts in that direction |
 
 ## Supported Formats
 
