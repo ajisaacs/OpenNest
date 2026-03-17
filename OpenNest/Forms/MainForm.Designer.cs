@@ -149,6 +149,7 @@
             engineLabel = new System.Windows.Forms.ToolStripLabel();
             engineComboBox = new System.Windows.Forms.ToolStripComboBox();
             btnAutoNest = new System.Windows.Forms.ToolStripButton();
+            btnShowRemnants = new System.Windows.Forms.ToolStripButton();
             pEPToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             openNestToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             menuStrip1.SuspendLayout();
@@ -888,7 +889,7 @@
             // toolStrip1
             // 
             toolStrip1.AutoSize = false;
-            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate, toolStripSeparator3, btnZoomOut, btnZoomIn, btnZoomToFit, toolStripSeparator4, engineLabel, engineComboBox, btnAutoNest });
+            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate, toolStripSeparator3, btnZoomOut, btnZoomIn, btnZoomToFit, toolStripSeparator4, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants });
             toolStrip1.Location = new System.Drawing.Point(0, 24);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new System.Drawing.Size(1281, 40);
@@ -1067,7 +1068,15 @@
             btnAutoNest.Size = new System.Drawing.Size(64, 37);
             btnAutoNest.Text = "Auto Nest";
             btnAutoNest.Click += RunAutoNest_Click;
-            // 
+            //
+            // btnShowRemnants
+            //
+            btnShowRemnants.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            btnShowRemnants.Name = "btnShowRemnants";
+            btnShowRemnants.Size = new System.Drawing.Size(64, 37);
+            btnShowRemnants.Text = "Remnants";
+            btnShowRemnants.Click += ShowRemnants_Click;
+            //
             // pEPToolStripMenuItem
             // 
             pEPToolStripMenuItem.Name = "pEPToolStripMenuItem";
@@ -1232,5 +1241,6 @@
         private System.Windows.Forms.ToolStripLabel engineLabel;
         private System.Windows.Forms.ToolStripComboBox engineComboBox;
         private System.Windows.Forms.ToolStripButton btnAutoNest;
+        private System.Windows.Forms.ToolStripButton btnShowRemnants;
     }
 }

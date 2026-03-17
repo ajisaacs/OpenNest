@@ -737,6 +737,49 @@ namespace OpenNest.Forms
             activeForm.LoadNextPlate();
         }
 
+        private RemnantViewerForm remnantViewer;
+
+        private void ShowRemnants_Click(object sender, EventArgs e)
+        {
+            if (activeForm?.PlateView?.Plate == null)
+                return;
+
+            var plate = activeForm.PlateView.Plate;
+
+            // Minimum remnant dimension = smallest part bbox dimension on the plate.
+            var minDim = 0.0;
+            var nest = activeForm.Nest;
+            if (nest != null)
+            {
+                foreach (var drawing in nest.Drawings)
+                {
+                    var bbox = drawing.Program.BoundingBox();
+                    var dim = System.Math.Min(bbox.Width, bbox.Length);
+                    if (minDim == 0 || dim < minDim)
+                        minDim = dim;
+                }
+            }
+
+            var finder = RemnantFinder.FromPlate(plate);
+            var tiered = finder.FindTieredRemnants(minDim);
+
+            if (remnantViewer == null || remnantViewer.IsDisposed)
+            {
+                remnantViewer = new RemnantViewerForm();
+                remnantViewer.Owner = this;
+
+                // Position next to the main form's right edge.
+                var screen = Screen.FromControl(this);
+                remnantViewer.Location = new Point(
+                    System.Math.Min(Right, screen.WorkingArea.Right - remnantViewer.Width),
+                    Top);
+            }
+
+            remnantViewer.LoadRemnants(tiered, activeForm.PlateView);
+            remnantViewer.Show();
+            remnantViewer.BringToFront();
+        }
+
         private async void RunAutoNest_Click(object sender, EventArgs e)
         {
             var form = new AutoNestForm(activeForm.Nest);
@@ -744,7 +787,7 @@ namespace OpenNest.Forms
 
             if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                 return;
-
+            
             var items = form.GetNestItems();
 
             if (!items.Any(it => it.Quantity > 0))
