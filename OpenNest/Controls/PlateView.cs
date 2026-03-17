@@ -415,14 +415,14 @@ namespace OpenNest.Controls
         {
             var plateRect = new RectangleF
             {
-                Width = LengthWorldToGui(Plate.Size.Width),
-                Height = LengthWorldToGui(Plate.Size.Length)
+                Width = LengthWorldToGui(Plate.Size.Length),
+                Height = LengthWorldToGui(Plate.Size.Width)
             };
 
             var edgeSpacingRect = new RectangleF
             {
-                Width = LengthWorldToGui(Plate.Size.Width - Plate.EdgeSpacing.Left - Plate.EdgeSpacing.Right),
-                Height = LengthWorldToGui(Plate.Size.Length - Plate.EdgeSpacing.Top - Plate.EdgeSpacing.Bottom)
+                Width = LengthWorldToGui(Plate.Size.Length - Plate.EdgeSpacing.Left - Plate.EdgeSpacing.Right),
+                Height = LengthWorldToGui(Plate.Size.Width - Plate.EdgeSpacing.Top - Plate.EdgeSpacing.Bottom)
             };
 
             switch (Plate.Quadrant)

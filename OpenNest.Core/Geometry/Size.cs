@@ -6,13 +6,13 @@ namespace OpenNest.Geometry
     {
         public Size(double width, double length)
         {
-            Length = length;
             Width = width;
+            Length = length;
         }
 
-        public double Length;
-
         public double Width;
+
+        public double Length;
 
         public static Size Parse(string size)
         {
@@ -21,8 +21,8 @@ namespace OpenNest.Geometry
             if (a.Length > 2)
                 throw new FormatException("Invalid size format.");
 
-            var length = double.Parse(a[0]);
-            var width = double.Parse(a[1]);
+            var width = double.Parse(a[0]);
+            var length = double.Parse(a[1]);
 
             return new Size(width, length);
         }
@@ -42,14 +42,8 @@ namespace OpenNest.Geometry
             return true;
         }
 
-        public override string ToString()
-        {
-            return string.Format("{0} x {1}", Length, Width);
-        }
-
-        public string ToString(int decimalPlaces)
-        {
-            return string.Format("{0} x {1}", System.Math.Round(Length, decimalPlaces), System.Math.Round(Width, decimalPlaces));
-        }
+        public override string ToString() => $"{Width} x {Length}";
+        
+        public string ToString(int decimalPlaces) => $"{System.Math.Round(Width, decimalPlaces)} x {System.Math.Round(Length, decimalPlaces)}";
     }
 }

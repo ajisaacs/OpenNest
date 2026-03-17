@@ -53,6 +53,51 @@ Or open `OpenNest.sln` in Visual Studio and run the `OpenNest` project.
 
 <!-- TODO: Add screenshots for each step -->
 
+## Command-Line Interface
+
+OpenNest includes a CLI for batch nesting without the GUI — useful for automation, scripting, and CI pipelines.
+
+```bash
+dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- <input-files> [options]
+```
+
+**Import DXF files and nest onto a plate:**
+
+```bash
+# Import a DXF and fill a 60x120 plate
+dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- part.dxf --size 60x120
+
+# Import multiple DXFs with NFP-based auto-nesting
+dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- part1.dxf part2.dxf --size 60x120 --autonest
+```
+
+**Work with existing nest files:**
+
+```bash
+# Re-fill an existing nest file
+dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- project.zip
+
+# Add a new DXF to an existing nest and auto-nest
+dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- project.zip extra-part.dxf --autonest
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--size <WxL>` | Plate size (e.g. `60x120`). Required for DXF-only mode. |
+| `--autonest` | Use NFP-based mixed-part nesting instead of linear fill |
+| `--drawing <name>` | Select which drawing to fill with (default: first) |
+| `--quantity <n>` | Max parts to place (default: unlimited) |
+| `--spacing <value>` | Override part spacing |
+| `--template <path>` | Load plate defaults (thickness, quadrant, material, spacing) from a nest file |
+| `--output <path>` | Output file path (default: `<input>-result.zip`) |
+| `--keep-parts` | Keep existing parts instead of clearing before fill |
+| `--check-overlaps` | Run overlap detection after fill (exits with code 1 if found) |
+| `--engine <name>` | Select a registered nesting engine |
+| `--no-save` | Skip saving the output file |
+| `--no-log` | Skip writing the debug log |
+
 ## Project Structure
 
 ```
@@ -68,11 +113,12 @@ OpenNest.sln
 └── OpenNest.Tests/        # Unit tests
 ```
 
-For most users, only the first four matter:
+For most users, only these matter:
 
 | Project | What it does |
 |---------|-------------|
 | **OpenNest** | The app you run. WinForms UI with plate viewer, drawing list, and dialogs. |
+| **OpenNest.Console** | Command-line interface for batch nesting, scripting, and automation. |
 | **OpenNest.Core** | The building blocks — parts, plates, drawings, geometry, G-code representation. |
 | **OpenNest.Engine** | The brains — algorithms that decide where parts go on a plate. |
 | **OpenNest.IO** | Reads and writes files — DXF (via ACadSharp), G-code, and the `.nest` ZIP format. |

@@ -35,7 +35,7 @@ namespace OpenNest
         }
 
         public Plate(double width, double length)
-            : this(new Size(length, width))
+            : this(new Size(width, length))
         {
         }
 
