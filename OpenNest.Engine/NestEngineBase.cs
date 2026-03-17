@@ -71,29 +71,36 @@ namespace OpenNest
                 .Where(i => i.Quantity == 1)
                 .ToList();
 
-            // Phase 1: Fill multi-quantity drawings sequentially.
-            foreach (var item in fillItems)
+            // Phase 1: Fill multi-quantity drawings using RemnantFiller.
+            if (fillItems.Count > 0)
             {
-                if (token.IsCancellationRequested)
-                    break;
+                var remnantFiller = new RemnantFiller(workArea, Plate.PartSpacing);
 
-                if (item.Quantity <= 0 || workArea.Width <= 0 || workArea.Length <= 0)
-                    continue;
+                Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
+                    FillExact(ni, b, progress, token);
 
-                var parts = FillExact(
-                    new NestItem { Drawing = item.Drawing, Quantity = item.Quantity },
-                    workArea, progress, token);
+                var fillParts = remnantFiller.FillItems(fillItems, fillFunc, token, progress);
 
-                if (parts.Count > 0)
+                if (fillParts.Count > 0)
                 {
-                    allParts.AddRange(parts);
-                    item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
-                    var placedObstacles = parts.Select(p => p.BoundingBox.Offset(Plate.PartSpacing)).ToList();
+                    allParts.AddRange(fillParts);
+
+                    // Deduct placed quantities
+                    foreach (var item in fillItems)
+                    {
+                        var placed = fillParts.Count(p =>
+                            p.BaseDrawing.Name == item.Drawing.Name);
+                        item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                    }
+
+                    // Update workArea for pack phase
+                    var placedObstacles = fillParts.Select(p => p.BoundingBox.Offset(Plate.PartSpacing)).ToList();
                     var finder = new RemnantFinder(workArea, placedObstacles);
                     var remnants = finder.FindRemnants();
-                    if (remnants.Count == 0)
-                        break;
-                    workArea = remnants[0]; // Largest remnant
+                    if (remnants.Count > 0)
+                        workArea = remnants[0];
+                    else
+                        workArea = new Box(0, 0, 0, 0);
                 }
             }
 
