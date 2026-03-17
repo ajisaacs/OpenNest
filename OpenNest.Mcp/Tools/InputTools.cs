@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Text;
@@ -6,6 +5,7 @@ using ModelContextProtocol.Server;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using OpenNest.Shapes;
 using CncProgram = OpenNest.CNC.Program;
 
 namespace OpenNest.Mcp.Tools
@@ -98,108 +98,46 @@ namespace OpenNest.Mcp.Tools
             [Description("Radius for circle shape")] double radius = 5,
             [Description("G-code string (only used when shape is 'gcode')")] string gcode = null)
         {
-            CncProgram pgm;
+            ShapeDefinition shapeDef;
 
             switch (shape.ToLower())
             {
                 case "rectangle":
-                    pgm = CreateRectangle(width, height);
+                    shapeDef = new RectangleShape { Name = name, Width = width, Height = height };
                     break;
 
                 case "circle":
-                    pgm = CreateCircle(radius);
+                    shapeDef = new CircleShape { Name = name, Diameter = radius * 2 };
                     break;
 
                 case "l_shape":
-                    pgm = CreateLShape(width, height);
+                    shapeDef = new LShape { Name = name, Width = width, Height = height };
                     break;
 
                 case "t_shape":
-                    pgm = CreateTShape(width, height);
+                    shapeDef = new TShape { Name = name, Width = width, Height = height };
                     break;
 
                 case "gcode":
                     if (string.IsNullOrWhiteSpace(gcode))
                         return "Error: gcode parameter is required when shape is 'gcode'";
-                    pgm = ParseGcode(gcode);
+                    var pgm = ParseGcode(gcode);
                     if (pgm == null)
                         return "Error: failed to parse G-code";
-                    break;
+                    var gcodeDrawing = new Drawing(name, pgm);
+                    _session.Drawings.Add(gcodeDrawing);
+                    var gcodeBbox = pgm.BoundingBox();
+                    return $"Created drawing '{name}': bbox={gcodeBbox.Width:F2} x {gcodeBbox.Length:F2}";
 
                 default:
                     return $"Error: unknown shape '{shape}'. Use: rectangle, circle, l_shape, t_shape, gcode";
             }
 
-            var drawing = new Drawing(name, pgm);
+            var drawing = shapeDef.GetDrawing();
             _session.Drawings.Add(drawing);
 
-            var bbox = pgm.BoundingBox();
+            var bbox = drawing.Program.BoundingBox();
             return $"Created drawing '{name}': bbox={bbox.Width:F2} x {bbox.Length:F2}";
-        }
-
-        private static CncProgram CreateRectangle(double width, double height)
-        {
-            var entities = new List<Entity>
-            {
-                new Line(0, 0, width, 0),
-                new Line(width, 0, width, height),
-                new Line(width, height, 0, height),
-                new Line(0, height, 0, 0)
-            };
-
-            return ConvertGeometry.ToProgram(entities);
-        }
-
-        private static CncProgram CreateCircle(double radius)
-        {
-            var entities = new List<Entity>
-            {
-                new Circle(0, 0, radius)
-            };
-
-            return ConvertGeometry.ToProgram(entities);
-        }
-
-        private static CncProgram CreateLShape(double width, double height)
-        {
-            var hw = width / 2;
-            var hh = height / 2;
-
-            var entities = new List<Entity>
-            {
-                new Line(0, 0, width, 0),
-                new Line(width, 0, width, hh),
-                new Line(width, hh, hw, hh),
-                new Line(hw, hh, hw, height),
-                new Line(hw, height, 0, height),
-                new Line(0, height, 0, 0)
-            };
-
-            return ConvertGeometry.ToProgram(entities);
-        }
-
-        private static CncProgram CreateTShape(double width, double height)
-        {
-            var stemWidth = width / 3;
-            var topHeight = height / 3;
-            var stemLeft = (width - stemWidth) / 2;
-            var stemRight = stemLeft + stemWidth;
-            var stemBottom = 0.0;
-            var stemTop = height - topHeight;
-
-            var entities = new List<Entity>
-            {
-                new Line(stemLeft, stemBottom, stemRight, stemBottom),
-                new Line(stemRight, stemBottom, stemRight, stemTop),
-                new Line(stemRight, stemTop, width, stemTop),
-                new Line(width, stemTop, width, height),
-                new Line(width, height, 0, height),
-                new Line(0, height, 0, stemTop),
-                new Line(0, stemTop, stemLeft, stemTop),
-                new Line(stemLeft, stemTop, stemLeft, stemBottom)
-            };
-
-            return ConvertGeometry.ToProgram(entities);
         }
 
         private static CncProgram ParseGcode(string gcode)
