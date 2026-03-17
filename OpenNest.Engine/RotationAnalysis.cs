@@ -88,19 +88,32 @@ namespace OpenNest
             var vertices = hull.Vertices;
             var n = hull.IsClosed() ? vertices.Count - 1 : vertices.Count;
 
-            var angles = new List<double> { 0 };
+            // Collect edges with their squared length so we can sort by longest first.
+            var edges = new List<(double angle, double lengthSq)>();
 
             for (var i = 0; i < n; i++)
             {
                 var next = (i + 1) % n;
                 var dx = vertices[next].X - vertices[i].X;
                 var dy = vertices[next].Y - vertices[i].Y;
+                var lengthSq = dx * dx + dy * dy;
 
-                if (dx * dx + dy * dy < Tolerance.Epsilon)
+                if (lengthSq < Tolerance.Epsilon)
                     continue;
 
                 var angle = -System.Math.Atan2(dy, dx);
 
+                if (!edges.Any(e => e.angle.IsEqualTo(angle)))
+                    edges.Add((angle, lengthSq));
+            }
+
+            // Longest edges first — they produce the flattest tiling rows.
+            edges.Sort((a, b) => b.lengthSq.CompareTo(a.lengthSq));
+
+            var angles = new List<double>(edges.Count + 1) { 0 };
+
+            foreach (var (angle, _) in edges)
+            {
                 if (!angles.Any(a => a.IsEqualTo(angle)))
                     angles.Add(angle);
             }
