@@ -19,6 +19,11 @@ namespace OpenNest
         
         public double HalfSpacing => PartSpacing / 2;
 
+        /// <summary>
+        /// Optional multi-part patterns (e.g. interlocking pairs) to try in remainder strips.
+        /// </summary>
+        public List<Pattern> RemainderPatterns { get; set; }
+
         private static Vector MakeOffset(NestDirection direction, double distance)
         {
             return direction == NestDirection.Horizontal
@@ -408,7 +413,30 @@ namespace OpenNest
                 return new List<Part>();
 
             var rotations = BuildRotationSet(seedPattern);
-            return FindBestFill(rotations, remainingStrip);
+            var best = FindBestFill(rotations, remainingStrip);
+
+            if (RemainderPatterns != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FillRemainingStrip] Strip: {remainingStrip.Width:F1}x{remainingStrip.Length:F1}, individual best={best?.Count ?? 0}, trying {RemainderPatterns.Count} patterns");
+
+                foreach (var pattern in RemainderPatterns)
+                {
+                    var filler = new FillLinear(remainingStrip, PartSpacing);
+                    var h = filler.Fill(pattern, NestDirection.Horizontal);
+                    var v = filler.Fill(pattern, NestDirection.Vertical);
+
+                    System.Diagnostics.Debug.WriteLine($"[FillRemainingStrip]   Pattern ({pattern.Parts.Count} parts, bbox={pattern.BoundingBox.Width:F1}x{pattern.BoundingBox.Length:F1}): H={h?.Count ?? 0}, V={v?.Count ?? 0}");
+
+                    if (h != null && h.Count > (best?.Count ?? 0))
+                        best = h;
+                    if (v != null && v.Count > (best?.Count ?? 0))
+                        best = v;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"[FillRemainingStrip] Final best={best?.Count ?? 0}");
+            }
+
+            return best ?? new List<Part>();
         }
 
         private static double FindPlacedEdge(List<Part> placedParts, NestDirection tiledAxis)

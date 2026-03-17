@@ -5,6 +5,9 @@
     <AssemblyName>OpenNest.Engine</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="OpenNest.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

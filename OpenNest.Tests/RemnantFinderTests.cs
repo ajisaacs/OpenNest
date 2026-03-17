@@ -1,4 +1,5 @@
 using OpenNest.Geometry;
+using OpenNest.IO;
 
 namespace OpenNest.Tests;
 
@@ -268,5 +269,102 @@ public class RemnantFinderTests
 
         // Should find gaps between obstacles
         Assert.True(remnants.Count > 0);
+    }
+
+    [Fact]
+    public void SingleObstacle_NearEdge_FindsRemnantsOnAllSides()
+    {
+        // Obstacle near top-left: should find remnants above, below, and to the right.
+        var finder = new RemnantFinder(new Box(0, 0, 120, 60));
+        finder.AddObstacle(new Box(0, 47, 21, 6));
+        var remnants = finder.FindRemnants();
+
+        var above = remnants.FirstOrDefault(r => r.Bottom >= 53 - 0.1 && r.Width > 50);
+        var below = remnants.FirstOrDefault(r => r.Top <= 47 + 0.1 && r.Width > 50);
+        var right = remnants.FirstOrDefault(r => r.Left >= 21 - 0.1 && r.Length > 50);
+
+        Assert.NotNull(above);
+        Assert.NotNull(below);
+        Assert.NotNull(right);
+    }
+
+    [Fact]
+    public void LoadNestFile_FindsGapAboveMainGrid()
+    {
+        var nestFile = @"C:\Users\AJ\Desktop\no_remnant_found.nest";
+        if (!File.Exists(nestFile))
+            return; // Skip if file not available.
+
+        var reader = new NestReader(nestFile);
+        var nest = reader.Read();
+        var plate = nest.Plates[0];
+
+        var finder = RemnantFinder.FromPlate(plate);
+
+        // Use smallest drawing bbox dimension as minDim (same as UI).
+        var minDim = nest.Drawings.Min(d =>
+            System.Math.Min(d.Program.BoundingBox().Width, d.Program.BoundingBox().Length));
+
+        var tiered = finder.FindTieredRemnants(minDim);
+
+        // Should find a remnant near (0.25, 53.13) — the gap above the main grid.
+        var topGap = tiered.FirstOrDefault(t =>
+            t.Box.Bottom > 50 && t.Box.Bottom < 55 &&
+            t.Box.Left < 1 &&
+            t.Box.Width > 100 &&
+            t.Box.Length > 5);
+
+        Assert.True(topGap.Box.Width > 0, "Expected remnant above main grid");
+    }
+
+    [Fact]
+    public void DensePack_FindsGapAtTop()
+    {
+        // Reproduce real plate: 120x60, 68 parts of SULLYS-004.
+        // Main grid tops out at y=53.14 (obstacle). Two rotated parts on the
+        // right extend to y=58.49 but only at x > 106. The gap at x < 106
+        // from y=53.14 to y=59.8 is ~106 x 6.66 — should be found.
+        var workArea = new Box(0.2, 0.8, 119.5, 59.0);
+        var obstacles = new List<Box>();
+        var spacing = 0.25;
+
+        // Main grid: 5 columns x 12 rows (6 pairs).
+        // Even rows: bbox bottom offsets, odd rows: different offsets.
+        double[] colX = { 0.25, 21.08, 41.90, 62.73, 83.56 };
+        double[] colXOdd = { 0.81, 21.64, 42.46, 63.29, 84.12 };
+        double[] evenY = { 3.67, 12.41, 21.14, 29.87, 38.60, 47.33 };
+        double[] oddY = { 0.75, 9.48, 18.21, 26.94, 35.67, 44.40 };
+
+        foreach (var cx in colX)
+            foreach (var ey in evenY)
+                obstacles.Add(new Box(cx - spacing, ey - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2));
+        foreach (var cx in colXOdd)
+            foreach (var oy in oddY)
+                obstacles.Add(new Box(cx - spacing, oy - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2));
+
+        // Right-side rotated parts (only 2 extend high: parts 62 and 66).
+        obstacles.Add(new Box(106.70 - spacing, 37.59 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        obstacles.Add(new Box(114.19 - spacing, 37.59 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        // Parts 63, 67 (lower rotated)
+        obstacles.Add(new Box(105.02 - spacing, 29.35 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        obstacles.Add(new Box(112.51 - spacing, 29.35 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        // Parts 60, 64 (upper-right rotated, lower)
+        obstacles.Add(new Box(106.70 - spacing, 8.99 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        obstacles.Add(new Box(114.19 - spacing, 8.99 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        // Parts 61, 65
+        obstacles.Add(new Box(105.02 - spacing, 0.75 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        obstacles.Add(new Box(112.51 - spacing, 0.75 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+
+        var finder = new RemnantFinder(workArea, obstacles);
+        var remnants = finder.FindRemnants(5.375);
+
+        // The gap at x < 106 from y=53.14 to y=59.8 should be found.
+        Assert.True(remnants.Count > 0, "Should find gap above main grid");
+        var topRemnant = remnants.FirstOrDefault(r => r.Length >= 5.375 && r.Width > 50);
+        Assert.NotNull(topRemnant);
+
+        // Verify dimensions are close to the expected ~104 x 6.6 gap.
+        Assert.True(topRemnant.Width > 100, $"Expected width > 100, got {topRemnant.Width:F1}");
+        Assert.True(topRemnant.Length > 6, $"Expected length > 6, got {topRemnant.Length:F1}");
     }
 }

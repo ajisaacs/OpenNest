@@ -3,14 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest
 {
     public class StripNestEngine : NestEngineBase
     {
-        private const int MaxShrinkIterations = 20;
-
         public StripNestEngine(Plate plate) : base(plate)
         {
         }
@@ -165,54 +162,25 @@ namespace OpenNest
                 ? new Box(workArea.X, workArea.Y, workArea.Width, estimatedDim)
                 : new Box(workArea.X, workArea.Y, estimatedDim, workArea.Length);
 
-            // Initial fill using DefaultNestEngine (composition, not inheritance).
-            var inner = new DefaultNestEngine(Plate);
-            var stripParts = inner.Fill(
-                new NestItem { Drawing = stripItem.Drawing, Quantity = stripItem.Quantity },
-                stripBox, progress, token);
+            // Shrink to tightest strip.
+            var shrinkAxis = direction == StripDirection.Bottom
+                ? ShrinkAxis.Height : ShrinkAxis.Width;
 
-            if (stripParts == null || stripParts.Count == 0)
+            Func<NestItem, Box, List<Part>> stripFill = (ni, b) =>
+            {
+                var trialInner = new DefaultNestEngine(Plate);
+                return trialInner.Fill(ni, b, progress, token);
+            };
+
+            var shrinkResult = ShrinkFiller.Shrink(stripFill,
+                new NestItem { Drawing = stripItem.Drawing, Quantity = stripItem.Quantity },
+                stripBox, Plate.PartSpacing, shrinkAxis, token);
+
+            if (shrinkResult.Parts == null || shrinkResult.Parts.Count == 0)
                 return result;
 
-            // Measure actual strip dimension from placed parts.
-            var placedBox = stripParts.Cast<IBoundable>().GetBoundingBox();
-            var actualDim = direction == StripDirection.Bottom
-                ? placedBox.Top - workArea.Y
-                : placedBox.Right - workArea.X;
-
-            var bestParts = stripParts;
-            var bestDim = actualDim;
-            var targetCount = stripParts.Count;
-
-            // Shrink loop: reduce strip dimension by PartSpacing until count drops.
-            for (var i = 0; i < MaxShrinkIterations; i++)
-            {
-                if (token.IsCancellationRequested)
-                    break;
-
-                var trialDim = bestDim - Plate.PartSpacing;
-                if (trialDim <= 0)
-                    break;
-
-                var trialBox = direction == StripDirection.Bottom
-                    ? new Box(workArea.X, workArea.Y, workArea.Width, trialDim)
-                    : new Box(workArea.X, workArea.Y, trialDim, workArea.Length);
-
-                var trialInner = new DefaultNestEngine(Plate);
-                var trialParts = trialInner.Fill(
-                    new NestItem { Drawing = stripItem.Drawing, Quantity = stripItem.Quantity },
-                    trialBox, progress, token);
-
-                if (trialParts == null || trialParts.Count < targetCount)
-                    break;
-
-                // Same count in a tighter strip — keep going.
-                bestParts = trialParts;
-                var trialPlacedBox = trialParts.Cast<IBoundable>().GetBoundingBox();
-                bestDim = direction == StripDirection.Bottom
-                    ? trialPlacedBox.Top - workArea.Y
-                    : trialPlacedBox.Right - workArea.X;
-            }
+            var bestParts = shrinkResult.Parts;
+            var bestDim = shrinkResult.Dimension;
 
             // TODO: Compact strip parts individually to close geometry-based gaps.
             // Disabled pending investigation — remnant finder picks up gaps created
@@ -258,88 +226,23 @@ namespace OpenNest
                 })
                 .ToList();
 
-            // Fill remnant areas iteratively using RemnantFinder.
-            // After each fill, re-discover all free rectangles and try again
-            // until no more items can be placed.
+            // Fill remnants
             if (remnantBox.Width > 0 && remnantBox.Length > 0)
             {
                 var remnantProgress = progress != null
                     ? new AccumulatingProgress(progress, allParts)
-                    : null;
+                    : (IProgress<NestProgress>)null;
 
-                var obstacles = allParts.Select(p => p.BoundingBox.Offset(spacing)).ToList();
-                var finder = new RemnantFinder(workArea, obstacles);
-                var madeProgress = true;
+                var remnantFiller = new RemnantFiller(workArea, spacing);
+                remnantFiller.AddObstacles(allParts);
 
-                // Track quantities locally so we don't mutate the shared NestItem objects.
-                // TryOrientation is called twice (bottom, left) with the same items.
-                var localQty = new Dictionary<string, int>();
-                foreach (var item in effectiveRemainder)
-                    localQty[item.Drawing.Name] = item.Quantity;
+                Func<NestItem, Box, List<Part>> remnantFillFunc = (ni, b) =>
+                    ShrinkFill(ni, b, remnantProgress, token);
 
-                while (madeProgress && !token.IsCancellationRequested)
-                {
-                    madeProgress = false;
+                var additional = remnantFiller.FillItems(effectiveRemainder,
+                    remnantFillFunc, token, remnantProgress);
 
-                    // Minimum remnant size = smallest remaining part dimension
-                    var minRemnantDim = double.MaxValue;
-                    foreach (var item in effectiveRemainder)
-                    {
-                        if (localQty[item.Drawing.Name] <= 0)
-                            continue;
-                        var bb = item.Drawing.Program.BoundingBox();
-                        var dim = System.Math.Min(bb.Width, bb.Length);
-                        if (dim < minRemnantDim)
-                            minRemnantDim = dim;
-                    }
-
-                    if (minRemnantDim == double.MaxValue)
-                        break; // No items with remaining quantity
-
-                    var freeBoxes = finder.FindRemnants(minRemnantDim);
-
-                    if (freeBoxes.Count == 0)
-                        break;
-
-                    foreach (var item in effectiveRemainder)
-                    {
-                        if (token.IsCancellationRequested)
-                            break;
-
-                        var qty = localQty[item.Drawing.Name];
-                        if (qty == 0)
-                            continue;
-
-                        var itemBbox = item.Drawing.Program.BoundingBox();
-                        var minItemDim = System.Math.Min(itemBbox.Width, itemBbox.Length);
-
-                        foreach (var box in freeBoxes)
-                        {
-                            if (System.Math.Min(box.Width, box.Length) < minItemDim)
-                                continue;
-
-                            var remnantParts = ShrinkFill(
-                                new NestItem { Drawing = item.Drawing, Quantity = qty },
-                                box, remnantProgress, token);
-
-                            if (remnantParts != null && remnantParts.Count > 0)
-                            {
-                                allParts.AddRange(remnantParts);
-                                localQty[item.Drawing.Name] = System.Math.Max(0, qty - remnantParts.Count);
-
-                                // Update obstacles and re-discover remnants
-                                foreach (var p in remnantParts)
-                                    finder.AddObstacle(p.BoundingBox.Offset(spacing));
-
-                                madeProgress = true;
-                                break; // Re-discover free boxes with updated obstacles
-                            }
-                        }
-
-                        if (madeProgress)
-                            break; // Restart the outer loop to re-discover remnants
-                    }
-                }
+                allParts.AddRange(additional);
             }
 
             result.Parts = allParts;
@@ -351,101 +254,20 @@ namespace OpenNest
             return result;
         }
 
-        /// <summary>
-        /// Fill a box and then shrink it to the tightest area that still fits
-        /// the same number of parts. This maximizes leftover space for subsequent fills.
-        /// </summary>
         private List<Part> ShrinkFill(NestItem item, Box box,
             IProgress<NestProgress> progress, CancellationToken token)
         {
-            var inner = new DefaultNestEngine(Plate);
-            var parts = inner.Fill(item, box, progress, token);
-
-            if (parts == null || parts.Count < 2)
-                return parts;
-
-            var targetCount = parts.Count;
-            var placedBox = parts.Cast<IBoundable>().GetBoundingBox();
-
-            // Try shrinking horizontally
-            var bestParts = parts;
-            var shrunkWidth = placedBox.Right - box.X;
-            var shrunkHeight = placedBox.Top - box.Y;
-
-            for (var i = 0; i < MaxShrinkIterations; i++)
+            Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
             {
-                if (token.IsCancellationRequested)
-                    break;
+                var inner = new DefaultNestEngine(Plate);
+                return inner.Fill(ni, b, null, token);
+            };
 
-                var trialWidth = shrunkWidth - Plate.PartSpacing;
-                if (trialWidth <= 0)
-                    break;
+            var heightResult = ShrinkFiller.Shrink(fillFunc, item, box,
+                Plate.PartSpacing, ShrinkAxis.Height, token);
 
-                var trialBox = new Box(box.X, box.Y, trialWidth, box.Length);
-                var trialInner = new DefaultNestEngine(Plate);
-                var trialParts = trialInner.Fill(item, trialBox, null, token);
-
-                if (trialParts == null || trialParts.Count < targetCount)
-                    break;
-
-                bestParts = trialParts;
-                var trialPlacedBox = trialParts.Cast<IBoundable>().GetBoundingBox();
-                shrunkWidth = trialPlacedBox.Right - box.X;
-            }
-
-            // Try shrinking vertically
-            for (var i = 0; i < MaxShrinkIterations; i++)
-            {
-                if (token.IsCancellationRequested)
-                    break;
-
-                var trialHeight = shrunkHeight - Plate.PartSpacing;
-                if (trialHeight <= 0)
-                    break;
-
-                var trialBox = new Box(box.X, box.Y, box.Width, trialHeight);
-                var trialInner = new DefaultNestEngine(Plate);
-                var trialParts = trialInner.Fill(item, trialBox, null, token);
-
-                if (trialParts == null || trialParts.Count < targetCount)
-                    break;
-
-                bestParts = trialParts;
-                var trialPlacedBox = trialParts.Cast<IBoundable>().GetBoundingBox();
-                shrunkHeight = trialPlacedBox.Top - box.Y;
-            }
-
-            return bestParts;
+            return heightResult.Parts;
         }
 
-        /// <summary>
-        /// Wraps an IProgress to prepend previously placed parts to each report,
-        /// so the UI shows the full picture (strip + remnant) during remnant fills.
-        /// </summary>
-        private class AccumulatingProgress : IProgress<NestProgress>
-        {
-            private readonly IProgress<NestProgress> inner;
-            private readonly List<Part> previousParts;
-
-            public AccumulatingProgress(IProgress<NestProgress> inner, List<Part> previousParts)
-            {
-                this.inner = inner;
-                this.previousParts = previousParts;
-            }
-
-            public void Report(NestProgress value)
-            {
-                if (value.BestParts != null && previousParts.Count > 0)
-                {
-                    var combined = new List<Part>(previousParts.Count + value.BestParts.Count);
-                    combined.AddRange(previousParts);
-                    combined.AddRange(value.BestParts);
-                    value.BestParts = combined;
-                    value.BestPartCount = combined.Count;
-                }
-
-                inner.Report(value);
-            }
-        }
     }
 }

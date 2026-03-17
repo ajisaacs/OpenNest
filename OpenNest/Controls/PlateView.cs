@@ -33,6 +33,7 @@ namespace OpenNest.Controls
         private List<LayoutPart> temporaryParts = new List<LayoutPart>();
         private Point middleMouseDownPoint;
         private Box activeWorkArea;
+        private List<Box> debugRemnants;
 
         public Box ActiveWorkArea
         {
@@ -43,6 +44,18 @@ namespace OpenNest.Controls
                 Invalidate();
             }
         }
+
+        public List<Box> DebugRemnants
+        {
+            get => debugRemnants;
+            set
+            {
+                debugRemnants = value;
+                Invalidate();
+            }
+        }
+
+        public List<int> DebugRemnantPriorities { get; set; }
 
         public List<LayoutPart> SelectedParts;
         public ReadOnlyCollection<LayoutPart> Parts;
@@ -374,6 +387,7 @@ namespace OpenNest.Controls
             DrawPlate(e.Graphics);
             DrawParts(e.Graphics);
             DrawActiveWorkArea(e.Graphics);
+            DrawDebugRemnants(e.Graphics);
 
             base.OnPaint(e);
         }
@@ -630,6 +644,51 @@ namespace OpenNest.Controls
                 DashStyle = DashStyle.Dash
             };
             g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+        }
+
+        // Priority 0 = green (preferred), 1 = yellow (extend), 2 = red (last resort)
+        private static readonly Color[] PriorityFills =
+        {
+            Color.FromArgb(60, Color.LimeGreen),
+            Color.FromArgb(60, Color.Gold),
+            Color.FromArgb(60, Color.Salmon),
+        };
+
+        private static readonly Color[] PriorityBorders =
+        {
+            Color.FromArgb(180, Color.Green),
+            Color.FromArgb(180, Color.DarkGoldenrod),
+            Color.FromArgb(180, Color.DarkRed),
+        };
+
+        private void DrawDebugRemnants(Graphics g)
+        {
+            if (debugRemnants == null || debugRemnants.Count == 0)
+                return;
+
+            for (var i = 0; i < debugRemnants.Count; i++)
+            {
+                var box = debugRemnants[i];
+                var loc = PointWorldToGraph(box.Location);
+                var w = LengthWorldToGui(box.Width);
+                var h = LengthWorldToGui(box.Length);
+                var rect = new RectangleF(loc.X, loc.Y - h, w, h);
+
+                var priority = DebugRemnantPriorities != null && i < DebugRemnantPriorities.Count
+                    ? System.Math.Min(DebugRemnantPriorities[i], 2)
+                    : 0;
+
+                using var brush = new SolidBrush(PriorityFills[priority]);
+                g.FillRectangle(brush, rect);
+
+                using var pen = new Pen(PriorityBorders[priority], 1.5f);
+                g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+
+                var label = $"P{priority} {box.Width:F1}x{box.Length:F1}";
+                using var font = new Font("Segoe UI", 8f);
+                using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(label, font, Brushes.Black, rect, sf);
+            }
         }
 
         public LayoutPart GetPartAtControlPoint(Point pt)

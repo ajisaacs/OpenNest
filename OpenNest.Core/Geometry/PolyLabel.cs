@@ -3,25 +3,23 @@ using System.Collections.Generic;
 
 namespace OpenNest.Geometry
 {
-    /// <summary>
-    /// Finds the pole of inaccessibility — the point inside a polygon that is
-    /// farthest from any edge. Based on the polylabel algorithm by Mapbox.
-    /// </summary>
     public static class PolyLabel
     {
-        public static Vector Find(List<Vector> vertices, double precision = 1.0)
+        public static Vector Find(Polygon outer, IList<Polygon> holes = null, double precision = 0.5)
         {
-            if (vertices == null || vertices.Count < 3)
-                return Vector.Zero;
+            if (outer.Vertices.Count < 3)
+                return outer.Vertices.Count > 0
+                    ? outer.Vertices[0]
+                    : new Vector();
 
             var minX = double.MaxValue;
             var minY = double.MaxValue;
             var maxX = double.MinValue;
             var maxY = double.MinValue;
 
-            for (var i = 0; i < vertices.Count; i++)
+            for (var i = 0; i < outer.Vertices.Count; i++)
             {
-                var v = vertices[i];
+                var v = outer.Vertices[i];
                 if (v.X < minX) minX = v.X;
                 if (v.Y < minY) minY = v.Y;
                 if (v.X > maxX) maxX = v.X;
@@ -33,162 +31,185 @@ namespace OpenNest.Geometry
             var cellSize = System.Math.Min(width, height);
 
             if (cellSize == 0)
-                return new Vector(minX, minY);
+                return new Vector((minX + maxX) / 2, (minY + maxY) / 2);
 
-            var halfCell = cellSize / 2.0;
+            var halfCell = cellSize / 2;
 
-            // Priority queue (sorted list, largest distance first)
             var queue = new List<Cell>();
 
             for (var x = minX; x < maxX; x += cellSize)
-            {
                 for (var y = minY; y < maxY; y += cellSize)
+                    queue.Add(new Cell(x + halfCell, y + halfCell, halfCell, outer, holes));
+
+            queue.Sort((a, b) => b.MaxDist.CompareTo(a.MaxDist));
+
+            var bestCell = GetCentroidCell(outer, holes);
+
+            for (var i = 0; i < queue.Count; i++)
+                if (queue[i].Dist > bestCell.Dist)
                 {
-                    queue.Add(new Cell(x + halfCell, y + halfCell, halfCell, vertices));
+                    bestCell = queue[i];
+                    break;
                 }
-            }
-
-            queue.Sort((a, b) => b.Max.CompareTo(a.Max));
-
-            var bestCell = GetCentroidCell(vertices);
-
-            var bboxCell = new Cell(minX + width / 2, minY + height / 2, 0, vertices);
-            if (bboxCell.Distance > bestCell.Distance)
-                bestCell = bboxCell;
 
             while (queue.Count > 0)
             {
-                var cell = queue[queue.Count - 1];
-                queue.RemoveAt(queue.Count - 1);
+                var cell = queue[0];
+                queue.RemoveAt(0);
 
-                if (cell.Distance > bestCell.Distance)
+                if (cell.Dist > bestCell.Dist)
                     bestCell = cell;
 
-                if (cell.Max - bestCell.Distance <= precision)
+                if (cell.MaxDist - bestCell.Dist <= precision)
                     continue;
 
                 halfCell = cell.HalfSize / 2;
 
-                var c1 = new Cell(cell.X - halfCell, cell.Y - halfCell, halfCell, vertices);
-                var c2 = new Cell(cell.X + halfCell, cell.Y - halfCell, halfCell, vertices);
-                var c3 = new Cell(cell.X - halfCell, cell.Y + halfCell, halfCell, vertices);
-                var c4 = new Cell(cell.X + halfCell, cell.Y + halfCell, halfCell, vertices);
+                var newCells = new[]
+                {
+                    new Cell(cell.X - halfCell, cell.Y - halfCell, halfCell, outer, holes),
+                    new Cell(cell.X + halfCell, cell.Y - halfCell, halfCell, outer, holes),
+                    new Cell(cell.X - halfCell, cell.Y + halfCell, halfCell, outer, holes),
+                    new Cell(cell.X + halfCell, cell.Y + halfCell, halfCell, outer, holes),
+                };
 
-                InsertSorted(queue, c1);
-                InsertSorted(queue, c2);
-                InsertSorted(queue, c3);
-                InsertSorted(queue, c4);
+                for (var i = 0; i < newCells.Length; i++)
+                {
+                    if (newCells[i].MaxDist > bestCell.Dist + precision)
+                        InsertSorted(queue, newCells[i]);
+                }
             }
 
             return new Vector(bestCell.X, bestCell.Y);
         }
 
-        private static void InsertSorted(List<Cell> queue, Cell cell)
+        private static void InsertSorted(List<Cell> list, Cell cell)
         {
-            var index = queue.BinarySearch(cell, CellComparer.Instance);
-            if (index < 0) index = ~index;
-            queue.Insert(index, cell);
+            var idx = 0;
+            while (idx < list.Count && list[idx].MaxDist > cell.MaxDist)
+                idx++;
+            list.Insert(idx, cell);
         }
 
-        private static Cell GetCentroidCell(List<Vector> vertices)
+        private static Cell GetCentroidCell(Polygon outer, IList<Polygon> holes)
         {
             var area = 0.0;
             var cx = 0.0;
             var cy = 0.0;
-            var n = vertices.Count;
+            var verts = outer.Vertices;
 
-            for (int i = 0, j = n - 1; i < n; j = i++)
+            for (int i = 0, j = verts.Count - 1; i < verts.Count; j = i++)
             {
-                var a = vertices[i];
-                var b = vertices[j];
-                var f = a.X * b.Y - b.X * a.Y;
-                cx += (a.X + b.X) * f;
-                cy += (a.Y + b.Y) * f;
-                area += f * 3;
+                var a = verts[i];
+                var b = verts[j];
+                var cross = a.X * b.Y - b.X * a.Y;
+                cx += (a.X + b.X) * cross;
+                cy += (a.Y + b.Y) * cross;
+                area += cross;
             }
 
-            if (area == 0)
-                return new Cell(vertices[0].X, vertices[0].Y, 0, vertices);
+            area *= 0.5;
 
-            return new Cell(cx / area, cy / area, 0, vertices);
+            if (System.Math.Abs(area) < 1e-10)
+                return new Cell(verts[0].X, verts[0].Y, 0, outer, holes);
+
+            cx /= (6 * area);
+            cy /= (6 * area);
+
+            return new Cell(cx, cy, 0, outer, holes);
         }
 
-        private static double PointToPolygonDistance(double x, double y, List<Vector> vertices)
+        private static double PointToPolygonDist(double x, double y, Polygon polygon)
         {
-            var inside = false;
-            var minDistSq = double.MaxValue;
-            var n = vertices.Count;
+            var minDist = double.MaxValue;
+            var verts = polygon.Vertices;
 
-            for (int i = 0, j = n - 1; i < n; j = i++)
+            for (int i = 0, j = verts.Count - 1; i < verts.Count; j = i++)
             {
-                var a = vertices[i];
-                var b = vertices[j];
+                var a = verts[i];
+                var b = verts[j];
 
-                if ((a.Y > y) != (b.Y > y) &&
-                    x < (b.X - a.X) * (y - a.Y) / (b.Y - a.Y) + a.X)
+                var dx = b.X - a.X;
+                var dy = b.Y - a.Y;
+
+                if (dx != 0 || dy != 0)
                 {
-                    inside = !inside;
+                    var t = ((x - a.X) * dx + (y - a.Y) * dy) / (dx * dx + dy * dy);
+
+                    if (t > 1)
+                    {
+                        a = b;
+                    }
+                    else if (t > 0)
+                    {
+                        a = new Vector(a.X + dx * t, a.Y + dy * t);
+                    }
                 }
 
-                var distSq = SegmentDistanceSq(x, y, a.X, a.Y, b.X, b.Y);
-                if (distSq < minDistSq)
-                    minDistSq = distSq;
+                var segDx = x - a.X;
+                var segDy = y - a.Y;
+                var dist = System.Math.Sqrt(segDx * segDx + segDy * segDy);
+
+                if (dist < minDist)
+                    minDist = dist;
             }
 
-            var dist = System.Math.Sqrt(minDistSq);
-            return inside ? dist : -dist;
+            return minDist;
         }
 
-        private static double SegmentDistanceSq(double px, double py,
-            double ax, double ay, double bx, double by)
-        {
-            var dx = bx - ax;
-            var dy = by - ay;
-
-            if (dx != 0 || dy != 0)
-            {
-                var t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy);
-
-                if (t > 1)
-                {
-                    ax = bx;
-                    ay = by;
-                }
-                else if (t > 0)
-                {
-                    ax += dx * t;
-                    ay += dy * t;
-                }
-            }
-
-            dx = px - ax;
-            dy = py - ay;
-
-            return dx * dx + dy * dy;
-        }
-
-        private struct Cell
+        private sealed class Cell
         {
             public readonly double X;
             public readonly double Y;
             public readonly double HalfSize;
-            public readonly double Distance;
-            public readonly double Max;
+            public readonly double Dist;
+            public readonly double MaxDist;
 
-            public Cell(double x, double y, double halfSize, List<Vector> vertices)
+            public Cell(double x, double y, double halfSize, Polygon outer, IList<Polygon> holes)
             {
                 X = x;
                 Y = y;
                 HalfSize = halfSize;
-                Distance = PointToPolygonDistance(x, y, vertices);
-                Max = Distance + halfSize * System.Math.Sqrt(2);
+
+                var pt = new Vector(x, y);
+                var inside = outer.ContainsPoint(pt);
+
+                if (inside && holes != null)
+                {
+                    for (var i = 0; i < holes.Count; i++)
+                    {
+                        if (holes[i].ContainsPoint(pt))
+                        {
+                            inside = false;
+                            break;
+                        }
+                    }
+                }
+
+                Dist = PointToAllEdgesDist(x, y, outer, holes);
+
+                if (!inside)
+                    Dist = -Dist;
+
+                MaxDist = Dist + HalfSize * System.Math.Sqrt(2);
             }
         }
 
-        private class CellComparer : IComparer<Cell>
+        private static double PointToAllEdgesDist(double x, double y, Polygon outer, IList<Polygon> holes)
         {
-            public static readonly CellComparer Instance = new CellComparer();
-            public int Compare(Cell a, Cell b) => b.Max.CompareTo(a.Max);
+            var minDist = PointToPolygonDist(x, y, outer);
+
+            if (holes != null)
+            {
+                for (var i = 0; i < holes.Count; i++)
+                {
+                    var d = PointToPolygonDist(x, y, holes[i]);
+                    if (d < minDist)
+                        minDist = d;
+                }
+            }
+
+            return minDist;
         }
     }
 }

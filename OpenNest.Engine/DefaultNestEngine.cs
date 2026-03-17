@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenNest.Engine.BestFit;
-using OpenNest.Engine.ML;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using OpenNest.RectanglePacking;
@@ -20,11 +19,13 @@ namespace OpenNest
 
         public override string Description => "Multi-phase nesting (Linear, Pairs, RectBestFit)";
 
-        public bool ForceFullAngleSweep { get; set; }
+        private readonly AngleCandidateBuilder angleBuilder = new();
 
-        // Angles that have produced results across multiple Fill calls.
-        // Populated after each Fill; used to prune subsequent fills.
-        private readonly HashSet<double> knownGoodAngles = new();
+        public bool ForceFullAngleSweep
+        {
+            get => angleBuilder.ForceFullSweep;
+            set => angleBuilder.ForceFullSweep = value;
+        }
 
         // --- Public Fill API ---
 
@@ -134,7 +135,8 @@ namespace OpenNest
 
                     token.ThrowIfCancellationRequested();
 
-                    var pairResult = FillWithPairs(nestItem, workArea, token, progress);
+                    var pairFiller = new PairFiller(Plate.Size, Plate.PartSpacing);
+                    var pairResult = pairFiller.Fill(nestItem, workArea, PlateNumber, token, progress);
                     PhaseResults.Add(new PhaseResult(NestPhase.Pairs, pairResult.Count, 0));
 
                     Debug.WriteLine($"[Fill(groupParts,Box)] Pair: {pairResult.Count} parts | Winner: {(IsBetterFill(pairResult, best, workArea) ? "Pair" : "Linear")}");
@@ -178,11 +180,12 @@ namespace OpenNest
             try
             {
                 var bestRotation = RotationAnalysis.FindBestRotation(item);
-                var angles = BuildCandidateAngles(item, bestRotation, workArea);
+                var angles = angleBuilder.Build(item, bestRotation, workArea);
 
                 // Pairs phase
                 var pairSw = Stopwatch.StartNew();
-                var pairResult = FillWithPairs(item, workArea, token, progress);
+                var pairFiller = new PairFiller(Plate.Size, Plate.PartSpacing);
+                var pairResult = pairFiller.Fill(item, workArea, PlateNumber, token, progress);
                 pairSw.Stop();
                 best = pairResult;
                 var bestScore = FillScore.Compute(best, workArea);
@@ -239,12 +242,7 @@ namespace OpenNest
                 linearSw.Stop();
                 PhaseResults.Add(new PhaseResult(NestPhase.Linear, bestLinearCount, linearSw.ElapsedMilliseconds));
 
-                // Record productive angles for future fills.
-                foreach (var ar in AngleResults)
-                {
-                    if (ar.PartCount > 0)
-                        knownGoodAngles.Add(Angle.ToRadians(ar.AngleDeg));
-                }
+                angleBuilder.RecordProductive(AngleResults);
 
                 Debug.WriteLine($"[FindBestFill] Linear: {bestScore.Count} parts, density={bestScore.Density:P1} | WorkArea: {workArea.Width:F1}x{workArea.Length:F1} | Angles: {angles.Count}");
 
@@ -274,78 +272,6 @@ namespace OpenNest
             return best ?? new List<Part>();
         }
 
-        // --- Angle building ---
-
-        private List<double> BuildCandidateAngles(NestItem item, double bestRotation, Box workArea)
-        {
-            var angles = new List<double> { bestRotation, bestRotation + Angle.HalfPI };
-
-            // When the work area is narrow relative to the part, sweep rotation
-            // angles so we can find one that fits the part into the tight strip.
-            var testPart = new Part(item.Drawing);
-            if (!bestRotation.IsEqualTo(0))
-                testPart.Rotate(bestRotation);
-            testPart.UpdateBounds();
-
-            var partLongestSide = System.Math.Max(testPart.BoundingBox.Width, testPart.BoundingBox.Length);
-            var workAreaShortSide = System.Math.Min(workArea.Width, workArea.Length);
-            var needsSweep = workAreaShortSide < partLongestSide || ForceFullAngleSweep;
-
-            if (needsSweep)
-            {
-                var step = Angle.ToRadians(5);
-                for (var a = 0.0; a < System.Math.PI; a += step)
-                {
-                    if (!angles.Any(existing => existing.IsEqualTo(a)))
-                        angles.Add(a);
-                }
-            }
-
-            // When the work area triggers a full sweep (and we're not forcing it for training),
-            // try ML angle prediction to reduce the sweep.
-            if (!ForceFullAngleSweep && angles.Count > 2)
-            {
-                var features = FeatureExtractor.Extract(item.Drawing);
-                if (features != null)
-                {
-                    var predicted = AnglePredictor.PredictAngles(
-                        features, workArea.Width, workArea.Length);
-
-                    if (predicted != null)
-                    {
-                        var mlAngles = new List<double>(predicted);
-
-                        if (!mlAngles.Any(a => a.IsEqualTo(bestRotation)))
-                            mlAngles.Add(bestRotation);
-                        if (!mlAngles.Any(a => a.IsEqualTo(bestRotation + Angle.HalfPI)))
-                            mlAngles.Add(bestRotation + Angle.HalfPI);
-
-                        Debug.WriteLine($"[BuildCandidateAngles] ML: {angles.Count} angles -> {mlAngles.Count} predicted");
-                        angles = mlAngles;
-                    }
-                }
-            }
-
-            // If we have known-good angles from previous fills, use only those
-            // plus the defaults (bestRotation + 90°). This prunes the expensive
-            // angle sweep after the first fill.
-            if (knownGoodAngles.Count > 0 && !ForceFullAngleSweep)
-            {
-                var pruned = new List<double> { bestRotation, bestRotation + Angle.HalfPI };
-
-                foreach (var a in knownGoodAngles)
-                {
-                    if (!pruned.Any(existing => existing.IsEqualTo(a)))
-                        pruned.Add(a);
-                }
-
-                Debug.WriteLine($"[BuildCandidateAngles] Pruned: {angles.Count} -> {pruned.Count} angles (known-good)");
-                return pruned;
-            }
-
-            return angles;
-        }
-
         // --- Fill strategies ---
 
         private List<Part> FillRectangleBestFit(NestItem item, Box workArea)
@@ -359,123 +285,9 @@ namespace OpenNest
             return BinConverter.ToParts(bin, new List<NestItem> { item });
         }
 
-        private List<Part> FillWithPairs(NestItem item, Box workArea,
-            CancellationToken token = default, IProgress<NestProgress> progress = null)
-        {
-            var bestFits = BestFitCache.GetOrCompute(
-                item.Drawing, Plate.Size.Width, Plate.Size.Length,
-                Plate.PartSpacing);
-
-            var candidates = SelectPairCandidates(bestFits, workArea);
-            var diagMsg = $"[FillWithPairs] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {candidates.Count}\n" +
-                          $"[FillWithPairs] Plate: {Plate.Size.Width:F2}x{Plate.Size.Length:F2}, WorkArea: {workArea.Width:F2}x{workArea.Length:F2}";
-            Debug.WriteLine(diagMsg);
-            try { System.IO.File.AppendAllText(
-                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log"),
-                $"{DateTime.Now:HH:mm:ss} {diagMsg}\n"); } catch { }
-
-            List<Part> best = null;
-            var bestScore = default(FillScore);
-            var sinceImproved = 0;
-
-            try
-            {
-                for (var i = 0; i < candidates.Count; i++)
-                {
-                    token.ThrowIfCancellationRequested();
-
-                    var result = candidates[i];
-                    var pairParts = result.BuildParts(item.Drawing);
-                    var angles = result.HullAngles;
-                    var engine = new FillLinear(workArea, Plate.PartSpacing);
-                    var filled = FillPattern(engine, pairParts, angles, workArea);
-
-                    if (filled != null && filled.Count > 0)
-                    {
-                        var score = FillScore.Compute(filled, workArea);
-                        if (best == null || score > bestScore)
-                        {
-                            best = filled;
-                            bestScore = score;
-                            sinceImproved = 0;
-                        }
-                        else
-                        {
-                            sinceImproved++;
-                        }
-                    }
-                    else
-                    {
-                        sinceImproved++;
-                    }
-
-                    ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea,
-                        $"Pairs: {i + 1}/{candidates.Count} candidates, best = {bestScore.Count} parts");
-
-                    // Early exit: stop if we've tried enough candidates without improvement.
-                    if (i >= 9 && sinceImproved >= 10)
-                    {
-                        Debug.WriteLine($"[FillWithPairs] Early exit at {i + 1}/{candidates.Count} — no improvement in last {sinceImproved} candidates");
-                        break;
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                Debug.WriteLine("[FillWithPairs] Cancelled mid-phase, using results so far");
-            }
-
-            Debug.WriteLine($"[FillWithPairs] Best pair result: {bestScore.Count} parts, density={bestScore.Density:P1}");
-            try { System.IO.File.AppendAllText(
-                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log"),
-                $"{DateTime.Now:HH:mm:ss} [FillWithPairs] Best: {bestScore.Count} parts, density={bestScore.Density:P1}\n"); } catch { }
-            return best ?? new List<Part>();
-        }
-
-        /// <summary>
-        /// Selects pair candidates to try for the given work area. Always includes
-        /// the top 50 by area. For narrow work areas, also includes all pairs whose
-        /// shortest side fits the strip width.
-        /// </summary>
-        private List<BestFitResult> SelectPairCandidates(List<BestFitResult> bestFits, Box workArea)
-        {
-            var kept = bestFits.Where(r => r.Keep).ToList();
-            var top = kept.Take(50).ToList();
-
-            var workShortSide = System.Math.Min(workArea.Width, workArea.Length);
-            var plateShortSide = System.Math.Min(Plate.Size.Width, Plate.Size.Length);
-
-            // When the work area is significantly narrower than the plate,
-            // search ALL candidates (not just kept) for pairs that fit the
-            // narrow dimension. Pairs rejected by aspect ratio for the full
-            // plate may be exactly what's needed for a narrow remainder strip.
-            if (workShortSide < plateShortSide * 0.5)
-            {
-                var stripCandidates = bestFits
-                    .Where(r => r.ShortestSide <= workShortSide + Tolerance.Epsilon
-                             && r.Utilization >= 0.3)
-                    .OrderByDescending(r => r.Utilization);
-
-                var existing = new HashSet<BestFitResult>(top);
-
-                foreach (var r in stripCandidates)
-                {
-                    if (top.Count >= 100)
-                        break;
-
-                    if (existing.Add(r))
-                        top.Add(r);
-                }
-
-                Debug.WriteLine($"[SelectPairCandidates] Strip mode: {top.Count} candidates (shortSide <= {workShortSide:F1})");
-            }
-
-            return top;
-        }
-
         // --- Pattern helpers ---
 
-        private Pattern BuildRotatedPattern(List<Part> groupParts, double angle)
+        internal static Pattern BuildRotatedPattern(List<Part> groupParts, double angle)
         {
             var pattern = new Pattern();
             var center = ((IEnumerable<IBoundable>)groupParts).GetBoundingBox().Center;
@@ -495,7 +307,7 @@ namespace OpenNest
             return pattern;
         }
 
-        private List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
+        internal static List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
         {
             var results = new System.Collections.Concurrent.ConcurrentBag<(List<Part> Parts, FillScore Score)>();
 
