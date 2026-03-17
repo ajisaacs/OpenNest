@@ -20,6 +20,8 @@ namespace OpenNest
         private Brush brush;
         private Pen pen;
 
+        private PointF _labelPoint;
+
         private List<PointF[]> _offsetPolygonPoints;
         private double _cachedOffsetSpacing;
         private double _cachedOffsetTolerance;
@@ -95,9 +97,7 @@ namespace OpenNest
                 g.DrawPath(pen, Path);
             }
 
-            var pt = Path.PointCount > 0 ? Path.PathPoints[0] : PointF.Empty;
-
-            g.DrawString(id, programIdFont, Brushes.Black, pt.X, pt.Y);
+            g.DrawString(id, programIdFont, Brushes.Black, _labelPoint.X, _labelPoint.Y);
         }
 
         public GraphicsPath OffsetPath { get; private set; }
@@ -106,7 +106,50 @@ namespace OpenNest
         {
             Path = GraphicsHelper.GetGraphicsPath(BasePart.Program, BasePart.Location);
             Path.Transform(plateView.Matrix);
+            _labelPoint = ComputeLabelPoint();
             IsDirty = false;
+        }
+
+        private PointF ComputeLabelPoint()
+        {
+            if (Path.PointCount == 0)
+                return PointF.Empty;
+
+            var points = Path.PathPoints;
+            var types = Path.PathTypes;
+
+            // Extract the largest figure from the path for polylabel.
+            var bestFigure = new List<Vector>();
+            var currentFigure = new List<Vector>();
+
+            for (var i = 0; i < points.Length; i++)
+            {
+                if ((types[i] & 0x01) == 0 && currentFigure.Count > 0)
+                {
+                    // New figure starting — save previous if it's the largest so far.
+                    if (currentFigure.Count > bestFigure.Count)
+                        bestFigure = currentFigure;
+
+                    currentFigure = new List<Vector>();
+                }
+
+                currentFigure.Add(new Vector(points[i].X, points[i].Y));
+            }
+
+            if (currentFigure.Count > bestFigure.Count)
+                bestFigure = currentFigure;
+
+            if (bestFigure.Count < 3)
+                return points[0];
+
+            // Close the polygon if needed.
+            var first = bestFigure[0];
+            var last = bestFigure[bestFigure.Count - 1];
+            if (first.DistanceTo(last) > 1e-6)
+                bestFigure.Add(first);
+
+            var label = PolyLabel.Find(bestFigure, 0.5);
+            return new PointF((float)label.X, (float)label.Y);
         }
 
         public void UpdateOffset(double spacing, double tolerance, Matrix matrix)
