@@ -31,6 +31,7 @@ namespace OpenNest.Forms
         private Panel plateHeaderPanel;
         private Label plateInfoLabel;
         private Button btnFirstPlate;
+
         private Button btnPreviousPlate;
         private Button btnNextPlate;
         private Button btnLastPlate;
@@ -120,8 +121,18 @@ namespace OpenNest.Forms
 
             navPanel.Controls.AddRange(new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate });
 
+            var btnRemovePlate = CreateNavButton(Resources.remove);
+            btnRemovePlate.Dock = DockStyle.Right;
+            btnRemovePlate.Click += (s, e) => RemoveCurrentPlate();
+
+            var btnAddPlate = CreateNavButton(Resources.add);
+            btnAddPlate.Dock = DockStyle.Right;
+            btnAddPlate.Click += (s, e) => Nest.CreatePlate();
+
             plateHeaderPanel.Controls.Add(navPanel);
             plateHeaderPanel.Controls.Add(plateInfoLabel);
+            plateHeaderPanel.Controls.Add(btnRemovePlate);
+            plateHeaderPanel.Controls.Add(btnAddPlate);
 
             // Center the nav panel on resize
             CenterNavPanel(navPanel);

@@ -37,9 +37,6 @@
             this.sizeColumn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.qtyColumn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
-            this.toolStripButtonAddPlate = new System.Windows.Forms.ToolStripButton();
-            this.toolStripButtonRemovePlate = new System.Windows.Forms.ToolStripButton();
-            this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
             this.toolStripButton1 = new System.Windows.Forms.ToolStripButton();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.drawingListBox1 = new OpenNest.Controls.DrawingListBox();
@@ -136,44 +133,12 @@
             this.toolStrip1.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.toolStripButtonAddPlate,
-            this.toolStripButtonRemovePlate,
-            this.toolStripSeparator2,
             this.toolStripButton1});
             this.toolStrip1.Location = new System.Drawing.Point(3, 3);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(227, 31);
             this.toolStrip1.TabIndex = 2;
             this.toolStrip1.Text = "toolStrip1";
-            // 
-            // toolStripButtonAddPlate
-            // 
-            this.toolStripButtonAddPlate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButtonAddPlate.Image = global::OpenNest.Properties.Resources.add;
-            this.toolStripButtonAddPlate.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            this.toolStripButtonAddPlate.Name = "toolStripButtonAddPlate";
-            this.toolStripButtonAddPlate.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            this.toolStripButtonAddPlate.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.toolStripButtonAddPlate.Size = new System.Drawing.Size(38, 28);
-            this.toolStripButtonAddPlate.Text = "Add Plate";
-            this.toolStripButtonAddPlate.Click += new System.EventHandler(this.AddPlate_Click);
-            // 
-            // toolStripButtonRemovePlate
-            // 
-            this.toolStripButtonRemovePlate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButtonRemovePlate.Image = global::OpenNest.Properties.Resources.remove;
-            this.toolStripButtonRemovePlate.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            this.toolStripButtonRemovePlate.Name = "toolStripButtonRemovePlate";
-            this.toolStripButtonRemovePlate.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            this.toolStripButtonRemovePlate.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            this.toolStripButtonRemovePlate.Size = new System.Drawing.Size(38, 28);
-            this.toolStripButtonRemovePlate.Text = "Remove Selected Plate";
-            this.toolStripButtonRemovePlate.Click += new System.EventHandler(this.RemoveSelectedPlate_Click);
-            // 
-            // toolStripSeparator2
-            // 
-            this.toolStripSeparator2.Name = "toolStripSeparator2";
-            this.toolStripSeparator2.Size = new System.Drawing.Size(6, 31);
             // 
             // toolStripButton1
             // 
@@ -293,13 +258,10 @@
         private System.Windows.Forms.ColumnHeader sizeColumn;
         private System.Windows.Forms.ColumnHeader qtyColumn;
         private System.Windows.Forms.ToolStrip toolStrip1;
-        private System.Windows.Forms.ToolStripButton toolStripButtonAddPlate;
-        private System.Windows.Forms.ToolStripButton toolStripButtonRemovePlate;
         private System.Windows.Forms.ToolStripButton toolStripButton1;
         private System.Windows.Forms.TabPage tabPage2;
         private Controls.DrawingListBox drawingListBox1;
         private System.Windows.Forms.ColumnHeader plateNumColumn;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.ToolStrip toolStrip2;
         private System.Windows.Forms.ToolStripButton toolStripButton2;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
