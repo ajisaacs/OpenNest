@@ -46,16 +46,7 @@ namespace OpenNest
             Color = part.BaseDrawing.Color;
         }
 
-        private bool _isDirty;
-        internal bool IsDirty
-        {
-            get => _isDirty;
-            set
-            {
-                _isDirty = value;
-                if (value) _labelPoint = null;
-            }
-        }
+        internal bool IsDirty { get; set; }
 
         public bool IsSelected { get; set; }
         
@@ -119,14 +110,14 @@ namespace OpenNest
 
         private Vector ComputeLabelPoint()
         {
-            var entities = ConvertProgram.ToGeometry(BasePart.Program);
+            var entities = ConvertProgram.ToGeometry(BasePart.BaseDrawing.Program);
             var nonRapid = entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList();
 
             var shapes = ShapeBuilder.GetShapes(nonRapid);
 
             if (shapes.Count == 0)
             {
-                var bbox = BasePart.Program.BoundingBox();
+                var bbox = BasePart.BaseDrawing.Program.BoundingBox();
                 return new Vector(bbox.Location.X + bbox.Width / 2, bbox.Location.Y + bbox.Length / 2);
             }
 
@@ -151,9 +142,10 @@ namespace OpenNest
             Path.Transform(plateView.Matrix);
 
             _labelPoint ??= ComputeLabelPoint();
+            var rotatedLabel = _labelPoint.Value.Rotate(BasePart.Rotation);
             var labelPt = new PointF(
-                (float)(_labelPoint.Value.X + BasePart.Location.X),
-                (float)(_labelPoint.Value.Y + BasePart.Location.Y));
+                (float)(rotatedLabel.X + BasePart.Location.X),
+                (float)(rotatedLabel.Y + BasePart.Location.Y));
             var pts = new[] { labelPt };
             plateView.Matrix.TransformPoints(pts);
             _labelScreenPoint = pts[0];
