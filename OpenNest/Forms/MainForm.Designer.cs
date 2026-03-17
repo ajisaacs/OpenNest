@@ -137,11 +137,6 @@
             btnSave = new System.Windows.Forms.ToolStripButton();
             btnSaveAs = new System.Windows.Forms.ToolStripButton();
             toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-            btnFirstPlate = new System.Windows.Forms.ToolStripButton();
-            btnPreviousPlate = new System.Windows.Forms.ToolStripButton();
-            btnNextPlate = new System.Windows.Forms.ToolStripButton();
-            btnLastPlate = new System.Windows.Forms.ToolStripButton();
-            toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
             btnZoomOut = new System.Windows.Forms.ToolStripButton();
             btnZoomIn = new System.Windows.Forms.ToolStripButton();
             btnZoomToFit = new System.Windows.Forms.ToolStripButton();
@@ -889,7 +884,7 @@
             // toolStrip1
             // 
             toolStrip1.AutoSize = false;
-            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate, toolStripSeparator3, btnZoomOut, btnZoomIn, btnZoomToFit, toolStripSeparator4, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants });
+            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, btnZoomOut, btnZoomIn, btnZoomToFit, toolStripSeparator4, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants });
             toolStrip1.Location = new System.Drawing.Point(0, 24);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new System.Drawing.Size(1281, 40);
@@ -948,61 +943,6 @@
             // 
             toolStripSeparator1.Name = "toolStripSeparator1";
             toolStripSeparator1.Size = new System.Drawing.Size(6, 40);
-            // 
-            // btnFirstPlate
-            // 
-            btnFirstPlate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            btnFirstPlate.Image = Properties.Resources.move_first;
-            btnFirstPlate.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            btnFirstPlate.ImageTransparentColor = System.Drawing.Color.Magenta;
-            btnFirstPlate.Name = "btnFirstPlate";
-            btnFirstPlate.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            btnFirstPlate.Size = new System.Drawing.Size(38, 37);
-            btnFirstPlate.Text = "Go to First Plate";
-            btnFirstPlate.Click += LoadFirstPlate_Click;
-            // 
-            // btnPreviousPlate
-            // 
-            btnPreviousPlate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            btnPreviousPlate.Image = Properties.Resources.move_previous;
-            btnPreviousPlate.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            btnPreviousPlate.ImageTransparentColor = System.Drawing.Color.Magenta;
-            btnPreviousPlate.Name = "btnPreviousPlate";
-            btnPreviousPlate.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            btnPreviousPlate.Size = new System.Drawing.Size(38, 37);
-            btnPreviousPlate.Text = "Go to Previous Plate";
-            btnPreviousPlate.Click += LoadPreviousPlate_Click;
-            // 
-            // btnNextPlate
-            // 
-            btnNextPlate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            btnNextPlate.Image = Properties.Resources.move_next;
-            btnNextPlate.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            btnNextPlate.ImageTransparentColor = System.Drawing.Color.Magenta;
-            btnNextPlate.Name = "btnNextPlate";
-            btnNextPlate.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            btnNextPlate.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            btnNextPlate.Size = new System.Drawing.Size(38, 37);
-            btnNextPlate.Text = "Go to Next Plate";
-            btnNextPlate.Click += LoadNextPlate_Click;
-            // 
-            // btnLastPlate
-            // 
-            btnLastPlate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            btnLastPlate.Image = Properties.Resources.move_last;
-            btnLastPlate.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            btnLastPlate.ImageTransparentColor = System.Drawing.Color.Magenta;
-            btnLastPlate.Name = "btnLastPlate";
-            btnLastPlate.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            btnLastPlate.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            btnLastPlate.Size = new System.Drawing.Size(38, 37);
-            btnLastPlate.Text = "Go to Last Plate";
-            btnLastPlate.Click += LoadLastPlate_Click;
-            // 
-            // toolStripSeparator3
-            // 
-            toolStripSeparator3.Name = "toolStripSeparator3";
-            toolStripSeparator3.Size = new System.Drawing.Size(6, 40);
             // 
             // btnZoomOut
             // 
@@ -1165,8 +1105,6 @@
         private System.Windows.Forms.ToolStripButton btnOpen;
         private System.Windows.Forms.ToolStripStatusLabel plateIndexStatusLabel;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
-        private System.Windows.Forms.ToolStripButton btnPreviousPlate;
-        private System.Windows.Forms.ToolStripButton btnNextPlate;
         private System.Windows.Forms.ToolStripMenuItem mnuWindow;
         private System.Windows.Forms.ToolStripMenuItem mnuWindowCascade;
         private System.Windows.Forms.ToolStripMenuItem mnuWindowTileVertical;
@@ -1200,13 +1138,10 @@
         private System.Windows.Forms.ToolStripMenuItem mnuPlateViewInCad;
         private System.Windows.Forms.ToolStripButton btnNew;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateAdd;
-        private System.Windows.Forms.ToolStripButton btnFirstPlate;
-        private System.Windows.Forms.ToolStripButton btnLastPlate;
         private System.Windows.Forms.ToolStripButton btnZoomToFit;
         private System.Windows.Forms.ToolStripMenuItem mnuNestRemoveEmptyPlates;
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomIn;
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomOut;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem14;
         private System.Windows.Forms.ToolStripMenuItem mnuSetOffsetIncrement;
         private System.Windows.Forms.ToolStripMenuItem mnuSetRotationIncrement;

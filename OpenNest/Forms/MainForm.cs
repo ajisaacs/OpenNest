@@ -155,30 +155,16 @@ namespace OpenNest.Forms
             if (activeForm == null)
             {
                 mnuNestPreviousPlate.Enabled = false;
-                btnPreviousPlate.Enabled = false;
-
                 mnuNestNextPlate.Enabled = false;
-                btnNextPlate.Enabled = false;
-
                 mnuNestFirstPlate.Enabled = false;
-                btnFirstPlate.Enabled = false;
-
                 mnuNestLastPlate.Enabled = false;
-                btnLastPlate.Enabled = false;
             }
             else
             {
                 mnuNestPreviousPlate.Enabled = !activeForm.IsFirstPlate();
-                btnPreviousPlate.Enabled = !activeForm.IsFirstPlate();
-
                 mnuNestNextPlate.Enabled = !activeForm.IsLastPlate();
-                btnNextPlate.Enabled = !activeForm.IsLastPlate();
-
                 mnuNestFirstPlate.Enabled = activeForm.PlateCount > 0 && !activeForm.IsFirstPlate();
-                btnFirstPlate.Enabled = activeForm.PlateCount > 0 && !activeForm.IsFirstPlate();
-
                 mnuNestLastPlate.Enabled = activeForm.PlateCount > 0 && !activeForm.IsLastPlate();
-                btnLastPlate.Enabled = activeForm.PlateCount > 0 && !activeForm.IsLastPlate();
             }
         }
 
@@ -192,13 +178,9 @@ namespace OpenNest.Forms
 
             // Lock plate navigation
             mnuNestPreviousPlate.Enabled = !locked && activeForm != null && !activeForm.IsFirstPlate();
-            btnPreviousPlate.Enabled = mnuNestPreviousPlate.Enabled;
             mnuNestNextPlate.Enabled = !locked && activeForm != null && !activeForm.IsLastPlate();
-            btnNextPlate.Enabled = mnuNestNextPlate.Enabled;
             mnuNestFirstPlate.Enabled = !locked && activeForm != null && activeForm.PlateCount > 0 && !activeForm.IsFirstPlate();
-            btnFirstPlate.Enabled = mnuNestFirstPlate.Enabled;
             mnuNestLastPlate.Enabled = !locked && activeForm != null && activeForm.PlateCount > 0 && !activeForm.IsLastPlate();
-            btnLastPlate.Enabled = mnuNestLastPlate.Enabled;
         }
 
         private void UpdateLocationStatus()

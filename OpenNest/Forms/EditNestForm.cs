@@ -28,6 +28,13 @@ namespace OpenNest.Forms
 
         private readonly Timer updateDrawingListTimer;
 
+        private Panel plateHeaderPanel;
+        private Label plateInfoLabel;
+        private Button btnFirstPlate;
+        private Button btnPreviousPlate;
+        private Button btnNextPlate;
+        private Button btnLastPlate;
+
         /// <summary>
         /// Used to distinguish between single/double click on drawing within drawinglistbox.
         /// If double click, this is set to false so the single click action won't be triggered.
@@ -43,8 +50,10 @@ namespace OpenNest.Forms
             PlateView.Dock = DockStyle.Fill;
 
             InitializeComponent();
+            CreatePlateHeader();
 
             splitContainer.Panel2.Controls.Add(PlateView);
+            splitContainer.Panel2.Controls.Add(plateHeaderPanel);
 
             var renderer = new ToolStripRenderer(ToolbarTheme.Toolbar);
             toolStrip1.Renderer = renderer;
@@ -59,6 +68,81 @@ namespace OpenNest.Forms
                 PlateView.Plate = Nest.Plates[CurrentPlateIndex];
                 PlateView.ZoomToFit();
                 FirePlateChanged(false);
+            };
+        }
+
+        private void CreatePlateHeader()
+        {
+            plateHeaderPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 30,
+                BackColor = Color.FromArgb(240, 240, 240),
+                Padding = new Padding(4, 0, 4, 0)
+            };
+
+            plateInfoLabel = new Label
+            {
+                AutoSize = true,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(120, 120, 120),
+                Dock = DockStyle.Left,
+                Padding = new Padding(4, 4, 4, 4)
+            };
+
+            var btnSize = new System.Drawing.Size(28, 28);
+
+            btnFirstPlate = CreateNavButton(Resources.move_first);
+            btnFirstPlate.Click += (s, e) => LoadFirstPlate();
+
+            btnPreviousPlate = CreateNavButton(Resources.move_previous);
+            btnPreviousPlate.Click += (s, e) => LoadPreviousPlate();
+
+            btnNextPlate = CreateNavButton(Resources.move_next);
+            btnNextPlate.Click += (s, e) => LoadNextPlate();
+
+            btnLastPlate = CreateNavButton(Resources.move_last);
+            btnLastPlate.Click += (s, e) => LoadLastPlate();
+
+            // Panel that holds the nav buttons and centers itself in the header
+            var navPanel = new Panel
+            {
+                Width = btnSize.Width * 4,
+                Height = btnSize.Height,
+                Anchor = AnchorStyles.None
+            };
+
+            btnFirstPlate.Location = new Point(0, 0);
+            btnPreviousPlate.Location = new Point(btnSize.Width, 0);
+            btnNextPlate.Location = new Point(btnSize.Width * 2, 0);
+            btnLastPlate.Location = new Point(btnSize.Width * 3, 0);
+
+            navPanel.Controls.AddRange(new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate });
+
+            plateHeaderPanel.Controls.Add(navPanel);
+            plateHeaderPanel.Controls.Add(plateInfoLabel);
+
+            // Center the nav panel on resize
+            CenterNavPanel(navPanel);
+            plateHeaderPanel.Resize += (s, e) => CenterNavPanel(navPanel);
+        }
+
+        private void CenterNavPanel(Panel navPanel)
+        {
+            navPanel.Left = (plateHeaderPanel.Width - navPanel.Width) / 2;
+            navPanel.Top = (plateHeaderPanel.Height - navPanel.Height) / 2;
+        }
+
+        private static Button CreateNavButton(System.Drawing.Image image)
+        {
+            return new Button
+            {
+                Image = image,
+                Size = new System.Drawing.Size(28, 28),
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 0 },
+                Cursor = Cursors.Hand
             };
         }
 
@@ -518,8 +602,30 @@ namespace OpenNest.Forms
             if (updateListView)
                 platesListView.Items[CurrentPlateIndex].Selected = true;
 
+            UpdatePlateHeader();
+
             if (PlateChanged != null)
                 PlateChanged.Invoke(this, EventArgs.Empty);
+        }
+
+        private void UpdatePlateHeader()
+        {
+            var plate = Nest.Plates.Count > 0 ? Nest.Plates[CurrentPlateIndex] : null;
+
+            if (plate != null)
+            {
+                plateInfoLabel.Text = string.Format("Plate {0} of {1}  |  {2}",
+                    CurrentPlateIndex + 1, Nest.Plates.Count, plate.Size);
+            }
+            else
+            {
+                plateInfoLabel.Text = "No plates";
+            }
+
+            btnFirstPlate.Enabled = !IsFirstPlate();
+            btnPreviousPlate.Enabled = !IsFirstPlate();
+            btnNextPlate.Enabled = !IsLastPlate();
+            btnLastPlate.Enabled = !IsLastPlate();
         }
 
         #region Overrides
