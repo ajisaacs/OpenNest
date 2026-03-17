@@ -119,6 +119,9 @@ namespace OpenNest
 
             Size = new Size(Size.Length, Size.Width);
 
+            // After Size swap above, new Size.Width = old Length (old X extent),
+            // new Size.Length = old Width (old Y extent).
+            // Convention: Length = X axis, Width = Y axis.
             if (rotationDirection == RotationType.CW)
             {
                 Rotate(oneAndHalfPI);
@@ -128,19 +131,19 @@ namespace OpenNest
                     switch (Quadrant)
                     {
                         case 1:
-                            Offset(0, Size.Length);
+                            Offset(0, Size.Width);
                             break;
 
                         case 2:
-                            Offset(-Size.Width, 0);
+                            Offset(-Size.Length, 0);
                             break;
 
                         case 3:
-                            Offset(0, -Size.Length);
+                            Offset(0, -Size.Width);
                             break;
 
                         case 4:
-                            Offset(Size.Width, 0);
+                            Offset(Size.Length, 0);
                             break;
 
                         default:
@@ -161,19 +164,19 @@ namespace OpenNest
                     switch (Quadrant)
                     {
                         case 1:
-                            Offset(Size.Width, 0);
+                            Offset(Size.Length, 0);
                             break;
 
                         case 2:
-                            Offset(0, Size.Length);
+                            Offset(0, Size.Width);
                             break;
 
                         case 3:
-                            Offset(-Size.Width, 0);
+                            Offset(-Size.Length, 0);
                             break;
 
                         case 4:
-                            Offset(0, -Size.Length);
+                            Offset(0, -Size.Width);
                             break;
 
                         default:
@@ -200,19 +203,19 @@ namespace OpenNest
                 switch (Quadrant)
                 {
                     case 1:
-                        centerpt = new Vector(Size.Width * 0.5, Size.Length * 0.5);
+                        centerpt = new Vector(Size.Length * 0.5, Size.Width * 0.5);
                         break;
 
                     case 2:
-                        centerpt = new Vector(-Size.Width * 0.5, Size.Length * 0.5);
+                        centerpt = new Vector(-Size.Length * 0.5, Size.Width * 0.5);
                         break;
 
                     case 3:
-                        centerpt = new Vector(-Size.Width * 0.5, -Size.Length * 0.5);
+                        centerpt = new Vector(-Size.Length * 0.5, -Size.Width * 0.5);
                         break;
 
                     case 4:
-                        centerpt = new Vector(Size.Width * 0.5, -Size.Length * 0.5);
+                        centerpt = new Vector(Size.Length * 0.5, -Size.Width * 0.5);
                         break;
 
                     default:
@@ -294,6 +297,7 @@ namespace OpenNest
         {
             var plateBox = new Box();
 
+            // Convention: Size.Length = X axis (horizontal), Size.Width = Y axis (vertical)
             switch (Quadrant)
             {
                 case 1:
@@ -302,26 +306,26 @@ namespace OpenNest
                     break;
 
                 case 2:
-                    plateBox.X = (float)-Size.Width;
+                    plateBox.X = (float)-Size.Length;
                     plateBox.Y = 0;
                     break;
 
                 case 3:
-                    plateBox.X = (float)-Size.Width;
-                    plateBox.Y = (float)-Size.Length;
+                    plateBox.X = (float)-Size.Length;
+                    plateBox.Y = (float)-Size.Width;
                     break;
 
                 case 4:
                     plateBox.X = 0;
-                    plateBox.Y = (float)-Size.Length;
+                    plateBox.Y = (float)-Size.Width;
                     break;
 
                 default:
                     return new Box();
             }
 
-            plateBox.Width = Size.Width;
-            plateBox.Length = Size.Length;
+            plateBox.Width = Size.Length;
+            plateBox.Length = Size.Width;
 
             if (!includeParts)
                 return plateBox;
@@ -382,29 +386,30 @@ namespace OpenNest
 
             var bounds = Parts.GetBoundingBox();
 
-            double width;
-            double length;
+            // Convention: Length = X axis, Width = Y axis
+            double xExtent;
+            double yExtent;
 
             switch (Quadrant)
             {
                 case 1:
-                    width = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
-                    length = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    xExtent = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
+                    yExtent = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
                     break;
 
                 case 2:
-                    width = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
-                    length = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    xExtent = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
+                    yExtent = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
                     break;
 
                 case 3:
-                    width = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
-                    length = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    xExtent = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
+                    yExtent = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
                     break;
 
                 case 4:
-                    width = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
-                    length = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    xExtent = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
+                    yExtent = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
                     break;
 
                 default:
@@ -412,8 +417,8 @@ namespace OpenNest
             }
 
             Size = new Size(
-                Rounding.RoundUpToNearest(width, roundingFactor),
-                Rounding.RoundUpToNearest(length, roundingFactor));
+                Rounding.RoundUpToNearest(yExtent, roundingFactor),
+                Rounding.RoundUpToNearest(xExtent, roundingFactor));
         }
 
         /// <summary>

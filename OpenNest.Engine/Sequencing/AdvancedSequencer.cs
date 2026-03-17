@@ -28,7 +28,7 @@ namespace OpenNest.Engine.Sequencing
             rows.Sort((a, b) => a.RowY.CompareTo(b.RowY));
 
             // Determine initial direction based on exit point
-            var leftToRight = exit.X > plate.Size.Width * 0.5;
+            var leftToRight = exit.X > plate.Size.Length * 0.5;
 
             var result = new List<SequencedPart>(parts.Count);
             foreach (var row in rows)

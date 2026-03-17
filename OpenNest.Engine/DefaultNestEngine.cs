@@ -71,7 +71,7 @@ namespace OpenNest
 
             // Top pair candidates — check if pairs tile better in this box.
             var bestFits = BestFitCache.GetOrCompute(
-                drawing, Plate.Size.Width, Plate.Size.Length, Plate.PartSpacing);
+                drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
             var topPairs = bestFits.Where(r => r.Keep).Take(3);
 
             foreach (var pair in topPairs)
