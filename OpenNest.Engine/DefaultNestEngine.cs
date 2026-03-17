@@ -475,7 +475,7 @@ namespace OpenNest
 
         // --- Pattern helpers ---
 
-        private Pattern BuildRotatedPattern(List<Part> groupParts, double angle)
+        internal static Pattern BuildRotatedPattern(List<Part> groupParts, double angle)
         {
             var pattern = new Pattern();
             var center = ((IEnumerable<IBoundable>)groupParts).GetBoundingBox().Center;
@@ -495,7 +495,7 @@ namespace OpenNest
             return pattern;
         }
 
-        private List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
+        internal static List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
         {
             var results = new System.Collections.Concurrent.ConcurrentBag<(List<Part> Parts, FillScore Score)>();
 
