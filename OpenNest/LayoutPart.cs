@@ -25,6 +25,9 @@ namespace OpenNest
         private double _cachedOffsetTolerance;
         private double _cachedOffsetRotation = double.NaN;
 
+        private Vector? _labelPoint;
+        private PointF _labelScreenPoint;
+
         public readonly Part BasePart;
 
         static LayoutPart()
@@ -43,7 +46,16 @@ namespace OpenNest
             Color = part.BaseDrawing.Color;
         }
 
-        internal bool IsDirty { get; set; }
+        private bool _isDirty;
+        internal bool IsDirty
+        {
+            get => _isDirty;
+            set
+            {
+                _isDirty = value;
+                if (value) _labelPoint = null;
+            }
+        }
 
         public bool IsSelected { get; set; }
         
@@ -95,17 +107,55 @@ namespace OpenNest
                 g.DrawPath(pen, Path);
             }
 
-            var pt = Path.PointCount > 0 ? Path.PathPoints[0] : PointF.Empty;
-
-            g.DrawString(id, programIdFont, Brushes.Black, pt.X, pt.Y);
+            using var sf = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center
+            };
+            g.DrawString(id, programIdFont, Brushes.Black, _labelScreenPoint.X, _labelScreenPoint.Y, sf);
         }
 
         public GraphicsPath OffsetPath { get; private set; }
+
+        private Vector ComputeLabelPoint()
+        {
+            var entities = ConvertProgram.ToGeometry(BasePart.Program);
+            var nonRapid = entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+
+            if (nonRapid.Count == 0)
+            {
+                var bbox = BasePart.Program.BoundingBox();
+                return new Vector(bbox.Location.X + bbox.Width / 2, bbox.Location.Y + bbox.Length / 2);
+            }
+
+            var profile = new ShapeProfile(nonRapid);
+            var outer = profile.Perimeter.ToPolygonWithTolerance(0.1);
+
+            List<Polygon> holes = null;
+
+            if (profile.Cutouts.Count > 0)
+            {
+                holes = new List<Polygon>();
+                foreach (var cutout in profile.Cutouts)
+                    holes.Add(cutout.ToPolygonWithTolerance(0.1));
+            }
+
+            return PolyLabel.Find(outer, holes);
+        }
 
         public void Update(DrawControl plateView)
         {
             Path = GraphicsHelper.GetGraphicsPath(BasePart.Program, BasePart.Location);
             Path.Transform(plateView.Matrix);
+
+            _labelPoint ??= ComputeLabelPoint();
+            var labelPt = new PointF(
+                (float)(_labelPoint.Value.X + BasePart.Location.X),
+                (float)(_labelPoint.Value.Y + BasePart.Location.Y));
+            var pts = new[] { labelPt };
+            plateView.Matrix.TransformPoints(pts);
+            _labelScreenPoint = pts[0];
+
             IsDirty = false;
         }
 
