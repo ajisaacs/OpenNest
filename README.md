@@ -145,7 +145,6 @@ For most users, only these matter:
 | DXF (AutoCAD Drawing Exchange) | Yes | Yes |
 | DWG (AutoCAD Drawing) | Yes | No |
 | G-code | No | Yes (via post-processors) |
-| `.nest` (ZIP-based project file) | Yes | Yes |
 
 ## Status
 
