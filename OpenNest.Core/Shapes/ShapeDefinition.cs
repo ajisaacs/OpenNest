@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 
@@ -7,6 +9,11 @@ namespace OpenNest.Shapes
 {
     public abstract class ShapeDefinition
     {
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
         public string Name { get; set; }
 
         protected ShapeDefinition()
@@ -18,6 +25,12 @@ namespace OpenNest.Shapes
         }
 
         public abstract Drawing GetDrawing();
+
+        public static List<T> LoadFromJson<T>(string path) where T : ShapeDefinition
+        {
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<List<T>>(json, JsonOptions);
+        }
 
         protected Drawing CreateDrawing(List<Entity> entities)
         {
