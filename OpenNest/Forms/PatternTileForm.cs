@@ -97,6 +97,7 @@ namespace OpenNest.Forms
         {
             RebuildCell();
             RebuildPreview();
+            btnAutoArrange.Enabled = SelectedDrawingA != null && SelectedDrawingB != null;
         }
 
         private void OnPlateSettingsChanged(object sender, EventArgs e)
@@ -107,7 +108,7 @@ namespace OpenNest.Forms
 
         private void OnCellMouseUp(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left && cellView.Plate.Parts.Count == 2)
+            if (e.Button == MouseButtons.Left && cellView.Plate.Parts.Count >= 2)
             {
                 CompactCellParts();
             }
@@ -154,8 +155,15 @@ namespace OpenNest.Forms
             if (parts.Count < 2)
                 return;
 
-            var combinedBox = parts.GetBoundingBox();
-            var centroid = combinedBox.Center;
+            CompactTowardCentroid(parts, PartSpacing);
+            cellView.Refresh();
+        }
+
+        private static void CompactTowardCentroid(List<Part> parts, double spacing)
+        {
+            // Use a fixed centroid as the attractor — close enough for 2-part cells
+            // and avoids oscillation from recomputing each iteration.
+            var centroid = parts.GetBoundingBox().Center;
             var syntheticWorkArea = new Box(-10000, -10000, 20000, 20000);
 
             for (var iteration = 0; iteration < 10; iteration++)
@@ -167,9 +175,8 @@ namespace OpenNest.Forms
                     var partCenter = part.BoundingBox.Center;
                     var dx = centroid.X - partCenter.X;
                     var dy = centroid.Y - partCenter.Y;
-                    var dist = System.Math.Sqrt(dx * dx + dy * dy);
 
-                    if (dist < 0.01)
+                    if (System.Math.Sqrt(dx * dx + dy * dy) < 0.01)
                         continue;
 
                     var angle = System.Math.Atan2(dy, dx);
@@ -177,14 +184,12 @@ namespace OpenNest.Forms
                     var obstacles = parts.Where(p => p != part).ToList();
 
                     totalMoved += Compactor.Push(single, obstacles,
-                        syntheticWorkArea, PartSpacing, angle);
+                        syntheticWorkArea, spacing, angle);
                 }
 
                 if (totalMoved < 0.01)
                     break;
             }
-
-            cellView.Refresh();
         }
 
         private void UpdatePreviewPlateSize()
@@ -242,30 +247,7 @@ namespace OpenNest.Forms
                         partB.Offset(partA.BoundingBox.Right + PartSpacing, 0);
 
                         var cell = new List<Part> { partA, partB };
-
-                        // Compact toward center
-                        var box = cell.GetBoundingBox();
-                        var centroid = box.Center;
-                        var syntheticWorkArea = new Box(-10000, -10000, 20000, 20000);
-
-                        for (var i = 0; i < 10; i++)
-                        {
-                            var moved = 0.0;
-                            foreach (var part in cell)
-                            {
-                                var pc = part.BoundingBox.Center;
-                                var dx = centroid.X - pc.X;
-                                var dy = centroid.Y - pc.Y;
-                                if (System.Math.Sqrt(dx * dx + dy * dy) < 0.01)
-                                    continue;
-
-                                var angle = System.Math.Atan2(dy, dx);
-                                var single = new List<Part> { part };
-                                var obstacles = cell.Where(p => p != part).ToList();
-                                moved += Compactor.Push(single, obstacles, syntheticWorkArea, PartSpacing, angle);
-                            }
-                            if (moved < 0.01) break;
-                        }
+                        CompactTowardCentroid(cell, PartSpacing);
 
                         var finalBox = cell.GetBoundingBox();
                         var area = finalBox.Width * finalBox.Length;
