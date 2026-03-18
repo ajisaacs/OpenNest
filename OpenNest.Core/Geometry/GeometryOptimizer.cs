@@ -1,7 +1,7 @@
+using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {

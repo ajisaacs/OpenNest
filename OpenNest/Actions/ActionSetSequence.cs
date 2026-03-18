@@ -1,12 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using OpenNest.Controls;
+using OpenNest.Converters;
+using OpenNest.Forms;
+using OpenNest.Geometry;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using OpenNest.Controls;
-using OpenNest.Converters;
-using OpenNest.Forms;
-using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {

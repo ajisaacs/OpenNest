@@ -1,11 +1,11 @@
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using OpenNest.Converters;
 using OpenNest.Engine.BestFit.Tiling;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace OpenNest.Engine.BestFit
 {

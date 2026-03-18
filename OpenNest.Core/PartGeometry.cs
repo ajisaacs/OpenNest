@@ -1,7 +1,7 @@
-using System.Collections.Generic;
-using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest
 {
@@ -174,10 +174,10 @@ namespace OpenNest
 
                 switch (facingDirection)
                 {
-                    case PushDirection.Left:  keep = -sign * dy > 0; break;
-                    case PushDirection.Right: keep =  sign * dy > 0; break;
-                    case PushDirection.Up:    keep = -sign * dx > 0; break;
-                    case PushDirection.Down:  keep =  sign * dx > 0; break;
+                    case PushDirection.Left: keep = -sign * dy > 0; break;
+                    case PushDirection.Right: keep = sign * dy > 0; break;
+                    case PushDirection.Up: keep = -sign * dx > 0; break;
+                    case PushDirection.Down: keep = sign * dx > 0; break;
                     default: keep = true; break;
                 }
 

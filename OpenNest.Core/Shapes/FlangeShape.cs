@@ -1,6 +1,5 @@
-using System;
-using System.Collections.Generic;
 using OpenNest.Geometry;
+using System.Collections.Generic;
 
 namespace OpenNest.Shapes
 {

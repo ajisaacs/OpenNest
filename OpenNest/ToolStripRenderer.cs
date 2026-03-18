@@ -151,7 +151,8 @@ namespace OpenNest
                     return hot ? (int)MenuPopupItemStates.Hover : (int)MenuPopupItemStates.Normal;
                 return hot ? (int)MenuPopupItemStates.DisabledHover : (int)MenuPopupItemStates.Disabled;
             }
-            else {
+            else
+            {
                 if (item.Pressed)
                     return item.Enabled ? (int)MenuBarItemStates.Pushed : (int)MenuBarItemStates.DisabledPushed;
                 if (item.Enabled)
@@ -265,7 +266,8 @@ namespace OpenNest
                     e.Graphics.Clip = oldClip;
                 }
             }
-            else {
+            else
+            {
                 base.OnRenderToolStripBorder(e);
             }
         }
@@ -299,7 +301,8 @@ namespace OpenNest
                 Rectangle bgRect = GetBackgroundRectangle(e.Item);
                 renderer.DrawBackground(e.Graphics, bgRect, bgRect);
             }
-            else {
+            else
+            {
                 base.OnRenderMenuItemBackground(e);
             }
         }
@@ -314,7 +317,8 @@ namespace OpenNest
                 {
                     renderer.SetParameters(RebarClass, RebarBackground, 0);
                 }
-                else {
+                else
+                {
                     renderer.SetParameters(RebarClass, 0, 0);
                 }
 
@@ -325,7 +329,8 @@ namespace OpenNest
 
                 e.Handled = true;
             }
-            else {
+            else
+            {
                 base.OnRenderToolStripPanelBackground(e);
             }
         }
@@ -339,7 +344,8 @@ namespace OpenNest
                 {
                     renderer.SetParameters(MenuClass, (int)MenuParts.PopupBackground, 0);
                 }
-                else {
+                else
+                {
                     // It's a MenuStrip or a ToolStrip. If it's contained inside a larger panel, it should have a
                     // transparent background, showing the panel's background.
 
@@ -350,7 +356,8 @@ namespace OpenNest
                         // if someone does that.)
                         return;
                     }
-                    else {
+                    else
+                    {
                         // A lone toolbar/menubar should act like it's inside a toolbox, I guess.
                         // Maybe I should use the MenuClass in the case of a MenuStrip, although that would break
                         // the other themes...
@@ -366,7 +373,8 @@ namespace OpenNest
 
                 renderer.DrawBackground(e.Graphics, e.ToolStrip.ClientRectangle, e.AffectedBounds);
             }
-            else {
+            else
+            {
                 base.OnRenderToolStripBackground(e);
             }
         }
@@ -383,7 +391,8 @@ namespace OpenNest
                 // It doesn't matter what colour of arrow we tell it to draw. OnRenderArrow will compute it from the item anyway.
                 OnRenderArrow(new ToolStripArrowRenderEventArgs(e.Graphics, sb, sb.DropDownButtonBounds, Color.Red, ArrowDirection.Down));
             }
-            else {
+            else
+            {
                 base.OnRenderSplitButtonBackground(e);
             }
         }
@@ -426,13 +435,15 @@ namespace OpenNest
                         rect = new Rectangle(rect.X - extraWidth, rect.Y, sepWidth, rect.Height);
                         rect.X += sepWidth;
                     }
-                    else {
+                    else
+                    {
                         rect = new Rectangle(rect.Width + extraWidth - sepWidth, rect.Y, sepWidth, rect.Height);
                     }
                     renderer.DrawBackground(e.Graphics, rect);
                 }
             }
-            else {
+            else
+            {
                 base.OnRenderImageMargin(e);
             }
         }
@@ -447,10 +458,10 @@ namespace OpenNest
             }
             else
             {
-                e.Graphics.DrawLine(Pens.LightGray, 
-                    e.Item.ContentRectangle.X, 
-                    e.Item.ContentRectangle.Y, 
-                    e.Item.ContentRectangle.X, 
+                e.Graphics.DrawLine(Pens.LightGray,
+                    e.Item.ContentRectangle.X,
+                    e.Item.ContentRectangle.Y,
+                    e.Item.ContentRectangle.X,
                     e.Item.ContentRectangle.Y + e.Item.Height - 6);
             }
         }
@@ -478,7 +489,8 @@ namespace OpenNest
 
                 renderer.DrawBackground(e.Graphics, checkRect);
             }
-            else {
+            else
+            {
                 base.OnRenderItemCheck(e);
             }
         }
@@ -510,7 +522,8 @@ namespace OpenNest
                 renderer.SetParameters(rebarClass, VisualStyleElement.Rebar.Chevron.Normal.Part, state);
                 renderer.DrawBackground(e.Graphics, new Rectangle(Point.Empty, e.Item.Size));
             }
-            else {
+            else
+            {
                 base.OnRenderOverflowButtonBackground(e);
             }
         }

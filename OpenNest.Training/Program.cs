@@ -1,15 +1,15 @@
+using OpenNest;
+using OpenNest.Engine.BestFit;
+using OpenNest.Engine.ML;
+using OpenNest.Geometry;
+using OpenNest.Gpu;
+using OpenNest.IO;
+using OpenNest.Training;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using OpenNest;
-using OpenNest.Geometry;
-using OpenNest.IO;
 using Color = System.Drawing.Color;
-using OpenNest.Engine.BestFit;
-using OpenNest.Engine.ML;
-using OpenNest.Gpu;
-using OpenNest.Training;
 
 // Parse arguments.
 var dbPath = "OpenNestTraining";

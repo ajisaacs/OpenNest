@@ -6,7 +6,7 @@ namespace OpenNest.Controls
     {
         private string suffix;
 
-        
+
 
         public NumericUpDown()
         {
@@ -16,8 +16,8 @@ namespace OpenNest.Controls
         public string Suffix
         {
             get { return suffix; }
-            set 
-            { 
+            set
+            {
                 suffix = value;
                 UpdateEditText();
             }

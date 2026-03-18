@@ -1,9 +1,8 @@
-﻿using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using OpenNest.CNC;
+﻿using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System.Drawing;
+using System.Drawing.Drawing2D;
 
 namespace OpenNest
 {
@@ -53,7 +52,7 @@ namespace OpenNest
             var img = new Bitmap(size.Width, size.Height);
             var path = pgm.GetGraphicsPath();
             var bounds = path.GetBounds();
-            
+
             var scalex = (size.Height - 10) / bounds.Height;
             var scaley = (size.Width - 10) / bounds.Width;
             var scale = scalex < scaley ? scalex : scaley;
@@ -132,9 +131,9 @@ namespace OpenNest
                 var sweepAngle = (endAngle - startAngle);
 
                 path.AddArc(
-                    pt.X, pt.Y, 
+                    pt.X, pt.Y,
                     size, size,
-                    (float)startAngle, 
+                    (float)startAngle,
                     (float)sweepAngle);
 
                 if (arc.Layer == LayerType.Leadin || arc.Layer == LayerType.Leadout)

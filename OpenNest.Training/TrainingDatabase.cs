@@ -1,12 +1,12 @@
+using Microsoft.EntityFrameworkCore;
+using OpenNest.Engine.ML;
+using OpenNest.IO;
+using OpenNest.Training.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
-using OpenNest.Engine.ML;
-using OpenNest.IO;
-using OpenNest.Training.Data;
 
 namespace OpenNest.Training
 {

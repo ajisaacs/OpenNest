@@ -1,13 +1,13 @@
+using OpenNest;
+using OpenNest.Converters;
+using OpenNest.Geometry;
+using OpenNest.IO;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using OpenNest;
-using OpenNest.Converters;
-using OpenNest.Geometry;
-using OpenNest.IO;
 
 return NestConsole.Run(args);
 

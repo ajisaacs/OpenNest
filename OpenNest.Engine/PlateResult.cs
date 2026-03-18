@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Engine.RapidPlanning;
+using System.Collections.Generic;
 
 namespace OpenNest.Engine
 {

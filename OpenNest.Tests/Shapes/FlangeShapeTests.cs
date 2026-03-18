@@ -1,4 +1,3 @@
-using OpenNest.CNC;
 using OpenNest.Shapes;
 
 namespace OpenNest.Tests.Shapes;

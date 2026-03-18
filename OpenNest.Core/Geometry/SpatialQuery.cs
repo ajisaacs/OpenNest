@@ -1,7 +1,6 @@
-using System;
+using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
-using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -30,41 +29,41 @@ namespace OpenNest.Geometry
             {
                 case PushDirection.Left:
                 case PushDirection.Right:
-                {
-                    var dy = p2y - p1y;
-                    if (System.Math.Abs(dy) < Tolerance.Epsilon)
+                    {
+                        var dy = p2y - p1y;
+                        if (System.Math.Abs(dy) < Tolerance.Epsilon)
+                            return double.MaxValue;
+
+                        var t = (vy - p1y) / dy;
+                        if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                            return double.MaxValue;
+
+                        var ix = p1x + t * (p2x - p1x);
+                        var dist = direction == PushDirection.Left ? vx - ix : ix - vx;
+
+                        if (dist > Tolerance.Epsilon) return dist;
+                        if (dist >= -Tolerance.Epsilon) return 0;
                         return double.MaxValue;
-
-                    var t = (vy - p1y) / dy;
-                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
-                        return double.MaxValue;
-
-                    var ix = p1x + t * (p2x - p1x);
-                    var dist = direction == PushDirection.Left ? vx - ix : ix - vx;
-
-                    if (dist > Tolerance.Epsilon) return dist;
-                    if (dist >= -Tolerance.Epsilon) return 0;
-                    return double.MaxValue;
-                }
+                    }
 
                 case PushDirection.Down:
                 case PushDirection.Up:
-                {
-                    var dx = p2x - p1x;
-                    if (System.Math.Abs(dx) < Tolerance.Epsilon)
+                    {
+                        var dx = p2x - p1x;
+                        if (System.Math.Abs(dx) < Tolerance.Epsilon)
+                            return double.MaxValue;
+
+                        var t = (vx - p1x) / dx;
+                        if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                            return double.MaxValue;
+
+                        var iy = p1y + t * (p2y - p1y);
+                        var dist = direction == PushDirection.Down ? vy - iy : iy - vy;
+
+                        if (dist > Tolerance.Epsilon) return dist;
+                        if (dist >= -Tolerance.Epsilon) return 0;
                         return double.MaxValue;
-
-                    var t = (vx - p1x) / dx;
-                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
-                        return double.MaxValue;
-
-                    var iy = p1y + t * (p2y - p1y);
-                    var dist = direction == PushDirection.Down ? vy - iy : iy - vy;
-
-                    if (dist > Tolerance.Epsilon) return dist;
-                    if (dist >= -Tolerance.Epsilon) return 0;
-                    return double.MaxValue;
-                }
+                    }
 
                 default:
                     return double.MaxValue;
@@ -363,10 +362,10 @@ namespace OpenNest.Geometry
         {
             switch (direction)
             {
-                case PushDirection.Left:  return box.Left - boundary.Left;
+                case PushDirection.Left: return box.Left - boundary.Left;
                 case PushDirection.Right: return boundary.Right - box.Right;
-                case PushDirection.Up:    return boundary.Top - box.Top;
-                case PushDirection.Down:  return box.Bottom - boundary.Bottom;
+                case PushDirection.Up: return boundary.Top - box.Top;
+                case PushDirection.Down: return box.Bottom - boundary.Bottom;
                 default: return double.MaxValue;
             }
         }
@@ -375,10 +374,10 @@ namespace OpenNest.Geometry
         {
             switch (direction)
             {
-                case PushDirection.Left:  return new Vector(-distance, 0);
+                case PushDirection.Left: return new Vector(-distance, 0);
                 case PushDirection.Right: return new Vector(distance, 0);
-                case PushDirection.Up:    return new Vector(0, distance);
-                case PushDirection.Down:  return new Vector(0, -distance);
+                case PushDirection.Up: return new Vector(0, distance);
+                case PushDirection.Down: return new Vector(0, -distance);
                 default: return new Vector();
             }
         }
@@ -387,10 +386,10 @@ namespace OpenNest.Geometry
         {
             switch (direction)
             {
-                case PushDirection.Left:  return from.Left - to.Right;
+                case PushDirection.Left: return from.Left - to.Right;
                 case PushDirection.Right: return to.Left - from.Right;
-                case PushDirection.Up:    return to.Bottom - from.Top;
-                case PushDirection.Down:  return from.Bottom - to.Top;
+                case PushDirection.Up: return to.Bottom - from.Top;
+                case PushDirection.Down: return from.Bottom - to.Top;
                 default: return double.MaxValue;
             }
         }

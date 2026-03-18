@@ -1,6 +1,5 @@
 using OpenNest.CNC;
 using OpenNest.Geometry;
-using Xunit;
 
 namespace OpenNest.Tests;
 

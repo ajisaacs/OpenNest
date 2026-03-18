@@ -1,8 +1,8 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using OpenNest.CNC;
+﻿using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest
 {

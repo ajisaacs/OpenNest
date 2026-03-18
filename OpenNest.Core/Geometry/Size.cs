@@ -43,7 +43,7 @@ namespace OpenNest.Geometry
         }
 
         public override string ToString() => $"{Width} x {Length}";
-        
+
         public string ToString(int decimalPlaces) => $"{System.Math.Round(Width, decimalPlaces)} x {System.Math.Round(Length, decimalPlaces)}";
     }
 }

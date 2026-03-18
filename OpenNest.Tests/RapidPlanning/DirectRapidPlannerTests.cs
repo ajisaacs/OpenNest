@@ -1,7 +1,5 @@
-using System.Collections.Generic;
 using OpenNest.Engine.RapidPlanning;
 using OpenNest.Geometry;
-using Xunit;
 
 namespace OpenNest.Tests.RapidPlanning;
 

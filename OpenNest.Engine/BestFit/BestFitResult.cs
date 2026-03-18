@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System.Collections.Generic;
 
 namespace OpenNest.Engine.BestFit
 {

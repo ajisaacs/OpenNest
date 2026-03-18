@@ -1,8 +1,8 @@
-using System;
-using System.Diagnostics;
 using ILGPU;
 using ILGPU.Runtime;
 using OpenNest.Engine.BestFit;
+using System;
+using System.Diagnostics;
 
 namespace OpenNest.Gpu
 {

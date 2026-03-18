@@ -1,20 +1,18 @@
-﻿using System;
+﻿using OpenNest.Actions;
+using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Collections;
+using OpenNest.Controls;
+using OpenNest.Engine.Sequencing;
+using OpenNest.IO;
+using OpenNest.Math;
+using OpenNest.Properties;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-using OpenNest.Actions;
-using OpenNest.CNC.CuttingStrategy;
-using OpenNest.Collections;
-using OpenNest.Controls;
-using OpenNest.Engine;
-using OpenNest.Engine.RapidPlanning;
-using OpenNest.Engine.Sequencing;
-using OpenNest.IO;
-using OpenNest.Math;
-using OpenNest.Properties;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Forms

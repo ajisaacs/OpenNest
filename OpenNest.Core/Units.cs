@@ -19,7 +19,7 @@ namespace OpenNest
                 case Units.Millimeters:
                     return "mm";
 
-                default: 
+                default:
                     return string.Empty;
             }
         }
@@ -34,7 +34,7 @@ namespace OpenNest
                 case Units.Millimeters:
                     return "millimeters";
 
-                default: 
+                default:
                     return string.Empty;
             }
         }
@@ -49,7 +49,7 @@ namespace OpenNest
                 case Units.Millimeters:
                     return "sec";
 
-                default: 
+                default:
                     return string.Empty;
             }
         }

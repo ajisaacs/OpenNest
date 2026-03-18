@@ -1,17 +1,16 @@
-﻿using System.Collections.Generic;
-using System.ComponentModel;
-using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using OpenNest.CNC;
+﻿using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Properties;
-using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.IO;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace OpenNest.Forms
 {
@@ -101,7 +100,7 @@ namespace OpenNest.Forms
 
                 if (entities.Count == 0)
                     continue;
-                
+
                 var drawing = new Drawing(item.Name);
                 drawing.Color = GetNextColor();
                 drawing.Customer = item.Customer;

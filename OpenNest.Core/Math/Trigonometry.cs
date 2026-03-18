@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace OpenNest.Math
+﻿namespace OpenNest.Math
 {
     public static class Trigonometry
     {

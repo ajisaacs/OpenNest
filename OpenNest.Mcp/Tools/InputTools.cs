@@ -1,11 +1,10 @@
+using ModelContextProtocol.Server;
+using OpenNest.Converters;
+using OpenNest.IO;
+using OpenNest.Shapes;
 using System.ComponentModel;
 using System.IO;
 using System.Text;
-using ModelContextProtocol.Server;
-using OpenNest.Converters;
-using OpenNest.Geometry;
-using OpenNest.IO;
-using OpenNest.Shapes;
 using CncProgram = OpenNest.CNC.Program;
 
 namespace OpenNest.Mcp.Tools

@@ -1,9 +1,9 @@
-﻿using System.Drawing;
-using System.Linq;
-using System.Threading;
-using OpenNest.CNC;
+﻿using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using System.Drawing;
+using System.Linq;
+using System.Threading;
 
 namespace OpenNest
 {

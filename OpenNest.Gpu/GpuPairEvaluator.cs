@@ -1,13 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using ILGPU;
 using ILGPU.Runtime;
 using OpenNest.Converters;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
-using OpenNest.Math;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace OpenNest.Gpu
 {

@@ -1,8 +1,8 @@
-﻿using System.ComponentModel;
+﻿using OpenNest.Controls;
+using OpenNest.Geometry;
+using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
-using OpenNest.Controls;
-using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
