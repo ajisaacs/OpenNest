@@ -61,6 +61,7 @@
             mnuTools = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsMeasureArea = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsBestFitViewer = new System.Windows.Forms.ToolStripMenuItem();
+            mnuToolsPatternTile = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsAlign = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsAlignLeft = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsAlignRight = new System.Windows.Forms.ToolStripMenuItem();
@@ -380,7 +381,7 @@
             // 
             // mnuTools
             // 
-            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsOptions });
+            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsPatternTile, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsOptions });
             mnuTools.Name = "mnuTools";
             mnuTools.Size = new System.Drawing.Size(47, 20);
             mnuTools.Text = "&Tools";
@@ -398,9 +399,16 @@
             mnuToolsBestFitViewer.Size = new System.Drawing.Size(214, 22);
             mnuToolsBestFitViewer.Text = "Best-Fit Viewer";
             mnuToolsBestFitViewer.Click += BestFitViewer_Click;
-            // 
+            //
+            // mnuToolsPatternTile
+            //
+            this.mnuToolsPatternTile.Name = "mnuToolsPatternTile";
+            this.mnuToolsPatternTile.Size = new System.Drawing.Size(214, 22);
+            this.mnuToolsPatternTile.Text = "Pattern Tile";
+            this.mnuToolsPatternTile.Click += PatternTile_Click;
+            //
             // mnuToolsAlign
-            // 
+            //
             mnuToolsAlign.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsAlignLeft, mnuToolsAlignRight, mnuToolsAlignTop, mnuToolsAlignBottom, toolStripMenuItem11, mnuToolsAlignHorizontal, mnuToolsAlignVertically, toolStripMenuItem8, mnuToolsEvenlySpaceHorizontal, mnuToolsEvenlySpaceVertical });
             mnuToolsAlign.Name = "mnuToolsAlign";
             mnuToolsAlign.Size = new System.Drawing.Size(214, 22);
@@ -1169,6 +1177,7 @@
         private System.Windows.Forms.ToolStripMenuItem autoSequenceAllPlatesToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsMeasureArea;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsBestFitViewer;
+        private System.Windows.Forms.ToolStripMenuItem mnuToolsPatternTile;
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;

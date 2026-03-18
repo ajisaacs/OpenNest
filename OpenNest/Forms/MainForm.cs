@@ -596,6 +596,49 @@ namespace OpenNest.Forms
             }
         }
 
+        private void PatternTile_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null)
+                return;
+
+            if (activeForm.Nest.Drawings.Count == 0)
+            {
+                MessageBox.Show("No drawings available.", "Pattern Tile",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var form = new PatternTileForm(activeForm.Nest))
+            {
+                if (form.ShowDialog(this) != DialogResult.OK || form.Result == null)
+                    return;
+
+                var result = form.Result;
+
+                if (result.Target == PatternTileTarget.CurrentPlate)
+                {
+                    activeForm.PlateView.Plate.Parts.Clear();
+
+                    foreach (var part in result.Parts)
+                        activeForm.PlateView.Plate.Parts.Add(part);
+
+                    activeForm.PlateView.ZoomToFit();
+                }
+                else
+                {
+                    var plate = activeForm.Nest.CreatePlate();
+                    plate.Size = result.PlateSize;
+
+                    foreach (var part in result.Parts)
+                        plate.Parts.Add(part);
+
+                    activeForm.LoadLastPlate();
+                }
+
+                activeForm.Nest.UpdateDrawingQuantities();
+            }
+        }
+
         private void SetOffsetIncrement_Click(object sender, EventArgs e)
         {
             if (activeForm == null) return;
