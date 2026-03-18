@@ -150,13 +150,15 @@ namespace OpenNest
                     token.ThrowIfCancellationRequested();
 
                     var extentsFiller = new FillExtents(workArea, Plate.PartSpacing);
+                    var bestFits2 = BestFitCache.GetOrCompute(
+                        groupParts[0].BaseDrawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
                     var extentsAngles2 = new[] { groupParts[0].Rotation, groupParts[0].Rotation + Angle.HalfPI };
                     List<Part> bestExtents2 = null;
 
                     foreach (var angle in extentsAngles2)
                     {
                         token.ThrowIfCancellationRequested();
-                        var result = extentsFiller.Fill(groupParts[0].BaseDrawing, angle, PlateNumber, token, progress);
+                        var result = extentsFiller.Fill(groupParts[0].BaseDrawing, angle, PlateNumber, token, progress, bestFits2);
                         if (result != null && result.Count > (bestExtents2?.Count ?? 0))
                             bestExtents2 = result;
                     }
@@ -294,17 +296,19 @@ namespace OpenNest
                     ReportProgress(progress, NestPhase.RectBestFit, PlateNumber, best, workArea, BuildProgressSummary());
                 }
 
-                // Extents phase
+                // Extents phase — reuse the BestFit cache from the Pairs phase.
                 token.ThrowIfCancellationRequested();
                 var extentsSw = Stopwatch.StartNew();
                 var extentsFiller = new FillExtents(workArea, Plate.PartSpacing);
+                var bestFits = BestFitCache.GetOrCompute(
+                    item.Drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
                 List<Part> bestExtents = null;
                 var extentsAngles = new[] { bestRotation, bestRotation + Angle.HalfPI };
 
                 foreach (var angle in extentsAngles)
                 {
                     token.ThrowIfCancellationRequested();
-                    var extentsResult = extentsFiller.Fill(item.Drawing, angle, PlateNumber, token, progress);
+                    var extentsResult = extentsFiller.Fill(item.Drawing, angle, PlateNumber, token, progress, bestFits);
                     if (bestExtents == null || (extentsResult != null && extentsResult.Count > (bestExtents?.Count ?? 0)))
                         bestExtents = extentsResult;
                 }
@@ -351,59 +355,10 @@ namespace OpenNest
         // --- Pattern helpers ---
 
         internal static Pattern BuildRotatedPattern(List<Part> groupParts, double angle)
-        {
-            var pattern = new Pattern();
-            var center = ((IEnumerable<IBoundable>)groupParts).GetBoundingBox().Center;
-
-            foreach (var part in groupParts)
-            {
-                var clone = (Part)part.Clone();
-                clone.UpdateBounds();
-
-                if (!angle.IsEqualTo(0))
-                    clone.Rotate(angle, center);
-
-                pattern.Parts.Add(clone);
-            }
-
-            pattern.UpdateBounds();
-            return pattern;
-        }
+            => FillHelpers.BuildRotatedPattern(groupParts, angle);
 
         internal static List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
-        {
-            var results = new System.Collections.Concurrent.ConcurrentBag<(List<Part> Parts, FillScore Score)>();
-
-            Parallel.ForEach(angles, angle =>
-            {
-                var pattern = BuildRotatedPattern(groupParts, angle);
-
-                if (pattern.Parts.Count == 0)
-                    return;
-
-                var h = engine.Fill(pattern, NestDirection.Horizontal);
-                if (h != null && h.Count > 0)
-                    results.Add((h, FillScore.Compute(h, workArea)));
-
-                var v = engine.Fill(pattern, NestDirection.Vertical);
-                if (v != null && v.Count > 0)
-                    results.Add((v, FillScore.Compute(v, workArea)));
-            });
-
-            List<Part> best = null;
-            var bestScore = default(FillScore);
-
-            foreach (var res in results)
-            {
-                if (best == null || res.Score > bestScore)
-                {
-                    best = res.Parts;
-                    bestScore = res.Score;
-                }
-            }
-
-            return best;
-        }
+            => FillHelpers.FillPattern(engine, groupParts, angles, workArea);
 
     }
 }
