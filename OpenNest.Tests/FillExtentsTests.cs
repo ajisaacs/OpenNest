@@ -84,4 +84,78 @@ public class FillExtentsTests
         Assert.True(gap < 1.0,
             $"Gap of {gap:F2} is too large — adjustment should fill close to the top");
     }
+
+    [Fact]
+    public void Fill_Triangle_FillsWidthWithMultipleColumns()
+    {
+        var workArea = new Box(0, 0, 120, 60);
+        var filler = new FillExtents(workArea, 0.5);
+        var drawing = MakeRightTriangle(10, 8);
+
+        var parts = filler.Fill(drawing);
+
+        // With a 120-wide sheet and ~10-wide parts, we should get multiple columns.
+        Assert.True(parts.Count >= 8,
+            $"Expected multiple columns but got only {parts.Count} parts");
+
+        // Verify all parts are within bounds.
+        foreach (var part in parts)
+        {
+            Assert.True(part.BoundingBox.Right <= workArea.Right + 0.01);
+            Assert.True(part.BoundingBox.Top <= workArea.Top + 0.01);
+            Assert.True(part.BoundingBox.Left >= workArea.Left - 0.01);
+            Assert.True(part.BoundingBox.Bottom >= workArea.Bottom - 0.01);
+        }
+    }
+
+    [Fact]
+    public void Fill_Rect_ReturnsNonEmpty()
+    {
+        var workArea = new Box(0, 0, 120, 60);
+        var filler = new FillExtents(workArea, 0.5);
+        var drawing = MakeRect(15, 10);
+
+        var parts = filler.Fill(drawing);
+
+        Assert.NotNull(parts);
+        Assert.True(parts.Count > 0, "Rectangle should produce results");
+    }
+
+    [Fact]
+    public void Fill_NonZeroOriginWorkArea_PartsWithinBounds()
+    {
+        // Simulate a remnant sub-region with non-zero origin.
+        var workArea = new Box(30, 10, 80, 40);
+        var filler = new FillExtents(workArea, 0.5);
+        var drawing = MakeRightTriangle(10, 8);
+
+        var parts = filler.Fill(drawing);
+
+        Assert.True(parts.Count > 0);
+
+        foreach (var part in parts)
+        {
+            Assert.True(part.BoundingBox.Left >= workArea.Left - 0.01,
+                $"Part left {part.BoundingBox.Left} below work area left {workArea.Left}");
+            Assert.True(part.BoundingBox.Bottom >= workArea.Bottom - 0.01,
+                $"Part bottom {part.BoundingBox.Bottom} below work area bottom {workArea.Bottom}");
+            Assert.True(part.BoundingBox.Right <= workArea.Right + 0.01);
+            Assert.True(part.BoundingBox.Top <= workArea.Top + 0.01);
+        }
+    }
+
+    [Fact]
+    public void Fill_RespectsCancellation()
+    {
+        var cts = new System.Threading.CancellationTokenSource();
+        cts.Cancel();
+
+        var workArea = new Box(0, 0, 120, 60);
+        var filler = new FillExtents(workArea, 0.5);
+        var drawing = MakeRightTriangle(10, 8);
+
+        var parts = filler.Fill(drawing, token: cts.Token);
+
+        Assert.NotNull(parts);
+    }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -297,11 +298,76 @@ namespace OpenNest
             return (p1, p2, newBbox);
         }
 
-        // --- Step 4: Horizontal Repetition (stub for Task 4) ---
+        // --- Step 4: Horizontal Repetition ---
 
         private List<Part> RepeatColumns(List<Part> column, CancellationToken token)
         {
-            return column;
+            if (column.Count == 0)
+                return column;
+
+            var columnBbox = ((IEnumerable<IBoundable>)column).GetBoundingBox();
+            var columnWidth = columnBbox.Width;
+
+            // Create a test column shifted right by columnWidth + spacing.
+            var testOffset = columnWidth + partSpacing;
+            var testColumn = new List<Part>(column.Count);
+            foreach (var part in column)
+                testColumn.Add(part.CloneAtOffset(new Vector(testOffset, 0)));
+
+            // Compact the test column left against the original column.
+            var distanceMoved = Compactor.Push(testColumn, column, workArea, partSpacing, PushDirection.Left);
+
+            // Derive the true copy distance from where the test column ended up.
+            var testBbox = ((IEnumerable<IBoundable>)testColumn).GetBoundingBox();
+            var copyDistance = testBbox.Left - columnBbox.Left;
+
+            if (copyDistance <= Tolerance.Epsilon)
+                copyDistance = columnWidth + partSpacing;
+
+            Debug.WriteLine($"[FillExtents] Column copy distance: {copyDistance:F2} (bbox width: {columnWidth:F2}, spacing: {partSpacing:F2})");
+
+            // Build all columns.
+            var result = new List<Part>(column);
+
+            // Add the test column we already computed as column 2.
+            foreach (var part in testColumn)
+            {
+                if (IsWithinWorkArea(part))
+                    result.Add(part);
+            }
+
+            // Tile additional columns at the copy distance.
+            var colIndex = 2;
+            while (!token.IsCancellationRequested)
+            {
+                var offset = new Vector(copyDistance * colIndex, 0);
+                var anyFit = false;
+
+                foreach (var part in column)
+                {
+                    var clone = part.CloneAtOffset(offset);
+                    if (IsWithinWorkArea(clone))
+                    {
+                        result.Add(clone);
+                        anyFit = true;
+                    }
+                }
+
+                if (!anyFit)
+                    break;
+
+                colIndex++;
+            }
+
+            return result;
+        }
+
+        private bool IsWithinWorkArea(Part part)
+        {
+            return part.BoundingBox.Right <= workArea.Right + Tolerance.Epsilon &&
+                   part.BoundingBox.Top <= workArea.Top + Tolerance.Epsilon &&
+                   part.BoundingBox.Left >= workArea.Left - Tolerance.Epsilon &&
+                   part.BoundingBox.Bottom >= workArea.Bottom - Tolerance.Epsilon;
         }
     }
 }
