@@ -930,7 +930,7 @@ namespace OpenNest.Controls
                 var parts = await Task.Run(() =>
                     engine.Fill(groupParts, workArea, progress, cts.Token));
 
-                if (parts.Count > 0 && !cts.IsCancellationRequested)
+                if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
                 {
                     AcceptTemporaryParts();
                     sw.Stop();

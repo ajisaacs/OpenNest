@@ -865,7 +865,7 @@ namespace OpenNest.Forms
 
                     activeForm.PlateView.ClearTemporaryParts();
 
-                    if (nestParts.Count > 0 && !token.IsCancellationRequested)
+                    if (nestParts.Count > 0 && (!token.IsCancellationRequested || progressForm.Accepted))
                     {
                         plate.Parts.AddRange(nestParts);
                         activeForm.PlateView.Invalidate();
