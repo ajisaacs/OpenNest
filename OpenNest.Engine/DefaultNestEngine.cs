@@ -34,69 +34,31 @@ namespace OpenNest
         {
             PhaseResults.Clear();
             AngleResults.Clear();
-            var best = FindBestFill(item, workArea, progress, token);
 
-            if (best == null || best.Count == 0)
-                return new List<Part>();
+            var context = new FillContext
+            {
+                Item = item,
+                WorkArea = workArea,
+                Plate = Plate,
+                PlateNumber = PlateNumber,
+                Token = token,
+                Progress = progress,
+            };
+
+            RunPipeline(context);
+
+            // PhaseResults already synced during RunPipeline.
+            AngleResults.AddRange(context.AngleResults);
+            WinnerPhase = context.WinnerPhase;
+
+            var best = context.CurrentBest ?? new List<Part>();
 
             if (item.Quantity > 0 && best.Count > item.Quantity)
                 best = best.Take(item.Quantity).ToList();
 
+            ReportProgress(progress, WinnerPhase, PlateNumber, best, workArea, BuildProgressSummary());
+
             return best;
-        }
-
-        /// <summary>
-        /// Fast fill count using linear fill with two angles plus the top cached
-        /// pair candidates. Used by binary search to estimate capacity at a given
-        /// box size without running the full Fill pipeline.
-        /// </summary>
-        private int QuickFillCount(Drawing drawing, Box testBox, double bestRotation)
-        {
-            var engine = new FillLinear(testBox, Plate.PartSpacing);
-            var bestCount = 0;
-
-            // Single-part linear fills.
-            var angles = new[] { bestRotation, bestRotation + Angle.HalfPI };
-
-            foreach (var angle in angles)
-            {
-                var h = engine.Fill(drawing, angle, NestDirection.Horizontal);
-                if (h != null && h.Count > bestCount)
-                    bestCount = h.Count;
-
-                var v = engine.Fill(drawing, angle, NestDirection.Vertical);
-                if (v != null && v.Count > bestCount)
-                    bestCount = v.Count;
-            }
-
-            // Top pair candidates — check if pairs tile better in this box.
-            var bestFits = BestFitCache.GetOrCompute(
-                drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
-            var topPairs = bestFits.Where(r => r.Keep).Take(3);
-
-            foreach (var pair in topPairs)
-            {
-                var pairParts = pair.BuildParts(drawing);
-                var pairAngles = pair.HullAngles ?? new List<double> { 0 };
-                var pairEngine = new FillLinear(testBox, Plate.PartSpacing);
-
-                foreach (var angle in pairAngles)
-                {
-                    var pattern = BuildRotatedPattern(pairParts, angle);
-                    if (pattern.Parts.Count == 0)
-                        continue;
-
-                    var h = pairEngine.Fill(pattern, NestDirection.Horizontal);
-                    if (h != null && h.Count > bestCount)
-                        bestCount = h.Count;
-
-                    var v = pairEngine.Fill(pattern, NestDirection.Vertical);
-                    if (v != null && v.Count > bestCount)
-                        bestCount = v.Count;
-                }
-            }
-
-            return bestCount;
         }
 
         public override List<Part> Fill(List<Part> groupParts, Box workArea,
@@ -122,7 +84,11 @@ namespace OpenNest
                     token.ThrowIfCancellationRequested();
 
                     var nestItem = new NestItem { Drawing = groupParts[0].BaseDrawing };
-                    var rectResult = FillRectangleBestFit(nestItem, workArea);
+                    var binItem = BinConverter.ToItem(nestItem, Plate.PartSpacing);
+                    var bin = BinConverter.CreateBin(workArea, Plate.PartSpacing);
+                    var rectEngine = new FillBestFit(bin);
+                    rectEngine.Fill(binItem);
+                    var rectResult = BinConverter.ToParts(bin, new List<NestItem> { nestItem });
                     PhaseResults.Add(new PhaseResult(NestPhase.RectBestFit, rectResult?.Count ?? 0, 0));
 
                     Debug.WriteLine($"[Fill(groupParts,Box)] RectBestFit: {rectResult?.Count ?? 0} parts");
@@ -202,154 +168,50 @@ namespace OpenNest
             return BinConverter.ToParts(bin, items);
         }
 
-        // --- FindBestFill: core orchestration ---
+        // --- RunPipeline: strategy-based orchestration ---
 
-        private List<Part> FindBestFill(NestItem item, Box workArea,
-            IProgress<NestProgress> progress = null, CancellationToken token = default)
+        private void RunPipeline(FillContext context)
         {
-            List<Part> best = null;
+            var bestRotation = RotationAnalysis.FindBestRotation(context.Item);
+            context.SharedState["BestRotation"] = bestRotation;
+
+            var angles = angleBuilder.Build(context.Item, bestRotation, context.WorkArea);
+            context.SharedState["AngleCandidates"] = angles;
 
             try
             {
-                var bestRotation = RotationAnalysis.FindBestRotation(item);
-                var angles = angleBuilder.Build(item, bestRotation, workArea);
-
-                // Pairs phase
-                var pairSw = Stopwatch.StartNew();
-                var pairFiller = new PairFiller(Plate.Size, Plate.PartSpacing);
-                var pairResult = pairFiller.Fill(item, workArea, PlateNumber, token, progress);
-                pairSw.Stop();
-                best = pairResult;
-                var bestScore = FillScore.Compute(best, workArea);
-                WinnerPhase = NestPhase.Pairs;
-                PhaseResults.Add(new PhaseResult(NestPhase.Pairs, pairResult.Count, pairSw.ElapsedMilliseconds));
-
-                Debug.WriteLine($"[FindBestFill] Pair: {bestScore.Count} parts");
-                ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea, BuildProgressSummary());
-                token.ThrowIfCancellationRequested();
-
-                // Linear phase
-                var linearSw = Stopwatch.StartNew();
-                var bestLinearCount = 0;
-
-                for (var ai = 0; ai < angles.Count; ai++)
+                foreach (var strategy in FillStrategyRegistry.Strategies)
                 {
-                    token.ThrowIfCancellationRequested();
+                    context.Token.ThrowIfCancellationRequested();
 
-                    var angle = angles[ai];
-                    var localEngine = new FillLinear(workArea, Plate.PartSpacing);
-                    var h = localEngine.Fill(item.Drawing, angle, NestDirection.Horizontal);
-                    var v = localEngine.Fill(item.Drawing, angle, NestDirection.Vertical);
+                    var sw = Stopwatch.StartNew();
+                    var result = strategy.Fill(context);
+                    sw.Stop();
 
-                    var angleDeg = Angle.ToDegrees(angle);
-                    if (h != null && h.Count > 0)
+                    var phaseResult = new PhaseResult(
+                        strategy.Phase, result?.Count ?? 0, sw.ElapsedMilliseconds);
+                    context.PhaseResults.Add(phaseResult);
+
+                    // Keep engine's PhaseResults in sync so BuildProgressSummary() works
+                    // during progress reporting.
+                    PhaseResults.Add(phaseResult);
+
+                    if (IsBetterFill(result, context.CurrentBest, context.WorkArea))
                     {
-                        var scoreH = FillScore.Compute(h, workArea);
-                        AngleResults.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Horizontal, PartCount = h.Count });
-                        if (h.Count > bestLinearCount) bestLinearCount = h.Count;
-                        if (scoreH > bestScore)
-                        {
-                            best = h;
-                            bestScore = scoreH;
-                            WinnerPhase = NestPhase.Linear;
-                        }
+                        context.CurrentBest = result;
+                        context.CurrentBestScore = FillScore.Compute(result, context.WorkArea);
+                        context.WinnerPhase = strategy.Phase;
+                        ReportProgress(context.Progress, strategy.Phase, PlateNumber,
+                            result, context.WorkArea, BuildProgressSummary());
                     }
-                    if (v != null && v.Count > 0)
-                    {
-                        var scoreV = FillScore.Compute(v, workArea);
-                        AngleResults.Add(new AngleResult { AngleDeg = angleDeg, Direction = NestDirection.Vertical, PartCount = v.Count });
-                        if (v.Count > bestLinearCount) bestLinearCount = v.Count;
-                        if (scoreV > bestScore)
-                        {
-                            best = v;
-                            bestScore = scoreV;
-                            WinnerPhase = NestPhase.Linear;
-                        }
-                    }
-
-                    ReportProgress(progress, NestPhase.Linear, PlateNumber, best, workArea,
-                        $"Linear: {ai + 1}/{angles.Count} angles, {angleDeg:F0}° best = {bestScore.Count} parts");
-                }
-
-                linearSw.Stop();
-                PhaseResults.Add(new PhaseResult(NestPhase.Linear, bestLinearCount, linearSw.ElapsedMilliseconds));
-
-                angleBuilder.RecordProductive(AngleResults);
-
-                Debug.WriteLine($"[FindBestFill] Linear: {bestScore.Count} parts, density={bestScore.Density:P1} | WorkArea: {workArea.Width:F1}x{workArea.Length:F1} | Angles: {angles.Count}");
-
-                ReportProgress(progress, NestPhase.Linear, PlateNumber, best, workArea, BuildProgressSummary());
-                token.ThrowIfCancellationRequested();
-
-                // RectBestFit phase
-                var rectSw = Stopwatch.StartNew();
-                var rectResult = FillRectangleBestFit(item, workArea);
-                rectSw.Stop();
-                var rectScore = rectResult != null ? FillScore.Compute(rectResult, workArea) : default;
-                Debug.WriteLine($"[FindBestFill] RectBestFit: {rectScore.Count} parts");
-                PhaseResults.Add(new PhaseResult(NestPhase.RectBestFit, rectResult?.Count ?? 0, rectSw.ElapsedMilliseconds));
-
-                if (rectScore > bestScore)
-                {
-                    best = rectResult;
-                    WinnerPhase = NestPhase.RectBestFit;
-                    ReportProgress(progress, NestPhase.RectBestFit, PlateNumber, best, workArea, BuildProgressSummary());
-                }
-
-                // Extents phase — reuse the BestFit cache from the Pairs phase.
-                token.ThrowIfCancellationRequested();
-                var extentsSw = Stopwatch.StartNew();
-                var extentsFiller = new FillExtents(workArea, Plate.PartSpacing);
-                var bestFits = BestFitCache.GetOrCompute(
-                    item.Drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
-                List<Part> bestExtents = null;
-                var extentsAngles = new[] { bestRotation, bestRotation + Angle.HalfPI };
-
-                foreach (var angle in extentsAngles)
-                {
-                    token.ThrowIfCancellationRequested();
-                    var extentsResult = extentsFiller.Fill(item.Drawing, angle, PlateNumber, token, progress, bestFits);
-                    if (bestExtents == null || (extentsResult != null && extentsResult.Count > (bestExtents?.Count ?? 0)))
-                        bestExtents = extentsResult;
-                }
-
-                extentsSw.Stop();
-                var extentsScore = bestExtents != null ? FillScore.Compute(bestExtents, workArea) : default;
-                Debug.WriteLine($"[FindBestFill] Extents: {extentsScore.Count} parts");
-                PhaseResults.Add(new PhaseResult(NestPhase.Extents, bestExtents?.Count ?? 0, extentsSw.ElapsedMilliseconds));
-
-                var bestScore2 = FillScore.Compute(best, workArea);
-                if (extentsScore > bestScore2)
-                {
-                    best = bestExtents;
-                    WinnerPhase = NestPhase.Extents;
-                    ReportProgress(progress, NestPhase.Extents, PlateNumber, best, workArea, BuildProgressSummary());
                 }
             }
             catch (OperationCanceledException)
             {
-                Debug.WriteLine("[FindBestFill] Cancelled, returning current best");
+                Debug.WriteLine("[RunPipeline] Cancelled, returning current best");
             }
 
-            // Always report the final winner so the UI's temporary parts
-            // match the returned result (sub-phases may have reported their
-            // own intermediate results via progress).
-            ReportProgress(progress, WinnerPhase, PlateNumber, best, workArea, BuildProgressSummary());
-
-            return best ?? new List<Part>();
-        }
-
-        // --- Fill strategies ---
-
-        private List<Part> FillRectangleBestFit(NestItem item, Box workArea)
-        {
-            var binItem = BinConverter.ToItem(item, Plate.PartSpacing);
-            var bin = BinConverter.CreateBin(workArea, Plate.PartSpacing);
-
-            var engine = new FillBestFit(bin);
-            engine.Fill(binItem);
-
-            return BinConverter.ToParts(bin, new List<NestItem> { item });
+            angleBuilder.RecordProductive(context.AngleResults);
         }
 
         // --- Pattern helpers ---
