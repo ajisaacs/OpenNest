@@ -72,6 +72,40 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Generalized ray-edge distance along an arbitrary unit direction vector.
+        /// Returns double.MaxValue if the ray does not hit the segment.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static double RayEdgeDistance(
+            double vx, double vy,
+            double p1x, double p1y, double p2x, double p2y,
+            double dirX, double dirY)
+        {
+            var ex = p2x - p1x;
+            var ey = p2y - p1y;
+
+            var det = ex * dirY - ey * dirX;
+            if (System.Math.Abs(det) < Tolerance.Epsilon)
+                return double.MaxValue;
+
+            var dvx = p1x - vx;
+            var dvy = p1y - vy;
+
+            var t = (ex * dvy - ey * dvx) / det;
+            if (t < -Tolerance.Epsilon)
+                return double.MaxValue;
+
+            var s = (dirX * dvy - dirY * dvx) / det;
+            if (s < -Tolerance.Epsilon || s > 1.0 + Tolerance.Epsilon)
+                return double.MaxValue;
+
+            if (t > Tolerance.Epsilon) return t;
+            if (t >= -Tolerance.Epsilon) return 0;
+            return double.MaxValue;
+        }
+
+        /// <summary>
         /// Computes the minimum translation distance along a push direction before
         /// any edge of movingLines contacts any edge of stationaryLines.
         /// Returns double.MaxValue if no collision path exists.
@@ -360,6 +394,135 @@ namespace OpenNest.Geometry
                 default: return double.MaxValue;
             }
         }
+
+        #region Generalized direction (Vector) overloads
+
+        /// <summary>
+        /// Computes how far a box can travel along the given unit direction
+        /// before exiting the boundary box.
+        /// </summary>
+        public static double EdgeDistance(Box box, Box boundary, Vector direction)
+        {
+            var dist = double.MaxValue;
+
+            if (direction.X < -Tolerance.Epsilon)
+            {
+                var d = (box.Left - boundary.Left) / -direction.X;
+                if (d < dist) dist = d;
+            }
+            else if (direction.X > Tolerance.Epsilon)
+            {
+                var d = (boundary.Right - box.Right) / direction.X;
+                if (d < dist) dist = d;
+            }
+
+            if (direction.Y < -Tolerance.Epsilon)
+            {
+                var d = (box.Bottom - boundary.Bottom) / -direction.Y;
+                if (d < dist) dist = d;
+            }
+            else if (direction.Y > Tolerance.Epsilon)
+            {
+                var d = (boundary.Top - box.Top) / direction.Y;
+                if (d < dist) dist = d;
+            }
+
+            return dist < 0 ? 0 : dist;
+        }
+
+        /// <summary>
+        /// Computes the directional gap between two boxes along an arbitrary unit direction.
+        /// Positive means 'to' is ahead of 'from' in the push direction.
+        /// </summary>
+        public static double DirectionalGap(Box from, Box to, Vector direction)
+        {
+            var fromMax = BoxProjectionMax(from, direction.X, direction.Y);
+            var toMin = BoxProjectionMin(to, direction.X, direction.Y);
+            return toMin - fromMax;
+        }
+
+        /// <summary>
+        /// Returns true if two boxes overlap when projected onto the axis
+        /// perpendicular to the given unit direction.
+        /// </summary>
+        public static bool PerpendicularOverlap(Box a, Box b, Vector direction)
+        {
+            var px = -direction.Y;
+            var py = direction.X;
+
+            var aMin = BoxProjectionMin(a, px, py);
+            var aMax = BoxProjectionMax(a, px, py);
+            var bMin = BoxProjectionMin(b, px, py);
+            var bMax = BoxProjectionMax(b, px, py);
+
+            return aMin <= bMax + Tolerance.Epsilon && bMin <= aMax + Tolerance.Epsilon;
+        }
+
+        /// <summary>
+        /// Computes the minimum translation distance along an arbitrary unit direction
+        /// before any edge of movingLines contacts any edge of stationaryLines.
+        /// </summary>
+        public static double DirectionalDistance(List<Line> movingLines, List<Line> stationaryLines, Vector direction)
+        {
+            var minDist = double.MaxValue;
+            var dirX = direction.X;
+            var dirY = direction.Y;
+
+            var movingVertices = new HashSet<Vector>();
+            for (var i = 0; i < movingLines.Count; i++)
+            {
+                movingVertices.Add(movingLines[i].pt1);
+                movingVertices.Add(movingLines[i].pt2);
+            }
+
+            foreach (var mv in movingVertices)
+            {
+                for (var i = 0; i < stationaryLines.Count; i++)
+                {
+                    var e = stationaryLines[i];
+                    var d = RayEdgeDistance(mv.X, mv.Y, e.pt1.X, e.pt1.Y, e.pt2.X, e.pt2.Y, dirX, dirY);
+                    if (d < minDist) minDist = d;
+                }
+            }
+
+            var oppX = -dirX;
+            var oppY = -dirY;
+
+            var stationaryVertices = new HashSet<Vector>();
+            for (var i = 0; i < stationaryLines.Count; i++)
+            {
+                stationaryVertices.Add(stationaryLines[i].pt1);
+                stationaryVertices.Add(stationaryLines[i].pt2);
+            }
+
+            foreach (var sv in stationaryVertices)
+            {
+                for (var i = 0; i < movingLines.Count; i++)
+                {
+                    var e = movingLines[i];
+                    var d = RayEdgeDistance(sv.X, sv.Y, e.pt1.X, e.pt1.Y, e.pt2.X, e.pt2.Y, oppX, oppY);
+                    if (d < minDist) minDist = d;
+                }
+            }
+
+            return minDist;
+        }
+
+        private static double BoxProjectionMin(Box box, double dx, double dy)
+        {
+            var x = dx >= 0 ? box.Left : box.Right;
+            var y = dy >= 0 ? box.Bottom : box.Top;
+            return x * dx + y * dy;
+        }
+
+        private static double BoxProjectionMax(Box box, double dx, double dy)
+        {
+            var x = dx >= 0 ? box.Right : box.Left;
+            var y = dy >= 0 ? box.Top : box.Bottom;
+            return x * dx + y * dy;
+        }
+
+        #endregion
 
         public static double ClosestDistanceLeft(Box box, List<Box> boxes)
         {

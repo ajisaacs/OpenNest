@@ -141,28 +141,28 @@ namespace OpenNest.Actions
         {
             if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
             {
+                var movingParts = parts.Select(p => p.BasePart).ToList();
+
+                PushDirection hDir, vDir;
                 switch (plateView.Plate.Quadrant)
                 {
-                    case 1:
-                        plateView.PushSelected(PushDirection.Left);
-                        plateView.PushSelected(PushDirection.Down);
-                        break;
-
-                    case 2:
-                        plateView.PushSelected(PushDirection.Right);
-                        plateView.PushSelected(PushDirection.Down);
-                        break;
-
-                    case 3:
-                        plateView.PushSelected(PushDirection.Right);
-                        plateView.PushSelected(PushDirection.Up);
-                        break;
-
-                    case 4:
-                        plateView.PushSelected(PushDirection.Left);
-                        plateView.PushSelected(PushDirection.Up);
-                        break;
+                    case 1:  hDir = PushDirection.Left;  vDir = PushDirection.Down; break;
+                    case 2:  hDir = PushDirection.Right;  vDir = PushDirection.Down; break;
+                    case 3:  hDir = PushDirection.Right;  vDir = PushDirection.Up;   break;
+                    case 4:  hDir = PushDirection.Left;  vDir = PushDirection.Up;   break;
+                    default: hDir = PushDirection.Left;  vDir = PushDirection.Down; break;
                 }
+
+                // Phase 1: BB-only push to get past irregular geometry quickly.
+                Compactor.PushBoundingBox(movingParts, plateView.Plate, hDir);
+                Compactor.PushBoundingBox(movingParts, plateView.Plate, vDir);
+
+                // Phase 2: Geometry push to settle against actual contours.
+                Compactor.Push(movingParts, plateView.Plate, hDir);
+                Compactor.Push(movingParts, plateView.Plate, vDir);
+
+                parts.ForEach(p => p.IsDirty = true);
+                plateView.Invalidate();
             }
 
             parts.ForEach(p => plateView.Plate.Parts.Add(p.BasePart.Clone() as Part));
