@@ -5,6 +5,9 @@ namespace OpenNest.IO
 {
     public static class NestFormat
     {
+        public const string FileExtension = ".opnest";
+        public const string FileFilter = "Nest Files (*.opnest)|*.opnest";
+
         public static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

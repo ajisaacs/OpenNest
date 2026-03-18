@@ -21,8 +21,8 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "load_nest")]
-        [Description("Load a .nest zip file into the session. Returns a summary of plates, parts, and drawings.")]
-        public string LoadNest([Description("Absolute path to the .nest file")] string path)
+        [Description("Load an .opnest file into the session. Returns a summary of plates, parts, and drawings.")]
+        public string LoadNest([Description("Absolute path to the .opnest file")] string path)
         {
             if (!File.Exists(path))
                 return $"Error: file not found: {path}";

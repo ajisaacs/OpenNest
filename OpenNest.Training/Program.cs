@@ -234,7 +234,7 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                     Directory.CreateDirectory(partDir);
 
                     var nestName = $"{partNo}-{size.Length}x{size.Width}-{result.PartCount}pcs";
-                    var fileName = nestName + ".zip";
+                    var fileName = nestName + NestFormat.FileExtension;
                     savedFilePath = Path.Combine(partDir, fileName);
 
                     // Create nest from template or from scratch
@@ -299,7 +299,7 @@ void PrintUsage()
     Console.Error.WriteLine("Options:");
     Console.Error.WriteLine("  --spacing <value>      Part spacing (default: 0.5)");
     Console.Error.WriteLine("  --db <path>            SQLite database path (default: OpenNestTraining.db)");
-    Console.Error.WriteLine("  --save-nests <dir>     Directory to save individual .zip nests for each winner");
+    Console.Error.WriteLine("  --save-nests <dir>     Directory to save individual .opnest nests for each winner");
     Console.Error.WriteLine("  --template <path>      Nest template (.nstdot) for plate defaults");
     Console.Error.WriteLine("  -h, --help             Show this help");
 }

@@ -403,7 +403,7 @@ namespace OpenNest.Forms
         private void Open_Click(object sender, EventArgs e)
         {
             var dlg = new OpenFileDialog();
-            dlg.Filter = "Nest Files (*.zip) | *.zip";
+            dlg.Filter = NestFormat.FileFilter;
             dlg.Multiselect = true;
 
             if (dlg.ShowDialog() == DialogResult.OK)

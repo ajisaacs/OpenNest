@@ -152,7 +152,8 @@ static class NestConsole
     static Nest LoadOrCreateNest(Options options)
     {
         var nestFile = options.InputFiles.FirstOrDefault(f =>
-            f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            f.EndsWith(NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase)
+            || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
         var dxfFiles = options.InputFiles.Where(f =>
             f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -190,7 +191,7 @@ static class NestConsole
         // DXF-only mode: create a fresh nest.
         if (dxfFiles.Count == 0)
         {
-            Console.Error.WriteLine("Error: no nest (.zip) or DXF (.dxf) files specified");
+            Console.Error.WriteLine("Error: no nest (.opnest) or DXF (.dxf) files specified");
             return null;
         }
 
@@ -272,7 +273,9 @@ static class NestConsole
             plate.PartSpacing = options.Spacing.Value;
 
         // Only apply size override when it wasn't already used to create the plate.
-        var hasDxfOnly = !options.InputFiles.Any(f => f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+        var hasDxfOnly = !options.InputFiles.Any(f =>
+            f.EndsWith(NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase)
+            || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
 
         if (options.PlateSize.HasValue && !hasDxfOnly)
             plate.Size = options.PlateSize.Value;
@@ -373,7 +376,7 @@ static class NestConsole
         var firstInput = options.InputFiles[0];
         var outputFile = options.OutputFile ?? Path.Combine(
             Path.GetDirectoryName(firstInput),
-            $"{Path.GetFileNameWithoutExtension(firstInput)}-result.zip");
+            $"{Path.GetFileNameWithoutExtension(firstInput)}-result{NestFormat.FileExtension}");
 
         new NestWriter(nest).Write(outputFile);
         Console.WriteLine($"Saved: {outputFile}");
@@ -384,12 +387,12 @@ static class NestConsole
         Console.Error.WriteLine("Usage: OpenNest.Console <input-files...> [options]");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Arguments:");
-        Console.Error.WriteLine("  input-files            One or more .zip nest files or .dxf drawing files");
+        Console.Error.WriteLine("  input-files            One or more .opnest nest files or .dxf drawing files");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Modes:");
-        Console.Error.WriteLine("  <nest.zip>             Load nest and fill (existing behavior)");
-        Console.Error.WriteLine("  <part.dxf> --size WxL  Import DXF, create plate, and fill");
-        Console.Error.WriteLine("  <nest.zip> <part.dxf>  Load nest and add imported DXF drawings");
+        Console.Error.WriteLine("  <nest.opnest>             Load nest and fill (existing behavior)");
+        Console.Error.WriteLine("  <part.dxf> --size WxL     Import DXF, create plate, and fill");
+        Console.Error.WriteLine("  <nest.opnest> <part.dxf>  Load nest and add imported DXF drawings");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Options:");
         Console.Error.WriteLine("  --drawing <name>       Drawing name to fill with (default: first drawing)");
@@ -397,7 +400,7 @@ static class NestConsole
         Console.Error.WriteLine("  --quantity <n>          Max parts to place (default: 0 = unlimited)");
         Console.Error.WriteLine("  --spacing <value>      Override part spacing");
         Console.Error.WriteLine("  --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode");
-        Console.Error.WriteLine("  --output <path>        Output nest file path (default: <input>-result.zip)");
+        Console.Error.WriteLine("  --output <path>        Output nest file path (default: <input>-result.opnest)");
         Console.Error.WriteLine("  --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)");
         Console.Error.WriteLine("  --autonest             Use NFP-based mixed-part autonesting instead of linear fill");
         Console.Error.WriteLine("  --keep-parts           Don't clear existing parts before filling");

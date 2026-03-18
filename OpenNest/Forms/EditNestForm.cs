@@ -288,7 +288,7 @@ namespace OpenNest.Forms
         public void SaveAs()
         {
             var dlg = new SaveFileDialog();
-            dlg.Filter = "Nest Files|*.zip|Template File|*.nstdot";
+            dlg.Filter = $"{NestFormat.FileFilter}|Template File|*.nstdot";
             dlg.FileName = Nest.Name;
 
             if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
