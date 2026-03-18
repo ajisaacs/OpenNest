@@ -25,7 +25,10 @@ namespace OpenNest.Forms
     {
         private readonly Nest nest;
         private readonly PlateView cellView;
-        private readonly PlateView previewView;
+        private readonly PlateView hPreview;
+        private readonly PlateView vPreview;
+        private readonly Label hLabel;
+        private readonly Label vLabel;
 
         public PatternTileResult Result { get; private set; }
 
@@ -43,14 +46,44 @@ namespace OpenNest.Forms
             cellView.Dock = DockStyle.Fill;
             splitContainer.Panel1.Controls.Add(cellView);
 
-            // Tile preview — plate visible, read-only
-            previewView = new PlateView();
-            previewView.Plate.Quantity = 0; // prevent Drawing.Quantity.Nested side-effects
-            previewView.AllowSelect = false;
-            previewView.AllowDrop = false;
-            previewView.DrawBounds = false;
-            previewView.Dock = DockStyle.Fill;
-            splitContainer.Panel2.Controls.Add(previewView);
+            // Right side: vertical split with horizontal and vertical preview
+            var previewSplit = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Horizontal,
+                SplitterDistance = 250
+            };
+            splitContainer.Panel2.Controls.Add(previewSplit);
+
+            hLabel = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 20,
+                Text = "Horizontal — 0 parts",
+                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+                Font = new System.Drawing.Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold),
+                ForeColor = System.Drawing.Color.FromArgb(80, 80, 80),
+                Padding = new Padding(4, 0, 0, 0)
+            };
+
+            hPreview = CreatePreviewView();
+            previewSplit.Panel1.Controls.Add(hPreview);
+            previewSplit.Panel1.Controls.Add(hLabel);
+
+            vLabel = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 20,
+                Text = "Vertical — 0 parts",
+                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
+                Font = new System.Drawing.Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold),
+                ForeColor = System.Drawing.Color.FromArgb(80, 80, 80),
+                Padding = new Padding(4, 0, 0, 0)
+            };
+
+            vPreview = CreatePreviewView();
+            previewSplit.Panel2.Controls.Add(vPreview);
+            previewSplit.Panel2.Controls.Add(vLabel);
 
             // Populate drawing dropdowns
             var drawings = nest.Drawings.OrderBy(d => d.Name).ToList();
@@ -192,32 +225,71 @@ namespace OpenNest.Forms
             }
         }
 
+        private static PlateView CreatePreviewView()
+        {
+            var view = new PlateView();
+            view.Plate.Quantity = 0;
+            view.AllowSelect = false;
+            view.AllowDrop = false;
+            view.DrawBounds = false;
+            view.Dock = DockStyle.Fill;
+            return view;
+        }
+
         private void UpdatePreviewPlateSize()
         {
-            if (TryGetPlateSize(out var size))
-                previewView.Plate.Size = size;
+            if (!TryGetPlateSize(out var size))
+                return;
+
+            hPreview.Plate.Size = size;
+            vPreview.Plate.Size = size;
+        }
+
+        private Pattern BuildCellPattern()
+        {
+            var cellParts = cellView.Plate.Parts.ToList();
+            if (cellParts.Count == 0)
+                return null;
+
+            var pattern = new Pattern();
+            foreach (var part in cellParts)
+                pattern.Parts.Add(part);
+            pattern.UpdateBounds();
+            return pattern;
         }
 
         private void RebuildPreview()
         {
-            previewView.Plate.Parts.Clear();
+            hPreview.Plate.Parts.Clear();
+            vPreview.Plate.Parts.Clear();
 
             if (!TryGetPlateSize(out var plateSize))
                 return;
 
-            previewView.Plate.Size = plateSize;
-            previewView.Plate.PartSpacing = PartSpacing;
+            hPreview.Plate.Size = plateSize;
+            hPreview.Plate.PartSpacing = PartSpacing;
+            vPreview.Plate.Size = plateSize;
+            vPreview.Plate.PartSpacing = PartSpacing;
 
-            var cellParts = cellView.Plate.Parts.ToList();
-            if (cellParts.Count == 0)
+            var pattern = BuildCellPattern();
+            if (pattern == null)
                 return;
 
-            var tiled = Engine.PatternTiler.Tile(cellParts, plateSize, PartSpacing);
+            var workArea = new Box(0, 0, plateSize.Width, plateSize.Length);
+            var filler = new FillLinear(workArea, PartSpacing);
 
-            foreach (var part in tiled)
-                previewView.Plate.Parts.Add(part);
+            var hParts = filler.Fill(pattern, NestDirection.Horizontal);
+            foreach (var part in hParts)
+                hPreview.Plate.Parts.Add(part);
+            hLabel.Text = $"Horizontal — {hParts.Count} parts";
+            hPreview.ZoomToFit();
 
-            previewView.ZoomToFit();
+            var vFiller = new FillLinear(workArea, PartSpacing);
+            var vParts = vFiller.Fill(pattern, NestDirection.Vertical);
+            foreach (var part in vParts)
+                vPreview.Plate.Parts.Add(part);
+            vLabel.Text = $"Vertical — {vParts.Count} parts";
+            vPreview.ZoomToFit();
         }
 
         private void OnAutoArrangeClick(object sender, EventArgs e)
@@ -277,14 +349,29 @@ namespace OpenNest.Forms
 
         private void OnApplyClick(object sender, EventArgs e)
         {
-            if (previewView.Plate.Parts.Count == 0)
+            var hCount = hPreview.Plate.Parts.Count;
+            var vCount = vPreview.Plate.Parts.Count;
+
+            if (hCount == 0 && vCount == 0)
                 return;
 
             if (!TryGetPlateSize(out var plateSize))
                 return;
 
+            // Pick which direction to apply — use the one with more parts,
+            // or ask if they're equal and both > 0
+            NestDirection applyDirection;
+
+            if (hCount > vCount)
+                applyDirection = NestDirection.Horizontal;
+            else if (vCount > hCount)
+                applyDirection = NestDirection.Vertical;
+            else
+                applyDirection = NestDirection.Horizontal; // tie-break
+
             var choice = MessageBox.Show(
-                "Apply pattern to current plate?\n\nYes = Current plate (clears existing parts)\nNo = New plate",
+                $"Apply {applyDirection} pattern ({(applyDirection == NestDirection.Horizontal ? hCount : vCount)} parts) to current plate?" +
+                "\n\nYes = Current plate (clears existing parts)\nNo = New plate",
                 "Apply Pattern",
                 MessageBoxButtons.YesNoCancel,
                 MessageBoxIcon.Question);
@@ -293,8 +380,12 @@ namespace OpenNest.Forms
                 return;
 
             // Rebuild a fresh set of tiled parts for the caller
-            var cellParts = cellView.Plate.Parts.ToList();
-            var tiledParts = Engine.PatternTiler.Tile(cellParts, plateSize, PartSpacing);
+            var pattern = BuildCellPattern();
+            if (pattern == null)
+                return;
+
+            var filler = new FillLinear(new Box(0, 0, plateSize.Width, plateSize.Length), PartSpacing);
+            var tiledParts = filler.Fill(pattern, applyDirection);
 
             Result = new PatternTileResult
             {
