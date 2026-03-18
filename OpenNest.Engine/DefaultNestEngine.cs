@@ -17,7 +17,7 @@ namespace OpenNest
 
         public override string Name => "Default";
 
-        public override string Description => "Multi-phase nesting (Linear, Pairs, RectBestFit)";
+        public override string Description => "Multi-phase nesting (Linear, Pairs, RectBestFit, Extents)";
 
         private readonly AngleCandidateBuilder angleBuilder = new();
 
@@ -146,6 +146,29 @@ namespace OpenNest
                         best = pairResult;
                         ReportProgress(progress, NestPhase.Pairs, PlateNumber, best, workArea, BuildProgressSummary());
                     }
+
+                    token.ThrowIfCancellationRequested();
+
+                    var extentsFiller = new FillExtents(workArea, Plate.PartSpacing);
+                    var extentsAngles2 = new[] { groupParts[0].Rotation, groupParts[0].Rotation + Angle.HalfPI };
+                    List<Part> bestExtents2 = null;
+
+                    foreach (var angle in extentsAngles2)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        var result = extentsFiller.Fill(groupParts[0].BaseDrawing, angle, PlateNumber, token, progress);
+                        if (result != null && result.Count > (bestExtents2?.Count ?? 0))
+                            bestExtents2 = result;
+                    }
+
+                    PhaseResults.Add(new PhaseResult(NestPhase.Extents, bestExtents2?.Count ?? 0, 0));
+                    Debug.WriteLine($"[Fill(groupParts,Box)] Extents: {bestExtents2?.Count ?? 0} parts");
+
+                    if (IsBetterFill(bestExtents2, best, workArea))
+                    {
+                        best = bestExtents2;
+                        ReportProgress(progress, NestPhase.Extents, PlateNumber, best, workArea, BuildProgressSummary());
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -262,6 +285,34 @@ namespace OpenNest
                     best = rectResult;
                     WinnerPhase = NestPhase.RectBestFit;
                     ReportProgress(progress, NestPhase.RectBestFit, PlateNumber, best, workArea, BuildProgressSummary());
+                }
+
+                // Extents phase
+                token.ThrowIfCancellationRequested();
+                var extentsSw = Stopwatch.StartNew();
+                var extentsFiller = new FillExtents(workArea, Plate.PartSpacing);
+                List<Part> bestExtents = null;
+                var extentsAngles = new[] { bestRotation, bestRotation + Angle.HalfPI };
+
+                foreach (var angle in extentsAngles)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var extentsResult = extentsFiller.Fill(item.Drawing, angle, PlateNumber, token, progress);
+                    if (bestExtents == null || (extentsResult != null && extentsResult.Count > (bestExtents?.Count ?? 0)))
+                        bestExtents = extentsResult;
+                }
+
+                extentsSw.Stop();
+                var extentsScore = bestExtents != null ? FillScore.Compute(bestExtents, workArea) : default;
+                Debug.WriteLine($"[FindBestFill] Extents: {extentsScore.Count} parts");
+                PhaseResults.Add(new PhaseResult(NestPhase.Extents, bestExtents?.Count ?? 0, extentsSw.ElapsedMilliseconds));
+
+                var bestScore2 = FillScore.Compute(best, workArea);
+                if (extentsScore > bestScore2)
+                {
+                    best = bestExtents;
+                    WinnerPhase = NestPhase.Extents;
+                    ReportProgress(progress, NestPhase.Extents, PlateNumber, best, workArea, BuildProgressSummary());
                 }
             }
             catch (OperationCanceledException)
