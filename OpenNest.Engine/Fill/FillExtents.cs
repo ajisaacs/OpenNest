@@ -1,11 +1,11 @@
+using OpenNest.Geometry;
+using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
-using OpenNest.Geometry;
-using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     public class FillExtents
     {

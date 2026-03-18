@@ -1,3 +1,5 @@
+using OpenNest.Engine.Fill;
+
 namespace OpenNest.Tests;
 
 public class AccumulatingProgressTests

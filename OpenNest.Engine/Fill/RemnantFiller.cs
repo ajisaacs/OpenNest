@@ -1,9 +1,9 @@
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     /// <summary>
     /// Iteratively fills remnant boxes with items using a RemnantFinder.

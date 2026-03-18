@@ -1,9 +1,9 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     public class FillLinear
     {
@@ -16,7 +16,7 @@ namespace OpenNest
         public Box WorkArea { get; }
 
         public double PartSpacing { get; }
-        
+
         public double HalfSpacing => PartSpacing / 2;
 
         /// <summary>

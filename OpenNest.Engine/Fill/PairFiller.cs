@@ -1,13 +1,14 @@
+using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Strategies;
+using OpenNest.Geometry;
+using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using OpenNest.Engine.BestFit;
-using OpenNest.Geometry;
-using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     /// <summary>
     /// Fills a work area using interlocking part pairs from BestFitCache.
@@ -52,11 +53,11 @@ namespace OpenNest
                     var engine = new FillLinear(workArea, partSpacing);
 
                     // Let the remainder strip try pair-based filling too.
-                    var p0 = DefaultNestEngine.BuildRotatedPattern(pairParts, 0);
-                    var p90 = DefaultNestEngine.BuildRotatedPattern(pairParts, Angle.HalfPI);
+                    var p0 = FillHelpers.BuildRotatedPattern(pairParts, 0);
+                    var p90 = FillHelpers.BuildRotatedPattern(pairParts, Angle.HalfPI);
                     engine.RemainderPatterns = new List<Pattern> { p0, p90 };
 
-                    var filled = DefaultNestEngine.FillPattern(engine, pairParts, angles, workArea);
+                    var filled = FillHelpers.FillPattern(engine, pairParts, angles, workArea);
 
                     if (filled != null && filled.Count > 0)
                     {

@@ -1,7 +1,8 @@
-using System.Collections.Generic;
 using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Fill;
+using System.Collections.Generic;
 
-namespace OpenNest
+namespace OpenNest.Engine.Strategies
 {
     public class PairsFillStrategy : IFillStrategy
     {

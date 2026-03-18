@@ -1,4 +1,11 @@
-﻿using System;
+﻿using OpenNest.Actions;
+using OpenNest.CNC;
+using OpenNest.Collections;
+using OpenNest.Engine.Fill;
+using OpenNest.Forms;
+using OpenNest.Geometry;
+using OpenNest.Math;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -9,12 +16,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using OpenNest.Actions;
-using OpenNest.CNC;
-using OpenNest.Collections;
-using OpenNest.Forms;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using Action = OpenNest.Actions.Action;
 using Timer = System.Timers.Timer;
 
@@ -59,7 +60,7 @@ namespace OpenNest.Controls
 
         public List<LayoutPart> SelectedParts;
         public ReadOnlyCollection<LayoutPart> Parts;
-        
+
         public event EventHandler<ItemAddedEventArgs<Part>> PartAdded;
         public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
         public event EventHandler StatusChanged;
@@ -381,7 +382,7 @@ namespace OpenNest.Controls
                 e.Graphics.DrawLine(ColorScheme.OriginPen, origin.X, 0, origin.X, Height);
                 e.Graphics.DrawLine(ColorScheme.OriginPen, 0, origin.Y, Width, origin.Y);
             }
-            
+
             e.Graphics.TranslateTransform(origin.X, origin.Y);
 
             DrawPlate(e.Graphics);
@@ -1001,7 +1002,7 @@ namespace OpenNest.Controls
         {
             base.ZoomToPoint(pt, zoomFactor, false);
 
-            if (redraw) 
+            if (redraw)
                 Invalidate();
         }
 

@@ -1,9 +1,10 @@
+using OpenNest.Controls;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
-using OpenNest.Controls;
-using OpenNest.Geometry;
 using GeoSize = OpenNest.Geometry.Size;
 
 namespace OpenNest.Forms

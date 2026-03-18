@@ -1,9 +1,10 @@
+using OpenNest.Controls;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-using OpenNest.Controls;
-using OpenNest.Geometry;
 
 namespace OpenNest.Forms
 {

@@ -1,9 +1,10 @@
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -212,9 +213,13 @@ namespace OpenNest
                       $"PartArea={totalPartArea:F0}, Remnant={workArea.Area() - totalPartArea:F0}, " +
                       $"WorkArea={workArea.Width:F1}x{workArea.Length:F1} | {description}";
             Debug.WriteLine(msg);
-            try { System.IO.File.AppendAllText(
+            try
+            {
+                System.IO.File.AppendAllText(
                 System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log"),
-                $"{DateTime.Now:HH:mm:ss.fff} {msg}\n"); } catch { }
+                $"{DateTime.Now:HH:mm:ss.fff} {msg}\n");
+            }
+            catch { }
 
             progress.Report(new NestProgress
             {

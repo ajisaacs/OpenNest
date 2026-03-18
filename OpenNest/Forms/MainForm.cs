@@ -1,4 +1,12 @@
-﻿using System;
+﻿using OpenNest.Actions;
+using OpenNest.Collections;
+using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
+using OpenNest.Gpu;
+using OpenNest.IO;
+using OpenNest.Properties;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -7,13 +15,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using OpenNest.Actions;
-using OpenNest.Collections;
-using OpenNest.Engine.BestFit;
-using OpenNest.Gpu;
-using OpenNest.Geometry;
-using OpenNest.IO;
-using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
@@ -812,7 +813,7 @@ namespace OpenNest.Forms
 
             if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                 return;
-            
+
             var items = form.GetNestItems();
 
             if (!items.Any(it => it.Quantity > 0))
@@ -896,7 +897,7 @@ namespace OpenNest.Forms
 
         private void SequenceAllPlates_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) 
+            if (activeForm == null)
                 return;
 
             activeForm.AutoSequenceAllPlates();

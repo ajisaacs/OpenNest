@@ -1,9 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using OpenNest.Controls;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Forms;
-using OpenNest.Controls;
-using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
@@ -71,7 +72,7 @@ namespace OpenNest.Actions
         {
             if (plateView.ViewScale != lastScale)
             {
-                parts.ForEach(p => 
+                parts.ForEach(p =>
                 {
                     p.Update(plateView);
                     p.Draw(e.Graphics);
@@ -146,11 +147,11 @@ namespace OpenNest.Actions
                 PushDirection hDir, vDir;
                 switch (plateView.Plate.Quadrant)
                 {
-                    case 1:  hDir = PushDirection.Left;  vDir = PushDirection.Down; break;
-                    case 2:  hDir = PushDirection.Right;  vDir = PushDirection.Down; break;
-                    case 3:  hDir = PushDirection.Right;  vDir = PushDirection.Up;   break;
-                    case 4:  hDir = PushDirection.Left;  vDir = PushDirection.Up;   break;
-                    default: hDir = PushDirection.Left;  vDir = PushDirection.Down; break;
+                    case 1: hDir = PushDirection.Left; vDir = PushDirection.Down; break;
+                    case 2: hDir = PushDirection.Right; vDir = PushDirection.Down; break;
+                    case 3: hDir = PushDirection.Right; vDir = PushDirection.Up; break;
+                    case 4: hDir = PushDirection.Left; vDir = PushDirection.Up; break;
+                    default: hDir = PushDirection.Left; vDir = PushDirection.Down; break;
                 }
 
                 // Phase 1: BB-only push to get past irregular geometry quickly.

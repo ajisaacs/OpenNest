@@ -1,11 +1,11 @@
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using OpenNest.Engine.ML;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     /// <summary>
     /// Builds candidate rotation angles for single-item fill. Encapsulates the

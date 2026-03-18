@@ -1,10 +1,11 @@
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using OpenNest.Geometry;
-using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine.Strategies
 {
     public static class FillHelpers
     {

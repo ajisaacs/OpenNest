@@ -1,9 +1,10 @@
+using OpenNest.Converters;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using OpenNest.Converters;
-using OpenNest.Geometry;
 
 namespace OpenNest.Engine.BestFit
 {

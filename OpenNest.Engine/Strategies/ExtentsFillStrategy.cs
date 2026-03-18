@@ -1,8 +1,8 @@
-using System.Collections.Generic;
-using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Fill;
 using OpenNest.Math;
+using System.Collections.Generic;
 
-namespace OpenNest
+namespace OpenNest.Engine.Strategies
 {
     public class ExtentsFillStrategy : IFillStrategy
     {
@@ -20,10 +20,6 @@ namespace OpenNest
 
             var angles = new[] { bestRotation, bestRotation + Angle.HalfPI };
 
-            var bestFits = context.SharedState.TryGetValue("BestFits", out var cached)
-                ? (List<BestFitResult>)cached
-                : null;
-
             List<Part> best = null;
             var bestScore = default(FillScore);
 
@@ -31,7 +27,7 @@ namespace OpenNest
             {
                 context.Token.ThrowIfCancellationRequested();
                 var result = filler.Fill(context.Item.Drawing, angle,
-                    context.PlateNumber, context.Token, context.Progress, bestFits);
+                    context.PlateNumber, context.Token, context.Progress);
                 if (result != null && result.Count > 0)
                 {
                     var score = FillScore.Compute(result, context.WorkArea);

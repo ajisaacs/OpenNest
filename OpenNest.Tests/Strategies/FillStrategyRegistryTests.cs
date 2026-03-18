@@ -1,3 +1,5 @@
+using OpenNest.Engine.Strategies;
+
 namespace OpenNest.Tests.Strategies;
 
 public class FillStrategyRegistryTests
