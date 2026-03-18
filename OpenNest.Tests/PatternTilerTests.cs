@@ -92,7 +92,7 @@ public class PatternTilerTests
     }
 
     [Fact]
-    public void Tile_CellLargerThanPlate_ReturnsSingleCell()
+    public void Tile_CellLargerThanPlate_ReturnsEmpty()
     {
         var drawing = MakeSquareDrawing(50);
         var cell = new List<Part> { Part.CreateAtOrigin(drawing) };
