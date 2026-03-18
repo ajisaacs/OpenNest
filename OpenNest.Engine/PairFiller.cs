@@ -30,11 +30,11 @@ namespace OpenNest
             IProgress<NestProgress> progress = null)
         {
             var bestFits = BestFitCache.GetOrCompute(
-                item.Drawing, plateSize.Width, plateSize.Length, partSpacing);
+                item.Drawing, plateSize.Length, plateSize.Width, partSpacing);
 
             var candidates = SelectPairCandidates(bestFits, workArea);
             Debug.WriteLine($"[PairFiller] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
-            Debug.WriteLine($"[PairFiller] Plate: {plateSize.Width:F2}x{plateSize.Length:F2}, WorkArea: {workArea.Width:F2}x{workArea.Length:F2}");
+            Debug.WriteLine($"[PairFiller] Plate: {plateSize.Length:F2}x{plateSize.Width:F2}, WorkArea: {workArea.Width:F2}x{workArea.Length:F2}");
 
             List<Part> best = null;
             var bestScore = default(FillScore);

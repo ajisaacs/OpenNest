@@ -435,24 +435,24 @@ namespace OpenNest.Controls
                     break;
 
                 case 2:
-                    plateRect.Location = PointWorldToGraph(-Plate.Size.Width, 0);
+                    plateRect.Location = PointWorldToGraph(-Plate.Size.Length, 0);
                     edgeSpacingRect.Location = PointWorldToGraph(
-                        Plate.EdgeSpacing.Left - Plate.Size.Width,
+                        Plate.EdgeSpacing.Left - Plate.Size.Length,
                         Plate.EdgeSpacing.Bottom);
                     break;
 
                 case 3:
-                    plateRect.Location = PointWorldToGraph(-Plate.Size.Width, -Plate.Size.Length);
+                    plateRect.Location = PointWorldToGraph(-Plate.Size.Length, -Plate.Size.Width);
                     edgeSpacingRect.Location = PointWorldToGraph(
-                        Plate.EdgeSpacing.Left - Plate.Size.Width,
-                        Plate.EdgeSpacing.Bottom - Plate.Size.Length);
+                        Plate.EdgeSpacing.Left - Plate.Size.Length,
+                        Plate.EdgeSpacing.Bottom - Plate.Size.Width);
                     break;
 
                 case 4:
-                    plateRect.Location = PointWorldToGraph(0, -Plate.Size.Length);
+                    plateRect.Location = PointWorldToGraph(0, -Plate.Size.Width);
                     edgeSpacingRect.Location = PointWorldToGraph(
                         Plate.EdgeSpacing.Left,
-                        Plate.EdgeSpacing.Bottom - Plate.Size.Length);
+                        Plate.EdgeSpacing.Bottom - Plate.Size.Width);
                     break;
 
                 default:

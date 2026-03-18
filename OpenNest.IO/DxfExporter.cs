@@ -145,30 +145,30 @@ namespace OpenNest.IO
             {
                 case 1:
                     pt1 = new XYZ(0, 0, 0);
-                    pt2 = new XYZ(0, plate.Size.Length, 0);
-                    pt3 = new XYZ(plate.Size.Width, plate.Size.Length, 0);
-                    pt4 = new XYZ(plate.Size.Width, 0, 0);
+                    pt2 = new XYZ(0, plate.Size.Width, 0);
+                    pt3 = new XYZ(plate.Size.Length, plate.Size.Width, 0);
+                    pt4 = new XYZ(plate.Size.Length, 0, 0);
                     break;
 
                 case 2:
                     pt1 = new XYZ(0, 0, 0);
-                    pt2 = new XYZ(0, plate.Size.Length, 0);
-                    pt3 = new XYZ(-plate.Size.Width, plate.Size.Length, 0);
-                    pt4 = new XYZ(-plate.Size.Width, 0, 0);
+                    pt2 = new XYZ(0, plate.Size.Width, 0);
+                    pt3 = new XYZ(-plate.Size.Length, plate.Size.Width, 0);
+                    pt4 = new XYZ(-plate.Size.Length, 0, 0);
                     break;
 
                 case 3:
                     pt1 = new XYZ(0, 0, 0);
-                    pt2 = new XYZ(0, -plate.Size.Length, 0);
-                    pt3 = new XYZ(-plate.Size.Width, -plate.Size.Length, 0);
-                    pt4 = new XYZ(-plate.Size.Width, 0, 0);
+                    pt2 = new XYZ(0, -plate.Size.Width, 0);
+                    pt3 = new XYZ(-plate.Size.Length, -plate.Size.Width, 0);
+                    pt4 = new XYZ(-plate.Size.Length, 0, 0);
                     break;
 
                 case 4:
                     pt1 = new XYZ(0, 0, 0);
-                    pt2 = new XYZ(0, -plate.Size.Length, 0);
-                    pt3 = new XYZ(plate.Size.Width, -plate.Size.Length, 0);
-                    pt4 = new XYZ(plate.Size.Width, 0, 0);
+                    pt2 = new XYZ(0, -plate.Size.Width, 0);
+                    pt3 = new XYZ(plate.Size.Length, -plate.Size.Width, 0);
+                    pt4 = new XYZ(plate.Size.Length, 0, 0);
                     break;
 
                 default:
