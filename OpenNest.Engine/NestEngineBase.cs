@@ -308,6 +308,7 @@ namespace OpenNest
                 case NestPhase.Linear: return "Linear";
                 case NestPhase.RectBestFit: return "BestFit";
                 case NestPhase.Extents: return "Extents";
+                case NestPhase.Custom: return "Custom";
                 default: return phase.ToString();
             }
         }

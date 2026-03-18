@@ -9,7 +9,8 @@ namespace OpenNest
         RectBestFit,
         Pairs,
         Nfp,
-        Extents
+        Extents,
+        Custom
     }
 
     public class PhaseResult
