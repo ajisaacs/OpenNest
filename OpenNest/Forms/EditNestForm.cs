@@ -29,6 +29,7 @@ namespace OpenNest.Forms
         private Panel plateHeaderPanel;
         private Label plateInfoLabel;
         private Button btnFirstPlate;
+        private Button btnRemovePlate;
 
         private Button btnPreviousPlate;
         private Button btnNextPlate;
@@ -119,7 +120,7 @@ namespace OpenNest.Forms
 
             navPanel.Controls.AddRange(new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate });
 
-            var btnRemovePlate = CreateNavButton(Resources.remove);
+            btnRemovePlate = CreateNavButton(Resources.remove);
             btnRemovePlate.Dock = DockStyle.Right;
             btnRemovePlate.Click += (s, e) => RemoveCurrentPlate();
 
@@ -175,6 +176,7 @@ namespace OpenNest.Forms
 
             UpdatePlateList();
             UpdateDrawingList();
+            UpdateRemovePlateButton();
 
             LoadFirstPlate();
 
@@ -728,6 +730,7 @@ namespace OpenNest.Forms
                 PlateView.Plate = Nest.Plates[CurrentPlateIndex];
 
             UpdatePlateList();
+            UpdateRemovePlateButton();
             PlateView.ZoomToFit();
         }
 
@@ -735,8 +738,14 @@ namespace OpenNest.Forms
         {
             tabControl1.SelectedIndex = 0;
             UpdatePlateList();
+            UpdateRemovePlateButton();
             LoadLastPlate();
             PlateView.ZoomToFit();
+        }
+
+        private void UpdateRemovePlateButton()
+        {
+            btnRemovePlate.Enabled = Nest.Plates.Count > 1;
         }
 
         #endregion
