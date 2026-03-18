@@ -176,6 +176,13 @@ namespace OpenNest
                 }
             }
 
+            // Always report the final winner so the UI's temporary parts
+            // match the returned result.
+            var winPhase = PhaseResults.Count > 0
+                ? PhaseResults.OrderByDescending(r => r.PartCount).First().Phase
+                : NestPhase.Linear;
+            ReportProgress(progress, winPhase, PlateNumber, best, workArea, BuildProgressSummary());
+
             return best ?? new List<Part>();
         }
 
@@ -319,6 +326,11 @@ namespace OpenNest
             {
                 Debug.WriteLine("[FindBestFill] Cancelled, returning current best");
             }
+
+            // Always report the final winner so the UI's temporary parts
+            // match the returned result (sub-phases may have reported their
+            // own intermediate results via progress).
+            ReportProgress(progress, WinnerPhase, PlateNumber, best, workArea, BuildProgressSummary());
 
             return best ?? new List<Part>();
         }

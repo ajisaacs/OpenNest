@@ -50,6 +50,12 @@ namespace OpenNest
                     var pairParts = result.BuildParts(item.Drawing);
                     var angles = result.HullAngles;
                     var engine = new FillLinear(workArea, partSpacing);
+
+                    // Let the remainder strip try pair-based filling too.
+                    var p0 = DefaultNestEngine.BuildRotatedPattern(pairParts, 0);
+                    var p90 = DefaultNestEngine.BuildRotatedPattern(pairParts, Angle.HalfPI);
+                    engine.RemainderPatterns = new List<Pattern> { p0, p90 };
+
                     var filled = DefaultNestEngine.FillPattern(engine, pairParts, angles, workArea);
 
                     if (filled != null && filled.Count > 0)

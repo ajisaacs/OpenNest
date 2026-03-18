@@ -177,9 +177,13 @@ namespace OpenNest
             // startOffset = pairHeight (no extra spacing), copyDist = height - slide.
             var copyDist = pairHeight - minSlide;
 
-            // Clamp: never let geometry quirks produce a distance smaller than
-            // the bounding box height (which would overlap).
-            return System.Math.Max(copyDist, pairHeight + partSpacing);
+            // Boundaries are inflated by halfSpacing, so the geometry-aware
+            // distance already guarantees partSpacing gap. Only fall back to
+            // bounding-box distance if the calculation produced a non-positive value.
+            if (copyDist <= Tolerance.Epsilon)
+                return pairHeight + partSpacing;
+
+            return copyDist;
         }
 
         private static double SlideDistance(
