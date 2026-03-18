@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine
@@ -28,6 +26,8 @@ namespace OpenNest.Engine
             if (cols <= 0 || rows <= 0)
                 return new List<Part>();
 
+            // Shift cell so parts start at halfSpacing inset, ensuring symmetric
+            // spacing between adjacent tiled cells on all sides.
             var cellOrigin = cellBox.Location;
             var baseOffset = new Vector(halfSpacing - cellOrigin.X, halfSpacing - cellOrigin.Y);
 
