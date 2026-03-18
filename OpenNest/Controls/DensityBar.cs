@@ -46,8 +46,9 @@ namespace OpenNest.Controls
             var fillWidth = (int)(rect.Width * value);
             if (fillWidth > 0)
             {
+                var fillRadius = System.Math.Min(4, fillWidth / 2);
                 var fillRect = new Rectangle(rect.X, rect.Y, fillWidth, rect.Height);
-                using var fillPath = CreateRoundedRect(fillRect, 4);
+                using var fillPath = CreateRoundedRect(fillRect, fillRadius);
                 using var gradientBrush = new LinearGradientBrush(
                     new Point(rect.X, 0), new Point(rect.Right, 0),
                     LowColor, HighColor);

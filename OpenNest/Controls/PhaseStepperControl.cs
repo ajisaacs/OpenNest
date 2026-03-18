@@ -81,7 +81,7 @@ namespace OpenNest.Controls
 
             var padding = 30;
             var usableWidth = Width - padding * 2;
-            var spacing = usableWidth / (count - 1);
+            var spacing = (float)usableWidth / (count - 1);
             var circleY = 18;
             var normalRadius = 9;
             var activeRadius = 11;
@@ -96,8 +96,8 @@ namespace OpenNest.Controls
             // Draw connecting lines
             for (var i = 0; i < count - 1; i++)
             {
-                var x1 = padding + i * spacing;
-                var x2 = padding + (i + 1) * spacing;
+                var x1 = (int)(padding + i * spacing);
+                var x2 = (int)(padding + (i + 1) * spacing);
                 g.DrawLine(linePen, x1, circleY, x2, circleY);
             }
 
@@ -105,7 +105,7 @@ namespace OpenNest.Controls
             for (var i = 0; i < count; i++)
             {
                 var phase = Phases[i];
-                var cx = padding + i * spacing;
+                var cx = (int)(padding + i * spacing);
                 var isActive = activePhase == phase && !isComplete;
                 var isVisited = visitedPhases.Contains(phase) || isComplete;
 
