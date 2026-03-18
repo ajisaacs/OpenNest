@@ -59,4 +59,29 @@ public class FillExtentsTests
         Assert.NotNull(parts);
         Assert.Empty(parts);
     }
+
+    [Fact]
+    public void Fill_Triangle_ColumnFillsHeight()
+    {
+        var workArea = new Box(0, 0, 120, 60);
+        var filler = new FillExtents(workArea, 0.5);
+        var drawing = MakeRightTriangle(10, 8);
+
+        var parts = filler.Fill(drawing);
+
+        Assert.True(parts.Count > 0);
+
+        // The topmost part should be close to the work area top edge.
+        var topEdge = 0.0;
+        foreach (var part in parts)
+        {
+            if (part.BoundingBox.Top > topEdge)
+                topEdge = part.BoundingBox.Top;
+        }
+
+        // After adjustment, the gap should be small (within one part spacing).
+        var gap = workArea.Top - topEdge;
+        Assert.True(gap < 1.0,
+            $"Gap of {gap:F2} is too large — adjustment should fill close to the top");
+    }
 }

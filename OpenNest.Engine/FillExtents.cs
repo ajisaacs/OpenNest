@@ -196,14 +196,105 @@ namespace OpenNest
                 direction);
         }
 
-        // --- Step 3: Iterative Adjustment (stub for Task 3) ---
+        // --- Step 3: Iterative Adjustment ---
 
         private List<Part> AdjustColumn(
             (Part part1, Part part2, Box pairBbox) pair,
             List<Part> column,
             CancellationToken token)
         {
+            var originalPairWidth = pair.pairBbox.Width;
+
+            for (var iteration = 0; iteration < MaxIterations; iteration++)
+            {
+                if (token.IsCancellationRequested)
+                    break;
+
+                // Measure current gap.
+                var topEdge = double.MinValue;
+                foreach (var p in column)
+                    if (p.BoundingBox.Top > topEdge)
+                        topEdge = p.BoundingBox.Top;
+
+                var gap = workArea.Top - topEdge;
+
+                if (gap <= Tolerance.Epsilon)
+                    break;
+
+                var pairCount = column.Count / 2;
+                if (pairCount <= 0)
+                    break;
+
+                var adjustment = gap / pairCount;
+                if (adjustment <= Tolerance.Epsilon)
+                    break;
+
+                // Try adjusting the pair and rebuilding the column.
+                var adjusted = TryAdjustPair(pair, adjustment, originalPairWidth);
+                if (adjusted == null)
+                    break;
+
+                var newColumn = BuildColumn(adjusted.Value.part1, adjusted.Value.part2, adjusted.Value.pairBbox);
+                if (newColumn.Count == 0)
+                    break;
+
+                column = newColumn;
+                pair = adjusted.Value;
+            }
+
             return column;
+        }
+
+        private (Part part1, Part part2, Box pairBbox)? TryAdjustPair(
+            (Part part1, Part part2, Box pairBbox) pair,
+            double adjustment, double originalPairWidth)
+        {
+            // Try shifting part2 up first.
+            var result = TryShiftDirection(pair, adjustment, originalPairWidth);
+
+            if (result != null)
+                return result;
+
+            // Up made the pair wider — try down instead.
+            return TryShiftDirection(pair, -adjustment, originalPairWidth);
+        }
+
+        private (Part part1, Part part2, Box pairBbox)? TryShiftDirection(
+            (Part part1, Part part2, Box pairBbox) pair,
+            double verticalShift, double originalPairWidth)
+        {
+            // Clone parts so we don't mutate the originals.
+            var p1 = (Part)pair.part1.Clone();
+            var p2 = (Part)pair.part2.Clone();
+
+            // Separate: shift part2 right so bounding boxes don't touch.
+            p2.Offset(partSpacing, 0);
+            p2.UpdateBounds();
+
+            // Apply the vertical shift.
+            p2.Offset(0, verticalShift);
+            p2.UpdateBounds();
+
+            // Compact part2 left toward part1.
+            var moving = new List<Part> { p2 };
+            var obstacles = new List<Part> { p1 };
+            Compactor.Push(moving, obstacles, workArea, partSpacing, PushDirection.Left);
+
+            // Check if the pair got wider.
+            var newBbox = ((IEnumerable<IBoundable>)new IBoundable[] { p1, p2 }).GetBoundingBox();
+
+            if (newBbox.Width > originalPairWidth + Tolerance.Epsilon)
+                return null;
+
+            // Re-anchor to work area origin.
+            var anchor = new Vector(workArea.X - newBbox.Left, workArea.Y - newBbox.Bottom);
+            p1.Offset(anchor);
+            p2.Offset(anchor);
+            p1.UpdateBounds();
+            p2.UpdateBounds();
+
+            newBbox = ((IEnumerable<IBoundable>)new IBoundable[] { p1, p2 }).GetBoundingBox();
+            return (p1, p2, newBbox);
         }
 
         // --- Step 4: Horizontal Repetition (stub for Task 4) ---
