@@ -1,11 +1,12 @@
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Engine.Nfp
 {
     /// <summary>
     /// Simulated annealing optimizer for NFP-based nesting.

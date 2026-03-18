@@ -1,7 +1,7 @@
-using System.Collections.Generic;
 using OpenNest.Geometry;
+using System.Collections.Generic;
 
-namespace OpenNest
+namespace OpenNest.Engine.Nfp
 {
     /// <summary>
     /// NFP-based Bottom-Left Fill (BLF) placement engine.

@@ -1,13 +1,12 @@
-using System;
+using OpenNest.Converters;
+using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using OpenNest.Converters;
-using OpenNest.Geometry;
-using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine.Nfp
 {
     /// <summary>
     /// Mixed-part geometry-aware nesting using NFP-based collision avoidance
