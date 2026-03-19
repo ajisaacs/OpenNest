@@ -55,7 +55,8 @@ namespace OpenNest
             if (item.Quantity > 0 && best.Count > item.Quantity)
                 best = best.Take(item.Quantity).ToList();
 
-            ReportProgress(progress, WinnerPhase, PlateNumber, best, workArea, BuildProgressSummary());
+            ReportProgress(progress, WinnerPhase, PlateNumber, best, workArea, BuildProgressSummary(),
+                isOverallBest: true);
 
             return best;
         }
@@ -82,7 +83,8 @@ namespace OpenNest
 
             Debug.WriteLine($"[Fill(groupParts,Box)] Linear pattern: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Length:F1}");
 
-            ReportProgress(progress, NestPhase.Linear, PlateNumber, best, workArea, BuildProgressSummary());
+            ReportProgress(progress, NestPhase.Linear, PlateNumber, best, workArea, BuildProgressSummary(),
+                isOverallBest: true);
 
             return best ?? new List<Part>();
         }
@@ -134,8 +136,13 @@ namespace OpenNest
                         context.CurrentBest = result;
                         context.CurrentBestScore = FillScore.Compute(result, context.WorkArea);
                         context.WinnerPhase = strategy.Phase;
-                        ReportProgress(context.Progress, strategy.Phase, PlateNumber,
-                            result, context.WorkArea, BuildProgressSummary());
+                    }
+
+                    if (context.CurrentBest != null && context.CurrentBest.Count > 0)
+                    {
+                        ReportProgress(context.Progress, context.WinnerPhase, PlateNumber,
+                            context.CurrentBest, context.WorkArea, BuildProgressSummary(),
+                            isOverallBest: true);
                     }
                 }
             }
