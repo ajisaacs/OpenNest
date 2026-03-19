@@ -31,7 +31,8 @@ namespace OpenNest.Controls
         private Action currentAction;
         private Action previousAction;
         private List<LayoutPart> parts;
-        private List<LayoutPart> temporaryParts = new List<LayoutPart>();
+        private List<LayoutPart> stationaryParts = new List<LayoutPart>();
+        private List<LayoutPart> activeParts = new List<LayoutPart>();
         private Point middleMouseDownPoint;
         private Box activeWorkArea;
         private List<Box> debugRemnants;
@@ -149,7 +150,8 @@ namespace OpenNest.Controls
                 plate.PartAdded -= plate_PartAdded;
                 plate.PartRemoved -= plate_PartRemoved;
                 parts.Clear();
-                temporaryParts.Clear();
+                stationaryParts.Clear();
+                activeParts.Clear();
                 SelectedParts.Clear();
             }
 
@@ -408,7 +410,8 @@ namespace OpenNest.Controls
         public override void Refresh()
         {
             parts.ForEach(p => p.Update(this));
-            temporaryParts.ForEach(p => p.Update(this));
+            stationaryParts.ForEach(p => p.Update(this));
+            activeParts.ForEach(p => p.Update(this));
             Invalidate();
         }
 
@@ -503,22 +506,36 @@ namespace OpenNest.Controls
                 part.Draw(g, (i + 1).ToString());
             }
 
-            // Draw temporary (preview) parts
-            for (var i = 0; i < temporaryParts.Count; i++)
+            // Draw stationary preview parts (overall best — full opacity)
+            for (var i = 0; i < stationaryParts.Count; i++)
             {
-                var temp = temporaryParts[i];
+                var part = stationaryParts[i];
 
-                if (temp.IsDirty)
-                    temp.Update(this);
+                if (part.IsDirty)
+                    part.Update(this);
 
-                var path = temp.Path;
-                var pathBounds = path.GetBounds();
-
-                if (!pathBounds.IntersectsWith(viewBounds))
+                var path = part.Path;
+                if (!path.GetBounds().IntersectsWith(viewBounds))
                     continue;
 
                 g.FillPath(ColorScheme.PreviewPartBrush, path);
                 g.DrawPath(ColorScheme.PreviewPartPen, path);
+            }
+
+            // Draw active preview parts (current strategy — reduced opacity)
+            for (var i = 0; i < activeParts.Count; i++)
+            {
+                var part = activeParts[i];
+
+                if (part.IsDirty)
+                    part.Update(this);
+
+                var path = part.Path;
+                if (!path.GetBounds().IntersectsWith(viewBounds))
+                    continue;
+
+                g.FillPath(ColorScheme.ActivePreviewPartBrush, path);
+                g.DrawPath(ColorScheme.ActivePreviewPartPen, path);
             }
 
             if (DrawOffset && Plate.PartSpacing > 0)
@@ -879,34 +896,49 @@ namespace OpenNest.Controls
             Plate.Parts.Add(part);
         }
 
-        public void SetTemporaryParts(List<Part> parts)
+        public void SetStationaryParts(List<Part> parts)
         {
-            temporaryParts.Clear();
+            stationaryParts.Clear();
 
             if (parts != null)
             {
                 foreach (var part in parts)
-                    temporaryParts.Add(LayoutPart.Create(part, this));
+                    stationaryParts.Add(LayoutPart.Create(part, this));
             }
 
             Invalidate();
         }
 
-        public void ClearTemporaryParts()
+        public void SetActiveParts(List<Part> parts)
         {
-            temporaryParts.Clear();
+            activeParts.Clear();
+
+            if (parts != null)
+            {
+                foreach (var part in parts)
+                    activeParts.Add(LayoutPart.Create(part, this));
+            }
+
             Invalidate();
         }
 
-        public int AcceptTemporaryParts()
+        public void ClearPreviewParts()
         {
-            var count = temporaryParts.Count;
+            stationaryParts.Clear();
+            activeParts.Clear();
+            Invalidate();
+        }
 
-            foreach (var layoutPart in temporaryParts)
-                Plate.Parts.Add(layoutPart.BasePart);
+        public void AcceptPreviewParts(List<Part> parts)
+        {
+            if (parts != null)
+            {
+                foreach (var part in parts)
+                    Plate.Parts.Add(part);
+            }
 
-            temporaryParts.Clear();
-            return count;
+            stationaryParts.Clear();
+            activeParts.Clear();
         }
 
         public async void FillWithProgress(List<Part> groupParts, Box workArea)
@@ -918,7 +950,12 @@ namespace OpenNest.Controls
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
-                SetTemporaryParts(p.BestParts);
+
+                if (p.IsOverallBest)
+                    SetStationaryParts(p.BestParts);
+                else
+                    SetActiveParts(p.BestParts);
+
                 ActiveWorkArea = p.ActiveWorkArea;
             });
 
@@ -932,20 +969,20 @@ namespace OpenNest.Controls
 
                 if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
                 {
-                    AcceptTemporaryParts();
+                    AcceptPreviewParts(parts);
                     sw.Stop();
                     Status = $"Fill: {parts.Count} parts in {sw.ElapsedMilliseconds} ms";
                 }
                 else
                 {
-                    ClearTemporaryParts();
+                    ClearPreviewParts();
                 }
 
                 progressForm.ShowCompleted();
             }
             catch (Exception)
             {
-                ClearTemporaryParts();
+                ClearPreviewParts();
             }
             finally
             {
@@ -1082,7 +1119,8 @@ namespace OpenNest.Controls
         {
             base.UpdateMatrix();
             parts.ForEach(p => p.Update(this));
-            temporaryParts.ForEach(p => p.Update(this));
+            stationaryParts.ForEach(p => p.Update(this));
+            activeParts.ForEach(p => p.Update(this));
         }
     }
 }
