@@ -3,7 +3,6 @@ using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 
 namespace OpenNest.Engine.Fill
@@ -14,11 +13,13 @@ namespace OpenNest.Engine.Fill
 
         private readonly Box workArea;
         private readonly double partSpacing;
+        private readonly double halfSpacing;
 
         public FillExtents(Box workArea, double partSpacing)
         {
             this.workArea = workArea;
             this.partSpacing = partSpacing;
+            halfSpacing = partSpacing / 2;
         }
 
         public List<Part> Fill(Drawing drawing, double rotationAngle = 0,
@@ -26,18 +27,18 @@ namespace OpenNest.Engine.Fill
             CancellationToken token = default,
             IProgress<NestProgress> progress = null)
         {
-            var initialPair = CreatePair(drawing, rotationAngle, rotationAngle + System.Math.PI);
-            if (initialPair == null)
+            var pair = BuildPair(drawing, rotationAngle);
+            if (pair == null)
                 return new List<Part>();
 
-            var column = BuildColumn(initialPair.Value.part1, initialPair.Value.part2, initialPair.Value.pairBbox);
+            var column = BuildColumn(pair.Value.part1, pair.Value.part2, pair.Value.pairBbox);
             if (column.Count == 0)
                 return new List<Part>();
 
             NestEngineBase.ReportProgress(progress, NestPhase.Extents, plateNumber,
                 column, workArea, $"Extents: initial column {column.Count} parts");
 
-            var adjusted = AdjustColumn(initialPair.Value, column, token);
+            var adjusted = AdjustColumn(pair.Value, column, token);
 
             NestEngineBase.ReportProgress(progress, NestPhase.Extents, plateNumber,
                 adjusted, workArea, $"Extents: adjusted column {adjusted.Count} parts");
@@ -52,33 +53,52 @@ namespace OpenNest.Engine.Fill
 
         // --- Step 1: Pair Construction ---
 
-        private (Part part1, Part part2, Box pairBbox)? CreatePair(
-            Drawing drawing, double rotation1, double rotation2, double verticalShift2 = 0)
+        private (Part part1, Part part2, Box pairBbox)? BuildPair(Drawing drawing, double rotationAngle)
         {
-            var p1 = Part.CreateAtOrigin(drawing, rotation1);
-            var p2 = Part.CreateAtOrigin(drawing, rotation2);
+            var part1 = Part.CreateAtOrigin(drawing, rotationAngle);
+            var part2 = Part.CreateAtOrigin(drawing, rotationAngle + System.Math.PI);
 
-            // Initial positioning: p2 to the right of p1, with optional vertical shift.
-            p2.Offset(p1.BoundingBox.Width + partSpacing, verticalShift2);
+            // Check that each part fits in the work area individually.
+            if (part1.BoundingBox.Width > workArea.Width + Tolerance.Epsilon ||
+                part1.BoundingBox.Length > workArea.Length + Tolerance.Epsilon)
+                return null;
 
-            // Compact p2 left toward p1 using geometry-aware distance.
-            Compactor.Push(new List<Part> { p2 }, new List<Part> { p1 }, workArea, partSpacing, PushDirection.Left);
+            // Slide part2 toward part1 from the right using geometry-aware distance.
+            var boundary1 = new PartBoundary(part1, halfSpacing);
+            var boundary2 = new PartBoundary(part2, halfSpacing);
 
-            var pairBbox = ((IEnumerable<IBoundable>)new IBoundable[] { p1, p2 }).GetBoundingBox();
+            // Position part2 to the right of part1 at bounding box width distance.
+            var startOffset = part1.BoundingBox.Width + part2.BoundingBox.Width + partSpacing;
+            part2.Offset(startOffset, 0);
+            part2.UpdateBounds();
 
-            // Re-anchor pair to work area origin (bottom-left).
+            // Slide part2 left toward part1.
+            var movingLines = boundary2.GetLines(part2.Location, PushDirection.Left);
+            var stationaryLines = boundary1.GetLines(part1.Location, PushDirection.Right);
+            var dist = SpatialQuery.DirectionalDistance(movingLines, stationaryLines, PushDirection.Left);
+
+            if (dist < double.MaxValue && dist > 0)
+            {
+                part2.Offset(-dist, 0);
+                part2.UpdateBounds();
+            }
+
+            // Re-anchor pair to work area origin.
+            var pairBbox = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
             var anchor = new Vector(workArea.X - pairBbox.Left, workArea.Y - pairBbox.Bottom);
-            p1.Offset(anchor);
-            p2.Offset(anchor);
+            part1.Offset(anchor);
+            part2.Offset(anchor);
+            part1.UpdateBounds();
+            part2.UpdateBounds();
 
-            pairBbox = ((IEnumerable<IBoundable>)new IBoundable[] { p1, p2 }).GetBoundingBox();
+            pairBbox = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
 
             // Verify pair fits in work area.
             if (pairBbox.Width > workArea.Width + Tolerance.Epsilon ||
                 pairBbox.Length > workArea.Length + Tolerance.Epsilon)
                 return null;
 
-            return (p1, p2, pairBbox);
+            return (part1, part2, pairBbox);
         }
 
         // --- Step 2: Build Column (tile vertically) ---
@@ -87,104 +107,193 @@ namespace OpenNest.Engine.Fill
         {
             var column = new List<Part> { (Part)part1.Clone(), (Part)part2.Clone() };
 
-            var copyDistance = ComputeVerticalCopyDistance(part1, part2, pairBbox);
+            // Find geometry-aware copy distance for the pair vertically.
+            var boundary1 = new PartBoundary(part1, halfSpacing);
+            var boundary2 = new PartBoundary(part2, halfSpacing);
+
+            // Compute vertical copy distance using bounding boxes as starting point,
+            // then slide down to find true geometry distance.
+            var pairHeight = pairBbox.Length;
+            var testOffset = new Vector(0, pairHeight);
+
+            // Create test parts for slide distance measurement.
+            var testPart1 = part1.CloneAtOffset(testOffset);
+            var testPart2 = part2.CloneAtOffset(testOffset);
+
+            // Find minimum distance from test pair sliding down toward original pair.
+            var copyDistance = FindVerticalCopyDistance(
+                part1, part2, testPart1, testPart2,
+                boundary1, boundary2, pairHeight);
+
             if (copyDistance <= 0)
                 return column;
 
-            var pairHeight = pairBbox.Length;
-            var currentY = pairBbox.Bottom + copyDistance;
-
-            while (currentY + pairHeight <= workArea.Top + Tolerance.Epsilon)
+            var count = 1;
+            while (true)
             {
-                var offset = new Vector(0, currentY - pairBbox.Bottom);
+                var nextBottom = pairBbox.Bottom + copyDistance * count;
+                if (nextBottom + pairHeight > workArea.Top + Tolerance.Epsilon)
+                    break;
+
+                var offset = new Vector(0, copyDistance * count);
                 column.Add(part1.CloneAtOffset(offset));
                 column.Add(part2.CloneAtOffset(offset));
-                currentY += copyDistance;
+                count++;
             }
 
             return column;
         }
 
-        private double ComputeVerticalCopyDistance(Part p1, Part p2, Box pairBbox)
+        private double FindVerticalCopyDistance(
+            Part origPart1, Part origPart2,
+            Part testPart1, Part testPart2,
+            PartBoundary boundary1, PartBoundary boundary2,
+            double pairHeight)
         {
-            var pairHeight = pairBbox.Length;
-            // Start the test pair high enough so it doesn't overlap the original pair's bounding box initially.
-            var startOffset = pairHeight + partSpacing;
-            var testParts = new List<Part> { p1.CloneAtOffset(new Vector(0, startOffset)), p2.CloneAtOffset(new Vector(0, startOffset)) };
-            var obstacles = new List<Part> { p1, p2 };
+            // Check all 4 combinations: test parts sliding down toward original parts.
+            var minSlide = double.MaxValue;
 
-            // Use a large work area to prevent edge-clamping during distance measurement.
-            var largeWorkArea = new Box(workArea.X, workArea.Y - pairHeight, workArea.Width, workArea.Length + pairHeight * 3);
-            var slide = Compactor.Push(testParts, obstacles, largeWorkArea, partSpacing, PushDirection.Down);
+            // Test1 -> Orig1
+            var d = SlideDistance(boundary1, testPart1.Location, boundary1, origPart1.Location, PushDirection.Down);
+            if (d < minSlide) minSlide = d;
 
-            // True copy distance = start - slide. Clamp to BB height + spacing to prevent BB overlap.
-            var copyDist = startOffset - slide;
+            // Test1 -> Orig2
+            d = SlideDistance(boundary1, testPart1.Location, boundary2, origPart2.Location, PushDirection.Down);
+            if (d < minSlide) minSlide = d;
+
+            // Test2 -> Orig1
+            d = SlideDistance(boundary2, testPart2.Location, boundary1, origPart1.Location, PushDirection.Down);
+            if (d < minSlide) minSlide = d;
+
+            // Test2 -> Orig2
+            d = SlideDistance(boundary2, testPart2.Location, boundary2, origPart2.Location, PushDirection.Down);
+            if (d < minSlide) minSlide = d;
+
+            if (minSlide >= double.MaxValue || minSlide < 0)
+                return pairHeight + partSpacing;
+
+            // Match FillLinear.ComputeCopyDistance: copyDist = startOffset - slide,
+            // clamped so it never goes below pairHeight + partSpacing to prevent
+            // bounding-box overlap from spurious slide values.
+            var copyDist = pairHeight - minSlide;
+
             return System.Math.Max(copyDist, pairHeight + partSpacing);
+        }
+
+        private static double SlideDistance(
+            PartBoundary movingBoundary, Vector movingLocation,
+            PartBoundary stationaryBoundary, Vector stationaryLocation,
+            PushDirection direction)
+        {
+            var opposite = SpatialQuery.OppositeDirection(direction);
+            var movingEdges = movingBoundary.GetEdges(direction);
+            var stationaryEdges = stationaryBoundary.GetEdges(opposite);
+
+            return SpatialQuery.DirectionalDistance(
+                movingEdges, movingLocation,
+                stationaryEdges, stationaryLocation,
+                direction);
         }
 
         // --- Step 3: Iterative Adjustment ---
 
         private List<Part> AdjustColumn(
-            (Part part1, Part part2, Box pairBbox) initialPair,
-            List<Part> initialColumn,
+            (Part part1, Part part2, Box pairBbox) pair,
+            List<Part> column,
             CancellationToken token)
         {
-            var currentPair = initialPair;
-            var currentColumn = initialColumn;
-            var originalWidth = initialPair.pairBbox.Width;
+            var originalPairWidth = pair.pairBbox.Width;
 
             for (var iteration = 0; iteration < MaxIterations; iteration++)
             {
                 if (token.IsCancellationRequested)
                     break;
 
-                var columnBbox = ((IEnumerable<IBoundable>)currentColumn).GetBoundingBox();
-                var gap = workArea.Top - columnBbox.Top;
+                // Measure current gap.
+                var topEdge = double.MinValue;
+                foreach (var p in column)
+                    if (p.BoundingBox.Top > topEdge)
+                        topEdge = p.BoundingBox.Top;
+
+                var gap = workArea.Top - topEdge;
 
                 if (gap <= Tolerance.Epsilon)
                     break;
 
-                var pairCount = currentColumn.Count / 2;
+                var pairCount = column.Count / 2;
+                if (pairCount <= 0)
+                    break;
+
                 var adjustment = gap / pairCount;
                 if (adjustment <= Tolerance.Epsilon)
                     break;
 
-                // Try shifting p2 up or down relative to p1 to see if we can close the gap
-                // without making the pair wider than its initial horizontal footprint.
-                var adjusted = TryAdjustPair(currentPair, adjustment, originalWidth);
+                // Try adjusting the pair and rebuilding the column.
+                var adjusted = TryAdjustPair(pair, adjustment, originalPairWidth);
                 if (adjusted == null)
                     break;
 
                 var newColumn = BuildColumn(adjusted.Value.part1, adjusted.Value.part2, adjusted.Value.pairBbox);
-                if (newColumn.Count <= currentColumn.Count)
-                    break; // No improvement in part count.
+                if (newColumn.Count == 0)
+                    break;
 
-                currentColumn = newColumn;
-                currentPair = adjusted.Value;
+                column = newColumn;
+                pair = adjusted.Value;
             }
 
-            return currentColumn;
+            return column;
         }
 
         private (Part part1, Part part2, Box pairBbox)? TryAdjustPair(
             (Part part1, Part part2, Box pairBbox) pair,
-            double adjustment, double maxWidth)
+            double adjustment, double originalPairWidth)
         {
             // Try shifting part2 up first.
-            var result = CreatePair(pair.part1.BaseDrawing, pair.part1.Rotation, pair.part2.Rotation,
-                (pair.part2.Location.Y - pair.part1.Location.Y) + adjustment);
+            var result = TryShiftDirection(pair, adjustment, originalPairWidth);
 
-            if (result != null && result.Value.pairBbox.Width <= maxWidth + Tolerance.Epsilon)
+            if (result != null)
                 return result;
 
-            // Up made it wider or didn't fit — try down instead.
-            result = CreatePair(pair.part1.BaseDrawing, pair.part1.Rotation, pair.part2.Rotation,
-                (pair.part2.Location.Y - pair.part1.Location.Y) - adjustment);
+            // Up made the pair wider — try down instead.
+            return TryShiftDirection(pair, -adjustment, originalPairWidth);
+        }
 
-            if (result != null && result.Value.pairBbox.Width <= maxWidth + Tolerance.Epsilon)
-                return result;
+        private (Part part1, Part part2, Box pairBbox)? TryShiftDirection(
+            (Part part1, Part part2, Box pairBbox) pair,
+            double verticalShift, double originalPairWidth)
+        {
+            // Clone parts so we don't mutate the originals.
+            var p1 = (Part)pair.part1.Clone();
+            var p2 = (Part)pair.part2.Clone();
 
-            return null;
+            // Separate: shift part2 right so bounding boxes don't touch.
+            p2.Offset(partSpacing, 0);
+            p2.UpdateBounds();
+
+            // Apply the vertical shift.
+            p2.Offset(0, verticalShift);
+            p2.UpdateBounds();
+
+            // Compact part2 left toward part1.
+            var moving = new List<Part> { p2 };
+            var obstacles = new List<Part> { p1 };
+            Compactor.Push(moving, obstacles, workArea, partSpacing, PushDirection.Left);
+
+            // Check if the pair got wider.
+            var newBbox = ((IEnumerable<IBoundable>)new IBoundable[] { p1, p2 }).GetBoundingBox();
+
+            if (newBbox.Width > originalPairWidth + Tolerance.Epsilon)
+                return null;
+
+            // Re-anchor to work area origin.
+            var anchor = new Vector(workArea.X - newBbox.Left, workArea.Y - newBbox.Bottom);
+            p1.Offset(anchor);
+            p2.Offset(anchor);
+            p1.UpdateBounds();
+            p2.UpdateBounds();
+
+            newBbox = ((IEnumerable<IBoundable>)new IBoundable[] { p1, p2 }).GetBoundingBox();
+            return (p1, p2, newBbox);
         }
 
         // --- Step 4: Horizontal Repetition ---
@@ -197,21 +306,36 @@ namespace OpenNest.Engine.Fill
             var columnBbox = ((IEnumerable<IBoundable>)column).GetBoundingBox();
             var columnWidth = columnBbox.Width;
 
-            // Create a test column shifted right and compact it left to find the true copy distance.
-            var startOffset = columnWidth + partSpacing;
-            var testColumn = column.Select(p => p.CloneAtOffset(new Vector(startOffset, 0))).ToList();
+            // Create a test column shifted right by columnWidth + spacing.
+            var testOffset = columnWidth + partSpacing;
+            var testColumn = new List<Part>(column.Count);
+            foreach (var part in column)
+                testColumn.Add(part.CloneAtOffset(new Vector(testOffset, 0)));
 
-            var slide = Compactor.Push(testColumn, column, workArea, partSpacing, PushDirection.Left);
-            var copyDistance = startOffset - slide;
+            // Compact the test column left against the original column.
+            var distanceMoved = Compactor.Push(testColumn, column, workArea, partSpacing, PushDirection.Left);
+
+            // Derive the true copy distance from where the test column ended up.
+            var testBbox = ((IEnumerable<IBoundable>)testColumn).GetBoundingBox();
+            var copyDistance = testBbox.Left - columnBbox.Left;
 
             if (copyDistance <= Tolerance.Epsilon)
                 copyDistance = columnWidth + partSpacing;
 
             Debug.WriteLine($"[FillExtents] Column copy distance: {copyDistance:F2} (bbox width: {columnWidth:F2}, spacing: {partSpacing:F2})");
 
+            // Build all columns.
             var result = new List<Part>(column);
-            var colIndex = 1;
 
+            // Add the test column we already computed as column 2.
+            foreach (var part in testColumn)
+            {
+                if (IsWithinWorkArea(part))
+                    result.Add(part);
+            }
+
+            // Tile additional columns at the copy distance.
+            var colIndex = 2;
             while (!token.IsCancellationRequested)
             {
                 var offset = new Vector(copyDistance * colIndex, 0);
