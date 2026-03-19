@@ -1,8 +1,10 @@
+using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 
 namespace OpenNest.Engine.Fill
@@ -105,7 +107,7 @@ namespace OpenNest.Engine.Fill
 
         private List<Part> BuildColumn(Part part1, Part part2, Box pairBbox)
         {
-            var column = new List<Part> { (Part)part1.Clone(), (Part)part2.Clone() };
+            var pairParts = new List<Part> { (Part)part1.Clone(), (Part)part2.Clone() };
 
             // Find geometry-aware copy distance for the pair vertically.
             var boundary1 = new PartBoundary(part1, halfSpacing);
@@ -126,22 +128,11 @@ namespace OpenNest.Engine.Fill
                 boundary1, boundary2, pairHeight);
 
             if (copyDistance <= 0)
-                return column;
+                return pairParts;
 
-            var count = 1;
-            while (true)
-            {
-                var nextBottom = pairBbox.Bottom + copyDistance * count;
-                if (nextBottom + pairHeight > workArea.Top + Tolerance.Epsilon)
-                    break;
-
-                var offset = new Vector(0, copyDistance * count);
-                column.Add(part1.CloneAtOffset(offset));
-                column.Add(part2.CloneAtOffset(offset));
-                count++;
-            }
-
-            return column;
+            var result = new List<Part>(pairParts);
+            result.AddRange(FillHelpers.Tile(pairParts, workArea, copyDistance, NestDirection.Vertical, allowPartial: false));
+            return result;
         }
 
         private double FindVerticalCopyDistance(
@@ -324,48 +315,10 @@ namespace OpenNest.Engine.Fill
 
             Debug.WriteLine($"[FillExtents] Column copy distance: {copyDistance:F2} (bbox width: {columnWidth:F2}, spacing: {partSpacing:F2})");
 
-            // Build all columns.
             var result = new List<Part>(column);
-
-            // Add the test column we already computed as column 2.
-            foreach (var part in testColumn)
-            {
-                if (IsWithinWorkArea(part))
-                    result.Add(part);
-            }
-
-            // Tile additional columns at the copy distance.
-            var colIndex = 2;
-            while (!token.IsCancellationRequested)
-            {
-                var offset = new Vector(copyDistance * colIndex, 0);
-                var anyFit = false;
-
-                foreach (var part in column)
-                {
-                    var clone = part.CloneAtOffset(offset);
-                    if (IsWithinWorkArea(clone))
-                    {
-                        result.Add(clone);
-                        anyFit = true;
-                    }
-                }
-
-                if (!anyFit)
-                    break;
-
-                colIndex++;
-            }
+            result.AddRange(FillHelpers.Tile(column, workArea, copyDistance, NestDirection.Horizontal, allowPartial: true));
 
             return result;
-        }
-
-        private bool IsWithinWorkArea(Part part)
-        {
-            return part.BoundingBox.Right <= workArea.Right + Tolerance.Epsilon &&
-                   part.BoundingBox.Top <= workArea.Top + Tolerance.Epsilon &&
-                   part.BoundingBox.Left >= workArea.Left - Tolerance.Epsilon &&
-                   part.BoundingBox.Bottom >= workArea.Bottom - Tolerance.Epsilon;
         }
     }
 }

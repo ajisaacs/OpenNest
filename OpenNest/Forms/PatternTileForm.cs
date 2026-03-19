@@ -213,12 +213,14 @@ namespace OpenNest.Forms
                     if (System.Math.Sqrt(dx * dx + dy * dy) < 0.01)
                         continue;
 
-                    var angle = System.Math.Atan2(dy, dx);
+                    var direction = new Vector(dx, dy);
+                    var len = System.Math.Sqrt(dx * dx + dy * dy);
+                    if (len > 0) direction = new Vector(dx / len, dy / len);
                     var single = new List<Part> { part };
                     var obstacles = parts.Where(p => p != part).ToList();
 
                     totalMoved += Compactor.Push(single, obstacles,
-                        syntheticWorkArea, spacing, angle);
+                        syntheticWorkArea, spacing, direction);
                 }
 
                 if (totalMoved < 0.01)

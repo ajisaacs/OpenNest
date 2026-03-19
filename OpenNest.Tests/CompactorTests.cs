@@ -109,8 +109,9 @@ namespace OpenNest.Tests
             var moving = new List<Part> { part };
             var obstacles = new List<Part>();
 
-            // angle = π = push left
-            var distance = Compactor.Push(moving, obstacles, workArea, 0, System.Math.PI);
+            // direction = left
+            var direction = new Vector(System.Math.Cos(System.Math.PI), System.Math.Sin(System.Math.PI));
+            var distance = Compactor.Push(moving, obstacles, workArea, 0, direction);
 
             Assert.True(distance > 0);
             Assert.True(part.BoundingBox.Left < 1);
@@ -124,8 +125,10 @@ namespace OpenNest.Tests
             var moving = new List<Part> { part };
             var obstacles = new List<Part>();
 
-            // angle = 3π/2 = push down
-            var distance = Compactor.Push(moving, obstacles, workArea, 0, 3 * System.Math.PI / 2);
+            // direction = down
+            var angle = 3 * System.Math.PI / 2;
+            var direction = new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
+            var distance = Compactor.Push(moving, obstacles, workArea, 0, direction);
 
             Assert.True(distance > 0);
             Assert.True(part.BoundingBox.Bottom < 1);
