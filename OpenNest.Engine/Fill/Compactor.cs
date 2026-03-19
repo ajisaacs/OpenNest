@@ -13,68 +13,6 @@ namespace OpenNest.Engine.Fill
     {
         private const double ChordTolerance = 0.001;
 
-        /// <summary>
-        /// Compacts movingParts toward the bottom-left of the plate work area.
-        /// Everything already on the plate (excluding movingParts) is treated
-        /// as stationary obstacles.
-        /// </summary>
-        private const double RepeatThreshold = 0.01;
-        private const int MaxIterations = 20;
-
-        public static void Compact(List<Part> movingParts, Plate plate)
-        {
-            if (movingParts == null || movingParts.Count == 0)
-                return;
-
-            var savedPositions = SavePositions(movingParts);
-
-            // Try left-first.
-            var leftFirst = CompactLoop(movingParts, plate, PushDirection.Left, PushDirection.Down);
-
-            // Restore and try down-first.
-            RestorePositions(movingParts, savedPositions);
-            var downFirst = CompactLoop(movingParts, plate, PushDirection.Down, PushDirection.Left);
-
-            // Keep left-first if it traveled further.
-            if (leftFirst > downFirst)
-            {
-                RestorePositions(movingParts, savedPositions);
-                CompactLoop(movingParts, plate, PushDirection.Left, PushDirection.Down);
-            }
-        }
-
-        private static double CompactLoop(List<Part> parts, Plate plate,
-            PushDirection first, PushDirection second)
-        {
-            var total = 0.0;
-
-            for (var i = 0; i < MaxIterations; i++)
-            {
-                var a = Push(parts, plate, first);
-                var b = Push(parts, plate, second);
-                total += a + b;
-
-                if (a <= RepeatThreshold && b <= RepeatThreshold)
-                    break;
-            }
-
-            return total;
-        }
-
-        private static Vector[] SavePositions(List<Part> parts)
-        {
-            var positions = new Vector[parts.Count];
-            for (var i = 0; i < parts.Count; i++)
-                positions[i] = parts[i].Location;
-            return positions;
-        }
-
-        private static void RestorePositions(List<Part> parts, Vector[] positions)
-        {
-            for (var i = 0; i < parts.Count; i++)
-                parts[i].Location = positions[i];
-        }
-
         public static double Push(List<Part> movingParts, Plate plate, PushDirection direction)
         {
             var obstacleParts = plate.Parts
@@ -176,9 +114,6 @@ namespace OpenNest.Engine.Fill
             var halfSpacing = partSpacing / 2;
             var isHorizontal = SpatialQuery.IsHorizontalDirection(direction);
             var distance = double.MaxValue;
-
-            // BB gap at which offset geometries are expected to be touching.
-            var contactGap = (halfSpacing + ChordTolerance) * 2;
 
             foreach (var moving in movingParts)
             {
@@ -302,61 +237,6 @@ namespace OpenNest.Engine.Fill
             }
 
             return 0;
-        }
-
-        /// <summary>
-        /// Compacts parts individually toward the bottom-left of the work area.
-        /// Each part is pushed against all others as obstacles, closing geometry-based gaps.
-        /// Does not require parts to be on a plate.
-        /// </summary>
-        public static void CompactIndividual(List<Part> parts, Box workArea, double partSpacing)
-        {
-            if (parts == null || parts.Count < 2)
-                return;
-
-            var savedPositions = SavePositions(parts);
-
-            var leftFirst = CompactIndividualLoop(parts, workArea, partSpacing,
-                PushDirection.Left, PushDirection.Down);
-
-            RestorePositions(parts, savedPositions);
-            var downFirst = CompactIndividualLoop(parts, workArea, partSpacing,
-                PushDirection.Down, PushDirection.Left);
-
-            if (leftFirst > downFirst)
-            {
-                RestorePositions(parts, savedPositions);
-                CompactIndividualLoop(parts, workArea, partSpacing,
-                    PushDirection.Left, PushDirection.Down);
-            }
-        }
-
-        private static double CompactIndividualLoop(List<Part> parts, Box workArea,
-            double partSpacing, PushDirection first, PushDirection second)
-        {
-            var total = 0.0;
-
-            for (var pass = 0; pass < MaxIterations; pass++)
-            {
-                var moved = 0.0;
-
-                foreach (var part in parts)
-                {
-                    var single = new List<Part>(1) { part };
-                    var obstacles = new List<Part>(parts.Count - 1);
-                    foreach (var p in parts)
-                        if (p != part) obstacles.Add(p);
-
-                    moved += Push(single, obstacles, workArea, partSpacing, first);
-                    moved += Push(single, obstacles, workArea, partSpacing, second);
-                }
-
-                total += moved;
-                if (moved <= RepeatThreshold)
-                    break;
-            }
-
-            return total;
         }
     }
 }
