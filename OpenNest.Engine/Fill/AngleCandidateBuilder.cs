@@ -20,8 +20,24 @@ namespace OpenNest.Engine.Fill
 
         public List<double> Build(NestItem item, double bestRotation, Box workArea)
         {
-            var angles = new List<double> { bestRotation, bestRotation + Angle.HalfPI };
+            var baseAngles = new[] { bestRotation, bestRotation + Angle.HalfPI };
 
+            if (knownGoodAngles.Count > 0 && !ForceFullSweep)
+                return BuildPrunedList(baseAngles);
+
+            var angles = new List<double>(baseAngles);
+
+            if (NeedsSweep(item, bestRotation, workArea))
+                AddSweepAngles(angles);
+
+            if (!ForceFullSweep && angles.Count > 2)
+                angles = ApplyMlPrediction(item, workArea, baseAngles, angles);
+
+            return angles;
+        }
+
+        private bool NeedsSweep(NestItem item, double bestRotation, Box workArea)
+        {
             var testPart = new Part(item.Drawing);
             if (!bestRotation.IsEqualTo(0))
                 testPart.Rotate(bestRotation);
@@ -29,56 +45,57 @@ namespace OpenNest.Engine.Fill
 
             var partLongestSide = System.Math.Max(testPart.BoundingBox.Width, testPart.BoundingBox.Length);
             var workAreaShortSide = System.Math.Min(workArea.Width, workArea.Length);
-            var needsSweep = workAreaShortSide < partLongestSide || ForceFullSweep;
+            return workAreaShortSide < partLongestSide || ForceFullSweep;
+        }
 
-            if (needsSweep)
+        private static void AddSweepAngles(List<double> angles)
+        {
+            var step = Angle.ToRadians(5);
+            for (var a = 0.0; a < System.Math.PI; a += step)
             {
-                var step = Angle.ToRadians(5);
-                for (var a = 0.0; a < System.Math.PI; a += step)
-                {
-                    if (!angles.Any(existing => existing.IsEqualTo(a)))
-                        angles.Add(a);
-                }
+                if (!ContainsAngle(angles, a))
+                    angles.Add(a);
+            }
+        }
+
+        private static List<double> ApplyMlPrediction(
+            NestItem item, Box workArea, double[] baseAngles, List<double> fallback)
+        {
+            var features = FeatureExtractor.Extract(item.Drawing);
+            if (features == null)
+                return fallback;
+
+            var predicted = AnglePredictor.PredictAngles(features, workArea.Width, workArea.Length);
+            if (predicted == null)
+                return fallback;
+
+            var mlAngles = new List<double>(predicted);
+            foreach (var b in baseAngles)
+            {
+                if (!ContainsAngle(mlAngles, b))
+                    mlAngles.Add(b);
             }
 
-            if (!ForceFullSweep && angles.Count > 2)
+            Debug.WriteLine($"[AngleCandidateBuilder] ML: {fallback.Count} angles -> {mlAngles.Count} predicted");
+            return mlAngles;
+        }
+
+        private List<double> BuildPrunedList(double[] baseAngles)
+        {
+            var pruned = new List<double>(baseAngles);
+            foreach (var a in knownGoodAngles)
             {
-                var features = FeatureExtractor.Extract(item.Drawing);
-                if (features != null)
-                {
-                    var predicted = AnglePredictor.PredictAngles(
-                        features, workArea.Width, workArea.Length);
-
-                    if (predicted != null)
-                    {
-                        var mlAngles = new List<double>(predicted);
-
-                        if (!mlAngles.Any(a => a.IsEqualTo(bestRotation)))
-                            mlAngles.Add(bestRotation);
-                        if (!mlAngles.Any(a => a.IsEqualTo(bestRotation + Angle.HalfPI)))
-                            mlAngles.Add(bestRotation + Angle.HalfPI);
-
-                        Debug.WriteLine($"[AngleCandidateBuilder] ML: {angles.Count} angles -> {mlAngles.Count} predicted");
-                        angles = mlAngles;
-                    }
-                }
+                if (!ContainsAngle(pruned, a))
+                    pruned.Add(a);
             }
 
-            if (knownGoodAngles.Count > 0 && !ForceFullSweep)
-            {
-                var pruned = new List<double> { bestRotation, bestRotation + Angle.HalfPI };
+            Debug.WriteLine($"[AngleCandidateBuilder] Pruned to {pruned.Count} angles (known-good)");
+            return pruned;
+        }
 
-                foreach (var a in knownGoodAngles)
-                {
-                    if (!pruned.Any(existing => existing.IsEqualTo(a)))
-                        pruned.Add(a);
-                }
-
-                Debug.WriteLine($"[AngleCandidateBuilder] Pruned: {angles.Count} -> {pruned.Count} angles (known-good)");
-                return pruned;
-            }
-
-            return angles;
+        private static bool ContainsAngle(List<double> angles, double angle)
+        {
+            return angles.Any(existing => existing.IsEqualTo(angle));
         }
 
         /// <summary>
