@@ -17,10 +17,10 @@ namespace OpenNest.Mcp.Tools
         [McpServerTool(Name = "test_engine")]
         [Description("Build and run the nesting engine against a nest file. Returns fill results and a debug log file path for grepping. Use this to test engine changes without restarting the MCP server.")]
         public string TestEngine(
-            [Description("Path to the nest .opnest file")] string nestFile = @"C:\Users\AJ\Desktop\4980 A24 PT02 60x120  45pcs v2.opnest",
+            [Description("Path to the nest .nest file")] string nestFile = @"C:\Users\AJ\Desktop\4980 A24 PT02 60x120  45pcs v2.nest",
             [Description("Drawing name to fill with (default: first drawing)")] string drawingName = null,
             [Description("Plate index to fill (default: 0)")] int plateIndex = 0,
-            [Description("Output nest file path (default: <input>-result.opnest)")] string outputFile = null)
+            [Description("Output nest file path (default: <input>-result.nest)")] string outputFile = null)
         {
             if (!File.Exists(nestFile))
                 return $"Error: nest file not found: {nestFile}";

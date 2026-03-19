@@ -299,7 +299,7 @@ void PrintUsage()
     Console.Error.WriteLine("Options:");
     Console.Error.WriteLine("  --spacing <value>      Part spacing (default: 0.5)");
     Console.Error.WriteLine("  --db <path>            SQLite database path (default: OpenNestTraining.db)");
-    Console.Error.WriteLine("  --save-nests <dir>     Directory to save individual .opnest nests for each winner");
+    Console.Error.WriteLine("  --save-nests <dir>     Directory to save individual .nest nests for each winner");
     Console.Error.WriteLine("  --template <path>      Nest template (.nstdot) for plate defaults");
     Console.Error.WriteLine("  -h, --help             Show this help");
 }
