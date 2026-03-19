@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using OpenNest.Api;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
