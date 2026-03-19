@@ -77,14 +77,17 @@ namespace OpenNest
             // Phase 1: Iterative shrink-fill for multi-quantity items.
             if (fillItems.Count > 0)
             {
+                // Inner fills are silent — ShrinkFiller manages progress reporting
+                // to avoid overlapping layouts from per-angle/per-strategy reports.
                 Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
                 {
                     var inner = new DefaultNestEngine(Plate);
-                    return inner.Fill(ni, b, progress, token);
+                    return inner.Fill(ni, b, null, token);
                 };
 
                 var shrinkResult = IterativeShrinkFiller.Fill(
-                    fillItems, workArea, fillFunc, Plate.PartSpacing, token);
+                    fillItems, workArea, fillFunc, Plate.PartSpacing, token,
+                    progress, PlateNumber);
 
                 allParts.AddRange(shrinkResult.Parts);
 

@@ -28,7 +28,9 @@ namespace OpenNest.Engine.Fill
             Box workArea,
             Func<NestItem, Box, List<Part>> fillFunc,
             double spacing,
-            CancellationToken token = default)
+            CancellationToken token = default,
+            IProgress<NestProgress> progress = null,
+            int plateNumber = 0)
         {
             if (items == null || items.Count == 0)
                 return new IterativeShrinkResult();
@@ -65,16 +67,37 @@ namespace OpenNest.Engine.Fill
 
             var filler = new RemnantFiller(workArea, spacing);
 
+            // Track parts placed by previous items so ShrinkFiller can
+            // include them in progress reports.
+            var placedSoFar = new List<Part>();
+
             Func<NestItem, Box, List<Part>> shrinkWrapper = (ni, box) =>
             {
                 var target = ni.Quantity > 0 ? ni.Quantity : 0;
-                var heightResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Height, token, targetCount: target);
-                var widthResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Width, token, targetCount: target);
+                var heightResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Height, token,
+                    targetCount: target, progress: progress, plateNumber: plateNumber, placedParts: placedSoFar);
+                var widthResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Width, token,
+                    targetCount: target, progress: progress, plateNumber: plateNumber, placedParts: placedSoFar);
 
                 var heightScore = FillScore.Compute(heightResult.Parts, box);
                 var widthScore = FillScore.Compute(widthResult.Parts, box);
 
-                return widthScore > heightScore ? widthResult.Parts : heightResult.Parts;
+                var best = widthScore > heightScore ? widthResult.Parts : heightResult.Parts;
+
+                // Report the winner as overall best so the UI shows it as settled.
+                if (progress != null && best != null && best.Count > 0)
+                {
+                    var allParts = new List<Part>(placedSoFar.Count + best.Count);
+                    allParts.AddRange(placedSoFar);
+                    allParts.AddRange(best);
+                    NestEngineBase.ReportProgress(progress, NestPhase.Custom, plateNumber,
+                        allParts, box, $"Shrink: {best.Count} parts placed", isOverallBest: true);
+                }
+
+                // Accumulate for the next item's progress reports.
+                placedSoFar.AddRange(best);
+
+                return best;
             };
 
             var placed = filler.FillItems(workItems, shrinkWrapper, token);

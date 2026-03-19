@@ -29,7 +29,10 @@ namespace OpenNest.Engine.Fill
             ShrinkAxis axis,
             CancellationToken token = default,
             int maxIterations = 20,
-            int targetCount = 0)
+            int targetCount = 0,
+            IProgress<NestProgress> progress = null,
+            int plateNumber = 0,
+            List<Part> placedParts = null)
         {
             // If a target count is specified, estimate a smaller starting box
             // to avoid an expensive full-area fill.
@@ -60,6 +63,8 @@ namespace OpenNest.Engine.Fill
             var bestParts = parts;
             var bestDim = MeasureDimension(parts, box, axis);
 
+            ReportShrinkProgress(progress, plateNumber, placedParts, bestParts, box, axis, bestDim);
+
             for (var i = 0; i < maxIterations; i++)
             {
                 if (token.IsCancellationRequested)
@@ -73,6 +78,10 @@ namespace OpenNest.Engine.Fill
                     ? new Box(box.X, box.Y, trialDim, box.Length)
                     : new Box(box.X, box.Y, box.Width, trialDim);
 
+                // Report the trial box before the fill so the UI updates the
+                // work area border immediately rather than after the fill completes.
+                ReportShrinkProgress(progress, plateNumber, placedParts, bestParts, trialBox, axis, trialDim);
+
                 var trialParts = fillFunc(item, trialBox);
 
                 if (trialParts == null || trialParts.Count < shrinkTarget)
@@ -80,9 +89,33 @@ namespace OpenNest.Engine.Fill
 
                 bestParts = trialParts;
                 bestDim = MeasureDimension(trialParts, box, axis);
+
+                ReportShrinkProgress(progress, plateNumber, placedParts, bestParts, trialBox, axis, bestDim);
             }
 
             return new ShrinkResult { Parts = bestParts, Dimension = bestDim };
+        }
+
+        private static void ReportShrinkProgress(
+            IProgress<NestProgress> progress, int plateNumber,
+            List<Part> placedParts, List<Part> bestParts,
+            Box workArea, ShrinkAxis axis, double dim)
+        {
+            if (progress == null)
+                return;
+
+            var allParts = placedParts != null && placedParts.Count > 0
+                ? new List<Part>(placedParts.Count + bestParts.Count)
+                : new List<Part>(bestParts.Count);
+
+            if (placedParts != null && placedParts.Count > 0)
+                allParts.AddRange(placedParts);
+            allParts.AddRange(bestParts);
+
+            var desc = $"Shrink {axis}: {bestParts.Count} parts, dim={dim:F1}";
+
+            NestEngineBase.ReportProgress(progress, NestPhase.Custom, plateNumber,
+                allParts, workArea, desc);
         }
 
         /// <summary>
