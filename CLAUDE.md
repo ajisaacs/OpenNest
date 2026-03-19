@@ -84,11 +84,9 @@ The UI application with MDI interface.
 ## File Format
 
 Nest files (`.nest`, ZIP-based) use v2 JSON format:
-- `info.json` — nest metadata and plate defaults
-- `drawing-info.json` — drawing metadata (name, material, quantities, colors)
-- `plate-info.json` — plate metadata (size, material, spacing)
-- `program-NNN` — G-code text for each drawing's cut program
-- `plate-NNN` — G-code text encoding part placements (G00 for position, G65 for sub-program call with rotation)
+- `nest.json` — single JSON file containing all nest metadata: nest info (name, units, customer, dates, notes), plate defaults (size, thickness, quadrant, spacing, material, edge spacing), drawings array (id, name, color, quantity, priority, rotation constraints, material, source), and plates array (id, size, material, edge spacing, parts with drawingId/x/y/rotation)
+- `programs/program-N` — G-code text for each drawing's cut program (N = drawing id)
+- `bestfits/bestfit-N` — JSON array of best-fit pair evaluation results per drawing, keyed by plate size/spacing (optional, only present if best-fit data was computed)
 
 ## Tool Preferences
 
