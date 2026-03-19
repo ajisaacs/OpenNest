@@ -33,11 +33,10 @@ namespace OpenNest.Engine.Fill
             if (items == null || items.Count == 0)
                 return new IterativeShrinkResult();
 
-            // RemnantFiller.FillItems skips items with Quantity <= 0 (its localQty
-            // check treats them as "done"). Convert unlimited items to an estimated
-            // max capacity so they are actually processed.
+            // RemnantFiller.FillItems skips items with Quantity == 0 (its localQty
+            // check treats them as done). Convert unlimited items (Quantity <= 0)
+            // to an estimated max capacity so they are actually processed.
             var workItems = new List<NestItem>(items.Count);
-            var unlimitedDrawings = new HashSet<string>();
 
             foreach (var item in items)
             {
@@ -48,7 +47,6 @@ namespace OpenNest.Engine.Fill
                         ? (int)(workArea.Area() / bbox.Area()) * 2
                         : 1000;
 
-                    unlimitedDrawings.Add(item.Drawing.Name);
                     workItems.Add(new NestItem
                     {
                         Drawing = item.Drawing,
