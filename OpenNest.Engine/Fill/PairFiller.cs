@@ -48,6 +48,9 @@ namespace OpenNest.Engine.Fill
             Debug.WriteLine($"[PairFiller] Total: {BestFits.Count}, Kept: {BestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
             Debug.WriteLine($"[PairFiller] Plate: {plateSize.Length:F2}x{plateSize.Width:F2}, WorkArea: {workArea.Width:F2}x{workArea.Length:F2}");
 
+            var targetCount = item.Quantity > 0 ? item.Quantity : 0;
+            var effectiveWorkArea = workArea;
+
             List<Part> best = null;
             var bestScore = default(FillScore);
             var sinceImproved = 0;
@@ -58,16 +61,29 @@ namespace OpenNest.Engine.Fill
                 {
                     token.ThrowIfCancellationRequested();
 
-                    var filled = EvaluateCandidate(candidates[i], item.Drawing, workArea);
+                    var filled = EvaluateCandidate(candidates[i], item.Drawing, effectiveWorkArea);
 
                     if (filled != null && filled.Count > 0)
                     {
-                        var score = FillScore.Compute(filled, workArea);
+                        var score = FillScore.Compute(filled, effectiveWorkArea);
                         if (best == null || score > bestScore)
                         {
                             best = filled;
                             bestScore = score;
                             sinceImproved = 0;
+
+                            // If we exceeded the target, reduce the work area for
+                            // subsequent candidates by trimming excess parts and
+                            // measuring the tighter bounding box.
+                            if (targetCount > 0 && filled.Count > targetCount)
+                            {
+                                var reduced = ReduceWorkArea(filled, targetCount, workArea);
+                                if (reduced.Area() < effectiveWorkArea.Area())
+                                {
+                                    effectiveWorkArea = reduced;
+                                    Debug.WriteLine($"[PairFiller] Reduced work area to {effectiveWorkArea.Width:F2}x{effectiveWorkArea.Length:F2} (trimmed to {targetCount + 1} parts)");
+                                }
+                            }
                         }
                         else
                         {
@@ -96,6 +112,32 @@ namespace OpenNest.Engine.Fill
 
             Debug.WriteLine($"[PairFiller] Best pair result: {bestScore.Count} parts, density={bestScore.Density:P1}");
             return best ?? new List<Part>();
+        }
+
+        /// <summary>
+        /// Given parts that exceed targetCount, sorts by BoundingBox.Top descending,
+        /// removes parts from the top until exactly targetCount remain, then returns
+        /// the Top of the remaining parts as the new work area height to beat.
+        /// </summary>
+        private static Box ReduceWorkArea(List<Part> parts, int targetCount, Box workArea)
+        {
+            if (parts.Count <= targetCount)
+                return workArea;
+
+            // Sort by Top descending — highest parts get trimmed first.
+            var sorted = parts
+                .OrderByDescending(p => p.BoundingBox.Top)
+                .ToList();
+
+            // Remove from the top until exactly targetCount remain.
+            var trimCount = sorted.Count - targetCount;
+            var remaining = sorted.Skip(trimCount).ToList();
+
+            var newTop = remaining.Max(p => p.BoundingBox.Top);
+
+            return new Box(workArea.X, workArea.Y,
+                workArea.Width,
+                System.Math.Min(newTop - workArea.Y, workArea.Length));
         }
 
         private List<Part> EvaluateCandidate(BestFitResult candidate, Drawing drawing, Box workArea)
