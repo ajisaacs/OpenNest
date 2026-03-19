@@ -1,4 +1,3 @@
-using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
 using System.Collections.Generic;
 
@@ -16,11 +15,7 @@ namespace OpenNest.Engine.Strategies
             var result = filler.Fill(context.Item, context.WorkArea,
                 context.PlateNumber, context.Token, context.Progress);
 
-            // Cache hit — PairFiller already called GetOrCompute internally.
-            var bestFits = BestFitCache.GetOrCompute(
-                context.Item.Drawing, context.Plate.Size.Length,
-                context.Plate.Size.Width, context.Plate.PartSpacing);
-            context.SharedState["BestFits"] = bestFits;
+            context.SharedState["BestFits"] = filler.BestFits;
 
             return result;
         }

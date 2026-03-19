@@ -12,12 +12,23 @@ namespace OpenNest.Engine.Fill
 {
     /// <summary>
     /// Fills a work area using interlocking part pairs from BestFitCache.
-    /// Extracted from DefaultNestEngine.FillWithPairs.
     /// </summary>
     public class PairFiller
     {
+        private const int MaxTopCandidates = 50;
+        private const int MaxStripCandidates = 100;
+        private const double MinStripUtilization = 0.3;
+        private const int EarlyExitMinTried = 10;
+        private const int EarlyExitStaleLimit = 10;
+
         private readonly Size plateSize;
         private readonly double partSpacing;
+
+        /// <summary>
+        /// The best-fit results computed during the last Fill call.
+        /// Available after Fill returns so callers can reuse without recomputing.
+        /// </summary>
+        public List<BestFitResult> BestFits { get; private set; }
 
         public PairFiller(Size plateSize, double partSpacing)
         {
@@ -30,11 +41,11 @@ namespace OpenNest.Engine.Fill
             CancellationToken token = default,
             IProgress<NestProgress> progress = null)
         {
-            var bestFits = BestFitCache.GetOrCompute(
+            BestFits = BestFitCache.GetOrCompute(
                 item.Drawing, plateSize.Length, plateSize.Width, partSpacing);
 
-            var candidates = SelectPairCandidates(bestFits, workArea);
-            Debug.WriteLine($"[PairFiller] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
+            var candidates = SelectPairCandidates(BestFits, workArea);
+            Debug.WriteLine($"[PairFiller] Total: {BestFits.Count}, Kept: {BestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
             Debug.WriteLine($"[PairFiller] Plate: {plateSize.Length:F2}x{plateSize.Width:F2}, WorkArea: {workArea.Width:F2}x{workArea.Length:F2}");
 
             List<Part> best = null;
@@ -47,17 +58,7 @@ namespace OpenNest.Engine.Fill
                 {
                     token.ThrowIfCancellationRequested();
 
-                    var result = candidates[i];
-                    var pairParts = result.BuildParts(item.Drawing);
-                    var angles = result.HullAngles;
-                    var engine = new FillLinear(workArea, partSpacing);
-
-                    // Let the remainder strip try pair-based filling too.
-                    var p0 = FillHelpers.BuildRotatedPattern(pairParts, 0);
-                    var p90 = FillHelpers.BuildRotatedPattern(pairParts, Angle.HalfPI);
-                    engine.RemainderPatterns = new List<Pattern> { p0, p90 };
-
-                    var filled = FillHelpers.FillPattern(engine, pairParts, angles, workArea);
+                    var filled = EvaluateCandidate(candidates[i], item.Drawing, workArea);
 
                     if (filled != null && filled.Count > 0)
                     {
@@ -81,8 +82,7 @@ namespace OpenNest.Engine.Fill
                     NestEngineBase.ReportProgress(progress, NestPhase.Pairs, plateNumber, best, workArea,
                         $"Pairs: {i + 1}/{candidates.Count} candidates, best = {bestScore.Count} parts");
 
-                    // Early exit: stop if we've tried enough candidates without improvement.
-                    if (i >= 9 && sinceImproved >= 10)
+                    if (i + 1 >= EarlyExitMinTried && sinceImproved >= EarlyExitStaleLimit)
                     {
                         Debug.WriteLine($"[PairFiller] Early exit at {i + 1}/{candidates.Count} — no improvement in last {sinceImproved} candidates");
                         break;
@@ -98,10 +98,22 @@ namespace OpenNest.Engine.Fill
             return best ?? new List<Part>();
         }
 
+        private List<Part> EvaluateCandidate(BestFitResult candidate, Drawing drawing, Box workArea)
+        {
+            var pairParts = candidate.BuildParts(drawing);
+            var engine = new FillLinear(workArea, partSpacing);
+
+            var p0 = FillHelpers.BuildRotatedPattern(pairParts, 0);
+            var p90 = FillHelpers.BuildRotatedPattern(pairParts, Angle.HalfPI);
+            engine.RemainderPatterns = new List<Pattern> { p0, p90 };
+
+            return FillHelpers.FillPattern(engine, pairParts, candidate.HullAngles, workArea);
+        }
+
         private List<BestFitResult> SelectPairCandidates(List<BestFitResult> bestFits, Box workArea)
         {
             var kept = bestFits.Where(r => r.Keep).ToList();
-            var top = kept.Take(50).ToList();
+            var top = kept.Take(MaxTopCandidates).ToList();
 
             var workShortSide = System.Math.Min(workArea.Width, workArea.Length);
             var plateShortSide = System.Math.Min(plateSize.Width, plateSize.Length);
@@ -110,14 +122,14 @@ namespace OpenNest.Engine.Fill
             {
                 var stripCandidates = bestFits
                     .Where(r => r.ShortestSide <= workShortSide + Tolerance.Epsilon
-                             && r.Utilization >= 0.3)
+                             && r.Utilization >= MinStripUtilization)
                     .OrderByDescending(r => r.Utilization);
 
                 var existing = new HashSet<BestFitResult>(top);
 
                 foreach (var r in stripCandidates)
                 {
-                    if (top.Count >= 100)
+                    if (top.Count >= MaxStripCandidates)
                         break;
 
                     if (existing.Add(r))
