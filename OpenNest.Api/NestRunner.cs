@@ -67,7 +67,8 @@ public static class NestRunner
             var plate = new Plate(request.SheetSize)
             {
                 Thickness = request.Thickness,
-                PartSpacing = request.Spacing
+                PartSpacing = request.Spacing,
+                Material = new Material(request.Material)
             };
 
             // Build items for this pass with remaining quantities

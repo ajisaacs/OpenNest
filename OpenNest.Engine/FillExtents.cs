@@ -25,7 +25,8 @@ namespace OpenNest
         public List<Part> Fill(Drawing drawing, double rotationAngle = 0,
             int plateNumber = 0,
             CancellationToken token = default,
-            IProgress<NestProgress> progress = null)
+            IProgress<NestProgress> progress = null,
+            List<Engine.BestFit.BestFitResult> bestFits = null)
         {
             var pair = BuildPair(drawing, rotationAngle);
             if (pair == null)

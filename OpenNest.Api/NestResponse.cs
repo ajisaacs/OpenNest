@@ -67,27 +67,30 @@ public class NestResponse
         using var zip = new ZipArchive(fs, ZipArchiveMode.Read);
 
         // Read request.json
-        var requestEntry = zip.GetEntry("request.json");
+        var requestEntry = zip.GetEntry("request.json")
+            ?? throw new InvalidOperationException("Missing request.json in .nestquote file");
         NestRequest request;
-        await using (var stream = requestEntry!.Open())
+        await using (var stream = requestEntry.Open())
         {
             request = await JsonSerializer.DeserializeAsync<NestRequest>(stream, JsonOptions);
         }
 
         // Read response.json
-        var responseEntry = zip.GetEntry("response.json");
+        var responseEntry = zip.GetEntry("response.json")
+            ?? throw new InvalidOperationException("Missing response.json in .nestquote file");
         JsonElement metricsJson;
-        await using (var stream = responseEntry!.Open())
+        await using (var stream = responseEntry.Open())
         {
             metricsJson = await JsonSerializer.DeserializeAsync<JsonElement>(stream, JsonOptions);
         }
 
         // Read embedded nest.nest via NestReader(Stream)
-        var nestEntry = zip.GetEntry("nest.nest");
+        var nestEntry = zip.GetEntry("nest.nest")
+            ?? throw new InvalidOperationException("Missing nest.nest in .nestquote file");
         Nest nest;
         using (var nestMs = new MemoryStream())
         {
-            await using (var stream = nestEntry!.Open())
+            await using (var stream = nestEntry.Open())
             {
                 await stream.CopyToAsync(nestMs);
             }
