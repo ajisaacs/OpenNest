@@ -1,8 +1,8 @@
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
-using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Engine.Nfp
 {
     /// <summary>
     /// Caches computed No-Fit Polygons keyed by (DrawingA.Id, RotationA, DrawingB.Id, RotationB).

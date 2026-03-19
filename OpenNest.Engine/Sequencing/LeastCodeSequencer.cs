@@ -1,6 +1,5 @@
-using System;
-using System.Collections.Generic;
 using OpenNest.Math;
+using System.Collections.Generic;
 
 namespace OpenNest.Engine.Sequencing
 {

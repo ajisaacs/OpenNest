@@ -1,6 +1,6 @@
+using OpenNest.Math;
 using System.Collections.Generic;
 using System.Diagnostics;
-using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {

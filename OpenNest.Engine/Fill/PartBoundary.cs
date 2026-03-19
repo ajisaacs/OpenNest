@@ -1,9 +1,9 @@
-using System.Collections.Generic;
-using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using System.Collections.Generic;
+using System.Linq;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     /// <summary>
     /// Pre-computed offset boundary polygons for a part's geometry.
@@ -87,9 +87,9 @@ namespace OpenNest
                     var edge = (verts[i - 1], verts[i]);
 
                     if (-sign * dy > 0) left.Add(edge);
-                    if ( sign * dy > 0) right.Add(edge);
+                    if (sign * dy > 0) right.Add(edge);
                     if (-sign * dx > 0) up.Add(edge);
-                    if ( sign * dx > 0) down.Add(edge);
+                    if (sign * dx > 0) down.Add(edge);
                 }
             }
 
@@ -145,11 +145,11 @@ namespace OpenNest
         {
             switch (direction)
             {
-                case PushDirection.Left:  return _leftEdges;
+                case PushDirection.Left: return _leftEdges;
                 case PushDirection.Right: return _rightEdges;
-                case PushDirection.Up:    return _upEdges;
-                case PushDirection.Down:  return _downEdges;
-                default:                  return _leftEdges;
+                case PushDirection.Up: return _upEdges;
+                case PushDirection.Down: return _downEdges;
+                default: return _leftEdges;
             }
         }
 

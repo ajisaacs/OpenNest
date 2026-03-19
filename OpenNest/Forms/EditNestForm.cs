@@ -1,4 +1,12 @@
-﻿using System;
+﻿using OpenNest.Actions;
+using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Collections;
+using OpenNest.Controls;
+using OpenNest.Engine.Sequencing;
+using OpenNest.IO;
+using OpenNest.Math;
+using OpenNest.Properties;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
@@ -6,16 +14,6 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Api;
-using OpenNest.Actions;
-using OpenNest.CNC.CuttingStrategy;
-using OpenNest.Collections;
-using OpenNest.Controls;
-using OpenNest.Engine;
-using OpenNest.Engine.RapidPlanning;
-using OpenNest.Engine.Sequencing;
-using OpenNest.IO;
-using OpenNest.Math;
-using OpenNest.Properties;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Forms
@@ -32,6 +30,7 @@ namespace OpenNest.Forms
         private Panel plateHeaderPanel;
         private Label plateInfoLabel;
         private Button btnFirstPlate;
+        private Button btnRemovePlate;
 
         private Button btnPreviousPlate;
         private Button btnNextPlate;
@@ -122,7 +121,7 @@ namespace OpenNest.Forms
 
             navPanel.Controls.AddRange(new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate });
 
-            var btnRemovePlate = CreateNavButton(Resources.remove);
+            btnRemovePlate = CreateNavButton(Resources.remove);
             btnRemovePlate.Dock = DockStyle.Right;
             btnRemovePlate.Click += (s, e) => RemoveCurrentPlate();
 
@@ -178,6 +177,7 @@ namespace OpenNest.Forms
 
             UpdatePlateList();
             UpdateDrawingList();
+            UpdateRemovePlateButton();
 
             LoadFirstPlate();
 
@@ -731,6 +731,7 @@ namespace OpenNest.Forms
                 PlateView.Plate = Nest.Plates[CurrentPlateIndex];
 
             UpdatePlateList();
+            UpdateRemovePlateButton();
             PlateView.ZoomToFit();
         }
 
@@ -738,8 +739,14 @@ namespace OpenNest.Forms
         {
             tabControl1.SelectedIndex = 0;
             UpdatePlateList();
+            UpdateRemovePlateButton();
             LoadLastPlate();
             PlateView.ZoomToFit();
+        }
+
+        private void UpdateRemovePlateButton()
+        {
+            btnRemovePlate.Enabled = Nest.Plates.Count > 1;
         }
 
         #endregion

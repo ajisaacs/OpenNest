@@ -1,10 +1,10 @@
+using ACadSharp;
+using ACadSharp.IO;
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using ACadSharp;
-using ACadSharp.IO;
-using OpenNest.Geometry;
 
 namespace OpenNest.IO
 {

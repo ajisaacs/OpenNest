@@ -1,10 +1,10 @@
-using System.Collections.Generic;
-using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System.Collections.Generic;
+using System.Linq;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     internal static class RotationAnalysis
     {

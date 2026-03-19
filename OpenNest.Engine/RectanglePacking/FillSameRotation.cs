@@ -1,5 +1,4 @@
-﻿using OpenNest.Geometry;
-using OpenNest.Math;
+﻿using OpenNest.Math;
 
 namespace OpenNest.RectanglePacking
 {

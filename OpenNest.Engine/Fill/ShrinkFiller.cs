@@ -1,10 +1,10 @@
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     public enum ShrinkAxis { Width, Height }
 

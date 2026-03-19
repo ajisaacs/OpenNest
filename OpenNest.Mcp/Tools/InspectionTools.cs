@@ -1,10 +1,9 @@
-using System.Collections.Generic;
+using ModelContextProtocol.Server;
+using OpenNest.Engine.Fill;
+using OpenNest.Math;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
-using ModelContextProtocol.Server;
-using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest.Mcp.Tools
 {

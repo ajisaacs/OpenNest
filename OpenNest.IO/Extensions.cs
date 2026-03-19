@@ -1,10 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
 using ACadSharp.Entities;
 using CSMath;
 using OpenNest.Geometry;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 
 namespace OpenNest.IO
 {
@@ -26,9 +25,9 @@ namespace OpenNest.IO
                 arc.Center.X, arc.Center.Y, arc.Radius,
                 arc.StartAngle,
                 arc.EndAngle)
-                {
-                    Layer = arc.Layer.ToOpenNest()
-                };
+            {
+                Layer = arc.Layer.ToOpenNest()
+            };
             result.ApplyDxfProperties(arc);
             return result;
         }
@@ -38,9 +37,9 @@ namespace OpenNest.IO
             var result = new Geometry.Circle(
                 circle.Center.X, circle.Center.Y,
                 circle.Radius)
-                {
-                    Layer = circle.Layer.ToOpenNest()
-                };
+            {
+                Layer = circle.Layer.ToOpenNest()
+            };
             result.ApplyDxfProperties(circle);
             return result;
         }
@@ -50,9 +49,9 @@ namespace OpenNest.IO
             var result = new Geometry.Line(
                 line.StartPoint.X, line.StartPoint.Y,
                 line.EndPoint.X, line.EndPoint.Y)
-                {
-                    Layer = line.Layer.ToOpenNest()
-                };
+            {
+                Layer = line.Layer.ToOpenNest()
+            };
             result.ApplyDxfProperties(line);
             return result;
         }
@@ -76,7 +75,9 @@ namespace OpenNest.IO
 
                 lines.Add(new Geometry.Line(lastPoint, nextPoint)
                 {
-                    Layer = layer, Color = color, LineTypeName = lineTypeName
+                    Layer = layer,
+                    Color = color,
+                    LineTypeName = lineTypeName
                 });
 
                 lastPoint = nextPoint;
@@ -85,7 +86,9 @@ namespace OpenNest.IO
             if (spline.IsClosed)
                 lines.Add(new Geometry.Line(lastPoint, pts[0].ToOpenNest())
                 {
-                    Layer = layer, Color = color, LineTypeName = lineTypeName
+                    Layer = layer,
+                    Color = color,
+                    LineTypeName = lineTypeName
                 });
 
             return lines;
@@ -109,7 +112,9 @@ namespace OpenNest.IO
 
                 lines.Add(new Geometry.Line(lastPoint, nextPoint)
                 {
-                    Layer = layer, Color = color, LineTypeName = lineTypeName
+                    Layer = layer,
+                    Color = color,
+                    LineTypeName = lineTypeName
                 });
 
                 lastPoint = nextPoint;
@@ -120,7 +125,9 @@ namespace OpenNest.IO
             if (isClosed)
                 lines.Add(new Geometry.Line(lastPoint, polyline.Vertices[0].Location.ToOpenNest())
                 {
-                    Layer = layer, Color = color, LineTypeName = lineTypeName
+                    Layer = layer,
+                    Color = color,
+                    LineTypeName = lineTypeName
                 });
 
             return lines;
@@ -144,7 +151,9 @@ namespace OpenNest.IO
 
                 lines.Add(new Geometry.Line(lastPoint, nextPoint)
                 {
-                    Layer = layer, Color = color, LineTypeName = lineTypeName
+                    Layer = layer,
+                    Color = color,
+                    LineTypeName = lineTypeName
                 });
 
                 lastPoint = nextPoint;
@@ -155,7 +164,9 @@ namespace OpenNest.IO
             if (isClosed)
                 lines.Add(new Geometry.Line(lastPoint, polyline.Vertices[0].ToOpenNest())
                 {
-                    Layer = layer, Color = color, LineTypeName = lineTypeName
+                    Layer = layer,
+                    Color = color,
+                    LineTypeName = lineTypeName
                 });
 
             return lines;
@@ -204,7 +215,9 @@ namespace OpenNest.IO
             {
                 lines.Add(new Geometry.Line(points[i], points[i + 1])
                 {
-                    Layer = layer, Color = color, LineTypeName = lineTypeName
+                    Layer = layer,
+                    Color = color,
+                    LineTypeName = lineTypeName
                 });
             }
 
@@ -215,7 +228,9 @@ namespace OpenNest.IO
                 var last = lines.Last();
                 lines.Add(new Geometry.Line(last.EndPoint, first.StartPoint)
                 {
-                    Layer = layer, Color = color, LineTypeName = lineTypeName
+                    Layer = layer,
+                    Color = color,
+                    LineTypeName = lineTypeName
                 });
             }
 

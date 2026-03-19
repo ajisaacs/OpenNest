@@ -1,4 +1,12 @@
-﻿using System;
+﻿using OpenNest.Actions;
+using OpenNest.Collections;
+using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
+using OpenNest.Gpu;
+using OpenNest.IO;
+using OpenNest.Properties;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -7,13 +15,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using OpenNest.Actions;
-using OpenNest.Collections;
-using OpenNest.Engine.BestFit;
-using OpenNest.Gpu;
-using OpenNest.Geometry;
-using OpenNest.IO;
-using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
@@ -812,7 +813,7 @@ namespace OpenNest.Forms
 
             if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                 return;
-            
+
             var items = form.GetNestItems();
 
             if (!items.Any(it => it.Quantity > 0))
@@ -826,7 +827,12 @@ namespace OpenNest.Forms
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
-                activeForm.PlateView.SetTemporaryParts(p.BestParts);
+
+                if (p.IsOverallBest)
+                    activeForm.PlateView.SetStationaryParts(p.BestParts);
+                else
+                    activeForm.PlateView.SetActiveParts(p.BestParts);
+
                 activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
 
@@ -862,9 +868,9 @@ namespace OpenNest.Forms
                     var nestParts = await Task.Run(() =>
                         engine.Nest(remaining, progress, token));
 
-                    activeForm.PlateView.ClearTemporaryParts();
+                    activeForm.PlateView.ClearPreviewParts();
 
-                    if (nestParts.Count > 0 && !token.IsCancellationRequested)
+                    if (nestParts.Count > 0 && (!token.IsCancellationRequested || progressForm.Accepted))
                     {
                         plate.Parts.AddRange(nestParts);
                         activeForm.PlateView.Invalidate();
@@ -880,7 +886,7 @@ namespace OpenNest.Forms
             }
             catch (Exception ex)
             {
-                activeForm.PlateView.ClearTemporaryParts();
+                activeForm.PlateView.ClearPreviewParts();
                 MessageBox.Show($"Nesting error: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -896,7 +902,7 @@ namespace OpenNest.Forms
 
         private void SequenceAllPlates_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) 
+            if (activeForm == null)
                 return;
 
             activeForm.AutoSequenceAllPlates();
@@ -963,7 +969,12 @@ namespace OpenNest.Forms
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
-                activeForm.PlateView.SetTemporaryParts(p.BestParts);
+
+                if (p.IsOverallBest)
+                    activeForm.PlateView.SetStationaryParts(p.BestParts);
+                else
+                    activeForm.PlateView.SetActiveParts(p.BestParts);
+
                 activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
 
@@ -980,15 +991,15 @@ namespace OpenNest.Forms
                         plate.WorkArea(), progress, token));
 
                 if (parts.Count > 0)
-                    activeForm.PlateView.AcceptTemporaryParts();
+                    activeForm.PlateView.AcceptPreviewParts(parts);
                 else
-                    activeForm.PlateView.ClearTemporaryParts();
+                    activeForm.PlateView.ClearPreviewParts();
 
                 progressForm.ShowCompleted();
             }
             catch (Exception ex)
             {
-                activeForm.PlateView.ClearTemporaryParts();
+                activeForm.PlateView.ClearPreviewParts();
                 MessageBox.Show($"Nesting error: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -1025,16 +1036,21 @@ namespace OpenNest.Forms
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
-                activeForm.PlateView.SetTemporaryParts(p.BestParts);
+
+                if (p.IsOverallBest)
+                    activeForm.PlateView.SetStationaryParts(p.BestParts);
+                else
+                    activeForm.PlateView.SetActiveParts(p.BestParts);
+
                 activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
 
             Action<List<Part>> onComplete = parts =>
             {
                 if (parts != null && parts.Count > 0)
-                    activeForm.PlateView.AcceptTemporaryParts();
+                    activeForm.PlateView.AcceptPreviewParts(parts);
                 else
-                    activeForm.PlateView.ClearTemporaryParts();
+                    activeForm.PlateView.ClearPreviewParts();
 
                 activeForm.PlateView.ActiveWorkArea = null;
                 progressForm.Close();

@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using OpenNest.Controls;
+using OpenNest.Converters;
+using OpenNest.Geometry;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
-using OpenNest.Controls;
-using OpenNest.Converters;
-using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -49,7 +49,7 @@ namespace OpenNest
         internal bool IsDirty { get; set; }
 
         public bool IsSelected { get; set; }
-        
+
         public GraphicsPath Path { get; private set; }
 
         public Color Color

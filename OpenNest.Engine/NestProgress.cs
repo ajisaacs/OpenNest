@@ -1,5 +1,5 @@
-using System.Collections.Generic;
 using OpenNest.Geometry;
+using System.Collections.Generic;
 
 namespace OpenNest
 {
@@ -46,5 +46,6 @@ namespace OpenNest
         public List<Part> BestParts { get; set; }
         public string Description { get; set; }
         public Box ActiveWorkArea { get; set; }
+        public bool IsOverallBest { get; set; }
     }
 }

@@ -1,7 +1,7 @@
-using System.Collections.Generic;
-using System.Linq;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Math;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest.Engine.Sequencing
 {

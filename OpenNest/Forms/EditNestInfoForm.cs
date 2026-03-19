@@ -1,6 +1,6 @@
-﻿using System;
+﻿using OpenNest.Geometry;
+using System;
 using System.Windows.Forms;
-using OpenNest.Geometry;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Forms

@@ -1,5 +1,4 @@
-﻿using System;
-using OpenNest.Math;
+﻿using OpenNest.Math;
 
 namespace OpenNest
 {

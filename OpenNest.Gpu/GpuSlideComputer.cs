@@ -1,8 +1,8 @@
-using System;
 using ILGPU;
-using ILGPU.Runtime;
 using ILGPU.Algorithms;
+using ILGPU.Runtime;
 using OpenNest.Engine.BestFit;
+using System;
 
 namespace OpenNest.Gpu
 {
@@ -13,7 +13,7 @@ namespace OpenNest.Gpu
         private readonly object _lock = new object();
 
         // ── Kernels ──────────────────────────────────────────────────
-        
+
         private readonly Action<Index1D,
             ArrayView1D<double, Stride1D.Dense>,   // stationaryPrep
             ArrayView1D<double, Stride1D.Dense>,   // movingPrep
@@ -152,12 +152,12 @@ namespace OpenNest.Gpu
         private void EnsureStationary(double[] data, int count)
         {
             // Fast check: if same object or content is identical, skip upload
-            if (_gpuStationaryPrep != null && 
-                _lastStationaryData != null && 
+            if (_gpuStationaryPrep != null &&
+                _lastStationaryData != null &&
                 _lastStationaryData.Length == data.Length)
             {
                 // Reference equality or content equality
-                if (_lastStationaryData == data || 
+                if (_lastStationaryData == data ||
                     new ReadOnlySpan<double>(_lastStationaryData).SequenceEqual(new ReadOnlySpan<double>(data)))
                 {
                     return;
@@ -178,11 +178,11 @@ namespace OpenNest.Gpu
 
         private void EnsureMoving(double[] data, int count)
         {
-             if (_gpuMovingPrep != null && 
-                _lastMovingData != null && 
-                _lastMovingData.Length == data.Length)
+            if (_gpuMovingPrep != null &&
+               _lastMovingData != null &&
+               _lastMovingData.Length == data.Length)
             {
-                if (_lastMovingData == data || 
+                if (_lastMovingData == data ||
                     new ReadOnlySpan<double>(_lastMovingData).SequenceEqual(new ReadOnlySpan<double>(data)))
                 {
                     return;
@@ -240,7 +240,7 @@ namespace OpenNest.Gpu
 
             var dx = x2 - x1;
             var dy = y2 - y1;
-            
+
             // invD is used for parameter 't'. We use a small epsilon for stability.
             prepared[index * 10 + 4] = (XMath.Abs(dx) < 1e-9) ? 0 : 1.0 / dx;
             prepared[index * 10 + 5] = (XMath.Abs(dy) < 1e-9) ? 0 : 1.0 / dy;
@@ -265,7 +265,7 @@ namespace OpenNest.Gpu
 
             var dx = offsets[index * 2];
             var dy = offsets[index * 2 + 1];
-            
+
             results[index] = ComputeSlideLean(
                 stationaryPrep, movingPrep, dx, dy, sCount, mCount, direction);
         }

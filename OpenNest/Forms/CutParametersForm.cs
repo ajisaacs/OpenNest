@@ -48,7 +48,7 @@ namespace OpenNest.Forms
             var suffix = UnitsHelper.GetShortTimeUnitPair(units);
 
             numericUpDown1.Suffix = " " + suffix;
-            numericUpDown2.Suffix = " " + suffix;          
+            numericUpDown2.Suffix = " " + suffix;
         }
 
         public CutParameters GetCutParameters()

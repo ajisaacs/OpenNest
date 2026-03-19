@@ -1,10 +1,10 @@
-using System.Collections.Generic;
-using System.Linq;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Engine.RapidPlanning;
 using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest.Engine
 {

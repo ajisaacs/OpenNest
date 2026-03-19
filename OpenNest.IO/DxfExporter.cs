@@ -1,13 +1,10 @@
-using System;
-using System.Diagnostics;
-using System.IO;
 using ACadSharp;
-using ACadSharp.Entities;
 using ACadSharp.IO;
-using ACadSharp.Tables;
 using CSMath;
 using OpenNest.CNC;
 using OpenNest.Math;
+using System.Diagnostics;
+using System.IO;
 
 namespace OpenNest.IO
 {

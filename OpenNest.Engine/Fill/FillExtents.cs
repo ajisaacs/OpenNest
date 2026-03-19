@@ -1,11 +1,11 @@
+using OpenNest.Geometry;
+using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
-using OpenNest.Geometry;
-using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     public class FillExtents
     {
@@ -173,18 +173,12 @@ namespace OpenNest
             if (minSlide >= double.MaxValue || minSlide < 0)
                 return pairHeight + partSpacing;
 
-            // Boundaries are inflated by halfSpacing, so when inflated edges touch
-            // the actual parts have partSpacing gap. Match FillLinear's pattern:
-            // startOffset = pairHeight (no extra spacing), copyDist = height - slide.
+            // Match FillLinear.ComputeCopyDistance: copyDist = startOffset - slide,
+            // clamped so it never goes below pairHeight + partSpacing to prevent
+            // bounding-box overlap from spurious slide values.
             var copyDist = pairHeight - minSlide;
 
-            // Boundaries are inflated by halfSpacing, so the geometry-aware
-            // distance already guarantees partSpacing gap. Only fall back to
-            // bounding-box distance if the calculation produced a non-positive value.
-            if (copyDist <= Tolerance.Epsilon)
-                return pairHeight + partSpacing;
-
-            return copyDist;
+            return System.Math.Max(copyDist, pairHeight + partSpacing);
         }
 
         private static double SlideDistance(

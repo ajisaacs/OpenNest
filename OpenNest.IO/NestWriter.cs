@@ -1,3 +1,5 @@
+using OpenNest.CNC;
+using OpenNest.Engine.BestFit;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -5,10 +7,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using OpenNest.CNC;
-using OpenNest.Engine.BestFit;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using static OpenNest.IO.NestFormat;
 
 namespace OpenNest.IO

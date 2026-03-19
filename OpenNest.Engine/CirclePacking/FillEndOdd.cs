@@ -1,6 +1,6 @@
-﻿using System;
-using OpenNest.Geometry;
+﻿using OpenNest.Geometry;
 using OpenNest.Math;
+using System;
 
 namespace OpenNest.CirclePacking
 {

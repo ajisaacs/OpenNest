@@ -1,7 +1,7 @@
-using System.Collections.Generic;
 using OpenNest.Geometry;
+using System.Collections.Generic;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     public class Pattern
     {

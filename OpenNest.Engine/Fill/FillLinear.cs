@@ -1,9 +1,9 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     public class FillLinear
     {
@@ -16,7 +16,7 @@ namespace OpenNest
         public Box WorkArea { get; }
 
         public double PartSpacing { get; }
-        
+
         public double HalfSpacing => PartSpacing / 2;
 
         /// <summary>
@@ -110,47 +110,40 @@ namespace OpenNest
             var pushDir = GetPushDirection(direction);
             var opposite = SpatialQuery.OppositeDirection(pushDir);
 
-            // Compute a starting offset large enough that every part-pair in
-            // patternB has its offset geometry beyond patternA's offset geometry.
-            var maxUpper = double.MinValue;
-            var minLower = double.MaxValue;
-
-            for (var i = 0; i < patternA.Parts.Count; i++)
-            {
-                var bb = patternA.Parts[i].BoundingBox;
-                var upper = direction == NestDirection.Horizontal ? bb.Right : bb.Top;
-                var lower = direction == NestDirection.Horizontal ? bb.Left : bb.Bottom;
-
-                if (upper > maxUpper) maxUpper = upper;
-                if (lower < minLower) minLower = lower;
-            }
-
-            var startOffset = System.Math.Max(bboxDim,
-                maxUpper - minLower + PartSpacing + Tolerance.Epsilon);
-
+            // bboxDim already spans max(upper) - min(lower) across all parts,
+            // so the start offset just needs to push beyond that plus spacing.
+            var startOffset = bboxDim + PartSpacing + Tolerance.Epsilon;
             var offset = MakeOffset(direction, startOffset);
 
-            // Pre-cache edge arrays.
-            var movingEdges = new (Vector start, Vector end)[patternA.Parts.Count][];
-            var stationaryEdges = new (Vector start, Vector end)[patternA.Parts.Count][];
+            var maxCopyDistance = FindMaxPairDistance(
+                patternA.Parts, boundaries, offset, pushDir, opposite, startOffset);
 
-            for (var i = 0; i < patternA.Parts.Count; i++)
-            {
-                movingEdges[i] = boundaries[i].GetEdges(pushDir);
-                stationaryEdges[i] = boundaries[i].GetEdges(opposite);
-            }
+            if (maxCopyDistance < Tolerance.Epsilon)
+                return bboxDim + PartSpacing;
 
+            return maxCopyDistance;
+        }
+
+        /// <summary>
+        /// Tests every pair of parts across adjacent pattern copies and returns the
+        /// maximum copy distance found. Returns 0 if no valid slide was found.
+        /// </summary>
+        private static double FindMaxPairDistance(
+            List<Part> parts, PartBoundary[] boundaries, Vector offset,
+            PushDirection pushDir, PushDirection opposite, double startOffset)
+        {
             var maxCopyDistance = 0.0;
 
-            for (var j = 0; j < patternA.Parts.Count; j++)
+            for (var j = 0; j < parts.Count; j++)
             {
-                var locationB = patternA.Parts[j].Location + offset;
+                var movingEdges = boundaries[j].GetEdges(pushDir);
+                var locationB = parts[j].Location + offset;
 
-                for (var i = 0; i < patternA.Parts.Count; i++)
+                for (var i = 0; i < parts.Count; i++)
                 {
                     var slideDistance = SpatialQuery.DirectionalDistance(
-                        movingEdges[j], locationB,
-                        stationaryEdges[i], patternA.Parts[i].Location,
+                        movingEdges, locationB,
+                        boundaries[i].GetEdges(opposite), parts[i].Location,
                         pushDir);
 
                     if (slideDistance >= double.MaxValue || slideDistance < 0)
@@ -162,9 +155,6 @@ namespace OpenNest
                         maxCopyDistance = copyDist;
                 }
             }
-
-            if (maxCopyDistance < Tolerance.Epsilon)
-                return bboxDim + PartSpacing;
 
             return maxCopyDistance;
         }

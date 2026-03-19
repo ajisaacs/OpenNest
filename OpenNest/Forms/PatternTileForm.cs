@@ -1,34 +1,16 @@
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
-using OpenNest.Controls;
-using OpenNest.Geometry;
 using GeoSize = OpenNest.Geometry.Size;
 
 namespace OpenNest.Forms
 {
-    public enum PatternTileTarget
-    {
-        CurrentPlate,
-        NewPlate
-    }
-
-    public class PatternTileResult
-    {
-        public List<Part> Parts { get; set; }
-        public PatternTileTarget Target { get; set; }
-        public GeoSize PlateSize { get; set; }
-    }
-
     public partial class PatternTileForm : Form
     {
         private readonly Nest nest;
-        private readonly PlateView cellView;
-        private readonly PlateView hPreview;
-        private readonly PlateView vPreview;
-        private readonly Label hLabel;
-        private readonly Label vLabel;
 
         public PatternTileResult Result { get; private set; }
 
@@ -37,53 +19,11 @@ namespace OpenNest.Forms
             this.nest = nest;
             InitializeComponent();
 
-            // Unit cell editor — plate outline hidden via zero-size plate
-            cellView = new PlateView();
+            // Hide plate outline via zero-size plate
             cellView.Plate.Size = new GeoSize(0, 0);
-            cellView.Plate.Quantity = 0; // prevent Drawing.Quantity.Nested side-effects
-            cellView.DrawOrigin = false;
-            cellView.DrawBounds = false; // hide selection bounding box overlay
-            cellView.Dock = DockStyle.Fill;
-            splitContainer.Panel1.Controls.Add(cellView);
-
-            // Right side: vertical split with horizontal and vertical preview
-            var previewSplit = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                SplitterDistance = 250
-            };
-            splitContainer.Panel2.Controls.Add(previewSplit);
-
-            hLabel = new Label
-            {
-                Dock = DockStyle.Top,
-                Height = 20,
-                Text = "Horizontal — 0 parts",
-                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
-                Font = new System.Drawing.Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold),
-                ForeColor = System.Drawing.Color.FromArgb(80, 80, 80),
-                Padding = new Padding(4, 0, 0, 0)
-            };
-
-            hPreview = CreatePreviewView();
-            previewSplit.Panel1.Controls.Add(hPreview);
-            previewSplit.Panel1.Controls.Add(hLabel);
-
-            vLabel = new Label
-            {
-                Dock = DockStyle.Top,
-                Height = 20,
-                Text = "Vertical — 0 parts",
-                TextAlign = System.Drawing.ContentAlignment.MiddleLeft,
-                Font = new System.Drawing.Font("Segoe UI", 9f, System.Drawing.FontStyle.Bold),
-                ForeColor = System.Drawing.Color.FromArgb(80, 80, 80),
-                Padding = new Padding(4, 0, 0, 0)
-            };
-
-            vPreview = CreatePreviewView();
-            previewSplit.Panel2.Controls.Add(vPreview);
-            previewSplit.Panel2.Controls.Add(vLabel);
+            cellView.Plate.Quantity = 0;
+            hPreview.Plate.Quantity = 0;
+            vPreview.Plate.Quantity = 0;
 
             // Populate drawing dropdowns
             var drawings = nest.Drawings.OrderBy(d => d.Name).ToList();
@@ -102,6 +42,12 @@ namespace OpenNest.Forms
             txtPlateSize.Text = defaults.Size.ToString();
             nudPartSpacing.Value = (decimal)defaults.PartSpacing;
 
+            // Format drawing names in dropdowns
+            cboDrawingA.FormattingEnabled = true;
+            cboDrawingA.Format += ComboDrawing_Format;
+            cboDrawingB.FormattingEnabled = true;
+            cboDrawingB.Format += ComboDrawing_Format;
+
             // Wire events
             cboDrawingA.SelectedIndexChanged += OnDrawingChanged;
             cboDrawingB.SelectedIndexChanged += OnDrawingChanged;
@@ -110,6 +56,12 @@ namespace OpenNest.Forms
             btnAutoArrange.Click += OnAutoArrangeClick;
             btnApply.Click += OnApplyClick;
             cellView.MouseUp += OnCellMouseUp;
+        }
+
+        private void ComboDrawing_Format(object sender, ListControlConvertEventArgs e)
+        {
+            if (e.Value is Drawing d)
+                e.Value = d.Name;
         }
 
         private Drawing SelectedDrawingA =>
@@ -144,6 +96,7 @@ namespace OpenNest.Forms
             if (e.Button == MouseButtons.Left && cellView.Plate.Parts.Count >= 2)
             {
                 CompactCellParts();
+                cellView.ZoomToFit();
             }
 
             RebuildPreview();
@@ -212,28 +165,19 @@ namespace OpenNest.Forms
                     if (System.Math.Sqrt(dx * dx + dy * dy) < 0.01)
                         continue;
 
-                    var angle = System.Math.Atan2(dy, dx);
+                    var direction = new Vector(dx, dy);
+                    var len = System.Math.Sqrt(dx * dx + dy * dy);
+                    if (len > 0) direction = new Vector(dx / len, dy / len);
                     var single = new List<Part> { part };
                     var obstacles = parts.Where(p => p != part).ToList();
 
                     totalMoved += Compactor.Push(single, obstacles,
-                        syntheticWorkArea, spacing, angle);
+                        syntheticWorkArea, spacing, direction);
                 }
 
                 if (totalMoved < 0.01)
                     break;
             }
-        }
-
-        private static PlateView CreatePreviewView()
-        {
-            var view = new PlateView();
-            view.Plate.Quantity = 0;
-            view.AllowSelect = false;
-            view.AllowDrop = false;
-            view.DrawBounds = false;
-            view.Dock = DockStyle.Fill;
-            return view;
         }
 
         private void UpdatePreviewPlateSize()
@@ -275,7 +219,7 @@ namespace OpenNest.Forms
             if (pattern == null)
                 return;
 
-            var workArea = new Box(0, 0, plateSize.Width, plateSize.Length);
+            var workArea = new Box(0, 0, plateSize.Length, plateSize.Width);
             var filler = new FillLinear(workArea, PartSpacing);
 
             var hParts = filler.Fill(pattern, NestDirection.Horizontal);
@@ -384,7 +328,7 @@ namespace OpenNest.Forms
             if (pattern == null)
                 return;
 
-            var filler = new FillLinear(new Box(0, 0, plateSize.Width, plateSize.Length), PartSpacing);
+            var filler = new FillLinear(new Box(0, 0, plateSize.Length, plateSize.Width), PartSpacing);
             var tiledParts = filler.Fill(pattern, applyDirection);
 
             Result = new PatternTileResult
@@ -399,5 +343,18 @@ namespace OpenNest.Forms
             DialogResult = DialogResult.OK;
             Close();
         }
+    }
+
+    public enum PatternTileTarget
+    {
+        CurrentPlate,
+        NewPlate
+    }
+
+    public class PatternTileResult
+    {
+        public List<Part> Parts { get; set; }
+        public PatternTileTarget Target { get; set; }
+        public GeoSize PlateSize { get; set; }
     }
 }

@@ -1,9 +1,9 @@
-﻿using System;
-using System.Linq;
-using OpenNest.Api;
+﻿using OpenNest.Api;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using System;
+using System.Linq;
 
 namespace OpenNest
 {
@@ -84,7 +84,7 @@ namespace OpenNest
                     time += TimeSpan.FromSeconds(info.TravelDistance / cutParams.RapidTravelRate);
                     break;
             }
-            
+
             time += TimeSpan.FromTicks(info.PierceCount * cutParams.PierceTime.Ticks);
 
             return time;

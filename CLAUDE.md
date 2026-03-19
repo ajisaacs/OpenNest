@@ -37,16 +37,15 @@ Nesting algorithms with a pluggable engine architecture. `NestEngineBase` is the
 
 - **Engine hierarchy**: `NestEngineBase` (abstract) → `DefaultNestEngine` (Linear, Pairs, RectBestFit, Remainder phases). Custom engines subclass `NestEngineBase` and register via `NestEngineRegistry.Register()` or as plugin DLLs in `Engines/`.
 - **NestEngineRegistry**: Static registry — `Create(Plate)` factory, `ActiveEngineName` global selection, `LoadPlugins(directory)` for DLL discovery. All callsites use `NestEngineRegistry.Create(plate)` except `BruteForceRunner` which uses `new DefaultNestEngine(plate)` directly for training consistency.
-- **BestFit/**: NFP-based pair evaluation pipeline — `BestFitFinder` orchestrates angle sweeps, `PairEvaluator`/`IPairEvaluator` scores part pairs, `RotationSlideStrategy`/`ISlideComputer` computes slide distances. `BestFitCache` and `BestFitFilter` optimize repeated lookups.
-- **RectanglePacking/**: `FillBestFit` (single-item fill, tries horizontal and vertical orientations), `PackBottomLeft` (multi-item bin packing, sorts by area descending). Both operate on `Bin`/`Item` abstractions.
-- **CirclePacking/**: Alternative packing for circular parts.
-- **ML/**: `AnglePredictor` (ONNX model for predicting good rotation angles), `FeatureExtractor` (part geometry features), `BruteForceRunner` (full angle sweep for training data).
-- `FillLinear`: Grid-based fill with directional sliding.
-- `Compactor`: Post-fill gravity compaction — pushes parts toward a plate edge to close gaps.
-- `FillScore`: Lexicographic comparison struct for fill results (count > utilization > compactness).
+- **Fill/** (`namespace OpenNest.Engine.Fill`): Fill algorithms — `FillLinear` (grid-based), `FillExtents` (extents-based pair tiling), `PairFiller` (interlocking pairs), `ShrinkFiller`, `RemnantFiller`/`RemnantFinder`, `Compactor` (post-fill gravity compaction), `FillScore` (lexicographic comparison: count > utilization > compactness), `Pattern`/`PatternTiler`, `PartBoundary`, `RotationAnalysis`, `AngleCandidateBuilder`, `BestCombination`, `AccumulatingProgress`.
+- **Strategies/** (`namespace OpenNest.Engine.Strategies`): Pluggable fill strategy layer — `IFillStrategy` interface, `FillContext`, `FillStrategyRegistry` (auto-discovers strategies via reflection, supports plugin DLLs), `FillHelpers`. Built-in strategies: `LinearFillStrategy`, `PairsFillStrategy`, `RectBestFitStrategy`, `ExtentsFillStrategy`.
+- **BestFit/** (`namespace OpenNest.Engine.BestFit`): NFP-based pair evaluation pipeline — `BestFitFinder` orchestrates angle sweeps, `PairEvaluator`/`IPairEvaluator` scores part pairs, `RotationSlideStrategy`/`ISlideComputer` computes slide distances. `BestFitCache` and `BestFitFilter` optimize repeated lookups.
+- **RectanglePacking/** (`namespace OpenNest.RectanglePacking`): `FillBestFit` (single-item fill, tries horizontal and vertical orientations), `PackBottomLeft` (multi-item bin packing, sorts by area descending). Both operate on `Bin`/`Item` abstractions.
+- **CirclePacking/** (`namespace OpenNest.CirclePacking`): Alternative packing for circular parts.
+- **Nfp/** (`namespace OpenNest.Engine.Nfp`): NFP-based nesting (not yet integrated) — `AutoNester` (mixed-part nesting with simulated annealing), `BottomLeftFill` (BLF placement), `NfpCache` (computed NFP caching), `SimulatedAnnealing` (optimizer), `INestOptimizer`/`NestResult`.
+- **ML/** (`namespace OpenNest.Engine.ML`): `AnglePredictor` (ONNX model for predicting good rotation angles), `FeatureExtractor` (part geometry features), `BruteForceRunner` (full angle sweep for training data).
 - `NestItem`: Input to the engine — wraps a `Drawing` with quantity, priority, and rotation constraints.
 - `NestProgress`: Progress reporting model with `NestPhase` enum for UI feedback.
-- `RotationAnalysis`: Analyzes part geometry to determine valid rotation angles.
 
 ### OpenNest.IO (class library, depends on Core)
 File I/O and format conversion. Uses ACadSharp for DXF/DWG support.
@@ -99,9 +98,14 @@ Always use Roslyn Bridge MCP tools (`mcp__RoslynBridge__*`) as the primary metho
 
 - Always use `var` instead of explicit types (e.g., `var parts = new List<Part>();` not `List<Part> parts = new List<Part>();`).
 
+## Documentation Maintenance
+
+Always keep `README.md` and `CLAUDE.md` up to date when making changes that affect project structure, architecture, build instructions, dependencies, or key patterns. If you add a new project, change a namespace, modify the build process, or alter significant behavior, update both files as part of the same change.
+
 ## Key Patterns
 
 - OpenNest.Core uses multiple namespaces: `OpenNest` (root domain), `OpenNest.CNC`, `OpenNest.Geometry`, `OpenNest.Converters`, `OpenNest.Math`, `OpenNest.Collections`.
+- OpenNest.Engine uses sub-namespaces: `OpenNest.Engine.Fill` (fill algorithms), `OpenNest.Engine.Strategies` (pluggable strategy layer), `OpenNest.Engine.BestFit`, `OpenNest.Engine.Nfp` (NFP-based nesting, not yet integrated), `OpenNest.Engine.ML`, `OpenNest.Engine.RapidPlanning`, `OpenNest.Engine.Sequencing`.
 - `ObservableList<T>` provides ItemAdded/ItemRemoved/ItemChanged events used for automatic quantity tracking between plates and drawings.
 - Angles throughout the codebase are in **radians** (use `Angle.ToRadians()`/`Angle.ToDegrees()` for conversion).
 - `Tolerance.Epsilon` is used for floating-point comparisons across geometry operations.

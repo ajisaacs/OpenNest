@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using OpenNest.Geometry;
 
 namespace OpenNest.Engine.ML
 {

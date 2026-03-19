@@ -25,10 +25,10 @@ namespace OpenNest.Engine.Sequencing
 
         private static double MinEdgeDistance(OpenNest.Geometry.Vector center, OpenNest.Geometry.Box plateBox)
         {
-            var distLeft   = center.X - plateBox.Left;
-            var distRight  = plateBox.Right - center.X;
+            var distLeft = center.X - plateBox.Left;
+            var distRight = plateBox.Right - center.X;
             var distBottom = center.Y - plateBox.Bottom;
-            var distTop    = plateBox.Top - center.Y;
+            var distTop = plateBox.Top - center.Y;
 
             return System.Math.Min(System.Math.Min(distLeft, distRight), System.Math.Min(distBottom, distTop));
         }

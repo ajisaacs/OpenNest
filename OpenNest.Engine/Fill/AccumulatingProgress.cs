@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     /// <summary>
     /// Wraps an IProgress to prepend previously placed parts to each report,

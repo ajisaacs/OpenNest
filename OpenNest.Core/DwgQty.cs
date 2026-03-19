@@ -8,10 +8,10 @@
 
         public int Remaining
         {
-            get 
+            get
             {
                 var x = Required - Nested;
-                return x < 0 ? 0: x; 
+                return x < 0 ? 0 : x;
             }
         }
     }

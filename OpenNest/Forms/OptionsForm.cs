@@ -1,5 +1,5 @@
-﻿using System.Windows.Forms;
-using OpenNest.Properties;
+﻿using OpenNest.Properties;
+using System.Windows.Forms;
 
 namespace OpenNest.Forms
 {

@@ -1,7 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using OpenNest.Geometry;
+using System.Linq;
 
 namespace OpenNest.Engine.ML
 {

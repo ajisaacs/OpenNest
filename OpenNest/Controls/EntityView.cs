@@ -1,10 +1,9 @@
-﻿using System;
+﻿using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-using OpenNest.Geometry;
-using OpenNest.Math;
 
 namespace OpenNest.Controls
 {
@@ -137,7 +136,7 @@ namespace OpenNest.Controls
             var diameter = radius * 2.0f;
 
             var startAngle = arc.IsReversed
-                ? -(float)Angle.ToDegrees(arc.EndAngle) 
+                ? -(float)Angle.ToDegrees(arc.EndAngle)
                 : -(float)Angle.ToDegrees(arc.StartAngle);
 
             g.DrawArc(

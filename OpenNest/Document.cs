@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using OpenNest.IO;
+using System;
 using System.IO;
-using System.Linq;
-using System.Text;
-using OpenNest.IO;
 
 namespace OpenNest
 {

@@ -9,14 +9,14 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 ## Features
 
 - **DXF Import/Export** — Load part drawings from DXF files and export completed nest layouts
-- **Multiple Fill Strategies** — Grid-based linear fill, NFP (No Fit Polygon) pair fitting, and rectangle bin packing
+- **Multiple Fill Strategies** — Grid-based linear fill and rectangle bin packing
 - **Part Rotation** — Automatically tries different rotation angles to find better fits
 - **Gravity Compaction** — After placing parts, pushes them together to close gaps
 - **Multi-Plate Support** — Work with multiple plates of different sizes and materials in a single nest
 - **G-code Output** — Post-process nested layouts to G-code for CNC cutting machines
 - **Built-in Shapes** — Create basic geometric parts (circles, rectangles, triangles, etc.) without needing a DXF file
 - **Interactive Editing** — Zoom, pan, select, clone, and manually arrange parts on the plate view
-- **Lead-in/Lead-out & Tabs** — Configure cutting parameters like approach paths and holding tabs
+- **Lead-in/Lead-out & Tabs** — Cutting parameters like approach paths and holding tabs (engine support, UI coming soon)
 
 ![OpenNest - 44 parts nested on a 60x120 plate](screenshots/screenshot-nest-2.png)
 
@@ -67,7 +67,7 @@ dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- <input-files> [
 # Import a DXF and fill a 60x120 plate
 dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- part.dxf --size 60x120
 
-# Import multiple DXFs with NFP-based auto-nesting
+# Import multiple DXFs with mixed-part auto-nesting (experimental)
 dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- part1.dxf part2.dxf --size 60x120 --autonest
 ```
 
@@ -86,7 +86,7 @@ dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- project.zip ext
 | Option | Description |
 |--------|-------------|
 | `--size <WxL>` | Plate size (e.g. `60x120`). Required for DXF-only mode. |
-| `--autonest` | Use NFP-based mixed-part nesting instead of linear fill |
+| `--autonest` | Use mixed-part nesting instead of linear fill (experimental) |
 | `--drawing <name>` | Select which drawing to fill with (default: first) |
 | `--quantity <n>` | Max parts to place (default: unlimited) |
 | `--spacing <value>` | Override part spacing |
@@ -145,6 +145,14 @@ For most users, only these matter:
 | DXF (AutoCAD Drawing Exchange) | Yes | Yes |
 | DWG (AutoCAD Drawing) | Yes | No |
 | G-code | No | Yes (via post-processors) |
+
+## Roadmap
+
+- **NFP-based nesting** — No Fit Polygon algorithms and simulated annealing optimizer exist in the engine but aren't integrated into the UI or engine registry yet
+- **Lead-in/Lead-out UI** — Engine support for lead-ins, lead-outs, and tabs is implemented; needs a UI for configuration
+- **Sheet cut-offs** — Cut the sheet to size after nesting to reduce waste
+- **Post-processors** — Plugin interface (`IPostProcessor`) is in place; need to ship built-in post-processors for common CNC controllers
+- **Shape library UI** — Built-in shape generation code exists; needs a browsable library UI for quick access
 
 ## Status
 

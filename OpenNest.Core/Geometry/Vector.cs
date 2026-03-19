@@ -1,5 +1,5 @@
-﻿using System;
-using OpenNest.Math;
+﻿using OpenNest.Math;
+using System;
 
 namespace OpenNest.Geometry
 {

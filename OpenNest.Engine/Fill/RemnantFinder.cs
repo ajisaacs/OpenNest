@@ -1,9 +1,8 @@
-using System;
+using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.Linq;
-using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     /// <summary>
     /// A remnant box with a priority tier.

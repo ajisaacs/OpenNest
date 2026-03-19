@@ -1,8 +1,8 @@
+using OpenNest.Engine.BestFit;
+using OpenNest.Math;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-using OpenNest.Engine.BestFit;
-using OpenNest.Math;
 
 namespace OpenNest.Controls
 {

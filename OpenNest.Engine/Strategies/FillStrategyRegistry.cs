@@ -5,12 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 
-namespace OpenNest
+namespace OpenNest.Engine.Strategies
 {
     public static class FillStrategyRegistry
     {
         private static readonly List<IFillStrategy> strategies = new();
         private static List<IFillStrategy> sorted;
+        private static HashSet<string> enabledFilter;
 
         static FillStrategyRegistry()
         {
@@ -18,7 +19,21 @@ namespace OpenNest
         }
 
         public static IReadOnlyList<IFillStrategy> Strategies =>
-            sorted ??= strategies.OrderBy(s => s.Order).ToList();
+            sorted ??= (enabledFilter != null
+                ? strategies.Where(s => enabledFilter.Contains(s.Name)).OrderBy(s => s.Order).ToList()
+                : strategies.OrderBy(s => s.Order).ToList());
+
+        /// <summary>
+        /// Restricts the active strategies to only those whose names are listed.
+        /// Pass null to restore all strategies.
+        /// </summary>
+        public static void SetEnabled(params string[] names)
+        {
+            enabledFilter = names != null && names.Length > 0
+                ? new HashSet<string>(names, StringComparer.OrdinalIgnoreCase)
+                : null;
+            sorted = null;
+        }
 
         public static void LoadFrom(Assembly assembly)
         {

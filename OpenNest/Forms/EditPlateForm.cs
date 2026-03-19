@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Windows.Forms;
-using OpenNest.Geometry;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Forms
@@ -15,7 +14,7 @@ namespace OpenNest.Forms
         public EditPlateForm(Plate plate)
         {
             InitializeComponent();
-            
+
             this.plate = plate;
 
             timer = new Timer
@@ -57,7 +56,7 @@ namespace OpenNest.Forms
             else
                 increment = 1;
 
-            var controls = new []
+            var controls = new[]
             {
                 numericUpDownThickness,
                 numericUpDownPartSpacing,

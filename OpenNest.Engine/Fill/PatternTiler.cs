@@ -1,7 +1,7 @@
-using System.Collections.Generic;
 using OpenNest.Geometry;
+using System.Collections.Generic;
 
-namespace OpenNest.Engine
+namespace OpenNest.Engine.Fill
 {
     public static class PatternTiler
     {

@@ -1,7 +1,7 @@
-using System.Collections.Generic;
 using OpenNest.RectanglePacking;
+using System.Collections.Generic;
 
-namespace OpenNest
+namespace OpenNest.Engine.Strategies
 {
     public class RectBestFitStrategy : IFillStrategy
     {

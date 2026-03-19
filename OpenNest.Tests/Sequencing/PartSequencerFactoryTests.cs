@@ -1,7 +1,5 @@
-using System;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Engine.Sequencing;
-using Xunit;
 
 namespace OpenNest.Tests.Sequencing;
 

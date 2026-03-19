@@ -1,9 +1,9 @@
+using OpenNest.Converters;
+using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using OpenNest.Converters;
-using OpenNest.Geometry;
 
 namespace OpenNest.Shapes
 {

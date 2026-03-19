@@ -1,7 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
-using Xunit;
 
 namespace OpenNest.Tests;
 

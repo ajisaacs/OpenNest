@@ -1,5 +1,5 @@
-using System;
 using OpenNest.CNC.CuttingStrategy;
+using System;
 
 namespace OpenNest.Engine.Sequencing
 {
@@ -9,12 +9,12 @@ namespace OpenNest.Engine.Sequencing
         {
             return parameters.Method switch
             {
-                SequenceMethod.RightSide  => new RightSideSequencer(),
-                SequenceMethod.LeftSide   => new LeftSideSequencer(),
+                SequenceMethod.RightSide => new RightSideSequencer(),
+                SequenceMethod.LeftSide => new LeftSideSequencer(),
                 SequenceMethod.BottomSide => new BottomSideSequencer(),
-                SequenceMethod.EdgeStart  => new EdgeStartSequencer(),
-                SequenceMethod.LeastCode  => new LeastCodeSequencer(),
-                SequenceMethod.Advanced   => new AdvancedSequencer(parameters),
+                SequenceMethod.EdgeStart => new EdgeStartSequencer(),
+                SequenceMethod.LeastCode => new LeastCodeSequencer(),
+                SequenceMethod.Advanced => new AdvancedSequencer(parameters),
                 _ => throw new NotSupportedException(
                     $"Sequence method '{parameters.Method}' is not supported.")
             };

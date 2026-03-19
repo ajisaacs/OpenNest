@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using OpenNest.Geometry;
+﻿using OpenNest.Geometry;
 using OpenNest.Math;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest.RectanglePacking
 {
@@ -71,7 +71,7 @@ namespace OpenNest.RectanglePacking
 
             if (pt.X != double.MaxValue && pt.Y != double.MaxValue)
                 return pt;
-            
+
             return null;
         }
 

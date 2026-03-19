@@ -1,11 +1,9 @@
-﻿using System;
+﻿using OpenNest.Controls;
+using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
-using OpenNest.Controls;
-using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
@@ -94,12 +92,12 @@ namespace OpenNest.Actions
 
             var location = plateView.PointWorldToGraph(SelectedArea.Location);
             var size = new SizeF(
-                plateView.LengthWorldToGui(SelectedArea.Width), 
+                plateView.LengthWorldToGui(SelectedArea.Width),
                 plateView.LengthWorldToGui(SelectedArea.Length));
 
             var rect = new System.Drawing.RectangleF(location.X, location.Y - size.Height, size.Width, size.Height);
 
-            e.Graphics.DrawRectangle(pen, 
+            e.Graphics.DrawRectangle(pen,
                 rect.X,
                 rect.Y,
                 rect.Width,
@@ -109,9 +107,9 @@ namespace OpenNest.Actions
 
             e.Graphics.DrawString(
                 SelectedArea.Size.ToString(2),
-                font, 
-                Brushes.Green, 
-                rect, 
+                font,
+                Brushes.Green,
+                rect,
                 stringFormat);
         }
 

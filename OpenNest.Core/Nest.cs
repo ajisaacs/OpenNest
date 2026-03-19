@@ -1,6 +1,6 @@
-﻿using System;
-using OpenNest.Collections;
+﻿using OpenNest.Collections;
 using OpenNest.Geometry;
+using System;
 
 namespace OpenNest
 {

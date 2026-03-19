@@ -1,8 +1,8 @@
-﻿using System.Drawing;
-using System.Windows.Forms;
-using OpenNest.Collections;
+﻿using OpenNest.Collections;
 using OpenNest.Controls;
 using OpenNest.Geometry;
+using System.Drawing;
+using System.Windows.Forms;
 
 namespace OpenNest.Forms
 {
