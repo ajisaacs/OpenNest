@@ -107,7 +107,17 @@ namespace OpenNest.Engine.Fill
             var p90 = FillHelpers.BuildRotatedPattern(pairParts, Angle.HalfPI);
             engine.RemainderPatterns = new List<Pattern> { p0, p90 };
 
-            return FillHelpers.FillPattern(engine, pairParts, candidate.HullAngles, workArea);
+            // Include the pair's rotating calipers optimal rotation angle
+            // alongside the hull edge angles for tiling.
+            var angles = new List<double>(candidate.HullAngles);
+            var optAngle = -candidate.OptimalRotation;
+            if (!angles.Any(a => a.IsEqualTo(optAngle)))
+                angles.Add(optAngle);
+            var optAngle90 = Angle.NormalizeRad(optAngle + Angle.HalfPI);
+            if (!angles.Any(a => a.IsEqualTo(optAngle90)))
+                angles.Add(optAngle90);
+
+            return FillHelpers.FillPattern(engine, pairParts, angles, workArea);
         }
 
         private List<BestFitResult> SelectPairCandidates(List<BestFitResult> bestFits, Box workArea)
