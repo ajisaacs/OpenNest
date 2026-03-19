@@ -37,76 +37,106 @@ namespace OpenNest.Engine.Fill
                 return new List<Part>();
 
             var allParts = new List<Part>();
-            var madeProgress = true;
 
             // Track quantities locally — do not mutate the input NestItem objects.
-            var localQty = new Dictionary<string, int>();
-            foreach (var item in items)
-                localQty[item.Drawing.Name] = item.Quantity;
+            var localQty = BuildLocalQuantities(items);
 
-            while (madeProgress && !token.IsCancellationRequested)
+            while (!token.IsCancellationRequested)
             {
-                madeProgress = false;
-
-                var minRemnantDim = double.MaxValue;
-                foreach (var item in items)
-                {
-                    var qty = localQty[item.Drawing.Name];
-                    if (qty <= 0)
-                        continue;
-                    var bb = item.Drawing.Program.BoundingBox();
-                    var dim = System.Math.Min(bb.Width, bb.Length);
-                    if (dim < minRemnantDim)
-                        minRemnantDim = dim;
-                }
-
-                if (minRemnantDim == double.MaxValue)
+                var minDim = FindMinItemDimension(items, localQty);
+                if (minDim == double.MaxValue)
                     break;
 
-                var freeBoxes = finder.FindRemnants(minRemnantDim);
-
+                var freeBoxes = finder.FindRemnants(minDim);
                 if (freeBoxes.Count == 0)
                     break;
 
-                foreach (var item in items)
-                {
-                    if (token.IsCancellationRequested)
-                        break;
-
-                    var qty = localQty[item.Drawing.Name];
-                    if (qty == 0)
-                        continue;
-
-                    var itemBbox = item.Drawing.Program.BoundingBox();
-                    var minItemDim = System.Math.Min(itemBbox.Width, itemBbox.Length);
-
-                    foreach (var box in freeBoxes)
-                    {
-                        if (System.Math.Min(box.Width, box.Length) < minItemDim)
-                            continue;
-
-                        var fillItem = new NestItem { Drawing = item.Drawing, Quantity = qty };
-                        var remnantParts = fillFunc(fillItem, box);
-
-                        if (remnantParts != null && remnantParts.Count > 0)
-                        {
-                            allParts.AddRange(remnantParts);
-                            localQty[item.Drawing.Name] = System.Math.Max(0, qty - remnantParts.Count);
-
-                            foreach (var p in remnantParts)
-                                finder.AddObstacle(p.BoundingBox.Offset(spacing));
-
-                            madeProgress = true;
-                            break;
-                        }
-                    }
-
-                    if (madeProgress)
-                        break;
-                }
+                if (!TryFillOneItem(items, freeBoxes, localQty, fillFunc, allParts, token))
+                    break;
             }
 
             return allParts;
+        }
+
+        private static Dictionary<string, int> BuildLocalQuantities(List<NestItem> items)
+        {
+            var localQty = new Dictionary<string, int>(items.Count);
+            foreach (var item in items)
+                localQty[item.Drawing.Name] = item.Quantity;
+            return localQty;
+        }
+
+        private static double FindMinItemDimension(List<NestItem> items, Dictionary<string, int> localQty)
+        {
+            var minDim = double.MaxValue;
+            foreach (var item in items)
+            {
+                if (localQty[item.Drawing.Name] <= 0)
+                    continue;
+                var bb = item.Drawing.Program.BoundingBox();
+                var dim = System.Math.Min(bb.Width, bb.Length);
+                if (dim < minDim)
+                    minDim = dim;
+            }
+            return minDim;
+        }
+
+        private bool TryFillOneItem(
+            List<NestItem> items,
+            List<Box> freeBoxes,
+            Dictionary<string, int> localQty,
+            Func<NestItem, Box, List<Part>> fillFunc,
+            List<Part> allParts,
+            CancellationToken token)
+        {
+            foreach (var item in items)
+            {
+                if (token.IsCancellationRequested)
+                    return false;
+
+                var qty = localQty[item.Drawing.Name];
+                if (qty <= 0)
+                    continue;
+
+                var placed = TryFillInRemnants(item, qty, freeBoxes, fillFunc);
+                if (placed == null)
+                    continue;
+
+                allParts.AddRange(placed);
+                localQty[item.Drawing.Name] = System.Math.Max(0, qty - placed.Count);
+
+                foreach (var p in placed)
+                    finder.AddObstacle(p.BoundingBox.Offset(spacing));
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static List<Part> TryFillInRemnants(
+            NestItem item,
+            int qty,
+            List<Box> freeBoxes,
+            Func<NestItem, Box, List<Part>> fillFunc)
+        {
+            var itemBbox = item.Drawing.Program.BoundingBox();
+
+            foreach (var box in freeBoxes)
+            {
+                var fitsNormal = box.Width >= itemBbox.Width && box.Length >= itemBbox.Length;
+                var fitsRotated = box.Width >= itemBbox.Length && box.Length >= itemBbox.Width;
+                if (!fitsNormal && !fitsRotated)
+                    continue;
+
+                var fillItem = new NestItem { Drawing = item.Drawing, Quantity = qty };
+                var parts = fillFunc(fillItem, box);
+
+                if (parts != null && parts.Count > 0)
+                    return parts;
+            }
+
+            return null;
         }
     }
 }

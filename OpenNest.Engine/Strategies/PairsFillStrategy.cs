@@ -15,9 +15,9 @@ namespace OpenNest.Engine.Strategies
             var result = filler.Fill(context.Item, context.WorkArea,
                 context.PlateNumber, context.Token, context.Progress);
 
-            context.SharedState["BestFits"] = filler.BestFits;
+            context.SharedState["BestFits"] = result.BestFits;
 
-            return result;
+            return result.Parts;
         }
     }
 }

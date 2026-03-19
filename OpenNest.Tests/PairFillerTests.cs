@@ -24,11 +24,10 @@ public class PairFillerTests
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var workArea = new Box(0, 0, 120, 60);
 
-        var parts = filler.Fill(item, workArea);
+        var result = filler.Fill(item, workArea);
 
-        Assert.NotNull(parts);
-        // Pair filling may or may not find interlocking pairs for rectangles,
-        // but should return a non-null list.
+        Assert.NotNull(result.Parts);
+        Assert.NotNull(result.BestFits);
     }
 
     [Fact]
@@ -39,10 +38,10 @@ public class PairFillerTests
         var item = new NestItem { Drawing = MakeRectDrawing(20, 20) };
         var workArea = new Box(0, 0, 10, 10);
 
-        var parts = filler.Fill(item, workArea);
+        var result = filler.Fill(item, workArea);
 
-        Assert.NotNull(parts);
-        Assert.Empty(parts);
+        Assert.NotNull(result.Parts);
+        Assert.Empty(result.Parts);
     }
 
     [Fact]
@@ -56,9 +55,8 @@ public class PairFillerTests
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var workArea = new Box(0, 0, 120, 60);
 
-        var parts = filler.Fill(item, workArea, token: cts.Token);
+        var result = filler.Fill(item, workArea, token: cts.Token);
 
-        // Should return empty or partial — not throw
-        Assert.NotNull(parts);
+        Assert.NotNull(result.Parts);
     }
 }

@@ -10,6 +10,12 @@ using System.Threading;
 
 namespace OpenNest.Engine.Fill
 {
+    public class PairFillResult
+    {
+        public List<Part> Parts { get; set; } = new List<Part>();
+        public List<BestFitResult> BestFits { get; set; }
+    }
+
     /// <summary>
     /// Fills a work area using interlocking part pairs from BestFitCache.
     /// </summary>
@@ -24,36 +30,40 @@ namespace OpenNest.Engine.Fill
         private readonly Size plateSize;
         private readonly double partSpacing;
 
-        /// <summary>
-        /// The best-fit results computed during the last Fill call.
-        /// Available after Fill returns so callers can reuse without recomputing.
-        /// </summary>
-        public List<BestFitResult> BestFits { get; private set; }
-
         public PairFiller(Size plateSize, double partSpacing)
         {
             this.plateSize = plateSize;
             this.partSpacing = partSpacing;
         }
 
-        public List<Part> Fill(NestItem item, Box workArea,
+        public PairFillResult Fill(NestItem item, Box workArea,
             int plateNumber = 0,
             CancellationToken token = default,
             IProgress<NestProgress> progress = null)
         {
-            BestFits = BestFitCache.GetOrCompute(
+            var bestFits = BestFitCache.GetOrCompute(
                 item.Drawing, plateSize.Length, plateSize.Width, partSpacing);
 
-            var candidates = SelectPairCandidates(BestFits, workArea);
-            Debug.WriteLine($"[PairFiller] Total: {BestFits.Count}, Kept: {BestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
+            var candidates = SelectPairCandidates(bestFits, workArea);
+            Debug.WriteLine($"[PairFiller] Total: {bestFits.Count}, Kept: {bestFits.Count(r => r.Keep)}, Trying: {candidates.Count}");
             Debug.WriteLine($"[PairFiller] Plate: {plateSize.Length:F2}x{plateSize.Width:F2}, WorkArea: {workArea.Width:F2}x{workArea.Length:F2}");
 
             var targetCount = item.Quantity > 0 ? item.Quantity : 0;
-            var effectiveWorkArea = workArea;
+            var parts = EvaluateCandidates(candidates, item.Drawing, workArea, targetCount,
+                plateNumber, token, progress);
 
+            return new PairFillResult { Parts = parts, BestFits = bestFits };
+        }
+
+        private List<Part> EvaluateCandidates(
+            List<BestFitResult> candidates, Drawing drawing,
+            Box workArea, int targetCount,
+            int plateNumber, CancellationToken token, IProgress<NestProgress> progress)
+        {
             List<Part> best = null;
             var bestScore = default(FillScore);
             var sinceImproved = 0;
+            var effectiveWorkArea = workArea;
 
             try
             {
@@ -61,34 +71,15 @@ namespace OpenNest.Engine.Fill
                 {
                     token.ThrowIfCancellationRequested();
 
-                    var filled = EvaluateCandidate(candidates[i], item.Drawing, effectiveWorkArea);
+                    var filled = EvaluateCandidate(candidates[i], drawing, effectiveWorkArea);
+                    var score = FillScore.Compute(filled, effectiveWorkArea);
 
-                    if (filled != null && filled.Count > 0)
+                    if (score > bestScore)
                     {
-                        var score = FillScore.Compute(filled, effectiveWorkArea);
-                        if (best == null || score > bestScore)
-                        {
-                            best = filled;
-                            bestScore = score;
-                            sinceImproved = 0;
-
-                            // If we exceeded the target, reduce the work area for
-                            // subsequent candidates by trimming excess parts and
-                            // measuring the tighter bounding box.
-                            if (targetCount > 0 && filled.Count > targetCount)
-                            {
-                                var reduced = ReduceWorkArea(filled, targetCount, workArea);
-                                if (reduced.Area() < effectiveWorkArea.Area())
-                                {
-                                    effectiveWorkArea = reduced;
-                                    Debug.WriteLine($"[PairFiller] Reduced work area to {effectiveWorkArea.Width:F2}x{effectiveWorkArea.Length:F2} (trimmed to {targetCount + 1} parts)");
-                                }
-                            }
-                        }
-                        else
-                        {
-                            sinceImproved++;
-                        }
+                        best = filled;
+                        bestScore = score;
+                        sinceImproved = 0;
+                        effectiveWorkArea = TryReduceWorkArea(filled, targetCount, workArea, effectiveWorkArea);
                     }
                     else
                     {
@@ -114,6 +105,19 @@ namespace OpenNest.Engine.Fill
             return best ?? new List<Part>();
         }
 
+        private static Box TryReduceWorkArea(List<Part> parts, int targetCount, Box workArea, Box effectiveWorkArea)
+        {
+            if (targetCount <= 0 || parts.Count <= targetCount)
+                return effectiveWorkArea;
+
+            var reduced = ReduceWorkArea(parts, targetCount, workArea);
+            if (reduced.Area() >= effectiveWorkArea.Area())
+                return effectiveWorkArea;
+
+            Debug.WriteLine($"[PairFiller] Reduced work area to {reduced.Width:F2}x{reduced.Length:F2} (trimmed to {targetCount + 1} parts)");
+            return reduced;
+        }
+
         /// <summary>
         /// Given parts that exceed targetCount, sorts by BoundingBox.Top descending,
         /// removes parts from the top until exactly targetCount remain, then returns
@@ -124,12 +128,10 @@ namespace OpenNest.Engine.Fill
             if (parts.Count <= targetCount)
                 return workArea;
 
-            // Sort by Top descending — highest parts get trimmed first.
             var sorted = parts
                 .OrderByDescending(p => p.BoundingBox.Top)
                 .ToList();
 
-            // Remove from the top until exactly targetCount remain.
             var trimCount = sorted.Count - targetCount;
             var remaining = sorted.Skip(trimCount).ToList();
 
@@ -144,22 +146,23 @@ namespace OpenNest.Engine.Fill
         {
             var pairParts = candidate.BuildParts(drawing);
             var engine = new FillLinear(workArea, partSpacing);
+            var angles = BuildTilingAngles(candidate);
+            return FillHelpers.FillPattern(engine, pairParts, angles, workArea);
+        }
 
-            var p0 = FillHelpers.BuildRotatedPattern(pairParts, 0);
-            var p90 = FillHelpers.BuildRotatedPattern(pairParts, Angle.HalfPI);
-            engine.RemainderPatterns = new List<Pattern> { p0, p90 };
-
-            // Include the pair's rotating calipers optimal rotation angle
-            // alongside the hull edge angles for tiling.
+        private static List<double> BuildTilingAngles(BestFitResult candidate)
+        {
             var angles = new List<double>(candidate.HullAngles);
             var optAngle = -candidate.OptimalRotation;
+
             if (!angles.Any(a => a.IsEqualTo(optAngle)))
                 angles.Add(optAngle);
+
             var optAngle90 = Angle.NormalizeRad(optAngle + Angle.HalfPI);
             if (!angles.Any(a => a.IsEqualTo(optAngle90)))
                 angles.Add(optAngle90);
 
-            return FillHelpers.FillPattern(engine, pairParts, angles, workArea);
+            return angles;
         }
 
         private List<BestFitResult> SelectPairCandidates(List<BestFitResult> bestFits, Box workArea)
@@ -191,7 +194,41 @@ namespace OpenNest.Engine.Fill
                 Debug.WriteLine($"[PairFiller] Strip mode: {top.Count} candidates (shortSide <= {workShortSide:F1})");
             }
 
+            SortByEstimatedCount(top, workArea);
+
             return top;
+        }
+
+        private void SortByEstimatedCount(List<BestFitResult> candidates, Box workArea)
+        {
+            var w = workArea.Width;
+            var l = workArea.Length;
+
+            candidates.Sort((a, b) =>
+            {
+                var aCount = EstimateTileCount(a, w, l);
+                var bCount = EstimateTileCount(b, w, l);
+
+                if (aCount != bCount)
+                    return bCount.CompareTo(aCount);
+
+                return b.Utilization.CompareTo(a.Utilization);
+            });
+        }
+
+        private int EstimateTileCount(BestFitResult r, double areaW, double areaL)
+        {
+            var h = EstimateCount(r.BoundingWidth, r.BoundingHeight, areaW, areaL);
+            var v = EstimateCount(r.BoundingHeight, r.BoundingWidth, areaW, areaL);
+            return System.Math.Max(h, v);
+        }
+
+        private int EstimateCount(double pairW, double pairH, double areaW, double areaL)
+        {
+            if (pairW <= 0 || pairH <= 0) return 0;
+            var cols = (int)((areaW + partSpacing) / (pairW + partSpacing));
+            var rows = (int)((areaL + partSpacing) / (pairH + partSpacing));
+            return cols * rows * 2;
         }
     }
 }
