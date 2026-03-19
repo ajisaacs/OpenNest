@@ -67,8 +67,9 @@ namespace OpenNest.Engine.Fill
 
             Func<NestItem, Box, List<Part>> shrinkWrapper = (ni, box) =>
             {
-                var heightResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Height, token);
-                var widthResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Width, token);
+                var target = ni.Quantity > 0 ? ni.Quantity : 0;
+                var heightResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Height, token, targetCount: target);
+                var widthResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Width, token, targetCount: target);
 
                 var heightScore = FillScore.Compute(heightResult.Parts, box);
                 var widthScore = FillScore.Compute(widthResult.Parts, box);
