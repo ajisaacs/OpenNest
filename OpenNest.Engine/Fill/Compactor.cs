@@ -31,16 +31,16 @@ namespace OpenNest.Engine.Fill
                 .Where(p => !movingParts.Contains(p))
                 .ToList();
 
-            return Push(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, angle);
+            var direction = new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
+            return Push(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, direction);
         }
 
         /// <summary>
         /// Pushes movingParts along an arbitrary angle (radians, 0 = right, π/2 = up).
         /// </summary>
         public static double Push(List<Part> movingParts, List<Part> obstacleParts,
-            Box workArea, double partSpacing, double angle)
+            Box workArea, double partSpacing, Vector direction)
         {
-            var direction = new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
             var opposite = -direction;
 
             var obstacleBoxes = new Box[obstacleParts.Count];
@@ -104,72 +104,8 @@ namespace OpenNest.Engine.Fill
         public static double Push(List<Part> movingParts, List<Part> obstacleParts,
             Box workArea, double partSpacing, PushDirection direction)
         {
-            var obstacleBoxes = new Box[obstacleParts.Count];
-            var obstacleLines = new List<Line>[obstacleParts.Count];
-
-            for (var i = 0; i < obstacleParts.Count; i++)
-                obstacleBoxes[i] = obstacleParts[i].BoundingBox;
-
-            var opposite = SpatialQuery.OppositeDirection(direction);
-            var halfSpacing = partSpacing / 2;
-            var isHorizontal = SpatialQuery.IsHorizontalDirection(direction);
-            var distance = double.MaxValue;
-
-            foreach (var moving in movingParts)
-            {
-                var edgeDist = SpatialQuery.EdgeDistance(moving.BoundingBox, workArea, direction);
-                if (edgeDist <= 0)
-                    distance = 0;
-                else if (edgeDist < distance)
-                    distance = edgeDist;
-
-                var movingBox = moving.BoundingBox;
-                List<Line> movingLines = null;
-
-                for (var i = 0; i < obstacleBoxes.Length; i++)
-                {
-                    // Use the reverse-direction gap to check if the obstacle is entirely
-                    // behind the moving part. The forward gap (gap < 0) is unreliable for
-                    // irregular shapes whose bounding boxes overlap even when the actual
-                    // geometry still has a valid contact in the push direction.
-                    var reverseGap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], opposite);
-                    if (reverseGap > 0)
-                        continue;
-
-                    var gap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], direction);
-                    if (gap >= distance)
-                        continue;
-
-                    var perpOverlap = isHorizontal
-                        ? movingBox.IsHorizontalTo(obstacleBoxes[i], out _)
-                        : movingBox.IsVerticalTo(obstacleBoxes[i], out _);
-
-                    if (!perpOverlap)
-                        continue;
-
-                    movingLines ??= halfSpacing > 0
-                        ? PartGeometry.GetOffsetPartLines(moving, halfSpacing, direction, ChordTolerance)
-                        : PartGeometry.GetPartLines(moving, direction, ChordTolerance);
-
-                    obstacleLines[i] ??= halfSpacing > 0
-                        ? PartGeometry.GetOffsetPartLines(obstacleParts[i], halfSpacing, opposite, ChordTolerance)
-                        : PartGeometry.GetPartLines(obstacleParts[i], opposite, ChordTolerance);
-
-                    var d = SpatialQuery.DirectionalDistance(movingLines, obstacleLines[i], direction);
-                    if (d < distance)
-                        distance = d;
-                }
-            }
-
-            if (distance < double.MaxValue && distance > 0)
-            {
-                var offset = SpatialQuery.DirectionToOffset(direction, distance);
-                foreach (var moving in movingParts)
-                    moving.Offset(offset);
-                return distance;
-            }
-
-            return 0;
+            var vector = SpatialQuery.DirectionToOffset(direction, 1.0);
+            return Push(movingParts, obstacleParts, workArea, partSpacing, vector);
         }
 
         /// <summary>

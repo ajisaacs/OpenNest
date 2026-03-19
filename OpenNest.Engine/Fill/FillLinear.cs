@@ -1,3 +1,4 @@
+using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using System.Collections.Generic;
@@ -249,57 +250,7 @@ namespace OpenNest.Engine.Fill
         private List<Part> TilePattern(Pattern basePattern, NestDirection direction, PartBoundary[] boundaries)
         {
             var copyDistance = FindPatternCopyDistance(basePattern, direction, boundaries);
-
-            if (copyDistance <= 0)
-                return new List<Part>();
-
-            var dim = GetDimension(basePattern.BoundingBox, direction);
-            var start = GetStart(basePattern.BoundingBox, direction);
-            var limit = GetLimit(direction);
-
-            var estimatedCopies = (int)((limit - start - dim) / copyDistance);
-            var result = new List<Part>(estimatedCopies * basePattern.Parts.Count);
-
-            var count = 1;
-
-            while (true)
-            {
-                var nextPos = start + copyDistance * count;
-
-                if (nextPos + dim > limit + Tolerance.Epsilon)
-                    break;
-
-                var offset = MakeOffset(direction, copyDistance * count);
-
-                foreach (var part in basePattern.Parts)
-                    result.Add(part.CloneAtOffset(offset));
-
-                count++;
-            }
-
-            // For multi-part patterns, try to place individual parts from the
-            // next copy that didn't fit as a whole. This handles cases where
-            // e.g. a 2-part pair only partially fits — one part may still be
-            // within the work area even though the full pattern exceeds it.
-            if (basePattern.Parts.Count > 1)
-            {
-                var offset = MakeOffset(direction, copyDistance * count);
-
-                foreach (var basePart in basePattern.Parts)
-                {
-                    var part = basePart.CloneAtOffset(offset);
-
-                    if (part.BoundingBox.Right <= WorkArea.Right + Tolerance.Epsilon &&
-                        part.BoundingBox.Top <= WorkArea.Top + Tolerance.Epsilon &&
-                        part.BoundingBox.Left >= WorkArea.Left - Tolerance.Epsilon &&
-                        part.BoundingBox.Bottom >= WorkArea.Bottom - Tolerance.Epsilon)
-                    {
-                        result.Add(part);
-                    }
-                }
-            }
-
-            return result;
+            return FillHelpers.Tile(basePattern.Parts, WorkArea, copyDistance, direction, allowPartial: true);
         }
 
         /// <summary>
