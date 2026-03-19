@@ -29,11 +29,16 @@ namespace OpenNest.IO
 
         public bool Write(string file)
         {
+            using var fileStream = new FileStream(file, FileMode.Create);
+            return Write(fileStream);
+        }
+
+        public bool Write(Stream stream)
+        {
             nest.DateLastModified = DateTime.Now;
             SetDrawingIds();
 
-            using var fileStream = new FileStream(file, FileMode.Create);
-            using var zipArchive = new ZipArchive(fileStream, ZipArchiveMode.Create);
+            using var zipArchive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
 
             WriteNestJson(zipArchive);
             WritePrograms(zipArchive);
