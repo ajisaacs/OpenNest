@@ -506,10 +506,15 @@ namespace OpenNest.Controls
                 part.Draw(g, (i + 1).ToString());
             }
 
-            // Draw stationary preview parts (overall best — full opacity)
-            for (var i = 0; i < stationaryParts.Count; i++)
+            // Draw preview parts — active (current strategy) takes precedence
+            // over stationary (overall best) to avoid overlapping fills.
+            var previewParts = activeParts.Count > 0 ? activeParts : stationaryParts;
+            var previewBrush = activeParts.Count > 0 ? ColorScheme.ActivePreviewPartBrush : ColorScheme.PreviewPartBrush;
+            var previewPen = activeParts.Count > 0 ? ColorScheme.ActivePreviewPartPen : ColorScheme.PreviewPartPen;
+
+            for (var i = 0; i < previewParts.Count; i++)
             {
-                var part = stationaryParts[i];
+                var part = previewParts[i];
 
                 if (part.IsDirty)
                     part.Update(this);
@@ -518,24 +523,8 @@ namespace OpenNest.Controls
                 if (!path.GetBounds().IntersectsWith(viewBounds))
                     continue;
 
-                g.FillPath(ColorScheme.PreviewPartBrush, path);
-                g.DrawPath(ColorScheme.PreviewPartPen, path);
-            }
-
-            // Draw active preview parts (current strategy — reduced opacity)
-            for (var i = 0; i < activeParts.Count; i++)
-            {
-                var part = activeParts[i];
-
-                if (part.IsDirty)
-                    part.Update(this);
-
-                var path = part.Path;
-                if (!path.GetBounds().IntersectsWith(viewBounds))
-                    continue;
-
-                g.FillPath(ColorScheme.ActivePreviewPartBrush, path);
-                g.DrawPath(ColorScheme.ActivePreviewPartPen, path);
+                g.FillPath(previewBrush, path);
+                g.DrawPath(previewPen, path);
             }
 
             if (DrawOffset && Plate.PartSpacing > 0)
@@ -899,6 +888,7 @@ namespace OpenNest.Controls
         public void SetStationaryParts(List<Part> parts)
         {
             stationaryParts.Clear();
+            activeParts.Clear();
 
             if (parts != null)
             {
