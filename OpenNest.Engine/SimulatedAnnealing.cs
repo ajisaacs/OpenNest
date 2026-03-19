@@ -17,7 +17,7 @@ namespace OpenNest
         private const double DefaultMinTemperature = 0.1;
         private const int DefaultMaxNoImprovement = 500;
 
-        public NestResult Optimize(List<NestItem> items, Box workArea, NfpCache cache,
+        public OptimizationResult Optimize(List<NestItem> items, Box workArea, NfpCache cache,
             Dictionary<int, List<double>> candidateRotations,
             CancellationToken cancellation = default)
         {
@@ -28,7 +28,7 @@ namespace OpenNest
             var sequence = BuildInitialSequence(items, candidateRotations);
 
             if (sequence.Count == 0)
-                return new NestResult { Sequence = sequence, Score = default, Iterations = 0 };
+                return new OptimizationResult { Sequence = sequence, Score = default, Iterations = 0 };
 
             // Evaluate initial solution.
             var blf = new BottomLeftFill(workArea, cache);
@@ -105,7 +105,7 @@ namespace OpenNest
 
             Debug.WriteLine($"[SA] Done: {iteration} iters, best={bestScore.Count} parts, density={bestScore.Density:P1}");
 
-            return new NestResult
+            return new OptimizationResult
             {
                 Sequence = bestSequence,
                 Score = bestScore,

@@ -7,7 +7,7 @@ namespace OpenNest
     /// <summary>
     /// Result of a nest optimization run.
     /// </summary>
-    public class NestResult
+    public class OptimizationResult
     {
         /// <summary>
         /// The best sequence found: (drawingId, rotation, drawing) tuples in placement order.
@@ -31,7 +31,7 @@ namespace OpenNest
     /// </summary>
     public interface INestOptimizer
     {
-        NestResult Optimize(List<NestItem> items, Box workArea, NfpCache cache,
+        OptimizationResult Optimize(List<NestItem> items, Box workArea, NfpCache cache,
             Dictionary<int, List<double>> candidateRotations,
             CancellationToken cancellation = default);
     }
