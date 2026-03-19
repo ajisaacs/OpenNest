@@ -17,12 +17,18 @@ New static class in `OpenNest.Engine/Fill/IterativeShrinkFiller.cs`.
 **Algorithm:**
 
 1. Create a `RemnantFiller` with the work area and spacing.
-2. For each multi-quantity item (sorted by priority ascending, then area descending), provide a fill function to `RemnantFiller` that internally:
+2. Build a single fill function (closure) that wraps the caller-provided raw fill function with dual-direction shrink logic:
    - Calls `ShrinkFiller.Shrink` with `ShrinkAxis.Height` (bottom strip direction).
    - Calls `ShrinkFiller.Shrink` with `ShrinkAxis.Width` (left strip direction).
-   - Returns the parts from whichever direction produces a better `FillScore`.
-3. Collect any unfilled quantities into a leftovers list.
-4. Return placed parts, leftovers, and the `RemnantFinder` state for a subsequent pack pass.
+   - Compares results using `FillScore.Compute(parts, box)` where `box` is the remnant box passed by `RemnantFiller`. Since `FillScore` density is derived from placed parts' bounding box (not the work area parameter), the comparison is valid regardless of which box is used.
+   - Returns the parts from whichever direction scores better.
+3. Pass this wrapper function and all items to `RemnantFiller.FillItems`, which drives the iteration — discovering free rectangles, iterating over items and boxes, and managing obstacle tracking.
+4. After `RemnantFiller.FillItems` returns, collect any unfilled quantities (including `Quantity <= 0` items which mean "unlimited") into a leftovers list.
+5. Return placed parts and leftovers. Remaining free space for the pack pass is reconstructed from placed parts by the caller (existing pattern), not by returning `RemnantFinder` state.
+
+**Data flow:** Caller provides a raw single-item fill function (e.g., `DefaultNestEngine.Fill`) → `IterativeShrinkFiller` wraps it in a dual-direction shrink closure → passes the wrapper to `RemnantFiller.FillItems` which drives the loop.
+
+**Note on quantities:** `Quantity <= 0` means "fill as many as possible" (unlimited). These items are included in the fill bucket (qty != 1), not the pack bucket.
 
 **Interface:**
 
@@ -60,7 +66,7 @@ This feeds into every downstream path (pruned known-good list, sweep, ML predict
 
 ### 3. CaliperAngle on NestItem
 
-Add a `double? CaliperAngle` property to `NestItem`. Pre-computed by the caller before passing items to the engine. When null, `AngleCandidateBuilder` skips the caliper angles (backward compatible).
+Add a `double? CaliperAngle` property (radians) to `NestItem`. Pre-computed by the caller before passing items to the engine. When null, `AngleCandidateBuilder` skips the caliper angles (backward compatible).
 
 Computation pipeline:
 ```csharp
