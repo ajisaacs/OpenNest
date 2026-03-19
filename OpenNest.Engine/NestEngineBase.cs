@@ -191,7 +191,8 @@ namespace OpenNest
             int plateNumber,
             List<Part> best,
             Box workArea,
-            string description)
+            string description,
+            bool isOverallBest = false)
         {
             if (progress == null || best == null || best.Count == 0)
                 return;
@@ -233,6 +234,7 @@ namespace OpenNest
                 BestParts = clonedParts,
                 Description = description,
                 ActiveWorkArea = workArea,
+                IsOverallBest = isOverallBest,
             });
         }
 
