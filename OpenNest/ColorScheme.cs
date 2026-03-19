@@ -59,6 +59,10 @@ namespace OpenNest
 
         public Brush PreviewPartBrush { get; private set; }
 
+        public Pen ActivePreviewPartPen { get; private set; }
+
+        public Brush ActivePreviewPartBrush { get; private set; }
+
         #endregion Pens/Brushes
 
         #region Colors
@@ -170,8 +174,16 @@ namespace OpenNest
                 if (PreviewPartBrush != null)
                     PreviewPartBrush.Dispose();
 
+                if (ActivePreviewPartPen != null)
+                    ActivePreviewPartPen.Dispose();
+
+                if (ActivePreviewPartBrush != null)
+                    ActivePreviewPartBrush.Dispose();
+
                 PreviewPartPen = new Pen(value, 1);
                 PreviewPartBrush = new SolidBrush(Color.FromArgb(60, value));
+                ActivePreviewPartPen = new Pen(Color.FromArgb(128, value), 1);
+                ActivePreviewPartBrush = new SolidBrush(Color.FromArgb(30, value));
             }
         }
 
