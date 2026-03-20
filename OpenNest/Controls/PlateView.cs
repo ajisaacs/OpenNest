@@ -65,6 +65,7 @@ namespace OpenNest.Controls
         public event EventHandler<ItemAddedEventArgs<Part>> PartAdded;
         public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
         public event EventHandler StatusChanged;
+        public event EventHandler SelectionChanged;
 
         public PlateView()
             : this(ColorScheme.Default)
@@ -1017,12 +1018,19 @@ namespace OpenNest.Controls
         {
             SelectedParts.ForEach(p => p.IsSelected = false);
             SelectedParts.Clear();
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void SelectAll()
         {
             parts.ForEach(p => p.IsSelected = true);
             SelectedParts.AddRange(parts);
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void NotifySelectionChanged()
+        {
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public override void ZoomToPoint(Vector pt, float zoomFactor, bool redraw = true)

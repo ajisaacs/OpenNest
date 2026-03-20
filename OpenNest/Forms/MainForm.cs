@@ -221,10 +221,38 @@ namespace OpenNest.Forms
                 activeForm.PlateView.Plate.Quantity);
         }
 
+        private void UpdateSelectionStatus()
+        {
+            if (activeForm == null || activeForm.PlateView.SelectedParts.Count == 0)
+            {
+                selectionStatusLabel.Text = string.Empty;
+                return;
+            }
+
+            var selected = activeForm.PlateView.SelectedParts;
+
+            if (selected.Count == 1)
+            {
+                var box = selected[0].BoundingBox;
+                selectionStatusLabel.Text = string.Format("Selected: [{0}, {1}] {2} x {3}",
+                    box.X.ToString("n4"), box.Y.ToString("n4"),
+                    box.Width.ToString("n4"), box.Length.ToString("n4"));
+            }
+            else
+            {
+                var bounds = selected.Select(p => p.BasePart).ToList().GetBoundingBox();
+                selectionStatusLabel.Text = string.Format("Selected ({0}): [{1}, {2}] {3} x {4}",
+                    selected.Count,
+                    bounds.X.ToString("n4"), bounds.Y.ToString("n4"),
+                    bounds.Width.ToString("n4"), bounds.Length.ToString("n4"));
+            }
+        }
+
         private void UpdateStatus()
         {
             UpdateLocationStatus();
             UpdatePlateStatus();
+            UpdateSelectionStatus();
         }
 
         private void UpdateGpuStatus()
@@ -313,6 +341,7 @@ namespace OpenNest.Forms
                 activeForm.PlateView.MouseMove -= PlateView_MouseMove;
                 activeForm.PlateView.MouseClick -= PlateView_MouseClick;
                 activeForm.PlateView.StatusChanged -= PlateView_StatusChanged;
+                activeForm.PlateView.SelectionChanged -= PlateView_SelectionChanged;
             }
 
             // If nesting is in progress and the active form changed, cancel nesting
@@ -330,11 +359,14 @@ namespace OpenNest.Forms
             if (activeForm == null)
             {
                 statusLabel1.Text = "";
+                selectionStatusLabel.Text = "";
                 return;
             }
 
             UpdateLocationMode();
+            UpdateSelectionStatus();
             activeForm.PlateView.StatusChanged += PlateView_StatusChanged;
+            activeForm.PlateView.SelectionChanged += PlateView_SelectionChanged;
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
             statusLabel1.Text = activeForm.PlateView.Status;
@@ -1197,6 +1229,11 @@ namespace OpenNest.Forms
         private void PlateView_StatusChanged(object sender, EventArgs e)
         {
             statusLabel1.Text = activeForm.PlateView.Status;
+        }
+
+        private void PlateView_SelectionChanged(object sender, EventArgs e)
+        {
+            UpdateSelectionStatus();
         }
 
         #endregion PlateView Events

@@ -132,6 +132,7 @@
             plateSizeStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateQtyStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             gpuStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            selectionStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             toolStrip1 = new System.Windows.Forms.ToolStrip();
             btnNew = new System.Windows.Forms.ToolStripButton();
             btnOpen = new System.Windows.Forms.ToolStripButton();
@@ -828,7 +829,7 @@
             // 
             // statusStrip1
             // 
-            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, gpuStatusLabel });
+            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, gpuStatusLabel });
             statusStrip1.Location = new System.Drawing.Point(0, 630);
             statusStrip1.Name = "statusStrip1";
             statusStrip1.Padding = new System.Windows.Forms.Padding(1, 0, 16, 0);
@@ -850,7 +851,14 @@
             locationStatusLabel.Size = new System.Drawing.Size(102, 19);
             locationStatusLabel.Text = "Location : [0, 0]";
             locationStatusLabel.Click += LocationStatusLabel_Click;
-            // 
+            //
+            // selectionStatusLabel
+            //
+            selectionStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            selectionStatusLabel.Name = "selectionStatusLabel";
+            selectionStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            selectionStatusLabel.Size = new System.Drawing.Size(14, 19);
+            //
             // spacerLabel
             // 
             spacerLabel.Name = "spacerLabel";
@@ -1181,6 +1189,7 @@
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;
+        private System.Windows.Forms.ToolStripStatusLabel selectionStatusLabel;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
         private System.Windows.Forms.ToolStripLabel engineLabel;
         private System.Windows.Forms.ToolStripComboBox engineComboBox;

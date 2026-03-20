@@ -171,6 +171,7 @@ namespace OpenNest.Actions
                 part.IsSelected = true;
             }
 
+            plateView.NotifySelectionChanged();
             plateView.Invalidate();
             return true;
         }
@@ -187,6 +188,8 @@ namespace OpenNest.Actions
                 plateView.SelectedParts.Add(part);
                 part.IsSelected = true;
             }
+
+            plateView.NotifySelectionChanged();
         }
 
         private void UpdateBrushAndPen()
