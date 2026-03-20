@@ -250,9 +250,9 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Converts an OpenNest Polygon to a Clipper2 PathD.
+        /// Converts an OpenNest Polygon to a Clipper2 PathD, with an optional offset.
         /// </summary>
-        internal static PathD ToClipperPath(Polygon polygon)
+        public static PathD ToClipperPath(Polygon polygon, Vector offset = default)
         {
             var path = new PathD();
             var verts = polygon.Vertices;
@@ -263,7 +263,7 @@ namespace OpenNest.Geometry
                 n--;
 
             for (var i = 0; i < n; i++)
-                path.Add(new PointD(verts[i].X, verts[i].Y));
+                path.Add(new PointD(verts[i].X + offset.X, verts[i].Y + offset.Y));
 
             return path;
         }
@@ -271,7 +271,7 @@ namespace OpenNest.Geometry
         /// <summary>
         /// Converts a Clipper2 PathD to an OpenNest Polygon.
         /// </summary>
-        internal static Polygon FromClipperPath(PathD path)
+        public static Polygon FromClipperPath(PathD path)
         {
             var polygon = new Polygon();
 
@@ -279,6 +279,7 @@ namespace OpenNest.Geometry
                 polygon.Vertices.Add(new Vector(pt.x, pt.y));
 
             polygon.Close();
+            polygon.UpdateBounds();
             return polygon;
         }
     }

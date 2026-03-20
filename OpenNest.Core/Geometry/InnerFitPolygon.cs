@@ -52,6 +52,7 @@ namespace OpenNest.Geometry
             result.Vertices.Add(new Vector(ifpRight, ifpTop));
             result.Vertices.Add(new Vector(ifpLeft, ifpTop));
             result.Close();
+            result.UpdateBounds();
 
             return result;
         }
@@ -62,36 +63,20 @@ namespace OpenNest.Geometry
         /// Returns the polygon representing valid placement positions, or an empty
         /// polygon if no valid position exists.
         /// </summary>
-        public static Polygon ComputeFeasibleRegion(Polygon ifp, Polygon[] nfps)
+        public static Polygon ComputeFeasibleRegion(Polygon ifp, PathsD nfpPaths)
         {
             if (ifp.Vertices.Count < 3)
                 return new Polygon();
 
-            if (nfps == null || nfps.Length == 0)
+            if (nfpPaths == null || nfpPaths.Count == 0)
                 return ifp;
 
             var ifpPath = NoFitPolygon.ToClipperPath(ifp);
             var ifpPaths = new PathsD { ifpPath };
 
-            // Union all NFPs.
-            var nfpPaths = new PathsD();
-
-            foreach (var nfp in nfps)
-            {
-                if (nfp.Vertices.Count >= 3)
-                {
-                    var path = NoFitPolygon.ToClipperPath(nfp);
-                    nfpPaths.Add(path);
-                }
-            }
-
-            if (nfpPaths.Count == 0)
-                return ifp;
-
-            var nfpUnion = Clipper.Union(nfpPaths, FillRule.NonZero);
-
-            // Subtract the NFP union from the IFP.
-            var feasible = Clipper.Difference(ifpPaths, nfpUnion, FillRule.NonZero);
+            // Subtract the NFPs from the IFP.
+            // Clipper2 handles the implicit union of the clip paths.
+            var feasible = Clipper.Difference(ifpPaths, nfpPaths, FillRule.NonZero);
 
             if (feasible.Count == 0)
                 return new Polygon();
@@ -116,6 +101,25 @@ namespace OpenNest.Geometry
             }
 
             return bestPath != null ? NoFitPolygon.FromClipperPath(bestPath) : new Polygon();
+        }
+
+        /// <summary>
+        /// Computes the feasible region for placing a part given already-placed parts.
+        /// (Legacy overload for backward compatibility).
+        /// </summary>
+        public static Polygon ComputeFeasibleRegion(Polygon ifp, Polygon[] nfps)
+        {
+            if (nfps == null || nfps.Length == 0)
+                return ifp;
+
+            var nfpPaths = new PathsD(nfps.Length);
+            foreach (var nfp in nfps)
+            {
+                if (nfp.Vertices.Count >= 3)
+                    nfpPaths.Add(NoFitPolygon.ToClipperPath(nfp));
+            }
+
+            return ComputeFeasibleRegion(ifp, nfpPaths);
         }
 
         /// <summary>

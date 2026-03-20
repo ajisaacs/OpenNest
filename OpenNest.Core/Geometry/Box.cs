@@ -74,6 +74,16 @@ namespace OpenNest.Geometry
             Location += voffset;
         }
 
+        public Box Translate(double x, double y)
+        {
+            return new Box(X + x, Y + y, Width, Length);
+        }
+
+        public Box Translate(Vector offset)
+        {
+            return new Box(X + offset.X, Y + offset.Y, Width, Length);
+        }
+
         public double Left
         {
             get { return X; }
