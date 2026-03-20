@@ -1,4 +1,3 @@
-using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using System;
@@ -203,44 +202,7 @@ namespace OpenNest.Engine.Nfp
         /// </summary>
         private static Polygon ExtractPerimeterPolygon(Drawing drawing, double halfSpacing)
         {
-            var entities = ConvertProgram.ToGeometry(drawing.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
-                .ToList();
-
-            if (entities.Count == 0)
-                return null;
-
-            var definedShape = new ShapeProfile(entities);
-            var perimeter = definedShape.Perimeter;
-
-            if (perimeter == null)
-                return null;
-
-            // Inflate by half-spacing if spacing is non-zero.
-            Shape inflated;
-
-            if (halfSpacing > 0)
-            {
-                var offsetEntity = perimeter.OffsetEntity(halfSpacing, OffsetSide.Left);
-                inflated = offsetEntity as Shape ?? perimeter;
-            }
-            else
-            {
-                inflated = perimeter;
-            }
-
-            // Convert to polygon with circumscribed arcs for tight nesting.
-            var polygon = inflated.ToPolygonWithTolerance(0.01, circumscribe: true);
-
-            if (polygon.Vertices.Count < 3)
-                return null;
-
-            // Normalize: move reference point to origin.
-            polygon.UpdateBounds();
-            var bb = polygon.BoundingBox;
-            polygon.Offset(-bb.Left, -bb.Bottom);
-
-            return polygon;
+            return BestFit.PolygonHelper.ExtractPerimeterPolygon(drawing, halfSpacing).Polygon;
         }
 
         /// <summary>
@@ -320,26 +282,7 @@ namespace OpenNest.Engine.Nfp
         /// </summary>
         private static Polygon RotatePolygon(Polygon polygon, double angle)
         {
-            if (angle.IsEqualTo(0))
-                return polygon;
-
-            var result = new Polygon();
-            var cos = System.Math.Cos(angle);
-            var sin = System.Math.Sin(angle);
-
-            foreach (var v in polygon.Vertices)
-            {
-                result.Vertices.Add(new Vector(
-                    v.X * cos - v.Y * sin,
-                    v.X * sin + v.Y * cos));
-            }
-
-            // Re-normalize to origin.
-            result.UpdateBounds();
-            var bb = result.BoundingBox;
-            result.Offset(-bb.Left, -bb.Bottom);
-
-            return result;
+            return BestFit.PolygonHelper.RotatePolygon(polygon, angle);
         }
     }
 }

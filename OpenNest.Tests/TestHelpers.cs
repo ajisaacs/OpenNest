@@ -24,4 +24,28 @@ internal static class TestHelpers
             plate.Parts.Add(p);
         return plate;
     }
+
+    public static Drawing MakeSquareDrawing(double size = 10)
+    {
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(size, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(size, size)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, size)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        return new Drawing("square", pgm);
+    }
+
+    public static Drawing MakeLShapeDrawing()
+    {
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 5)));
+        pgm.Codes.Add(new LinearMove(new Vector(5, 5)));
+        pgm.Codes.Add(new LinearMove(new Vector(5, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        return new Drawing("lshape", pgm);
+    }
 }
