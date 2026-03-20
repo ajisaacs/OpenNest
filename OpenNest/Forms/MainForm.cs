@@ -576,22 +576,20 @@ namespace OpenNest.Forms
                 return;
 
             var plate = activeForm.PlateView.Plate;
-            var drawing = activeForm.Nest.Drawings.Count > 0
-                ? activeForm.Nest.Drawings.First()
-                : null;
+            var drawings = activeForm.Nest.Drawings;
 
-            if (drawing == null)
+            if (drawings.Count == 0)
             {
                 MessageBox.Show("No drawings available.", "Best-Fit Viewer",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            using (var form = new BestFitViewerForm(drawing, plate))
+            using (var form = new BestFitViewerForm(drawings, plate))
             {
                 if (form.ShowDialog(this) == DialogResult.OK && form.SelectedResult != null)
                 {
-                    var parts = form.SelectedResult.BuildParts(drawing);
+                    var parts = form.SelectedResult.BuildParts(form.SelectedDrawing);
                     activeForm.PlateView.SetAction(typeof(ActionClone), parts);
                 }
             }

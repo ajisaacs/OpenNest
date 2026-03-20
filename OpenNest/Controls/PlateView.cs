@@ -30,7 +30,7 @@ namespace OpenNest.Controls
         private Plate plate;
         private Action currentAction;
         private Action previousAction;
-        private List<LayoutPart> parts;
+        protected List<LayoutPart> parts;
         private List<LayoutPart> stationaryParts = new List<LayoutPart>();
         private List<LayoutPart> activeParts = new List<LayoutPart>();
         private Point middleMouseDownPoint;

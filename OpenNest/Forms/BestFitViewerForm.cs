@@ -1,10 +1,14 @@
+using OpenNest.Collections;
 using OpenNest.Controls;
 using OpenNest.Engine.BestFit;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace OpenNest.Forms
@@ -20,12 +24,15 @@ namespace OpenNest.Forms
         private const int Rows = 3;
         private const int ItemsPerPage = Columns * Rows;
 
-        private static readonly Color KeptColor = Color.FromArgb(0, 0, 100);
-        private static readonly Color DroppedColor = Color.FromArgb(100, 0, 0);
+        private static readonly Color KeptBackground = Color.FromArgb(240, 240, 240);
+        private static readonly Color DroppedBackground = Color.FromArgb(255, 235, 235);
+        private static readonly Color KeptPartColor = Color.FromArgb(50, 120, 190);
+        private static readonly Color DroppedPartColor = Color.FromArgb(180, 80, 80);
 
-        private readonly Drawing drawing;
+        private readonly List<Drawing> drawings;
         private readonly Plate plate;
 
+        private Drawing activeDrawing;
         private List<BestFitResult> results;
         private int totalResults;
         private int keptCount;
@@ -33,30 +40,37 @@ namespace OpenNest.Forms
         private double totalSeconds;
         private int currentPage;
         private int pageCount;
+        private CancellationTokenSource computeCts;
 
         public BestFitResult SelectedResult { get; private set; }
+        public Drawing SelectedDrawing => activeDrawing;
 
-        public BestFitViewerForm(Drawing drawing, Plate plate)
+        public BestFitViewerForm(DrawingCollection drawings, Plate plate)
         {
-            this.drawing = drawing;
+            this.drawings = drawings.ToList();
             this.plate = plate;
+            this.activeDrawing = this.drawings[0];
             DoubleBuffered = true;
             InitializeComponent();
+
+            foreach (var d in drawings)
+                cboDrawing.Items.Add(d.Name);
+            cboDrawing.SelectedIndex = 0;
+            cboDrawing.SelectedIndexChanged += cboDrawing_SelectedIndexChanged;
+
+            navPanel.SizeChanged += (s, ev) => CenterNavControls();
             Shown += BestFitViewerForm_Shown;
         }
 
-        private void BestFitViewerForm_Shown(object sender, System.EventArgs e)
+        private void BestFitViewerForm_Shown(object sender, EventArgs e)
         {
-            Cursor = Cursors.WaitCursor;
-            try
-            {
-                ComputeResults();
-                ShowPage(0);
-            }
-            finally
-            {
-                Cursor = Cursors.Default;
-            }
+            LoadResultsAsync();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            computeCts?.Cancel();
+            base.OnFormClosed(e);
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -79,27 +93,97 @@ namespace OpenNest.Forms
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        private void ComputeResults()
+        private void cboDrawing_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var index = cboDrawing.SelectedIndex;
+            if (index < 0 || index >= drawings.Count)
+                return;
+
+            activeDrawing = drawings[index];
+            LoadResultsAsync();
+        }
+
+        private async void LoadResultsAsync()
+        {
+            computeCts?.Cancel();
+            var cts = new CancellationTokenSource();
+            computeCts = cts;
+
+            SetLoading(true);
+
+            try
+            {
+                var drawing = activeDrawing;
+                var length = plate.Size.Length;
+                var width = plate.Size.Width;
+                var spacing = plate.PartSpacing;
+
+                var result = await Task.Run(() => ComputeResults(drawing, length, width, spacing), cts.Token);
+
+                if (cts.Token.IsCancellationRequested)
+                    return;
+
+                results = result.Results;
+                totalResults = result.TotalResults;
+                keptCount = result.KeptCount;
+                computeSeconds = result.ComputeSeconds;
+                totalSeconds = result.TotalSeconds;
+                pageCount = System.Math.Max(1, (int)System.Math.Ceiling(results.Count / (double)ItemsPerPage));
+
+                ShowPage(0);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                if (cts == computeCts)
+                    SetLoading(false);
+            }
+        }
+
+        private void SetLoading(bool loading)
+        {
+            Cursor = loading ? Cursors.WaitCursor : Cursors.Default;
+            cboDrawing.Enabled = !loading;
+            btnPrev.Enabled = !loading;
+            btnNext.Enabled = !loading;
+            txtPage.Enabled = !loading;
+
+            if (loading)
+            {
+                Text = "Best-Fit Viewer — Computing...";
+                gridPanel.SuspendLayout();
+                gridPanel.Controls.Clear();
+                gridPanel.ResumeLayout(true);
+            }
+        }
+
+        private static ComputeResult ComputeResults(Drawing drawing, double length, double width, double spacing)
         {
             var sw = Stopwatch.StartNew();
 
-            var all = BestFitCache.GetOrCompute(
-                drawing, plate.Size.Length, plate.Size.Width, plate.PartSpacing);
+            var all = BestFitCache.GetOrCompute(drawing, length, width, spacing);
 
-            computeSeconds = sw.ElapsedMilliseconds / 1000.0;
-            totalResults = all.Count;
-            keptCount = 0;
+            var computeMs = sw.ElapsedMilliseconds;
+            var total = all.Count;
+            var kept = 0;
 
             foreach (var r in all)
             {
-                if (r.Keep) keptCount++;
+                if (r.Keep) kept++;
             }
 
-            results = all;
-            pageCount = System.Math.Max(1, (int)System.Math.Ceiling(results.Count / (double)ItemsPerPage));
-
             sw.Stop();
-            totalSeconds = sw.Elapsed.TotalSeconds;
+
+            return new ComputeResult
+            {
+                Results = all,
+                TotalResults = total,
+                KeptCount = kept,
+                ComputeSeconds = computeMs / 1000.0,
+                TotalSeconds = sw.Elapsed.TotalSeconds
+            };
         }
 
         private void ShowPage(int page)
@@ -122,7 +206,7 @@ namespace OpenNest.Forms
                 for (var i = 0; i < count; i++)
                 {
                     var result = results[start + i];
-                    var cell = CreateCell(result, drawing, start + i + 1);
+                    var cell = CreateCell(result, activeDrawing, start + i + 1);
                     gridPanel.Controls.Add(cell, i % Columns, i / Columns);
                 }
 
@@ -144,9 +228,28 @@ namespace OpenNest.Forms
                 start + 1, start + count, results.Count);
         }
 
-        private void btnPrev_Click(object sender, System.EventArgs e) => NavigatePage(-1);
+        private void btnPrev_Click(object sender, EventArgs e) => NavigatePage(-1);
 
-        private void btnNext_Click(object sender, System.EventArgs e) => NavigatePage(1);
+        private void btnNext_Click(object sender, EventArgs e) => NavigatePage(1);
+
+        private void CenterNavControls()
+        {
+            var gap = 6;
+            var groupWidth = btnPrev.Width + gap + txtPage.Width + gap + lblPageCount.Width + gap + btnNext.Width;
+            var x = (navPanel.Width - groupWidth) / 2;
+            var midY = navPanel.Height / 2;
+
+            btnPrev.Location = new Point(x, midY - btnPrev.Height / 2);
+            x += btnPrev.Width + gap;
+
+            txtPage.Location = new Point(x, midY - txtPage.Height / 2);
+            x += txtPage.Width + gap;
+
+            lblPageCount.Location = new Point(x, midY - lblPageCount.Height / 2);
+            x += lblPageCount.Width + gap;
+
+            btnNext.Location = new Point(x, midY - btnNext.Height / 2);
+        }
 
         private void NavigatePage(int delta)
         {
@@ -169,12 +272,14 @@ namespace OpenNest.Forms
 
         private BestFitCell CreateCell(BestFitResult result, Drawing drawing, int rank)
         {
-            var bgColor = result.Keep ? KeptColor : DroppedColor;
+            var kept = result.Keep;
+            var bgColor = kept ? KeptBackground : DroppedBackground;
+            var partColor = kept ? KeptPartColor : DroppedPartColor;
 
             var colorScheme = new ColorScheme
             {
                 BackgroundColor = bgColor,
-                LayoutOutlineColor = bgColor,
+                LayoutOutlineColor = Color.Gray,
                 LayoutFillColor = bgColor,
                 BoundingBoxColor = bgColor,
                 RapidColor = Color.DodgerBlue,
@@ -183,10 +288,11 @@ namespace OpenNest.Forms
             };
 
             var cell = new BestFitCell(colorScheme);
+            cell.PartColor = partColor;
             cell.Dock = DockStyle.Fill;
             cell.Plate.Size = new Geometry.Size(
-                result.BoundingWidth,
-                result.BoundingHeight);
+                result.BoundingHeight,
+                result.BoundingWidth);
 
             var parts = result.BuildParts(drawing);
 
@@ -203,6 +309,15 @@ namespace OpenNest.Forms
             };
 
             return cell;
+        }
+
+        private struct ComputeResult
+        {
+            public List<BestFitResult> Results;
+            public int TotalResults;
+            public int KeptCount;
+            public double ComputeSeconds;
+            public double TotalSeconds;
         }
     }
 }

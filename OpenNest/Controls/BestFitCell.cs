@@ -9,8 +9,15 @@ namespace OpenNest.Controls
     public class BestFitCell : PlateView
     {
         private string[] metadataLines;
+        private Color? partColor;
 
         public BestFitResult Result { get; set; }
+
+        public Color? PartColor
+        {
+            get => partColor;
+            set => partColor = value;
+        }
 
         public BestFitCell(ColorScheme colorScheme)
             : base(colorScheme)
@@ -22,6 +29,8 @@ namespace OpenNest.Controls
             AllowZoom = false;
             AllowDrop = false;
             Cursor = Cursors.Hand;
+
+            Plate.PartAdded += (s, e) => ApplyPartColor();
         }
 
         public void SetMetadata(BestFitResult result, int rank)
@@ -59,13 +68,22 @@ namespace OpenNest.Controls
             PaintMetadata(e.Graphics);
         }
 
+        private void ApplyPartColor()
+        {
+            if (!partColor.HasValue)
+                return;
+
+            foreach (var lp in parts)
+                lp.Color = partColor.Value;
+        }
+
         private void PaintMetadata(Graphics g)
         {
             if (metadataLines == null)
                 return;
 
             var font = Font;
-            var brush = Brushes.White;
+            var textColor = IsDarkBackground() ? Brushes.White : Brushes.Black;
             var lineHeight = font.GetHeight(g) + 1;
             var y = 2f;
 
@@ -74,9 +92,16 @@ namespace OpenNest.Controls
                 if (line.Length == 0)
                     continue;
 
-                g.DrawString(line, font, brush, 2, y);
+                g.DrawString(line, font, textColor, 2, y);
                 y += lineHeight;
             }
+        }
+
+        private bool IsDarkBackground()
+        {
+            var bg = ColorScheme.BackgroundColor;
+            var brightness = bg.R * 0.299 + bg.G * 0.587 + bg.B * 0.114;
+            return brightness < 128;
         }
     }
 }
