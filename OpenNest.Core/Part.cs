@@ -20,6 +20,7 @@ namespace OpenNest
     public class Part : IPart, IBoundable
     {
         private Vector location;
+        private bool ownsProgram;
 
         public readonly Drawing BaseDrawing;
 
@@ -32,6 +33,7 @@ namespace OpenNest
         {
             BaseDrawing = baseDrawing;
             Program = baseDrawing.Program.Clone() as Program;
+            ownsProgram = true;
             this.location = location;
             UpdateBounds();
         }
@@ -67,6 +69,7 @@ namespace OpenNest
         /// <param name="angle">Angle of rotation in radians.</param>
         public void Rotate(double angle)
         {
+            EnsureOwnedProgram();
             Program.Rotate(angle);
             location = Location.Rotate(angle);
             UpdateBounds();
@@ -79,6 +82,7 @@ namespace OpenNest
         /// <param name="origin">The origin to rotate the part around.</param>
         public void Rotate(double angle, Vector origin)
         {
+            EnsureOwnedProgram();
             Program.Rotate(angle);
             location = Location.Rotate(angle, origin);
             UpdateBounds();
@@ -220,6 +224,15 @@ namespace OpenNest
                     BoundingBox.Width, BoundingBox.Length));
 
             return part;
+        }
+
+        private void EnsureOwnedProgram()
+        {
+            if (!ownsProgram)
+            {
+                Program = Program.Clone() as Program;
+                ownsProgram = true;
+            }
         }
 
         private Part(Drawing baseDrawing, Program program, Vector location, Box boundingBox)
