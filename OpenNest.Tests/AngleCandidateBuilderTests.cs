@@ -29,18 +29,16 @@ public class AngleCandidateBuilderTests
     }
 
     [Fact]
-    public void Build_NarrowWorkArea_ProducesMoreAngles()
+    public void Build_NarrowWorkArea_UsesBaseAnglesOnly()
     {
         var builder = new AngleCandidateBuilder();
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
-        var wideArea = new Box(0, 0, 100, 100);
         var narrowArea = new Box(0, 0, 100, 8); // narrower than part's longest side
 
-        var wideAngles = builder.Build(item, 0, wideArea);
-        var narrowAngles = builder.Build(item, 0, narrowArea);
+        var angles = builder.Build(item, 0, narrowArea);
 
-        Assert.True(narrowAngles.Count > wideAngles.Count,
-            $"Narrow ({narrowAngles.Count}) should have more angles than wide ({wideAngles.Count})");
+        // Without ForceFullSweep, narrow areas use only base angles (0° and 90°)
+        Assert.Equal(2, angles.Count);
     }
 
     [Fact]

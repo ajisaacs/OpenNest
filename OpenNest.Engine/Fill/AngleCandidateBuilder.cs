@@ -27,25 +27,13 @@ namespace OpenNest.Engine.Fill
 
             var angles = new List<double>(baseAngles);
 
-            if (NeedsSweep(item, bestRotation, workArea))
+            if (ForceFullSweep)
                 AddSweepAngles(angles);
 
             if (!ForceFullSweep && angles.Count > 2)
                 angles = ApplyMlPrediction(item, workArea, baseAngles, angles);
 
             return angles;
-        }
-
-        private bool NeedsSweep(NestItem item, double bestRotation, Box workArea)
-        {
-            var testPart = new Part(item.Drawing);
-            if (!bestRotation.IsEqualTo(0))
-                testPart.Rotate(bestRotation);
-            testPart.UpdateBounds();
-
-            var partLongestSide = System.Math.Max(testPart.BoundingBox.Width, testPart.BoundingBox.Length);
-            var workAreaShortSide = System.Math.Min(workArea.Width, workArea.Length);
-            return workAreaShortSide < partLongestSide || ForceFullSweep;
         }
 
         private static void AddSweepAngles(List<double> angles)
