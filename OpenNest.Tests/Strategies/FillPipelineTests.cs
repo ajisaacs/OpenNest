@@ -18,7 +18,7 @@ public class FillPipelineTests
     [Fact]
     public void Pipeline_PopulatesPhaseResults()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var engine = new DefaultNestEngine(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
@@ -31,7 +31,7 @@ public class FillPipelineTests
     [Fact]
     public void Pipeline_SetsWinnerPhase()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var engine = new DefaultNestEngine(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
@@ -47,7 +47,7 @@ public class FillPipelineTests
     [Fact]
     public void Pipeline_RespectsCancellation()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var engine = new DefaultNestEngine(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var cts = new System.Threading.CancellationTokenSource();

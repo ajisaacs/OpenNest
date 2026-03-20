@@ -18,7 +18,7 @@ public class EngineRefactorSmokeTests
     [Fact]
     public void DefaultEngine_FillNestItem_ProducesResults()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var engine = new DefaultNestEngine(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
@@ -30,7 +30,7 @@ public class EngineRefactorSmokeTests
     [Fact]
     public void DefaultEngine_FillGroupParts_ProducesResults()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var engine = new DefaultNestEngine(plate);
         var drawing = MakeRectDrawing(20, 10);
         var groupParts = new List<Part> { new Part(drawing) };
@@ -43,7 +43,7 @@ public class EngineRefactorSmokeTests
     [Fact]
     public void DefaultEngine_ForceFullAngleSweep_StillWorks()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var engine = new DefaultNestEngine(plate);
         engine.ForceFullAngleSweep = true;
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
@@ -56,7 +56,7 @@ public class EngineRefactorSmokeTests
     [Fact]
     public void StripEngine_Nest_ProducesResults()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var engine = new StripNestEngine(plate);
         var items = new List<NestItem>
         {
@@ -72,7 +72,7 @@ public class EngineRefactorSmokeTests
     [Fact]
     public void DefaultEngine_Nest_ProducesResults()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var engine = new DefaultNestEngine(plate);
         var items = new List<NestItem>
         {
@@ -88,7 +88,7 @@ public class EngineRefactorSmokeTests
     [Fact]
     public void BruteForceRunner_StillWorks()
     {
-        var plate = new Plate(120, 60);
+        var plate = new Plate(60, 120);
         var drawing = MakeRectDrawing(20, 10);
 
         var result = OpenNest.Engine.ML.BruteForceRunner.Run(drawing, plate, forceFullAngleSweep: true);
