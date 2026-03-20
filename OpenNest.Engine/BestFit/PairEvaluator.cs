@@ -1,6 +1,7 @@
 using OpenNest.Converters;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -66,6 +67,15 @@ namespace OpenNest.Engine.BestFit
             }
 
             var trueArea = drawing.Area * 2;
+
+            // Normalize to landscape (width >= height) for consistent display.
+            if (bestHeight > bestWidth)
+            {
+                var tmp = bestWidth;
+                bestWidth = bestHeight;
+                bestHeight = tmp;
+                bestRotation += Angle.HalfPI;
+            }
 
             return new BestFitResult
             {

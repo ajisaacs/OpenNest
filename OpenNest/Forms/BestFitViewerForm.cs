@@ -291,8 +291,8 @@ namespace OpenNest.Forms
             cell.PartColor = partColor;
             cell.Dock = DockStyle.Fill;
             cell.Plate.Size = new Geometry.Size(
-                result.BoundingHeight,
-                result.BoundingWidth);
+                result.BoundingWidth,
+                result.BoundingHeight);
 
             var parts = result.BuildParts(drawing);
 
