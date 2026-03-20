@@ -53,7 +53,7 @@ namespace OpenNest
             var best = context.CurrentBest ?? new List<Part>();
 
             if (item.Quantity > 0 && best.Count > item.Quantity)
-                best = best.Take(item.Quantity).ToList();
+                best = ShrinkFiller.TrimToCount(best, item.Quantity, ShrinkAxis.Width);
 
             ReportProgress(progress, WinnerPhase, PlateNumber, best, workArea, BuildProgressSummary(),
                 isOverallBest: true);
