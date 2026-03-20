@@ -1,18 +1,24 @@
 using OpenNest.Controls;
 using OpenNest.Engine.BestFit;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace OpenNest.Forms
 {
     public partial class BestFitViewerForm : Form
     {
+        private const int WM_SETREDRAW = 0x000B;
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
         private const int Columns = 5;
-        private const int Rows = 2;
+        private const int Rows = 3;
         private const int ItemsPerPage = Columns * Rows;
-        private const int MaxResults = 50;
 
         private static readonly Color KeptColor = Color.FromArgb(0, 0, 100);
         private static readonly Color DroppedColor = Color.FromArgb(100, 0, 0);
@@ -34,6 +40,7 @@ namespace OpenNest.Forms
         {
             this.drawing = drawing;
             this.plate = plate;
+            DoubleBuffered = true;
             InitializeComponent();
             Shown += BestFitViewerForm_Shown;
         }
@@ -88,9 +95,8 @@ namespace OpenNest.Forms
                 if (r.Keep) keptCount++;
             }
 
-            var count = System.Math.Min(totalResults, MaxResults);
-            results = all.GetRange(0, count);
-            pageCount = System.Math.Max(1, (int)System.Math.Ceiling(count / (double)ItemsPerPage));
+            results = all;
+            pageCount = System.Math.Max(1, (int)System.Math.Ceiling(results.Count / (double)ItemsPerPage));
 
             sw.Stop();
             totalSeconds = sw.Elapsed.TotalSeconds;
@@ -102,26 +108,36 @@ namespace OpenNest.Forms
             var start = page * ItemsPerPage;
             var count = System.Math.Min(ItemsPerPage, results.Count - start);
 
-            gridPanel.SuspendLayout();
-            gridPanel.Controls.Clear();
-
-            gridPanel.RowCount = Rows;
-            gridPanel.RowStyles.Clear();
-            for (var i = 0; i < Rows; i++)
-                gridPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / Rows));
-
-            for (var i = 0; i < count; i++)
+            SendMessage(gridPanel.Handle, WM_SETREDRAW, IntPtr.Zero, IntPtr.Zero);
+            try
             {
-                var result = results[start + i];
-                var cell = CreateCell(result, drawing, start + i + 1);
-                gridPanel.Controls.Add(cell, i % Columns, i / Columns);
-            }
+                gridPanel.SuspendLayout();
+                gridPanel.Controls.Clear();
 
-            gridPanel.ResumeLayout(true);
+                gridPanel.RowCount = Rows;
+                gridPanel.RowStyles.Clear();
+                for (var i = 0; i < Rows; i++)
+                    gridPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / Rows));
+
+                for (var i = 0; i < count; i++)
+                {
+                    var result = results[start + i];
+                    var cell = CreateCell(result, drawing, start + i + 1);
+                    gridPanel.Controls.Add(cell, i % Columns, i / Columns);
+                }
+
+                gridPanel.ResumeLayout(true);
+            }
+            finally
+            {
+                SendMessage(gridPanel.Handle, WM_SETREDRAW, (IntPtr)1, IntPtr.Zero);
+                gridPanel.Invalidate(true);
+            }
 
             btnPrev.Enabled = currentPage > 0;
             btnNext.Enabled = currentPage < pageCount - 1;
-            lblPage.Text = string.Format("Page {0} / {1}", currentPage + 1, pageCount);
+            txtPage.Text = (currentPage + 1).ToString();
+            lblPageCount.Text = string.Format("/ {0}", pageCount);
 
             Text = string.Format("Best-Fit Viewer — {0} candidates ({1} kept) | Compute: {2:F1}s | Total: {3:F1}s | Showing {4}-{5} of {6}",
                 totalResults, keptCount, computeSeconds, totalSeconds,
@@ -137,6 +153,18 @@ namespace OpenNest.Forms
             var newPage = currentPage + delta;
             if (newPage >= 0 && newPage < pageCount)
                 ShowPage(newPage);
+        }
+
+        private void txtPage_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                if (int.TryParse(txtPage.Text, out var page) && page >= 1 && page <= pageCount)
+                    ShowPage(page - 1);
+                else
+                    txtPage.Text = (currentPage + 1).ToString();
+            }
         }
 
         private BestFitCell CreateCell(BestFitResult result, Drawing drawing, int rank)
