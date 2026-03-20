@@ -174,5 +174,28 @@ namespace OpenNest.Engine.Fill
 
             return 0;
         }
+
+        /// <summary>
+        /// Repeatedly pushes parts left then down until total movement per
+        /// iteration falls below the given threshold.
+        /// </summary>
+        public static void Settle(List<Part> parts, Box workArea, double partSpacing,
+            double threshold = 0.01, int maxIterations = 20)
+        {
+            if (parts.Count < 2)
+                return;
+
+            var noObstacles = new List<Part>();
+
+            for (var i = 0; i < maxIterations; i++)
+            {
+                var moved = 0.0;
+                moved += Push(parts, noObstacles, workArea, partSpacing, PushDirection.Left);
+                moved += Push(parts, noObstacles, workArea, partSpacing, PushDirection.Down);
+
+                if (moved < threshold)
+                    break;
+            }
+        }
     }
 }
