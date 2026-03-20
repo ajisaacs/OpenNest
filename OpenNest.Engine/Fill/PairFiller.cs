@@ -168,35 +168,30 @@ namespace OpenNest.Engine.Fill
         private List<BestFitResult> SelectPairCandidates(List<BestFitResult> bestFits, Box workArea)
         {
             var kept = bestFits.Where(r => r.Keep).ToList();
-            var top = kept.Take(MaxTopCandidates).ToList();
 
             var workShortSide = System.Math.Min(workArea.Width, workArea.Length);
             var plateShortSide = System.Math.Min(plateSize.Width, plateSize.Length);
 
             if (workShortSide < plateShortSide * 0.5)
             {
-                var stripCandidates = bestFits
+                // Strip mode: prioritize candidates that fit the narrow dimension.
+                var stripCandidates = kept
                     .Where(r => r.ShortestSide <= workShortSide + Tolerance.Epsilon
                              && r.Utilization >= MinStripUtilization)
-                    .OrderByDescending(r => r.Utilization);
+                    .ToList();
 
-                var existing = new HashSet<BestFitResult>(top);
+                SortByEstimatedCount(stripCandidates, workArea);
 
-                foreach (var r in stripCandidates)
-                {
-                    if (top.Count >= MaxStripCandidates)
-                        break;
-
-                    if (existing.Add(r))
-                        top.Add(r);
-                }
+                var top = stripCandidates.Take(MaxStripCandidates).ToList();
 
                 Debug.WriteLine($"[PairFiller] Strip mode: {top.Count} candidates (shortSide <= {workShortSide:F1})");
+                return top;
             }
 
-            SortByEstimatedCount(top, workArea);
+            var result = kept.Take(MaxTopCandidates).ToList();
+            SortByEstimatedCount(result, workArea);
 
-            return top;
+            return result;
         }
 
         private void SortByEstimatedCount(List<BestFitResult> candidates, Box workArea)
