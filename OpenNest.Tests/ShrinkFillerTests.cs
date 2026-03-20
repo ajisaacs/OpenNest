@@ -97,4 +97,71 @@ public class ShrinkFillerTests
         Assert.NotNull(result);
         Assert.True(result.Parts.Count > 0);
     }
+
+    [Fact]
+    public void TrimToCount_Width_KeepsPartsNearestToOrigin()
+    {
+        var parts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 5),   // Right = 5
+            TestHelpers.MakePartAt(10, 0, 5),  // Right = 15
+            TestHelpers.MakePartAt(20, 0, 5),  // Right = 25
+            TestHelpers.MakePartAt(30, 0, 5),  // Right = 35
+        };
+
+        var trimmed = ShrinkFiller.TrimToCount(parts, 2, ShrinkAxis.Width);
+
+        Assert.Equal(2, trimmed.Count);
+        Assert.True(trimmed.All(p => p.BoundingBox.Right <= 15));
+    }
+
+    [Fact]
+    public void TrimToCount_Height_KeepsPartsNearestToOrigin()
+    {
+        var parts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 5),   // Top = 5
+            TestHelpers.MakePartAt(0, 10, 5),  // Top = 15
+            TestHelpers.MakePartAt(0, 20, 5),  // Top = 25
+            TestHelpers.MakePartAt(0, 30, 5),  // Top = 35
+        };
+
+        var trimmed = ShrinkFiller.TrimToCount(parts, 2, ShrinkAxis.Height);
+
+        Assert.Equal(2, trimmed.Count);
+        Assert.True(trimmed.All(p => p.BoundingBox.Top <= 15));
+    }
+
+    [Fact]
+    public void TrimToCount_ReturnsInput_WhenCountAtOrBelowTarget()
+    {
+        var parts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 5),
+            TestHelpers.MakePartAt(10, 0, 5),
+        };
+
+        var same = ShrinkFiller.TrimToCount(parts, 2, ShrinkAxis.Width);
+        Assert.Same(parts, same);
+
+        var fewer = ShrinkFiller.TrimToCount(parts, 5, ShrinkAxis.Width);
+        Assert.Same(parts, fewer);
+    }
+
+    [Fact]
+    public void TrimToCount_DoesNotMutateInput()
+    {
+        var parts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 5),
+            TestHelpers.MakePartAt(10, 0, 5),
+            TestHelpers.MakePartAt(20, 0, 5),
+        };
+
+        var originalCount = parts.Count;
+        var trimmed = ShrinkFiller.TrimToCount(parts, 1, ShrinkAxis.Width);
+
+        Assert.Equal(originalCount, parts.Count);
+        Assert.Equal(1, trimmed.Count);
+    }
 }

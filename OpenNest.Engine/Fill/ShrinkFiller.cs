@@ -163,5 +163,20 @@ namespace OpenNest.Engine.Fill
                 ? placedBox.Right - box.X
                 : placedBox.Top - box.Y;
         }
+
+        /// <summary>
+        /// Keeps the <paramref name="targetCount"/> parts nearest to the origin
+        /// along the given axis, discarding parts farthest from the origin.
+        /// Returns the input list unchanged if count is already at or below target.
+        /// </summary>
+        internal static List<Part> TrimToCount(List<Part> parts, int targetCount, ShrinkAxis axis)
+        {
+            if (parts == null || parts.Count <= targetCount)
+                return parts;
+
+            return axis == ShrinkAxis.Width
+                ? parts.OrderBy(p => p.BoundingBox.Right).Take(targetCount).ToList()
+                : parts.OrderBy(p => p.BoundingBox.Top).Take(targetCount).ToList();
+        }
     }
 }
