@@ -20,6 +20,10 @@ namespace OpenNest
             Register("Strip",
                 "Strip-based nesting for mixed-drawing layouts",
                 plate => new StripNestEngine(plate));
+
+            Register("NFP",
+                "NFP-based mixed-part nesting with simulated annealing",
+                plate => new NfpNestEngine(plate));
         }
 
         public static IReadOnlyList<NestEngineInfo> AvailableEngines => engines;
