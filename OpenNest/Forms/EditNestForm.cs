@@ -774,6 +774,9 @@ namespace OpenNest.Forms
 
         private void drawingListUpdateTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
+            if (!drawingListBox1.IsHandleCreated)
+                return;
+
             drawingListBox1.Invoke(new MethodInvoker(() =>
             {
                 drawingListBox1.Refresh();
