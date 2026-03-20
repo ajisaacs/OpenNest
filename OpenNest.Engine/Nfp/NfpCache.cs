@@ -14,6 +14,8 @@ namespace OpenNest.Engine.Nfp
         private readonly Dictionary<NfpKey, Polygon> cache = new Dictionary<NfpKey, Polygon>();
         private readonly Dictionary<int, Dictionary<double, Polygon>> polygonCache
             = new Dictionary<int, Dictionary<double, Polygon>>();
+        private readonly Dictionary<(int drawingId, double rotation), Polygon> ifpCache
+            = new Dictionary<(int drawingId, double rotation), Polygon>();
 
         /// <summary>
         /// Registers a pre-computed polygon for a drawing at a specific rotation.
@@ -28,6 +30,26 @@ namespace OpenNest.Engine.Nfp
             }
 
             rotations[rotation] = polygon;
+
+            // Clear IFP cache if a polygon is updated (though usually they aren't).
+            ifpCache.Remove((drawingId, rotation));
+        }
+
+        /// <summary>
+        /// Gets or computes the IFP for a drawing at a specific rotation within a work area.
+        /// </summary>
+        public Polygon GetIfp(int drawingId, double rotation, Box workArea)
+        {
+            if (ifpCache.TryGetValue((drawingId, rotation), out var ifp))
+                return ifp;
+
+            var polygon = GetPolygon(drawingId, rotation);
+            if (polygon == null)
+                return new Polygon();
+
+            ifp = InnerFitPolygon.Compute(workArea, polygon);
+            ifpCache[(drawingId, rotation)] = ifp;
+            return ifp;
         }
 
         /// <summary>
