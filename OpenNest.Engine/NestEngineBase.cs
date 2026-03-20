@@ -1,4 +1,5 @@
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Nfp;
 using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
@@ -125,6 +126,12 @@ namespace OpenNest
                     }
                 }
             }
+
+            // Compact placed parts toward the origin to close gaps.
+            Compactor.Settle(allParts, Plate.WorkArea(), Plate.PartSpacing);
+
+            // NFP optimization pass — re-place parts using geometry-aware BLF.
+            allParts = AutoNester.Optimize(allParts, Plate);
 
             return allParts;
         }

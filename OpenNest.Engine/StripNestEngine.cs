@@ -1,4 +1,5 @@
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Nfp;
 using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
@@ -92,12 +93,7 @@ namespace OpenNest
                 allParts.AddRange(shrinkResult.Parts);
 
                 // Compact placed parts toward the origin to close gaps.
-                if (allParts.Count > 1)
-                {
-                    var noObstacles = new List<Part>();
-                    Compactor.Push(allParts, noObstacles, workArea, Plate.PartSpacing, PushDirection.Left);
-                    Compactor.Push(allParts, noObstacles, workArea, Plate.PartSpacing, PushDirection.Down);
-                }
+                Compactor.Settle(allParts, workArea, Plate.PartSpacing);
 
                 // Add unfilled items to pack list.
                 packItems.AddRange(shrinkResult.Leftovers);
@@ -126,6 +122,9 @@ namespace OpenNest
                     allParts.AddRange(packParts);
                 }
             }
+
+            // NFP optimization pass — re-place parts using geometry-aware BLF.
+            allParts = AutoNester.Optimize(allParts, Plate);
 
             // Deduct placed quantities from original items.
             foreach (var item in items)
