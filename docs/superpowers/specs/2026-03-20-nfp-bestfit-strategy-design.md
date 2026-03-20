@@ -24,17 +24,43 @@ Implement `NfpSlideStrategy : IBestFitStrategy` that plugs into the existing `Be
 - `double part2Rotation` — rotation angle for Part2 (same as `RotationSlideStrategy`)
 - `int type` — strategy type id (same as `RotationSlideStrategy`)
 - `string description` — human-readable description
+- `Polygon stationaryPoly` (optional) — pre-extracted stationary polygon to avoid redundant extraction across rotation angles
 
 **`GenerateCandidates(Drawing drawing, double spacing, double stepSize)`:**
 
 1. Extract perimeter polygon from the drawing inflated by `spacing / 2` using `PolygonHelper.ExtractPerimeterPolygon` (shared helper, extracted from `AutoNester`)
-2. Create a rotated copy of the polygon at `part2Rotation` using `PolygonHelper.RotatePolygon` (also extracted)
-3. Compute `NoFitPolygon.Compute(stationaryPoly, orbitingPoly)` — single call
-4. If the NFP is null or has fewer than 3 vertices, return empty list
-5. Walk the NFP boundary:
+2. If polygon extraction fails (null), return empty list
+3. Create a rotated copy of the polygon at `part2Rotation` using `PolygonHelper.RotatePolygon` (also extracted)
+4. Compute `NoFitPolygon.Compute(stationaryPoly, orbitingPoly)` — single call
+5. If the NFP is null or has fewer than 3 vertices, return empty list
+6. Convert NFP vertices from polygon-space to Part-space (see Coordinate Correction below)
+7. Walk the NFP boundary:
    - Each vertex becomes a `PairCandidate` with that vertex as `Part2Offset`
-   - For edges longer than `stepSize`, add intermediate sample points at `stepSize` intervals along the edge (catches optimal positions on long straight NFP edges)
-6. Return the candidates list
+   - For edges longer than `stepSize`, add intermediate sample points starting at `stepSize` from the edge start, exclusive of endpoints (to avoid duplicates with vertex candidates)
+   - Skip the closing vertex if the polygon is closed (first == last)
+8. Part1 is always at rotation 0, matching existing `RotationSlideStrategy` behavior
+9. Return the candidates list
+
+### Coordinate correction
+
+`ExtractPerimeterPolygon` inflates by `halfSpacing` and re-normalizes to origin based on the inflated bounding box. `Part.CreateAtOrigin` normalizes using the raw program bounding box — a different reference point. NFP offsets are in polygon-space and must be mapped to Part-space.
+
+**Correction:** Compute the offset between the two reference points:
+```
+programOrigin = (program.BoundingBox.Left, program.BoundingBox.Bottom)
+polygonOrigin = (inflatedPerimeter.BoundingBox.Left, inflatedPerimeter.BoundingBox.Bottom) → (0, 0) after normalization
+correction = programOrigin - polygonOrigin
+```
+
+Since both are normalized to (0,0), the actual correction is the difference between where the inflated perimeter's bottom-left sits relative to the program's bottom-left *before* normalization. In practice:
+- The program bbox includes all entities (rapid moves, all layers)
+- The perimeter polygon only uses non-rapid cut geometry, inflated outward
+
+`PolygonHelper` will compute this correction vector once per drawing and return it alongside the polygon. `NfpSlideStrategy` applies it to each NFP vertex before creating `PairCandidate` offsets.
+
+### Floating-point boundary tolerance
+
+NFP boundary positions represent exact touching. Floating-point imprecision may cause `PairEvaluator`'s shape-intersection test to falsely detect overlap at valid boundary points. The `PairEvaluator` overlap check serves as a safety net — a few boundary positions may be filtered out, but the best results should remain valid since we sample many boundary points.
 
 ### Shared helper: `PolygonHelper`
 
@@ -50,6 +76,8 @@ After extraction, `AutoNester` delegates to these methods to avoid duplication.
 
 Replace `RotationSlideStrategy` instances with `NfpSlideStrategy` instances. Same rotation angles from `GetRotationAngles(drawing)`, different strategy class. No `ISlideComputer` dependency needed.
 
+Extract the stationary polygon once and pass it to each strategy to avoid redundant computation (strategies run in `Parallel.ForEach`):
+
 ```csharp
 private List<IBestFitStrategy> BuildStrategies(Drawing drawing)
 {
@@ -57,15 +85,20 @@ private List<IBestFitStrategy> BuildStrategies(Drawing drawing)
     var strategies = new List<IBestFitStrategy>();
     var type = 1;
 
+    // Extract stationary polygon once, shared across all rotation strategies.
+    var stationaryPoly = PolygonHelper.ExtractPerimeterPolygon(drawing, 0);
+
     foreach (var angle in angles)
     {
         var desc = $"{Angle.ToDegrees(angle):F1} deg NFP";
-        strategies.Add(new NfpSlideStrategy(angle, type++, desc));
+        strategies.Add(new NfpSlideStrategy(angle, type++, desc, stationaryPoly));
     }
 
     return strategies;
 }
 ```
+
+Note: spacing inflation is applied inside `GenerateCandidates` since it depends on the `spacing` parameter, not at strategy construction time.
 
 ### No changes required
 
