@@ -1,5 +1,8 @@
 using OpenNest.Geometry;
+using System;
 using System.Collections.Generic;
+using System.IO;
+using Clipper2Lib;
 
 namespace OpenNest.Engine.Nfp
 {
@@ -10,6 +13,9 @@ namespace OpenNest.Engine.Nfp
     /// </summary>
     public class BottomLeftFill
     {
+        private static readonly string DebugLogPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log");
+
         private readonly Box workArea;
         private readonly NfpCache nfpCache;
 
@@ -21,55 +27,56 @@ namespace OpenNest.Engine.Nfp
 
         /// <summary>
         /// Places parts according to the given sequence using NFP-based BLF.
-        /// Each entry is (drawingId, rotation) determining what to place and how.
         /// Returns the list of successfully placed parts with their positions.
         /// </summary>
-        public List<PlacedPart> Fill(List<(int drawingId, double rotation, Drawing drawing)> sequence)
+        public List<PlacedPart> Fill(List<SequenceEntry> sequence)
         {
             var placedParts = new List<PlacedPart>();
 
-            foreach (var (drawingId, rotation, drawing) in sequence)
+            using var log = new StreamWriter(DebugLogPath, false);
+            log.WriteLine($"[BLF] {DateTime.Now:HH:mm:ss.fff}  workArea: X={workArea.X} Y={workArea.Y} W={workArea.Width} H={workArea.Length}  Right={workArea.Right} Top={workArea.Top}");
+            log.WriteLine($"[BLF] Sequence count: {sequence.Count}");
+
+            foreach (var entry in sequence)
             {
-                var polygon = nfpCache.GetPolygon(drawingId, rotation);
-
-                if (polygon == null || polygon.Vertices.Count < 3)
-                    continue;
-
-                // Compute IFP for this part inside the work area.
-                var ifp = InnerFitPolygon.Compute(workArea, polygon);
+                var ifp = nfpCache.GetIfp(entry.DrawingId, entry.Rotation, workArea);
 
                 if (ifp.Vertices.Count < 3)
-                    continue;
-
-                // Compute NFPs against all already-placed parts.
-                var nfps = new Polygon[placedParts.Count];
-
-                for (var i = 0; i < placedParts.Count; i++)
                 {
-                    var placed = placedParts[i];
-                    var nfp = nfpCache.Get(placed.DrawingId, placed.Rotation, drawingId, rotation);
-
-                    // Translate NFP to the placed part's position.
-                    var translated = TranslatePolygon(nfp, placed.Position);
-                    nfps[i] = translated;
+                    log.WriteLine($"[BLF] DrawingId={entry.DrawingId} rot={entry.Rotation:F3}  SKIPPED (IFP has {ifp.Vertices.Count} verts)");
+                    continue;
                 }
 
-                // Compute feasible region and find bottom-left point.
-                var feasible = InnerFitPolygon.ComputeFeasibleRegion(ifp, nfps);
+                log.WriteLine($"[BLF] DrawingId={entry.DrawingId} rot={entry.Rotation:F3}  IFP verts={ifp.Vertices.Count} bounds=({ifp.BoundingBox.X:F2},{ifp.BoundingBox.Y:F2},{ifp.BoundingBox.Width:F2},{ifp.BoundingBox.Length:F2})");
+
+                var nfpPaths = ComputeNfpPaths(placedParts, entry.DrawingId, entry.Rotation, ifp.BoundingBox);
+                var feasible = InnerFitPolygon.ComputeFeasibleRegion(ifp, nfpPaths);
                 var point = InnerFitPolygon.FindBottomLeftPoint(feasible);
 
                 if (double.IsNaN(point.X))
+                {
+                    log.WriteLine($"[BLF]   -> NO feasible point (NaN)");
                     continue;
+                }
+
+                // Clamp to IFP bounds to correct Clipper2 floating-point drift.
+                var ifpBb = ifp.BoundingBox;
+                point = new Vector(
+                    System.Math.Max(ifpBb.X, System.Math.Min(ifpBb.Right, point.X)),
+                    System.Math.Max(ifpBb.Y, System.Math.Min(ifpBb.Top, point.Y)));
+
+                log.WriteLine($"[BLF]   -> placed at ({point.X:F4}, {point.Y:F4})  nfpPaths={nfpPaths.Count} feasibleVerts={feasible.Vertices.Count}");
 
                 placedParts.Add(new PlacedPart
                 {
-                    DrawingId = drawingId,
-                    Rotation = rotation,
+                    DrawingId = entry.DrawingId,
+                    Rotation = entry.Rotation,
                     Position = point,
-                    Drawing = drawing
+                    Drawing = entry.Drawing
                 });
             }
 
+            log.WriteLine($"[BLF] Total placed: {placedParts.Count}/{sequence.Count}");
             return placedParts;
         }
 
@@ -82,12 +89,12 @@ namespace OpenNest.Engine.Nfp
 
             foreach (var placed in placedParts)
             {
-                var part = new Part(placed.Drawing);
-
-                if (placed.Rotation != 0)
-                    part.Rotate(placed.Rotation);
-
-                part.Location = placed.Position;
+                var part = Part.CreateAtOrigin(placed.Drawing, placed.Rotation);
+                // CreateAtOrigin sets Location to compensate for the rotated program's
+                // bounding box offset.  The BLF position is a displacement for the
+                // origin-normalized polygon, so we ADD it to the existing Location
+                // rather than replacing it.
+                part.Location = part.Location + placed.Position;
                 parts.Add(part);
             }
 
@@ -95,27 +102,31 @@ namespace OpenNest.Engine.Nfp
         }
 
         /// <summary>
-        /// Creates a translated copy of a polygon.
+        /// Computes NFPs for a candidate part against all already-placed parts,
+        /// returned as Clipper paths with translations applied.
+        /// Filters NFPs that don't intersect the target IFP.
         /// </summary>
-        private static Polygon TranslatePolygon(Polygon polygon, Vector offset)
+        private PathsD ComputeNfpPaths(List<PlacedPart> placedParts, int drawingId, double rotation, Box ifpBounds)
         {
-            var result = new Polygon();
+            var nfpPaths = new PathsD(placedParts.Count);
 
-            foreach (var v in polygon.Vertices)
-                result.Vertices.Add(new Vector(v.X + offset.X, v.Y + offset.Y));
+            for (var i = 0; i < placedParts.Count; i++)
+            {
+                var placed = placedParts[i];
+                var nfp = nfpCache.Get(placed.DrawingId, placed.Rotation, drawingId, rotation);
 
-            return result;
+                if (nfp != null && nfp.Vertices.Count >= 3)
+                {
+                    // Spatial pruning: only include NFPs that could actually subtract from the IFP.
+                    var nfpBounds = nfp.BoundingBox.Translate(placed.Position);
+                    if (nfpBounds.Intersects(ifpBounds))
+                    {
+                        nfpPaths.Add(NoFitPolygon.ToClipperPath(nfp, placed.Position));
+                    }
+                }
+            }
+
+            return nfpPaths;
         }
-    }
-
-    /// <summary>
-    /// Represents a part that has been placed by the BLF algorithm.
-    /// </summary>
-    public class PlacedPart
-    {
-        public int DrawingId { get; set; }
-        public double Rotation { get; set; }
-        public Vector Position { get; set; }
-        public Drawing Drawing { get; set; }
     }
 }

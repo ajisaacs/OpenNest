@@ -20,11 +20,12 @@ namespace OpenNest.Engine.Nfp
 
         public OptimizationResult Optimize(List<NestItem> items, Box workArea, NfpCache cache,
             Dictionary<int, List<double>> candidateRotations,
+            IProgress<NestProgress> progress = null,
             CancellationToken cancellation = default)
         {
             var random = new Random();
 
-            // Build initial sequence: expand NestItems into individual (drawingId, rotation, drawing) entries,
+            // Build initial sequence: expand NestItems into individual entries,
             // sorted by area descending.
             var sequence = BuildInitialSequence(items, candidateRotations);
 
@@ -35,9 +36,9 @@ namespace OpenNest.Engine.Nfp
             var blf = new BottomLeftFill(workArea, cache);
             var bestPlaced = blf.Fill(sequence);
             var bestScore = FillScore.Compute(BottomLeftFill.ToNestParts(bestPlaced), workArea);
-            var bestSequence = new List<(int, double, Drawing)>(sequence);
+            var bestSequence = new List<SequenceEntry>(sequence);
 
-            var currentSequence = new List<(int, double, Drawing)>(sequence);
+            var currentSequence = new List<SequenceEntry>(sequence);
             var currentScore = bestScore;
 
             // Calibrate initial temperature so ~80% of worse moves are accepted.
@@ -49,13 +50,16 @@ namespace OpenNest.Engine.Nfp
 
             Debug.WriteLine($"[SA] Initial: {bestScore.Count} parts, density={bestScore.Density:P1}, temp={initialTemp:F2}");
 
+            ReportBest(progress, BottomLeftFill.ToNestParts(bestPlaced), workArea,
+                $"NFP: initial {bestScore.Count} parts, density={bestScore.Density:P1}");
+
             while (temperature > DefaultMinTemperature
                    && noImprovement < DefaultMaxNoImprovement
                    && !cancellation.IsCancellationRequested)
             {
                 iteration++;
 
-                var candidate = new List<(int drawingId, double rotation, Drawing drawing)>(currentSequence);
+                var candidate = new List<SequenceEntry>(currentSequence);
                 Mutate(candidate, candidateRotations, random);
 
                 var candidatePlaced = blf.Fill(candidate);
@@ -72,10 +76,13 @@ namespace OpenNest.Engine.Nfp
                     if (currentScore > bestScore)
                     {
                         bestScore = currentScore;
-                        bestSequence = new List<(int, double, Drawing)>(currentSequence);
+                        bestSequence = new List<SequenceEntry>(currentSequence);
                         noImprovement = 0;
 
                         Debug.WriteLine($"[SA] New best at iter {iteration}: {bestScore.Count} parts, density={bestScore.Density:P1}");
+
+                        ReportBest(progress, BottomLeftFill.ToNestParts(candidatePlaced), workArea,
+                            $"NFP: iter {iteration}, {bestScore.Count} parts, density={bestScore.Density:P1}");
                     }
                     else
                     {
@@ -118,10 +125,10 @@ namespace OpenNest.Engine.Nfp
         /// Builds the initial placement sequence sorted by drawing area descending.
         /// Each NestItem is expanded by its quantity.
         /// </summary>
-        private static List<(int drawingId, double rotation, Drawing drawing)> BuildInitialSequence(
+        private static List<SequenceEntry> BuildInitialSequence(
             List<NestItem> items, Dictionary<int, List<double>> candidateRotations)
         {
-            var sequence = new List<(int drawingId, double rotation, Drawing drawing)>();
+            var sequence = new List<SequenceEntry>();
 
             // Sort items by area descending.
             var sorted = items.OrderByDescending(i => i.Drawing.Area).ToList();
@@ -135,7 +142,7 @@ namespace OpenNest.Engine.Nfp
                     rotation = rotations[0];
 
                 for (var i = 0; i < qty; i++)
-                    sequence.Add((item.Drawing.Id, rotation, item.Drawing));
+                    sequence.Add(new SequenceEntry(item.Drawing.Id, rotation, item.Drawing));
             }
 
             return sequence;
@@ -144,7 +151,7 @@ namespace OpenNest.Engine.Nfp
         /// <summary>
         /// Applies a random mutation to the sequence.
         /// </summary>
-        private static void Mutate(List<(int drawingId, double rotation, Drawing drawing)> sequence,
+        private static void Mutate(List<SequenceEntry> sequence,
             Dictionary<int, List<double>> candidateRotations, Random random)
         {
             if (sequence.Count < 2)
@@ -169,7 +176,7 @@ namespace OpenNest.Engine.Nfp
         /// <summary>
         /// Swaps two random parts in the sequence.
         /// </summary>
-        private static void MutateSwap(List<(int, double, Drawing)> sequence, Random random)
+        private static void MutateSwap(List<SequenceEntry> sequence, Random random)
         {
             var i = random.Next(sequence.Count);
             var j = random.Next(sequence.Count);
@@ -183,23 +190,23 @@ namespace OpenNest.Engine.Nfp
         /// <summary>
         /// Changes a random part's rotation to another candidate angle.
         /// </summary>
-        private static void MutateRotate(List<(int drawingId, double rotation, Drawing drawing)> sequence,
+        private static void MutateRotate(List<SequenceEntry> sequence,
             Dictionary<int, List<double>> candidateRotations, Random random)
         {
             var idx = random.Next(sequence.Count);
             var entry = sequence[idx];
 
-            if (!candidateRotations.TryGetValue(entry.drawingId, out var rotations) || rotations.Count <= 1)
+            if (!candidateRotations.TryGetValue(entry.DrawingId, out var rotations) || rotations.Count <= 1)
                 return;
 
             var newRotation = rotations[random.Next(rotations.Count)];
-            sequence[idx] = (entry.drawingId, newRotation, entry.drawing);
+            sequence[idx] = entry.WithRotation(newRotation);
         }
 
         /// <summary>
         /// Reverses a random contiguous subsequence.
         /// </summary>
-        private static void MutateReverse(List<(int, double, Drawing)> sequence, Random random)
+        private static void MutateReverse(List<SequenceEntry> sequence, Random random)
         {
             var i = random.Next(sequence.Count);
             var j = random.Next(sequence.Count);
@@ -221,7 +228,7 @@ namespace OpenNest.Engine.Nfp
         /// are accepted initially.
         /// </summary>
         private static double CalibrateTemperature(
-            List<(int drawingId, double rotation, Drawing drawing)> sequence,
+            List<SequenceEntry> sequence,
             Box workArea, NfpCache cache,
             Dictionary<int, List<double>> candidateRotations, Random random)
         {
@@ -234,7 +241,7 @@ namespace OpenNest.Engine.Nfp
 
             for (var i = 0; i < samples; i++)
             {
-                var candidate = new List<(int, double, Drawing)>(sequence);
+                var candidate = new List<SequenceEntry>(sequence);
                 Mutate(candidate, candidateRotations, random);
 
                 var placed = blf.Fill(candidate);
@@ -265,6 +272,13 @@ namespace OpenNest.Engine.Nfp
             var densityDiff = better.Density - worse.Density;
 
             return countDiff * 10.0 + densityDiff;
+        }
+
+        private static void ReportBest(IProgress<NestProgress> progress, List<Part> parts,
+            Box workArea, string description)
+        {
+            NestEngineBase.ReportProgress(progress, NestPhase.Nfp, 0, parts, workArea,
+                description, isOverallBest: true);
         }
     }
 }
