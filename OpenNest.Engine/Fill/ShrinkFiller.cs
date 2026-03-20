@@ -16,9 +16,8 @@ namespace OpenNest.Engine.Fill
     }
 
     /// <summary>
-    /// Fills a box then iteratively shrinks one axis by the spacing amount
-    /// until the part count drops. Returns the tightest box that still fits
-    /// the target number of parts.
+    /// Fills a box and trims excess parts by removing those farthest from
+    /// the origin along the shrink axis.
     /// </summary>
     public static class ShrinkFiller
     {
@@ -28,22 +27,17 @@ namespace OpenNest.Engine.Fill
             double spacing,
             ShrinkAxis axis,
             CancellationToken token = default,
-            int maxIterations = 20,
             int targetCount = 0,
             IProgress<NestProgress> progress = null,
             int plateNumber = 0,
             List<Part> placedParts = null)
         {
-            // If a target count is specified, estimate a smaller starting box
-            // to avoid an expensive full-area fill.
             var startBox = box;
             if (targetCount > 0)
                 startBox = EstimateStartBox(item, box, spacing, axis, targetCount);
 
             var parts = fillFunc(item, startBox);
 
-            // If estimate was too aggressive and we got fewer than target,
-            // fall back to the full box.
             if (targetCount > 0 && startBox != box
                 && (parts == null || parts.Count < targetCount))
             {
@@ -53,47 +47,18 @@ namespace OpenNest.Engine.Fill
             if (parts == null || parts.Count == 0)
                 return new ShrinkResult { Parts = parts ?? new List<Part>(), Dimension = 0 };
 
-            // Shrink target: if a target count was given and we got at least that many,
-            // shrink to fit targetCount (not the full count). This produces a tighter box.
-            // If we got fewer than target, shrink to maintain what we have.
             var shrinkTarget = targetCount > 0
                 ? System.Math.Min(targetCount, parts.Count)
                 : parts.Count;
 
-            var bestParts = parts;
-            var bestDim = MeasureDimension(parts, box, axis);
+            if (parts.Count > shrinkTarget)
+                parts = TrimToCount(parts, shrinkTarget, axis);
 
-            ReportShrinkProgress(progress, plateNumber, placedParts, bestParts, box, axis, bestDim);
+            var dim = MeasureDimension(parts, box, axis);
 
-            for (var i = 0; i < maxIterations; i++)
-            {
-                if (token.IsCancellationRequested)
-                    break;
+            ReportShrinkProgress(progress, plateNumber, placedParts, parts, box, axis, dim);
 
-                var trialDim = bestDim - spacing;
-                if (trialDim <= 0)
-                    break;
-
-                var trialBox = axis == ShrinkAxis.Width
-                    ? new Box(box.X, box.Y, trialDim, box.Length)
-                    : new Box(box.X, box.Y, box.Width, trialDim);
-
-                // Report the trial box before the fill so the UI updates the
-                // work area border immediately rather than after the fill completes.
-                ReportShrinkProgress(progress, plateNumber, placedParts, bestParts, trialBox, axis, trialDim);
-
-                var trialParts = fillFunc(item, trialBox);
-
-                if (trialParts == null || trialParts.Count < shrinkTarget)
-                    break;
-
-                bestParts = trialParts;
-                bestDim = MeasureDimension(trialParts, box, axis);
-
-                ReportShrinkProgress(progress, plateNumber, placedParts, bestParts, trialBox, axis, bestDim);
-            }
-
-            return new ShrinkResult { Parts = bestParts, Dimension = bestDim };
+            return new ShrinkResult { Parts = parts, Dimension = dim };
         }
 
         private static void ReportShrinkProgress(

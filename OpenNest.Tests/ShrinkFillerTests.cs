@@ -17,7 +17,7 @@ public class ShrinkFillerTests
     }
 
     [Fact]
-    public void Shrink_ReducesDimension_UntilCountDrops()
+    public void Shrink_FillsAndReturnsDimension()
     {
         var drawing = MakeSquareDrawing(10);
         var item = new NestItem { Drawing = drawing };
@@ -57,25 +57,6 @@ public class ShrinkFillerTests
         Assert.NotNull(result);
         Assert.True(result.Parts.Count > 0);
         Assert.True(result.Dimension <= 100);
-    }
-
-    [Fact]
-    public void Shrink_RespectsMaxIterations()
-    {
-        var callCount = 0;
-        Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
-        {
-            callCount++;
-            return new List<Part> { TestHelpers.MakePartAt(0, 0, 5) };
-        };
-
-        var item = new NestItem { Drawing = MakeSquareDrawing(5) };
-        var box = new Box(0, 0, 100, 100);
-
-        ShrinkFiller.Shrink(fillFunc, item, box, 1.0, ShrinkAxis.Height, maxIterations: 3);
-
-        // 1 initial + up to 3 shrink iterations = max 4 calls
-        Assert.True(callCount <= 4);
     }
 
     [Fact]
