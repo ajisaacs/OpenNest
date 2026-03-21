@@ -26,6 +26,16 @@ namespace OpenNest
             set => angleBuilder.ForceFullSweep = value;
         }
 
+        public override List<double> BuildAngles(NestItem item, double bestRotation, Box workArea)
+        {
+            return angleBuilder.Build(item, bestRotation, workArea);
+        }
+
+        protected override void RecordProductiveAngles(List<AngleResult> angleResults)
+        {
+            angleBuilder.RecordProductive(angleResults);
+        }
+
         // --- Public Fill API ---
 
         public override List<Part> Fill(NestItem item, Box workArea,
@@ -42,6 +52,7 @@ namespace OpenNest
                 PlateNumber = PlateNumber,
                 Token = token,
                 Progress = progress,
+                Policy = BuildPolicy(),
             };
 
             RunPipeline(context);
@@ -78,6 +89,7 @@ namespace OpenNest
             PhaseResults.Clear();
             var engine = new FillLinear(workArea, Plate.PartSpacing);
             var angles = RotationAnalysis.FindHullEdgeAngles(groupParts);
+            // TODO: pass Comparer to FillPattern (Task 6)
             var best = FillHelpers.FillPattern(engine, groupParts, angles, workArea);
             PhaseResults.Add(new PhaseResult(NestPhase.Linear, best?.Count ?? 0, 0));
 
@@ -105,12 +117,12 @@ namespace OpenNest
 
         // --- RunPipeline: strategy-based orchestration ---
 
-        private void RunPipeline(FillContext context)
+        protected virtual void RunPipeline(FillContext context)
         {
             var bestRotation = RotationAnalysis.FindBestRotation(context.Item);
             context.SharedState["BestRotation"] = bestRotation;
 
-            var angles = angleBuilder.Build(context.Item, bestRotation, context.WorkArea);
+            var angles = BuildAngles(context.Item, bestRotation, context.WorkArea);
             context.SharedState["AngleCandidates"] = angles;
 
             try
@@ -131,7 +143,7 @@ namespace OpenNest
                     // during progress reporting.
                     PhaseResults.Add(phaseResult);
 
-                    if (IsBetterFill(result, context.CurrentBest, context.WorkArea))
+                    if (context.Policy.Comparer.IsBetter(result, context.CurrentBest, context.WorkArea))
                     {
                         context.CurrentBest = result;
                         context.CurrentBestScore = FillScore.Compute(result, context.WorkArea);
@@ -151,7 +163,7 @@ namespace OpenNest
                 Debug.WriteLine("[RunPipeline] Cancelled, returning current best");
             }
 
-            angleBuilder.RecordProductive(context.AngleResults);
+            RecordProductiveAngles(context.AngleResults);
         }
 
     }

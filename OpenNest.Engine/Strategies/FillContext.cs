@@ -14,8 +14,10 @@ namespace OpenNest.Engine.Strategies
         public int PlateNumber { get; init; }
         public CancellationToken Token { get; init; }
         public IProgress<NestProgress> Progress { get; init; }
+        public FillPolicy Policy { get; init; }
 
         public List<Part> CurrentBest { get; set; }
+        /// <summary>For progress reporting only; comparisons use Policy.Comparer.</summary>
         public FillScore CurrentBestScore { get; set; }
         public NestPhase WinnerPhase { get; set; }
         public List<PhaseResult> PhaseResults { get; } = new();
