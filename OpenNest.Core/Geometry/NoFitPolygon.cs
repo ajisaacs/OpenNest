@@ -78,7 +78,7 @@ namespace OpenNest.Geometry
         /// edge vectors sorted by angle. O(n+m) where n and m are vertex counts.
         /// Both polygons must have CCW winding.
         /// </summary>
-        internal static Polygon ConvexMinkowskiSum(Polygon a, Polygon b)
+        public static Polygon ConvexMinkowskiSum(Polygon a, Polygon b)
         {
             var edgesA = GetEdgeVectors(a);
             var edgesB = GetEdgeVectors(b);

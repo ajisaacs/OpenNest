@@ -32,13 +32,23 @@ namespace OpenNest.Engine.BestFit
             if (stationaryResult.Polygon == null)
                 return candidates;
 
-            var stationaryPoly = stationaryResult.Polygon;
+            // Use convex hulls for NFP computation — avoids expensive
+            // triangulation + Clipper2 union for concave parts.
+            // Convex-convex Minkowski sum is O(n+m) with no boolean ops.
+            var stationaryPoly = ConvexHull.Compute(stationaryResult.Polygon.Vertices);
 
-            // Orbiting polygon: same shape rotated to Part2's angle.
-            var orbitingPoly = PolygonHelper.RotatePolygon(stationaryResult.Polygon, _part2Rotation);
+            // Orbiting polygon: same shape rotated to Part2's angle, then hulled.
+            var rotated = PolygonHelper.RotatePolygon(stationaryResult.Polygon, _part2Rotation);
+            var orbitingPoly = ConvexHull.Compute(rotated.Vertices);
 
-            // Compute NFP.
-            var nfp = NoFitPolygon.Compute(stationaryPoly, orbitingPoly);
+            // Compute NFP directly via convex Minkowski sum — O(n+m), no Clipper union.
+            // NFP(A, B) = MinkowskiSum(A, -B) for convex polygons.
+            var reflected = new Polygon();
+            foreach (var v in orbitingPoly.Vertices)
+                reflected.Vertices.Add(new Vector(-v.X, -v.Y));
+            reflected.Vertices.Reverse(); // maintain CCW winding
+
+            var nfp = NoFitPolygon.ConvexMinkowskiSum(stationaryPoly, reflected);
 
             if (nfp == null || nfp.Vertices.Count < 3)
                 return candidates;
