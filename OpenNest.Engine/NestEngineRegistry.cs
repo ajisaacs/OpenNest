@@ -24,6 +24,14 @@ namespace OpenNest
             Register("NFP",
                 "NFP-based mixed-part nesting with simulated annealing",
                 plate => new NfpNestEngine(plate));
+
+            Register("Vertical Remnant",
+                "Optimizes for largest right-side vertical drop",
+                plate => new VerticalRemnantEngine(plate));
+
+            Register("Horizontal Remnant",
+                "Optimizes for largest top-side horizontal drop",
+                plate => new HorizontalRemnantEngine(plate));
         }
 
         public static IReadOnlyList<NestEngineInfo> AvailableEngines => engines;
