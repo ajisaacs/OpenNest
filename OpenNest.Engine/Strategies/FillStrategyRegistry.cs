@@ -12,6 +12,7 @@ namespace OpenNest.Engine.Strategies
         private static readonly List<IFillStrategy> strategies = new();
         private static List<IFillStrategy> sorted;
         private static HashSet<string> enabledFilter;
+        private static readonly HashSet<string> disabled = new(StringComparer.OrdinalIgnoreCase);
 
         static FillStrategyRegistry()
         {
@@ -19,9 +20,36 @@ namespace OpenNest.Engine.Strategies
         }
 
         public static IReadOnlyList<IFillStrategy> Strategies =>
-            sorted ??= (enabledFilter != null
-                ? strategies.Where(s => enabledFilter.Contains(s.Name)).OrderBy(s => s.Order).ToList()
-                : strategies.OrderBy(s => s.Order).ToList());
+            sorted ??= FilterStrategies();
+
+        private static List<IFillStrategy> FilterStrategies()
+        {
+            var source = enabledFilter != null
+                ? strategies.Where(s => enabledFilter.Contains(s.Name))
+                : strategies.Where(s => !disabled.Contains(s.Name));
+            return source.OrderBy(s => s.Order).ToList();
+        }
+
+        /// <summary>
+        /// Permanently disables strategies by name. They remain registered
+        /// but are excluded from the default pipeline.
+        /// </summary>
+        public static void Disable(params string[] names)
+        {
+            foreach (var name in names)
+                disabled.Add(name);
+            sorted = null;
+        }
+
+        /// <summary>
+        /// Re-enables a previously disabled strategy.
+        /// </summary>
+        public static void Enable(params string[] names)
+        {
+            foreach (var name in names)
+                disabled.Remove(name);
+            sorted = null;
+        }
 
         /// <summary>
         /// Restricts the active strategies to only those whose names are listed.

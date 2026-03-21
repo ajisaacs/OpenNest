@@ -1,3 +1,4 @@
+using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests.Strategies;
@@ -24,8 +25,8 @@ public class FillPipelineTests
 
         engine.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
 
-        Assert.True(engine.PhaseResults.Count >= 6,
-            $"Expected phase results from all strategies, got {engine.PhaseResults.Count}");
+        Assert.True(engine.PhaseResults.Count >= FillStrategyRegistry.Strategies.Count,
+            $"Expected phase results from all active strategies, got {engine.PhaseResults.Count}");
     }
 
     [Fact]
