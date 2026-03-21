@@ -27,17 +27,9 @@ namespace OpenNest.Engine.BestFit
             var perimeterBb = perimeter.BoundingBox;
 
             // Inflate by half-spacing if spacing is non-zero.
-            Shape inflated;
-
-            if (halfSpacing > 0)
-            {
-                var offsetEntity = perimeter.OffsetEntity(halfSpacing, OffsetSide.Left);
-                inflated = offsetEntity as Shape ?? perimeter;
-            }
-            else
-            {
-                inflated = perimeter;
-            }
+            var inflated = halfSpacing > 0
+                ? (perimeter.OffsetEntity(halfSpacing, OffsetSide.Left) as Shape ?? perimeter)
+                : perimeter;
 
             // Convert to polygon with circumscribed arcs for tight nesting.
             var polygon = inflated.ToPolygonWithTolerance(0.01, circumscribe: true);
