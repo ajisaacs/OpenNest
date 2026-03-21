@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
@@ -25,6 +27,43 @@ public class StripeFillerTests
         pattern.Parts.Add(part);
         pattern.UpdateBounds();
         return pattern;
+    }
+
+    /// <summary>
+    /// Builds a simple side-by-side pair BestFitResult for a rectangular drawing.
+    /// Places two copies next to each other along the X axis with the given spacing.
+    /// </summary>
+    private static List<BestFitResult> MakeSideBySideBestFits(
+        Drawing drawing, double spacing)
+    {
+        var bb = drawing.Program.BoundingBox();
+        var w = bb.Width;
+        var h = bb.Length;
+
+        var candidate = new PairCandidate
+        {
+            Drawing = drawing,
+            Part1Rotation = 0,
+            Part2Rotation = 0,
+            Part2Offset = new Vector(w + spacing, 0),
+            Spacing = spacing,
+        };
+
+        var pairWidth = 2 * w + spacing;
+        var result = new BestFitResult
+        {
+            Candidate = candidate,
+            BoundingWidth = pairWidth,
+            BoundingHeight = h,
+            RotatedArea = pairWidth * h,
+            TrueArea = 2 * w * h,
+            OptimalRotation = 0,
+            Keep = true,
+            Reason = "Valid",
+            HullAngles = new List<double>(),
+        };
+
+        return new List<BestFitResult> { result };
     }
 
     [Fact]
@@ -91,5 +130,87 @@ public class StripeFillerTests
             pattern.Parts, 120.0, 0.5, NestDirection.Vertical);
 
         Assert.True(count >= 5, $"Expected at least 5 pairs, got {count}");
+    }
+
+    [Fact]
+    public void Fill_ProducesPartsForSimpleDrawing()
+    {
+        var plate = new Plate(60, 120) { PartSpacing = 0.5 };
+        var drawing = MakeRectDrawing(20, 10);
+        var item = new NestItem { Drawing = drawing };
+        var workArea = new Box(0, 0, 120, 60);
+
+        var bestFits = MakeSideBySideBestFits(drawing, 0.5);
+
+        var context = new OpenNest.Engine.Strategies.FillContext
+        {
+            Item = item,
+            WorkArea = workArea,
+            Plate = plate,
+            PlateNumber = 0,
+            Token = System.Threading.CancellationToken.None,
+            Progress = null,
+        };
+        context.SharedState["BestFits"] = bestFits;
+
+        var filler = new StripeFiller(context, NestDirection.Horizontal);
+        var parts = filler.Fill();
+
+        Assert.NotNull(parts);
+        Assert.True(parts.Count > 0, "Expected parts from stripe fill");
+    }
+
+    [Fact]
+    public void Fill_VerticalProducesParts()
+    {
+        var plate = new Plate(60, 120) { PartSpacing = 0.5 };
+        var drawing = MakeRectDrawing(20, 10);
+        var item = new NestItem { Drawing = drawing };
+        var workArea = new Box(0, 0, 120, 60);
+
+        var bestFits = MakeSideBySideBestFits(drawing, 0.5);
+
+        var context = new OpenNest.Engine.Strategies.FillContext
+        {
+            Item = item,
+            WorkArea = workArea,
+            Plate = plate,
+            PlateNumber = 0,
+            Token = System.Threading.CancellationToken.None,
+            Progress = null,
+        };
+        context.SharedState["BestFits"] = bestFits;
+
+        var filler = new StripeFiller(context, NestDirection.Vertical);
+        var parts = filler.Fill();
+
+        Assert.NotNull(parts);
+        Assert.True(parts.Count > 0, "Expected parts from column fill");
+    }
+
+    [Fact]
+    public void Fill_ReturnsEmpty_WhenNoBestFits()
+    {
+        var plate = new Plate(60, 120) { PartSpacing = 0.5 };
+        var drawing = MakeRectDrawing(20, 10);
+        var item = new NestItem { Drawing = drawing };
+        var workArea = new Box(0, 0, 120, 60);
+
+        var context = new OpenNest.Engine.Strategies.FillContext
+        {
+            Item = item,
+            WorkArea = workArea,
+            Plate = plate,
+            PlateNumber = 0,
+            Token = System.Threading.CancellationToken.None,
+            Progress = null,
+        };
+        context.SharedState["BestFits"] = new List<OpenNest.Engine.BestFit.BestFitResult>();
+
+        var filler = new StripeFiller(context, NestDirection.Horizontal);
+        var parts = filler.Fill();
+
+        Assert.NotNull(parts);
+        Assert.Empty(parts);
     }
 }
