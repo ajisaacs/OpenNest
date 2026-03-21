@@ -20,6 +20,10 @@ namespace OpenNest.Engine.BestFit
         public List<PairCandidate> GenerateCandidates(Drawing drawing, double spacing, double stepSize)
         {
             var candidates = new List<PairCandidate>();
+
+            if (stepSize <= 0)
+                return candidates;
+
             var halfSpacing = spacing / 2;
 
             // Extract stationary polygon (Part1 at rotation 0), with spacing applied.
