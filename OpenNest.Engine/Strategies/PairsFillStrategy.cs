@@ -12,7 +12,7 @@ namespace OpenNest.Engine.Strategies
         public List<Part> Fill(FillContext context)
         {
             var comparer = context.Policy?.Comparer;
-            var filler = new PairFiller(context.Plate.Size, context.Plate.PartSpacing, comparer);
+            var filler = new PairFiller(context.Plate, comparer);
             var result = filler.Fill(context.Item, context.WorkArea,
                 context.PlateNumber, context.Token, context.Progress);
 
