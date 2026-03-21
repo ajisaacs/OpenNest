@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -73,6 +74,57 @@ public class StripeFiller
         }
 
         return bestAngle;
+    }
+
+    /// <summary>
+    /// Iteratively finds the rotation angle where N copies of the pattern
+    /// span the given dimension with minimal waste.
+    /// Returns (angle, waste, pairCount).
+    /// </summary>
+    public static (double Angle, double Waste, int Count) ConvergeStripeAngle(
+        List<Part> patternParts, double sheetSpan, double spacing,
+        NestDirection axis, CancellationToken token = default)
+    {
+        var currentAngle = 0.0;
+        var bestWaste = double.MaxValue;
+        var bestAngle = 0.0;
+        var bestCount = 0;
+        var tolerance = sheetSpan * 0.001;
+
+        for (var iteration = 0; iteration < MaxConvergenceIterations; iteration++)
+        {
+            token.ThrowIfCancellationRequested();
+
+            var rotated = FillHelpers.BuildRotatedPattern(patternParts, currentAngle);
+            var pairSpan = GetDimension(rotated.BoundingBox, axis);
+
+            if (pairSpan + spacing <= 0)
+                break;
+
+            var n = (int)System.Math.Floor((sheetSpan + spacing) / (pairSpan + spacing));
+            if (n <= 0)
+                break;
+
+            var usedSpan = n * (pairSpan + spacing) - spacing;
+            var remaining = sheetSpan - usedSpan;
+
+            if (remaining < bestWaste)
+            {
+                bestWaste = remaining;
+                bestAngle = currentAngle;
+                bestCount = n;
+            }
+
+            if (remaining <= tolerance)
+                break;
+
+            var delta = remaining / n;
+            var targetSpan = pairSpan + delta;
+
+            currentAngle = FindAngleForTargetSpan(patternParts, targetSpan, axis);
+        }
+
+        return (bestAngle, bestWaste, bestCount);
     }
 
     private static double BisectForTarget(

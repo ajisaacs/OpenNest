@@ -60,4 +60,36 @@ public class StripeFillerTests
 
         Assert.True(angle >= 0 && angle <= System.Math.PI / 2);
     }
+
+    [Fact]
+    public void ConvergeStripeAngle_ReducesWaste()
+    {
+        var pattern = MakeRectPattern(20, 10);
+        var (angle, waste, count) = StripeFiller.ConvergeStripeAngle(
+            pattern.Parts, 120.0, 0.5, NestDirection.Horizontal);
+
+        Assert.True(count >= 5, $"Expected at least 5 pairs, got {count}");
+        Assert.True(waste < 18.0, $"Expected waste < 18, got {waste:F2}");
+    }
+
+    [Fact]
+    public void ConvergeStripeAngle_HandlesExactFit()
+    {
+        var pattern = MakeRectPattern(10, 5);
+        var (angle, waste, count) = StripeFiller.ConvergeStripeAngle(
+            pattern.Parts, 100.0, 0.0, NestDirection.Horizontal);
+
+        Assert.Equal(10, count);
+        Assert.True(waste < 0.2, $"Expected near-zero waste, got {waste:F2}");
+    }
+
+    [Fact]
+    public void ConvergeStripeAngle_Vertical()
+    {
+        var pattern = MakeRectPattern(10, 20);
+        var (angle, waste, count) = StripeFiller.ConvergeStripeAngle(
+            pattern.Parts, 120.0, 0.5, NestDirection.Vertical);
+
+        Assert.True(count >= 5, $"Expected at least 5 pairs, got {count}");
+    }
 }
