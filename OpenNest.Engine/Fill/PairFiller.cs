@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine;
 
 namespace OpenNest.Engine.Fill
 {
@@ -29,11 +30,13 @@ namespace OpenNest.Engine.Fill
 
         private readonly Size plateSize;
         private readonly double partSpacing;
+        private readonly IFillComparer comparer;
 
-        public PairFiller(Size plateSize, double partSpacing)
+        public PairFiller(Size plateSize, double partSpacing, IFillComparer comparer = null)
         {
             this.plateSize = plateSize;
             this.partSpacing = partSpacing;
+            this.comparer = comparer ?? new DefaultFillComparer();
         }
 
         public PairFillResult Fill(NestItem item, Box workArea,
@@ -61,7 +64,6 @@ namespace OpenNest.Engine.Fill
             int plateNumber, CancellationToken token, IProgress<NestProgress> progress)
         {
             List<Part> best = null;
-            var bestScore = default(FillScore);
             var sinceImproved = 0;
             var effectiveWorkArea = workArea;
 
@@ -72,12 +74,10 @@ namespace OpenNest.Engine.Fill
                     token.ThrowIfCancellationRequested();
 
                     var filled = EvaluateCandidate(candidates[i], drawing, effectiveWorkArea);
-                    var score = FillScore.Compute(filled, effectiveWorkArea);
 
-                    if (score > bestScore)
+                    if (comparer.IsBetter(filled, best, effectiveWorkArea))
                     {
                         best = filled;
-                        bestScore = score;
                         sinceImproved = 0;
                         effectiveWorkArea = TryReduceWorkArea(filled, targetCount, workArea, effectiveWorkArea);
                     }
@@ -87,7 +87,7 @@ namespace OpenNest.Engine.Fill
                     }
 
                     NestEngineBase.ReportProgress(progress, NestPhase.Pairs, plateNumber, best, workArea,
-                        $"Pairs: {i + 1}/{candidates.Count} candidates, best = {bestScore.Count} parts");
+                        $"Pairs: {i + 1}/{candidates.Count} candidates, best = {best?.Count ?? 0} parts");
 
                     if (i + 1 >= EarlyExitMinTried && sinceImproved >= EarlyExitStaleLimit)
                     {
@@ -101,7 +101,7 @@ namespace OpenNest.Engine.Fill
                 Debug.WriteLine("[PairFiller] Cancelled mid-phase, using results so far");
             }
 
-            Debug.WriteLine($"[PairFiller] Best pair result: {bestScore.Count} parts, density={bestScore.Density:P1}");
+            Debug.WriteLine($"[PairFiller] Best pair result: {best?.Count ?? 0} parts");
             return best ?? new List<Part>();
         }
 
@@ -147,7 +147,7 @@ namespace OpenNest.Engine.Fill
             var pairParts = candidate.BuildParts(drawing);
             var engine = new FillLinear(workArea, partSpacing);
             var angles = BuildTilingAngles(candidate);
-            return FillHelpers.FillPattern(engine, pairParts, angles, workArea);
+            return FillHelpers.FillPattern(engine, pairParts, angles, workArea, comparer);
         }
 
         private static List<double> BuildTilingAngles(BestFitResult candidate)

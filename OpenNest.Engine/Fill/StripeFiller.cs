@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
@@ -18,6 +19,7 @@ public class StripeFiller
 
     private readonly FillContext _context;
     private readonly NestDirection _primaryAxis;
+    private readonly IFillComparer _comparer;
 
     /// <summary>
     /// When true, only complete stripes are placed — no partial rows/columns.
@@ -35,6 +37,7 @@ public class StripeFiller
     {
         _context = context;
         _primaryAxis = primaryAxis;
+        _comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
     }
 
     public List<Part> Fill()
@@ -49,7 +52,6 @@ public class StripeFiller
         var strategyName = _primaryAxis == NestDirection.Horizontal ? "Row" : "Column";
 
         List<Part> bestParts = null;
-        var bestScore = default(FillScore);
 
         for (var i = 0; i < bestFits.Count; i++)
         {
@@ -82,22 +84,20 @@ public class StripeFiller
                     if (result == null || result.Count == 0)
                         continue;
 
-                    var score = FillScore.Compute(result, workArea);
                     Debug.WriteLine($"[StripeFiller] {strategyName} candidate {i} {dirLabel}: " +
                         $"angle={Angle.ToDegrees(angle):F1}°, N={count}, waste={waste:F2}, " +
                         $"grid={result.Count} parts");
 
-                    if (bestParts == null || score > bestScore)
+                    if (_comparer.IsBetter(result, bestParts, workArea))
                     {
                         bestParts = result;
-                        bestScore = score;
                     }
                 }
             }
 
             NestEngineBase.ReportProgress(_context.Progress, NestPhase.Custom,
                 _context.PlateNumber, bestParts, workArea,
-                $"{strategyName}: {i + 1}/{bestFits.Count} pairs, best = {bestScore.Count} parts");
+                $"{strategyName}: {i + 1}/{bestFits.Count} pairs, best = {bestParts?.Count ?? 0} parts");
         }
 
         return bestParts ?? new List<Part>();
