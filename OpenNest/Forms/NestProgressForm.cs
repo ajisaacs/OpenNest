@@ -73,7 +73,7 @@ namespace OpenNest.Forms
 
             descriptionValue.Text = !string.IsNullOrEmpty(progress.Description)
                 ? progress.Description
-                : FormatPhase(progress.Phase);
+                : progress.Phase.DisplayName();
         }
 
         public void ShowCompleted()
@@ -195,19 +195,6 @@ namespace OpenNest.Forms
             if (density < 0.7)
                 return DensityMidColor;
             return DensityHighColor;
-        }
-
-        private static string FormatPhase(NestPhase phase)
-        {
-            switch (phase)
-            {
-                case NestPhase.Linear: return "Trying rotations...";
-                case NestPhase.RectBestFit: return "Trying best fit...";
-                case NestPhase.Pairs: return "Trying pairs...";
-                case NestPhase.Extents: return "Trying extents...";
-                case NestPhase.Nfp: return "Trying NFP...";
-                default: return phase.ToString();
-            }
         }
     }
 }

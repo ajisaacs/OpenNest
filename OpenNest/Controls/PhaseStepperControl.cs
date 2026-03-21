@@ -59,16 +59,6 @@ namespace OpenNest.Controls
             }
         }
 
-        private static string GetDisplayName(NestPhase phase)
-        {
-            switch (phase)
-            {
-                case NestPhase.RectBestFit: return "BestFit";
-                case NestPhase.Nfp: return "NFP";
-                default: return phase.ToString();
-            }
-        }
-
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
@@ -134,7 +124,7 @@ namespace OpenNest.Controls
                 }
 
                 // Label
-                var label = GetDisplayName(phase);
+                var label = phase.ShortName();
                 var font = isVisited || isActive ? BoldLabelFont : LabelFont;
                 var brush = isVisited || isActive ? activeTextBrush : pendingTextBrush;
                 var labelSize = g.MeasureString(label, font);
