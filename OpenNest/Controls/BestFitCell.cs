@@ -40,7 +40,7 @@ namespace OpenNest.Controls
             metadataLines = new[]
             {
                 string.Format("#{0}  {1:F1}x{2:F1}  Area={3:F1}",
-                    rank, result.BoundingWidth, result.BoundingHeight, result.RotatedArea),
+                    rank, result.BoundingHeight, result.BoundingWidth, result.RotatedArea),
                 string.Format("Util={0:P1}  Rot={1:F1}\u00b0",
                     result.Utilization,
                     Angle.ToDegrees(result.OptimalRotation)),
