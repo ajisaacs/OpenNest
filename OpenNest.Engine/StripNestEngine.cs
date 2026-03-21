@@ -1,5 +1,4 @@
 using OpenNest.Engine.Fill;
-using OpenNest.Engine.Nfp;
 using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
@@ -122,9 +121,6 @@ namespace OpenNest
                     allParts.AddRange(packParts);
                 }
             }
-
-            // NFP optimization pass — re-place parts using geometry-aware BLF.
-            allParts = AutoNester.Optimize(allParts, Plate);
 
             // Deduct placed quantities from original items.
             foreach (var item in items)

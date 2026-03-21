@@ -49,9 +49,6 @@ namespace OpenNest
             // Compact placed parts toward the origin to close gaps.
             Compactor.Settle(parts, Plate.WorkArea(), Plate.PartSpacing);
 
-            // NFP optimization pass — re-place parts using geometry-aware BLF.
-            parts = AutoNester.Optimize(parts, Plate);
-
             // Deduct placed quantities from original items.
             foreach (var item in items)
             {

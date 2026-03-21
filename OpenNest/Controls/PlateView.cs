@@ -2,7 +2,6 @@
 using OpenNest.CNC;
 using OpenNest.Collections;
 using OpenNest.Engine.Fill;
-using OpenNest.Engine.Nfp;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -961,7 +960,7 @@ namespace OpenNest.Controls
                 {
                     var result = engine.Fill(groupParts, workArea, progress, cts.Token);
                     Compactor.Settle(result, workArea, spacing);
-                    return AutoNester.Optimize(result, workArea, spacing);
+                    return result;
                 });
 
                 if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
