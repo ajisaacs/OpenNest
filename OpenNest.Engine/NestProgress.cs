@@ -70,18 +70,93 @@ namespace OpenNest
         public int PartCount { get; set; }
     }
 
+    internal readonly struct ProgressReport
+    {
+        public NestPhase Phase { get; init; }
+        public int PlateNumber { get; init; }
+        public List<Part> Parts { get; init; }
+        public Box WorkArea { get; init; }
+        public string Description { get; init; }
+        public bool IsOverallBest { get; init; }
+    }
+
     public class NestProgress
     {
         public NestPhase Phase { get; set; }
         public int PlateNumber { get; set; }
-        public int BestPartCount { get; set; }
-        public double BestDensity { get; set; }
-        public double NestedWidth { get; set; }
-        public double NestedLength { get; set; }
-        public double NestedArea { get; set; }
-        public List<Part> BestParts { get; set; }
+
+        private List<Part> bestParts;
+        public List<Part> BestParts
+        {
+            get => bestParts;
+            set { bestParts = value; cachedParts = null; }
+        }
+
         public string Description { get; set; }
         public Box ActiveWorkArea { get; set; }
         public bool IsOverallBest { get; set; }
+
+        public int BestPartCount => BestParts?.Count ?? 0;
+
+        private List<Part> cachedParts;
+        private Box cachedBounds;
+        private double cachedPartArea;
+
+        private void EnsureCache()
+        {
+            if (cachedParts == bestParts) return;
+            cachedParts = bestParts;
+            if (bestParts == null || bestParts.Count == 0)
+            {
+                cachedBounds = default;
+                cachedPartArea = 0;
+                return;
+            }
+            cachedBounds = bestParts.GetBoundingBox();
+            cachedPartArea = 0;
+            foreach (var p in bestParts)
+                cachedPartArea += p.BaseDrawing.Area;
+        }
+
+        public double BestDensity
+        {
+            get
+            {
+                if (BestParts == null || BestParts.Count == 0) return 0;
+                EnsureCache();
+                var bboxArea = cachedBounds.Width * cachedBounds.Length;
+                return bboxArea > 0 ? cachedPartArea / bboxArea : 0;
+            }
+        }
+
+        public double NestedWidth
+        {
+            get
+            {
+                if (BestParts == null || BestParts.Count == 0) return 0;
+                EnsureCache();
+                return cachedBounds.Width;
+            }
+        }
+
+        public double NestedLength
+        {
+            get
+            {
+                if (BestParts == null || BestParts.Count == 0) return 0;
+                EnsureCache();
+                return cachedBounds.Length;
+            }
+        }
+
+        public double NestedArea
+        {
+            get
+            {
+                if (BestParts == null || BestParts.Count == 0) return 0;
+                EnsureCache();
+                return cachedPartArea;
+            }
+        }
     }
 }

@@ -88,8 +88,14 @@ namespace OpenNest.Engine.Fill
                         sinceImproved++;
                     }
 
-                    NestEngineBase.ReportProgress(progress, NestPhase.Pairs, plateNumber, best, workArea,
-                        $"Pairs: {i + 1}/{candidates.Count} candidates, best = {best?.Count ?? 0} parts");
+                    NestEngineBase.ReportProgress(progress, new ProgressReport
+                    {
+                        Phase = NestPhase.Pairs,
+                        PlateNumber = plateNumber,
+                        Parts = best,
+                        WorkArea = workArea,
+                        Description = $"Pairs: {i + 1}/{candidates.Count} candidates, best = {best?.Count ?? 0} parts",
+                    });
 
                     if (i + 1 >= EarlyExitMinTried && sinceImproved >= EarlyExitStaleLimit)
                     {

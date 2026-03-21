@@ -210,55 +210,26 @@ namespace OpenNest
         // --- Protected utilities ---
 
         internal static void ReportProgress(
-            IProgress<NestProgress> progress,
-            NestPhase phase,
-            int plateNumber,
-            List<Part> best,
-            Box workArea,
-            string description,
-            bool isOverallBest = false)
+            IProgress<NestProgress> progress, ProgressReport report)
         {
-            if (progress == null || best == null || best.Count == 0)
+            if (progress == null || report.Parts == null || report.Parts.Count == 0)
                 return;
 
-            var score = FillScore.Compute(best, workArea);
-            var clonedParts = new List<Part>(best.Count);
-            var totalPartArea = 0.0;
-
-            foreach (var part in best)
-            {
+            var clonedParts = new List<Part>(report.Parts.Count);
+            foreach (var part in report.Parts)
                 clonedParts.Add((Part)part.Clone());
-                totalPartArea += part.BaseDrawing.Area;
-            }
 
-            var bounds = best.GetBoundingBox();
-
-            var msg = $"[Progress] Phase={phase}, Plate={plateNumber}, Parts={score.Count}, " +
-                      $"Density={score.Density:P1}, Nested={bounds.Width:F1}x{bounds.Length:F1}, " +
-                      $"PartArea={totalPartArea:F0}, Remnant={workArea.Area() - totalPartArea:F0}, " +
-                      $"WorkArea={workArea.Width:F1}x{workArea.Length:F1} | {description}";
-            Debug.WriteLine(msg);
-            try
-            {
-                System.IO.File.AppendAllText(
-                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log"),
-                $"{DateTime.Now:HH:mm:ss.fff} {msg}\n");
-            }
-            catch { }
+            Debug.WriteLine($"[Progress] Phase={report.Phase}, Plate={report.PlateNumber}, " +
+                            $"Parts={clonedParts.Count} | {report.Description}");
 
             progress.Report(new NestProgress
             {
-                Phase = phase,
-                PlateNumber = plateNumber,
-                BestPartCount = score.Count,
-                BestDensity = score.Density,
-                NestedWidth = bounds.Width,
-                NestedLength = bounds.Length,
-                NestedArea = totalPartArea,
+                Phase = report.Phase,
+                PlateNumber = report.PlateNumber,
                 BestParts = clonedParts,
-                Description = description,
-                ActiveWorkArea = workArea,
-                IsOverallBest = isOverallBest,
+                Description = report.Description,
+                ActiveWorkArea = report.WorkArea,
+                IsOverallBest = report.IsOverallBest,
             });
         }
 
@@ -270,7 +241,7 @@ namespace OpenNest
             var parts = new List<string>(PhaseResults.Count);
 
             foreach (var r in PhaseResults)
-                parts.Add($"{FormatPhaseName(r.Phase)}: {r.PartCount}");
+                parts.Add($"{r.Phase.ShortName()}: {r.PartCount}");
 
             return string.Join(" | ", parts);
         }
@@ -323,17 +294,5 @@ namespace OpenNest
             return false;
         }
 
-        protected static string FormatPhaseName(NestPhase phase)
-        {
-            switch (phase)
-            {
-                case NestPhase.Pairs: return "Pairs";
-                case NestPhase.Linear: return "Linear";
-                case NestPhase.RectBestFit: return "BestFit";
-                case NestPhase.Extents: return "Extents";
-                case NestPhase.Custom: return "Custom";
-                default: return phase.ToString();
-            }
-        }
     }
 }

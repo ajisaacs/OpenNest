@@ -93,9 +93,14 @@ public class StripeFiller
                 }
             }
 
-            NestEngineBase.ReportProgress(_context.Progress, NestPhase.Custom,
-                _context.PlateNumber, bestParts, workArea,
-                $"{strategyName}: {i + 1}/{bestFits.Count} pairs, best = {bestParts?.Count ?? 0} parts");
+            NestEngineBase.ReportProgress(_context.Progress, new ProgressReport
+            {
+                Phase = NestPhase.Custom,
+                PlateNumber = _context.PlateNumber,
+                Parts = bestParts,
+                WorkArea = workArea,
+                Description = $"{strategyName}: {i + 1}/{bestFits.Count} pairs, best = {bestParts?.Count ?? 0} parts",
+            });
         }
 
         return bestParts ?? new List<Part>();

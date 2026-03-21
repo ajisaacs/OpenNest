@@ -79,8 +79,14 @@ namespace OpenNest.Engine.Fill
 
             var desc = $"Shrink {axis}: {bestParts.Count} parts, dim={dim:F1}";
 
-            NestEngineBase.ReportProgress(progress, NestPhase.Custom, plateNumber,
-                allParts, workArea, desc);
+            NestEngineBase.ReportProgress(progress, new ProgressReport
+            {
+                Phase = NestPhase.Custom,
+                PlateNumber = plateNumber,
+                Parts = allParts,
+                WorkArea = workArea,
+                Description = desc,
+            });
         }
 
         /// <summary>

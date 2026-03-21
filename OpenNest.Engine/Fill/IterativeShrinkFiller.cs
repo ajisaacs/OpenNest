@@ -108,8 +108,15 @@ namespace OpenNest.Engine.Fill
                     var allParts = new List<Part>(placedSoFar.Count + best.Count);
                     allParts.AddRange(placedSoFar);
                     allParts.AddRange(best);
-                    NestEngineBase.ReportProgress(progress, NestPhase.Custom, plateNumber,
-                        allParts, box, $"Shrink: {best.Count} parts placed", isOverallBest: true);
+                    NestEngineBase.ReportProgress(progress, new ProgressReport
+                    {
+                        Phase = NestPhase.Custom,
+                        PlateNumber = plateNumber,
+                        Parts = allParts,
+                        WorkArea = box,
+                        Description = $"Shrink: {best.Count} parts placed",
+                        IsOverallBest = true,
+                    });
                 }
 
                 // Accumulate for the next item's progress reports.

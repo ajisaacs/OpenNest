@@ -26,7 +26,6 @@ namespace OpenNest.Engine.Fill
                 combined.AddRange(previousParts);
                 combined.AddRange(value.BestParts);
                 value.BestParts = combined;
-                value.BestPartCount = combined.Count;
             }
 
             inner.Report(value);

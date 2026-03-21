@@ -277,8 +277,15 @@ namespace OpenNest.Engine.Nfp
         private static void ReportBest(IProgress<NestProgress> progress, List<Part> parts,
             Box workArea, string description)
         {
-            NestEngineBase.ReportProgress(progress, NestPhase.Nfp, 0, parts, workArea,
-                description, isOverallBest: true);
+            NestEngineBase.ReportProgress(progress, new ProgressReport
+            {
+                Phase = NestPhase.Nfp,
+                PlateNumber = 0,
+                Parts = parts,
+                WorkArea = workArea,
+                Description = description,
+                IsOverallBest = true,
+            });
         }
     }
 }

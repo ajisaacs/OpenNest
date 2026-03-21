@@ -66,8 +66,15 @@ namespace OpenNest
             if (item.Quantity > 0 && best.Count > item.Quantity)
                 best = ShrinkFiller.TrimToCount(best, item.Quantity, ShrinkAxis.Width);
 
-            ReportProgress(progress, WinnerPhase, PlateNumber, best, workArea, BuildProgressSummary(),
-                isOverallBest: true);
+            ReportProgress(progress, new ProgressReport
+            {
+                Phase = WinnerPhase,
+                PlateNumber = PlateNumber,
+                Parts = best,
+                WorkArea = workArea,
+                Description = BuildProgressSummary(),
+                IsOverallBest = true,
+            });
 
             return best;
         }
@@ -94,8 +101,15 @@ namespace OpenNest
 
             Debug.WriteLine($"[Fill(groupParts,Box)] Linear pattern: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Length:F1}");
 
-            ReportProgress(progress, NestPhase.Linear, PlateNumber, best, workArea, BuildProgressSummary(),
-                isOverallBest: true);
+            ReportProgress(progress, new ProgressReport
+            {
+                Phase = NestPhase.Linear,
+                PlateNumber = PlateNumber,
+                Parts = best,
+                WorkArea = workArea,
+                Description = BuildProgressSummary(),
+                IsOverallBest = true,
+            });
 
             return best ?? new List<Part>();
         }
@@ -151,9 +165,15 @@ namespace OpenNest
 
                     if (context.CurrentBest != null && context.CurrentBest.Count > 0)
                     {
-                        ReportProgress(context.Progress, context.WinnerPhase, PlateNumber,
-                            context.CurrentBest, context.WorkArea, BuildProgressSummary(),
-                            isOverallBest: true);
+                        ReportProgress(context.Progress, new ProgressReport
+                        {
+                            Phase = context.WinnerPhase,
+                            PlateNumber = PlateNumber,
+                            Parts = context.CurrentBest,
+                            WorkArea = context.WorkArea,
+                            Description = BuildProgressSummary(),
+                            IsOverallBest = true,
+                        });
                     }
                 }
             }

@@ -36,18 +36,36 @@ namespace OpenNest.Engine.Fill
             if (column.Count == 0)
                 return new List<Part>();
 
-            NestEngineBase.ReportProgress(progress, NestPhase.Extents, plateNumber,
-                column, workArea, $"Extents: initial column {column.Count} parts");
+            NestEngineBase.ReportProgress(progress, new ProgressReport
+            {
+                Phase = NestPhase.Extents,
+                PlateNumber = plateNumber,
+                Parts = column,
+                WorkArea = workArea,
+                Description = $"Extents: initial column {column.Count} parts",
+            });
 
             var adjusted = AdjustColumn(pair.Value, column, token);
 
-            NestEngineBase.ReportProgress(progress, NestPhase.Extents, plateNumber,
-                adjusted, workArea, $"Extents: adjusted column {adjusted.Count} parts");
+            NestEngineBase.ReportProgress(progress, new ProgressReport
+            {
+                Phase = NestPhase.Extents,
+                PlateNumber = plateNumber,
+                Parts = adjusted,
+                WorkArea = workArea,
+                Description = $"Extents: adjusted column {adjusted.Count} parts",
+            });
 
             var result = RepeatColumns(adjusted, token);
 
-            NestEngineBase.ReportProgress(progress, NestPhase.Extents, plateNumber,
-                result, workArea, $"Extents: {result.Count} parts total");
+            NestEngineBase.ReportProgress(progress, new ProgressReport
+            {
+                Phase = NestPhase.Extents,
+                PlateNumber = plateNumber,
+                Parts = result,
+                WorkArea = workArea,
+                Description = $"Extents: {result.Count} parts total",
+            });
 
             return result;
         }

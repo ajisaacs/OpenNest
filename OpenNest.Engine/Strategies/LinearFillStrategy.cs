@@ -47,9 +47,14 @@ namespace OpenNest.Engine.Strategies
                         best = result;
                 }
 
-                NestEngineBase.ReportProgress(context.Progress, NestPhase.Linear,
-                    context.PlateNumber, best, workArea,
-                    $"Linear: {ai + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts");
+                NestEngineBase.ReportProgress(context.Progress, new ProgressReport
+                {
+                    Phase = NestPhase.Linear,
+                    PlateNumber = context.PlateNumber,
+                    Parts = best,
+                    WorkArea = workArea,
+                    Description = $"Linear: {ai + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts",
+                });
             }
 
             return best ?? new List<Part>();

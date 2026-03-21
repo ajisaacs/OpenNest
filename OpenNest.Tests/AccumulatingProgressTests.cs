@@ -18,7 +18,7 @@ public class AccumulatingProgressTests
         var accumulating = new AccumulatingProgress(inner, previous);
 
         var newParts = new List<Part> { TestHelpers.MakePartAt(20, 0, 10) };
-        accumulating.Report(new NestProgress { BestParts = newParts, BestPartCount = 1 });
+        accumulating.Report(new NestProgress { BestParts = newParts });
 
         Assert.NotNull(inner.Last);
         Assert.Equal(2, inner.Last.BestParts.Count);
@@ -32,7 +32,7 @@ public class AccumulatingProgressTests
         var accumulating = new AccumulatingProgress(inner, new List<Part>());
 
         var newParts = new List<Part> { TestHelpers.MakePartAt(0, 0, 10) };
-        accumulating.Report(new NestProgress { BestParts = newParts, BestPartCount = 1 });
+        accumulating.Report(new NestProgress { BestParts = newParts });
 
         Assert.NotNull(inner.Last);
         Assert.Single(inner.Last.BestParts);

@@ -74,8 +74,15 @@ namespace OpenNest.Engine.Nfp
 
             Debug.WriteLine($"[AutoNest] Result: {parts.Count} parts placed, {result.Iterations} SA iterations");
 
-            NestEngineBase.ReportProgress(progress, NestPhase.Nfp, 0, parts, workArea,
-                $"NFP: {parts.Count} parts, {result.Iterations} iterations", isOverallBest: true);
+            NestEngineBase.ReportProgress(progress, new ProgressReport
+            {
+                Phase = NestPhase.Nfp,
+                PlateNumber = 0,
+                Parts = parts,
+                WorkArea = workArea,
+                Description = $"NFP: {parts.Count} parts, {result.Iterations} iterations",
+                IsOverallBest = true,
+            });
 
             return parts;
         }
