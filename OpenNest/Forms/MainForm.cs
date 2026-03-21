@@ -204,6 +204,7 @@ namespace OpenNest.Forms
                 plateIndexStatusLabel.Text = string.Empty;
                 plateSizeStatusLabel.Text = string.Empty;
                 plateQtyStatusLabel.Text = string.Empty;
+                plateUtilStatusLabel.Text = string.Empty;
                 return;
             }
 
@@ -219,6 +220,10 @@ namespace OpenNest.Forms
             plateQtyStatusLabel.Text = string.Format(
                 "Qty: {0}",
                 activeForm.PlateView.Plate.Quantity);
+
+            plateUtilStatusLabel.Text = string.Format(
+                "Util: {0:P1}",
+                activeForm.PlateView.Plate.Utilization());
         }
 
         private void UpdateSelectionStatus()
@@ -342,6 +347,8 @@ namespace OpenNest.Forms
                 activeForm.PlateView.MouseClick -= PlateView_MouseClick;
                 activeForm.PlateView.StatusChanged -= PlateView_StatusChanged;
                 activeForm.PlateView.SelectionChanged -= PlateView_SelectionChanged;
+                activeForm.PlateView.PartAdded -= PlateView_PartAdded;
+                activeForm.PlateView.PartRemoved -= PlateView_PartRemoved;
             }
 
             // If nesting is in progress and the active form changed, cancel nesting
@@ -367,6 +374,8 @@ namespace OpenNest.Forms
             UpdateSelectionStatus();
             activeForm.PlateView.StatusChanged += PlateView_StatusChanged;
             activeForm.PlateView.SelectionChanged += PlateView_SelectionChanged;
+            activeForm.PlateView.PartAdded += PlateView_PartAdded;
+            activeForm.PlateView.PartRemoved += PlateView_PartRemoved;
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
             statusLabel1.Text = activeForm.PlateView.Status;
@@ -1214,6 +1223,9 @@ namespace OpenNest.Forms
         #endregion Statusbar Events
 
         #region PlateView Events
+
+        private void PlateView_PartAdded(object sender, ItemAddedEventArgs<Part> e) => UpdatePlateStatus();
+        private void PlateView_PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => UpdatePlateStatus();
 
         private void PlateView_MouseMove(object sender, MouseEventArgs e)
         {

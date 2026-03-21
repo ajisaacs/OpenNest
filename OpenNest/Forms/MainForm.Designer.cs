@@ -131,6 +131,7 @@
             plateIndexStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateSizeStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateQtyStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            plateUtilStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             gpuStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             selectionStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             toolStrip1 = new System.Windows.Forms.ToolStrip();
@@ -829,7 +830,7 @@
             // 
             // statusStrip1
             // 
-            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, gpuStatusLabel });
+            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, plateUtilStatusLabel, gpuStatusLabel });
             statusStrip1.Location = new System.Drawing.Point(0, 630);
             statusStrip1.Name = "statusStrip1";
             statusStrip1.Padding = new System.Windows.Forms.Padding(1, 0, 16, 0);
@@ -889,7 +890,15 @@
             plateQtyStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
             plateQtyStatusLabel.Size = new System.Drawing.Size(55, 19);
             plateQtyStatusLabel.Text = "Qty : 0";
-            // 
+            //
+            // plateUtilStatusLabel
+            //
+            plateUtilStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            plateUtilStatusLabel.Name = "plateUtilStatusLabel";
+            plateUtilStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            plateUtilStatusLabel.Size = new System.Drawing.Size(75, 19);
+            plateUtilStatusLabel.Text = "Util : 0.0%";
+            //
             // gpuStatusLabel
             // 
             gpuStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
@@ -1128,6 +1137,7 @@
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem10;
         private System.Windows.Forms.ToolStripMenuItem mnuCloseAll;
         private System.Windows.Forms.ToolStripStatusLabel plateQtyStatusLabel;
+        private System.Windows.Forms.ToolStripStatusLabel plateUtilStatusLabel;
         private System.Windows.Forms.ToolStripMenuItem mnuFileExportAll;
         private System.Windows.Forms.ToolStripMenuItem openNestToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem pEPToolStripMenuItem;
