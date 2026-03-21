@@ -76,7 +76,7 @@ namespace OpenNest.Geometry
         /// </summary>
         [System.Runtime.CompilerServices.MethodImpl(
             System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        private static double RayEdgeDistance(
+        public static double RayEdgeDistance(
             double vx, double vy,
             double p1x, double p1y, double p2x, double p2y,
             double dirX, double dirY)
