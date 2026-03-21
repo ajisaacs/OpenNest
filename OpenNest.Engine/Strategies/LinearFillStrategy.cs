@@ -17,8 +17,9 @@ namespace OpenNest.Engine.Strategies
                 : new List<double> { 0, Angle.HalfPI };
 
             var workArea = context.WorkArea;
+            var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
+            var preferred = context.Policy?.PreferredDirection;
             List<Part> best = null;
-            var bestScore = default(FillScore);
 
             for (var ai = 0; ai < angles.Count; ai++)
             {
@@ -26,48 +27,29 @@ namespace OpenNest.Engine.Strategies
 
                 var angle = angles[ai];
                 var engine = new FillLinear(workArea, context.Plate.PartSpacing);
-                var h = engine.Fill(context.Item.Drawing, angle, NestDirection.Horizontal);
-                var v = engine.Fill(context.Item.Drawing, angle, NestDirection.Vertical);
+
+                var result = FillHelpers.FillWithDirectionPreference(
+                    dir => engine.Fill(context.Item.Drawing, angle, dir),
+                    preferred, comparer, workArea);
 
                 var angleDeg = Angle.ToDegrees(angle);
 
-                if (h != null && h.Count > 0)
+                if (result != null && result.Count > 0)
                 {
-                    var scoreH = FillScore.Compute(h, workArea);
                     context.AngleResults.Add(new AngleResult
                     {
                         AngleDeg = angleDeg,
-                        Direction = NestDirection.Horizontal,
-                        PartCount = h.Count
+                        Direction = preferred ?? NestDirection.Horizontal,
+                        PartCount = result.Count
                     });
 
-                    if (best == null || scoreH > bestScore)
-                    {
-                        best = h;
-                        bestScore = scoreH;
-                    }
-                }
-
-                if (v != null && v.Count > 0)
-                {
-                    var scoreV = FillScore.Compute(v, workArea);
-                    context.AngleResults.Add(new AngleResult
-                    {
-                        AngleDeg = angleDeg,
-                        Direction = NestDirection.Vertical,
-                        PartCount = v.Count
-                    });
-
-                    if (best == null || scoreV > bestScore)
-                    {
-                        best = v;
-                        bestScore = scoreV;
-                    }
+                    if (best == null || comparer.IsBetter(result, best, workArea))
+                        best = result;
                 }
 
                 NestEngineBase.ReportProgress(context.Progress, NestPhase.Linear,
                     context.PlateNumber, best, workArea,
-                    $"Linear: {ai + 1}/{angles.Count} angles, {angleDeg:F0}° best = {bestScore.Count} parts");
+                    $"Linear: {ai + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts");
             }
 
             return best ?? new List<Part>();

@@ -89,8 +89,7 @@ namespace OpenNest
             PhaseResults.Clear();
             var engine = new FillLinear(workArea, Plate.PartSpacing);
             var angles = RotationAnalysis.FindHullEdgeAngles(groupParts);
-            // TODO: pass Comparer to FillPattern (Task 6)
-            var best = FillHelpers.FillPattern(engine, groupParts, angles, workArea);
+            var best = FillHelpers.FillPattern(engine, groupParts, angles, workArea, Comparer);
             PhaseResults.Add(new PhaseResult(NestPhase.Linear, best?.Count ?? 0, 0));
 
             Debug.WriteLine($"[Fill(groupParts,Box)] Linear pattern: {best?.Count ?? 0} parts | WorkArea: {workArea.Width:F1}x{workArea.Length:F1}");

@@ -30,7 +30,7 @@ namespace OpenNest.Engine.Strategies
             return pattern;
         }
 
-        public static List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea)
+        public static List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea, IFillComparer comparer = null)
         {
             var results = new ConcurrentBag<(List<Part> Parts, FillScore Score)>();
 
@@ -55,10 +55,18 @@ namespace OpenNest.Engine.Strategies
 
             foreach (var res in results)
             {
-                if (best == null || res.Score > bestScore)
+                if (comparer != null)
                 {
-                    best = res.Parts;
-                    bestScore = res.Score;
+                    if (best == null || comparer.IsBetter(res.Parts, best, workArea))
+                        best = res.Parts;
+                }
+                else
+                {
+                    if (best == null || res.Score > bestScore)
+                    {
+                        best = res.Parts;
+                        bestScore = res.Score;
+                    }
                 }
             }
 

@@ -21,7 +21,7 @@ namespace OpenNest.Engine.Strategies
             var angles = new[] { bestRotation, bestRotation + Angle.HalfPI };
 
             List<Part> best = null;
-            var bestScore = default(FillScore);
+            var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
 
             foreach (var angle in angles)
             {
@@ -30,12 +30,8 @@ namespace OpenNest.Engine.Strategies
                     context.PlateNumber, context.Token, context.Progress);
                 if (result != null && result.Count > 0)
                 {
-                    var score = FillScore.Compute(result, context.WorkArea);
-                    if (best == null || score > bestScore)
-                    {
+                    if (best == null || comparer.IsBetter(result, best, context.WorkArea))
                         best = result;
-                        bestScore = score;
-                    }
                 }
             }
 
