@@ -63,3 +63,111 @@ public class DefaultFillComparerTests
         Assert.True(comparer.IsBetter(candidate, current, workArea));
     }
 }
+
+public class VerticalRemnantComparerTests
+{
+    private readonly IFillComparer comparer = new VerticalRemnantComparer();
+    private readonly Box workArea = new(0, 0, 100, 100);
+
+    [Fact]
+    public void HigherCount_WinsRegardlessOfExtent()
+    {
+        var candidate = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(40, 0, 10),
+            TestHelpers.MakePartAt(80, 0, 10)
+        };
+        var current = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(12, 0, 10)
+        };
+        Assert.True(comparer.IsBetter(candidate, current, workArea));
+    }
+
+    [Fact]
+    public void SameCount_SmallerXExtent_Wins()
+    {
+        var candidate = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(12, 0, 10)
+        };
+        var current = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(50, 0, 10)
+        };
+        Assert.True(comparer.IsBetter(candidate, current, workArea));
+    }
+
+    [Fact]
+    public void SameCount_SameExtent_HigherDensityWins()
+    {
+        var candidate = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(40, 0, 10)
+        };
+        var current = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(40, 40, 10)
+        };
+        Assert.True(comparer.IsBetter(candidate, current, workArea));
+    }
+
+    [Fact]
+    public void NullCandidate_ReturnsFalse()
+    {
+        var current = new List<Part> { TestHelpers.MakePartAt(0, 0, 10) };
+        Assert.False(comparer.IsBetter(null, current, workArea));
+    }
+
+    [Fact]
+    public void NullCurrent_ReturnsTrue()
+    {
+        var candidate = new List<Part> { TestHelpers.MakePartAt(0, 0, 10) };
+        Assert.True(comparer.IsBetter(candidate, null, workArea));
+    }
+}
+
+public class HorizontalRemnantComparerTests
+{
+    private readonly IFillComparer comparer = new HorizontalRemnantComparer();
+    private readonly Box workArea = new(0, 0, 100, 100);
+
+    [Fact]
+    public void SameCount_SmallerYExtent_Wins()
+    {
+        var candidate = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(0, 12, 10)
+        };
+        var current = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(0, 50, 10)
+        };
+        Assert.True(comparer.IsBetter(candidate, current, workArea));
+    }
+
+    [Fact]
+    public void HigherCount_WinsRegardlessOfExtent()
+    {
+        var candidate = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(0, 40, 10),
+            TestHelpers.MakePartAt(0, 80, 10)
+        };
+        var current = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(0, 12, 10)
+        };
+        Assert.True(comparer.IsBetter(candidate, current, workArea));
+    }
+}
