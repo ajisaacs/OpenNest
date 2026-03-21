@@ -36,7 +36,7 @@ namespace OpenNest.Engine.BestFit
             double stepSize = 0.25,
             BestFitSortField sortBy = BestFitSortField.Area)
         {
-            var strategies = BuildStrategies(drawing);
+            var strategies = BuildStrategies(drawing, spacing);
 
             var candidateBags = new ConcurrentBag<List<PairCandidate>>();
 
@@ -75,7 +75,7 @@ namespace OpenNest.Engine.BestFit
                 .ToList();
         }
 
-        private List<IBestFitStrategy> BuildStrategies(Drawing drawing)
+        private List<IBestFitStrategy> BuildStrategies(Drawing drawing, double spacing)
         {
             var angles = GetRotationAngles(drawing);
             var strategies = new List<IBestFitStrategy>();

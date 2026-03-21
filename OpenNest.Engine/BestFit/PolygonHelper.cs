@@ -22,13 +22,10 @@ namespace OpenNest.Engine.BestFit
             if (perimeter == null)
                 return new PolygonExtractionResult(null, Vector.Zero);
 
-            // Compute the perimeter bounding box before inflation for coordinate correction.
-            perimeter.UpdateBounds();
-            var perimeterBb = perimeter.BoundingBox;
-
             // Inflate by half-spacing if spacing is non-zero.
+            // OffsetSide.Right = outward for CCW perimeters (standard for outer contours).
             var inflated = halfSpacing > 0
-                ? (perimeter.OffsetEntity(halfSpacing, OffsetSide.Left) as Shape ?? perimeter)
+                ? (perimeter.OffsetEntity(halfSpacing, OffsetSide.Right) as Shape ?? perimeter)
                 : perimeter;
 
             // Convert to polygon with circumscribed arcs for tight nesting.
@@ -37,22 +34,18 @@ namespace OpenNest.Engine.BestFit
             if (polygon.Vertices.Count < 3)
                 return new PolygonExtractionResult(null, Vector.Zero);
 
-            // Compute correction: difference between program origin and perimeter origin.
-            // Part.CreateAtOrigin normalizes to program bbox; polygon normalizes to perimeter bbox.
-            var programBb = drawing.Program.BoundingBox();
-            var correction = new Vector(
-                perimeterBb.Left - programBb.Location.X,
-                perimeterBb.Bottom - programBb.Location.Y);
-
-            // Normalize: move reference point to origin.
+            // Normalize: move polygon to origin.
             polygon.UpdateBounds();
             var bb = polygon.BoundingBox;
             polygon.Offset(-bb.Left, -bb.Bottom);
 
-            return new PolygonExtractionResult(polygon, correction);
+            // No correction needed: BestFitFinder always pairs the same drawing with
+            // itself, so the polygon-to-part offset is identical for both parts and
+            // cancels out in the NFP displacement.
+            return new PolygonExtractionResult(polygon, Vector.Zero);
         }
 
-        public static Polygon RotatePolygon(Polygon polygon, double angle)
+        public static Polygon RotatePolygon(Polygon polygon, double angle, bool reNormalize = true)
         {
             if (angle.IsEqualTo(0))
                 return polygon;
@@ -68,10 +61,13 @@ namespace OpenNest.Engine.BestFit
                     v.X * sin + v.Y * cos));
             }
 
-            // Re-normalize to origin.
-            result.UpdateBounds();
-            var bb = result.BoundingBox;
-            result.Offset(-bb.Left, -bb.Bottom);
+            if (reNormalize)
+            {
+                // Re-normalize to origin.
+                result.UpdateBounds();
+                var bb = result.BoundingBox;
+                result.Offset(-bb.Left, -bb.Bottom);
+            }
 
             return result;
         }

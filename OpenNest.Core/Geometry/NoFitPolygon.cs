@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using OpenNest.Math;
 using System.Collections.Generic;
 
 namespace OpenNest.Geometry
@@ -23,7 +24,19 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Optimized version of Compute for polygons known to be convex.
+        /// Bypasses expensive triangulation and Clipper unions.
+        /// </summary>
+        public static Polygon ComputeConvex(Polygon stationary, Polygon orbiting)
+        {
+            var reflected = Reflect(orbiting);
+            return ConvexMinkowskiSum(stationary, reflected);
+        }
+
+        /// <summary>
         /// Reflects a polygon through the origin (negates all vertex coordinates).
+        /// Point reflection (negating both axes) is equivalent to 180° rotation,
+        /// which preserves winding order. No reversal needed.
         /// </summary>
         private static Polygon Reflect(Polygon polygon)
         {
@@ -32,8 +45,6 @@ namespace OpenNest.Geometry
             foreach (var v in polygon.Vertices)
                 result.Vertices.Add(new Vector(-v.X, -v.Y));
 
-            // Reflecting reverses winding order — reverse to maintain CCW.
-            result.Vertices.Reverse();
             return result;
         }
 
@@ -83,14 +94,19 @@ namespace OpenNest.Geometry
             var edgesA = GetEdgeVectors(a);
             var edgesB = GetEdgeVectors(b);
 
-            // Find bottom-most (then left-most) vertex for each polygon as starting point.
+            // Find indices of bottom-left vertices for both.
             var startA = FindBottomLeft(a);
             var startB = FindBottomLeft(b);
 
             var result = new Polygon();
+            
+            // The starting point of the Minkowski sum A + B is the sum of the 
+            // starting points of A and B. For NFP = A + (-B), this is 
+            // startA + startReflectedB.
             var current = new Vector(
                 a.Vertices[startA].X + b.Vertices[startB].X,
                 a.Vertices[startA].Y + b.Vertices[startB].Y);
+            
             result.Vertices.Add(current);
 
             var ia = 0;
@@ -98,7 +114,6 @@ namespace OpenNest.Geometry
             var na = edgesA.Count;
             var nb = edgesB.Count;
 
-            // Reorder edges to start from the bottom-left vertex.
             var orderedA = ReorderEdges(edgesA, startA);
             var orderedB = ReorderEdges(edgesB, startB);
 
@@ -117,7 +132,10 @@ namespace OpenNest.Geometry
                 else
                 {
                     var angleA = System.Math.Atan2(orderedA[ia].Y, orderedA[ia].X);
+                    if (angleA < 0) angleA += Angle.TwoPI;
+
                     var angleB = System.Math.Atan2(orderedB[ib].Y, orderedB[ib].X);
+                    if (angleB < 0) angleB += Angle.TwoPI;
 
                     if (angleA < angleB)
                     {
@@ -129,7 +147,6 @@ namespace OpenNest.Geometry
                     }
                     else
                     {
-                        // Same angle — merge both edges.
                         edge = new Vector(
                             orderedA[ia].X + orderedB[ib].X,
                             orderedA[ia].Y + orderedB[ib].Y);
@@ -143,6 +160,7 @@ namespace OpenNest.Geometry
             }
 
             result.Close();
+            result.UpdateBounds();
             return result;
         }
 
