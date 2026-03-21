@@ -1,4 +1,6 @@
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
@@ -30,6 +32,25 @@ namespace OpenNest
         public abstract string Name { get; }
 
         public abstract string Description { get; }
+
+        // --- Engine policy ---
+
+        private IFillComparer _comparer;
+
+        protected IFillComparer Comparer => _comparer ??= CreateComparer();
+
+        protected virtual IFillComparer CreateComparer() => new DefaultFillComparer();
+
+        public virtual NestDirection? PreferredDirection => null;
+
+        public virtual List<double> BuildAngles(NestItem item, double bestRotation, Box workArea)
+        {
+            return new List<double> { bestRotation, bestRotation + OpenNest.Math.Angle.HalfPI };
+        }
+
+        protected virtual void RecordProductiveAngles(List<AngleResult> angleResults) { }
+
+        protected FillPolicy BuildPolicy() => new FillPolicy(Comparer, PreferredDirection);
 
         // --- Virtual methods (side-effect-free, return parts) ---
 
@@ -255,15 +276,7 @@ namespace OpenNest
         }
 
         protected bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea)
-        {
-            if (candidate == null || candidate.Count == 0)
-                return false;
-
-            if (current == null || current.Count == 0)
-                return true;
-
-            return FillScore.Compute(candidate, workArea) > FillScore.Compute(current, workArea);
-        }
+            => Comparer.IsBetter(candidate, current, workArea);
 
         protected bool IsBetterValidFill(List<Part> candidate, List<Part> current, Box workArea)
         {
