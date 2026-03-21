@@ -208,3 +208,7 @@ FakesAssemblies/
 
 # Claude Code
 .claude/
+.superpowers/
+
+# Launch settings
+**/Properties/launchSettings.json
