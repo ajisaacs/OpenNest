@@ -83,8 +83,8 @@ namespace OpenNest.Engine.BestFit
 
             foreach (var angle in angles)
             {
-                var desc = $"{Angle.ToDegrees(angle):F1} deg NFP";
-                strategies.Add(new NfpSlideStrategy(angle, type++, desc));
+                var desc = string.Format("{0:F1} deg rotated, offset slide", Angle.ToDegrees(angle));
+                strategies.Add(new RotationSlideStrategy(angle, type++, desc, _slideComputer));
             }
 
             return strategies;
