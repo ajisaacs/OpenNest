@@ -1,6 +1,7 @@
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -62,6 +63,43 @@ namespace OpenNest.Engine.Strategies
             }
 
             return best;
+        }
+
+        /// <summary>
+        /// Runs a fill function with direction preference logic.
+        /// If preferred is null, tries both directions and returns the better result.
+        /// If preferred is set, tries preferred first; only tries other if preferred yields zero.
+        /// </summary>
+        public static List<Part> FillWithDirectionPreference(
+            Func<NestDirection, List<Part>> fillFunc,
+            NestDirection? preferred,
+            IFillComparer comparer,
+            Box workArea)
+        {
+            if (preferred == null)
+            {
+                var h = fillFunc(NestDirection.Horizontal);
+                var v = fillFunc(NestDirection.Vertical);
+
+                if ((h == null || h.Count == 0) && (v == null || v.Count == 0))
+                    return new List<Part>();
+
+                if (h == null || h.Count == 0) return v;
+                if (v == null || v.Count == 0) return h;
+
+                return comparer.IsBetter(h, v, workArea) ? h : v;
+            }
+
+            var other = preferred == NestDirection.Horizontal
+                ? NestDirection.Vertical
+                : NestDirection.Horizontal;
+
+            var pref = fillFunc(preferred.Value);
+            if (pref != null && pref.Count > 0)
+                return pref;
+
+            var fallback = fillFunc(other);
+            return fallback ?? new List<Part>();
         }
     }
 }
