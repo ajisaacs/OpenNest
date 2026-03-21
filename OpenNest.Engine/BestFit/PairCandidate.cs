@@ -8,7 +8,7 @@ namespace OpenNest.Engine.BestFit
         public double Part1Rotation { get; set; }
         public double Part2Rotation { get; set; }
         public Vector Part2Offset { get; set; }
-        public int StrategyType { get; set; }
+        public int StrategyIndex { get; set; }
         public int TestNumber { get; set; }
         public double Spacing { get; set; }
     }

@@ -22,14 +22,14 @@ namespace OpenNest.Engine.BestFit
             Polygon stationaryPerimeter, Polygon stationaryHull, Vector correction)
         {
             _part2Rotation = part2Rotation;
-            Type = type;
+            StrategyIndex = type;
             Description = description;
             _stationaryPerimeter = stationaryPerimeter;
             _stationaryHull = stationaryHull;
             _correction = correction;
         }
 
-        public int Type { get; }
+        public int StrategyIndex { get; }
         public string Description { get; }
 
         /// <summary>
@@ -155,7 +155,7 @@ namespace OpenNest.Engine.BestFit
                 Part1Rotation = 0,
                 Part2Rotation = _part2Rotation,
                 Part2Offset = offset,
-                StrategyType = Type,
+                StrategyIndex = StrategyIndex,
                 TestNumber = testNumber,
                 Spacing = spacing
             };

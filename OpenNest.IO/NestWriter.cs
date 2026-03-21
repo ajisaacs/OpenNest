@@ -214,7 +214,7 @@ namespace OpenNest.IO
                         Part2Rotation = r.Candidate.Part2Rotation,
                         Part2OffsetX = r.Candidate.Part2Offset.X,
                         Part2OffsetY = r.Candidate.Part2Offset.Y,
-                        StrategyType = r.Candidate.StrategyType,
+                        StrategyType = r.Candidate.StrategyIndex,
                         TestNumber = r.Candidate.TestNumber,
                         CandidateSpacing = r.Candidate.Spacing,
                         RotatedArea = r.RotatedArea,

@@ -129,7 +129,7 @@ namespace OpenNest.IO
                         Part1Rotation = r.Part1Rotation,
                         Part2Rotation = r.Part2Rotation,
                         Part2Offset = new Vector(r.Part2OffsetX, r.Part2OffsetY),
-                        StrategyType = r.StrategyType,
+                        StrategyIndex = r.StrategyType,
                         TestNumber = r.TestNumber,
                         Spacing = r.CandidateSpacing
                     },

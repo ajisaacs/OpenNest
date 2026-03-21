@@ -12,14 +12,16 @@ namespace OpenNest.Engine.BestFit
     public class BestFitFinder
     {
         private readonly IPairEvaluator _evaluator;
-        private readonly ISlideComputer _slideComputer;
+        private readonly IDistanceComputer _distanceComputer;
         private readonly BestFitFilter _filter;
 
         public BestFitFinder(double maxPlateWidth, double maxPlateHeight,
             IPairEvaluator evaluator = null, ISlideComputer slideComputer = null)
         {
             _evaluator = evaluator ?? new PairEvaluator();
-            _slideComputer = slideComputer;
+            _distanceComputer = slideComputer != null
+                ? (IDistanceComputer)new GpuDistanceComputer(slideComputer)
+                : new CpuDistanceComputer();
             var plateAspect = System.Math.Max(maxPlateWidth, maxPlateHeight) /
                               System.Math.Max(System.Math.Min(maxPlateWidth, maxPlateHeight), 0.001);
             _filter = new BestFitFilter
@@ -79,12 +81,12 @@ namespace OpenNest.Engine.BestFit
         {
             var angles = GetRotationAngles(drawing);
             var strategies = new List<IBestFitStrategy>();
-            var type = 1;
+            var index = 1;
 
             foreach (var angle in angles)
             {
                 var desc = string.Format("{0:F1} deg rotated, offset slide", Angle.ToDegrees(angle));
-                strategies.Add(new RotationSlideStrategy(angle, type++, desc, _slideComputer));
+                strategies.Add(new RotationSlideStrategy(angle, index++, desc, _distanceComputer));
             }
 
             return strategies;
@@ -226,7 +228,7 @@ namespace OpenNest.Engine.BestFit
                 case BestFitSortField.ShortestSide:
                     return results.OrderBy(r => r.ShortestSide).ToList();
                 case BestFitSortField.Type:
-                    return results.OrderBy(r => r.Candidate.StrategyType)
+                    return results.OrderBy(r => r.Candidate.StrategyIndex)
                         .ThenBy(r => r.Candidate.TestNumber).ToList();
                 case BestFitSortField.OriginalSequence:
                     return results.OrderBy(r => r.Candidate.TestNumber).ToList();
