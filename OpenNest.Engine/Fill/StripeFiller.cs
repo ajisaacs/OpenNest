@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -18,6 +19,18 @@ public class StripeFiller
     private readonly FillContext _context;
     private readonly NestDirection _primaryAxis;
 
+    /// <summary>
+    /// When true, only complete stripes are placed — no partial rows/columns.
+    /// </summary>
+    public bool CompleteStripesOnly { get; set; }
+
+    /// <summary>
+    /// Factory to create the engine used for filling the remnant strip.
+    /// Defaults to NestEngineRegistry.Create (uses the user's selected engine).
+    /// </summary>
+    public Func<Plate, NestEngineBase> CreateRemnantEngine { get; set; }
+        = NestEngineRegistry.Create;
+
     public StripeFiller(FillContext context, NestDirection primaryAxis)
     {
         _context = context;
@@ -33,10 +46,6 @@ public class StripeFiller
         var workArea = _context.WorkArea;
         var spacing = _context.Plate.PartSpacing;
         var drawing = _context.Item.Drawing;
-        var perpAxis = _primaryAxis == NestDirection.Horizontal
-            ? NestDirection.Vertical
-            : NestDirection.Horizontal;
-        var sheetSpan = GetDimension(workArea, _primaryAxis);
         var strategyName = _primaryAxis == NestDirection.Horizontal ? "Row" : "Column";
 
         List<Part> bestParts = null;
@@ -49,30 +58,40 @@ public class StripeFiller
             var candidate = bestFits[i];
             var pairParts = candidate.BuildParts(drawing);
 
-            // Try both expand (N wider pairs) and shrink (N+1 narrower pairs)
-            var expandResult = ConvergeStripeAngle(
-                pairParts, sheetSpan, spacing, _primaryAxis, _context.Token);
-            var shrinkResult = ConvergeStripeAngleShrink(
-                pairParts, sheetSpan, spacing, _primaryAxis, _context.Token);
-
-            // Evaluate both convergence results
-            foreach (var (angle, waste, count) in new[] { expandResult, shrinkResult })
+            // Try both directions for each candidate to find the shortest
+            // perpendicular dimension (more complete stripes → larger remnant)
+            foreach (var axis in new[] { NestDirection.Horizontal, NestDirection.Vertical })
             {
-                if (count <= 0)
-                    continue;
+                var perpAxis = axis == NestDirection.Horizontal
+                    ? NestDirection.Vertical : NestDirection.Horizontal;
+                var sheetSpan = GetDimension(workArea, axis);
+                var dirLabel = axis == NestDirection.Horizontal ? "Row" : "Col";
 
-                var result = BuildGrid(pairParts, angle, workArea, spacing, perpAxis, drawing);
-                if (result == null || result.Count == 0)
-                    continue;
+                var expandResult = ConvergeStripeAngle(
+                    pairParts, sheetSpan, spacing, axis, _context.Token);
+                var shrinkResult = ConvergeStripeAngleShrink(
+                    pairParts, sheetSpan, spacing, axis, _context.Token);
 
-                var score = FillScore.Compute(result, workArea);
-                Debug.WriteLine($"[StripeFiller] {strategyName} candidate {i}: angle={Angle.ToDegrees(angle):F1}°, " +
-                    $"pairsAcross={count}, waste={waste:F2}, grid={result.Count} parts");
-
-                if (bestParts == null || score > bestScore)
+                foreach (var (angle, waste, count) in new[] { expandResult, shrinkResult })
                 {
-                    bestParts = result;
-                    bestScore = score;
+                    if (count <= 0)
+                        continue;
+
+                    var result = BuildGrid(pairParts, angle, workArea, spacing, axis, perpAxis, drawing);
+
+                    if (result == null || result.Count == 0)
+                        continue;
+
+                    var score = FillScore.Compute(result, workArea);
+                    Debug.WriteLine($"[StripeFiller] {strategyName} candidate {i} {dirLabel}: " +
+                        $"angle={Angle.ToDegrees(angle):F1}°, N={count}, waste={waste:F2}, " +
+                        $"grid={result.Count} parts");
+
+                    if (bestParts == null || score > bestScore)
+                    {
+                        bestParts = result;
+                        bestScore = score;
+                    }
                 }
             }
 
@@ -85,18 +104,21 @@ public class StripeFiller
     }
 
     private List<Part> BuildGrid(List<Part> pairParts, double angle,
-        Box workArea, double spacing, NestDirection perpAxis, Drawing drawing)
+        Box workArea, double spacing, NestDirection primaryAxis,
+        NestDirection perpAxis, Drawing drawing)
     {
         var rotatedPattern = FillHelpers.BuildRotatedPattern(pairParts, angle);
         var perpDim = GetDimension(rotatedPattern.BoundingBox, perpAxis);
-        var stripeBox = MakeStripeBox(workArea, perpDim, _primaryAxis);
+        var stripeBox = MakeStripeBox(workArea, perpDim, primaryAxis);
         var stripeEngine = new FillLinear(stripeBox, spacing);
-        var stripeParts = stripeEngine.Fill(rotatedPattern, _primaryAxis);
+        var stripeParts = stripeEngine.Fill(rotatedPattern, primaryAxis);
 
         if (stripeParts == null || stripeParts.Count == 0)
             return null;
 
-        Debug.WriteLine($"[StripeFiller] Stripe: {stripeParts.Count} parts, " +
+        var partsPerStripe = stripeParts.Count;
+
+        Debug.WriteLine($"[StripeFiller] Stripe: {partsPerStripe} parts, " +
             $"box={stripeBox.Width:F2}x{stripeBox.Length:F2}");
 
         var stripePattern = new Pattern();
@@ -109,10 +131,26 @@ public class StripeFiller
         if (gridParts == null || gridParts.Count == 0)
             return null;
 
+        if (CompleteStripesOnly)
+        {
+            // Keep only complete stripes — discard partial copies
+            var completeCount = gridParts.Count / partsPerStripe * partsPerStripe;
+            if (completeCount < gridParts.Count)
+            {
+                Debug.WriteLine($"[StripeFiller] CompleteOnly: {gridParts.Count} → {completeCount} " +
+                    $"(dropped {gridParts.Count - completeCount} partial)");
+                gridParts = gridParts.GetRange(0, completeCount);
+            }
+        }
+
         Debug.WriteLine($"[StripeFiller] Grid: {gridParts.Count} parts");
 
+        if (gridParts.Count == 0)
+            return null;
+
         var allParts = new List<Part>(gridParts);
-        var remnantParts = FillRemnant(gridParts, drawing, angle, workArea, spacing);
+
+        var remnantParts = FillRemnant(gridParts, drawing, angle, primaryAxis, workArea, spacing);
         if (remnantParts != null)
         {
             Debug.WriteLine($"[StripeFiller] Remnant: {remnantParts.Count} parts");
@@ -150,7 +188,7 @@ public class StripeFiller
 
     private List<Part> FillRemnant(
         List<Part> gridParts, Drawing drawing, double angle,
-        Box workArea, double spacing)
+        NestDirection primaryAxis, Box workArea, double spacing)
     {
         var gridBox = gridParts.GetBoundingBox();
         var minDim = System.Math.Min(
@@ -159,7 +197,7 @@ public class StripeFiller
 
         Box remnantBox;
 
-        if (_primaryAxis == NestDirection.Horizontal)
+        if (primaryAxis == NestDirection.Horizontal)
         {
             var remnantY = gridBox.Top + spacing;
             var remnantLength = workArea.Top - remnantY;
@@ -176,9 +214,39 @@ public class StripeFiller
             remnantBox = new Box(remnantX, workArea.Y, remnantWidth, workArea.Length);
         }
 
-        var engine = new FillLinear(remnantBox, spacing);
-        var parts = engine.Fill(drawing, angle, _primaryAxis);
-        return parts != null && parts.Count > 0 ? parts : null;
+        Debug.WriteLine($"[StripeFiller] Remnant box: {remnantBox.Width:F2}x{remnantBox.Length:F2}");
+
+        // Check cache first
+        var cached = FillResultCache.Get(drawing, remnantBox, spacing);
+        if (cached != null)
+        {
+            Debug.WriteLine($"[StripeFiller] Remnant CACHE HIT: {cached.Count} parts");
+            return cached;
+        }
+
+        // Exclude Row/Column from remnant fill to prevent recursion
+        FillStrategyRegistry.SetEnabled("Pairs", "RectBestFit", "Extents", "Linear");
+        try
+        {
+            var engine = CreateRemnantEngine(_context.Plate);
+            var item = new NestItem { Drawing = drawing };
+            var parts = engine.Fill(item, remnantBox, _context.Progress, _context.Token);
+
+            Debug.WriteLine($"[StripeFiller] Remnant engine ({engine.Name}): {parts?.Count ?? 0} parts, " +
+                $"winner={engine.WinnerPhase}");
+
+            if (parts != null && parts.Count > 0)
+            {
+                FillResultCache.Store(drawing, remnantBox, spacing, parts);
+                return parts;
+            }
+
+            return null;
+        }
+        finally
+        {
+            FillStrategyRegistry.SetEnabled(null);
+        }
     }
 
     public static double FindAngleForTargetSpan(
@@ -261,22 +329,38 @@ public class StripeFiller
         var bestCount = 0;
         var tolerance = sheetSpan * 0.001;
 
+        Debug.WriteLine($"[Converge] Start: orient={Angle.ToDegrees(currentAngle):F1}°, sheetSpan={sheetSpan:F2}, spacing={spacing}");
+
         for (var iteration = 0; iteration < MaxConvergenceIterations; iteration++)
         {
             token.ThrowIfCancellationRequested();
 
             var rotated = FillHelpers.BuildRotatedPattern(patternParts, currentAngle);
             var pairSpan = GetDimension(rotated.BoundingBox, axis);
+            var perpDim = axis == NestDirection.Horizontal
+                ? rotated.BoundingBox.Length : rotated.BoundingBox.Width;
 
             if (pairSpan + spacing <= 0)
                 break;
 
-            var n = (int)System.Math.Floor((sheetSpan + spacing) / (pairSpan + spacing));
+            // Use FillLinear to get the ACTUAL part count with geometry-aware spacing
+            var stripeBox = axis == NestDirection.Horizontal
+                ? new Box(0, 0, sheetSpan, perpDim)
+                : new Box(0, 0, perpDim, sheetSpan);
+            var engine = new FillLinear(stripeBox, spacing);
+            var filled = engine.Fill(rotated, axis);
+            var n = filled?.Count ?? 0;
+
             if (n <= 0)
                 break;
 
-            var usedSpan = n * (pairSpan + spacing) - spacing;
+            // Measure actual waste from the placed parts
+            var filledBox = ((IEnumerable<IBoundable>)filled).GetBoundingBox();
+            var usedSpan = GetDimension(filledBox, axis);
             var remaining = sheetSpan - usedSpan;
+
+            Debug.WriteLine($"[Converge] iter={iteration}: angle={Angle.ToDegrees(currentAngle):F2}°, " +
+                $"pairSpan={pairSpan:F4}, perpDim={perpDim:F4}, N={n}, waste={remaining:F3}");
 
             if (remaining < bestWaste)
             {
@@ -288,12 +372,27 @@ public class StripeFiller
             if (remaining <= tolerance)
                 break;
 
-            var delta = remaining / n;
+            // Estimate pairs from bounding box to compute delta
+            var bboxN = (int)System.Math.Floor((sheetSpan + spacing) / (pairSpan + spacing));
+            if (bboxN <= 0) bboxN = 1;
+            var delta = remaining / bboxN;
             var targetSpan = pairSpan + delta;
 
+            Debug.WriteLine($"[Converge]   delta={delta:F4}, targetSpan={targetSpan:F4}");
+
+            var prevAngle = currentAngle;
             currentAngle = FindAngleForTargetSpan(patternParts, targetSpan, axis);
+
+            Debug.WriteLine($"[Converge]   newAngle={Angle.ToDegrees(currentAngle):F2}° (was {Angle.ToDegrees(prevAngle):F2}°)");
+
+            if (System.Math.Abs(currentAngle - prevAngle) < Tolerance.Epsilon)
+            {
+                Debug.WriteLine("[Converge]   STUCK — angle unchanged, breaking");
+                break;
+            }
         }
 
+        Debug.WriteLine($"[Converge] Result: angle={Angle.ToDegrees(bestAngle):F2}°, N={bestCount}, waste={bestWaste:F3}");
         return (bestAngle, bestWaste, bestCount);
     }
 
@@ -336,7 +435,7 @@ public class StripeFiller
         var usedSpan = actualN * (actualSpan + spacing) - spacing;
         var waste = sheetSpan - usedSpan;
 
-        // Now converge from this starting point
+        // Now converge from this starting point using geometry-aware fill
         var bestWaste = waste;
         var bestAngle = angle;
         var bestCount = actualN;
@@ -352,13 +451,21 @@ public class StripeFiller
 
             rotated = FillHelpers.BuildRotatedPattern(patternParts, currentAngle);
             var pairSpan = GetDimension(rotated.BoundingBox, axis);
+            var perpDim = axis == NestDirection.Horizontal
+                ? rotated.BoundingBox.Length : rotated.BoundingBox.Width;
 
-            var n = (int)System.Math.Floor((sheetSpan + spacing) / (pairSpan + spacing));
+            var stripeBox = axis == NestDirection.Horizontal
+                ? new Box(0, 0, sheetSpan, perpDim)
+                : new Box(0, 0, perpDim, sheetSpan);
+            var engine = new FillLinear(stripeBox, spacing);
+            var filled = engine.Fill(rotated, axis);
+            var n = filled?.Count ?? 0;
+
             if (n <= 0)
                 break;
 
-            usedSpan = n * (pairSpan + spacing) - spacing;
-            var remaining = sheetSpan - usedSpan;
+            var filledBox = ((IEnumerable<IBoundable>)filled).GetBoundingBox();
+            var remaining = sheetSpan - GetDimension(filledBox, axis);
 
             if (remaining < bestWaste)
             {
@@ -370,7 +477,9 @@ public class StripeFiller
             if (remaining <= tolerance)
                 break;
 
-            var delta = remaining / n;
+            var bboxN = (int)System.Math.Floor((sheetSpan + spacing) / (pairSpan + spacing));
+            if (bboxN <= 0) bboxN = 1;
+            var delta = remaining / bboxN;
             var newTarget = pairSpan + delta;
 
             currentAngle = FindAngleForTargetSpan(patternParts, newTarget, axis);

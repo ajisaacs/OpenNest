@@ -11,7 +11,7 @@ public class RowFillStrategy : IFillStrategy
 
     public List<Part> Fill(FillContext context)
     {
-        var filler = new StripeFiller(context, NestDirection.Horizontal);
+        var filler = new StripeFiller(context, NestDirection.Horizontal) { CompleteStripesOnly = true };
         return filler.Fill();
     }
 }

@@ -100,6 +100,8 @@ Always use Roslyn Bridge MCP tools (`mcp__RoslynBridge__*`) as the primary metho
 
 Always keep `README.md` and `CLAUDE.md` up to date when making changes that affect project structure, architecture, build instructions, dependencies, or key patterns. If you add a new project, change a namespace, modify the build process, or alter significant behavior, update both files as part of the same change.
 
+**Do not commit** design specs, implementation plans, or other temporary planning documents (`docs/superpowers/` etc.) to the repository. These are working documents only — keep them local and untracked.
+
 ## Key Patterns
 
 - OpenNest.Core uses multiple namespaces: `OpenNest` (root domain), `OpenNest.CNC`, `OpenNest.Geometry`, `OpenNest.Converters`, `OpenNest.Math`, `OpenNest.Collections`.
