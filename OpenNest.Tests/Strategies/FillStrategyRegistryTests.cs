@@ -1,3 +1,4 @@
+using System.Linq;
 using OpenNest.Engine.Strategies;
 
 namespace OpenNest.Tests.Strategies;
@@ -9,11 +10,13 @@ public class FillStrategyRegistryTests
     {
         var strategies = FillStrategyRegistry.Strategies;
 
-        Assert.True(strategies.Count >= 4, $"Expected at least 4 built-in strategies, got {strategies.Count}");
+        Assert.True(strategies.Count >= 6, $"Expected at least 6 built-in strategies, got {strategies.Count}");
         Assert.Contains(strategies, s => s.Name == "Pairs");
         Assert.Contains(strategies, s => s.Name == "RectBestFit");
         Assert.Contains(strategies, s => s.Name == "Extents");
         Assert.Contains(strategies, s => s.Name == "Linear");
+        Assert.Contains(strategies, s => s.Name == "Row");
+        Assert.Contains(strategies, s => s.Name == "Column");
     }
 
     [Fact]
@@ -33,5 +36,20 @@ public class FillStrategyRegistryTests
         var last = strategies[strategies.Count - 1];
 
         Assert.Equal("Linear", last.Name);
+    }
+
+    [Fact]
+    public void Registry_RowAndColumnOrderedBetweenPairsAndRectBestFit()
+    {
+        var strategies = FillStrategyRegistry.Strategies;
+        var pairsOrder = strategies.First(s => s.Name == "Pairs").Order;
+        var rectOrder = strategies.First(s => s.Name == "RectBestFit").Order;
+        var rowOrder = strategies.First(s => s.Name == "Row").Order;
+        var colOrder = strategies.First(s => s.Name == "Column").Order;
+
+        Assert.True(rowOrder > pairsOrder, "Row should run after Pairs");
+        Assert.True(colOrder > pairsOrder, "Column should run after Pairs");
+        Assert.True(rowOrder < rectOrder, "Row should run before RectBestFit");
+        Assert.True(colOrder < rectOrder, "Column should run before RectBestFit");
     }
 }

@@ -24,7 +24,7 @@ public class FillPipelineTests
 
         engine.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
 
-        Assert.True(engine.PhaseResults.Count >= 4,
+        Assert.True(engine.PhaseResults.Count >= 6,
             $"Expected phase results from all strategies, got {engine.PhaseResults.Count}");
     }
 
@@ -41,7 +41,8 @@ public class FillPipelineTests
         Assert.True(engine.WinnerPhase == NestPhase.Pairs ||
                     engine.WinnerPhase == NestPhase.Linear ||
                     engine.WinnerPhase == NestPhase.RectBestFit ||
-                    engine.WinnerPhase == NestPhase.Extents);
+                    engine.WinnerPhase == NestPhase.Extents ||
+                    engine.WinnerPhase == NestPhase.Custom);
     }
 
     [Fact]
