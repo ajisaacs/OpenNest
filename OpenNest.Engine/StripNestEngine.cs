@@ -77,17 +77,23 @@ namespace OpenNest
             // Phase 1: Iterative shrink-fill for multi-quantity items.
             if (fillItems.Count > 0)
             {
-                // Pass progress through so the UI shows intermediate results
-                // during the initial BestFitCache computation and fill phases.
-                Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
+                // Use direction-specific engines: height shrink benefits from
+                // minimizing Y-extent, width shrink from minimizing X-extent.
+                Func<NestItem, Box, List<Part>> heightFillFunc = (ni, b) =>
                 {
-                    var inner = new DefaultNestEngine(Plate);
+                    var inner = new HorizontalRemnantEngine(Plate);
+                    return inner.Fill(ni, b, progress, token);
+                };
+
+                Func<NestItem, Box, List<Part>> widthFillFunc = (ni, b) =>
+                {
+                    var inner = new VerticalRemnantEngine(Plate);
                     return inner.Fill(ni, b, progress, token);
                 };
 
                 var shrinkResult = IterativeShrinkFiller.Fill(
-                    fillItems, workArea, fillFunc, Plate.PartSpacing, token,
-                    progress, PlateNumber);
+                    fillItems, workArea, heightFillFunc, Plate.PartSpacing, token,
+                    progress, PlateNumber, widthFillFunc);
 
                 allParts.AddRange(shrinkResult.Parts);
 

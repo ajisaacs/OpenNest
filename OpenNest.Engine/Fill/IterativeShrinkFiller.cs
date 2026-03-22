@@ -31,7 +31,8 @@ namespace OpenNest.Engine.Fill
             double spacing,
             CancellationToken token = default,
             IProgress<NestProgress> progress = null,
-            int plateNumber = 0)
+            int plateNumber = 0,
+            Func<NestItem, Box, List<Part>> widthFillFunc = null)
         {
             if (items == null || items.Count == 0)
                 return new IterativeShrinkResult();
@@ -72,6 +73,8 @@ namespace OpenNest.Engine.Fill
             // include them in progress reports.
             var placedSoFar = new List<Part>();
 
+            var wFillFunc = widthFillFunc ?? fillFunc;
+
             Func<NestItem, Box, List<Part>> shrinkWrapper = (ni, box) =>
             {
                 var target = ni.Quantity > 0 ? ni.Quantity : 0;
@@ -84,7 +87,7 @@ namespace OpenNest.Engine.Fill
                 Parallel.Invoke(
                     () => heightResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Height, token,
                         targetCount: target, progress: progress, plateNumber: plateNumber, placedParts: placedSoFar),
-                    () => widthResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Width, token,
+                    () => widthResult = ShrinkFiller.Shrink(wFillFunc, ni, box, spacing, ShrinkAxis.Width, token,
                         targetCount: target, progress: progress, plateNumber: plateNumber, placedParts: placedSoFar)
                 );
 
