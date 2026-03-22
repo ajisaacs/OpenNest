@@ -62,6 +62,7 @@ namespace OpenNest.IO
             public MaterialDto Material { get; init; } = new();
             public SpacingDto EdgeSpacing { get; init; } = new();
             public List<PartDto> Parts { get; init; } = new();
+            public List<CutOffDto> CutOffs { get; init; } = new();
         }
 
         public record PartDto
@@ -70,6 +71,15 @@ namespace OpenNest.IO
             public double X { get; init; }
             public double Y { get; init; }
             public double Rotation { get; init; }
+        }
+
+        public record CutOffDto
+        {
+            public double X { get; init; }
+            public double Y { get; init; }
+            public string Axis { get; init; } = "vertical";
+            public double? StartLimit { get; init; }
+            public double? EndLimit { get; init; }
         }
 
         public record SizeDto

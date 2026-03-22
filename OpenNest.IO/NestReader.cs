@@ -197,6 +197,25 @@ namespace OpenNest.IO
                     plate.Parts.Add(part);
                 }
 
+                // Cut-offs
+                if (p.CutOffs != null)
+                {
+                    foreach (var cutoffDto in p.CutOffs)
+                    {
+                        var axis = cutoffDto.Axis?.ToLowerInvariant() == "horizontal"
+                            ? CutOffAxis.Horizontal
+                            : CutOffAxis.Vertical;
+                        var cutoff = new CutOff(new Vector(cutoffDto.X, cutoffDto.Y), axis)
+                        {
+                            StartLimit = cutoffDto.StartLimit,
+                            EndLimit = cutoffDto.EndLimit
+                        };
+                        plate.CutOffs.Add(cutoff);
+                    }
+
+                    plate.RegenerateCutOffs(new CutOffSettings());
+                }
+
                 nest.Plates.Add(plate);
             }
 

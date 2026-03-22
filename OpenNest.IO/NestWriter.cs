@@ -152,7 +152,7 @@ namespace OpenNest.IO
             {
                 var plate = nest.Plates[i];
                 var parts = new List<PartDto>();
-                foreach (var part in plate.Parts)
+                foreach (var part in plate.Parts.Where(p => !p.BaseDrawing.IsCutOff))
                 {
                     var match = drawingDict.Where(dwg => dwg.Value == part.BaseDrawing).FirstOrDefault();
                     parts.Add(new PartDto
@@ -161,6 +161,19 @@ namespace OpenNest.IO
                         X = part.Location.X,
                         Y = part.Location.Y,
                         Rotation = part.Rotation
+                    });
+                }
+
+                var cutoffs = new List<CutOffDto>();
+                foreach (var cutoff in plate.CutOffs)
+                {
+                    cutoffs.Add(new CutOffDto
+                    {
+                        X = cutoff.Position.X,
+                        Y = cutoff.Position.Y,
+                        Axis = cutoff.Axis == CutOffAxis.Vertical ? "vertical" : "horizontal",
+                        StartLimit = cutoff.StartLimit,
+                        EndLimit = cutoff.EndLimit
                     });
                 }
 
@@ -185,7 +198,8 @@ namespace OpenNest.IO
                         Right = plate.EdgeSpacing.Right,
                         Bottom = plate.EdgeSpacing.Bottom
                     },
-                    Parts = parts
+                    Parts = parts,
+                    CutOffs = cutoffs
                 });
             }
             return list;
