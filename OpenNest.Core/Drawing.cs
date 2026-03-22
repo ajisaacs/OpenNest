@@ -56,6 +56,8 @@ namespace OpenNest
 
         public Color Color { get; set; }
 
+        public bool IsCutOff { get; set; }
+
         public NestConstraints Constraints { get; set; }
 
         public SourceInfo Source { get; set; }
