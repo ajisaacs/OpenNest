@@ -215,4 +215,52 @@ public class CutOffTests
         Assert.True(hCut.Drawing.Program.Codes.Count > 0);
         Assert.True(vCut.Drawing.Program.Codes.Count > 0);
     }
+
+    [Fact]
+    public void Plate_RegenerateCutOffs_MaterializesParts()
+    {
+        var plate = new Plate(100, 50);
+        var cutoff = new CutOff(new Geometry.Vector(25, 10), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+
+        plate.RegenerateCutOffs(new CutOffSettings());
+
+        Assert.Single(plate.Parts);
+        Assert.True(plate.Parts[0].BaseDrawing.IsCutOff);
+    }
+
+    [Fact]
+    public void Plate_RegenerateCutOffs_ReplacesOldParts()
+    {
+        var plate = new Plate(100, 50);
+        var cutoff = new CutOff(new Geometry.Vector(25, 10), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+
+        var settings = new CutOffSettings();
+        plate.RegenerateCutOffs(settings);
+        plate.RegenerateCutOffs(settings);
+
+        Assert.Single(plate.Parts);
+    }
+
+    [Fact]
+    public void Plate_RegenerateCutOffs_DoesNotAffectRegularParts()
+    {
+        var pgm = new OpenNest.CNC.Program();
+        pgm.Codes.Add(new OpenNest.CNC.RapidMove(new Geometry.Vector(0, 0)));
+        pgm.Codes.Add(new OpenNest.CNC.LinearMove(new Geometry.Vector(5, 5)));
+        var drawing = new Drawing("real", pgm);
+
+        var plate = new Plate(100, 50);
+        plate.Parts.Add(new Part(drawing));
+
+        var cutoff = new CutOff(new Geometry.Vector(25, 10), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+
+        plate.RegenerateCutOffs(new CutOffSettings());
+
+        Assert.Equal(2, plate.Parts.Count);
+        Assert.False(plate.Parts[0].BaseDrawing.IsCutOff);
+        Assert.True(plate.Parts[1].BaseDrawing.IsCutOff);
+    }
 }

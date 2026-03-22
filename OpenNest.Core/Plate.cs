@@ -47,6 +47,7 @@ namespace OpenNest
             Parts = new ObservableList<Part>();
             Parts.ItemAdded += Parts_PartAdded;
             Parts.ItemRemoved += Parts_PartRemoved;
+            CutOffs = new ObservableList<CutOff>();
             Quadrant = 1;
         }
 
@@ -91,6 +92,38 @@ namespace OpenNest
         /// The parts that the plate contains.
         /// </summary>
         public ObservableList<Part> Parts { get; set; }
+
+        /// <summary>
+        /// The cut-off lines defined on this plate.
+        /// </summary>
+        public ObservableList<CutOff> CutOffs { get; set; }
+
+        /// <summary>
+        /// Regenerates all cut-off drawings and materializes them as parts.
+        /// Existing cut-off parts are removed first, then each cut-off is
+        /// regenerated and added back if it produces any geometry.
+        /// </summary>
+        public void RegenerateCutOffs(CutOffSettings settings)
+        {
+            // Remove existing cut-off parts
+            for (var i = Parts.Count - 1; i >= 0; i--)
+            {
+                if (Parts[i].BaseDrawing.IsCutOff)
+                    Parts.RemoveAt(i);
+            }
+
+            // Regenerate and materialize each cut-off
+            foreach (var cutoff in CutOffs)
+            {
+                cutoff.Regenerate(this, settings);
+
+                if (cutoff.Drawing.Program.Codes.Count == 0)
+                    continue;
+
+                var part = new Part(cutoff.Drawing);
+                Parts.Add(part);
+            }
+        }
 
         /// <summary>
         /// The number of times to cut the plate.
@@ -242,11 +275,20 @@ namespace OpenNest
         /// <param name="angle"></param>
         public void Rotate(double angle)
         {
-            for (int i = 0; i < Parts.Count; ++i)
+            for (var i = Parts.Count - 1; i >= 0; i--)
+            {
+                if (Parts[i].BaseDrawing.IsCutOff)
+                    Parts.RemoveAt(i);
+            }
+
+            for (var i = 0; i < Parts.Count; ++i)
             {
                 var part = Parts[i];
                 part.Rotate(angle);
             }
+
+            foreach (var cutoff in CutOffs)
+                cutoff.Position = cutoff.Position.Rotate(angle);
         }
 
         /// <summary>
@@ -256,10 +298,23 @@ namespace OpenNest
         /// <param name="origin"></param>
         public void Rotate(double angle, Vector origin)
         {
-            for (int i = 0; i < Parts.Count; ++i)
+            for (var i = Parts.Count - 1; i >= 0; i--)
+            {
+                if (Parts[i].BaseDrawing.IsCutOff)
+                    Parts.RemoveAt(i);
+            }
+
+            for (var i = 0; i < Parts.Count; ++i)
             {
                 var part = Parts[i];
                 part.Rotate(angle, origin);
+            }
+
+            foreach (var cutoff in CutOffs)
+            {
+                var pos = cutoff.Position - origin;
+                pos = pos.Rotate(angle);
+                cutoff.Position = pos + origin;
             }
         }
 
@@ -270,11 +325,22 @@ namespace OpenNest
         /// <param name="y"></param>
         public void Offset(double x, double y)
         {
-            for (int i = 0; i < Parts.Count; ++i)
+            // Remove cut-off parts before transforming
+            for (var i = Parts.Count - 1; i >= 0; i--)
+            {
+                if (Parts[i].BaseDrawing.IsCutOff)
+                    Parts.RemoveAt(i);
+            }
+
+            for (var i = 0; i < Parts.Count; ++i)
             {
                 var part = Parts[i];
                 part.Offset(x, y);
             }
+
+            // Transform cut-off positions
+            foreach (var cutoff in CutOffs)
+                cutoff.Position = new Vector(cutoff.Position.X + x, cutoff.Position.Y + y);
         }
 
         /// <summary>
@@ -283,11 +349,20 @@ namespace OpenNest
         /// <param name="voffset"></param>
         public void Offset(Vector voffset)
         {
-            for (int i = 0; i < Parts.Count; ++i)
+            for (var i = Parts.Count - 1; i >= 0; i--)
+            {
+                if (Parts[i].BaseDrawing.IsCutOff)
+                    Parts.RemoveAt(i);
+            }
+
+            for (var i = 0; i < Parts.Count; ++i)
             {
                 var part = Parts[i];
                 part.Offset(voffset);
             }
+
+            foreach (var cutoff in CutOffs)
+                cutoff.Position = new Vector(cutoff.Position.X + voffset.X, cutoff.Position.Y + voffset.Y);
         }
 
         /// <summary>
