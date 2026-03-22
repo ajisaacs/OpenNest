@@ -64,7 +64,7 @@ namespace OpenNest
             var best = context.CurrentBest ?? new List<Part>();
 
             if (item.Quantity > 0 && best.Count > item.Quantity)
-                best = ShrinkFiller.TrimToCount(best, item.Quantity, ShrinkAxis.Width);
+                best = ShrinkFiller.TrimToCount(best, item.Quantity, TrimAxis);
 
             ReportProgress(progress, new ProgressReport
             {

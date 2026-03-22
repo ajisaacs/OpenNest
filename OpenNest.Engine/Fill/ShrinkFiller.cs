@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace OpenNest.Engine.Fill
 {
-    public enum ShrinkAxis { Width, Height }
+    public enum ShrinkAxis { Width, Length }
 
     public class ShrinkResult
     {
@@ -101,7 +101,7 @@ namespace OpenNest.Engine.Fill
             if (bbox.Width <= 0 || bbox.Length <= 0)
                 return box;
 
-            var maxDim = axis == ShrinkAxis.Height ? box.Length : box.Width;
+            var maxDim = axis == ShrinkAxis.Length ? box.Length : box.Width;
 
             // Use FillBestFit for a fast, accurate rectangle count on the full box.
             var bin = new Bin { Size = new Size(box.Width, box.Length) };
@@ -121,7 +121,7 @@ namespace OpenNest.Engine.Fill
             if (estimate <= 0 || estimate >= maxDim)
                 return box;
 
-            return axis == ShrinkAxis.Height
+            return axis == ShrinkAxis.Length
                 ? new Box(box.X, box.Y, box.Width, estimate)
                 : new Box(box.X, box.Y, estimate, box.Length);
         }

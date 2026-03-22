@@ -30,7 +30,7 @@ public class ShrinkFillerTests
             return engine.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
-        var result = ShrinkFiller.Shrink(fillFunc, item, box, 1.0, ShrinkAxis.Height);
+        var result = ShrinkFiller.Shrink(fillFunc, item, box, 1.0, ShrinkAxis.Length);
 
         Assert.NotNull(result);
         Assert.True(result.Parts.Count > 0);
@@ -73,7 +73,7 @@ public class ShrinkFillerTests
             new List<Part> { TestHelpers.MakePartAt(0, 0, 10) };
 
         var result = ShrinkFiller.Shrink(fillFunc, item, box, 1.0,
-            ShrinkAxis.Height, token: cts.Token);
+            ShrinkAxis.Length, token: cts.Token);
 
         Assert.NotNull(result);
         Assert.True(result.Parts.Count > 0);
@@ -97,7 +97,7 @@ public class ShrinkFillerTests
     }
 
     [Fact]
-    public void TrimToCount_Height_KeepsPartsNearestToOrigin()
+    public void TrimToCount_Length_KeepsPartsNearestToOrigin()
     {
         var parts = new List<Part>
         {
@@ -107,7 +107,7 @@ public class ShrinkFillerTests
             TestHelpers.MakePartAt(0, 30, 5),  // Top = 35
         };
 
-        var trimmed = ShrinkFiller.TrimToCount(parts, 2, ShrinkAxis.Height);
+        var trimmed = ShrinkFiller.TrimToCount(parts, 2, ShrinkAxis.Length);
 
         Assert.Equal(2, trimmed.Count);
         Assert.True(trimmed.All(p => p.BoundingBox.Top <= 15));

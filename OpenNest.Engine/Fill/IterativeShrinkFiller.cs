@@ -18,7 +18,7 @@ namespace OpenNest.Engine.Fill
     /// <summary>
     /// Composes <see cref="RemnantFiller"/> and <see cref="ShrinkFiller"/> with
     /// dual-direction shrink selection. Wraps the caller's fill function in a
-    /// closure that tries both <see cref="ShrinkAxis.Height"/> and
+    /// closure that tries both <see cref="ShrinkAxis.Length"/> and
     /// <see cref="ShrinkAxis.Width"/>, picks the better <see cref="FillScore"/>,
     /// and passes the wrapper to <see cref="RemnantFiller.FillItems"/>.
     /// </summary>
@@ -85,7 +85,7 @@ namespace OpenNest.Engine.Fill
                 ShrinkResult widthResult = null;
 
                 Parallel.Invoke(
-                    () => heightResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Height, token,
+                    () => heightResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Length, token,
                         targetCount: target, progress: progress, plateNumber: plateNumber, placedParts: placedSoFar),
                     () => widthResult = ShrinkFiller.Shrink(wFillFunc, ni, box, spacing, ShrinkAxis.Width, token,
                         targetCount: target, progress: progress, plateNumber: plateNumber, placedParts: placedSoFar)

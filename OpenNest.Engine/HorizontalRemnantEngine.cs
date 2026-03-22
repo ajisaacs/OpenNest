@@ -24,6 +24,8 @@ namespace OpenNest
 
         public override NestDirection? PreferredDirection => NestDirection.Vertical;
 
+        public override ShrinkAxis TrimAxis => ShrinkAxis.Length;
+
         public override List<double> BuildAngles(NestItem item, double bestRotation, Box workArea)
         {
             var baseAngles = new List<double> { bestRotation, bestRotation + Angle.HalfPI };

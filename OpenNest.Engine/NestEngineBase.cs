@@ -43,6 +43,8 @@ namespace OpenNest
 
         public virtual NestDirection? PreferredDirection => null;
 
+        public virtual ShrinkAxis TrimAxis => ShrinkAxis.Width;
+
         public virtual List<double> BuildAngles(NestItem item, double bestRotation, Box workArea)
         {
             return new List<double> { bestRotation, bestRotation + OpenNest.Math.Angle.HalfPI };
