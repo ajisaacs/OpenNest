@@ -52,12 +52,14 @@ namespace OpenNest
 
         private void Parts_PartAdded(object sender, ItemAddedEventArgs<Part> e)
         {
-            e.Item.BaseDrawing.Quantity.Nested += Quantity;
+            if (!e.Item.BaseDrawing.IsCutOff)
+                e.Item.BaseDrawing.Quantity.Nested += Quantity;
         }
 
         private void Parts_PartRemoved(object sender, ItemRemovedEventArgs<Part> e)
         {
-            e.Item.BaseDrawing.Quantity.Nested -= Quantity;
+            if (!e.Item.BaseDrawing.IsCutOff)
+                e.Item.BaseDrawing.Quantity.Nested -= Quantity;
         }
 
         /// <summary>
@@ -454,24 +456,23 @@ namespace OpenNest
         /// <returns>Returns a number between 0.0 and 1.0</returns>
         public double Utilization()
         {
-            return Parts.Sum(part => part.BaseDrawing.Area) / Area();
+            return Parts.Where(p => !p.BaseDrawing.IsCutOff).Sum(part => part.BaseDrawing.Area) / Area();
         }
 
         public bool HasOverlappingParts(out List<Vector> pts)
         {
             pts = new List<Vector>();
+            var realParts = Parts.Where(p => !p.BaseDrawing.IsCutOff).ToList();
 
-            for (int i = 0; i < Parts.Count; i++)
+            for (var i = 0; i < realParts.Count; i++)
             {
-                var part1 = Parts[i];
+                var part1 = realParts[i];
 
-                for (int j = i + 1; j < Parts.Count; j++)
+                for (var j = i + 1; j < realParts.Count; j++)
                 {
-                    var part2 = Parts[j];
+                    var part2 = realParts[j];
 
-                    List<Vector> pts2;
-
-                    if (part1.Intersects(part2, out pts2))
+                    if (part1.Intersects(part2, out var pts2))
                         pts.AddRange(pts2);
                 }
             }
