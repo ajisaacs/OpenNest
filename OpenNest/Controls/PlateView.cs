@@ -32,6 +32,7 @@ namespace OpenNest.Controls
         private Action previousAction;
         private CutOffSettings cutOffSettings = new CutOffSettings();
         private CutOff selectedCutOff;
+        private bool draggingCutOff;
         protected List<LayoutPart> parts;
         private List<LayoutPart> stationaryParts = new List<LayoutPart>();
         private List<LayoutPart> activeParts = new List<LayoutPart>();
@@ -234,6 +235,21 @@ namespace OpenNest.Controls
             if (e.Button == MouseButtons.Middle)
                 middleMouseDownPoint = e.Location;
 
+            if (e.Button == MouseButtons.Left && currentAction is ActionSelect)
+            {
+                var hitCutOff = GetCutOffAtPoint(CurrentPoint, 5.0 / ViewScale);
+                if (hitCutOff != null)
+                {
+                    SelectedCutOff = hitCutOff;
+                    draggingCutOff = true;
+                    return;
+                }
+                else
+                {
+                    SelectedCutOff = null;
+                }
+            }
+
             base.OnMouseDown(e);
         }
 
@@ -249,6 +265,14 @@ namespace OpenNest.Controls
                     RotateSelectedParts(Angle.ToRadians(90));
                     Invalidate();
                 }
+            }
+
+            if (draggingCutOff && selectedCutOff != null)
+            {
+                draggingCutOff = false;
+                Plate.RegenerateCutOffs(cutOffSettings);
+                Invalidate();
+                return;
             }
 
             base.OnMouseUp(e);
@@ -307,6 +331,13 @@ namespace OpenNest.Controls
 
             lastPoint = e.Location;
 
+            if (draggingCutOff && selectedCutOff != null)
+            {
+                selectedCutOff.Position = CurrentPoint;
+                Invalidate();
+                return;
+            }
+
             base.OnMouseMove(e);
         }
 
@@ -323,7 +354,17 @@ namespace OpenNest.Controls
             switch (e.KeyCode)
             {
                 case Keys.Delete:
-                    RemoveSelectedParts();
+                    if (selectedCutOff != null)
+                    {
+                        Plate.CutOffs.Remove(selectedCutOff);
+                        selectedCutOff = null;
+                        Plate.RegenerateCutOffs(cutOffSettings);
+                        Invalidate();
+                    }
+                    else
+                    {
+                        RemoveSelectedParts();
+                    }
                     break;
 
                 case Keys.F:
