@@ -1098,23 +1098,16 @@ namespace OpenNest.Controls
             var bounds = parts.GetBoundingBox();
             var center = bounds.Center;
             var anchor = bounds.Location;
-            var rotatedPrograms = new HashSet<Program>();
 
-            for (int i = 0; i < SelectedParts.Count; ++i)
+            for (var i = 0; i < SelectedParts.Count; ++i)
             {
                 var part = SelectedParts[i];
-                var basePart = part.BasePart;
-
-                if (rotatedPrograms.Add(basePart.Program))
-                    basePart.Program.Rotate(angle);
-
-                part.Location = part.Location.Rotate(angle, center);
-                basePart.UpdateBounds();
+                part.BasePart.Rotate(angle, center);
             }
 
             var diff = anchor - parts.GetBoundingBox().Location;
 
-            for (int i = 0; i < SelectedParts.Count; ++i)
+            for (var i = 0; i < SelectedParts.Count; ++i)
                 SelectedParts[i].Offset(diff);
         }
 
