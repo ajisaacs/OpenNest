@@ -117,6 +117,7 @@
             manualSequenceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             calculateCutTimeToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             centerPartsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateCutOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindow = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindowCascade = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindowTileVertical = new System.Windows.Forms.ToolStripMenuItem();
@@ -627,7 +628,7 @@
             // 
             // mnuPlate
             // 
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateFill, toolStripMenuItem9, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem });
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateFill, toolStripMenuItem9, mnuPlateCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -685,7 +686,14 @@
             toolStripMenuItem9.Size = new System.Drawing.Size(177, 22);
             toolStripMenuItem9.Text = "Fill Area";
             toolStripMenuItem9.Click += FillArea_Click;
-            // 
+            //
+            // mnuPlateCutOff
+            //
+            mnuPlateCutOff.Name = "mnuPlateCutOff";
+            mnuPlateCutOff.Size = new System.Drawing.Size(177, 22);
+            mnuPlateCutOff.Text = "Sheet Cut-Off";
+            mnuPlateCutOff.Click += CutOff_Click;
+            //
             // mnuPlateRotate
             // 
             mnuPlateRotate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateRotateCw, mnuPlateRotateCcw, toolStripSeparator2, mnuPlateRotate180 });
@@ -1205,5 +1213,6 @@
         private System.Windows.Forms.ToolStripComboBox engineComboBox;
         private System.Windows.Forms.ToolStripButton btnAutoNest;
         private System.Windows.Forms.ToolStripButton btnShowRemnants;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateCutOff;
     }
 }

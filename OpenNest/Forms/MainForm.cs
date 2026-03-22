@@ -1179,6 +1179,14 @@ namespace OpenNest.Forms
             activeForm.PlateView.SetAction(typeof(ActionSetSequence));
         }
 
+        private void CutOff_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null)
+                return;
+
+            activeForm.PlateView.SetAction(typeof(ActionCutOff));
+        }
+
         #endregion Plate Menu Events
 
         #region Window Menu Events
