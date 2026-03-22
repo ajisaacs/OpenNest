@@ -20,6 +20,7 @@ public class StripeFiller
     private readonly FillContext _context;
     private readonly NestDirection _primaryAxis;
     private readonly IFillComparer _comparer;
+    private readonly GridDedup _dedup;
 
     /// <summary>
     /// When true, only complete stripes are placed — no partial rows/columns.
@@ -38,6 +39,7 @@ public class StripeFiller
         _context = context;
         _primaryAxis = primaryAxis;
         _comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
+        _dedup = GridDedup.GetOrCreate(context.SharedState);
     }
 
     public List<Part> Fill()
@@ -115,6 +117,10 @@ public class StripeFiller
         var rotatedPattern = FillHelpers.BuildRotatedPattern(pairParts, angle);
         var perpDim = GetDimension(rotatedPattern.BoundingBox, perpAxis);
         var stripeBox = MakeStripeBox(workArea, perpDim, primaryAxis);
+
+        if (!_dedup.TryAdd(rotatedPattern.BoundingBox, workArea, primaryAxis))
+            return null;
+
         var stripeEngine = new FillLinear(stripeBox, spacing);
         var stripeParts = stripeEngine.Fill(rotatedPattern, primaryAxis);
 
