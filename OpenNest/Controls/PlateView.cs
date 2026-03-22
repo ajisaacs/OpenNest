@@ -30,6 +30,8 @@ namespace OpenNest.Controls
         private Plate plate;
         private Action currentAction;
         private Action previousAction;
+        private CutOffSettings cutOffSettings = new CutOffSettings();
+        private CutOff selectedCutOff;
         protected List<LayoutPart> parts;
         private List<LayoutPart> stationaryParts = new List<LayoutPart>();
         private List<LayoutPart> activeParts = new List<LayoutPart>();
@@ -133,6 +135,27 @@ namespace OpenNest.Controls
         public double OffsetTolerance { get; set; } = 0.001;
 
         public bool FillParts { get; set; }
+
+        public CutOffSettings CutOffSettings
+        {
+            get => cutOffSettings;
+            set
+            {
+                cutOffSettings = value;
+                Plate?.RegenerateCutOffs(value);
+                Invalidate();
+            }
+        }
+
+        public CutOff SelectedCutOff
+        {
+            get => selectedCutOff;
+            set
+            {
+                selectedCutOff = value;
+                Invalidate();
+            }
+        }
 
         public double RotateIncrementAngle { get; set; }
 
@@ -390,6 +413,8 @@ namespace OpenNest.Controls
 
             DrawPlate(e.Graphics);
             DrawParts(e.Graphics);
+            DrawCutOffs(e.Graphics);
+            DrawCutOffGrip(e.Graphics);
             DrawActiveWorkArea(e.Graphics);
             DrawDebugRemnants(e.Graphics);
 
@@ -539,6 +564,63 @@ namespace OpenNest.Controls
 
             if (DrawRapid)
                 DrawRapids(g);
+        }
+
+        private void DrawCutOffs(Graphics g)
+        {
+            if (Plate?.CutOffs == null || Plate.CutOffs.Count == 0)
+                return;
+
+            using var pen = new Pen(Color.FromArgb(64, 64, 64), 1.5f / ViewScale);
+
+            foreach (var cutoff in Plate.CutOffs)
+            {
+                var program = cutoff.Drawing?.Program;
+                if (program == null || program.Codes.Count == 0)
+                    continue;
+
+                for (var i = 0; i < program.Codes.Count - 1; i += 2)
+                {
+                    if (program.Codes[i] is RapidMove rapid &&
+                        program.Codes[i + 1] is LinearMove linear)
+                    {
+                        DrawLine(g, rapid.EndPoint, linear.EndPoint, pen);
+                    }
+                }
+            }
+        }
+
+        private void DrawCutOffGrip(Graphics g)
+        {
+            if (selectedCutOff == null)
+                return;
+
+            var radius = 4f / ViewScale;
+            var pos = selectedCutOff.Position;
+            var graphPt = PointWorldToGraph(pos);
+            var scaledRadius = LengthWorldToGui(radius);
+
+            g.FillEllipse(Brushes.DarkGray,
+                graphPt.X - scaledRadius, graphPt.Y - scaledRadius,
+                scaledRadius * 2, scaledRadius * 2);
+            g.DrawEllipse(Pens.Black,
+                graphPt.X - scaledRadius, graphPt.Y - scaledRadius,
+                scaledRadius * 2, scaledRadius * 2);
+        }
+
+        public CutOff GetCutOffAtPoint(Vector point, double tolerance)
+        {
+            if (Plate?.CutOffs == null)
+                return null;
+
+            foreach (var cutoff in Plate.CutOffs)
+            {
+                var dist = cutoff.Position.DistanceTo(point);
+                if (dist <= tolerance)
+                    return cutoff;
+            }
+
+            return null;
         }
 
         private void DrawOffsetGeometry(Graphics g)
