@@ -1236,6 +1236,9 @@ namespace OpenNest.Controls
 
             for (var i = 0; i < SelectedParts.Count; ++i)
                 SelectedParts[i].Offset(diff);
+
+            if (Plate.CutOffs.Count > 0)
+                Plate.RegenerateCutOffs(cutOffSettings);
         }
 
         protected override void UpdateMatrix()
