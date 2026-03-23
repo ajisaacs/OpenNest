@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.0.0
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11612.150
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest", "OpenNest\OpenNest.csproj", "{1F1E40E0-5C53-474F-A258-69C9C3FAC15A}"
 EndProject
@@ -22,6 +22,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Tests", "OpenNest.Tests\OpenNest.Tests.csproj", "{03539EB7-9DB2-4634-A6FD-F094B9603596}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Api", "OpenNest.Api\OpenNest.Api.csproj", "{44D2810A-16EF-46A4-859C-B897147D8D3C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PostProcessors", "PostProcessors", "{4052CFAC-1F12-48BE-872D-F503C3B65D7E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.Cincinnati", "OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj", "{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -153,8 +157,26 @@ Global
 		{44D2810A-16EF-46A4-859C-B897147D8D3C}.Release|x64.Build.0 = Release|Any CPU
 		{44D2810A-16EF-46A4-859C-B897147D8D3C}.Release|x86.ActiveCfg = Release|Any CPU
 		{44D2810A-16EF-46A4-859C-B897147D8D3C}.Release|x86.Build.0 = Release|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Debug|x64.Build.0 = Debug|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Debug|x86.Build.0 = Debug|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Release|x64.ActiveCfg = Release|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Release|x64.Build.0 = Release|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Release|x86.ActiveCfg = Release|Any CPU
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532} = {4052CFAC-1F12-48BE-872D-F503C3B65D7E}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {86FE17B3-F764-40AE-BCAA-F26B470CA05C}
 	EndGlobalSection
 EndGlobal
