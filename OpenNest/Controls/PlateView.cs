@@ -33,6 +33,7 @@ namespace OpenNest.Controls
         private CutOffSettings cutOffSettings = new CutOffSettings();
         private CutOff selectedCutOff;
         private bool draggingCutOff;
+        private Dictionary<Part, Geometry.Entity> dragPerimeterCache;
         protected List<LayoutPart> parts;
         private List<LayoutPart> stationaryParts = new List<LayoutPart>();
         private List<LayoutPart> activeParts = new List<LayoutPart>();
@@ -242,6 +243,7 @@ namespace OpenNest.Controls
                 {
                     SelectedCutOff = hitCutOff;
                     draggingCutOff = true;
+                    dragPerimeterCache = Plate.BuildPerimeterCache(Plate);
                     return;
                 }
                 else
@@ -270,6 +272,7 @@ namespace OpenNest.Controls
             if (draggingCutOff && selectedCutOff != null)
             {
                 draggingCutOff = false;
+                dragPerimeterCache = null;
                 Plate.RegenerateCutOffs(cutOffSettings);
                 Invalidate();
                 return;
@@ -333,7 +336,12 @@ namespace OpenNest.Controls
 
             if (draggingCutOff && selectedCutOff != null)
             {
-                selectedCutOff.Position = CurrentPoint;
+                if (selectedCutOff.Axis == CutOffAxis.Vertical)
+                    selectedCutOff.Position = new Vector(CurrentPoint.X, selectedCutOff.Position.Y);
+                else
+                    selectedCutOff.Position = new Vector(selectedCutOff.Position.X, CurrentPoint.Y);
+
+                selectedCutOff.Regenerate(Plate, cutOffSettings, dragPerimeterCache);
                 Invalidate();
                 return;
             }
@@ -455,7 +463,6 @@ namespace OpenNest.Controls
             DrawPlate(e.Graphics);
             DrawParts(e.Graphics);
             DrawCutOffs(e.Graphics);
-            DrawCutOffGrip(e.Graphics);
             DrawActiveWorkArea(e.Graphics);
             DrawDebugRemnants(e.Graphics);
 
@@ -612,7 +619,8 @@ namespace OpenNest.Controls
             if (Plate?.CutOffs == null || Plate.CutOffs.Count == 0)
                 return;
 
-            using var pen = new Pen(Color.FromArgb(64, 64, 64), 1.5f / ViewScale);
+            using var pen = new Pen(Color.FromArgb(64, 64, 64), 1.5f);
+            using var selectedPen = new Pen(Color.FromArgb(0, 120, 255), 3.5f);
 
             foreach (var cutoff in Plate.CutOffs)
             {
@@ -620,33 +628,17 @@ namespace OpenNest.Controls
                 if (program == null || program.Codes.Count == 0)
                     continue;
 
+                var activePen = cutoff == selectedCutOff ? selectedPen : pen;
+
                 for (var i = 0; i < program.Codes.Count - 1; i += 2)
                 {
                     if (program.Codes[i] is RapidMove rapid &&
                         program.Codes[i + 1] is LinearMove linear)
                     {
-                        DrawLine(g, rapid.EndPoint, linear.EndPoint, pen);
+                        DrawLine(g, rapid.EndPoint, linear.EndPoint, activePen);
                     }
                 }
             }
-        }
-
-        private void DrawCutOffGrip(Graphics g)
-        {
-            if (selectedCutOff == null)
-                return;
-
-            var radius = 4f / ViewScale;
-            var pos = selectedCutOff.Position;
-            var graphPt = PointWorldToGraph(pos);
-            var scaledRadius = LengthWorldToGui(radius);
-
-            g.FillEllipse(Brushes.DarkGray,
-                graphPt.X - scaledRadius, graphPt.Y - scaledRadius,
-                scaledRadius * 2, scaledRadius * 2);
-            g.DrawEllipse(Pens.Black,
-                graphPt.X - scaledRadius, graphPt.Y - scaledRadius,
-                scaledRadius * 2, scaledRadius * 2);
         }
 
         public CutOff GetCutOffAtPoint(Vector point, double tolerance)
@@ -656,9 +648,20 @@ namespace OpenNest.Controls
 
             foreach (var cutoff in Plate.CutOffs)
             {
-                var dist = cutoff.Position.DistanceTo(point);
-                if (dist <= tolerance)
-                    return cutoff;
+                var program = cutoff.Drawing?.Program;
+                if (program == null)
+                    continue;
+
+                for (var i = 0; i < program.Codes.Count - 1; i += 2)
+                {
+                    if (program.Codes[i] is RapidMove rapid &&
+                        program.Codes[i + 1] is LinearMove linear)
+                    {
+                        var line = new Geometry.Line(rapid.EndPoint, linear.EndPoint);
+                        if (line.ClosestPointTo(point).DistanceTo(point) <= tolerance)
+                            return cutoff;
+                    }
+                }
             }
 
             return null;
