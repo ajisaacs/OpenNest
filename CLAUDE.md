@@ -30,10 +30,11 @@ Domain model, geometry, and CNC primitives organized into namespaces:
 - **Math** (`Math/`, `namespace OpenNest.Math`): `Angle` (radian/degree conversion), `Tolerance` (floating-point comparison), `Trigonometry`, `Generic` (swap utility), `EvenOdd`, `Rounding` (factor-based rounding). Note: `OpenNest.Math` shadows `System.Math` — use `System.Math` fully qualified where both are needed.
 - **CNC/CuttingStrategy** (`CNC/CuttingStrategy/`, `namespace OpenNest.CNC`): `ContourCuttingStrategy` orchestrates cut ordering, lead-ins/lead-outs, and tabs. Includes `LeadIn`/`LeadOut` hierarchies (line, arc, clean-hole variants), `Tab` hierarchy (normal, machine, breaker), and `CuttingParameters`/`AssignmentParameters`/`SequenceParameters` configuration.
 - **Collections** (`Collections/`, `namespace OpenNest.Collections`): `ObservableList<T>`, `DrawingCollection`.
+- **CutOffs** (`namespace OpenNest`): `CutOff` (axis-aligned cut line with position, axis, optional start/end limits), `CutOffAxis` enum (`Horizontal`, `Vertical`), `CutOffSettings` (clearance, overtravel, min segment length, direction), `CutDirection` enum (`TowardOrigin`, `AwayFromOrigin`). Cut-offs generate CNC `Program` objects with trimmed line segments that avoid parts.
 - **Quadrant system**: Plates use quadrants 1-4 (like Cartesian quadrants) to determine coordinate origin placement. This affects bounding box calculation, rotation, and part positioning.
 
 ### OpenNest.Engine (class library, depends on Core)
-Nesting algorithms with a pluggable engine architecture. `NestEngineBase` is the abstract base class; `DefaultNestEngine` (formerly `NestEngine`) provides the multi-phase fill strategy. `NestEngineRegistry` manages available engines (built-in + plugins from `Engines/` directory) and the globally active engine. `AutoNester` handles mixed-part NFP-based nesting with simulated annealing (not yet integrated into the registry).
+Nesting algorithms with a pluggable engine architecture. `NestEngineBase` is the abstract base class; `DefaultNestEngine` (formerly `NestEngine`) provides the multi-phase fill strategy. `NestEngineRegistry` manages available engines (built-in + plugins from `Engines/` directory) and the globally active engine.
 
 - **Engine hierarchy**: `NestEngineBase` (abstract) → `DefaultNestEngine` (Linear, Pairs, RectBestFit, Remainder phases) → `VerticalRemnantEngine` (optimizes for right-side drop), `HorizontalRemnantEngine` (optimizes for top-side drop). Custom engines subclass `NestEngineBase` and register via `NestEngineRegistry.Register()` or as plugin DLLs in `Engines/`.
 - **IFillComparer**: Interface enabling engine-specific scoring. `DefaultFillComparer` (count-then-density), `VerticalRemnantComparer` (minimize X-extent), `HorizontalRemnantComparer` (minimize Y-extent). Engines provide their comparer via `CreateComparer()` factory, grouped into `FillPolicy` on `FillContext`.
@@ -43,7 +44,7 @@ Nesting algorithms with a pluggable engine architecture. `NestEngineBase` is the
 - **BestFit/** (`namespace OpenNest.Engine.BestFit`): NFP-based pair evaluation pipeline — `BestFitFinder` orchestrates angle sweeps, `PairEvaluator`/`IPairEvaluator` scores part pairs, `RotationSlideStrategy`/`ISlideComputer` computes slide distances. `BestFitCache` and `BestFitFilter` optimize repeated lookups.
 - **RectanglePacking/** (`namespace OpenNest.RectanglePacking`): `FillBestFit` (single-item fill, tries horizontal and vertical orientations), `PackBottomLeft` (multi-item bin packing, sorts by area descending). Both operate on `Bin`/`Item` abstractions.
 - **CirclePacking/** (`namespace OpenNest.CirclePacking`): Alternative packing for circular parts.
-- **Nfp/** (`namespace OpenNest.Engine.Nfp`): NFP-based nesting (not yet integrated) — `AutoNester` (mixed-part nesting with simulated annealing), `BottomLeftFill` (BLF placement), `NfpCache` (computed NFP caching), `SimulatedAnnealing` (optimizer), `INestOptimizer`/`NestResult`.
+- **Nfp/** (`namespace OpenNest.Engine.Nfp`): Internal NFP-based single-part placement utilities — `AutoNester` (NFP placement with simulated annealing), `BottomLeftFill` (BLF placement), `NfpCache` (computed NFP caching), `SimulatedAnnealing` (optimizer), `INestOptimizer`/`OptimizationResult`. Not exposed as a nest engine; used internally for individual part placement.
 - **ML/** (`namespace OpenNest.Engine.ML`): `AnglePredictor` (ONNX model for predicting good rotation angles), `FeatureExtractor` (part geometry features), `BruteForceRunner` (full angle sweep for training data).
 - `NestItem`: Input to the engine — wraps a `Drawing` with quantity, priority, and rotation constraints.
 - `NestProgress`: Progress reporting model with `NestPhase` enum for UI feedback.
@@ -79,13 +80,13 @@ The UI application with MDI interface.
 
 - **Forms/**: `MainForm` (MDI parent), `EditNestForm` (MDI child per nest), plus dialogs for plate editing, auto-nesting, DXF conversion, cut parameters, etc.
 - **Controls/**: `PlateView` (2D plate renderer with zoom/pan, supports temporary preview parts), `DrawingListBox`, `DrawControl`, `QuadrantSelect`.
-- **Actions/**: User interaction modes — `ActionSelect`, `ActionClone`, `ActionFillArea`, `ActionSelectArea`, `ActionZoomWindow`, `ActionSetSequence`.
+- **Actions/**: User interaction modes — `ActionSelect`, `ActionClone`, `ActionFillArea`, `ActionSelectArea`, `ActionZoomWindow`, `ActionSetSequence`, `ActionCutOff`.
 - **Post-processing**: `IPostProcessor` plugin interface loaded from DLLs in a `Posts/` directory at runtime.
 
 ## File Format
 
 Nest files (`.nest`, ZIP-based) use v2 JSON format:
-- `nest.json` — single JSON file containing all nest metadata: nest info (name, units, customer, dates, notes), plate defaults (size, thickness, quadrant, spacing, material, edge spacing), drawings array (id, name, color, quantity, priority, rotation constraints, material, source), and plates array (id, size, material, edge spacing, parts with drawingId/x/y/rotation)
+- `nest.json` — single JSON file containing all nest metadata: nest info (name, units, customer, dates, notes), plate defaults (size, thickness, quadrant, spacing, material, edge spacing), drawings array (id, name, color, quantity, priority, rotation constraints, material, source), and plates array (id, size, material, edge spacing, parts with drawingId/x/y/rotation, cutoffs with x/y/axis/startLimit/endLimit)
 - `programs/program-N` — G-code text for each drawing's cut program (N = drawing id)
 - `bestfits/bestfit-N` — JSON array of best-fit pair evaluation results per drawing, keyed by plate size/spacing (optional, only present if best-fit data was computed)
 
@@ -113,3 +114,4 @@ Always keep `README.md` and `CLAUDE.md` up to date when making changes that affe
 - Nesting uses async progress/cancellation: `IProgress<NestProgress>` and `CancellationToken` flow through the engine to the UI's `NestProgressForm`.
 - `Compactor` performs post-fill gravity compaction — after filling, parts are pushed toward a plate edge using directional distance calculations to close gaps between irregular shapes.
 - `FillScore` uses lexicographic comparison (count > utilization > compactness) to rank fill results consistently across all fill strategies.
+- **Cut-off materialization lifecycle**: `CutOff` objects live on `Plate.CutOffs`. Each generates a `Drawing` (with `IsCutOff = true`) whose `Program` contains trimmed line segments. `Plate.RegenerateCutOffs(settings)` removes old cut-off Parts, recomputes programs, and re-adds them to `Plate.Parts`. Regeneration triggers: cut-off add/remove/move, part drag complete, fill complete, plate transform. Cut-off Parts are excluded from quantity tracking, utilization, overlap detection, and nest file serialization (programs are regenerated from definitions on load).
