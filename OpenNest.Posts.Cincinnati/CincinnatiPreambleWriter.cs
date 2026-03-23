@@ -24,7 +24,7 @@ public sealed class CincinnatiPreambleWriter
     {
         w.WriteLine(CoordinateFormatter.Comment($"NEST {nestName}"));
         w.WriteLine(CoordinateFormatter.Comment($"CONFIGURATION - {_config.ConfigurationName}"));
-        w.WriteLine(CoordinateFormatter.Comment(DateTime.Now.ToString("MM-dd-yyyy hh:mm:ss tt")));
+        w.WriteLine(CoordinateFormatter.Comment(DateTime.Now.ToString("MM-dd-yyyy hh:mm:ss tt", System.Globalization.CultureInfo.InvariantCulture)));
 
         if (!string.IsNullOrEmpty(materialDescription))
             w.WriteLine(CoordinateFormatter.Comment($"Material = {materialDescription}"));

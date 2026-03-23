@@ -88,7 +88,7 @@ namespace OpenNest.Posts.Cincinnati
     /// Configuration for Cincinnati post processor.
     /// Defines machine-specific parameters, output format, and cutting strategies.
     /// </summary>
-    public class CincinnatiPostConfig
+    public sealed class CincinnatiPostConfig
     {
         /// <summary>
         /// Gets or sets the configuration name/identifier.

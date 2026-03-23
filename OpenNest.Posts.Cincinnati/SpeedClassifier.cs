@@ -8,7 +8,7 @@ namespace OpenNest.Posts.Cincinnati
         public string Classify(double contourLength, double sheetDiagonal)
         {
             var ratio = contourLength / sheetDiagonal;
-            if (ratio > FastThreshold) return "FAST";
+            if (ratio >= FastThreshold) return "FAST";
             if (ratio <= SlowThreshold) return "SLOW";
             return "MEDIUM";
         }
@@ -22,7 +22,7 @@ namespace OpenNest.Posts.Cincinnati
         {
             // Cincinnati convention: no leading zero for values < 1 (e.g., ".8702" not "0.8702")
             var rounded = System.Math.Round(value, 4);
-            var str = rounded.ToString("0.####");
+            var str = rounded.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
             if (rounded > 0 && rounded < 1 && str.StartsWith("0."))
                 return str.Substring(1);
             return str;

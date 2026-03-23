@@ -6,7 +6,8 @@ public class SpeedClassifierTests
 {
     [Theory]
     [InlineData(20.0, 10.0, "FAST")]
-    [InlineData(5.0, 10.0, "MEDIUM")]
+    [InlineData(5.0, 10.0, "FAST")]
+    [InlineData(4.9, 10.0, "MEDIUM")]
     [InlineData(0.5, 10.0, "SLOW")]
     public void Classify_ReturnsExpectedClass(double contourLength, double sheetDiagonal, string expected)
     {

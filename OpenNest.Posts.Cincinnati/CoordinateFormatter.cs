@@ -13,7 +13,8 @@ namespace OpenNest.Posts.Cincinnati
 
         public string FormatCoord(double value)
         {
-            return System.Math.Round(value, _accuracy).ToString(_format);
+            return System.Math.Round(value, _accuracy)
+                .ToString(_format, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         public static string Comment(string text) => $"( {text} )";
