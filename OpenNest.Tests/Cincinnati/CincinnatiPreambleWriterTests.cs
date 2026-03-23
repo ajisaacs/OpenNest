@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using OpenNest.CNC;
 using OpenNest.Posts.Cincinnati;
 
 namespace OpenNest.Tests.Cincinnati;

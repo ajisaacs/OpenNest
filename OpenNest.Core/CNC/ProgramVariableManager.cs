@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace OpenNest.Posts.Cincinnati
+namespace OpenNest.CNC
 {
     public sealed class ProgramVariableManager
     {

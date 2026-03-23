@@ -1,21 +1,61 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using OpenNest.CNC;
 
 namespace OpenNest.Posts.Cincinnati
 {
     public sealed class CincinnatiPostProcessor : IPostProcessor
     {
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            WriteIndented = true,
+            Converters = { new JsonStringEnumConverter() }
+        };
+
         public string Name => "Cincinnati CL-707";
         public string Author => "OpenNest";
         public string Description => "Cincinnati CL-707/CL-800/CL-900/CL-940/CLX family";
 
         public CincinnatiPostConfig Config { get; }
 
+        public CincinnatiPostProcessor()
+        {
+            var configPath = GetConfigPath();
+            if (File.Exists(configPath))
+            {
+                var json = File.ReadAllText(configPath);
+                Config = JsonSerializer.Deserialize<CincinnatiPostConfig>(json, JsonOptions);
+            }
+            else
+            {
+                Config = new CincinnatiPostConfig();
+                SaveConfig();
+            }
+        }
+
         public CincinnatiPostProcessor(CincinnatiPostConfig config)
         {
             Config = config;
+        }
+
+        public void SaveConfig()
+        {
+            var configPath = GetConfigPath();
+            var json = JsonSerializer.Serialize(Config, JsonOptions);
+            File.WriteAllText(configPath, json);
+        }
+
+        private static string GetConfigPath()
+        {
+            var assemblyPath = typeof(CincinnatiPostProcessor).Assembly.Location;
+            var dir = Path.GetDirectoryName(assemblyPath);
+            var name = Path.GetFileNameWithoutExtension(assemblyPath);
+            return Path.Combine(dir, name + ".json");
         }
 
         public void Post(Nest nest, Stream outputStream)

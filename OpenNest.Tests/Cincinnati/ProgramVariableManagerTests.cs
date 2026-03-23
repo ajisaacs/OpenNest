@@ -1,4 +1,4 @@
-using OpenNest.Posts.Cincinnati;
+using OpenNest.CNC;
 
 namespace OpenNest.Tests.Cincinnati;
 

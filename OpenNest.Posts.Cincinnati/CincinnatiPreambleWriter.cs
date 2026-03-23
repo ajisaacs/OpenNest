@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using OpenNest;
+using OpenNest.CNC;
 
 namespace OpenNest.Posts.Cincinnati;
 

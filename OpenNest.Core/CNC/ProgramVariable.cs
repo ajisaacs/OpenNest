@@ -1,4 +1,4 @@
-namespace OpenNest.Posts.Cincinnati
+namespace OpenNest.CNC
 {
     public sealed class ProgramVariable
     {

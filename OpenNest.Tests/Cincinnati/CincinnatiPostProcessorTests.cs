@@ -1,5 +1,7 @@
 using System.IO;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Posts.Cincinnati;
@@ -94,6 +96,47 @@ public class CincinnatiPostProcessorTests
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
         }
+    }
+
+    [Fact]
+    public void Config_RoundTripsAsJson()
+    {
+        var config = new CincinnatiPostConfig
+        {
+            ConfigurationName = "CL940_CORONA",
+            DefaultLibraryFile = "MS135N2PANEL.lib",
+            PostedUnits = Units.Inches,
+            KerfCompensation = KerfMode.ControllerSide,
+            UseAntiDive = true
+        };
+
+        var opts = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Converters = { new JsonStringEnumConverter() }
+        };
+        var json = JsonSerializer.Serialize(config, opts);
+        var deserialized = JsonSerializer.Deserialize<CincinnatiPostConfig>(json, opts);
+
+        Assert.Equal("CL940_CORONA", deserialized.ConfigurationName);
+        Assert.Equal("MS135N2PANEL.lib", deserialized.DefaultLibraryFile);
+        Assert.Equal(Units.Inches, deserialized.PostedUnits);
+        Assert.Equal(KerfMode.ControllerSide, deserialized.KerfCompensation);
+        Assert.True(deserialized.UseAntiDive);
+
+        // Enums serialize as strings
+        Assert.Contains("\"Inches\"", json);
+        Assert.Contains("\"ControllerSide\"", json);
+    }
+
+    [Fact]
+    public void ParameterlessConstructor_LoadsOrCreatesConfig()
+    {
+        // The parameterless constructor reads from a .json file next to the assembly,
+        // or creates defaults if none exists. Either way, Config should be non-null.
+        var post = new CincinnatiPostProcessor();
+        Assert.NotNull(post.Config);
+        Assert.Equal("CL940", post.Config.ConfigurationName);
     }
 
     private static Nest CreateTestNest()
