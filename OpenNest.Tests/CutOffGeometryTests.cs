@@ -337,6 +337,48 @@ public class CutOffGeometryTests
     }
 
     [Fact]
+    public void PlatePerimeterCache_ReturnsOneEntryPerPart()
+    {
+        var plate = new Plate(100, 100);
+        plate.Parts.Add(new Part(new Drawing("a", MakeSquare(10))));
+        plate.Parts.Add(new Part(new Drawing("b", MakeCircle(5))));
+        plate.Parts.Add(new Part(new Drawing("c", MakeDiamond(8))));
+
+        var cache = Plate.BuildPerimeterCache(plate);
+        Assert.Equal(3, cache.Count);
+    }
+
+    [Fact]
+    public void PlatePerimeterCache_SkipsCutOffParts()
+    {
+        var plate = new Plate(100, 100);
+        plate.Parts.Add(new Part(new Drawing("real", MakeSquare(10))));
+        plate.Parts.Add(new Part(new Drawing("cutoff", new Program()) { IsCutOff = true }));
+
+        var cache = Plate.BuildPerimeterCache(plate);
+        Assert.Single(cache);
+    }
+
+    [Fact]
+    public void PlatePerimeterCache_OpenContourUsesConvexHull()
+    {
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 10)));
+
+        var plate = new Plate(100, 100);
+        plate.Parts.Add(new Part(new Drawing("open", pgm)));
+
+        var cache = Plate.BuildPerimeterCache(plate);
+        Assert.Single(cache);
+
+        var part = plate.Parts[0];
+        Assert.True(cache.ContainsKey(part));
+        Assert.NotNull(cache[part]);
+    }
+
+    [Fact]
     public void ShapeProfile_SelectsLargestShapeAsPerimeter()
     {
         // Outer square: (5,0)→(25,0)→(25,20)→(5,20)→(5,0)

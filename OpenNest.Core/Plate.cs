@@ -126,6 +126,58 @@ namespace OpenNest
         }
 
         /// <summary>
+        /// Builds a dictionary mapping each non-cut-off part to its perimeter entity.
+        /// Closed shapes use ShapeProfile; open contours fall back to ConvexHull.
+        /// </summary>
+        public static Dictionary<Part, Geometry.Entity> BuildPerimeterCache(Plate plate)
+        {
+            var cache = new Dictionary<Part, Geometry.Entity>();
+
+            foreach (var part in plate.Parts)
+            {
+                if (part.BaseDrawing.IsCutOff)
+                    continue;
+
+                Geometry.Entity perimeter = null;
+                try
+                {
+                    var entities = Converters.ConvertProgram.ToGeometry(part.Program)
+                        .Where(e => e.Layer != SpecialLayers.Rapid)
+                        .ToList();
+
+                    if (entities.Count > 0)
+                    {
+                        var profile = new Geometry.ShapeProfile(entities);
+
+                        if (profile.Perimeter.IsClosed())
+                        {
+                            perimeter = profile.Perimeter;
+                            perimeter.Offset(part.Location);
+                        }
+                        else
+                        {
+                            var points = entities.CollectPoints();
+                            if (points.Count >= 3)
+                            {
+                                var hull = Geometry.ConvexHull.Compute(points);
+                                hull.Offset(part.Location);
+                                perimeter = hull;
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    perimeter = null;
+                }
+
+                cache[part] = perimeter;
+            }
+
+            return cache;
+        }
+
+        /// <summary>
         /// The number of times to cut the plate.
         /// </summary>
         public int Quantity { get; set; }
