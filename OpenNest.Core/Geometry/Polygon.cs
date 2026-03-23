@@ -317,12 +317,68 @@ namespace OpenNest.Geometry
 
         public override Entity OffsetEntity(double distance, OffsetSide side)
         {
-            throw new NotImplementedException();
+            if (Vertices.Count < 3)
+                return null;
+
+            var isClosed = IsClosed();
+            var count = isClosed ? Vertices.Count - 1 : Vertices.Count;
+            if (count < 3)
+                return null;
+
+            var ccw = CalculateArea() > 0;
+            var outward = ccw ? OffsetSide.Left : OffsetSide.Right;
+            var sign = side == outward ? 1.0 : -1.0;
+            var d = distance * sign;
+
+            var normals = new Vector[count];
+            for (var i = 0; i < count; i++)
+            {
+                var next = (i + 1) % count;
+                var dx = Vertices[next].X - Vertices[i].X;
+                var dy = Vertices[next].Y - Vertices[i].Y;
+                var len = System.Math.Sqrt(dx * dx + dy * dy);
+                if (len < Tolerance.Epsilon)
+                    return null;
+                normals[i] = new Vector(-dy / len * d, dx / len * d);
+            }
+
+            var result = new Polygon();
+            for (var i = 0; i < count; i++)
+            {
+                var prev = (i - 1 + count) % count;
+
+                var a1 = new Vector(Vertices[prev].X + normals[prev].X, Vertices[prev].Y + normals[prev].Y);
+                var a2 = new Vector(Vertices[i].X + normals[prev].X, Vertices[i].Y + normals[prev].Y);
+                var b1 = new Vector(Vertices[i].X + normals[i].X, Vertices[i].Y + normals[i].Y);
+                var b2 = new Vector(Vertices[(i + 1) % count].X + normals[i].X, Vertices[(i + 1) % count].Y + normals[i].Y);
+
+                var edgeA = new Line(a1, a2);
+                var edgeB = new Line(b1, b2);
+
+                if (edgeA.Intersects(edgeB, out var pt) && pt.IsValid())
+                    result.Vertices.Add(pt);
+                else
+                    result.Vertices.Add(new Vector(Vertices[i].X + normals[i].X, Vertices[i].Y + normals[i].Y));
+            }
+
+            result.Close();
+            result.RemoveSelfIntersections();
+            result.UpdateBounds();
+            return result;
         }
 
         public override Entity OffsetEntity(double distance, Vector pt)
         {
-            throw new NotImplementedException();
+            var left = OffsetEntity(distance, OffsetSide.Left);
+            var right = OffsetEntity(distance, OffsetSide.Right);
+
+            if (left == null) return right;
+            if (right == null) return left;
+
+            var distLeft = left.ClosestPointTo(pt).DistanceTo(pt);
+            var distRight = right.ClosestPointTo(pt).DistanceTo(pt);
+
+            return distLeft > distRight ? left : right;
         }
 
         /// <summary>

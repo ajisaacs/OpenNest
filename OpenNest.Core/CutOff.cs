@@ -129,9 +129,11 @@ namespace OpenNest
         private List<(double Start, double End)> IntersectPerimeter(
             Entity perimeter, double cutPosition, double lineStart, double lineEnd, double clearance)
         {
+            var target = OffsetOutward(perimeter, clearance) ?? perimeter;
+            var usedOffset = target != perimeter;
             var cutLine = new Line(MakePoint(cutPosition, lineStart), MakePoint(cutPosition, lineEnd));
 
-            if (!perimeter.Intersects(cutLine, out var pts) || pts.Count < 2)
+            if (!target.Intersects(cutLine, out var pts) || pts.Count < 2)
                 return null;
 
             var coords = pts
@@ -142,11 +144,29 @@ namespace OpenNest
             if (coords.Count % 2 != 0)
                 return null;
 
+            var padding = usedOffset ? 0 : clearance;
             var result = new List<(double Start, double End)>();
             for (var i = 0; i < coords.Count; i += 2)
-                result.Add((coords[i] - clearance, coords[i + 1] + clearance));
+                result.Add((coords[i] - padding, coords[i + 1] + padding));
 
             return result;
+        }
+
+        private static Entity OffsetOutward(Entity perimeter, double clearance)
+        {
+            if (clearance <= 0)
+                return null;
+
+            try
+            {
+                var offset = perimeter.OffsetEntity(clearance, OffsetSide.Left);
+                offset?.UpdateBounds();
+                return offset;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private Vector MakePoint(double cutCoord, double lineCoord) =>
