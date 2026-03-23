@@ -249,9 +249,8 @@ namespace OpenNest.Geometry
 
             foreach (var geo in shape.Entities)
             {
-                List<Vector> pts3;
-                geo.Intersects(line, out pts3);
-                pts.AddRange(pts3);
+                if (geo.Intersects(line, out var pts3))
+                    pts.AddRange(pts3);
             }
 
             return pts.Count > 0;

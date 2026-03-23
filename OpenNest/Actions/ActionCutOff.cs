@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.Controls;
 using OpenNest.Geometry;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -13,11 +14,18 @@ namespace OpenNest.Actions
     {
         private CutOff previewCutOff;
         private CutOffSettings settings;
+        private CutOffAxis lockedAxis = CutOffAxis.Vertical;
+        private Dictionary<Part, Entity> perimeterCache;
+        private readonly Timer debounceTimer;
+        private bool regeneratePending;
 
         public ActionCutOff(PlateView plateView)
             : base(plateView)
         {
             settings = plateView.CutOffSettings;
+            perimeterCache = Plate.BuildPerimeterCache(plateView.Plate);
+            debounceTimer = new Timer { Interval = 16 };
+            debounceTimer.Tick += OnDebounce;
 
             plateView.MouseMove += OnMouseMove;
             plateView.MouseDown += OnMouseDown;
@@ -27,6 +35,8 @@ namespace OpenNest.Actions
 
         public override void ConnectEvents()
         {
+            perimeterCache = Plate.BuildPerimeterCache(plateView.Plate);
+
             plateView.MouseMove += OnMouseMove;
             plateView.MouseDown += OnMouseDown;
             plateView.KeyDown += OnKeyDown;
@@ -35,12 +45,14 @@ namespace OpenNest.Actions
 
         public override void DisconnectEvents()
         {
+            debounceTimer.Stop();
             plateView.MouseMove -= OnMouseMove;
             plateView.MouseDown -= OnMouseDown;
             plateView.KeyDown -= OnKeyDown;
             plateView.Paint -= OnPaint;
 
             previewCutOff = null;
+            perimeterCache = null;
             plateView.Invalidate();
         }
 
@@ -50,11 +62,21 @@ namespace OpenNest.Actions
 
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
-            var pt = plateView.CurrentPoint;
-            var axis = DetectAxis(pt);
+            regeneratePending = true;
+            debounceTimer.Start();
+        }
 
-            previewCutOff = new CutOff(pt, axis);
-            previewCutOff.Regenerate(plateView.Plate, settings);
+        private void OnDebounce(object sender, System.EventArgs e)
+        {
+            debounceTimer.Stop();
+
+            if (!regeneratePending)
+                return;
+
+            regeneratePending = false;
+            var pt = plateView.CurrentPoint;
+            previewCutOff = new CutOff(pt, lockedAxis);
+            previewCutOff.Regenerate(plateView.Plate, settings, perimeterCache);
             plateView.Invalidate();
         }
 
@@ -64,18 +86,33 @@ namespace OpenNest.Actions
                 return;
 
             var pt = plateView.CurrentPoint;
-            var axis = DetectAxis(pt);
-            var cutoff = new CutOff(pt, axis);
+            var cutoff = new CutOff(pt, lockedAxis);
 
             plateView.Plate.CutOffs.Add(cutoff);
             plateView.Plate.RegenerateCutOffs(settings);
+            perimeterCache = Plate.BuildPerimeterCache(plateView.Plate);
             plateView.Invalidate();
         }
 
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Escape)
+            if (e.KeyCode == Keys.Space)
+            {
+                lockedAxis = lockedAxis == CutOffAxis.Vertical
+                    ? CutOffAxis.Horizontal
+                    : CutOffAxis.Vertical;
+
+                if (previewCutOff != null)
+                {
+                    previewCutOff = new CutOff(plateView.CurrentPoint, lockedAxis);
+                    previewCutOff.Regenerate(plateView.Plate, settings, perimeterCache);
+                    plateView.Invalidate();
+                }
+            }
+            else if (e.KeyCode == Keys.Escape)
+            {
                 plateView.SetAction(typeof(ActionSelect));
+            }
         }
 
         private void OnPaint(object sender, PaintEventArgs e)
@@ -102,21 +139,6 @@ namespace OpenNest.Actions
                     e.Graphics.DrawLine(pen, pt1, pt2);
                 }
             }
-        }
-
-        private CutOffAxis DetectAxis(Vector pt)
-        {
-            var bounds = plateView.Plate.BoundingBox(includeParts: false);
-            var distToLeftRight = System.Math.Min(
-                System.Math.Abs(pt.X - bounds.X),
-                System.Math.Abs(pt.X - (bounds.X + bounds.Width)));
-            var distToTopBottom = System.Math.Min(
-                System.Math.Abs(pt.Y - bounds.Y),
-                System.Math.Abs(pt.Y - (bounds.Y + bounds.Length)));
-
-            return distToTopBottom < distToLeftRight
-                ? CutOffAxis.Horizontal
-                : CutOffAxis.Vertical;
         }
     }
 }

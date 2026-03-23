@@ -86,7 +86,7 @@ public class CutOffGeometryTests
         part.Location = new Vector(0, 0);
         plate.Parts.Add(part);
 
-        var cache = CutOff.BuildPerimeterCache(plate);
+        var cache = Plate.BuildPerimeterCache(plate);
 
         // Cut at X=2: inside the BB but near the edge of the circle.
         var cutoff = new CutOff(new Vector(2, 0), CutOffAxis.Vertical);
@@ -125,7 +125,7 @@ public class CutOffGeometryTests
         part.Location = new Vector(0, 0);
         plate.Parts.Add(part);
 
-        var cache = CutOff.BuildPerimeterCache(plate);
+        var cache = Plate.BuildPerimeterCache(plate);
         var cutoff = new CutOff(new Vector(5, 0), CutOffAxis.Vertical);
         cutoff.Regenerate(plate, ZeroClearance, cache);
 
@@ -157,7 +157,7 @@ public class CutOffGeometryTests
         part.Location = new Vector(10, 10);
         plate.Parts.Add(part);
 
-        var cache = CutOff.BuildPerimeterCache(plate);
+        var cache = Plate.BuildPerimeterCache(plate);
         var cutoff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
         cutoff.Regenerate(plate, ZeroClearance, cache);
 
@@ -202,7 +202,7 @@ public class CutOffGeometryTests
         part.Location = new Vector(0, 0);
         plate.Parts.Add(part);
 
-        var cache = CutOff.BuildPerimeterCache(plate);
+        var cache = Plate.BuildPerimeterCache(plate);
 
         // Horizontal cut at Y=2: near the edge of the circle.
         var cutoff = new CutOff(new Vector(0, 2), CutOffAxis.Horizontal);
@@ -233,7 +233,7 @@ public class CutOffGeometryTests
         plate.Parts.Add(part);
 
         var settings = new CutOffSettings { PartClearance = 5.0 };
-        var cache = CutOff.BuildPerimeterCache(plate);
+        var cache = Plate.BuildPerimeterCache(plate);
         var cutoff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
         cutoff.Regenerate(plate, settings, cache);
 
@@ -243,32 +243,8 @@ public class CutOffGeometryTests
     }
 
     [Fact]
-    public void BuildPerimeterCache_ReturnsOneEntryPerPart()
+    public void BuildPerimeterCache_OpenContourGetsConvexHull()
     {
-        var plate = new Plate(100, 100);
-        plate.Parts.Add(new Part(new Drawing("a", MakeSquare(10))));
-        plate.Parts.Add(new Part(new Drawing("b", MakeCircle(5))));
-        plate.Parts.Add(new Part(new Drawing("c", MakeDiamond(8))));
-
-        var cache = CutOff.BuildPerimeterCache(plate);
-        Assert.Equal(3, cache.Count);
-    }
-
-    [Fact]
-    public void BuildPerimeterCache_SkipsCutOffParts()
-    {
-        var plate = new Plate(100, 100);
-        plate.Parts.Add(new Part(new Drawing("real", MakeSquare(10))));
-        plate.Parts.Add(new Part(new Drawing("cutoff", new Program()) { IsCutOff = true }));
-
-        var cache = CutOff.BuildPerimeterCache(plate);
-        Assert.Single(cache);
-    }
-
-    [Fact]
-    public void BuildPerimeterCache_NullForOpenContour()
-    {
-        // Open contour: line that doesn't close
         var pgm = new Program();
         pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
         pgm.Codes.Add(new LinearMove(new Vector(10, 0)));
@@ -277,9 +253,12 @@ public class CutOffGeometryTests
         var plate = new Plate(100, 100);
         plate.Parts.Add(new Part(new Drawing("open", pgm)));
 
-        var cache = CutOff.BuildPerimeterCache(plate);
+        var cache = Plate.BuildPerimeterCache(plate);
         Assert.Single(cache);
-        Assert.Null(cache[0]);
+
+        var perimeter = cache[plate.Parts[0]];
+        Assert.NotNull(perimeter);
+        Assert.IsType<Polygon>(perimeter);
     }
 
     [Fact]

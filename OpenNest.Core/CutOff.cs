@@ -26,9 +26,9 @@ namespace OpenNest
             Drawing = new Drawing(GetName()) { IsCutOff = true };
         }
 
-        public void Regenerate(Plate plate, CutOffSettings settings)
+        public void Regenerate(Plate plate, CutOffSettings settings, Dictionary<Part, Entity> cache = null)
         {
-            var segments = ComputeSegments(plate, settings);
+            var segments = ComputeSegments(plate, settings, cache);
             var program = BuildProgram(segments, settings);
             Drawing.Program = program;
         }
@@ -40,7 +40,7 @@ namespace OpenNest
             return $"CutOff-{axisChar}-{coord:F2}";
         }
 
-        private List<(double Start, double End)> ComputeSegments(Plate plate, CutOffSettings settings)
+        private List<(double Start, double End)> ComputeSegments(Plate plate, CutOffSettings settings, Dictionary<Part, Entity> cache)
         {
             var bounds = plate.BoundingBox(includeParts: false);
 
@@ -66,26 +66,10 @@ namespace OpenNest
                 if (part.BaseDrawing.IsCutOff)
                     continue;
 
-                var bb = part.BoundingBox;
-                double partStart, partEnd, partMin, partMax;
-
-                if (Axis == CutOffAxis.Vertical)
-                {
-                    partMin = bb.X - settings.PartClearance;
-                    partMax = bb.X + bb.Width + settings.PartClearance;
-                    partStart = bb.Y - settings.PartClearance;
-                    partEnd = bb.Y + bb.Length + settings.PartClearance;
-                }
-                else
-                {
-                    partMin = bb.Y - settings.PartClearance;
-                    partMax = bb.Y + bb.Length + settings.PartClearance;
-                    partStart = bb.X - settings.PartClearance;
-                    partEnd = bb.X + bb.Width + settings.PartClearance;
-                }
-
-                if (cutPosition >= partMin && cutPosition <= partMax)
-                    exclusions.Add((partStart, partEnd));
+                Entity perimeter = null;
+                cache?.TryGetValue(part, out perimeter);
+                var partExclusions = GetPartExclusions(part, perimeter, cutPosition, lineStart, lineEnd, settings.PartClearance);
+                exclusions.AddRange(partExclusions);
             }
 
             exclusions.Sort((a, b) => a.Start.CompareTo(b.Start));
@@ -118,6 +102,75 @@ namespace OpenNest
             segments = segments.Where(s => (s.End - s.Start) >= settings.MinSegmentLength).ToList();
 
             return segments;
+        }
+
+        private List<(double Start, double End)> GetPartExclusions(
+            Part part, Entity perimeter, double cutPosition, double lineStart, double lineEnd, double clearance)
+        {
+            var bb = part.BoundingBox;
+            double partMin, partMax, partStart, partEnd;
+
+            if (Axis == CutOffAxis.Vertical)
+            {
+                partMin = bb.X - clearance;
+                partMax = bb.X + bb.Width + clearance;
+                partStart = bb.Y - clearance;
+                partEnd = bb.Y + bb.Length + clearance;
+            }
+            else
+            {
+                partMin = bb.Y - clearance;
+                partMax = bb.Y + bb.Length + clearance;
+                partStart = bb.X - clearance;
+                partEnd = bb.X + bb.Width + clearance;
+            }
+
+            if (cutPosition < partMin || cutPosition > partMax)
+                return new List<(double Start, double End)>();
+
+            if (perimeter != null)
+            {
+                var perimeterExclusions = IntersectPerimeter(perimeter, cutPosition, lineStart, lineEnd, clearance);
+                if (perimeterExclusions != null)
+                    return perimeterExclusions;
+            }
+
+            return new List<(double Start, double End)> { (partStart, partEnd) };
+        }
+
+        private List<(double Start, double End)> IntersectPerimeter(
+            Entity perimeter, double cutPosition, double lineStart, double lineEnd, double clearance)
+        {
+            Vector p1, p2;
+            if (Axis == CutOffAxis.Vertical)
+            {
+                p1 = new Vector(cutPosition, lineStart);
+                p2 = new Vector(cutPosition, lineEnd);
+            }
+            else
+            {
+                p1 = new Vector(lineStart, cutPosition);
+                p2 = new Vector(lineEnd, cutPosition);
+            }
+
+            var cutLine = new Line(p1, p2);
+
+            if (!perimeter.Intersects(cutLine, out var pts) || pts.Count < 2)
+                return null;
+
+            var coords = pts
+                .Select(pt => Axis == CutOffAxis.Vertical ? pt.Y : pt.X)
+                .OrderBy(c => c)
+                .ToList();
+
+            if (coords.Count % 2 != 0)
+                return null;
+
+            var result = new List<(double Start, double End)>();
+            for (var i = 0; i < coords.Count; i += 2)
+                result.Add((coords[i] - clearance, coords[i + 1] + clearance));
+
+            return result;
         }
 
         private Program BuildProgram(List<(double Start, double End)> segments, CutOffSettings settings)
