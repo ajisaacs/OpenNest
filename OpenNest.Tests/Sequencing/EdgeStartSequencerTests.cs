@@ -11,7 +11,7 @@ public class EdgeStartSequencerTests
     {
         var plate = new Plate(60, 120);
         var edgePart = MakePartAt(1, 1);
-        var centerPart = MakePartAt(25, 55);
+        var centerPart = MakePartAt(25, 25);
         var midPart = MakePartAt(10, 10);
         plate.Parts.Add(edgePart);
         plate.Parts.Add(centerPart);
