@@ -27,19 +27,22 @@ public sealed class CincinnatiPartSubprogramWriter
     /// The program coordinates must already be normalized to origin (0,0).
     /// </summary>
     public void Write(TextWriter w, Program normalizedProgram, string drawingName,
-        int subNumber, string libraryFile, double sheetDiagonal)
+        int subNumber, string cutLibrary, string etchLibrary, double sheetDiagonal)
     {
-        var features = SplitFeatures(normalizedProgram.Codes);
-        if (features.Count == 0)
+        var allFeatures = SplitFeatures(normalizedProgram.Codes);
+        if (allFeatures.Count == 0)
             return;
+
+        // Classify and order: etch features first, then cut features
+        var ordered = OrderFeatures(allFeatures);
 
         w.WriteLine("(*****************************************************)");
         w.WriteLine($":{subNumber}");
         w.WriteLine(CoordinateFormatter.Comment($"PART: {drawingName}"));
 
-        for (var i = 0; i < features.Count; i++)
+        for (var i = 0; i < ordered.Count; i++)
         {
-            var codes = features[i];
+            var (codes, isEtch) = ordered[i];
             var featureNumber = i == 0
                 ? _config.FeatureLineNumberStart
                 : 1000 + i + 1;
@@ -51,10 +54,11 @@ public sealed class CincinnatiPartSubprogramWriter
                 FeatureNumber = featureNumber,
                 PartName = drawingName,
                 IsFirstFeatureOfPart = false,
-                IsLastFeatureOnSheet = i == features.Count - 1,
+                IsLastFeatureOnSheet = i == ordered.Count - 1,
                 IsSafetyHeadraise = false,
                 IsExteriorFeature = false,
-                LibraryFile = libraryFile,
+                IsEtch = isEtch,
+                LibraryFile = isEtch ? etchLibrary : cutLibrary,
                 CutDistance = cutDistance,
                 SheetDiagonal = sheetDiagonal
             };
@@ -62,8 +66,30 @@ public sealed class CincinnatiPartSubprogramWriter
             _featureWriter.Write(w, ctx);
         }
 
-        w.WriteLine("G0X0Y0");
-        w.WriteLine($"M99(END OF {drawingName})");
+        w.WriteLine("G0 X0 Y0");
+        w.WriteLine($"M99 (END OF {drawingName})");
+    }
+
+    internal static List<(List<ICode> codes, bool isEtch)> OrderFeatures(List<List<ICode>> features)
+    {
+        var result = new List<(List<ICode>, bool)>();
+        var etch = new List<List<ICode>>();
+        var cut = new List<List<ICode>>();
+
+        foreach (var f in features)
+        {
+            if (CincinnatiSheetWriter.IsFeatureEtch(f))
+                etch.Add(f);
+            else
+                cut.Add(f);
+        }
+
+        foreach (var f in etch)
+            result.Add((f, true));
+        foreach (var f in cut)
+            result.Add((f, false));
+
+        return result;
     }
 
     /// <summary>

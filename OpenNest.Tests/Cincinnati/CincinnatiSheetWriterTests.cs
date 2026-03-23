@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,7 +15,6 @@ public class CincinnatiSheetWriterTests
     {
         var config = new CincinnatiPostConfig
         {
-            DefaultLibraryFile = "MS135N2PANEL.lib",
             PostedAccuracy = 4
         };
         var plate = new Plate(48.0, 96.0);
@@ -24,14 +24,15 @@ public class CincinnatiSheetWriterTests
         using var sw = new StringWriter(sb);
         var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
 
-        sheetWriter.Write(sw, plate, "TestNest", 1, 101);
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "MS135N2PANEL.lib", "EtchN2.lib");
 
         var output = sb.ToString();
         Assert.Contains(":101", output);
         Assert.Contains("( Sheet 1 )", output);
         Assert.Contains("#110=", output);
         Assert.Contains("#111=", output);
-        Assert.Contains("G92X#5021Y#5022", output);
+        Assert.Contains("G92 X#5021 Y#5022", output);
+        Assert.Contains("G89 P MS135N2PANEL.lib", output);
         Assert.Contains("M99", output);
     }
 
@@ -50,11 +51,11 @@ public class CincinnatiSheetWriterTests
         using var sw = new StringWriter(sb);
         var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
 
-        sheetWriter.Write(sw, plate, "TestNest", 1, 101);
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "");
 
         var output = sb.ToString();
         Assert.Contains("M42", output);
-        Assert.Contains("G0X0Y0", output);
+        Assert.Contains("G0 X0 Y0", output);
         Assert.Contains("M50", output);
     }
 
@@ -68,7 +69,7 @@ public class CincinnatiSheetWriterTests
         using var sw = new StringWriter(sb);
         var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
 
-        sheetWriter.Write(sw, plate, "TestNest", 1, 101);
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "");
 
         Assert.Equal("", sb.ToString());
     }
@@ -96,12 +97,86 @@ public class CincinnatiSheetWriterTests
         using var sw = new StringWriter(sb);
         var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
 
-        sheetWriter.Write(sw, plate, "TestNest", 1, 101);
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "");
 
         var output = sb.ToString();
         // Should have two G84 pierce commands (one per contour)
         var g84Count = output.Split('\n').Count(l => l.Trim() == "G84");
         Assert.Equal(2, g84Count);
+    }
+
+    [Fact]
+    public void WriteSheet_EtchFeaturesOrderedBeforeCut()
+    {
+        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        var pgm = new Program();
+        // Cut contour first in program
+        pgm.Codes.Add(new RapidMove(0, 0));
+        pgm.Codes.Add(new LinearMove(5, 0) { Layer = LayerType.Cut });
+        pgm.Codes.Add(new LinearMove(5, 5) { Layer = LayerType.Cut });
+        // Etch contour second in program
+        pgm.Codes.Add(new RapidMove(1, 1));
+        pgm.Codes.Add(new LinearMove(2, 1) { Layer = LayerType.Scribe });
+        pgm.Codes.Add(new LinearMove(2, 2) { Layer = LayerType.Scribe });
+
+        var plate = new Plate(48.0, 96.0);
+        plate.Parts.Add(new Part(new Drawing("MixedPart", pgm)));
+
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
+
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "MS250O2.lib", "EtchN2.lib");
+
+        var output = sb.ToString();
+        // Etch (G85) should appear before cut (G84)
+        var g85Idx = output.IndexOf("G85");
+        var g84Idx = output.IndexOf("G84");
+        Assert.True(g85Idx >= 0, "G85 should be present for etch");
+        Assert.True(g84Idx >= 0, "G84 should be present for cut");
+        Assert.True(g85Idx < g84Idx, "G85 (etch) should come before G84 (cut)");
+
+        // Etch uses etch library
+        Assert.Contains("G89 P EtchN2.lib", output);
+        // Cut uses cut library
+        Assert.Contains("G89 P MS250O2.lib", output);
+    }
+
+    [Fact]
+    public void IsFeatureEtch_ReturnsTrueForScribeLayer()
+    {
+        var codes = new List<ICode>
+        {
+            new RapidMove(0, 0),
+            new LinearMove(1, 0) { Layer = LayerType.Scribe },
+            new LinearMove(1, 1) { Layer = LayerType.Scribe }
+        };
+
+        Assert.True(CincinnatiSheetWriter.IsFeatureEtch(codes));
+    }
+
+    [Fact]
+    public void IsFeatureEtch_ReturnsFalseForCutLayer()
+    {
+        var codes = new List<ICode>
+        {
+            new RapidMove(0, 0),
+            new LinearMove(1, 0) { Layer = LayerType.Cut },
+            new LinearMove(1, 1) { Layer = LayerType.Cut }
+        };
+
+        Assert.False(CincinnatiSheetWriter.IsFeatureEtch(codes));
+    }
+
+    [Fact]
+    public void IsFeatureEtch_ReturnsFalseForRapidsOnly()
+    {
+        var codes = new List<ICode>
+        {
+            new RapidMove(0, 0)
+        };
+
+        Assert.False(CincinnatiSheetWriter.IsFeatureEtch(codes));
     }
 
     private static Program CreateSimpleProgram()

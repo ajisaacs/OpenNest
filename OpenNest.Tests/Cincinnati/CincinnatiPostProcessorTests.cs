@@ -17,7 +17,6 @@ public class CincinnatiPostProcessorTests
         var config = new CincinnatiPostConfig
         {
             ConfigurationName = "CL940",
-            DefaultLibraryFile = "MS135N2PANEL.lib",
             PostedAccuracy = 4
         };
         var post = new CincinnatiPostProcessor(config);
@@ -72,7 +71,7 @@ public class CincinnatiPostProcessorTests
         var output = Encoding.UTF8.GetString(ms.ToArray());
 
         // Should only have one sheet subprogram call in main
-        Assert.Contains("N1M98 P101 (SHEET 1)", output);
+        Assert.Contains("N1 M98 P101 (SHEET 1)", output);
         Assert.DoesNotContain("SHEET 2", output);
     }
 
@@ -104,10 +103,19 @@ public class CincinnatiPostProcessorTests
         var config = new CincinnatiPostConfig
         {
             ConfigurationName = "CL940_CORONA",
-            DefaultLibraryFile = "MS135N2PANEL.lib",
+            DefaultAssistGas = "N2",
+            DefaultEtchGas = "N2",
             PostedUnits = Units.Inches,
             KerfCompensation = KerfMode.ControllerSide,
-            UseAntiDive = true
+            UseAntiDive = true,
+            MaterialLibraries = new()
+            {
+                new MaterialLibraryEntry { Material = "Mild Steel", Thickness = 0.135, Gas = "N2", Library = "MS135N2PANEL.lib" }
+            },
+            EtchLibraries = new()
+            {
+                new EtchLibraryEntry { Gas = "N2", Library = "EtchN2.lib" }
+            }
         };
 
         var opts = new JsonSerializerOptions
@@ -119,10 +127,15 @@ public class CincinnatiPostProcessorTests
         var deserialized = JsonSerializer.Deserialize<CincinnatiPostConfig>(json, opts);
 
         Assert.Equal("CL940_CORONA", deserialized.ConfigurationName);
-        Assert.Equal("MS135N2PANEL.lib", deserialized.DefaultLibraryFile);
+        Assert.Equal("N2", deserialized.DefaultAssistGas);
+        Assert.Equal("N2", deserialized.DefaultEtchGas);
         Assert.Equal(Units.Inches, deserialized.PostedUnits);
         Assert.Equal(KerfMode.ControllerSide, deserialized.KerfCompensation);
         Assert.True(deserialized.UseAntiDive);
+        Assert.Single(deserialized.MaterialLibraries);
+        Assert.Equal("MS135N2PANEL.lib", deserialized.MaterialLibraries[0].Library);
+        Assert.Single(deserialized.EtchLibraries);
+        Assert.Equal("EtchN2.lib", deserialized.EtchLibraries[0].Library);
 
         // Enums serialize as strings
         Assert.Contains("\"Inches\"", json);
@@ -157,21 +170,21 @@ public class CincinnatiPostProcessorTests
         var output = Encoding.UTF8.GetString(ms.ToArray());
 
         // Sheet should contain M98 call to part sub-program
-        Assert.Contains("M98P200", output);
+        Assert.Contains("M98 P200", output);
 
         // Should have G92 for local coordinate positioning
-        Assert.Contains("G92X0Y0", output);
+        Assert.Contains("G92 X0 Y0", output);
 
         // Part sub-program definition
         Assert.Contains(":200", output);
         Assert.Contains("G84", output);
 
-        // Sub-program ends with G0X0Y0 and M99
-        Assert.Contains("G0X0Y0", output);
-        Assert.Contains("M99(END OF Square)", output);
+        // Sub-program ends with G0 X0 Y0 and M99
+        Assert.Contains("G0 X0 Y0", output);
+        Assert.Contains("M99 (END OF Square)", output);
 
         // G92 restore after M98 call
-        Assert.Contains("G92X", output);
+        Assert.Contains("G92 X", output);
     }
 
     [Fact]
@@ -198,7 +211,7 @@ public class CincinnatiPostProcessorTests
         var output = Encoding.UTF8.GetString(ms.ToArray());
 
         // Both parts should call the same sub-program
-        var m98Count = System.Text.RegularExpressions.Regex.Matches(output, "M98P200").Count;
+        var m98Count = System.Text.RegularExpressions.Regex.Matches(output, @"M98 P200\b").Count;
         Assert.Equal(2, m98Count);
 
         // Only one sub-program definition
@@ -238,8 +251,8 @@ public class CincinnatiPostProcessorTests
         // Should have two different sub-programs
         Assert.Contains(":200", output);
         Assert.Contains(":201", output);
-        Assert.Contains("M98P200", output);
-        Assert.Contains("M98P201", output);
+        Assert.Contains("M98 P200", output);
+        Assert.Contains("M98 P201", output);
     }
 
     [Fact]
@@ -268,7 +281,7 @@ public class CincinnatiPostProcessorTests
         var output = Encoding.UTF8.GetString(ms.ToArray());
 
         // Regular part uses sub-program
-        Assert.Contains("M98P200", output);
+        Assert.Contains("M98 P200", output);
         Assert.Contains(":200", output);
 
         // Cutoff should NOT have its own sub-program

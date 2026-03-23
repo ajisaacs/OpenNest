@@ -13,9 +13,7 @@ public class CincinnatiFeatureWriterTests
         UseAntiDive = true,
         KerfCompensation = KerfMode.ControllerSide,
         DefaultKerfSide = KerfSide.Left,
-        RepeatG89BeforeEachFeature = true,
         ProcessParameterMode = G89Mode.LibraryFile,
-        DefaultLibraryFile = "MILD10",
         InteriorM47 = M47Mode.Always,
         ExteriorM47 = M47Mode.Always,
         UseSpeedGas = false,
@@ -58,7 +56,7 @@ public class CincinnatiFeatureWriterTests
         var output = WriteFeature(config, ctx);
         var lines = output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
-        Assert.StartsWith("N1G0X13.401Y57.4895", lines[0]);
+        Assert.StartsWith("N1 G0 X13.401 Y57.4895", lines[0]);
     }
 
     [Fact]
@@ -70,7 +68,7 @@ public class CincinnatiFeatureWriterTests
         var output = WriteFeature(config, ctx);
         var lines = output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
-        Assert.StartsWith("G0X13.401Y57.4895", lines[0]);
+        Assert.StartsWith("G0 X13.401 Y57.4895", lines[0]);
     }
 
     [Fact]
@@ -260,8 +258,8 @@ public class CincinnatiFeatureWriterTests
         var cwOutput = WriteFeature(config, SimpleContext(cwCodes));
         var ccwOutput = WriteFeature(config, SimpleContext(ccwCodes));
 
-        Assert.Contains("G2X", cwOutput);
-        Assert.Contains("G3X", ccwOutput);
+        Assert.Contains("G2 X", cwOutput);
+        Assert.Contains("G3 X", ccwOutput);
     }
 
     [Fact]
@@ -289,12 +287,10 @@ public class CincinnatiFeatureWriterTests
     }
 
     [Fact]
-    public void G89_EmittedWhenRepeatEnabled()
+    public void G89_EmittedWithLibraryFile()
     {
         var config = DefaultConfig();
-        config.RepeatG89BeforeEachFeature = true;
         config.ProcessParameterMode = G89Mode.LibraryFile;
-        config.DefaultLibraryFile = "MILD10";
         var ctx = SimpleContext();
         ctx.LibraryFile = "MILD10";
         ctx.CutDistance = 18.0;
@@ -305,14 +301,65 @@ public class CincinnatiFeatureWriterTests
     }
 
     [Fact]
-    public void G89_NotEmittedWhenRepeatDisabled()
+    public void G89_WarningEmittedWhenNoLibrary()
     {
         var config = DefaultConfig();
-        config.RepeatG89BeforeEachFeature = false;
+        config.ProcessParameterMode = G89Mode.LibraryFile;
         var ctx = SimpleContext();
+        ctx.LibraryFile = "";
         var output = WriteFeature(config, ctx);
 
-        Assert.DoesNotContain("G89", output);
+        Assert.Contains("WARNING: No library found", output);
+        Assert.DoesNotContain("G89 P", output);
+    }
+
+    [Fact]
+    public void Etch_UsesG85InsteadOfG84()
+    {
+        var config = DefaultConfig();
+        var ctx = SimpleContext();
+        ctx.IsEtch = true;
+        ctx.LibraryFile = "EtchN2.lib";
+        var output = WriteFeature(config, ctx);
+
+        Assert.Contains("G85", output);
+        Assert.DoesNotContain("G84", output);
+    }
+
+    [Fact]
+    public void Etch_SkipsKerfCompensation()
+    {
+        var config = DefaultConfig();
+        config.KerfCompensation = KerfMode.ControllerSide;
+        var ctx = SimpleContext();
+        ctx.IsEtch = true;
+        ctx.LibraryFile = "EtchN2.lib";
+        var output = WriteFeature(config, ctx);
+
+        Assert.DoesNotContain("G41", output);
+        Assert.DoesNotContain("G42", output);
+        Assert.DoesNotContain("G40", output);
+    }
+
+    [Fact]
+    public void Etch_AllMovesUseProcessFeedrate()
+    {
+        var config = DefaultConfig();
+        config.KerfCompensation = KerfMode.PreApplied;
+        var codes = new List<ICode>
+        {
+            new RapidMove(1.0, 1.0),
+            new LinearMove(2.0, 1.0) { Layer = LayerType.Leadin },
+            new LinearMove(3.0, 1.0) { Layer = LayerType.Cut }
+        };
+        var ctx = SimpleContext(codes);
+        ctx.IsEtch = true;
+        ctx.LibraryFile = "EtchN2.lib";
+        var output = WriteFeature(config, ctx);
+
+        // Should use #148 for all moves, not #126 for lead-in
+        Assert.DoesNotContain("F#126", output);
+        Assert.Contains("F#148", output);
     }
 
     [Fact]
@@ -378,7 +425,7 @@ public class CincinnatiFeatureWriterTests
         ctx.IsLastFeatureOnSheet = false;
         var output = WriteFeature(config, ctx);
 
-        Assert.Contains("M47 P2000(Safety Headraise)", output);
+        Assert.Contains("M47 P2000 (Safety Headraise)", output);
     }
 
     [Fact]
@@ -404,7 +451,7 @@ public class CincinnatiFeatureWriterTests
         var lines = output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
         // Find indices of key lines
-        var rapidIdx = Array.FindIndex(lines, l => l.Contains("G0X"));
+        var rapidIdx = Array.FindIndex(lines, l => l.Contains("G0 X"));
         var partIdx = Array.FindIndex(lines, l => l.Contains("PART:"));
         var g89Idx = Array.FindIndex(lines, l => l.Contains("G89"));
         var g84Idx = Array.FindIndex(lines, l => l.Contains("G84"));

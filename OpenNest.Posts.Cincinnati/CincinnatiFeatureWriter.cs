@@ -19,6 +19,7 @@ public sealed class FeatureContext
     public bool IsLastFeatureOnSheet { get; set; }
     public bool IsSafetyHeadraise { get; set; }
     public bool IsExteriorFeature { get; set; }
+    public bool IsEtch { get; set; }
     public string LibraryFile { get; set; } = "";
     public double CutDistance { get; set; }
     public double SheetDiagonal { get; set; }
@@ -61,17 +62,24 @@ public sealed class CincinnatiFeatureWriter
         if (ctx.IsFirstFeatureOfPart && !string.IsNullOrEmpty(ctx.PartName))
             writer.WriteLine(CoordinateFormatter.Comment($"PART: {ctx.PartName}"));
 
-        // 3. G89 process params (if RepeatG89BeforeEachFeature)
-        if (_config.RepeatG89BeforeEachFeature && _config.ProcessParameterMode == G89Mode.LibraryFile)
+        // 3. G89 process params
+        if (_config.ProcessParameterMode == G89Mode.LibraryFile)
         {
-            var lib = !string.IsNullOrEmpty(ctx.LibraryFile) ? ctx.LibraryFile : _config.DefaultLibraryFile;
-            var speedClass = _speedClassifier.Classify(ctx.CutDistance, ctx.SheetDiagonal);
-            var cutDist = _speedClassifier.FormatCutDist(ctx.CutDistance, ctx.SheetDiagonal);
-            writer.WriteLine($"G89 P {lib} ({speedClass} {cutDist})");
+            var lib = ctx.LibraryFile;
+            if (!string.IsNullOrEmpty(lib))
+            {
+                var speedClass = _speedClassifier.Classify(ctx.CutDistance, ctx.SheetDiagonal);
+                var cutDist = _speedClassifier.FormatCutDist(ctx.CutDistance, ctx.SheetDiagonal);
+                writer.WriteLine($"G89 P {lib} ({speedClass} {cutDist})");
+            }
+            else
+            {
+                writer.WriteLine("(WARNING: No library found)");
+            }
         }
 
-        // 4. Pierce and start cut
-        writer.WriteLine("G84");
+        // 4. Pierce/beam on — G85 for etch (no pierce), G84 for cut
+        writer.WriteLine(ctx.IsEtch ? "G85" : "G84");
 
         // 5. Anti-dive off
         if (_config.UseAntiDive)
@@ -90,20 +98,20 @@ public sealed class CincinnatiFeatureWriter
             {
                 var sb = new StringBuilder();
 
-                // Kerf compensation on first cutting move
-                if (!kerfEmitted && _config.KerfCompensation == KerfMode.ControllerSide)
+                // Kerf compensation on first cutting move (skip for etch)
+                if (!ctx.IsEtch && !kerfEmitted && _config.KerfCompensation == KerfMode.ControllerSide)
                 {
-                    sb.Append(_config.DefaultKerfSide == KerfSide.Left ? "G41" : "G42");
+                    sb.Append(_config.DefaultKerfSide == KerfSide.Left ? "G41 " : "G42 ");
                     kerfEmitted = true;
                 }
 
-                sb.Append($"G1X{_fmt.FormatCoord(linear.EndPoint.X)}Y{_fmt.FormatCoord(linear.EndPoint.Y)}");
+                sb.Append($"G1 X{_fmt.FormatCoord(linear.EndPoint.X)} Y{_fmt.FormatCoord(linear.EndPoint.Y)}");
 
-                // Feedrate
-                var feedVar = GetFeedVariable(linear.Layer);
+                // Feedrate — etch always uses process feedrate
+                var feedVar = ctx.IsEtch ? "#148" : GetFeedVariable(linear.Layer);
                 if (feedVar != lastFeedVar)
                 {
-                    sb.Append($"F{feedVar}");
+                    sb.Append($" F{feedVar}");
                     lastFeedVar = feedVar;
                 }
 
@@ -114,28 +122,30 @@ public sealed class CincinnatiFeatureWriter
             {
                 var sb = new StringBuilder();
 
-                // Kerf compensation on first cutting move
-                if (!kerfEmitted && _config.KerfCompensation == KerfMode.ControllerSide)
+                // Kerf compensation on first cutting move (skip for etch)
+                if (!ctx.IsEtch && !kerfEmitted && _config.KerfCompensation == KerfMode.ControllerSide)
                 {
-                    sb.Append(_config.DefaultKerfSide == KerfSide.Left ? "G41" : "G42");
+                    sb.Append(_config.DefaultKerfSide == KerfSide.Left ? "G41 " : "G42 ");
                     kerfEmitted = true;
                 }
 
                 // G2 = CW, G3 = CCW
                 var gCode = arc.Rotation == RotationType.CW ? "G2" : "G3";
-                sb.Append($"{gCode}X{_fmt.FormatCoord(arc.EndPoint.X)}Y{_fmt.FormatCoord(arc.EndPoint.Y)}");
+                sb.Append($"{gCode} X{_fmt.FormatCoord(arc.EndPoint.X)} Y{_fmt.FormatCoord(arc.EndPoint.Y)}");
 
                 // Convert absolute center to incremental I/J
                 var i = arc.CenterPoint.X - currentPos.X;
                 var j = arc.CenterPoint.Y - currentPos.Y;
-                sb.Append($"I{_fmt.FormatCoord(i)}J{_fmt.FormatCoord(j)}");
+                sb.Append($" I{_fmt.FormatCoord(i)} J{_fmt.FormatCoord(j)}");
 
-                // Feedrate — full circles use multiplied feedrate
+                // Feedrate — etch always uses process feedrate, cut uses layer-based
                 var isFullCircle = IsFullCircle(currentPos, arc.EndPoint);
-                var feedVar = isFullCircle ? "[#148*#128]" : GetFeedVariable(arc.Layer);
+                var feedVar = ctx.IsEtch ? "#148"
+                    : isFullCircle ? "[#148*#128]"
+                    : GetFeedVariable(arc.Layer);
                 if (feedVar != lastFeedVar)
                 {
-                    sb.Append($"F{feedVar}");
+                    sb.Append($" F{feedVar}");
                     lastFeedVar = feedVar;
                 }
 
@@ -183,9 +193,9 @@ public sealed class CincinnatiFeatureWriter
         var sb = new StringBuilder();
 
         if (_config.UseLineNumbers)
-            sb.Append($"N{featureNumber}");
+            sb.Append($"N{featureNumber} ");
 
-        sb.Append($"G0X{_fmt.FormatCoord(piercePoint.X)}Y{_fmt.FormatCoord(piercePoint.Y)}");
+        sb.Append($"G0 X{_fmt.FormatCoord(piercePoint.X)} Y{_fmt.FormatCoord(piercePoint.Y)}");
 
         writer.WriteLine(sb.ToString());
     }
@@ -194,7 +204,7 @@ public sealed class CincinnatiFeatureWriter
     {
         if (ctx.IsSafetyHeadraise && _config.SafetyHeadraiseDistance.HasValue)
         {
-            writer.WriteLine($"M47 P{_config.SafetyHeadraiseDistance.Value}(Safety Headraise)");
+            writer.WriteLine($"M47 P{_config.SafetyHeadraiseDistance.Value} (Safety Headraise)");
             return;
         }
 

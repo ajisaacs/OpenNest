@@ -13,14 +13,13 @@ public class CincinnatiPreambleWriterTests
         var config = new CincinnatiPostConfig
         {
             ConfigurationName = "CL940",
-            PostedUnits = Units.Inches,
-            DefaultLibraryFile = "MS135N2PANEL.lib"
+            PostedUnits = Units.Inches
         };
         var sb = new StringBuilder();
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "TestNest", "Mild Steel, 10GA", 2);
+        writer.WriteMainProgram(sw, "TestNest", "Mild Steel, 10GA", 2, "MS135N2PANEL.lib");
 
         var output = sb.ToString();
         Assert.Contains("( NEST TestNest )", output);
@@ -30,8 +29,8 @@ public class CincinnatiPreambleWriterTests
         Assert.Contains("G89 P MS135N2PANEL.lib", output);
         Assert.Contains("M98 P100 (Variable Declaration)", output);
         Assert.Contains("GOTO1 (GOTO SHEET NUMBER)", output);
-        Assert.Contains("N1M98 P101 (SHEET 1)", output);
-        Assert.Contains("N2M98 P102 (SHEET 2)", output);
+        Assert.Contains("N1 M98 P101 (SHEET 1)", output);
+        Assert.Contains("N2 M98 P102 (SHEET 2)", output);
         Assert.Contains("M30 (END OF MAIN)", output);
     }
 
@@ -43,7 +42,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1);
+        writer.WriteMainProgram(sw, "Test", "", 1, "");
 
         Assert.Contains("G21", sb.ToString());
     }
@@ -56,7 +55,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1);
+        writer.WriteMainProgram(sw, "Test", "", 1, "");
 
         Assert.Contains("G61", sb.ToString());
     }
@@ -69,7 +68,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1);
+        writer.WriteMainProgram(sw, "Test", "", 1, "");
 
         Assert.DoesNotContain("G61", sb.ToString());
     }

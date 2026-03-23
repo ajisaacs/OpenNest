@@ -21,7 +21,9 @@ public sealed class CincinnatiPreambleWriter
     /// <summary>
     /// Writes the main program header block.
     /// </summary>
-    public void WriteMainProgram(TextWriter w, string nestName, string materialDescription, int sheetCount)
+    /// <param name="initialLibrary">Resolved G89 library file for the initial process setup.</param>
+    public void WriteMainProgram(TextWriter w, string nestName, string materialDescription,
+        int sheetCount, string initialLibrary)
     {
         w.WriteLine(CoordinateFormatter.Comment($"NEST {nestName}"));
         w.WriteLine(CoordinateFormatter.Comment($"CONFIGURATION - {_config.ConfigurationName}"));
@@ -39,8 +41,8 @@ public sealed class CincinnatiPreambleWriter
 
         w.WriteLine("M42");
 
-        if (_config.ProcessParameterMode == G89Mode.LibraryFile && !string.IsNullOrEmpty(_config.DefaultLibraryFile))
-            w.WriteLine($"G89 P {_config.DefaultLibraryFile}");
+        if (_config.ProcessParameterMode == G89Mode.LibraryFile && !string.IsNullOrEmpty(initialLibrary))
+            w.WriteLine($"G89 P {initialLibrary}");
 
         w.WriteLine($"M98 P{_config.VariableDeclarationSubprogram} (Variable Declaration)");
 
@@ -49,7 +51,7 @@ public sealed class CincinnatiPreambleWriter
         for (var i = 1; i <= sheetCount; i++)
         {
             var subNum = _config.SheetSubprogramStart + (i - 1);
-            w.WriteLine($"N{i}M98 P{subNum} (SHEET {i})");
+            w.WriteLine($"N{i} M98 P{subNum} (SHEET {i})");
         }
 
         w.WriteLine("M42");
