@@ -21,9 +21,12 @@ namespace OpenNest.Geometry
             Perimeter = shapes[0];
             Cutouts = new List<Shape>();
 
-            for (int i = 1; i < shapes.Count; i++)
+            for (var i = 1; i < shapes.Count; i++)
             {
-                if (shapes[i].Left < Perimeter.Left)
+                var bb = shapes[i].BoundingBox;
+                var perimBB = Perimeter.BoundingBox;
+
+                if (bb.Width * bb.Length > perimBB.Width * perimBB.Length)
                 {
                     Cutouts.Add(Perimeter);
                     Perimeter = shapes[i];
