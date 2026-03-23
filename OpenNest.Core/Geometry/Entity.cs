@@ -247,7 +247,7 @@ namespace OpenNest.Geometry
 
     public static class EntityExtensions
     {
-        public static BoundingRectangleResult FindBestRotation(this List<Entity> entities, double startAngle = 0, double endAngle = Angle.TwoPI)
+        public static List<Vector> CollectPoints(this IEnumerable<Entity> entities)
         {
             var points = new List<Vector>();
 
@@ -286,17 +286,35 @@ namespace OpenNest.Geometry
 
                     case EntityType.Shape:
                         var shape = (Shape)entity;
-                        var subResult = shape.Entities.FindBestRotation(startAngle, endAngle);
-                        return subResult;
+                        points.AddRange(shape.Entities.CollectPoints());
+                        break;
                 }
             }
+
+            return points;
+        }
+
+        public static BoundingRectangleResult FindBestRotation(this List<Entity> entities, double startAngle = 0, double endAngle = Angle.TwoPI)
+        {
+            // Check for Shape entity first (recursive case returns early)
+            foreach (var entity in entities)
+            {
+                if (entity.Type == EntityType.Shape)
+                {
+                    var shape = (Shape)entity;
+                    var subResult = shape.Entities.FindBestRotation(startAngle, endAngle);
+                    return subResult;
+                }
+            }
+
+            var points = entities.CollectPoints();
 
             if (points.Count == 0)
                 return new BoundingRectangleResult(startAngle, 0, 0);
 
             var hull = ConvexHull.Compute(points);
 
-            bool constrained = !startAngle.IsEqualTo(0) || !endAngle.IsEqualTo(Angle.TwoPI);
+            var constrained = !startAngle.IsEqualTo(0) || !endAngle.IsEqualTo(Angle.TwoPI);
 
             return constrained
                 ? RotatingCalipers.MinimumBoundingRectangle(hull, startAngle, endAngle)

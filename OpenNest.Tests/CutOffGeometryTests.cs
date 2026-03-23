@@ -322,6 +322,21 @@ public class CutOffGeometryTests
     }
 
     [Fact]
+    public void CollectPoints_LinesAndArcs_ReturnsAllPoints()
+    {
+        var entities = new List<Entity>
+        {
+            new Line(new Vector(0, 0), new Vector(10, 0)),
+            new Arc(new Vector(5, 5), 5, 0, System.Math.PI)
+        };
+
+        var points = entities.CollectPoints();
+
+        // Line: 2 points. Arc: 2 endpoints + 4 cardinals = 6. Total = 8.
+        Assert.Equal(8, points.Count);
+    }
+
+    [Fact]
     public void ShapeProfile_SelectsLargestShapeAsPerimeter()
     {
         // Outer square: (5,0)→(25,0)→(25,20)→(5,20)→(5,0)
