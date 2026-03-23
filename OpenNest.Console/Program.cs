@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 
 return NestConsole.Run(args);
@@ -19,6 +20,12 @@ static class NestConsole
 
         if (options == null)
             return 0; // --help was requested
+
+        if (options.ListPosts)
+        {
+            ListPostProcessors(options);
+            return 0;
+        }
 
         if (options.InputFiles.Count == 0)
         {
@@ -68,6 +75,7 @@ static class NestConsole
 
         PrintResults(success, plate, elapsed);
         Save(nest, options);
+        PostProcess(nest, options);
 
         return options.CheckOverlaps && overlapCount > 0 ? 1 : 0;
     }
@@ -119,6 +127,18 @@ static class NestConsole
                     break;
                 case "--engine" when i + 1 < args.Length:
                     NestEngineRegistry.ActiveEngineName = args[++i];
+                    break;
+                case "--post" when i + 1 < args.Length:
+                    o.PostName = args[++i];
+                    break;
+                case "--post-output" when i + 1 < args.Length:
+                    o.PostOutput = args[++i];
+                    break;
+                case "--posts-dir" when i + 1 < args.Length:
+                    o.PostsDir = args[++i];
+                    break;
+                case "--list-posts":
+                    o.ListPosts = true;
                     break;
                 case "--help":
                 case "-h":
@@ -382,6 +402,100 @@ static class NestConsole
         Console.WriteLine($"Saved: {outputFile}");
     }
 
+    static string ResolvePostsDir(Options options)
+    {
+        if (options.PostsDir != null)
+            return options.PostsDir;
+
+        var exePath = Assembly.GetEntryAssembly()?.Location
+                      ?? typeof(NestConsole).Assembly.Location;
+        return Path.Combine(Path.GetDirectoryName(exePath), "Posts");
+    }
+
+    static List<IPostProcessor> LoadPostProcessors(string postsDir)
+    {
+        var processors = new List<IPostProcessor>();
+
+        if (!Directory.Exists(postsDir))
+            return processors;
+
+        foreach (var file in Directory.GetFiles(postsDir, "*.dll"))
+        {
+            try
+            {
+                var assembly = Assembly.LoadFrom(file);
+
+                foreach (var type in assembly.GetTypes())
+                {
+                    if (!typeof(IPostProcessor).IsAssignableFrom(type) || type.IsInterface || type.IsAbstract)
+                        continue;
+
+                    if (Activator.CreateInstance(type) is IPostProcessor processor)
+                        processors.Add(processor);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Warning: failed to load post processor from {Path.GetFileName(file)}: {ex.Message}");
+            }
+        }
+
+        return processors;
+    }
+
+    static void ListPostProcessors(Options options)
+    {
+        var postsDir = ResolvePostsDir(options);
+        var processors = LoadPostProcessors(postsDir);
+
+        if (processors.Count == 0)
+        {
+            Console.WriteLine($"No post processors found in: {postsDir}");
+            return;
+        }
+
+        Console.WriteLine($"Post processors ({postsDir}):");
+
+        foreach (var p in processors)
+            Console.WriteLine($"  {p.Name,-30} {p.Description}");
+    }
+
+    static void PostProcess(Nest nest, Options options)
+    {
+        if (options.PostName == null)
+            return;
+
+        var postsDir = ResolvePostsDir(options);
+        var processors = LoadPostProcessors(postsDir);
+        var post = processors.FirstOrDefault(p =>
+            p.Name.Equals(options.PostName, StringComparison.OrdinalIgnoreCase));
+
+        if (post == null)
+        {
+            Console.Error.WriteLine($"Error: post processor '{options.PostName}' not found");
+
+            if (processors.Count > 0)
+                Console.Error.WriteLine($"Available: {string.Join(", ", processors.Select(p => p.Name))}");
+            else
+                Console.Error.WriteLine($"No post processors found in: {postsDir}");
+
+            return;
+        }
+
+        var outputFile = options.PostOutput;
+
+        if (outputFile == null)
+        {
+            var firstInput = options.InputFiles[0];
+            outputFile = Path.Combine(
+                Path.GetDirectoryName(firstInput),
+                $"{Path.GetFileNameWithoutExtension(firstInput)}.cnc");
+        }
+
+        post.Post(nest, outputFile);
+        Console.WriteLine($"Post: {post.Name} -> {outputFile}");
+    }
+
     static void PrintUsage()
     {
         Console.Error.WriteLine("Usage: OpenNest.Console <input-files...> [options]");
@@ -407,6 +521,10 @@ static class NestConsole
         Console.Error.WriteLine("  --check-overlaps       Run overlap detection after fill (exit code 1 if found)");
         Console.Error.WriteLine("  --no-save              Skip saving output file");
         Console.Error.WriteLine("  --no-log               Skip writing debug log file");
+        Console.Error.WriteLine("  --post <name>          Run a post processor after nesting");
+        Console.Error.WriteLine("  --post-output <path>   Output file for post processor (default: <input>.cnc)");
+        Console.Error.WriteLine("  --posts-dir <path>     Directory containing post processor DLLs (default: Posts/)");
+        Console.Error.WriteLine("  --list-posts           List available post processors and exit");
         Console.Error.WriteLine("  -h, --help             Show this help");
     }
 
@@ -425,5 +543,9 @@ static class NestConsole
         public bool KeepParts;
         public bool AutoNest;
         public string TemplateFile;
+        public string PostName;
+        public string PostOutput;
+        public string PostsDir;
+        public bool ListPosts;
     }
 }
