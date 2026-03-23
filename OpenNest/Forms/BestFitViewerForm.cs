@@ -41,11 +41,12 @@ namespace OpenNest.Forms
         private int currentPage;
         private int pageCount;
         private CancellationTokenSource computeCts;
+        private Label lblLoading;
 
         public BestFitResult SelectedResult { get; private set; }
         public Drawing SelectedDrawing => activeDrawing;
 
-        public BestFitViewerForm(DrawingCollection drawings, Plate plate)
+        public BestFitViewerForm(DrawingCollection drawings, Plate plate, Units units = Units.Inches)
         {
             this.drawings = drawings.ToList();
             this.plate = plate;
@@ -53,10 +54,12 @@ namespace OpenNest.Forms
             DoubleBuffered = true;
             InitializeComponent();
 
+            drawingListBox.Units = units;
+            drawingListBox.HideQuantity = true;
             foreach (var d in drawings)
-                cboDrawing.Items.Add(d.Name);
-            cboDrawing.SelectedIndex = 0;
-            cboDrawing.SelectedIndexChanged += cboDrawing_SelectedIndexChanged;
+                drawingListBox.Items.Add(d);
+            drawingListBox.SelectedIndex = 0;
+            drawingListBox.SelectedIndexChanged += drawingListBox_SelectedIndexChanged;
 
             navPanel.SizeChanged += (s, ev) => CenterNavControls();
             Shown += BestFitViewerForm_Shown;
@@ -93,13 +96,13 @@ namespace OpenNest.Forms
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        private void cboDrawing_SelectedIndexChanged(object sender, EventArgs e)
+        private void drawingListBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            var index = cboDrawing.SelectedIndex;
-            if (index < 0 || index >= drawings.Count)
+            var drawing = drawingListBox.SelectedItem as Drawing;
+            if (drawing == null)
                 return;
 
-            activeDrawing = drawings[index];
+            activeDrawing = drawing;
             LoadResultsAsync();
         }
 
@@ -145,7 +148,6 @@ namespace OpenNest.Forms
         private void SetLoading(bool loading)
         {
             Cursor = loading ? Cursors.WaitCursor : Cursors.Default;
-            cboDrawing.Enabled = !loading;
             btnPrev.Enabled = !loading;
             btnNext.Enabled = !loading;
             txtPage.Enabled = !loading;
@@ -155,8 +157,34 @@ namespace OpenNest.Forms
                 Text = "Best-Fit Viewer — Computing...";
                 gridPanel.SuspendLayout();
                 gridPanel.Controls.Clear();
+                lblLoading = null;
+                EnsureLoadingLabel();
+                lblLoading.Text = string.Format("Computing best fits for {0}...", activeDrawing.Name);
                 gridPanel.ResumeLayout(true);
             }
+            else
+            {
+                if (lblLoading != null)
+                    lblLoading.Visible = false;
+            }
+        }
+
+        private void EnsureLoadingLabel()
+        {
+            if (lblLoading != null)
+                return;
+
+            lblLoading = new Label
+            {
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = Color.Gray,
+                Font = new Font(Font.FontFamily, 14f),
+                Dock = DockStyle.Fill
+            };
+            gridPanel.Controls.Add(lblLoading, 0, 0);
+            gridPanel.SetColumnSpan(lblLoading, Columns);
+            gridPanel.SetRowSpan(lblLoading, Rows);
         }
 
         private static ComputeResult ComputeResults(Drawing drawing, double length, double width, double spacing)

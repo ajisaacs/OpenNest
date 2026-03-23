@@ -626,7 +626,7 @@ namespace OpenNest.Forms
                 return;
             }
 
-            using (var form = new BestFitViewerForm(drawings, plate))
+            using (var form = new BestFitViewerForm(drawings, plate, activeForm.Nest.Units))
             {
                 if (form.ShowDialog(this) == DialogResult.OK && form.SelectedResult != null)
                 {

@@ -28,6 +28,8 @@ namespace OpenNest.Controls
 
         public bool HideDepletedParts { get; set; }
 
+        public bool HideQuantity { get; set; }
+
         protected override void OnDrawItem(DrawItemEventArgs e)
         {
             if (e.Index >= Items.Count || e.Index <= -1)
@@ -38,8 +40,15 @@ namespace OpenNest.Controls
             if (dwg == null)
                 return;
 
-            var isComplete = dwg.Quantity.Nested > 0 && dwg.Quantity.Remaining == 0;
-            var bgBrush = isComplete ? SystemBrushes.Info : Brushes.White;
+            var isSelected = (e.State & DrawItemState.Selected) != 0;
+            Brush bgBrush;
+
+            if (isSelected)
+                bgBrush = SystemBrushes.Highlight;
+            else if (!HideQuantity && dwg.Quantity.Nested > 0 && dwg.Quantity.Remaining == 0)
+                bgBrush = SystemBrushes.Info;
+            else
+                bgBrush = Brushes.White;
 
             e.Graphics.FillRectangle(bgBrush, e.Bounds);
 
@@ -57,19 +66,32 @@ namespace OpenNest.Controls
 
             pt.X += imageSize.Width + 10;
 
-            e.Graphics.DrawString(dwg.Name, nameFont, Brushes.Black, pt);
+            var textBrush = isSelected ? SystemBrushes.HighlightText : Brushes.Black;
+            var detailBrush = isSelected ? SystemBrushes.HighlightText : Brushes.Gray;
+
+            e.Graphics.DrawString(dwg.Name, nameFont, textBrush, pt);
 
             var bounds = dwg.Program.BoundingBox();
-            var text1 = string.Format("{0} of {1} nested", dwg.Quantity.Nested, dwg.Quantity.Required);
             var text2 = bounds.Size.ToString(4);
             var text3 = string.Format("{0} sq/{1}", System.Math.Round(dwg.Area, 4), UnitsHelper.GetShortString(Units));
 
-            pt.Y += 22;
-            e.Graphics.DrawString(text1, Font, Brushes.Gray, pt);
-            pt.Y += 18;
-            e.Graphics.DrawString(text2, Font, Brushes.Gray, pt);
-            pt.Y += 18;
-            e.Graphics.DrawString(text3, Font, Brushes.Gray, pt);
+            if (HideQuantity)
+            {
+                pt.Y += 22;
+                e.Graphics.DrawString(text2, Font, detailBrush, pt);
+                pt.Y += 18;
+                e.Graphics.DrawString(text3, Font, detailBrush, pt);
+            }
+            else
+            {
+                var text1 = string.Format("{0} of {1} nested", dwg.Quantity.Nested, dwg.Quantity.Required);
+                pt.Y += 22;
+                e.Graphics.DrawString(text1, Font, detailBrush, pt);
+                pt.Y += 18;
+                e.Graphics.DrawString(text2, Font, detailBrush, pt);
+                pt.Y += 18;
+                e.Graphics.DrawString(text3, Font, detailBrush, pt);
+            }
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
