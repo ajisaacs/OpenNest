@@ -133,6 +133,12 @@ namespace OpenNest.Actions
                 plateView.Invalidate();
                 status = Status.SetFirstPoint;
             }
+            else if (plateView.SelectedParts.Count > 0)
+            {
+                // Part drag completed — regenerate cut-off programs
+                if (plateView.Plate.CutOffs.Count > 0)
+                    plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);
+            }
         }
 
         private void plateView_Paint(object sender, PaintEventArgs e)

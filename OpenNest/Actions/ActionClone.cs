@@ -167,6 +167,9 @@ namespace OpenNest.Actions
             }
 
             parts.ForEach(p => plateView.Plate.Parts.Add(p.BasePart.Clone() as Part));
+
+            if (plateView.Plate.CutOffs.Count > 0)
+                plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);
         }
 
         private void Fill()

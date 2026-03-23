@@ -1089,6 +1089,10 @@ namespace OpenNest.Controls
                 if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
                 {
                     AcceptPreviewParts(parts);
+
+                    if (Plate.CutOffs.Count > 0)
+                        Plate.RegenerateCutOffs(cutOffSettings);
+
                     sw.Stop();
                     Status = $"Fill: {parts.Count} parts in {sw.ElapsedMilliseconds} ms";
                 }
