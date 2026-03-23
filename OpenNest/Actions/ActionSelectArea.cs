@@ -157,7 +157,31 @@ namespace OpenNest.Actions
         public void Update()
         {
             foreach (var part in plateView.Plate.Parts)
+            {
+                if (part.BaseDrawing.IsCutOff)
+                    continue;
+
                 boxes.Add(part.BoundingBox.Offset(plateView.Plate.PartSpacing));
+            }
+
+            // Add thin obstacle boxes from cutoff definitions so that
+            // the area selection correctly treats cutoffs as boundaries.
+            // Cutoff Parts have inflated bounding boxes (their programs use
+            // absolute coordinates, causing BoundingBox to span from origin)
+            // so we derive the position directly from the CutOff definition.
+            var plateBounds = plateView.Plate.BoundingBox(includeParts: false);
+
+            foreach (var cutoff in plateView.Plate.CutOffs)
+            {
+                Box cutoffBox;
+
+                if (cutoff.Axis == CutOffAxis.Vertical)
+                    cutoffBox = new Box(cutoff.Position.X, plateBounds.Y, 0, plateBounds.Length);
+                else
+                    cutoffBox = new Box(plateBounds.X, cutoff.Position.Y, plateBounds.Width, 0);
+
+                boxes.Add(cutoffBox.Offset(plateView.Plate.PartSpacing));
+            }
 
             Bounds = plateView.Plate.WorkArea();
         }

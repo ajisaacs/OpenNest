@@ -187,7 +187,25 @@ namespace OpenNest.Actions
 
             var boxes = new List<Box>();
             foreach (var part in plate.Parts)
+            {
+                if (part.BaseDrawing.IsCutOff)
+                    continue;
+
                 boxes.Add(part.BoundingBox.Offset(plate.PartSpacing));
+            }
+
+            var plateBounds = plate.BoundingBox(includeParts: false);
+            foreach (var cutoff in plate.CutOffs)
+            {
+                Box cutoffBox;
+
+                if (cutoff.Axis == CutOffAxis.Vertical)
+                    cutoffBox = new Box(cutoff.Position.X, plateBounds.Y, 0, plateBounds.Length);
+                else
+                    cutoffBox = new Box(plateBounds.X, cutoff.Position.Y, plateBounds.Width, 0);
+
+                boxes.Add(cutoffBox.Offset(plate.PartSpacing));
+            }
 
             var pt = plateView.CurrentPoint;
             var vertical = SpatialQuery.GetLargestBoxVertically(pt, bounds, boxes);
