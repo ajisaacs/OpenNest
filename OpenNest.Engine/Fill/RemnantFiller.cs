@@ -102,16 +102,59 @@ namespace OpenNest.Engine.Fill
                 if (placed == null)
                     continue;
 
+                // Remove the topmost bounding box part to create a clean
+                // rectangular obstacle boundary. Without this, gaps between
+                // individual bounding boxes cause the next drawing to fill
+                // into inter-row spaces, producing an interleaved layout.
+                if (placed.Count > 1)
+                    RemoveTopmostPart(placed);
+
                 allParts.AddRange(placed);
                 localQty[item.Drawing.Name] = System.Math.Max(0, qty - placed.Count);
 
-                foreach (var p in placed)
-                    finder.AddObstacle(p.BoundingBox.Offset(spacing));
+                // Add the envelope of all placed parts as a single obstacle
+                // rather than individual bounding boxes, preventing the
+                // remnant finder from seeing inter-part gaps.
+                var envelope = ComputeEnvelope(placed, spacing);
+                finder.AddObstacle(envelope);
 
                 return true;
             }
 
             return false;
+        }
+
+        private static void RemoveTopmostPart(List<Part> parts)
+        {
+            var topIdx = 0;
+
+            for (var i = 1; i < parts.Count; i++)
+            {
+                if (parts[i].BoundingBox.Top > parts[topIdx].BoundingBox.Top)
+                    topIdx = i;
+            }
+
+            parts.RemoveAt(topIdx);
+        }
+
+        private static Box ComputeEnvelope(List<Part> parts, double spacing)
+        {
+            var left = double.MaxValue;
+            var bottom = double.MaxValue;
+            var right = double.MinValue;
+            var top = double.MinValue;
+
+            foreach (var p in parts)
+            {
+                var bb = p.BoundingBox;
+                if (bb.Left < left) left = bb.Left;
+                if (bb.Bottom < bottom) bottom = bb.Bottom;
+                if (bb.Right > right) right = bb.Right;
+                if (bb.Top > top) top = bb.Top;
+            }
+
+            return new Box(left - spacing, bottom - spacing,
+                right - left + spacing * 2, top - bottom + spacing * 2);
         }
 
         private static List<Part> TryFillInRemnants(
