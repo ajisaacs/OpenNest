@@ -6,4 +6,11 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
   </ItemGroup>
+  <Target Name="CopyToPostsDir" AfterTargets="Build">
+    <PropertyGroup>
+      <PostsDir>..\OpenNest\bin\$(Configuration)\$(TargetFramework)\Posts\</PostsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(PostsDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
