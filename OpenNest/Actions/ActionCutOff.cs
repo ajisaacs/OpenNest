@@ -23,14 +23,9 @@ namespace OpenNest.Actions
             : base(plateView)
         {
             settings = plateView.CutOffSettings;
-            perimeterCache = Plate.BuildPerimeterCache(plateView.Plate);
             debounceTimer = new Timer { Interval = 16 };
             debounceTimer.Tick += OnDebounce;
-
-            plateView.MouseMove += OnMouseMove;
-            plateView.MouseDown += OnMouseDown;
-            plateView.KeyDown += OnKeyDown;
-            plateView.Paint += OnPaint;
+            ConnectEvents();
         }
 
         public override void ConnectEvents()
@@ -46,6 +41,7 @@ namespace OpenNest.Actions
         public override void DisconnectEvents()
         {
             debounceTimer.Stop();
+            debounceTimer.Dispose();
             plateView.MouseMove -= OnMouseMove;
             plateView.MouseDown -= OnMouseDown;
             plateView.KeyDown -= OnKeyDown;
@@ -90,7 +86,6 @@ namespace OpenNest.Actions
 
             plateView.Plate.CutOffs.Add(cutoff);
             plateView.Plate.RegenerateCutOffs(settings);
-            perimeterCache = Plate.BuildPerimeterCache(plateView.Plate);
             plateView.Invalidate();
         }
 

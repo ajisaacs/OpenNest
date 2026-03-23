@@ -104,29 +104,17 @@ namespace OpenNest
             return segments;
         }
 
+        private static readonly List<(double Start, double End)> EmptyExclusions = new();
+
         private List<(double Start, double End)> GetPartExclusions(
             Part part, Entity perimeter, double cutPosition, double lineStart, double lineEnd, double clearance)
         {
             var bb = part.BoundingBox;
-            double partMin, partMax, partStart, partEnd;
-
-            if (Axis == CutOffAxis.Vertical)
-            {
-                partMin = bb.X - clearance;
-                partMax = bb.X + bb.Width + clearance;
-                partStart = bb.Y - clearance;
-                partEnd = bb.Y + bb.Length + clearance;
-            }
-            else
-            {
-                partMin = bb.Y - clearance;
-                partMax = bb.Y + bb.Length + clearance;
-                partStart = bb.X - clearance;
-                partEnd = bb.X + bb.Width + clearance;
-            }
+            var (partMin, partMax) = AxisBounds(bb, clearance);
+            var (partStart, partEnd) = CrossAxisBounds(bb, clearance);
 
             if (cutPosition < partMin || cutPosition > partMax)
-                return new List<(double Start, double End)>();
+                return EmptyExclusions;
 
             if (perimeter != null)
             {
@@ -141,19 +129,7 @@ namespace OpenNest
         private List<(double Start, double End)> IntersectPerimeter(
             Entity perimeter, double cutPosition, double lineStart, double lineEnd, double clearance)
         {
-            Vector p1, p2;
-            if (Axis == CutOffAxis.Vertical)
-            {
-                p1 = new Vector(cutPosition, lineStart);
-                p2 = new Vector(cutPosition, lineEnd);
-            }
-            else
-            {
-                p1 = new Vector(lineStart, cutPosition);
-                p2 = new Vector(lineEnd, cutPosition);
-            }
-
-            var cutLine = new Line(p1, p2);
+            var cutLine = new Line(MakePoint(cutPosition, lineStart), MakePoint(cutPosition, lineEnd));
 
             if (!perimeter.Intersects(cutLine, out var pts) || pts.Count < 2)
                 return null;
@@ -173,6 +149,21 @@ namespace OpenNest
             return result;
         }
 
+        private Vector MakePoint(double cutCoord, double lineCoord) =>
+            Axis == CutOffAxis.Vertical
+                ? new Vector(cutCoord, lineCoord)
+                : new Vector(lineCoord, cutCoord);
+
+        private (double Min, double Max) AxisBounds(Box bb, double clearance) =>
+            Axis == CutOffAxis.Vertical
+                ? (bb.X - clearance, bb.X + bb.Width + clearance)
+                : (bb.Y - clearance, bb.Y + bb.Length + clearance);
+
+        private (double Start, double End) CrossAxisBounds(Box bb, double clearance) =>
+            Axis == CutOffAxis.Vertical
+                ? (bb.Y - clearance, bb.Y + bb.Length + clearance)
+                : (bb.X - clearance, bb.X + bb.Width + clearance);
+
         private Program BuildProgram(List<(double Start, double End)> segments, CutOffSettings settings)
         {
             var program = new Program();
@@ -180,39 +171,18 @@ namespace OpenNest
             if (segments.Count == 0)
                 return program;
 
-            if (settings.CutDirection == CutDirection.TowardOrigin)
-                segments = segments.OrderByDescending(s => s.Start).ToList();
-            else
-                segments = segments.OrderBy(s => s.Start).ToList();
+            var toward = settings.CutDirection == CutDirection.TowardOrigin;
+            segments = toward
+                ? segments.OrderByDescending(s => s.Start).ToList()
+                : segments.OrderBy(s => s.Start).ToList();
+
+            var cutPos = Axis == CutOffAxis.Vertical ? Position.X : Position.Y;
 
             foreach (var seg in segments)
             {
-                double startVal, endVal;
-                if (settings.CutDirection == CutDirection.TowardOrigin)
-                {
-                    startVal = seg.End;
-                    endVal = seg.Start;
-                }
-                else
-                {
-                    startVal = seg.Start;
-                    endVal = seg.End;
-                }
-
-                Vector startPt, endPt;
-                if (Axis == CutOffAxis.Vertical)
-                {
-                    startPt = new Vector(Position.X, startVal);
-                    endPt = new Vector(Position.X, endVal);
-                }
-                else
-                {
-                    startPt = new Vector(startVal, Position.Y);
-                    endPt = new Vector(endVal, Position.Y);
-                }
-
-                program.Codes.Add(new RapidMove(startPt));
-                program.Codes.Add(new LinearMove(endPt));
+                var (from, to) = toward ? (seg.End, seg.Start) : (seg.Start, seg.End);
+                program.Codes.Add(new RapidMove(MakePoint(cutPos, from)));
+                program.Codes.Add(new LinearMove(MakePoint(cutPos, to)));
             }
 
             return program;

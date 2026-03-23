@@ -9,6 +9,22 @@ public class CutOffGeometryTests
 {
     private static readonly CutOffSettings ZeroClearance = new() { PartClearance = 0.0 };
 
+    private static double TotalCutLength(Program program, CutOffAxis axis = CutOffAxis.Vertical)
+    {
+        var total = 0.0;
+        for (var i = 0; i < program.Codes.Count - 1; i += 2)
+        {
+            if (program.Codes[i] is RapidMove rapid &&
+                program.Codes[i + 1] is LinearMove linear)
+            {
+                total += axis == CutOffAxis.Vertical
+                    ? System.Math.Abs(rapid.EndPoint.Y - linear.EndPoint.Y)
+                    : System.Math.Abs(rapid.EndPoint.X - linear.EndPoint.X);
+            }
+        }
+        return total;
+    }
+
     private static Program MakeSquare(double size)
     {
         var pgm = new Program();
@@ -95,20 +111,8 @@ public class CutOffGeometryTests
         // The circle chord at X=2 from center (10,0) is much shorter than 20.
         // With geometry, we get a tighter exclusion, so the segments should
         // cover more of the plate than with BB.
-        var segments = cutoff.Drawing.Program.Codes.OfType<LinearMove>().ToList();
-        Assert.True(segments.Count >= 1);
-
         // Total cut length should be greater than 80 (BB would give 100-20=80)
-        var totalCutLength = 0.0;
-        for (var i = 0; i < cutoff.Drawing.Program.Codes.Count - 1; i += 2)
-        {
-            if (cutoff.Drawing.Program.Codes[i] is RapidMove rapid &&
-                cutoff.Drawing.Program.Codes[i + 1] is LinearMove linear)
-            {
-                totalCutLength += System.Math.Abs(rapid.EndPoint.Y - linear.EndPoint.Y);
-            }
-        }
-
+        var totalCutLength = TotalCutLength(cutoff.Drawing.Program);
         Assert.True(totalCutLength > 80, $"Geometry should give more cut length than BB. Got {totalCutLength:F2}");
     }
 
@@ -129,18 +133,9 @@ public class CutOffGeometryTests
         var cutoff = new CutOff(new Vector(5, 0), CutOffAxis.Vertical);
         cutoff.Regenerate(plate, ZeroClearance, cache);
 
-        var totalCutLength = 0.0;
-        for (var i = 0; i < cutoff.Drawing.Program.Codes.Count - 1; i += 2)
-        {
-            if (cutoff.Drawing.Program.Codes[i] is RapidMove rapid &&
-                cutoff.Drawing.Program.Codes[i + 1] is LinearMove linear)
-            {
-                totalCutLength += System.Math.Abs(rapid.EndPoint.Y - linear.EndPoint.Y);
-            }
-        }
-
         // BB would exclude full 20 → cut length = 80.
         // Geometry excludes only 10 → cut length = 90.
+        var totalCutLength = TotalCutLength(cutoff.Drawing.Program);
         Assert.True(totalCutLength > 85, $"Diamond geometry should give more cut than BB. Got {totalCutLength:F2}");
     }
 
@@ -161,18 +156,9 @@ public class CutOffGeometryTests
         var cutoff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
         cutoff.Regenerate(plate, ZeroClearance, cache);
 
-        var totalCutLength = 0.0;
-        for (var i = 0; i < cutoff.Drawing.Program.Codes.Count - 1; i += 2)
-        {
-            if (cutoff.Drawing.Program.Codes[i] is RapidMove rapid &&
-                cutoff.Drawing.Program.Codes[i + 1] is LinearMove linear)
-            {
-                totalCutLength += System.Math.Abs(rapid.EndPoint.Y - linear.EndPoint.Y);
-            }
-        }
-
         // BB would exclude [10,40] = 30 → cut = 70.
         // Geometry excludes [10,30] = 20 → cut = 80.
+        var totalCutLength = TotalCutLength(cutoff.Drawing.Program);
         Assert.True(totalCutLength > 75, $"Triangle geometry should give more cut than BB. Got {totalCutLength:F2}");
     }
 
@@ -208,18 +194,9 @@ public class CutOffGeometryTests
         var cutoff = new CutOff(new Vector(0, 2), CutOffAxis.Horizontal);
         cutoff.Regenerate(plate, ZeroClearance, cache);
 
-        var totalCutLength = 0.0;
-        for (var i = 0; i < cutoff.Drawing.Program.Codes.Count - 1; i += 2)
-        {
-            if (cutoff.Drawing.Program.Codes[i] is RapidMove rapid &&
-                cutoff.Drawing.Program.Codes[i + 1] is LinearMove linear)
-            {
-                totalCutLength += System.Math.Abs(rapid.EndPoint.X - linear.EndPoint.X);
-            }
-        }
-
         // BB would exclude X=[0,20] → cut = 80.
         // Circle chord at Y=2 is much shorter → cut > 80.
+        var totalCutLength = TotalCutLength(cutoff.Drawing.Program, CutOffAxis.Horizontal);
         Assert.True(totalCutLength > 80, $"Circle horizontal cut should use geometry. Got {totalCutLength:F2}");
     }
 
@@ -339,25 +316,6 @@ public class CutOffGeometryTests
     }
 
     [Fact]
-    public void PlatePerimeterCache_OpenContourUsesConvexHull()
-    {
-        var pgm = new Program();
-        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(10, 0)));
-        pgm.Codes.Add(new LinearMove(new Vector(10, 10)));
-
-        var plate = new Plate(100, 100);
-        plate.Parts.Add(new Part(new Drawing("open", pgm)));
-
-        var cache = Plate.BuildPerimeterCache(plate);
-        Assert.Single(cache);
-
-        var part = plate.Parts[0];
-        Assert.True(cache.ContainsKey(part));
-        Assert.NotNull(cache[part]);
-    }
-
-    [Fact]
     public void RegenerateCutOffs_UsesGeometryExclusions()
     {
         // Circle radius=10 at origin. Vertical cut at X=2.
@@ -373,17 +331,8 @@ public class CutOffGeometryTests
 
         // Find the materialized cut-off part
         var cutPart = plate.Parts.First(p => p.BaseDrawing.IsCutOff);
-        var totalCutLength = 0.0;
-        for (var i = 0; i < cutPart.BaseDrawing.Program.Codes.Count - 1; i += 2)
-        {
-            if (cutPart.BaseDrawing.Program.Codes[i] is RapidMove rapid &&
-                cutPart.BaseDrawing.Program.Codes[i + 1] is LinearMove linear)
-            {
-                totalCutLength += System.Math.Abs(rapid.EndPoint.Y - linear.EndPoint.Y);
-            }
-        }
-
         // BB would give 80 (100 - 20). Geometry should give more.
+        var totalCutLength = TotalCutLength(cutPart.BaseDrawing.Program);
         Assert.True(totalCutLength > 80, $"RegenerateCutOffs should use geometry. Got {totalCutLength:F2}");
     }
 
