@@ -1,0 +1,77 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+
+namespace OpenNest.Posts.Cincinnati
+{
+    public sealed class CincinnatiPostProcessor : IPostProcessor
+    {
+        public string Name => "Cincinnati CL-707";
+        public string Author => "OpenNest";
+        public string Description => "Cincinnati CL-707/CL-800/CL-900/CL-940/CLX family";
+
+        public CincinnatiPostConfig Config { get; }
+
+        public CincinnatiPostProcessor(CincinnatiPostConfig config)
+        {
+            Config = config;
+        }
+
+        public void Post(Nest nest, Stream outputStream)
+        {
+            // 1. Create variable manager and register standard variables
+            var vars = CreateVariableManager();
+
+            // 2. Filter to non-empty plates
+            var plates = nest.Plates
+                .Where(p => p.Parts.Count > 0)
+                .ToList();
+
+            // 3. Create writers
+            var preamble = new CincinnatiPreambleWriter(Config);
+            var sheetWriter = new CincinnatiSheetWriter(Config, vars);
+
+            // 4. Build material description from first plate
+            var material = plates.FirstOrDefault()?.Material;
+            var materialDesc = material != null
+                ? $"{material.Name}{(string.IsNullOrEmpty(material.Grade) ? "" : $", {material.Grade}")}"
+                : "";
+
+            // 5. Write to stream
+            using var writer = new StreamWriter(outputStream, Encoding.UTF8, 1024, leaveOpen: true);
+
+            // Main program
+            preamble.WriteMainProgram(writer, nest.Name ?? "NEST", materialDesc, plates.Count);
+
+            // Variable declaration subprogram
+            preamble.WriteVariableDeclaration(writer, vars);
+
+            // Sheet subprograms
+            for (var i = 0; i < plates.Count; i++)
+            {
+                var sheetIndex = i + 1;
+                var subNumber = Config.SheetSubprogramStart + i;
+                sheetWriter.Write(writer, plates[i], nest.Name ?? "NEST", sheetIndex, subNumber);
+            }
+
+            writer.Flush();
+        }
+
+        public void Post(Nest nest, string outputFile)
+        {
+            using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
+            Post(nest, fs);
+        }
+
+        private ProgramVariableManager CreateVariableManager()
+        {
+            var vars = new ProgramVariableManager();
+            vars.GetOrCreate("ProcessFeedrate", 148);  // Set by G89, no expression
+            vars.GetOrCreate("LeadInFeedrate", 126, $"[#148*{Config.LeadInFeedratePercent}]");
+            vars.GetOrCreate("LeadInArcLine2Feedrate", 127, $"[#148*{Config.LeadInArcLine2FeedratePercent}]");
+            vars.GetOrCreate("CircleFeedrate", 128, Config.CircleFeedrateMultiplier.ToString("0.#"));
+            return vars;
+        }
+    }
+}
