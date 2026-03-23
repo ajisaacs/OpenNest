@@ -112,10 +112,12 @@ namespace OpenNest
                     Parts.RemoveAt(i);
             }
 
+            var cache = BuildPerimeterCache(this);
+
             // Regenerate and materialize each cut-off
             foreach (var cutoff in CutOffs)
             {
-                cutoff.Regenerate(this, settings);
+                cutoff.Regenerate(this, settings, cache);
 
                 if (cutoff.Drawing.Program.Codes.Count == 0)
                     continue;

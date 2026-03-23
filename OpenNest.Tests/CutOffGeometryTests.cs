@@ -358,6 +358,36 @@ public class CutOffGeometryTests
     }
 
     [Fact]
+    public void RegenerateCutOffs_UsesGeometryExclusions()
+    {
+        // Circle radius=10 at origin. Vertical cut at X=2.
+        // With geometry: tighter exclusion than BB.
+        var drawing = new Drawing("circ", MakeCircle(10));
+        var plate = new Plate(100, 100);
+        var part = Part.CreateAtOrigin(drawing);
+        plate.Parts.Add(part);
+
+        var cutoff = new CutOff(new Vector(2, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+        plate.RegenerateCutOffs(new CutOffSettings { PartClearance = 0 });
+
+        // Find the materialized cut-off part
+        var cutPart = plate.Parts.First(p => p.BaseDrawing.IsCutOff);
+        var totalCutLength = 0.0;
+        for (var i = 0; i < cutPart.BaseDrawing.Program.Codes.Count - 1; i += 2)
+        {
+            if (cutPart.BaseDrawing.Program.Codes[i] is RapidMove rapid &&
+                cutPart.BaseDrawing.Program.Codes[i + 1] is LinearMove linear)
+            {
+                totalCutLength += System.Math.Abs(rapid.EndPoint.Y - linear.EndPoint.Y);
+            }
+        }
+
+        // BB would give 80 (100 - 20). Geometry should give more.
+        Assert.True(totalCutLength > 80, $"RegenerateCutOffs should use geometry. Got {totalCutLength:F2}");
+    }
+
+    [Fact]
     public void ShapeProfile_SelectsLargestShapeAsPerimeter()
     {
         // Outer square: (5,0)→(25,0)→(25,20)→(5,20)→(5,0)
