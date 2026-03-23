@@ -8,7 +8,7 @@ namespace OpenNest
 
     public class CutOffSettings
     {
-        public double PartClearance { get; set; } = 0.125;
+        public double PartClearance { get; set; } = 0.02;
         public double Overtravel { get; set; }
         public double MinSegmentLength { get; set; } = 0.05;
         public CutDirection CutDirection { get; set; } = CutDirection.AwayFromOrigin;
