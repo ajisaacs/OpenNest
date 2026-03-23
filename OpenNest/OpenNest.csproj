@@ -16,6 +16,7 @@
     <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
     <ProjectReference Include="..\OpenNest.Gpu\OpenNest.Gpu.csproj" />
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
+    <ProjectReference Include="..\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
   </ItemGroup>
   <ItemGroup>

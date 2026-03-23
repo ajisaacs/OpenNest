@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 18.4.11612.150
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest", "OpenNest\OpenNest.csproj", "{1F1E40E0-5C53-474F-A258-69C9C3FAC15A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532} = {FB1B2EB2-9D80-4499-BA93-B4E2F295A532}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Core", "OpenNest.Core\OpenNest.Core.csproj", "{5A5FDE8D-F8DB-440E-866C-C4807E1686CF}"
 EndProject
