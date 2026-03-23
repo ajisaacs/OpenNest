@@ -21,10 +21,6 @@ namespace OpenNest
                 "Strip-based nesting for mixed-drawing layouts",
                 plate => new StripNestEngine(plate));
 
-            Register("NFP",
-                "NFP-based mixed-part nesting with simulated annealing",
-                plate => new NfpNestEngine(plate));
-
             Register("Vertical Remnant",
                 "Optimizes for largest right-side vertical drop",
                 plate => new VerticalRemnantEngine(plate));
