@@ -139,6 +139,163 @@ public class CincinnatiPostProcessorTests
         Assert.Equal("CL940", post.Config.ConfigurationName);
     }
 
+    [Fact]
+    public void Post_WithPartSubprograms_WritesM98Calls()
+    {
+        var nest = CreateTestNest();
+        var config = new CincinnatiPostConfig
+        {
+            PostedAccuracy = 4,
+            UsePartSubprograms = true,
+            PartSubprogramStart = 200
+        };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+
+        // Sheet should contain M98 call to part sub-program
+        Assert.Contains("M98P200", output);
+
+        // Should have G92 for local coordinate positioning
+        Assert.Contains("G92X0Y0", output);
+
+        // Part sub-program definition
+        Assert.Contains(":200", output);
+        Assert.Contains("G84", output);
+
+        // Sub-program ends with G0X0Y0 and M99
+        Assert.Contains("G0X0Y0", output);
+        Assert.Contains("M99(END OF Square)", output);
+
+        // G92 restore after M98 call
+        Assert.Contains("G92X", output);
+    }
+
+    [Fact]
+    public void Post_WithPartSubprograms_ReusesSameSubprogram()
+    {
+        var nest = new Nest("TestNest");
+        var drawing = new Drawing("Square", CreateSquareProgram());
+        var plate = new Plate(48, 96);
+        plate.Parts.Add(new Part(drawing, new Vector(5, 5)));
+        plate.Parts.Add(new Part(drawing, new Vector(20, 5)));
+        nest.Plates.Add(plate);
+
+        var config = new CincinnatiPostConfig
+        {
+            PostedAccuracy = 4,
+            UsePartSubprograms = true,
+            PartSubprogramStart = 200
+        };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+
+        // Both parts should call the same sub-program
+        var m98Count = System.Text.RegularExpressions.Regex.Matches(output, "M98P200").Count;
+        Assert.Equal(2, m98Count);
+
+        // Only one sub-program definition
+        var subDefCount = System.Text.RegularExpressions.Regex.Matches(output, ":200").Count;
+        Assert.Equal(1, subDefCount);
+    }
+
+    [Fact]
+    public void Post_WithPartSubprograms_DifferentRotationsGetSeparateSubprograms()
+    {
+        var nest = new Nest("TestNest");
+        var drawing = new Drawing("Square", CreateSquareProgram());
+        var plate = new Plate(48, 96);
+
+        var part1 = new Part(drawing, new Vector(5, 5));
+        plate.Parts.Add(part1);
+
+        var part2 = new Part(drawing, new Vector(20, 5));
+        part2.Rotate(System.Math.PI / 2); // 90 degrees
+        plate.Parts.Add(part2);
+
+        nest.Plates.Add(plate);
+
+        var config = new CincinnatiPostConfig
+        {
+            PostedAccuracy = 4,
+            UsePartSubprograms = true,
+            PartSubprogramStart = 200
+        };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+
+        // Should have two different sub-programs
+        Assert.Contains(":200", output);
+        Assert.Contains(":201", output);
+        Assert.Contains("M98P200", output);
+        Assert.Contains("M98P201", output);
+    }
+
+    [Fact]
+    public void Post_WithPartSubprograms_CutoffsAreInline()
+    {
+        var nest = new Nest("TestNest");
+        var drawing = new Drawing("Square", CreateSquareProgram());
+        var cutoffDrawing = new Drawing("CutOff", CreateSquareProgram()) { IsCutOff = true };
+
+        var plate = new Plate(48, 96);
+        plate.Parts.Add(new Part(drawing, new Vector(5, 5)));
+        plate.Parts.Add(new Part(cutoffDrawing, new Vector(0, 30)));
+        nest.Plates.Add(plate);
+
+        var config = new CincinnatiPostConfig
+        {
+            PostedAccuracy = 4,
+            UsePartSubprograms = true,
+            PartSubprogramStart = 200
+        };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+
+        // Regular part uses sub-program
+        Assert.Contains("M98P200", output);
+        Assert.Contains(":200", output);
+
+        // Cutoff should NOT have its own sub-program
+        Assert.DoesNotContain(":201", output);
+    }
+
+    [Fact]
+    public void Post_WithPartSubprograms_ConfigRoundTrips()
+    {
+        var config = new CincinnatiPostConfig
+        {
+            UsePartSubprograms = true,
+            PartSubprogramStart = 300
+        };
+
+        var opts = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Converters = { new JsonStringEnumConverter() }
+        };
+        var json = JsonSerializer.Serialize(config, opts);
+        var deserialized = JsonSerializer.Deserialize<CincinnatiPostConfig>(json, opts);
+
+        Assert.True(deserialized.UsePartSubprograms);
+        Assert.Equal(300, deserialized.PartSubprogramStart);
+    }
+
     private static Nest CreateTestNest()
     {
         var nest = new Nest("TestNest");

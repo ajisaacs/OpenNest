@@ -68,17 +68,49 @@ namespace OpenNest.Posts.Cincinnati
                 .Where(p => p.Parts.Count > 0)
                 .ToList();
 
-            // 3. Create writers
+            // 3. Build part sub-program registry (if enabled)
+            Dictionary<(int, long), int> partSubprograms = null;
+            List<(int subNum, string name, Program program)> subprogramEntries = null;
+
+            if (Config.UsePartSubprograms)
+            {
+                partSubprograms = new Dictionary<(int, long), int>();
+                subprogramEntries = new List<(int, string, Program)>();
+                var nextSubNum = Config.PartSubprogramStart;
+
+                foreach (var plate in plates)
+                {
+                    foreach (var part in plate.Parts)
+                    {
+                        if (part.BaseDrawing.IsCutOff) continue;
+                        var key = CincinnatiPartSubprogramWriter.SubprogramKey(part);
+                        if (!partSubprograms.ContainsKey(key))
+                        {
+                            var subNum = nextSubNum++;
+                            partSubprograms[key] = subNum;
+
+                            // Create normalized program at origin
+                            var pgm = part.Program.Clone() as Program;
+                            var bbox = pgm.BoundingBox();
+                            pgm.Offset(-bbox.Location.X, -bbox.Location.Y);
+
+                            subprogramEntries.Add((subNum, part.BaseDrawing.Name, pgm));
+                        }
+                    }
+                }
+            }
+
+            // 4. Create writers
             var preamble = new CincinnatiPreambleWriter(Config);
             var sheetWriter = new CincinnatiSheetWriter(Config, vars);
 
-            // 4. Build material description from first plate
+            // 5. Build material description from first plate
             var material = plates.FirstOrDefault()?.Material;
             var materialDesc = material != null
                 ? $"{material.Name}{(string.IsNullOrEmpty(material.Grade) ? "" : $", {material.Grade}")}"
                 : "";
 
-            // 5. Write to stream
+            // 6. Write to stream
             using var writer = new StreamWriter(outputStream, Encoding.UTF8, 1024, leaveOpen: true);
 
             // Main program
@@ -92,7 +124,25 @@ namespace OpenNest.Posts.Cincinnati
             {
                 var sheetIndex = i + 1;
                 var subNumber = Config.SheetSubprogramStart + i;
-                sheetWriter.Write(writer, plates[i], nest.Name ?? "NEST", sheetIndex, subNumber);
+                sheetWriter.Write(writer, plates[i], nest.Name ?? "NEST", sheetIndex, subNumber,
+                    partSubprograms);
+            }
+
+            // Part sub-programs (if enabled)
+            if (subprogramEntries != null)
+            {
+                var partSubWriter = new CincinnatiPartSubprogramWriter(Config);
+                var firstPlate = plates.FirstOrDefault();
+                var sheetDiagonal = firstPlate != null
+                    ? System.Math.Sqrt(firstPlate.Size.Width * firstPlate.Size.Width
+                        + firstPlate.Size.Length * firstPlate.Size.Length)
+                    : 100.0;
+
+                foreach (var (subNum, name, pgm) in subprogramEntries)
+                {
+                    partSubWriter.Write(writer, pgm, name, subNum,
+                        Config.DefaultLibraryFile ?? "", sheetDiagonal);
+                }
             }
 
             writer.Flush();

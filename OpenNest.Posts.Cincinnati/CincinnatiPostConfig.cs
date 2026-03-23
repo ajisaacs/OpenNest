@@ -127,6 +127,20 @@ namespace OpenNest.Posts.Cincinnati
         public int SheetSubprogramStart { get; set; } = 101;
 
         /// <summary>
+        /// Gets or sets whether to use M98 sub-programs for part geometry.
+        /// When enabled, each unique part geometry is written as a reusable sub-program
+        /// called via M98, reducing output size for nests with repeated parts.
+        /// Default: false
+        /// </summary>
+        public bool UsePartSubprograms { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets the starting sub-program number for part geometry sub-programs.
+        /// Default: 200
+        /// </summary>
+        public int PartSubprogramStart { get; set; } = 200;
+
+        /// <summary>
         /// Gets or sets the subprogram number for variable declarations.
         /// Default: 100
         /// </summary>
