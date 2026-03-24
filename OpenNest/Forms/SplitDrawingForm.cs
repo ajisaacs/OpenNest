@@ -70,7 +70,16 @@ public partial class SplitDrawingForm : Form
             var plateH = (double)nudPlateHeight.Value;
             var spacing = (double)nudEdgeSpacing.Value;
             var overhang = GetCurrentParameters().FeatureOverhang;
-            _splitLines.AddRange(AutoSplitCalculator.FitToPlate(_drawingBounds, plateW, plateH, spacing, overhang));
+            var lines = AutoSplitCalculator.FitToPlate(_drawingBounds, plateW, plateH, spacing, overhang);
+
+            // Filter by user-selected axis
+            var axisIndex = cboSplitAxis.SelectedIndex;
+            if (axisIndex == 1) // Vertical Only
+                lines = lines.Where(l => l.Axis == CutOffAxis.Vertical).ToList();
+            else if (axisIndex == 2) // Horizontal Only
+                lines = lines.Where(l => l.Axis == CutOffAxis.Horizontal).ToList();
+
+            _splitLines.AddRange(lines);
         }
         else if (radByCount.Checked)
         {

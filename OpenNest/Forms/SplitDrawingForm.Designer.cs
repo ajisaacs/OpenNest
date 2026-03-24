@@ -51,6 +51,8 @@ namespace OpenNest.Forms
             this.nudPlateHeight = new System.Windows.Forms.NumericUpDown();
             this.lblEdgeSpacing = new System.Windows.Forms.Label();
             this.nudEdgeSpacing = new System.Windows.Forms.NumericUpDown();
+            this.lblSplitAxis = new System.Windows.Forms.Label();
+            this.cboSplitAxis = new System.Windows.Forms.ComboBox();
 
             // By Count group
             this.grpByCount = new System.Windows.Forms.GroupBox();
@@ -219,11 +221,13 @@ namespace OpenNest.Forms
             this.grpAutoFit.Dock = System.Windows.Forms.DockStyle.Top;
             this.grpAutoFit.Location = new System.Drawing.Point(6, 101);
             this.grpAutoFit.Name = "grpAutoFit";
-            this.grpAutoFit.Size = new System.Drawing.Size(208, 105);
+            this.grpAutoFit.Size = new System.Drawing.Size(208, 132);
             this.grpAutoFit.TabIndex = 1;
             this.grpAutoFit.TabStop = false;
             this.grpAutoFit.Text = "Auto-Fit Options";
             this.grpAutoFit.Visible = false;
+            this.grpAutoFit.Controls.Add(this.cboSplitAxis);
+            this.grpAutoFit.Controls.Add(this.lblSplitAxis);
             this.grpAutoFit.Controls.Add(this.nudEdgeSpacing);
             this.grpAutoFit.Controls.Add(this.lblEdgeSpacing);
             this.grpAutoFit.Controls.Add(this.nudPlateHeight);
@@ -283,6 +287,23 @@ namespace OpenNest.Forms
             this.nudEdgeSpacing.TabIndex = 2;
             this.nudEdgeSpacing.Value = new decimal(new int[] { 5, 0, 0, 131072 });
             this.nudEdgeSpacing.ValueChanged += new System.EventHandler(this.OnAutoFitValueChanged);
+
+            // lblSplitAxis
+            this.lblSplitAxis.AutoSize = true;
+            this.lblSplitAxis.Location = new System.Drawing.Point(10, 103);
+            this.lblSplitAxis.Name = "lblSplitAxis";
+            this.lblSplitAxis.Size = new System.Drawing.Size(60, 15);
+            this.lblSplitAxis.Text = "Split Axis:";
+
+            // cboSplitAxis
+            this.cboSplitAxis.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cboSplitAxis.Items.AddRange(new object[] { "Auto", "Vertical Only", "Horizontal Only" });
+            this.cboSplitAxis.Location = new System.Drawing.Point(110, 100);
+            this.cboSplitAxis.Name = "cboSplitAxis";
+            this.cboSplitAxis.Size = new System.Drawing.Size(88, 23);
+            this.cboSplitAxis.TabIndex = 3;
+            this.cboSplitAxis.SelectedIndex = 0;
+            this.cboSplitAxis.SelectedIndexChanged += new System.EventHandler(this.OnAutoFitValueChanged);
 
             // ---- By Count Group ----
             this.grpByCount.Dock = System.Windows.Forms.DockStyle.Top;
@@ -607,6 +628,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.NumericUpDown nudPlateHeight;
         private System.Windows.Forms.Label lblEdgeSpacing;
         private System.Windows.Forms.NumericUpDown nudEdgeSpacing;
+        private System.Windows.Forms.Label lblSplitAxis;
+        private System.Windows.Forms.ComboBox cboSplitAxis;
 
         private System.Windows.Forms.GroupBox grpByCount;
         private System.Windows.Forms.Label lblHorizontalPieces;
