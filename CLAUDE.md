@@ -31,6 +31,7 @@ Domain model, geometry, and CNC primitives organized into namespaces:
 - **CNC/CuttingStrategy** (`CNC/CuttingStrategy/`, `namespace OpenNest.CNC`): `ContourCuttingStrategy` orchestrates cut ordering, lead-ins/lead-outs, and tabs. Includes `LeadIn`/`LeadOut` hierarchies (line, arc, clean-hole variants), `Tab` hierarchy (normal, machine, breaker), and `CuttingParameters`/`AssignmentParameters`/`SequenceParameters` configuration.
 - **Collections** (`Collections/`, `namespace OpenNest.Collections`): `ObservableList<T>`, `DrawingCollection`.
 - **CutOffs** (`namespace OpenNest`): `CutOff` (axis-aligned cut line with position, axis, optional start/end limits), `CutOffAxis` enum (`Horizontal`, `Vertical`), `CutOffSettings` (clearance, overtravel, min segment length, direction), `CutDirection` enum (`TowardOrigin`, `AwayFromOrigin`). Cut-offs generate CNC `Program` objects with trimmed line segments that avoid parts.
+- **Splitting** (`Splitting/`, `namespace OpenNest`): `DrawingSplitter` splits a Drawing into multiple pieces along split lines. `ISplitFeature` strategy pattern with implementations: `StraightSplit` (clean edge), `WeldGapTabSplit` (rectangular tab spacers on one side), `SpikeGrooveSplit` (interlocking spike/V-groove pairs). `AutoSplitCalculator` computes split lines for fit-to-plate and split-by-count modes. Supporting types: `SplitLine`, `SplitParameters`, `SplitFeatureResult`.
 - **Quadrant system**: Plates use quadrants 1-4 (like Cartesian quadrants) to determine coordinate origin placement. This affects bounding box calculation, rotation, and part positioning.
 
 ### OpenNest.Engine (class library, depends on Core)
@@ -78,7 +79,7 @@ MCP server for Claude Code integration. Exposes nesting operations as MCP tools 
 ### OpenNest (WinForms WinExe, depends on Core + Engine + IO)
 The UI application with MDI interface.
 
-- **Forms/**: `MainForm` (MDI parent), `EditNestForm` (MDI child per nest), plus dialogs for plate editing, auto-nesting, DXF conversion, cut parameters, etc.
+- **Forms/**: `MainForm` (MDI parent), `EditNestForm` (MDI child per nest), `SplitDrawingForm` (split oversized drawings into smaller pieces, launched from CadConverterForm), plus dialogs for plate editing, auto-nesting, DXF conversion, cut parameters, etc.
 - **Controls/**: `PlateView` (2D plate renderer with zoom/pan, supports temporary preview parts), `DrawingListBox`, `DrawControl`, `QuadrantSelect`.
 - **Actions/**: User interaction modes — `ActionSelect`, `ActionClone`, `ActionFillArea`, `ActionSelectArea`, `ActionZoomWindow`, `ActionSetSequence`, `ActionCutOff`.
 - **Post-processing**: `IPostProcessor` plugin interface loaded from DLLs in a `Posts/` directory at runtime.
