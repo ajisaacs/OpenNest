@@ -153,6 +153,8 @@ public partial class SplitDrawingForm : Form
         {
             p.Type = SplitType.SpikeGroove;
             p.SpikeDepth = (double)nudSpikeDepth.Value;
+            p.GrooveDepth = (double)nudGrooveDepth.Value;
+            p.SpikeWeldGap = (double)nudSpikeWeldGap.Value;
             p.SpikeAngle = (double)nudSpikeAngle.Value;
             p.SpikePairCount = (int)nudSpikePairCount.Value;
         }

@@ -18,6 +18,8 @@ public class SplitParameters
 
     // Spike/Groove parameters
     public double SpikeDepth { get; set; } = 0.5;
+    public double GrooveDepth { get; set; } = 0.625;
+    public double SpikeWeldGap { get; set; } = 0.125;
     public double SpikeAngle { get; set; } = 60.0; // degrees
     public int SpikePairCount { get; set; } = 2;
 
@@ -27,7 +29,7 @@ public class SplitParameters
     public double FeatureOverhang => Type switch
     {
         SplitType.WeldGapTabs => TabHeight,
-        SplitType.SpikeGroove => SpikeDepth,
+        SplitType.SpikeGroove => System.Math.Max(SpikeDepth, GrooveDepth),
         _ => 0
     };
 }

@@ -84,6 +84,10 @@ namespace OpenNest.Forms
             this.nudSpikeAngle = new System.Windows.Forms.NumericUpDown();
             this.lblSpikePairCount = new System.Windows.Forms.Label();
             this.nudSpikePairCount = new System.Windows.Forms.NumericUpDown();
+            this.lblGrooveDepth = new System.Windows.Forms.Label();
+            this.nudGrooveDepth = new System.Windows.Forms.NumericUpDown();
+            this.lblSpikeWeldGap = new System.Windows.Forms.Label();
+            this.nudSpikeWeldGap = new System.Windows.Forms.NumericUpDown();
 
             // OK/Cancel buttons
             this.btnOK = new System.Windows.Forms.Button();
@@ -101,6 +105,8 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)(this.nudSpikeDepth)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudSpikeAngle)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudSpikePairCount)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudGrooveDepth)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudSpikeWeldGap)).BeginInit();
             this.pnlSettings.SuspendLayout();
             this.grpMethod.SuspendLayout();
             this.grpAutoFit.SuspendLayout();
@@ -464,13 +470,17 @@ namespace OpenNest.Forms
             this.grpSpikeParams.Dock = System.Windows.Forms.DockStyle.Top;
             this.grpSpikeParams.Location = new System.Drawing.Point(6, 484);
             this.grpSpikeParams.Name = "grpSpikeParams";
-            this.grpSpikeParams.Size = new System.Drawing.Size(208, 105);
+            this.grpSpikeParams.Size = new System.Drawing.Size(208, 159);
             this.grpSpikeParams.TabIndex = 5;
             this.grpSpikeParams.TabStop = false;
             this.grpSpikeParams.Text = "Spike Parameters";
             this.grpSpikeParams.Visible = false;
             this.grpSpikeParams.Controls.Add(this.nudSpikePairCount);
             this.grpSpikeParams.Controls.Add(this.lblSpikePairCount);
+            this.grpSpikeParams.Controls.Add(this.nudSpikeWeldGap);
+            this.grpSpikeParams.Controls.Add(this.lblSpikeWeldGap);
+            this.grpSpikeParams.Controls.Add(this.nudGrooveDepth);
+            this.grpSpikeParams.Controls.Add(this.lblGrooveDepth);
             this.grpSpikeParams.Controls.Add(this.nudSpikeAngle);
             this.grpSpikeParams.Controls.Add(this.lblSpikeAngle);
             this.grpSpikeParams.Controls.Add(this.nudSpikeDepth);
@@ -493,38 +503,71 @@ namespace OpenNest.Forms
             this.nudSpikeDepth.TabIndex = 0;
             this.nudSpikeDepth.Value = new decimal(new int[] { 5, 0, 0, 65536 });
 
+            // lblGrooveDepth
+            this.lblGrooveDepth.AutoSize = true;
+            this.lblGrooveDepth.Location = new System.Drawing.Point(10, 49);
+            this.lblGrooveDepth.Name = "lblGrooveDepth";
+            this.lblGrooveDepth.Size = new System.Drawing.Size(84, 15);
+            this.lblGrooveDepth.Text = "Groove Depth:";
+
+            // nudGrooveDepth
+            this.nudGrooveDepth.DecimalPlaces = 3;
+            this.nudGrooveDepth.Location = new System.Drawing.Point(110, 47);
+            this.nudGrooveDepth.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
+            this.nudGrooveDepth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
+            this.nudGrooveDepth.Name = "nudGrooveDepth";
+            this.nudGrooveDepth.Size = new System.Drawing.Size(88, 23);
+            this.nudGrooveDepth.TabIndex = 1;
+            this.nudGrooveDepth.Value = new decimal(new int[] { 625, 0, 0, 196608 });
+
+            // lblSpikeWeldGap
+            this.lblSpikeWeldGap.AutoSize = true;
+            this.lblSpikeWeldGap.Location = new System.Drawing.Point(10, 76);
+            this.lblSpikeWeldGap.Name = "lblSpikeWeldGap";
+            this.lblSpikeWeldGap.Size = new System.Drawing.Size(64, 15);
+            this.lblSpikeWeldGap.Text = "Weld Gap:";
+
+            // nudSpikeWeldGap
+            this.nudSpikeWeldGap.DecimalPlaces = 3;
+            this.nudSpikeWeldGap.Location = new System.Drawing.Point(110, 74);
+            this.nudSpikeWeldGap.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
+            this.nudSpikeWeldGap.Name = "nudSpikeWeldGap";
+            this.nudSpikeWeldGap.Size = new System.Drawing.Size(88, 23);
+            this.nudSpikeWeldGap.TabIndex = 2;
+            this.nudSpikeWeldGap.Value = new decimal(new int[] { 125, 0, 0, 196608 });
+
             // lblSpikeAngle
             this.lblSpikeAngle.AutoSize = true;
-            this.lblSpikeAngle.Location = new System.Drawing.Point(10, 49);
+            this.lblSpikeAngle.Location = new System.Drawing.Point(10, 103);
             this.lblSpikeAngle.Name = "lblSpikeAngle";
             this.lblSpikeAngle.Size = new System.Drawing.Size(74, 15);
             this.lblSpikeAngle.Text = "Spike Angle:";
 
             // nudSpikeAngle
             this.nudSpikeAngle.DecimalPlaces = 1;
-            this.nudSpikeAngle.Location = new System.Drawing.Point(110, 47);
+            this.nudSpikeAngle.Location = new System.Drawing.Point(110, 101);
             this.nudSpikeAngle.Maximum = new decimal(new int[] { 89, 0, 0, 0 });
             this.nudSpikeAngle.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
             this.nudSpikeAngle.Name = "nudSpikeAngle";
             this.nudSpikeAngle.Size = new System.Drawing.Size(88, 23);
-            this.nudSpikeAngle.TabIndex = 1;
+            this.nudSpikeAngle.TabIndex = 3;
             this.nudSpikeAngle.Value = new decimal(new int[] { 45, 0, 0, 0 });
 
             // lblSpikePairCount
             this.lblSpikePairCount.AutoSize = true;
-            this.lblSpikePairCount.Location = new System.Drawing.Point(10, 76);
+            this.lblSpikePairCount.Location = new System.Drawing.Point(10, 130);
             this.lblSpikePairCount.Name = "lblSpikePairCount";
             this.lblSpikePairCount.Size = new System.Drawing.Size(65, 15);
             this.lblSpikePairCount.Text = "Pair Count:";
 
             // nudSpikePairCount
-            this.nudSpikePairCount.Location = new System.Drawing.Point(110, 74);
+            this.nudSpikePairCount.Location = new System.Drawing.Point(110, 128);
             this.nudSpikePairCount.Maximum = new decimal(new int[] { 50, 0, 0, 0 });
             this.nudSpikePairCount.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             this.nudSpikePairCount.Name = "nudSpikePairCount";
             this.nudSpikePairCount.Size = new System.Drawing.Size(88, 23);
-            this.nudSpikePairCount.TabIndex = 2;
-            this.nudSpikePairCount.Value = new decimal(new int[] { 3, 0, 0, 0 });
+            this.nudSpikePairCount.TabIndex = 4;
+            this.nudSpikePairCount.Value = new decimal(new int[] { 2, 0, 0, 0 });
 
             // ---- OK / Cancel Buttons ----
             this.btnOK.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
@@ -584,6 +627,8 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)(this.nudSpikeDepth)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudSpikeAngle)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudSpikePairCount)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudGrooveDepth)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudSpikeWeldGap)).EndInit();
             this.pnlSettings.ResumeLayout(false);
             this.grpMethod.ResumeLayout(false);
             this.grpMethod.PerformLayout();
@@ -657,6 +702,10 @@ namespace OpenNest.Forms
         private System.Windows.Forms.NumericUpDown nudSpikeAngle;
         private System.Windows.Forms.Label lblSpikePairCount;
         private System.Windows.Forms.NumericUpDown nudSpikePairCount;
+        private System.Windows.Forms.Label lblGrooveDepth;
+        private System.Windows.Forms.NumericUpDown nudGrooveDepth;
+        private System.Windows.Forms.Label lblSpikeWeldGap;
+        private System.Windows.Forms.NumericUpDown nudSpikeWeldGap;
 
         private System.Windows.Forms.Button btnOK;
         private System.Windows.Forms.Button btnCancel;
