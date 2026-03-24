@@ -28,631 +28,682 @@ namespace OpenNest.Forms
         /// </summary>
         private void InitializeComponent()
         {
-            this.pnlSettings = new System.Windows.Forms.Panel();
-            this.pnlPreview = new System.Windows.Forms.Panel();
-            this.toolStrip = new System.Windows.Forms.ToolStrip();
-            this.btnAddLine = new System.Windows.Forms.ToolStripButton();
-            this.btnDeleteLine = new System.Windows.Forms.ToolStripButton();
-            this.statusStrip = new System.Windows.Forms.StatusStrip();
-            this.lblStatus = new System.Windows.Forms.ToolStripStatusLabel();
-            this.lblCursor = new System.Windows.Forms.ToolStripStatusLabel();
-
-            // Split Method group
-            this.grpMethod = new System.Windows.Forms.GroupBox();
-            this.radManual = new System.Windows.Forms.RadioButton();
-            this.radFitToPlate = new System.Windows.Forms.RadioButton();
-            this.radByCount = new System.Windows.Forms.RadioButton();
-
-            // Auto-fit group
-            this.grpAutoFit = new System.Windows.Forms.GroupBox();
-            this.lblPlateWidth = new System.Windows.Forms.Label();
-            this.nudPlateWidth = new System.Windows.Forms.NumericUpDown();
-            this.lblPlateHeight = new System.Windows.Forms.Label();
-            this.nudPlateHeight = new System.Windows.Forms.NumericUpDown();
-            this.lblEdgeSpacing = new System.Windows.Forms.Label();
-            this.nudEdgeSpacing = new System.Windows.Forms.NumericUpDown();
-            this.lblSplitAxis = new System.Windows.Forms.Label();
-            this.cboSplitAxis = new System.Windows.Forms.ComboBox();
-
-            // By Count group
-            this.grpByCount = new System.Windows.Forms.GroupBox();
-            this.lblHorizontalPieces = new System.Windows.Forms.Label();
-            this.nudHorizontalPieces = new System.Windows.Forms.NumericUpDown();
-            this.lblVerticalPieces = new System.Windows.Forms.Label();
-            this.nudVerticalPieces = new System.Windows.Forms.NumericUpDown();
-
-            // Split Type group
-            this.grpType = new System.Windows.Forms.GroupBox();
-            this.radStraight = new System.Windows.Forms.RadioButton();
-            this.radTabs = new System.Windows.Forms.RadioButton();
-            this.radSpike = new System.Windows.Forms.RadioButton();
-
-            // Tab Parameters group
-            this.grpTabParams = new System.Windows.Forms.GroupBox();
-            this.lblTabWidth = new System.Windows.Forms.Label();
-            this.nudTabWidth = new System.Windows.Forms.NumericUpDown();
-            this.lblTabHeight = new System.Windows.Forms.Label();
-            this.nudTabHeight = new System.Windows.Forms.NumericUpDown();
-            this.lblTabCount = new System.Windows.Forms.Label();
-            this.nudTabCount = new System.Windows.Forms.NumericUpDown();
-
-            // Spike Parameters group
-            this.grpSpikeParams = new System.Windows.Forms.GroupBox();
-            this.lblSpikeDepth = new System.Windows.Forms.Label();
-            this.nudSpikeDepth = new System.Windows.Forms.NumericUpDown();
-            this.lblSpikeAngle = new System.Windows.Forms.Label();
-            this.nudSpikeAngle = new System.Windows.Forms.NumericUpDown();
-            this.lblSpikePairCount = new System.Windows.Forms.Label();
-            this.nudSpikePairCount = new System.Windows.Forms.NumericUpDown();
-            this.lblGrooveDepth = new System.Windows.Forms.Label();
-            this.nudGrooveDepth = new System.Windows.Forms.NumericUpDown();
-            this.lblSpikeWeldGap = new System.Windows.Forms.Label();
-            this.nudSpikeWeldGap = new System.Windows.Forms.NumericUpDown();
-
-            // OK/Cancel buttons
-            this.btnOK = new System.Windows.Forms.Button();
-            this.btnCancel = new System.Windows.Forms.Button();
-
-            // Begin init
-            ((System.ComponentModel.ISupportInitialize)(this.nudPlateWidth)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudPlateHeight)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudEdgeSpacing)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudHorizontalPieces)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudVerticalPieces)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudTabWidth)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudTabHeight)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudTabCount)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudSpikeDepth)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudSpikeAngle)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudSpikePairCount)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudGrooveDepth)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudSpikeWeldGap)).BeginInit();
-            this.pnlSettings.SuspendLayout();
-            this.grpMethod.SuspendLayout();
-            this.grpAutoFit.SuspendLayout();
-            this.grpByCount.SuspendLayout();
-            this.grpType.SuspendLayout();
-            this.grpTabParams.SuspendLayout();
-            this.grpSpikeParams.SuspendLayout();
-            this.toolStrip.SuspendLayout();
-            this.statusStrip.SuspendLayout();
-            this.SuspendLayout();
-
-            // ---- ToolStrip ----
-            this.toolStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.btnAddLine,
-                this.btnDeleteLine
-            });
-            this.toolStrip.Location = new System.Drawing.Point(0, 0);
-            this.toolStrip.Name = "toolStrip";
-            this.toolStrip.Size = new System.Drawing.Size(580, 25);
-            this.toolStrip.TabIndex = 0;
-
-            // btnAddLine
-            this.btnAddLine.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.btnAddLine.Name = "btnAddLine";
-            this.btnAddLine.Size = new System.Drawing.Size(86, 22);
-            this.btnAddLine.Text = "Add Split Line";
-            this.btnAddLine.Click += new System.EventHandler(this.OnAddSplitLine);
-
-            // btnDeleteLine
-            this.btnDeleteLine.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.btnDeleteLine.Name = "btnDeleteLine";
-            this.btnDeleteLine.Size = new System.Drawing.Size(68, 22);
-            this.btnDeleteLine.Text = "Delete Line";
-            this.btnDeleteLine.Click += new System.EventHandler(this.OnDeleteSplitLine);
-
-            // ---- StatusStrip ----
-            this.statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-                this.lblStatus,
-                this.lblCursor
-            });
-            this.statusStrip.Location = new System.Drawing.Point(0, 528);
-            this.statusStrip.Name = "statusStrip";
-            this.statusStrip.Size = new System.Drawing.Size(800, 22);
-            this.statusStrip.TabIndex = 1;
-
-            // lblStatus
-            this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(100, 17);
-            this.lblStatus.Spring = true;
-            this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.lblStatus.Text = "";
-
-            // lblCursor
-            this.lblCursor.Name = "lblCursor";
-            this.lblCursor.Size = new System.Drawing.Size(150, 17);
-            this.lblCursor.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            this.lblCursor.Text = "Cursor: 0.00, 0.00";
-
-            // ---- Settings Panel (right side) ----
-            this.pnlSettings.AutoScroll = true;
-            this.pnlSettings.Dock = System.Windows.Forms.DockStyle.Right;
-            this.pnlSettings.Location = new System.Drawing.Point(580, 25);
-            this.pnlSettings.Name = "pnlSettings";
-            this.pnlSettings.Padding = new System.Windows.Forms.Padding(6);
-            this.pnlSettings.Size = new System.Drawing.Size(220, 503);
-            this.pnlSettings.TabIndex = 2;
-            this.pnlSettings.Controls.Add(this.btnCancel);
-            this.pnlSettings.Controls.Add(this.btnOK);
-            this.pnlSettings.Controls.Add(this.grpSpikeParams);
-            this.pnlSettings.Controls.Add(this.grpTabParams);
-            this.pnlSettings.Controls.Add(this.grpType);
-            this.pnlSettings.Controls.Add(this.grpByCount);
-            this.pnlSettings.Controls.Add(this.grpAutoFit);
-            this.pnlSettings.Controls.Add(this.grpMethod);
-
-            // ---- Split Method Group ----
-            this.grpMethod.Dock = System.Windows.Forms.DockStyle.Top;
-            this.grpMethod.Location = new System.Drawing.Point(6, 6);
-            this.grpMethod.Name = "grpMethod";
-            this.grpMethod.Size = new System.Drawing.Size(208, 95);
-            this.grpMethod.TabIndex = 0;
-            this.grpMethod.TabStop = false;
-            this.grpMethod.Text = "Split Method";
-            this.grpMethod.Controls.Add(this.radByCount);
-            this.grpMethod.Controls.Add(this.radFitToPlate);
-            this.grpMethod.Controls.Add(this.radManual);
-
-            // radManual
-            this.radManual.AutoSize = true;
-            this.radManual.Checked = true;
-            this.radManual.Location = new System.Drawing.Point(10, 20);
-            this.radManual.Name = "radManual";
-            this.radManual.Size = new System.Drawing.Size(65, 19);
-            this.radManual.TabIndex = 0;
-            this.radManual.TabStop = true;
-            this.radManual.Text = "Manual";
-            this.radManual.CheckedChanged += new System.EventHandler(this.OnMethodChanged);
-
-            // radFitToPlate
-            this.radFitToPlate.AutoSize = true;
-            this.radFitToPlate.Location = new System.Drawing.Point(10, 43);
-            this.radFitToPlate.Name = "radFitToPlate";
-            this.radFitToPlate.Size = new System.Drawing.Size(85, 19);
-            this.radFitToPlate.TabIndex = 1;
-            this.radFitToPlate.Text = "Fit to Plate";
-            this.radFitToPlate.CheckedChanged += new System.EventHandler(this.OnMethodChanged);
-
-            // radByCount
-            this.radByCount.AutoSize = true;
-            this.radByCount.Location = new System.Drawing.Point(10, 66);
-            this.radByCount.Name = "radByCount";
-            this.radByCount.Size = new System.Drawing.Size(102, 19);
-            this.radByCount.TabIndex = 2;
-            this.radByCount.Text = "Split by Count";
-            this.radByCount.CheckedChanged += new System.EventHandler(this.OnMethodChanged);
-
-            // ---- Auto-Fit Group ----
-            this.grpAutoFit.Dock = System.Windows.Forms.DockStyle.Top;
-            this.grpAutoFit.Location = new System.Drawing.Point(6, 101);
-            this.grpAutoFit.Name = "grpAutoFit";
-            this.grpAutoFit.Size = new System.Drawing.Size(208, 132);
-            this.grpAutoFit.TabIndex = 1;
-            this.grpAutoFit.TabStop = false;
-            this.grpAutoFit.Text = "Auto-Fit Options";
-            this.grpAutoFit.Visible = false;
-            this.grpAutoFit.Controls.Add(this.cboSplitAxis);
-            this.grpAutoFit.Controls.Add(this.lblSplitAxis);
-            this.grpAutoFit.Controls.Add(this.nudEdgeSpacing);
-            this.grpAutoFit.Controls.Add(this.lblEdgeSpacing);
-            this.grpAutoFit.Controls.Add(this.nudPlateHeight);
-            this.grpAutoFit.Controls.Add(this.lblPlateHeight);
-            this.grpAutoFit.Controls.Add(this.nudPlateWidth);
-            this.grpAutoFit.Controls.Add(this.lblPlateWidth);
-
-            // lblPlateWidth
-            this.lblPlateWidth.AutoSize = true;
-            this.lblPlateWidth.Location = new System.Drawing.Point(10, 22);
-            this.lblPlateWidth.Name = "lblPlateWidth";
-            this.lblPlateWidth.Size = new System.Drawing.Size(70, 15);
-            this.lblPlateWidth.Text = "Plate Length:";
-
-            // nudPlateWidth
-            this.nudPlateWidth.DecimalPlaces = 2;
-            this.nudPlateWidth.Location = new System.Drawing.Point(110, 20);
-            this.nudPlateWidth.Maximum = new decimal(new int[] { 100000, 0, 0, 0 });
-            this.nudPlateWidth.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            this.nudPlateWidth.Name = "nudPlateWidth";
-            this.nudPlateWidth.Size = new System.Drawing.Size(88, 23);
-            this.nudPlateWidth.TabIndex = 0;
-            this.nudPlateWidth.Value = new decimal(new int[] { 120, 0, 0, 0 });
-            this.nudPlateWidth.ValueChanged += new System.EventHandler(this.OnAutoFitValueChanged);
-
-            // lblPlateHeight
-            this.lblPlateHeight.AutoSize = true;
-            this.lblPlateHeight.Location = new System.Drawing.Point(10, 49);
-            this.lblPlateHeight.Name = "lblPlateHeight";
-            this.lblPlateHeight.Size = new System.Drawing.Size(74, 15);
-            this.lblPlateHeight.Text = "Plate Width:";
-
-            // nudPlateHeight
-            this.nudPlateHeight.DecimalPlaces = 2;
-            this.nudPlateHeight.Location = new System.Drawing.Point(110, 47);
-            this.nudPlateHeight.Maximum = new decimal(new int[] { 100000, 0, 0, 0 });
-            this.nudPlateHeight.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            this.nudPlateHeight.Name = "nudPlateHeight";
-            this.nudPlateHeight.Size = new System.Drawing.Size(88, 23);
-            this.nudPlateHeight.TabIndex = 1;
-            this.nudPlateHeight.Value = new decimal(new int[] { 60, 0, 0, 0 });
-            this.nudPlateHeight.ValueChanged += new System.EventHandler(this.OnAutoFitValueChanged);
-
-            // lblEdgeSpacing
-            this.lblEdgeSpacing.AutoSize = true;
-            this.lblEdgeSpacing.Location = new System.Drawing.Point(10, 76);
-            this.lblEdgeSpacing.Name = "lblEdgeSpacing";
-            this.lblEdgeSpacing.Size = new System.Drawing.Size(82, 15);
-            this.lblEdgeSpacing.Text = "Edge Spacing:";
-
-            // nudEdgeSpacing
-            this.nudEdgeSpacing.DecimalPlaces = 2;
-            this.nudEdgeSpacing.Location = new System.Drawing.Point(110, 74);
-            this.nudEdgeSpacing.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
-            this.nudEdgeSpacing.Name = "nudEdgeSpacing";
-            this.nudEdgeSpacing.Size = new System.Drawing.Size(88, 23);
-            this.nudEdgeSpacing.TabIndex = 2;
-            this.nudEdgeSpacing.Value = new decimal(new int[] { 5, 0, 0, 131072 });
-            this.nudEdgeSpacing.ValueChanged += new System.EventHandler(this.OnAutoFitValueChanged);
-
-            // lblSplitAxis
-            this.lblSplitAxis.AutoSize = true;
-            this.lblSplitAxis.Location = new System.Drawing.Point(10, 103);
-            this.lblSplitAxis.Name = "lblSplitAxis";
-            this.lblSplitAxis.Size = new System.Drawing.Size(60, 15);
-            this.lblSplitAxis.Text = "Split Axis:";
-
-            // cboSplitAxis
-            this.cboSplitAxis.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cboSplitAxis.Items.AddRange(new object[] { "Auto", "Vertical Only", "Horizontal Only" });
-            this.cboSplitAxis.Location = new System.Drawing.Point(110, 100);
-            this.cboSplitAxis.Name = "cboSplitAxis";
-            this.cboSplitAxis.Size = new System.Drawing.Size(88, 23);
-            this.cboSplitAxis.TabIndex = 3;
-            this.cboSplitAxis.SelectedIndex = 0;
-            this.cboSplitAxis.SelectedIndexChanged += new System.EventHandler(this.OnAutoFitValueChanged);
-
-            // ---- By Count Group ----
-            this.grpByCount.Dock = System.Windows.Forms.DockStyle.Top;
-            this.grpByCount.Location = new System.Drawing.Point(6, 206);
-            this.grpByCount.Name = "grpByCount";
-            this.grpByCount.Size = new System.Drawing.Size(208, 78);
-            this.grpByCount.TabIndex = 2;
-            this.grpByCount.TabStop = false;
-            this.grpByCount.Text = "Split by Count";
-            this.grpByCount.Visible = false;
-            this.grpByCount.Controls.Add(this.nudVerticalPieces);
-            this.grpByCount.Controls.Add(this.lblVerticalPieces);
-            this.grpByCount.Controls.Add(this.nudHorizontalPieces);
-            this.grpByCount.Controls.Add(this.lblHorizontalPieces);
-
-            // lblHorizontalPieces
-            this.lblHorizontalPieces.AutoSize = true;
-            this.lblHorizontalPieces.Location = new System.Drawing.Point(10, 22);
-            this.lblHorizontalPieces.Name = "lblHorizontalPieces";
-            this.lblHorizontalPieces.Size = new System.Drawing.Size(72, 15);
-            this.lblHorizontalPieces.Text = "H. Pieces:";
-
-            // nudHorizontalPieces
-            this.nudHorizontalPieces.Location = new System.Drawing.Point(110, 20);
-            this.nudHorizontalPieces.Maximum = new decimal(new int[] { 20, 0, 0, 0 });
-            this.nudHorizontalPieces.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            this.nudHorizontalPieces.Name = "nudHorizontalPieces";
-            this.nudHorizontalPieces.Size = new System.Drawing.Size(88, 23);
-            this.nudHorizontalPieces.TabIndex = 0;
-            this.nudHorizontalPieces.Value = new decimal(new int[] { 2, 0, 0, 0 });
-            this.nudHorizontalPieces.ValueChanged += new System.EventHandler(this.OnByCountValueChanged);
-
-            // lblVerticalPieces
-            this.lblVerticalPieces.AutoSize = true;
-            this.lblVerticalPieces.Location = new System.Drawing.Point(10, 49);
-            this.lblVerticalPieces.Name = "lblVerticalPieces";
-            this.lblVerticalPieces.Size = new System.Drawing.Size(63, 15);
-            this.lblVerticalPieces.Text = "V. Pieces:";
-
-            // nudVerticalPieces
-            this.nudVerticalPieces.Location = new System.Drawing.Point(110, 47);
-            this.nudVerticalPieces.Maximum = new decimal(new int[] { 20, 0, 0, 0 });
-            this.nudVerticalPieces.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            this.nudVerticalPieces.Name = "nudVerticalPieces";
-            this.nudVerticalPieces.Size = new System.Drawing.Size(88, 23);
-            this.nudVerticalPieces.TabIndex = 1;
-            this.nudVerticalPieces.Value = new decimal(new int[] { 1, 0, 0, 0 });
-            this.nudVerticalPieces.ValueChanged += new System.EventHandler(this.OnByCountValueChanged);
-
-            // ---- Split Type Group ----
-            this.grpType.Dock = System.Windows.Forms.DockStyle.Top;
-            this.grpType.Location = new System.Drawing.Point(6, 284);
-            this.grpType.Name = "grpType";
-            this.grpType.Size = new System.Drawing.Size(208, 95);
-            this.grpType.TabIndex = 3;
-            this.grpType.TabStop = false;
-            this.grpType.Text = "Split Type";
-            this.grpType.Controls.Add(this.radSpike);
-            this.grpType.Controls.Add(this.radTabs);
-            this.grpType.Controls.Add(this.radStraight);
-
-            // radStraight
-            this.radStraight.AutoSize = true;
-            this.radStraight.Checked = true;
-            this.radStraight.Location = new System.Drawing.Point(10, 20);
-            this.radStraight.Name = "radStraight";
-            this.radStraight.Size = new System.Drawing.Size(68, 19);
-            this.radStraight.TabIndex = 0;
-            this.radStraight.TabStop = true;
-            this.radStraight.Text = "Straight";
-            this.radStraight.CheckedChanged += new System.EventHandler(this.OnTypeChanged);
-
-            // radTabs
-            this.radTabs.AutoSize = true;
-            this.radTabs.Location = new System.Drawing.Point(10, 43);
-            this.radTabs.Name = "radTabs";
-            this.radTabs.Size = new System.Drawing.Size(107, 19);
-            this.radTabs.TabIndex = 1;
-            this.radTabs.Text = "Weld-Gap Tabs";
-            this.radTabs.CheckedChanged += new System.EventHandler(this.OnTypeChanged);
-
-            // radSpike
-            this.radSpike.AutoSize = true;
-            this.radSpike.Location = new System.Drawing.Point(10, 66);
-            this.radSpike.Name = "radSpike";
-            this.radSpike.Size = new System.Drawing.Size(99, 19);
-            this.radSpike.TabIndex = 2;
-            this.radSpike.Text = "Spike-Groove";
-            this.radSpike.CheckedChanged += new System.EventHandler(this.OnTypeChanged);
-
-            // ---- Tab Parameters Group ----
-            this.grpTabParams.Dock = System.Windows.Forms.DockStyle.Top;
-            this.grpTabParams.Location = new System.Drawing.Point(6, 379);
-            this.grpTabParams.Name = "grpTabParams";
-            this.grpTabParams.Size = new System.Drawing.Size(208, 105);
-            this.grpTabParams.TabIndex = 4;
-            this.grpTabParams.TabStop = false;
-            this.grpTabParams.Text = "Tab Parameters";
-            this.grpTabParams.Visible = false;
-            this.grpTabParams.Controls.Add(this.nudTabCount);
-            this.grpTabParams.Controls.Add(this.lblTabCount);
-            this.grpTabParams.Controls.Add(this.nudTabHeight);
-            this.grpTabParams.Controls.Add(this.lblTabHeight);
-            this.grpTabParams.Controls.Add(this.nudTabWidth);
-            this.grpTabParams.Controls.Add(this.lblTabWidth);
-
-            // lblTabWidth
-            this.lblTabWidth.AutoSize = true;
-            this.lblTabWidth.Location = new System.Drawing.Point(10, 22);
-            this.lblTabWidth.Name = "lblTabWidth";
-            this.lblTabWidth.Size = new System.Drawing.Size(65, 15);
-            this.lblTabWidth.Text = "Tab Width:";
-
-            // nudTabWidth
-            this.nudTabWidth.DecimalPlaces = 2;
-            this.nudTabWidth.Location = new System.Drawing.Point(110, 20);
-            this.nudTabWidth.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
-            this.nudTabWidth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
-            this.nudTabWidth.Name = "nudTabWidth";
-            this.nudTabWidth.Size = new System.Drawing.Size(88, 23);
-            this.nudTabWidth.TabIndex = 0;
-            this.nudTabWidth.Value = new decimal(new int[] { 5, 0, 0, 65536 });
-
-            // lblTabHeight
-            this.lblTabHeight.AutoSize = true;
-            this.lblTabHeight.Location = new System.Drawing.Point(10, 49);
-            this.lblTabHeight.Name = "lblTabHeight";
-            this.lblTabHeight.Size = new System.Drawing.Size(69, 15);
-            this.lblTabHeight.Text = "Tab Height:";
-
-            // nudTabHeight
-            this.nudTabHeight.DecimalPlaces = 2;
-            this.nudTabHeight.Location = new System.Drawing.Point(110, 47);
-            this.nudTabHeight.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
-            this.nudTabHeight.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
-            this.nudTabHeight.Name = "nudTabHeight";
-            this.nudTabHeight.Size = new System.Drawing.Size(88, 23);
-            this.nudTabHeight.TabIndex = 1;
-            this.nudTabHeight.Value = new decimal(new int[] { 1, 0, 0, 65536 });
-
-            // lblTabCount
-            this.lblTabCount.AutoSize = true;
-            this.lblTabCount.Location = new System.Drawing.Point(10, 76);
-            this.lblTabCount.Name = "lblTabCount";
-            this.lblTabCount.Size = new System.Drawing.Size(64, 15);
-            this.lblTabCount.Text = "Tab Count:";
-
-            // nudTabCount
-            this.nudTabCount.Location = new System.Drawing.Point(110, 74);
-            this.nudTabCount.Maximum = new decimal(new int[] { 50, 0, 0, 0 });
-            this.nudTabCount.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            this.nudTabCount.Name = "nudTabCount";
-            this.nudTabCount.Size = new System.Drawing.Size(88, 23);
-            this.nudTabCount.TabIndex = 2;
-            this.nudTabCount.Value = new decimal(new int[] { 3, 0, 0, 0 });
-
-            // ---- Spike Parameters Group ----
-            this.grpSpikeParams.Dock = System.Windows.Forms.DockStyle.Top;
-            this.grpSpikeParams.Location = new System.Drawing.Point(6, 484);
-            this.grpSpikeParams.Name = "grpSpikeParams";
-            this.grpSpikeParams.Size = new System.Drawing.Size(208, 159);
-            this.grpSpikeParams.TabIndex = 5;
-            this.grpSpikeParams.TabStop = false;
-            this.grpSpikeParams.Text = "Spike Parameters";
-            this.grpSpikeParams.Visible = false;
-            this.grpSpikeParams.Controls.Add(this.nudSpikePairCount);
-            this.grpSpikeParams.Controls.Add(this.lblSpikePairCount);
-            this.grpSpikeParams.Controls.Add(this.nudSpikeWeldGap);
-            this.grpSpikeParams.Controls.Add(this.lblSpikeWeldGap);
-            this.grpSpikeParams.Controls.Add(this.nudGrooveDepth);
-            this.grpSpikeParams.Controls.Add(this.lblGrooveDepth);
-            this.grpSpikeParams.Controls.Add(this.nudSpikeAngle);
-            this.grpSpikeParams.Controls.Add(this.lblSpikeAngle);
-            this.grpSpikeParams.Controls.Add(this.nudSpikeDepth);
-            this.grpSpikeParams.Controls.Add(this.lblSpikeDepth);
-
-            // lblSpikeDepth
-            this.lblSpikeDepth.AutoSize = true;
-            this.lblSpikeDepth.Location = new System.Drawing.Point(10, 22);
-            this.lblSpikeDepth.Name = "lblSpikeDepth";
-            this.lblSpikeDepth.Size = new System.Drawing.Size(74, 15);
-            this.lblSpikeDepth.Text = "Spike Depth:";
-
-            // nudSpikeDepth
-            this.nudSpikeDepth.DecimalPlaces = 2;
-            this.nudSpikeDepth.Location = new System.Drawing.Point(110, 20);
-            this.nudSpikeDepth.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
-            this.nudSpikeDepth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
-            this.nudSpikeDepth.Name = "nudSpikeDepth";
-            this.nudSpikeDepth.Size = new System.Drawing.Size(88, 23);
-            this.nudSpikeDepth.TabIndex = 0;
-            this.nudSpikeDepth.Value = new decimal(new int[] { 5, 0, 0, 65536 });
-
-            // lblGrooveDepth
-            this.lblGrooveDepth.AutoSize = true;
-            this.lblGrooveDepth.Location = new System.Drawing.Point(10, 49);
-            this.lblGrooveDepth.Name = "lblGrooveDepth";
-            this.lblGrooveDepth.Size = new System.Drawing.Size(84, 15);
-            this.lblGrooveDepth.Text = "Groove Depth:";
-
-            // nudGrooveDepth
-            this.nudGrooveDepth.DecimalPlaces = 3;
-            this.nudGrooveDepth.Location = new System.Drawing.Point(110, 47);
-            this.nudGrooveDepth.Maximum = new decimal(new int[] { 100, 0, 0, 0 });
-            this.nudGrooveDepth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
-            this.nudGrooveDepth.Name = "nudGrooveDepth";
-            this.nudGrooveDepth.Size = new System.Drawing.Size(88, 23);
-            this.nudGrooveDepth.TabIndex = 1;
-            this.nudGrooveDepth.Value = new decimal(new int[] { 625, 0, 0, 196608 });
-
-            // lblSpikeWeldGap
-            this.lblSpikeWeldGap.AutoSize = true;
-            this.lblSpikeWeldGap.Location = new System.Drawing.Point(10, 76);
-            this.lblSpikeWeldGap.Name = "lblSpikeWeldGap";
-            this.lblSpikeWeldGap.Size = new System.Drawing.Size(64, 15);
-            this.lblSpikeWeldGap.Text = "Weld Gap:";
-
-            // nudSpikeWeldGap
-            this.nudSpikeWeldGap.DecimalPlaces = 3;
-            this.nudSpikeWeldGap.Location = new System.Drawing.Point(110, 74);
-            this.nudSpikeWeldGap.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
-            this.nudSpikeWeldGap.Name = "nudSpikeWeldGap";
-            this.nudSpikeWeldGap.Size = new System.Drawing.Size(88, 23);
-            this.nudSpikeWeldGap.TabIndex = 2;
-            this.nudSpikeWeldGap.Value = new decimal(new int[] { 125, 0, 0, 196608 });
-
-            // lblSpikeAngle
-            this.lblSpikeAngle.AutoSize = true;
-            this.lblSpikeAngle.Location = new System.Drawing.Point(10, 103);
-            this.lblSpikeAngle.Name = "lblSpikeAngle";
-            this.lblSpikeAngle.Size = new System.Drawing.Size(74, 15);
-            this.lblSpikeAngle.Text = "Spike Angle:";
-
-            // nudSpikeAngle
-            this.nudSpikeAngle.DecimalPlaces = 1;
-            this.nudSpikeAngle.Location = new System.Drawing.Point(110, 101);
-            this.nudSpikeAngle.Maximum = new decimal(new int[] { 89, 0, 0, 0 });
-            this.nudSpikeAngle.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
-            this.nudSpikeAngle.Name = "nudSpikeAngle";
-            this.nudSpikeAngle.Size = new System.Drawing.Size(88, 23);
-            this.nudSpikeAngle.TabIndex = 3;
-            this.nudSpikeAngle.Value = new decimal(new int[] { 45, 0, 0, 0 });
-
-            // lblSpikePairCount
-            this.lblSpikePairCount.AutoSize = true;
-            this.lblSpikePairCount.Location = new System.Drawing.Point(10, 130);
-            this.lblSpikePairCount.Name = "lblSpikePairCount";
-            this.lblSpikePairCount.Size = new System.Drawing.Size(65, 15);
-            this.lblSpikePairCount.Text = "Pair Count:";
-
+            pnlSettings = new System.Windows.Forms.Panel();
+            pnlButtons = new System.Windows.Forms.Panel();
+            btnCancel = new System.Windows.Forms.Button();
+            btnOK = new System.Windows.Forms.Button();
+            grpSpikeParams = new System.Windows.Forms.GroupBox();
+            nudSpikePairCount = new System.Windows.Forms.NumericUpDown();
+            lblSpikePairCount = new System.Windows.Forms.Label();
+            nudSpikeWeldGap = new System.Windows.Forms.NumericUpDown();
+            lblSpikeWeldGap = new System.Windows.Forms.Label();
+            nudGrooveDepth = new System.Windows.Forms.NumericUpDown();
+            lblGrooveDepth = new System.Windows.Forms.Label();
+            nudSpikeAngle = new System.Windows.Forms.NumericUpDown();
+            lblSpikeAngle = new System.Windows.Forms.Label();
+            nudSpikeDepth = new System.Windows.Forms.NumericUpDown();
+            lblSpikeDepth = new System.Windows.Forms.Label();
+            grpTabParams = new System.Windows.Forms.GroupBox();
+            nudTabCount = new System.Windows.Forms.NumericUpDown();
+            lblTabCount = new System.Windows.Forms.Label();
+            nudTabHeight = new System.Windows.Forms.NumericUpDown();
+            lblTabHeight = new System.Windows.Forms.Label();
+            nudTabWidth = new System.Windows.Forms.NumericUpDown();
+            lblTabWidth = new System.Windows.Forms.Label();
+            grpType = new System.Windows.Forms.GroupBox();
+            radSpike = new System.Windows.Forms.RadioButton();
+            radTabs = new System.Windows.Forms.RadioButton();
+            radStraight = new System.Windows.Forms.RadioButton();
+            grpByCount = new System.Windows.Forms.GroupBox();
+            nudVerticalPieces = new System.Windows.Forms.NumericUpDown();
+            lblVerticalPieces = new System.Windows.Forms.Label();
+            nudHorizontalPieces = new System.Windows.Forms.NumericUpDown();
+            lblHorizontalPieces = new System.Windows.Forms.Label();
+            grpAutoFit = new System.Windows.Forms.GroupBox();
+            cboSplitAxis = new System.Windows.Forms.ComboBox();
+            lblSplitAxis = new System.Windows.Forms.Label();
+            nudEdgeSpacing = new System.Windows.Forms.NumericUpDown();
+            lblEdgeSpacing = new System.Windows.Forms.Label();
+            nudPlateHeight = new System.Windows.Forms.NumericUpDown();
+            lblPlateHeight = new System.Windows.Forms.Label();
+            nudPlateWidth = new System.Windows.Forms.NumericUpDown();
+            lblPlateWidth = new System.Windows.Forms.Label();
+            grpMethod = new System.Windows.Forms.GroupBox();
+            radByCount = new System.Windows.Forms.RadioButton();
+            radFitToPlate = new System.Windows.Forms.RadioButton();
+            radManual = new System.Windows.Forms.RadioButton();
+            pnlPreview = new SplitPreview();
+            toolStrip = new System.Windows.Forms.ToolStrip();
+            btnAddLine = new System.Windows.Forms.ToolStripButton();
+            btnDeleteLine = new System.Windows.Forms.ToolStripButton();
+            statusStrip = new System.Windows.Forms.StatusStrip();
+            lblStatus = new System.Windows.Forms.ToolStripStatusLabel();
+            lblCursor = new System.Windows.Forms.ToolStripStatusLabel();
+            pnlSettings.SuspendLayout();
+            grpSpikeParams.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)nudSpikePairCount).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudSpikeWeldGap).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudGrooveDepth).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudSpikeAngle).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudSpikeDepth).BeginInit();
+            grpTabParams.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)nudTabCount).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudTabHeight).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudTabWidth).BeginInit();
+            grpType.SuspendLayout();
+            grpByCount.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)nudVerticalPieces).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudHorizontalPieces).BeginInit();
+            grpAutoFit.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)nudEdgeSpacing).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudPlateHeight).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudPlateWidth).BeginInit();
+            grpMethod.SuspendLayout();
+            toolStrip.SuspendLayout();
+            statusStrip.SuspendLayout();
+            SuspendLayout();
+            // 
+            // pnlSettings
+            // 
+            pnlSettings.AutoScroll = true;
+            pnlSettings.Controls.Add(grpSpikeParams);
+            pnlSettings.Controls.Add(grpTabParams);
+            pnlSettings.Controls.Add(grpType);
+            pnlSettings.Controls.Add(grpByCount);
+            pnlSettings.Controls.Add(grpAutoFit);
+            pnlSettings.Controls.Add(grpMethod);
+            pnlSettings.Controls.Add(pnlButtons);
+            pnlSettings.Dock = System.Windows.Forms.DockStyle.Right;
+            pnlSettings.Location = new System.Drawing.Point(647, 25);
+            pnlSettings.Name = "pnlSettings";
+            pnlSettings.Padding = new System.Windows.Forms.Padding(6);
+            pnlSettings.Size = new System.Drawing.Size(220, 611);
+            pnlSettings.TabIndex = 2;
+            //
+            // pnlButtons
+            //
+            pnlButtons.Controls.Add(btnOK);
+            pnlButtons.Controls.Add(btnCancel);
+            pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom;
+            pnlButtons.Name = "pnlButtons";
+            pnlButtons.Size = new System.Drawing.Size(208, 40);
+            pnlButtons.TabIndex = 8;
+            //
+            // btnCancel
+            //
+            btnCancel.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            btnCancel.Location = new System.Drawing.Point(110, 6);
+            btnCancel.Name = "btnCancel";
+            btnCancel.Size = new System.Drawing.Size(80, 28);
+            btnCancel.TabIndex = 7;
+            btnCancel.Text = "Cancel";
+            btnCancel.UseVisualStyleBackColor = true;
+            btnCancel.Click += OnCancel;
+            //
+            // btnOK
+            //
+            btnOK.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            btnOK.Location = new System.Drawing.Point(20, 6);
+            btnOK.Name = "btnOK";
+            btnOK.Size = new System.Drawing.Size(80, 28);
+            btnOK.TabIndex = 6;
+            btnOK.Text = "OK";
+            btnOK.UseVisualStyleBackColor = true;
+            btnOK.Click += OnOK;
+            // 
+            // grpSpikeParams
+            // 
+            grpSpikeParams.Controls.Add(nudSpikePairCount);
+            grpSpikeParams.Controls.Add(lblSpikePairCount);
+            grpSpikeParams.Controls.Add(nudSpikeWeldGap);
+            grpSpikeParams.Controls.Add(lblSpikeWeldGap);
+            grpSpikeParams.Controls.Add(nudGrooveDepth);
+            grpSpikeParams.Controls.Add(lblGrooveDepth);
+            grpSpikeParams.Controls.Add(nudSpikeAngle);
+            grpSpikeParams.Controls.Add(lblSpikeAngle);
+            grpSpikeParams.Controls.Add(nudSpikeDepth);
+            grpSpikeParams.Controls.Add(lblSpikeDepth);
+            grpSpikeParams.Dock = System.Windows.Forms.DockStyle.Top;
+            grpSpikeParams.Location = new System.Drawing.Point(6, 511);
+            grpSpikeParams.Name = "grpSpikeParams";
+            grpSpikeParams.Size = new System.Drawing.Size(191, 159);
+            grpSpikeParams.TabIndex = 5;
+            grpSpikeParams.TabStop = false;
+            grpSpikeParams.Text = "Spike Parameters";
+            grpSpikeParams.Visible = false;
+            // 
             // nudSpikePairCount
-            this.nudSpikePairCount.Location = new System.Drawing.Point(110, 128);
-            this.nudSpikePairCount.Maximum = new decimal(new int[] { 50, 0, 0, 0 });
-            this.nudSpikePairCount.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            this.nudSpikePairCount.Name = "nudSpikePairCount";
-            this.nudSpikePairCount.Size = new System.Drawing.Size(88, 23);
-            this.nudSpikePairCount.TabIndex = 4;
-            this.nudSpikePairCount.Value = new decimal(new int[] { 2, 0, 0, 0 });
-
-            // ---- OK / Cancel Buttons ----
-            this.btnOK.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnOK.Location = new System.Drawing.Point(30, 468);
-            this.btnOK.Name = "btnOK";
-            this.btnOK.Size = new System.Drawing.Size(80, 28);
-            this.btnOK.TabIndex = 6;
-            this.btnOK.Text = "OK";
-            this.btnOK.UseVisualStyleBackColor = true;
-            this.btnOK.Click += new System.EventHandler(this.OnOK);
-
-            this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnCancel.Location = new System.Drawing.Point(120, 468);
-            this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(80, 28);
-            this.btnCancel.TabIndex = 7;
-            this.btnCancel.Text = "Cancel";
-            this.btnCancel.UseVisualStyleBackColor = true;
-            this.btnCancel.Click += new System.EventHandler(this.OnCancel);
-
-            // ---- Preview Panel (fills remaining space) ----
-            this.pnlPreview.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnlPreview.Location = new System.Drawing.Point(0, 25);
-            this.pnlPreview.Name = "pnlPreview";
-            this.pnlPreview.Size = new System.Drawing.Size(580, 503);
-            this.pnlPreview.TabIndex = 3;
-            this.pnlPreview.Paint += new System.Windows.Forms.PaintEventHandler(this.OnPreviewPaint);
-            this.pnlPreview.MouseDown += new System.Windows.Forms.MouseEventHandler(this.OnPreviewMouseDown);
-            this.pnlPreview.MouseMove += new System.Windows.Forms.MouseEventHandler(this.OnPreviewMouseMove);
-            this.pnlPreview.MouseUp += new System.Windows.Forms.MouseEventHandler(this.OnPreviewMouseUp);
-            this.pnlPreview.MouseWheel += new System.Windows.Forms.MouseEventHandler(this.OnPreviewMouseWheel);
-
-            // ---- SplitDrawingForm ----
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.CancelButton = this.btnCancel;
-            this.ClientSize = new System.Drawing.Size(800, 550);
-            this.Controls.Add(this.pnlPreview);
-            this.Controls.Add(this.pnlSettings);
-            this.Controls.Add(this.statusStrip);
-            this.Controls.Add(this.toolStrip);
-            this.MinimumSize = new System.Drawing.Size(600, 450);
-            this.Name = "SplitDrawingForm";
-            this.ShowIcon = false;
-            this.ShowInTaskbar = false;
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Split Drawing";
-
-            ((System.ComponentModel.ISupportInitialize)(this.nudPlateWidth)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudPlateHeight)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudEdgeSpacing)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudHorizontalPieces)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudVerticalPieces)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudTabWidth)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudTabHeight)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudTabCount)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudSpikeDepth)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudSpikeAngle)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudSpikePairCount)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudGrooveDepth)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.nudSpikeWeldGap)).EndInit();
-            this.pnlSettings.ResumeLayout(false);
-            this.grpMethod.ResumeLayout(false);
-            this.grpMethod.PerformLayout();
-            this.grpAutoFit.ResumeLayout(false);
-            this.grpAutoFit.PerformLayout();
-            this.grpByCount.ResumeLayout(false);
-            this.grpByCount.PerformLayout();
-            this.grpType.ResumeLayout(false);
-            this.grpType.PerformLayout();
-            this.grpTabParams.ResumeLayout(false);
-            this.grpTabParams.PerformLayout();
-            this.grpSpikeParams.ResumeLayout(false);
-            this.grpSpikeParams.PerformLayout();
-            this.toolStrip.ResumeLayout(false);
-            this.toolStrip.PerformLayout();
-            this.statusStrip.ResumeLayout(false);
-            this.statusStrip.PerformLayout();
-            this.ResumeLayout(false);
-            this.PerformLayout();
+            // 
+            nudSpikePairCount.Location = new System.Drawing.Point(110, 128);
+            nudSpikePairCount.Maximum = new decimal(new int[] { 50, 0, 0, 0 });
+            nudSpikePairCount.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            nudSpikePairCount.Name = "nudSpikePairCount";
+            nudSpikePairCount.Size = new System.Drawing.Size(88, 23);
+            nudSpikePairCount.TabIndex = 4;
+            nudSpikePairCount.Value = new decimal(new int[] { 2, 0, 0, 0 });
+            nudSpikePairCount.ValueChanged += OnFeatureCountChanged;
+            // 
+            // lblSpikePairCount
+            // 
+            lblSpikePairCount.AutoSize = true;
+            lblSpikePairCount.Location = new System.Drawing.Point(10, 130);
+            lblSpikePairCount.Name = "lblSpikePairCount";
+            lblSpikePairCount.Size = new System.Drawing.Size(66, 15);
+            lblSpikePairCount.TabIndex = 5;
+            lblSpikePairCount.Text = "Pair Count:";
+            // 
+            // nudSpikeWeldGap
+            // 
+            nudSpikeWeldGap.DecimalPlaces = 3;
+            nudSpikeWeldGap.Location = new System.Drawing.Point(110, 74);
+            nudSpikeWeldGap.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
+            nudSpikeWeldGap.Name = "nudSpikeWeldGap";
+            nudSpikeWeldGap.Size = new System.Drawing.Size(88, 23);
+            nudSpikeWeldGap.TabIndex = 2;
+            nudSpikeWeldGap.Value = new decimal(new int[] { 125, 0, 0, 196608 });
+            nudSpikeWeldGap.ValueChanged += OnSpikeParamChanged;
+            // 
+            // lblSpikeWeldGap
+            // 
+            lblSpikeWeldGap.AutoSize = true;
+            lblSpikeWeldGap.Location = new System.Drawing.Point(10, 76);
+            lblSpikeWeldGap.Name = "lblSpikeWeldGap";
+            lblSpikeWeldGap.Size = new System.Drawing.Size(61, 15);
+            lblSpikeWeldGap.TabIndex = 6;
+            lblSpikeWeldGap.Text = "Weld Gap:";
+            // 
+            // nudGrooveDepth
+            // 
+            nudGrooveDepth.DecimalPlaces = 3;
+            nudGrooveDepth.Location = new System.Drawing.Point(110, 47);
+            nudGrooveDepth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
+            nudGrooveDepth.Name = "nudGrooveDepth";
+            nudGrooveDepth.Size = new System.Drawing.Size(88, 23);
+            nudGrooveDepth.TabIndex = 1;
+            nudGrooveDepth.Value = new decimal(new int[] { 125, 0, 0, 196608 });
+            nudGrooveDepth.ValueChanged += OnSpikeParamChanged;
+            // 
+            // lblGrooveDepth
+            // 
+            lblGrooveDepth.AutoSize = true;
+            lblGrooveDepth.Location = new System.Drawing.Point(10, 49);
+            lblGrooveDepth.Name = "lblGrooveDepth";
+            lblGrooveDepth.Size = new System.Drawing.Size(83, 15);
+            lblGrooveDepth.TabIndex = 7;
+            lblGrooveDepth.Text = "Groove Depth:";
+            // 
+            // nudSpikeAngle
+            // 
+            nudSpikeAngle.DecimalPlaces = 1;
+            nudSpikeAngle.Location = new System.Drawing.Point(110, 101);
+            nudSpikeAngle.Maximum = new decimal(new int[] { 89, 0, 0, 0 });
+            nudSpikeAngle.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
+            nudSpikeAngle.Name = "nudSpikeAngle";
+            nudSpikeAngle.Size = new System.Drawing.Size(88, 23);
+            nudSpikeAngle.TabIndex = 3;
+            nudSpikeAngle.Value = new decimal(new int[] { 45, 0, 0, 0 });
+            // 
+            // lblSpikeAngle
+            // 
+            lblSpikeAngle.AutoSize = true;
+            lblSpikeAngle.Location = new System.Drawing.Point(10, 103);
+            lblSpikeAngle.Name = "lblSpikeAngle";
+            lblSpikeAngle.Size = new System.Drawing.Size(72, 15);
+            lblSpikeAngle.TabIndex = 8;
+            lblSpikeAngle.Text = "Spike Angle:";
+            // 
+            // nudSpikeDepth
+            // 
+            nudSpikeDepth.DecimalPlaces = 2;
+            nudSpikeDepth.Enabled = false;
+            nudSpikeDepth.Location = new System.Drawing.Point(110, 20);
+            nudSpikeDepth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
+            nudSpikeDepth.Name = "nudSpikeDepth";
+            nudSpikeDepth.Size = new System.Drawing.Size(88, 23);
+            nudSpikeDepth.TabIndex = 0;
+            nudSpikeDepth.Value = new decimal(new int[] { 25, 0, 0, 131072 });
+            // 
+            // lblSpikeDepth
+            // 
+            lblSpikeDepth.AutoSize = true;
+            lblSpikeDepth.Location = new System.Drawing.Point(10, 22);
+            lblSpikeDepth.Name = "lblSpikeDepth";
+            lblSpikeDepth.Size = new System.Drawing.Size(73, 15);
+            lblSpikeDepth.TabIndex = 9;
+            lblSpikeDepth.Text = "Spike Depth:";
+            // 
+            // grpTabParams
+            // 
+            grpTabParams.Controls.Add(nudTabCount);
+            grpTabParams.Controls.Add(lblTabCount);
+            grpTabParams.Controls.Add(nudTabHeight);
+            grpTabParams.Controls.Add(lblTabHeight);
+            grpTabParams.Controls.Add(nudTabWidth);
+            grpTabParams.Controls.Add(lblTabWidth);
+            grpTabParams.Dock = System.Windows.Forms.DockStyle.Top;
+            grpTabParams.Location = new System.Drawing.Point(6, 406);
+            grpTabParams.Name = "grpTabParams";
+            grpTabParams.Size = new System.Drawing.Size(191, 105);
+            grpTabParams.TabIndex = 4;
+            grpTabParams.TabStop = false;
+            grpTabParams.Text = "Tab Parameters";
+            grpTabParams.Visible = false;
+            // 
+            // nudTabCount
+            // 
+            nudTabCount.Location = new System.Drawing.Point(110, 74);
+            nudTabCount.Maximum = new decimal(new int[] { 50, 0, 0, 0 });
+            nudTabCount.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            nudTabCount.Name = "nudTabCount";
+            nudTabCount.Size = new System.Drawing.Size(88, 23);
+            nudTabCount.TabIndex = 2;
+            nudTabCount.Value = new decimal(new int[] { 2, 0, 0, 0 });
+            nudTabCount.ValueChanged += OnFeatureCountChanged;
+            // 
+            // lblTabCount
+            // 
+            lblTabCount.AutoSize = true;
+            lblTabCount.Location = new System.Drawing.Point(10, 76);
+            lblTabCount.Name = "lblTabCount";
+            lblTabCount.Size = new System.Drawing.Size(65, 15);
+            lblTabCount.TabIndex = 3;
+            lblTabCount.Text = "Tab Count:";
+            // 
+            // nudTabHeight
+            // 
+            nudTabHeight.DecimalPlaces = 2;
+            nudTabHeight.Location = new System.Drawing.Point(110, 47);
+            nudTabHeight.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
+            nudTabHeight.Name = "nudTabHeight";
+            nudTabHeight.Size = new System.Drawing.Size(88, 23);
+            nudTabHeight.TabIndex = 1;
+            nudTabHeight.Value = new decimal(new int[] { 1, 0, 0, 65536 });
+            // 
+            // lblTabHeight
+            // 
+            lblTabHeight.AutoSize = true;
+            lblTabHeight.Location = new System.Drawing.Point(10, 49);
+            lblTabHeight.Name = "lblTabHeight";
+            lblTabHeight.Size = new System.Drawing.Size(61, 15);
+            lblTabHeight.TabIndex = 4;
+            lblTabHeight.Text = "Weld Gap:";
+            // 
+            // nudTabWidth
+            // 
+            nudTabWidth.DecimalPlaces = 2;
+            nudTabWidth.Location = new System.Drawing.Point(110, 20);
+            nudTabWidth.Maximum = new decimal(new int[] { 1000, 0, 0, 0 });
+            nudTabWidth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
+            nudTabWidth.Name = "nudTabWidth";
+            nudTabWidth.Size = new System.Drawing.Size(88, 23);
+            nudTabWidth.TabIndex = 0;
+            nudTabWidth.Value = new decimal(new int[] { 5, 0, 0, 65536 });
+            // 
+            // lblTabWidth
+            // 
+            lblTabWidth.AutoSize = true;
+            lblTabWidth.Location = new System.Drawing.Point(10, 22);
+            lblTabWidth.Name = "lblTabWidth";
+            lblTabWidth.Size = new System.Drawing.Size(69, 15);
+            lblTabWidth.TabIndex = 5;
+            lblTabWidth.Text = "Tab Length:";
+            // 
+            // grpType
+            // 
+            grpType.Controls.Add(radSpike);
+            grpType.Controls.Add(radTabs);
+            grpType.Controls.Add(radStraight);
+            grpType.Dock = System.Windows.Forms.DockStyle.Top;
+            grpType.Location = new System.Drawing.Point(6, 311);
+            grpType.Name = "grpType";
+            grpType.Size = new System.Drawing.Size(191, 95);
+            grpType.TabIndex = 3;
+            grpType.TabStop = false;
+            grpType.Text = "Split Type";
+            // 
+            // radSpike
+            // 
+            radSpike.AutoSize = true;
+            radSpike.Location = new System.Drawing.Point(10, 66);
+            radSpike.Name = "radSpike";
+            radSpike.Size = new System.Drawing.Size(96, 19);
+            radSpike.TabIndex = 2;
+            radSpike.Text = "Spike-Groove";
+            radSpike.CheckedChanged += OnTypeChanged;
+            // 
+            // radTabs
+            // 
+            radTabs.AutoSize = true;
+            radTabs.Location = new System.Drawing.Point(10, 43);
+            radTabs.Name = "radTabs";
+            radTabs.Size = new System.Drawing.Size(105, 19);
+            radTabs.TabIndex = 1;
+            radTabs.Text = "Weld-Gap Tabs";
+            radTabs.CheckedChanged += OnTypeChanged;
+            // 
+            // radStraight
+            // 
+            radStraight.AutoSize = true;
+            radStraight.Checked = true;
+            radStraight.Location = new System.Drawing.Point(10, 20);
+            radStraight.Name = "radStraight";
+            radStraight.Size = new System.Drawing.Size(66, 19);
+            radStraight.TabIndex = 0;
+            radStraight.TabStop = true;
+            radStraight.Text = "Straight";
+            radStraight.CheckedChanged += OnTypeChanged;
+            // 
+            // grpByCount
+            // 
+            grpByCount.Controls.Add(nudVerticalPieces);
+            grpByCount.Controls.Add(lblVerticalPieces);
+            grpByCount.Controls.Add(nudHorizontalPieces);
+            grpByCount.Controls.Add(lblHorizontalPieces);
+            grpByCount.Dock = System.Windows.Forms.DockStyle.Top;
+            grpByCount.Location = new System.Drawing.Point(6, 233);
+            grpByCount.Name = "grpByCount";
+            grpByCount.Size = new System.Drawing.Size(191, 78);
+            grpByCount.TabIndex = 2;
+            grpByCount.TabStop = false;
+            grpByCount.Text = "Split by Count";
+            grpByCount.Visible = false;
+            // 
+            // nudVerticalPieces
+            // 
+            nudVerticalPieces.Location = new System.Drawing.Point(110, 47);
+            nudVerticalPieces.Maximum = new decimal(new int[] { 20, 0, 0, 0 });
+            nudVerticalPieces.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            nudVerticalPieces.Name = "nudVerticalPieces";
+            nudVerticalPieces.Size = new System.Drawing.Size(88, 23);
+            nudVerticalPieces.TabIndex = 1;
+            nudVerticalPieces.Value = new decimal(new int[] { 1, 0, 0, 0 });
+            nudVerticalPieces.ValueChanged += OnByCountValueChanged;
+            // 
+            // lblVerticalPieces
+            // 
+            lblVerticalPieces.AutoSize = true;
+            lblVerticalPieces.Location = new System.Drawing.Point(10, 49);
+            lblVerticalPieces.Name = "lblVerticalPieces";
+            lblVerticalPieces.Size = new System.Drawing.Size(56, 15);
+            lblVerticalPieces.TabIndex = 2;
+            lblVerticalPieces.Text = "V. Pieces:";
+            // 
+            // nudHorizontalPieces
+            // 
+            nudHorizontalPieces.Location = new System.Drawing.Point(110, 20);
+            nudHorizontalPieces.Maximum = new decimal(new int[] { 20, 0, 0, 0 });
+            nudHorizontalPieces.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            nudHorizontalPieces.Name = "nudHorizontalPieces";
+            nudHorizontalPieces.Size = new System.Drawing.Size(88, 23);
+            nudHorizontalPieces.TabIndex = 0;
+            nudHorizontalPieces.Value = new decimal(new int[] { 2, 0, 0, 0 });
+            nudHorizontalPieces.ValueChanged += OnByCountValueChanged;
+            // 
+            // lblHorizontalPieces
+            // 
+            lblHorizontalPieces.AutoSize = true;
+            lblHorizontalPieces.Location = new System.Drawing.Point(10, 22);
+            lblHorizontalPieces.Name = "lblHorizontalPieces";
+            lblHorizontalPieces.Size = new System.Drawing.Size(58, 15);
+            lblHorizontalPieces.TabIndex = 3;
+            lblHorizontalPieces.Text = "H. Pieces:";
+            // 
+            // grpAutoFit
+            // 
+            grpAutoFit.Controls.Add(cboSplitAxis);
+            grpAutoFit.Controls.Add(lblSplitAxis);
+            grpAutoFit.Controls.Add(nudEdgeSpacing);
+            grpAutoFit.Controls.Add(lblEdgeSpacing);
+            grpAutoFit.Controls.Add(nudPlateHeight);
+            grpAutoFit.Controls.Add(lblPlateHeight);
+            grpAutoFit.Controls.Add(nudPlateWidth);
+            grpAutoFit.Controls.Add(lblPlateWidth);
+            grpAutoFit.Dock = System.Windows.Forms.DockStyle.Top;
+            grpAutoFit.Location = new System.Drawing.Point(6, 101);
+            grpAutoFit.Name = "grpAutoFit";
+            grpAutoFit.Size = new System.Drawing.Size(191, 132);
+            grpAutoFit.TabIndex = 1;
+            grpAutoFit.TabStop = false;
+            grpAutoFit.Text = "Auto-Fit Options";
+            grpAutoFit.Visible = false;
+            // 
+            // cboSplitAxis
+            // 
+            cboSplitAxis.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            cboSplitAxis.Items.AddRange(new object[] { "Auto", "Vertical Only", "Horizontal Only" });
+            cboSplitAxis.Location = new System.Drawing.Point(110, 100);
+            cboSplitAxis.Name = "cboSplitAxis";
+            cboSplitAxis.Size = new System.Drawing.Size(88, 23);
+            cboSplitAxis.TabIndex = 3;
+            cboSplitAxis.SelectedIndexChanged += OnAutoFitValueChanged;
+            // 
+            // lblSplitAxis
+            // 
+            lblSplitAxis.AutoSize = true;
+            lblSplitAxis.Location = new System.Drawing.Point(10, 103);
+            lblSplitAxis.Name = "lblSplitAxis";
+            lblSplitAxis.Size = new System.Drawing.Size(57, 15);
+            lblSplitAxis.TabIndex = 4;
+            lblSplitAxis.Text = "Split Axis:";
+            // 
+            // nudEdgeSpacing
+            // 
+            nudEdgeSpacing.DecimalPlaces = 2;
+            nudEdgeSpacing.Location = new System.Drawing.Point(110, 74);
+            nudEdgeSpacing.Name = "nudEdgeSpacing";
+            nudEdgeSpacing.Size = new System.Drawing.Size(88, 23);
+            nudEdgeSpacing.TabIndex = 2;
+            nudEdgeSpacing.Value = new decimal(new int[] { 5, 0, 0, 65536 });
+            nudEdgeSpacing.ValueChanged += OnAutoFitValueChanged;
+            // 
+            // lblEdgeSpacing
+            // 
+            lblEdgeSpacing.AutoSize = true;
+            lblEdgeSpacing.Location = new System.Drawing.Point(10, 76);
+            lblEdgeSpacing.Name = "lblEdgeSpacing";
+            lblEdgeSpacing.Size = new System.Drawing.Size(81, 15);
+            lblEdgeSpacing.TabIndex = 5;
+            lblEdgeSpacing.Text = "Edge Spacing:";
+            // 
+            // nudPlateHeight
+            // 
+            nudPlateHeight.DecimalPlaces = 2;
+            nudPlateHeight.Location = new System.Drawing.Point(110, 47);
+            nudPlateHeight.Maximum = new decimal(new int[] { 100000, 0, 0, 0 });
+            nudPlateHeight.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            nudPlateHeight.Name = "nudPlateHeight";
+            nudPlateHeight.Size = new System.Drawing.Size(88, 23);
+            nudPlateHeight.TabIndex = 1;
+            nudPlateHeight.Value = new decimal(new int[] { 120, 0, 0, 0 });
+            nudPlateHeight.ValueChanged += OnAutoFitValueChanged;
+            // 
+            // lblPlateHeight
+            // 
+            lblPlateHeight.AutoSize = true;
+            lblPlateHeight.Location = new System.Drawing.Point(10, 49);
+            lblPlateHeight.Name = "lblPlateHeight";
+            lblPlateHeight.Size = new System.Drawing.Size(76, 15);
+            lblPlateHeight.TabIndex = 6;
+            lblPlateHeight.Text = "Plate Length:";
+            // 
+            // nudPlateWidth
+            // 
+            nudPlateWidth.DecimalPlaces = 2;
+            nudPlateWidth.Location = new System.Drawing.Point(110, 20);
+            nudPlateWidth.Maximum = new decimal(new int[] { 100000, 0, 0, 0 });
+            nudPlateWidth.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            nudPlateWidth.Name = "nudPlateWidth";
+            nudPlateWidth.Size = new System.Drawing.Size(88, 23);
+            nudPlateWidth.TabIndex = 0;
+            nudPlateWidth.Value = new decimal(new int[] { 60, 0, 0, 0 });
+            nudPlateWidth.ValueChanged += OnAutoFitValueChanged;
+            // 
+            // lblPlateWidth
+            // 
+            lblPlateWidth.AutoSize = true;
+            lblPlateWidth.Location = new System.Drawing.Point(10, 22);
+            lblPlateWidth.Name = "lblPlateWidth";
+            lblPlateWidth.Size = new System.Drawing.Size(71, 15);
+            lblPlateWidth.TabIndex = 7;
+            lblPlateWidth.Text = "Plate Width:";
+            // 
+            // grpMethod
+            // 
+            grpMethod.Controls.Add(radByCount);
+            grpMethod.Controls.Add(radFitToPlate);
+            grpMethod.Controls.Add(radManual);
+            grpMethod.Dock = System.Windows.Forms.DockStyle.Top;
+            grpMethod.Location = new System.Drawing.Point(6, 6);
+            grpMethod.Name = "grpMethod";
+            grpMethod.Size = new System.Drawing.Size(191, 95);
+            grpMethod.TabIndex = 0;
+            grpMethod.TabStop = false;
+            grpMethod.Text = "Split Method";
+            // 
+            // radByCount
+            // 
+            radByCount.AutoSize = true;
+            radByCount.Location = new System.Drawing.Point(10, 66);
+            radByCount.Name = "radByCount";
+            radByCount.Size = new System.Drawing.Size(100, 19);
+            radByCount.TabIndex = 2;
+            radByCount.Text = "Split by Count";
+            radByCount.CheckedChanged += OnMethodChanged;
+            // 
+            // radFitToPlate
+            // 
+            radFitToPlate.AutoSize = true;
+            radFitToPlate.Location = new System.Drawing.Point(10, 43);
+            radFitToPlate.Name = "radFitToPlate";
+            radFitToPlate.Size = new System.Drawing.Size(81, 19);
+            radFitToPlate.TabIndex = 1;
+            radFitToPlate.Text = "Fit to Plate";
+            radFitToPlate.CheckedChanged += OnMethodChanged;
+            // 
+            // radManual
+            // 
+            radManual.AutoSize = true;
+            radManual.Checked = true;
+            radManual.Location = new System.Drawing.Point(10, 20);
+            radManual.Name = "radManual";
+            radManual.Size = new System.Drawing.Size(65, 19);
+            radManual.TabIndex = 0;
+            radManual.TabStop = true;
+            radManual.Text = "Manual";
+            radManual.CheckedChanged += OnMethodChanged;
+            // 
+            // pnlPreview
+            // 
+            pnlPreview.BackColor = System.Drawing.Color.FromArgb(33, 40, 48);
+            pnlPreview.Dock = System.Windows.Forms.DockStyle.Fill;
+            pnlPreview.DrawOverlays = null;
+            pnlPreview.Location = new System.Drawing.Point(0, 25);
+            pnlPreview.Name = "pnlPreview";
+            pnlPreview.Size = new System.Drawing.Size(647, 611);
+            pnlPreview.TabIndex = 3;
+            pnlPreview.MouseDown += OnPreviewMouseDown;
+            pnlPreview.MouseMove += OnPreviewMouseMove;
+            pnlPreview.MouseUp += OnPreviewMouseUp;
+            // 
+            // toolStrip
+            // 
+            toolStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnAddLine, btnDeleteLine });
+            toolStrip.Location = new System.Drawing.Point(0, 0);
+            toolStrip.Name = "toolStrip";
+            toolStrip.Size = new System.Drawing.Size(867, 25);
+            toolStrip.TabIndex = 0;
+            // 
+            // btnAddLine
+            // 
+            btnAddLine.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            btnAddLine.Name = "btnAddLine";
+            btnAddLine.Size = new System.Drawing.Size(84, 22);
+            btnAddLine.Text = "Add Split Line";
+            btnAddLine.Click += OnAddSplitLine;
+            // 
+            // btnDeleteLine
+            // 
+            btnDeleteLine.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            btnDeleteLine.Name = "btnDeleteLine";
+            btnDeleteLine.Size = new System.Drawing.Size(69, 22);
+            btnDeleteLine.Text = "Delete Line";
+            btnDeleteLine.Click += OnDeleteSplitLine;
+            // 
+            // statusStrip
+            // 
+            statusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { lblStatus, lblCursor });
+            statusStrip.Location = new System.Drawing.Point(0, 636);
+            statusStrip.Name = "statusStrip";
+            statusStrip.Size = new System.Drawing.Size(867, 22);
+            statusStrip.TabIndex = 1;
+            // 
+            // lblStatus
+            // 
+            lblStatus.Name = "lblStatus";
+            lblStatus.Size = new System.Drawing.Size(756, 17);
+            lblStatus.Spring = true;
+            lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
+            // lblCursor
+            // 
+            lblCursor.Name = "lblCursor";
+            lblCursor.Size = new System.Drawing.Size(96, 17);
+            lblCursor.Text = "Cursor: 0.00, 0.00";
+            lblCursor.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            // 
+            // SplitDrawingForm
+            // 
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
+            CancelButton = btnCancel;
+            ClientSize = new System.Drawing.Size(867, 658);
+            Controls.Add(pnlPreview);
+            Controls.Add(pnlSettings);
+            Controls.Add(statusStrip);
+            Controls.Add(toolStrip);
+            MinimumSize = new System.Drawing.Size(600, 450);
+            Name = "SplitDrawingForm";
+            ShowIcon = false;
+            ShowInTaskbar = false;
+            StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            Text = "Split Drawing";
+            pnlSettings.ResumeLayout(false);
+            grpSpikeParams.ResumeLayout(false);
+            grpSpikeParams.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)nudSpikePairCount).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudSpikeWeldGap).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudGrooveDepth).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudSpikeAngle).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudSpikeDepth).EndInit();
+            grpTabParams.ResumeLayout(false);
+            grpTabParams.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)nudTabCount).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudTabHeight).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudTabWidth).EndInit();
+            grpType.ResumeLayout(false);
+            grpType.PerformLayout();
+            grpByCount.ResumeLayout(false);
+            grpByCount.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)nudVerticalPieces).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudHorizontalPieces).EndInit();
+            grpAutoFit.ResumeLayout(false);
+            grpAutoFit.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)nudEdgeSpacing).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudPlateHeight).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudPlateWidth).EndInit();
+            grpMethod.ResumeLayout(false);
+            grpMethod.PerformLayout();
+            toolStrip.ResumeLayout(false);
+            toolStrip.PerformLayout();
+            statusStrip.ResumeLayout(false);
+            statusStrip.PerformLayout();
+            ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
 
-        private System.Windows.Forms.Panel pnlPreview;
+        private SplitPreview pnlPreview;
         private System.Windows.Forms.Panel pnlSettings;
         private System.Windows.Forms.ToolStrip toolStrip;
         private System.Windows.Forms.ToolStripButton btnAddLine;
@@ -707,6 +758,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label lblSpikeWeldGap;
         private System.Windows.Forms.NumericUpDown nudSpikeWeldGap;
 
+        private System.Windows.Forms.Panel pnlButtons;
         private System.Windows.Forms.Button btnOK;
         private System.Windows.Forms.Button btnCancel;
     }

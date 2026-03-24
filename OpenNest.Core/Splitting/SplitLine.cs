@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace OpenNest;
 
 /// <summary>
@@ -8,6 +10,13 @@ public class SplitLine
 {
     public double Position { get; }
     public CutOffAxis Axis { get; }
+
+    /// <summary>
+    /// Optional custom center positions for features (tabs/spikes) along the split line.
+    /// Values are absolute coordinates on the perpendicular axis.
+    /// When empty, feature generators use their default even spacing.
+    /// </summary>
+    public List<double> FeaturePositions { get; set; } = new();
 
     public SplitLine(double position, CutOffAxis axis)
     {

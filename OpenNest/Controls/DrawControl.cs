@@ -167,6 +167,7 @@ namespace OpenNest.Controls
             origin.Y += (Size.Height - lastSize.Height) * 0.5f;
 
             lastSize = Size;
+            Invalidate();
         }
 
         public float LengthWorldToGui(double length)

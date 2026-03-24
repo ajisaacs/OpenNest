@@ -49,7 +49,7 @@ namespace OpenNest
             {
                 // Add chord tolerance to compensate for inscribed polygon chords
                 // being inside the actual offset arcs.
-                var offsetEntity = shape.OffsetEntity(spacing + chordTolerance, OffsetSide.Left) as Shape;
+                var offsetEntity = shape.OffsetOutward(spacing + chordTolerance);
 
                 if (offsetEntity == null)
                     continue;
@@ -71,7 +71,7 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var offsetEntity = shape.OffsetEntity(spacing + chordTolerance, OffsetSide.Left) as Shape;
+                var offsetEntity = shape.OffsetOutward(spacing + chordTolerance);
 
                 if (offsetEntity == null)
                     continue;
@@ -109,7 +109,7 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var offsetEntity = shape.OffsetEntity(spacing + chordTolerance, OffsetSide.Left) as Shape;
+                var offsetEntity = shape.OffsetOutward(spacing + chordTolerance);
 
                 if (offsetEntity == null)
                     continue;

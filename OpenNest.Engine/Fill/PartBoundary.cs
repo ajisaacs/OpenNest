@@ -33,7 +33,7 @@ namespace OpenNest.Engine.Fill
 
             if (perimeter != null)
             {
-                var offsetEntity = perimeter.OffsetEntity(spacing, OffsetSide.Left) as Shape;
+                var offsetEntity = perimeter.OffsetOutward(spacing);
 
                 if (offsetEntity != null)
                 {

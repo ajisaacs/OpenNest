@@ -220,6 +220,14 @@ namespace OpenNest.Geometry
 
         internal static bool Intersects(Line line1, Line line2, out Vector pt)
         {
+            if (!IntersectsUnbounded(line1, line2, out pt))
+                return false;
+
+            return line1.BoundingBox.Contains(pt) && line2.BoundingBox.Contains(pt);
+        }
+
+        internal static bool IntersectsUnbounded(Line line1, Line line2, out Vector pt)
+        {
             var a1 = line1.EndPoint.Y - line1.StartPoint.Y;
             var b1 = line1.StartPoint.X - line1.EndPoint.X;
             var c1 = a1 * line1.StartPoint.X + b1 * line1.StartPoint.Y;
@@ -240,7 +248,7 @@ namespace OpenNest.Geometry
             var y = (a1 * c2 - a2 * c1) / d;
 
             pt = new Vector(x, y);
-            return line1.BoundingBox.Contains(pt) && line2.BoundingBox.Contains(pt);
+            return true;
         }
 
         internal static bool Intersects(Line line, Shape shape, out List<Vector> pts)

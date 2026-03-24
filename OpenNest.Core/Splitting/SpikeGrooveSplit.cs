@@ -26,15 +26,19 @@ public class SpikeGrooveSplit : ISplitFeature
         var isVertical = line.Axis == CutOffAxis.Vertical;
         var pos = line.Position;
 
-        // Place pairs evenly: one near each end, with margin
-        var margin = extent * 0.15;
+        // Use custom positions if provided, otherwise place evenly with margin
         var pairPositions = new List<double>();
-        if (pairCount == 1)
+        if (line.FeaturePositions.Count > 0)
+        {
+            pairPositions.AddRange(line.FeaturePositions);
+        }
+        else if (pairCount == 1)
         {
             pairPositions.Add(extentStart + extent / 2);
         }
         else
         {
+            var margin = extent * 0.15;
             var usable = extent - 2 * margin;
             for (var i = 0; i < pairCount; i++)
                 pairPositions.Add(extentStart + margin + usable * i / (pairCount - 1));

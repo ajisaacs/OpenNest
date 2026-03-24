@@ -534,7 +534,7 @@ namespace OpenNest.Geometry
         {
             Vector intersection;
 
-            if (Intersect.Intersects(offsetLine, lastOffsetLine, out intersection))
+            if (Intersect.IntersectsUnbounded(offsetLine, lastOffsetLine, out intersection))
             {
                 offsetLine.StartPoint = intersection;
                 lastOffsetLine.EndPoint = intersection;
@@ -556,6 +556,46 @@ namespace OpenNest.Geometry
         public override Entity OffsetEntity(double distance, Vector pt)
         {
             throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Offsets the shape outward by the given distance, detecting winding direction
+        /// to choose the correct offset side. Falls back to the opposite side if the
+        /// bounding box shrinks (indicating the offset went inward).
+        /// </summary>
+        public Shape OffsetOutward(double distance)
+        {
+            var poly = ToPolygon();
+            var side = poly.Vertices.Count >= 3 && poly.RotationDirection() == RotationType.CW
+                ? OffsetSide.Left
+                : OffsetSide.Right;
+
+            var result = OffsetEntity(distance, side) as Shape;
+
+            if (result == null)
+                return null;
+
+            UpdateBounds();
+            var originalBB = BoundingBox;
+            result.UpdateBounds();
+            var offsetBB = result.BoundingBox;
+
+            if (offsetBB.Width < originalBB.Width || offsetBB.Length < originalBB.Length)
+            {
+                Trace.TraceWarning(
+                    "Shape.OffsetOutward: offset shrank bounding box " +
+                    $"(original={originalBB.Width:F3}x{originalBB.Length:F3}, " +
+                    $"offset={offsetBB.Width:F3}x{offsetBB.Length:F3}). " +
+                    "Retrying with opposite side.");
+
+                var opposite = side == OffsetSide.Left ? OffsetSide.Right : OffsetSide.Left;
+                var retry = OffsetEntity(distance, opposite) as Shape;
+
+                if (retry != null)
+                    result = retry;
+            }
+
+            return result;
         }
 
         /// <summary>

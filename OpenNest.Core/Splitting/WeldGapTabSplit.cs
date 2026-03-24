@@ -18,8 +18,18 @@ public class WeldGapTabSplit : ISplitFeature
         var tabWidth = parameters.TabWidth;
         var tabHeight = parameters.TabHeight;
 
-        // Evenly space tabs along the split line
-        var spacing = extent / (tabCount + 1);
+        // Use custom positions if provided, otherwise evenly space
+        var tabCenters = new List<double>();
+        if (line.FeaturePositions.Count > 0)
+        {
+            tabCenters.AddRange(line.FeaturePositions);
+        }
+        else
+        {
+            var spacing = extent / (tabCount + 1);
+            for (var i = 0; i < tabCount; i++)
+                tabCenters.Add(extentStart + spacing * (i + 1));
+        }
 
         var negEntities = new List<Entity>();
         var isVertical = line.Axis == CutOffAxis.Vertical;
@@ -30,9 +40,9 @@ public class WeldGapTabSplit : ISplitFeature
 
         var cursor = extentStart;
 
-        for (var i = 0; i < tabCount; i++)
+        for (var i = 0; i < tabCenters.Count; i++)
         {
-            var tabCenter = extentStart + spacing * (i + 1);
+            var tabCenter = tabCenters[i];
             var tabStart = tabCenter - tabWidth / 2;
             var tabEnd = tabCenter + tabWidth / 2;
 

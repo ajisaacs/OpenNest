@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 
@@ -18,13 +19,12 @@ public partial class SplitDrawingForm : Form
     private CutOffAxis _currentAxis = CutOffAxis.Vertical;
     private bool _placingLine;
 
-    // Zoom/pan state
-    private float _zoom = 1f;
-    private PointF _pan;
-    private Point _lastMouse;
-    private bool _panning;
-
-    // Snap threshold in screen pixels
+    // Feature handle drag state
+    private int _dragLineIndex = -1;
+    private int _dragFeatureIndex = -1;
+    private int _hoverLineIndex = -1;
+    private int _hoverFeatureIndex = -1;
+    private const float HandleRadius = 5f;
     private const double SnapThreshold = 5.0;
 
     public List<Drawing> ResultDrawings { get; private set; }
@@ -33,20 +33,20 @@ public partial class SplitDrawingForm : Form
     {
         InitializeComponent();
 
-        // Enable double buffering on the preview panel to reduce flicker
-        typeof(Panel).InvokeMember(
-            "DoubleBuffered",
-            System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-            null, pnlPreview, new object[] { true });
-
         _drawing = drawing;
         _drawingEntities = ConvertProgram.ToGeometry(drawing.Program)
             .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
         _drawingBounds = drawing.Program.BoundingBox();
 
+        foreach (var entity in _drawingEntities)
+            entity.Layer.IsVisible = true;
+
+        pnlPreview.Entities = _drawingEntities;
+        pnlPreview.DrawOverlays = PaintOverlays;
+
         Text = $"Split Drawing: {drawing.Name}";
         UpdateUI();
-        FitToView();
+        pnlPreview.ZoomToFit(true);
     }
 
     // --- Split Method Selection ---
@@ -72,7 +72,7 @@ public partial class SplitDrawingForm : Form
             var overhang = GetCurrentParameters().FeatureOverhang;
             var axisIndex = cboSplitAxis.SelectedIndex;
 
-            if (axisIndex == 1) // Vertical Only — split the part width using the plate size
+            if (axisIndex == 1)
             {
                 var usable = System.Math.Min(plateW, plateH) - 2 * spacing - overhang;
                 if (usable > 0)
@@ -86,7 +86,7 @@ public partial class SplitDrawingForm : Form
                     }
                 }
             }
-            else if (axisIndex == 2) // Horizontal Only — split the part height using the plate size
+            else if (axisIndex == 2)
             {
                 var usable = System.Math.Min(plateW, plateH) - 2 * spacing - overhang;
                 if (usable > 0)
@@ -100,7 +100,7 @@ public partial class SplitDrawingForm : Form
                     }
                 }
             }
-            else // Auto — both axes
+            else
             {
                 _splitLines.AddRange(AutoSplitCalculator.FitToPlate(_drawingBounds, plateW, plateH, spacing, overhang));
             }
@@ -112,6 +112,7 @@ public partial class SplitDrawingForm : Form
             _splitLines.AddRange(AutoSplitCalculator.SplitByCount(_drawingBounds, hPieces, vPieces));
         }
 
+        InitializeAllFeaturePositions();
         UpdateUI();
         pnlPreview.Invalidate();
     }
@@ -134,8 +135,30 @@ public partial class SplitDrawingForm : Form
     {
         grpTabParams.Visible = radTabs.Checked;
         grpSpikeParams.Visible = radSpike.Checked;
+        InitializeAllFeaturePositions();
         if (radFitToPlate.Checked)
-            RecalculateAutoSplitLines(); // overhang changed
+            RecalculateAutoSplitLines();
+        pnlPreview.Invalidate();
+    }
+
+    private void UpdateSpikeDepth()
+    {
+        var grooveDepth = (double)nudGrooveDepth.Value;
+        var weldGap = (double)nudSpikeWeldGap.Value;
+        nudSpikeDepth.Value = (decimal)(grooveDepth + weldGap);
+    }
+
+    private void OnSpikeParamChanged(object sender, EventArgs e)
+    {
+        UpdateSpikeDepth();
+        if (radFitToPlate.Checked)
+            RecalculateAutoSplitLines();
+        pnlPreview.Invalidate();
+    }
+
+    private void OnFeatureCountChanged(object sender, EventArgs e)
+    {
+        InitializeAllFeaturePositions();
         pnlPreview.Invalidate();
     }
 
@@ -153,7 +176,7 @@ public partial class SplitDrawingForm : Form
         {
             p.Type = SplitType.SpikeGroove;
             p.SpikeDepth = (double)nudSpikeDepth.Value;
-            p.GrooveDepth = (double)nudGrooveDepth.Value;
+            p.GrooveDepth = p.SpikeDepth + (double)nudGrooveDepth.Value;
             p.SpikeWeldGap = (double)nudSpikeWeldGap.Value;
             p.SpikeAngle = (double)nudSpikeAngle.Value;
             p.SpikePairCount = (int)nudSpikePairCount.Value;
@@ -161,51 +184,162 @@ public partial class SplitDrawingForm : Form
         return p;
     }
 
-    // --- Manual Split Line Placement ---
+    // --- Feature Position Management ---
+
+    private int GetFeatureCount()
+    {
+        if (radTabs.Checked) return (int)nudTabCount.Value;
+        if (radSpike.Checked) return (int)nudSpikePairCount.Value;
+        return 0;
+    }
+
+    private void GetExtent(SplitLine sl, out double start, out double end)
+    {
+        if (sl.Axis == CutOffAxis.Vertical)
+        {
+            start = _drawingBounds.Bottom;
+            end = _drawingBounds.Top;
+        }
+        else
+        {
+            start = _drawingBounds.Left;
+            end = _drawingBounds.Right;
+        }
+    }
+
+    private void InitializeFeaturePositions(SplitLine sl)
+    {
+        var count = GetFeatureCount();
+        GetExtent(sl, out var start, out var end);
+        var extent = end - start;
+
+        sl.FeaturePositions.Clear();
+        if (count <= 0 || extent <= 0) return;
+
+        if (radSpike.Checked)
+        {
+            var margin = extent * 0.15;
+            if (count == 1)
+            {
+                sl.FeaturePositions.Add(start + extent / 2);
+            }
+            else
+            {
+                var usable = extent - 2 * margin;
+                for (var i = 0; i < count; i++)
+                    sl.FeaturePositions.Add(start + margin + usable * i / (count - 1));
+            }
+        }
+        else
+        {
+            var spacing = extent / (count + 1);
+            for (var i = 0; i < count; i++)
+                sl.FeaturePositions.Add(start + spacing * (i + 1));
+        }
+    }
+
+    private void InitializeAllFeaturePositions()
+    {
+        foreach (var sl in _splitLines)
+            InitializeFeaturePositions(sl);
+    }
+
+    // --- Mouse Interaction ---
 
     private void OnPreviewMouseDown(object sender, MouseEventArgs e)
     {
-        if (e.Button == MouseButtons.Left && radManual.Checked && _placingLine)
+        if (e.Button != MouseButtons.Left) return;
+
+        var worldPt = pnlPreview.PointControlToWorld(e.Location);
+
+        // Check for feature handle hit
+        var (lineIdx, featIdx) = HitTestFeatureHandle(worldPt);
+        if (lineIdx >= 0)
         {
-            var pt = ScreenToDrawing(e.Location);
-            var snapped = SnapToMidpoint(pt);
+            _dragLineIndex = lineIdx;
+            _dragFeatureIndex = featIdx;
+            return;
+        }
+
+        // Split line placement
+        if (radManual.Checked && _placingLine)
+        {
+            var snapped = SnapToMidpoint(worldPt);
             var position = _currentAxis == CutOffAxis.Vertical ? snapped.X : snapped.Y;
-            _splitLines.Add(new SplitLine(position, _currentAxis));
+            var sl = new SplitLine(position, _currentAxis);
+            InitializeFeaturePositions(sl);
+            _splitLines.Add(sl);
             UpdateUI();
             pnlPreview.Invalidate();
-        }
-        else if (e.Button == MouseButtons.Middle)
-        {
-            _panning = true;
-            _lastMouse = e.Location;
         }
     }
 
     private void OnPreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (_panning)
+        var worldPt = pnlPreview.PointControlToWorld(e.Location);
+
+        if (_dragLineIndex >= 0)
         {
-            _pan.X += e.X - _lastMouse.X;
-            _pan.Y += e.Y - _lastMouse.Y;
-            _lastMouse = e.Location;
+            var sl = _splitLines[_dragLineIndex];
+            GetExtent(sl, out var start, out var end);
+            var pos = sl.Axis == CutOffAxis.Vertical ? worldPt.Y : worldPt.X;
+            pos = System.Math.Max(start, System.Math.Min(end, pos));
+            sl.FeaturePositions[_dragFeatureIndex] = pos;
             pnlPreview.Invalidate();
         }
+        else
+        {
+            var (lineIdx, featIdx) = HitTestFeatureHandle(worldPt);
+            if (lineIdx != _hoverLineIndex || featIdx != _hoverFeatureIndex)
+            {
+                _hoverLineIndex = lineIdx;
+                _hoverFeatureIndex = featIdx;
+                pnlPreview.Cursor = _hoverLineIndex >= 0
+                    ? (_splitLines[_hoverLineIndex].Axis == CutOffAxis.Vertical ? Cursors.SizeNS : Cursors.SizeWE)
+                    : Cursors.Cross;
+                pnlPreview.Invalidate();
+            }
+        }
 
-        var drawPt = ScreenToDrawing(e.Location);
-        lblCursor.Text = $"Cursor: {drawPt.X:F2}, {drawPt.Y:F2}";
+        lblCursor.Text = $"Cursor: {worldPt.X:F2}, {worldPt.Y:F2}";
     }
 
     private void OnPreviewMouseUp(object sender, MouseEventArgs e)
     {
-        if (e.Button == MouseButtons.Middle)
-            _panning = false;
+        if (e.Button == MouseButtons.Left && _dragLineIndex >= 0)
+        {
+            _dragLineIndex = -1;
+            _dragFeatureIndex = -1;
+            pnlPreview.Invalidate();
+        }
     }
 
-    private void OnPreviewMouseWheel(object sender, MouseEventArgs e)
+    private (int lineIndex, int featureIndex) HitTestFeatureHandle(Vector worldPt)
     {
-        var factor = e.Delta > 0 ? 1.1f : 0.9f;
-        _zoom *= factor;
-        pnlPreview.Invalidate();
+        if (radStraight.Checked) return (-1, -1);
+
+        var hitRadius = HandleRadius / pnlPreview.ViewScale;
+        for (var li = 0; li < _splitLines.Count; li++)
+        {
+            var sl = _splitLines[li];
+            for (var fi = 0; fi < sl.FeaturePositions.Count; fi++)
+            {
+                var center = GetFeatureHandleWorld(sl, fi);
+                var dx = worldPt.X - center.X;
+                var dy = worldPt.Y - center.Y;
+                if (dx * dx + dy * dy <= hitRadius * hitRadius)
+                    return (li, fi);
+            }
+        }
+        return (-1, -1);
+    }
+
+    private Vector GetFeatureHandleWorld(SplitLine sl, int featureIndex)
+    {
+        var pos = sl.FeaturePositions[featureIndex];
+        return sl.Axis == CutOffAxis.Vertical
+            ? new Vector(sl.Position, pos)
+            : new Vector(pos, sl.Position);
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
@@ -227,7 +361,7 @@ public partial class SplitDrawingForm : Form
     {
         var midX = _drawingBounds.Center.X;
         var midY = _drawingBounds.Center.Y;
-        var threshold = SnapThreshold / _zoom;
+        var threshold = SnapThreshold / pnlPreview.ViewScale;
 
         if (_currentAxis == CutOffAxis.Vertical && System.Math.Abs(pt.X - midX) < threshold)
             return new Vector(midX, pt.Y);
@@ -236,53 +370,65 @@ public partial class SplitDrawingForm : Form
         return pt;
     }
 
-    // --- Rendering ---
+    // --- Rendering (drawn on top of entities via SplitPreview) ---
 
-    private void OnPreviewPaint(object sender, PaintEventArgs e)
+    private void PaintOverlays(Graphics g)
     {
-        var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        g.Clear(Color.FromArgb(26, 26, 26));
 
-        g.TranslateTransform(_pan.X, _pan.Y);
-        g.ScaleTransform(_zoom, -_zoom); // flip Y for CNC coordinates
+        // Piece color overlays
+        var regions = BuildPreviewRegions();
+        for (var i = 0; i < regions.Count; i++)
+        {
+            var color = PieceColors[i % PieceColors.Length];
+            using var brush = new SolidBrush(color);
+            var r = regions[i];
+            var tl = pnlPreview.PointWorldToGraph(r.Left, r.Top);
+            var br = pnlPreview.PointWorldToGraph(r.Right, r.Bottom);
+            g.FillRectangle(brush, System.Math.Min(tl.X, br.X), System.Math.Min(tl.Y, br.Y),
+                System.Math.Abs(br.X - tl.X), System.Math.Abs(br.Y - tl.Y));
+        }
 
-        // Draw part outline
-        using var partPen = new Pen(Color.LightGray, 1f / _zoom);
-        DrawEntities(g, _drawingEntities, partPen);
-
-        // Draw split lines
-        using var splitPen = new Pen(Color.FromArgb(255, 82, 82), 1f / _zoom);
+        // Split lines
+        using var splitPen = new Pen(Color.FromArgb(255, 82, 82));
         splitPen.DashStyle = DashStyle.Dash;
         foreach (var sl in _splitLines)
         {
+            PointF p1, p2;
             if (sl.Axis == CutOffAxis.Vertical)
-                g.DrawLine(splitPen, (float)sl.Position, (float)(_drawingBounds.Bottom - 10), (float)sl.Position, (float)(_drawingBounds.Top + 10));
+            {
+                p1 = pnlPreview.PointWorldToGraph(sl.Position, _drawingBounds.Bottom - 10);
+                p2 = pnlPreview.PointWorldToGraph(sl.Position, _drawingBounds.Top + 10);
+            }
             else
-                g.DrawLine(splitPen, (float)(_drawingBounds.Left - 10), (float)sl.Position, (float)(_drawingBounds.Right + 10), (float)sl.Position);
+            {
+                p1 = pnlPreview.PointWorldToGraph(_drawingBounds.Left - 10, sl.Position);
+                p2 = pnlPreview.PointWorldToGraph(_drawingBounds.Right + 10, sl.Position);
+            }
+            g.DrawLine(splitPen, p1, p2);
         }
 
-        // Draw piece color overlays
-        DrawPieceOverlays(g);
-    }
-
-    private void DrawEntities(Graphics g, List<Entity> entities, Pen pen)
-    {
-        foreach (var entity in entities)
+        // Feature position handles
+        if (!radStraight.Checked)
         {
-            if (entity is Line line)
-                g.DrawLine(pen, (float)line.StartPoint.X, (float)line.StartPoint.Y, (float)line.EndPoint.X, (float)line.EndPoint.Y);
-            else if (entity is Arc arc)
+            for (var li = 0; li < _splitLines.Count; li++)
             {
-                var rect = new RectangleF(
-                    (float)(arc.Center.X - arc.Radius),
-                    (float)(arc.Center.Y - arc.Radius),
-                    (float)(arc.Radius * 2),
-                    (float)(arc.Radius * 2));
-                var startDeg = (float)OpenNest.Math.Angle.ToDegrees(arc.StartAngle);
-                var sweepDeg = (float)OpenNest.Math.Angle.ToDegrees(arc.EndAngle - arc.StartAngle);
-                if (rect.Width > 0 && rect.Height > 0)
-                    g.DrawArc(pen, rect, startDeg, sweepDeg);
+                var sl = _splitLines[li];
+                for (var fi = 0; fi < sl.FeaturePositions.Count; fi++)
+                {
+                    var center = pnlPreview.PointWorldToGraph(GetFeatureHandleWorld(sl, fi));
+                    var isDrag = li == _dragLineIndex && fi == _dragFeatureIndex;
+                    var isHover = li == _hoverLineIndex && fi == _hoverFeatureIndex;
+                    var fillColor = isDrag ? Color.FromArgb(255, 82, 82)
+                                  : isHover ? Color.FromArgb(255, 183, 77)
+                                  : Color.White;
+                    using var fill = new SolidBrush(fillColor);
+                    using var border = new Pen(Color.FromArgb(80, 80, 80));
+                    g.FillEllipse(fill, center.X - HandleRadius, center.Y - HandleRadius,
+                        HandleRadius * 2, HandleRadius * 2);
+                    g.DrawEllipse(border, center.X - HandleRadius, center.Y - HandleRadius,
+                        HandleRadius * 2, HandleRadius * 2);
+                }
             }
         }
     }
@@ -296,19 +442,6 @@ public partial class SplitDrawingForm : Form
         Color.FromArgb(40, 255, 138, 128),
         Color.FromArgb(40, 128, 222, 234)
     };
-
-    private void DrawPieceOverlays(Graphics g)
-    {
-        // Simple region overlay based on split lines and bounding box
-        var regions = BuildPreviewRegions();
-        for (var i = 0; i < regions.Count; i++)
-        {
-            var color = PieceColors[i % PieceColors.Length];
-            using var brush = new SolidBrush(color);
-            var r = regions[i];
-            g.FillRectangle(brush, (float)r.Left, (float)r.Bottom, (float)r.Width, (float)r.Length);
-        }
-    }
 
     private List<Box> BuildPreviewRegions()
     {
@@ -329,27 +462,6 @@ public partial class SplitDrawingForm : Form
                 regions.Add(new Box(xEdges[xi], yEdges[yi], xEdges[xi + 1] - xEdges[xi], yEdges[yi + 1] - yEdges[yi]));
 
         return regions;
-    }
-
-    // --- Coordinate transforms ---
-
-    private Vector ScreenToDrawing(Point screen)
-    {
-        var x = (screen.X - _pan.X) / _zoom;
-        var y = -(screen.Y - _pan.Y) / _zoom; // flip Y
-        return new Vector(x, y);
-    }
-
-    private void FitToView()
-    {
-        if (_drawingBounds.Width <= 0 || _drawingBounds.Length <= 0) return;
-        var pad = 40f;
-        var scaleX = (pnlPreview.Width - pad * 2) / (float)_drawingBounds.Width;
-        var scaleY = (pnlPreview.Height - pad * 2) / (float)_drawingBounds.Length;
-        _zoom = System.Math.Min(scaleX, scaleY);
-        _pan = new PointF(
-            pad - (float)_drawingBounds.Left * _zoom,
-            pnlPreview.Height - pad + (float)_drawingBounds.Bottom * _zoom);
     }
 
     // --- OK/Cancel ---
@@ -395,5 +507,18 @@ public partial class SplitDrawingForm : Form
     {
         var pieceCount = _splitLines.Count == 0 ? 1 : BuildPreviewRegions().Count;
         lblStatus.Text = $"Part: {_drawingBounds.Width:F2} x {_drawingBounds.Length:F2} | {_splitLines.Count} split lines | {pieceCount} pieces";
+    }
+
+    // --- SplitPreview control ---
+
+    private class SplitPreview : EntityView
+    {
+        public Action<Graphics> DrawOverlays { get; set; }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            DrawOverlays?.Invoke(e.Graphics);
+        }
     }
 }

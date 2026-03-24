@@ -182,7 +182,7 @@ namespace OpenNest
 
             foreach (var shape in shapes)
             {
-                var offsetEntity = shape.OffsetEntity(spacing, OffsetSide.Left) as Shape;
+                var offsetEntity = shape.OffsetOutward(spacing);
 
                 if (offsetEntity == null)
                     continue;
