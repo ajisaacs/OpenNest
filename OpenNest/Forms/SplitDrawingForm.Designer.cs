@@ -240,7 +240,7 @@ namespace OpenNest.Forms
             this.lblPlateWidth.Location = new System.Drawing.Point(10, 22);
             this.lblPlateWidth.Name = "lblPlateWidth";
             this.lblPlateWidth.Size = new System.Drawing.Size(70, 15);
-            this.lblPlateWidth.Text = "Plate Width:";
+            this.lblPlateWidth.Text = "Plate Length:";
 
             // nudPlateWidth
             this.nudPlateWidth.DecimalPlaces = 2;
@@ -258,7 +258,7 @@ namespace OpenNest.Forms
             this.lblPlateHeight.Location = new System.Drawing.Point(10, 49);
             this.lblPlateHeight.Name = "lblPlateHeight";
             this.lblPlateHeight.Size = new System.Drawing.Size(74, 15);
-            this.lblPlateHeight.Text = "Plate Length:";
+            this.lblPlateHeight.Text = "Plate Width:";
 
             // nudPlateHeight
             this.nudPlateHeight.DecimalPlaces = 2;
