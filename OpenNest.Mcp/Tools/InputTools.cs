@@ -57,6 +57,35 @@ namespace OpenNest.Mcp.Tools
             return sb.ToString();
         }
 
+        [McpServerTool(Name = "save_nest")]
+        [Description("Save the current session (all drawings and plates) to a .nest file.")]
+        public string SaveNest(
+            [Description("Absolute path for the output .nest file")] string path,
+            [Description("Name for the nest (optional)")] string name = null)
+        {
+            var nest = new Nest();
+            nest.Name = name ?? Path.GetFileNameWithoutExtension(path);
+
+            foreach (var drawing in _session.AllDrawings())
+                nest.Drawings.Add(drawing);
+
+            foreach (var plate in _session.AllPlates())
+                nest.Plates.Add(plate);
+
+            if (nest.Drawings.Count == 0)
+                return "Error: no drawings in session to save";
+
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            var writer = new NestWriter(nest);
+            if (!writer.Write(path))
+                return "Error: failed to write nest file";
+
+            return $"Saved nest to {path}\n  Drawings: {nest.Drawings.Count}\n  Plates: {nest.Plates.Count}";
+        }
+
         [McpServerTool(Name = "import_dxf")]
         [Description("Import a DXF file as a new drawing. Returns drawing name and bounding box.")]
         public string ImportDxf(

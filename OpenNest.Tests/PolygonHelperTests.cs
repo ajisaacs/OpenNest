@@ -37,6 +37,47 @@ public class PolygonHelperTests
     }
 
     [Fact]
+    public void ExtractPerimeterPolygon_InflatedPolygonIsLarger_ForCWWinding()
+    {
+        // CW winding (standard CNC convention): (0,0)→(0,10)→(10,10)→(10,0)→(0,0)
+        var drawing = TestHelpers.MakeSquareDrawing(10);
+        var noSpacing = PolygonHelper.ExtractPerimeterPolygon(drawing, 0);
+        var withSpacing = PolygonHelper.ExtractPerimeterPolygon(drawing, 1);
+
+        noSpacing.Polygon.UpdateBounds();
+        withSpacing.Polygon.UpdateBounds();
+
+        Assert.True(withSpacing.Polygon.BoundingBox.Width > noSpacing.Polygon.BoundingBox.Width,
+            $"Inflated width {withSpacing.Polygon.BoundingBox.Width:F3} should be > original {noSpacing.Polygon.BoundingBox.Width:F3}");
+        Assert.True(withSpacing.Polygon.BoundingBox.Length > noSpacing.Polygon.BoundingBox.Length,
+            $"Inflated length {withSpacing.Polygon.BoundingBox.Length:F3} should be > original {noSpacing.Polygon.BoundingBox.Length:F3}");
+    }
+
+    [Fact]
+    public void ExtractPerimeterPolygon_InflatedPolygonIsLarger_ForCCWWinding()
+    {
+        // CCW winding: (0,0)→(10,0)→(10,10)→(0,10)→(0,0)
+        var pgm = new CNC.Program();
+        pgm.Codes.Add(new CNC.RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new CNC.LinearMove(new Vector(10, 0)));
+        pgm.Codes.Add(new CNC.LinearMove(new Vector(10, 10)));
+        pgm.Codes.Add(new CNC.LinearMove(new Vector(0, 10)));
+        pgm.Codes.Add(new CNC.LinearMove(new Vector(0, 0)));
+        var drawing = new Drawing("ccw-square", pgm);
+
+        var noSpacing = PolygonHelper.ExtractPerimeterPolygon(drawing, 0);
+        var withSpacing = PolygonHelper.ExtractPerimeterPolygon(drawing, 1);
+
+        noSpacing.Polygon.UpdateBounds();
+        withSpacing.Polygon.UpdateBounds();
+
+        Assert.True(withSpacing.Polygon.BoundingBox.Width > noSpacing.Polygon.BoundingBox.Width,
+            $"Inflated width {withSpacing.Polygon.BoundingBox.Width:F3} should be > original {noSpacing.Polygon.BoundingBox.Width:F3}");
+        Assert.True(withSpacing.Polygon.BoundingBox.Length > noSpacing.Polygon.BoundingBox.Length,
+            $"Inflated length {withSpacing.Polygon.BoundingBox.Length:F3} should be > original {noSpacing.Polygon.BoundingBox.Length:F3}");
+    }
+
+    [Fact]
     public void ExtractPerimeterPolygon_ReturnsNull_ForEmptyDrawing()
     {
         var pgm = new Program();
