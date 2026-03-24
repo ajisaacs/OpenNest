@@ -41,8 +41,6 @@ namespace OpenNest.Forms
             lblGrooveDepth = new System.Windows.Forms.Label();
             nudSpikeAngle = new System.Windows.Forms.NumericUpDown();
             lblSpikeAngle = new System.Windows.Forms.Label();
-            nudSpikeDepth = new System.Windows.Forms.NumericUpDown();
-            lblSpikeDepth = new System.Windows.Forms.Label();
             grpTabParams = new System.Windows.Forms.GroupBox();
             nudTabCount = new System.Windows.Forms.NumericUpDown();
             lblTabCount = new System.Windows.Forms.Label();
@@ -85,7 +83,6 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)nudSpikeWeldGap).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudGrooveDepth).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudSpikeAngle).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)nudSpikeDepth).BeginInit();
             grpTabParams.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)nudTabCount).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudTabHeight).BeginInit();
@@ -162,12 +159,10 @@ namespace OpenNest.Forms
             grpSpikeParams.Controls.Add(lblGrooveDepth);
             grpSpikeParams.Controls.Add(nudSpikeAngle);
             grpSpikeParams.Controls.Add(lblSpikeAngle);
-            grpSpikeParams.Controls.Add(nudSpikeDepth);
-            grpSpikeParams.Controls.Add(lblSpikeDepth);
             grpSpikeParams.Dock = System.Windows.Forms.DockStyle.Top;
             grpSpikeParams.Location = new System.Drawing.Point(6, 511);
             grpSpikeParams.Name = "grpSpikeParams";
-            grpSpikeParams.Size = new System.Drawing.Size(191, 159);
+            grpSpikeParams.Size = new System.Drawing.Size(191, 132);
             grpSpikeParams.TabIndex = 5;
             grpSpikeParams.TabStop = false;
             grpSpikeParams.Text = "Spike Parameters";
@@ -175,7 +170,7 @@ namespace OpenNest.Forms
             // 
             // nudSpikePairCount
             // 
-            nudSpikePairCount.Location = new System.Drawing.Point(110, 128);
+            nudSpikePairCount.Location = new System.Drawing.Point(110, 101);
             nudSpikePairCount.Maximum = new decimal(new int[] { 50, 0, 0, 0 });
             nudSpikePairCount.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             nudSpikePairCount.Name = "nudSpikePairCount";
@@ -187,7 +182,7 @@ namespace OpenNest.Forms
             // lblSpikePairCount
             // 
             lblSpikePairCount.AutoSize = true;
-            lblSpikePairCount.Location = new System.Drawing.Point(10, 130);
+            lblSpikePairCount.Location = new System.Drawing.Point(10, 103);
             lblSpikePairCount.Name = "lblSpikePairCount";
             lblSpikePairCount.Size = new System.Drawing.Size(66, 15);
             lblSpikePairCount.TabIndex = 5;
@@ -196,7 +191,7 @@ namespace OpenNest.Forms
             // nudSpikeWeldGap
             // 
             nudSpikeWeldGap.DecimalPlaces = 3;
-            nudSpikeWeldGap.Location = new System.Drawing.Point(110, 74);
+            nudSpikeWeldGap.Location = new System.Drawing.Point(110, 47);
             nudSpikeWeldGap.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
             nudSpikeWeldGap.Name = "nudSpikeWeldGap";
             nudSpikeWeldGap.Size = new System.Drawing.Size(88, 23);
@@ -207,7 +202,7 @@ namespace OpenNest.Forms
             // lblSpikeWeldGap
             // 
             lblSpikeWeldGap.AutoSize = true;
-            lblSpikeWeldGap.Location = new System.Drawing.Point(10, 76);
+            lblSpikeWeldGap.Location = new System.Drawing.Point(10, 49);
             lblSpikeWeldGap.Name = "lblSpikeWeldGap";
             lblSpikeWeldGap.Size = new System.Drawing.Size(61, 15);
             lblSpikeWeldGap.TabIndex = 6;
@@ -216,18 +211,18 @@ namespace OpenNest.Forms
             // nudGrooveDepth
             // 
             nudGrooveDepth.DecimalPlaces = 3;
-            nudGrooveDepth.Location = new System.Drawing.Point(110, 47);
+            nudGrooveDepth.Location = new System.Drawing.Point(110, 20);
             nudGrooveDepth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
             nudGrooveDepth.Name = "nudGrooveDepth";
             nudGrooveDepth.Size = new System.Drawing.Size(88, 23);
             nudGrooveDepth.TabIndex = 1;
-            nudGrooveDepth.Value = new decimal(new int[] { 125, 0, 0, 196608 });
+            nudGrooveDepth.Value = new decimal(new int[] { 625, 0, 0, 196608 });
             nudGrooveDepth.ValueChanged += OnSpikeParamChanged;
             // 
             // lblGrooveDepth
             // 
             lblGrooveDepth.AutoSize = true;
-            lblGrooveDepth.Location = new System.Drawing.Point(10, 49);
+            lblGrooveDepth.Location = new System.Drawing.Point(10, 22);
             lblGrooveDepth.Name = "lblGrooveDepth";
             lblGrooveDepth.Size = new System.Drawing.Size(83, 15);
             lblGrooveDepth.TabIndex = 7;
@@ -236,7 +231,7 @@ namespace OpenNest.Forms
             // nudSpikeAngle
             // 
             nudSpikeAngle.DecimalPlaces = 1;
-            nudSpikeAngle.Location = new System.Drawing.Point(110, 101);
+            nudSpikeAngle.Location = new System.Drawing.Point(110, 74);
             nudSpikeAngle.Maximum = new decimal(new int[] { 89, 0, 0, 0 });
             nudSpikeAngle.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
             nudSpikeAngle.Name = "nudSpikeAngle";
@@ -247,31 +242,11 @@ namespace OpenNest.Forms
             // lblSpikeAngle
             // 
             lblSpikeAngle.AutoSize = true;
-            lblSpikeAngle.Location = new System.Drawing.Point(10, 103);
+            lblSpikeAngle.Location = new System.Drawing.Point(10, 76);
             lblSpikeAngle.Name = "lblSpikeAngle";
             lblSpikeAngle.Size = new System.Drawing.Size(72, 15);
             lblSpikeAngle.TabIndex = 8;
             lblSpikeAngle.Text = "Spike Angle:";
-            // 
-            // nudSpikeDepth
-            // 
-            nudSpikeDepth.DecimalPlaces = 2;
-            nudSpikeDepth.Enabled = false;
-            nudSpikeDepth.Location = new System.Drawing.Point(110, 20);
-            nudSpikeDepth.Minimum = new decimal(new int[] { 1, 0, 0, 131072 });
-            nudSpikeDepth.Name = "nudSpikeDepth";
-            nudSpikeDepth.Size = new System.Drawing.Size(88, 23);
-            nudSpikeDepth.TabIndex = 0;
-            nudSpikeDepth.Value = new decimal(new int[] { 25, 0, 0, 131072 });
-            // 
-            // lblSpikeDepth
-            // 
-            lblSpikeDepth.AutoSize = true;
-            lblSpikeDepth.Location = new System.Drawing.Point(10, 22);
-            lblSpikeDepth.Name = "lblSpikeDepth";
-            lblSpikeDepth.Size = new System.Drawing.Size(73, 15);
-            lblSpikeDepth.TabIndex = 9;
-            lblSpikeDepth.Text = "Spike Depth:";
             // 
             // grpTabParams
             // 
@@ -674,7 +649,6 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)nudSpikeWeldGap).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudGrooveDepth).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudSpikeAngle).EndInit();
-            ((System.ComponentModel.ISupportInitialize)nudSpikeDepth).EndInit();
             grpTabParams.ResumeLayout(false);
             grpTabParams.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)nudTabCount).EndInit();
@@ -747,8 +721,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.NumericUpDown nudTabCount;
 
         private System.Windows.Forms.GroupBox grpSpikeParams;
-        private System.Windows.Forms.Label lblSpikeDepth;
-        private System.Windows.Forms.NumericUpDown nudSpikeDepth;
         private System.Windows.Forms.Label lblSpikeAngle;
         private System.Windows.Forms.NumericUpDown nudSpikeAngle;
         private System.Windows.Forms.Label lblSpikePairCount;

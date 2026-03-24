@@ -7,6 +7,7 @@ namespace OpenNest;
 /// Generates interlocking spike/V-groove pairs along the split edge.
 /// Spikes protrude from the positive side into the negative side.
 /// V-grooves on the negative side receive the spikes for self-alignment during welding.
+/// The weld gap (grooveDepth - spikeDepth) is the clearance at the tip when assembled.
 /// </summary>
 public class SpikeGrooveSplit : ISplitFeature
 {
@@ -18,7 +19,6 @@ public class SpikeGrooveSplit : ISplitFeature
         var pairCount = parameters.SpikePairCount;
         var spikeDepth = parameters.SpikeDepth;
         var grooveDepth = parameters.GrooveDepth;
-        var weldGap = parameters.SpikeWeldGap;
         var angleRad = OpenNest.Math.Angle.ToRadians(parameters.SpikeAngle / 2);
         var spikeHalfWidth = spikeDepth * System.Math.Tan(angleRad);
         var grooveHalfWidth = grooveDepth * System.Math.Tan(angleRad);
@@ -44,10 +44,8 @@ public class SpikeGrooveSplit : ISplitFeature
                 pairPositions.Add(extentStart + margin + usable * i / (pairCount - 1));
         }
 
-        // Groove side: V-groove cut deeper than the spike so the spike fits inside
         var negEntities = BuildGrooveSide(pairPositions, grooveHalfWidth, grooveDepth, extentStart, extentEnd, pos, isVertical);
-        // Spike side: spike protrudes but stops short of the split line by weldGap
-        var posEntities = BuildSpikeSide(pairPositions, spikeHalfWidth, spikeDepth, weldGap, extentStart, extentEnd, pos, isVertical);
+        var posEntities = BuildSpikeSide(pairPositions, spikeHalfWidth, spikeDepth, extentStart, extentEnd, pos, isVertical);
 
         return new SplitFeatureResult(negEntities, posEntities);
     }
@@ -79,10 +77,8 @@ public class SpikeGrooveSplit : ISplitFeature
     }
 
     private static List<Entity> BuildSpikeSide(List<double> pairPositions, double halfWidth, double depth,
-        double weldGap, double extentStart, double extentEnd, double pos, bool isVertical)
+        double extentStart, double extentEnd, double pos, bool isVertical)
     {
-        // Spike tip stops short of the split line by weldGap
-        var tipDepth = depth - weldGap;
         var entities = new List<Entity>();
         var cursor = extentEnd;
 
@@ -95,8 +91,8 @@ public class SpikeGrooveSplit : ISplitFeature
             if (cursor > spikeEnd + OpenNest.Math.Tolerance.Epsilon)
                 entities.Add(MakeLine(pos, cursor, pos, spikeEnd, isVertical));
 
-            entities.Add(MakeLine(pos, spikeEnd, pos - tipDepth, center, isVertical));
-            entities.Add(MakeLine(pos - tipDepth, center, pos, spikeStart, isVertical));
+            entities.Add(MakeLine(pos, spikeEnd, pos - depth, center, isVertical));
+            entities.Add(MakeLine(pos - depth, center, pos, spikeStart, isVertical));
 
             cursor = spikeStart;
         }

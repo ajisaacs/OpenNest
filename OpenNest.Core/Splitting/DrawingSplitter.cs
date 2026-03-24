@@ -15,20 +15,12 @@ public static class DrawingSplitter
         if (splitLines.Count == 0)
             return new List<Drawing> { drawing };
 
-        // 1. Convert program to geometry -> ShapeProfile separates perimeter from cutouts
-        //    Filter out rapid-layer entities so ShapeBuilder doesn't chain cutouts to the perimeter
-        var entities = ConvertProgram.ToGeometry(drawing.Program)
-            .Where(e => e.Layer != SpecialLayers.Rapid)
-            .ToList();
-        var profile = new ShapeProfile(entities);
-
-        // Decompose circles to arcs so all entities support SplitAt()
+        var profile = BuildProfile(drawing);
         DecomposeCircles(profile);
 
         var perimeter = profile.Perimeter;
         var bounds = perimeter.BoundingBox;
 
-        // 2. Sort split lines by position, discard any outside the part
         var sortedLines = splitLines
             .Where(l => IsLineInsideBounds(l, bounds))
             .OrderBy(l => l.Position)
@@ -37,69 +29,76 @@ public static class DrawingSplitter
         if (sortedLines.Count == 0)
             return new List<Drawing> { drawing };
 
-        // 3. Build clip regions (grid cells between split lines)
         var regions = BuildClipRegions(sortedLines, bounds);
-
-        // 4. Get the split feature strategy
         var feature = GetFeature(parameters.Type);
 
-        // 5. For each region, clip the perimeter and build a new drawing
         var results = new List<Drawing>();
         var pieceIndex = 1;
 
         foreach (var region in regions)
         {
             var pieceEntities = ClipPerimeterToRegion(perimeter, region, sortedLines, feature, parameters);
-
             if (pieceEntities.Count == 0)
                 continue;
 
-            // Assign cutouts fully inside this region
-            var cutoutEntities = new List<Entity>();
-            foreach (var cutout in profile.Cutouts)
-            {
-                if (IsCutoutInRegion(cutout, region))
-                    cutoutEntities.AddRange(cutout.Entities);
-                else if (DoesCutoutCrossSplitLine(cutout, sortedLines))
-                {
-                    // Cutout crosses a split line -- clip it to this region too
-                    var clippedCutout = ClipCutoutToRegion(cutout, region);
-                    if (clippedCutout.Count > 0)
-                        cutoutEntities.AddRange(clippedCutout);
-                }
-            }
+            var cutoutEntities = CollectCutouts(profile.Cutouts, region, sortedLines);
 
-            // Normalize origin: translate so bounding box starts at (0,0)
             var allEntities = new List<Entity>();
             allEntities.AddRange(pieceEntities);
             allEntities.AddRange(cutoutEntities);
 
-            var pieceBounds = allEntities.Select(e => e.BoundingBox).ToList().GetBoundingBox();
-            var offsetX = -pieceBounds.X;
-            var offsetY = -pieceBounds.Y;
-
-            foreach (var e in allEntities)
-                e.Offset(offsetX, offsetY);
-
-            // Build program (ConvertGeometry.ToProgram internally identifies perimeter vs cutouts)
-            var pgm = ConvertGeometry.ToProgram(allEntities);
-
-            // Create drawing with copied properties
-            var piece = new Drawing($"{drawing.Name}-{pieceIndex}", pgm);
-            piece.Color = drawing.Color;
-            piece.Priority = drawing.Priority;
-            piece.Material = drawing.Material;
-            piece.Constraints = drawing.Constraints;
-            piece.Customer = drawing.Customer;
-            piece.Source = drawing.Source;
-
-            piece.Quantity.Required = drawing.Quantity.Required;
-
+            var piece = BuildPieceDrawing(drawing, allEntities, pieceIndex);
             results.Add(piece);
             pieceIndex++;
         }
 
         return results;
+    }
+
+    private static ShapeProfile BuildProfile(Drawing drawing)
+    {
+        var entities = ConvertProgram.ToGeometry(drawing.Program)
+            .Where(e => e.Layer != SpecialLayers.Rapid)
+            .ToList();
+        return new ShapeProfile(entities);
+    }
+
+    private static List<Entity> CollectCutouts(List<Shape> cutouts, Box region, List<SplitLine> splitLines)
+    {
+        var entities = new List<Entity>();
+        foreach (var cutout in cutouts)
+        {
+            if (IsCutoutInRegion(cutout, region))
+                entities.AddRange(cutout.Entities);
+            else if (DoesCutoutCrossSplitLine(cutout, splitLines))
+            {
+                var clipped = ClipCutoutToRegion(cutout, region, splitLines);
+                if (clipped.Count > 0)
+                    entities.AddRange(clipped);
+            }
+        }
+        return entities;
+    }
+
+    private static Drawing BuildPieceDrawing(Drawing source, List<Entity> entities, int pieceIndex)
+    {
+        var pieceBounds = entities.Select(e => e.BoundingBox).ToList().GetBoundingBox();
+        var offsetX = -pieceBounds.X;
+        var offsetY = -pieceBounds.Y;
+
+        foreach (var e in entities)
+            e.Offset(offsetX, offsetY);
+
+        var pgm = ConvertGeometry.ToProgram(entities);
+        var piece = new Drawing($"{source.Name}-{pieceIndex}", pgm);
+        piece.Color = source.Color;
+        piece.Priority = source.Priority;
+        piece.Material = source.Material;
+        piece.Constraints = source.Constraints;
+        piece.Customer = source.Customer;
+        piece.Source = source.Source;
+        piece.Quantity.Required = source.Quantity.Required;
+        return piece;
     }
 
     private static void DecomposeCircles(ShapeProfile profile)
@@ -155,138 +154,248 @@ public static class DrawingSplitter
     }
 
     /// <summary>
-    /// Clip perimeter to a region using Clipper2, then recover original arcs and stitch in feature edges.
+    /// Clip perimeter to a region by walking entities, splitting at split line crossings,
+    /// and stitching in feature edges. No polygon clipping library needed.
     /// </summary>
     private static List<Entity> ClipPerimeterToRegion(Shape perimeter, Box region,
         List<SplitLine> splitLines, ISplitFeature feature, SplitParameters parameters)
     {
-        var perimPoly = perimeter.ToPolygonWithTolerance(0.01);
+        var boundarySplitLines = GetBoundarySplitLines(region, splitLines);
+        var entities = new List<Entity>();
+        var splitPoints = new List<(Vector Point, SplitLine Line, bool IsExit)>();
 
-        var regionPoly = new Polygon();
-        regionPoly.Vertices.Add(new Vector(region.Left, region.Bottom));
-        regionPoly.Vertices.Add(new Vector(region.Right, region.Bottom));
-        regionPoly.Vertices.Add(new Vector(region.Right, region.Top));
-        regionPoly.Vertices.Add(new Vector(region.Left, region.Top));
-        regionPoly.Close();
+        foreach (var entity in perimeter.Entities)
+        {
+            ProcessEntity(entity, region, boundarySplitLines, entities, splitPoints);
+        }
 
-        // Reuse existing Clipper2 helpers from NoFitPolygon
-        var subj = new Clipper2Lib.PathsD { NoFitPolygon.ToClipperPath(perimPoly) };
-        var clip = new Clipper2Lib.PathsD { NoFitPolygon.ToClipperPath(regionPoly) };
-        var result = Clipper2Lib.Clipper.Intersect(subj, clip, Clipper2Lib.FillRule.NonZero);
-
-        if (result.Count == 0)
+        if (entities.Count == 0)
             return new List<Entity>();
 
-        var clippedPoly = NoFitPolygon.FromClipperPath(result[0]);
-        var clippedEntities = new List<Entity>();
+        InsertFeatureEdges(entities, splitPoints, region, boundarySplitLines, feature, parameters);
+        EnsurePerimeterWinding(entities);
+        return entities;
+    }
 
-        var verts = clippedPoly.Vertices;
-        for (var i = 0; i < verts.Count - 1; i++)
+    private static void ProcessEntity(Entity entity, Box region,
+        List<SplitLine> boundarySplitLines, List<Entity> entities,
+        List<(Vector Point, SplitLine Line, bool IsExit)> splitPoints)
+    {
+        // Find the first boundary split line this entity crosses
+        SplitLine crossedLine = null;
+        Vector? intersectionPt = null;
+
+        foreach (var sl in boundarySplitLines)
         {
-            var start = verts[i];
-            var end = verts[i + 1];
-
-            // Check if this edge lies on a split line -- replace with feature geometry
-            var splitLine = FindSplitLineForEdge(start, end, splitLines);
-            if (splitLine != null)
+            if (SplitLineIntersect.CrossesSplitLine(entity, sl))
             {
-                var extentStart = splitLine.Axis == CutOffAxis.Vertical
-                    ? System.Math.Min(start.Y, end.Y)
-                    : System.Math.Min(start.X, end.X);
-                var extentEnd = splitLine.Axis == CutOffAxis.Vertical
-                    ? System.Math.Max(start.Y, end.Y)
-                    : System.Math.Max(start.X, end.X);
-
-                var featureResult = feature.GenerateFeatures(splitLine, extentStart, extentEnd, parameters);
-
-                var regionCenter = splitLine.Axis == CutOffAxis.Vertical
-                    ? (region.Left + region.Right) / 2
-                    : (region.Bottom + region.Top) / 2;
-                var isNegativeSide = regionCenter < splitLine.Position;
-                var featureEdge = isNegativeSide ? featureResult.NegativeSideEdge : featureResult.PositiveSideEdge;
-
-                // Ensure feature edge direction matches the polygon winding
-                if (featureEdge.Count > 0)
+                var pt = SplitLineIntersect.FindIntersection(entity, sl);
+                if (pt != null)
                 {
-                    var featureStart = GetStartPoint(featureEdge[0]);
-                    var featureEnd = GetEndPoint(featureEdge[^1]);
-                    var edgeGoesForward = splitLine.Axis == CutOffAxis.Vertical
-                        ? start.Y < end.Y : start.X < end.X;
-                    var featureGoesForward = splitLine.Axis == CutOffAxis.Vertical
-                        ? featureStart.Y < featureEnd.Y : featureStart.X < featureEnd.X;
-
-                    if (edgeGoesForward != featureGoesForward)
-                    {
-                        featureEdge = new List<Entity>(featureEdge);
-                        featureEdge.Reverse();
-                        foreach (var e in featureEdge)
-                            e.Reverse();
-                    }
+                    crossedLine = sl;
+                    intersectionPt = pt;
+                    break;
                 }
-
-                clippedEntities.AddRange(featureEdge);
-            }
-            else
-            {
-                // Try to recover original arc for this chord edge
-                var originalArc = FindMatchingArc(start, end, perimeter);
-                if (originalArc != null)
-                    clippedEntities.Add(originalArc);
-                else
-                    clippedEntities.Add(new Line(start, end));
             }
         }
 
-        // Ensure CW winding for perimeter (positive area = CCW in Polygon, so CW = negative)
-        var shape = new Shape();
-        shape.Entities.AddRange(clippedEntities);
-        var poly = shape.ToPolygon();
-        if (poly != null && poly.RotationDirection() != RotationType.CW)
-            shape.Reverse();
+        if (crossedLine != null)
+        {
+            // Entity crosses a split line — split it and keep the half inside the region
+            var regionSide = RegionSideOf(region, crossedLine);
+            var startPt = GetStartPoint(entity);
+            var startSide = SplitLineIntersect.SideOf(startPt, crossedLine);
+            var startInRegion = startSide == regionSide || startSide == 0;
 
-        return shape.Entities;
+            SplitEntityAtPoint(entity, intersectionPt.Value, startInRegion, crossedLine, entities, splitPoints);
+        }
+        else
+        {
+            // Entity doesn't cross any boundary split line — check if it's inside the region
+            var mid = MidPoint(entity);
+            if (region.Contains(mid))
+                entities.Add(entity);
+        }
     }
 
-    private static SplitLine FindSplitLineForEdge(Vector start, Vector end, List<SplitLine> splitLines)
+    private static void SplitEntityAtPoint(Entity entity, Vector point, bool startInRegion,
+        SplitLine crossedLine, List<Entity> entities,
+        List<(Vector Point, SplitLine Line, bool IsExit)> splitPoints)
     {
+        if (entity is Line line)
+        {
+            var (first, second) = line.SplitAt(point);
+            if (startInRegion)
+            {
+                if (first != null) entities.Add(first);
+                splitPoints.Add((point, crossedLine, true));
+            }
+            else
+            {
+                splitPoints.Add((point, crossedLine, false));
+                if (second != null) entities.Add(second);
+            }
+        }
+        else if (entity is Arc arc)
+        {
+            var (first, second) = arc.SplitAt(point);
+            if (startInRegion)
+            {
+                if (first != null) entities.Add(first);
+                splitPoints.Add((point, crossedLine, true));
+            }
+            else
+            {
+                splitPoints.Add((point, crossedLine, false));
+                if (second != null) entities.Add(second);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns split lines whose position matches a boundary edge of the region.
+    /// </summary>
+    private static List<SplitLine> GetBoundarySplitLines(Box region, List<SplitLine> splitLines)
+    {
+        var result = new List<SplitLine>();
         foreach (var sl in splitLines)
         {
             if (sl.Axis == CutOffAxis.Vertical)
             {
-                if (System.Math.Abs(start.X - sl.Position) < 0.1 && System.Math.Abs(end.X - sl.Position) < 0.1)
-                    return sl;
+                if (System.Math.Abs(sl.Position - region.Left) < OpenNest.Math.Tolerance.Epsilon
+                    || System.Math.Abs(sl.Position - region.Right) < OpenNest.Math.Tolerance.Epsilon)
+                    result.Add(sl);
             }
             else
             {
-                if (System.Math.Abs(start.Y - sl.Position) < 0.1 && System.Math.Abs(end.Y - sl.Position) < 0.1)
-                    return sl;
+                if (System.Math.Abs(sl.Position - region.Bottom) < OpenNest.Math.Tolerance.Epsilon
+                    || System.Math.Abs(sl.Position - region.Top) < OpenNest.Math.Tolerance.Epsilon)
+                    result.Add(sl);
             }
         }
-        return null;
+        return result;
     }
 
     /// <summary>
-    /// Search original perimeter for an arc whose circle matches this polygon chord edge.
-    /// Returns a new arc segment between the chord endpoints if found.
+    /// Returns -1 or +1 indicating which side of the split line the region center is on.
     /// </summary>
-    private static Arc FindMatchingArc(Vector start, Vector end, Shape perimeter)
+    private static int RegionSideOf(Box region, SplitLine sl)
     {
-        foreach (var entity in perimeter.Entities)
-        {
-            if (entity is Arc arc)
-            {
-                var distStart = start.DistanceTo(arc.Center) - arc.Radius;
-                var distEnd = end.DistanceTo(arc.Center) - arc.Radius;
+        return SplitLineIntersect.SideOf(region.Center, sl);
+    }
 
-                if (System.Math.Abs(distStart) < 0.1 && System.Math.Abs(distEnd) < 0.1)
-                {
-                    var startAngle = OpenNest.Math.Angle.NormalizeRad(arc.Center.AngleTo(start));
-                    var endAngle = OpenNest.Math.Angle.NormalizeRad(arc.Center.AngleTo(end));
-                    return new Arc(arc.Center, arc.Radius, startAngle, endAngle, arc.IsReversed);
-                }
+    /// <summary>
+    /// Returns the midpoint of an entity. For lines: average of endpoints.
+    /// For arcs: point at the mid-angle.
+    /// </summary>
+    private static Vector MidPoint(Entity entity)
+    {
+        if (entity is Line line)
+            return line.MidPoint;
+
+        if (entity is Arc arc)
+        {
+            var midAngle = (arc.StartAngle + arc.EndAngle) / 2;
+            return new Vector(
+                arc.Center.X + arc.Radius * System.Math.Cos(midAngle),
+                arc.Center.Y + arc.Radius * System.Math.Sin(midAngle));
+        }
+
+        return new Vector(0, 0);
+    }
+
+    /// <summary>
+    /// Groups split points by split line, pairs exits with entries, and generates feature edges.
+    /// </summary>
+    private static void InsertFeatureEdges(List<Entity> entities,
+        List<(Vector Point, SplitLine Line, bool IsExit)> splitPoints,
+        Box region, List<SplitLine> boundarySplitLines,
+        ISplitFeature feature, SplitParameters parameters)
+    {
+        // Group split points by their split line
+        var groups = new Dictionary<SplitLine, List<(Vector Point, bool IsExit)>>();
+        foreach (var sp in splitPoints)
+        {
+            if (!groups.ContainsKey(sp.Line))
+                groups[sp.Line] = new List<(Vector, bool)>();
+            groups[sp.Line].Add((sp.Point, sp.IsExit));
+        }
+
+        foreach (var kvp in groups)
+        {
+            var sl = kvp.Key;
+            var points = kvp.Value;
+
+            // Pair each exit with the next entry
+            var exits = points.Where(p => p.IsExit).Select(p => p.Point).ToList();
+            var entries = points.Where(p => !p.IsExit).Select(p => p.Point).ToList();
+
+            if (exits.Count == 0 || entries.Count == 0)
+                continue;
+
+            // For each exit, find the matching entry to form the feature edge span
+            // Sort exits and entries by their position along the split line
+            var isVertical = sl.Axis == CutOffAxis.Vertical;
+            exits = exits.OrderBy(p => isVertical ? p.Y : p.X).ToList();
+            entries = entries.OrderBy(p => isVertical ? p.Y : p.X).ToList();
+
+            // Pair them up: each exit with the next entry (or vice versa)
+            var pairCount = System.Math.Min(exits.Count, entries.Count);
+            for (var i = 0; i < pairCount; i++)
+            {
+                var exitPt = exits[i];
+                var entryPt = entries[i];
+
+                var extentStart = isVertical
+                    ? System.Math.Min(exitPt.Y, entryPt.Y)
+                    : System.Math.Min(exitPt.X, entryPt.X);
+                var extentEnd = isVertical
+                    ? System.Math.Max(exitPt.Y, entryPt.Y)
+                    : System.Math.Max(exitPt.X, entryPt.X);
+
+                var featureResult = feature.GenerateFeatures(sl, extentStart, extentEnd, parameters);
+
+                var isNegativeSide = RegionSideOf(region, sl) < 0;
+                var featureEdge = isNegativeSide ? featureResult.NegativeSideEdge : featureResult.PositiveSideEdge;
+
+                if (featureEdge.Count > 0)
+                    featureEdge = AlignFeatureDirection(featureEdge, exitPt, entryPt, sl.Axis);
+
+                entities.AddRange(featureEdge);
             }
         }
-        return null;
+    }
+
+    private static List<Entity> AlignFeatureDirection(List<Entity> featureEdge, Vector start, Vector end, CutOffAxis axis)
+    {
+        var featureStart = GetStartPoint(featureEdge[0]);
+        var featureEnd = GetEndPoint(featureEdge[^1]);
+        var isVertical = axis == CutOffAxis.Vertical;
+
+        var edgeGoesForward = isVertical ? start.Y < end.Y : start.X < end.X;
+        var featureGoesForward = isVertical ? featureStart.Y < featureEnd.Y : featureStart.X < featureEnd.X;
+
+        if (edgeGoesForward != featureGoesForward)
+        {
+            featureEdge = new List<Entity>(featureEdge);
+            featureEdge.Reverse();
+            foreach (var e in featureEdge)
+                e.Reverse();
+        }
+
+        return featureEdge;
+    }
+
+    private static void EnsurePerimeterWinding(List<Entity> entities)
+    {
+        var shape = new Shape();
+        shape.Entities.AddRange(entities);
+        var poly = shape.ToPolygon();
+        if (poly != null && poly.RotationDirection() != RotationType.CW)
+            shape.Reverse();
+
+        entities.Clear();
+        entities.AddRange(shape.Entities);
     }
 
     private static bool IsCutoutInRegion(Shape cutout, Box region)
@@ -309,32 +418,53 @@ public static class DrawingSplitter
         return false;
     }
 
-    private static List<Entity> ClipCutoutToRegion(Shape cutout, Box region)
+    /// <summary>
+    /// Clip a cutout shape to a region by walking entities, splitting at split line
+    /// intersections, keeping portions inside the region, and closing gaps with
+    /// straight lines. No polygon clipping library needed.
+    /// </summary>
+    private static List<Entity> ClipCutoutToRegion(Shape cutout, Box region, List<SplitLine> splitLines)
     {
-        var cutoutPoly = cutout.ToPolygonWithTolerance(0.01);
-        var regionPoly = new Polygon();
-        regionPoly.Vertices.Add(new Vector(region.Left, region.Bottom));
-        regionPoly.Vertices.Add(new Vector(region.Right, region.Bottom));
-        regionPoly.Vertices.Add(new Vector(region.Right, region.Top));
-        regionPoly.Vertices.Add(new Vector(region.Left, region.Top));
-        regionPoly.Close();
+        var boundarySplitLines = GetBoundarySplitLines(region, splitLines);
+        var entities = new List<Entity>();
+        var splitPoints = new List<(Vector Point, SplitLine Line, bool IsExit)>();
 
-        var subj = new Clipper2Lib.PathsD { NoFitPolygon.ToClipperPath(cutoutPoly) };
-        var clip = new Clipper2Lib.PathsD { NoFitPolygon.ToClipperPath(regionPoly) };
-        var result = Clipper2Lib.Clipper.Intersect(subj, clip, Clipper2Lib.FillRule.NonZero);
+        foreach (var entity in cutout.Entities)
+        {
+            ProcessEntity(entity, region, boundarySplitLines, entities, splitPoints);
+        }
 
-        if (result.Count == 0)
+        if (entities.Count == 0)
             return new List<Entity>();
 
-        var clippedPoly = NoFitPolygon.FromClipperPath(result[0]);
-        var lineEntities = new List<Entity>();
-        var verts = clippedPoly.Vertices;
-        for (var i = 0; i < verts.Count - 1; i++)
-            lineEntities.Add(new Line(verts[i], verts[i + 1]));
+        // Close gaps with straight lines (connect exit→entry pairs)
+        var groups = new Dictionary<SplitLine, List<(Vector Point, bool IsExit)>>();
+        foreach (var sp in splitPoints)
+        {
+            if (!groups.ContainsKey(sp.Line))
+                groups[sp.Line] = new List<(Vector, bool)>();
+            groups[sp.Line].Add((sp.Point, sp.IsExit));
+        }
+
+        foreach (var kvp in groups)
+        {
+            var sl = kvp.Key;
+            var points = kvp.Value;
+            var isVertical = sl.Axis == CutOffAxis.Vertical;
+
+            var exits = points.Where(p => p.IsExit).Select(p => p.Point)
+                .OrderBy(p => isVertical ? p.Y : p.X).ToList();
+            var entries = points.Where(p => !p.IsExit).Select(p => p.Point)
+                .OrderBy(p => isVertical ? p.Y : p.X).ToList();
+
+            var pairCount = System.Math.Min(exits.Count, entries.Count);
+            for (var i = 0; i < pairCount; i++)
+                entities.Add(new Line(exits[i], entries[i]));
+        }
 
         // Ensure CCW winding for cutouts
         var shape = new Shape();
-        shape.Entities.AddRange(lineEntities);
+        shape.Entities.AddRange(entities);
         var poly = shape.ToPolygon();
         if (poly != null && poly.RotationDirection() != RotationType.CCW)
             shape.Reverse();
@@ -347,7 +477,7 @@ public static class DrawingSplitter
         return entity switch
         {
             Line l => l.StartPoint,
-            Arc a => a.StartPoint(), // Arc.StartPoint() is a method
+            Arc a => a.StartPoint(),
             _ => new Vector(0, 0)
         };
     }
@@ -357,7 +487,7 @@ public static class DrawingSplitter
         return entity switch
         {
             Line l => l.EndPoint,
-            Arc a => a.EndPoint(), // Arc.EndPoint() is a method
+            Arc a => a.EndPoint(),
             _ => new Vector(0, 0)
         };
     }

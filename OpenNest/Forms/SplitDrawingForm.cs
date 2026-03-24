@@ -141,16 +141,8 @@ public partial class SplitDrawingForm : Form
         pnlPreview.Invalidate();
     }
 
-    private void UpdateSpikeDepth()
-    {
-        var grooveDepth = (double)nudGrooveDepth.Value;
-        var weldGap = (double)nudSpikeWeldGap.Value;
-        nudSpikeDepth.Value = (decimal)(grooveDepth + weldGap);
-    }
-
     private void OnSpikeParamChanged(object sender, EventArgs e)
     {
-        UpdateSpikeDepth();
         if (radFitToPlate.Checked)
             RecalculateAutoSplitLines();
         pnlPreview.Invalidate();
@@ -175,9 +167,9 @@ public partial class SplitDrawingForm : Form
         else if (radSpike.Checked)
         {
             p.Type = SplitType.SpikeGroove;
-            p.SpikeDepth = (double)nudSpikeDepth.Value;
-            p.GrooveDepth = p.SpikeDepth + (double)nudGrooveDepth.Value;
+            p.GrooveDepth = (double)nudGrooveDepth.Value;
             p.SpikeWeldGap = (double)nudSpikeWeldGap.Value;
+            p.SpikeDepth = p.GrooveDepth + p.SpikeWeldGap;
             p.SpikeAngle = (double)nudSpikeAngle.Value;
             p.SpikePairCount = (int)nudSpikePairCount.Value;
         }
@@ -389,23 +381,72 @@ public partial class SplitDrawingForm : Form
                 System.Math.Abs(br.X - tl.X), System.Math.Abs(br.Y - tl.Y));
         }
 
-        // Split lines
+        // Split lines — trimmed at feature positions with feature contours
+        var parameters = GetCurrentParameters();
+        var feature = GetSplitFeature(parameters.Type);
         using var splitPen = new Pen(Color.FromArgb(255, 82, 82));
         splitPen.DashStyle = DashStyle.Dash;
+        using var featurePen = new Pen(Color.FromArgb(200, 255, 82, 82), 1.5f);
+
         foreach (var sl in _splitLines)
         {
-            PointF p1, p2;
-            if (sl.Axis == CutOffAxis.Vertical)
+            GetExtent(sl, out var extStart, out var extEnd);
+            var isVert = sl.Axis == CutOffAxis.Vertical;
+            var margin = 10.0;
+
+            if (sl.FeaturePositions.Count == 0 || radStraight.Checked)
             {
-                p1 = pnlPreview.PointWorldToGraph(sl.Position, _drawingBounds.Bottom - 10);
-                p2 = pnlPreview.PointWorldToGraph(sl.Position, _drawingBounds.Top + 10);
+                // No features — draw one continuous line
+                var p1 = isVert
+                    ? pnlPreview.PointWorldToGraph(sl.Position, extStart - margin)
+                    : pnlPreview.PointWorldToGraph(extStart - margin, sl.Position);
+                var p2 = isVert
+                    ? pnlPreview.PointWorldToGraph(sl.Position, extEnd + margin)
+                    : pnlPreview.PointWorldToGraph(extEnd + margin, sl.Position);
+                g.DrawLine(splitPen, p1, p2);
             }
             else
             {
-                p1 = pnlPreview.PointWorldToGraph(_drawingBounds.Left - 10, sl.Position);
-                p2 = pnlPreview.PointWorldToGraph(_drawingBounds.Right + 10, sl.Position);
+                // Generate feature geometry and draw contours
+                var featureResult = feature.GenerateFeatures(sl, extStart, extEnd, parameters);
+                DrawFeatureEdge(g, featurePen, featureResult.NegativeSideEdge, isVert);
+                DrawFeatureEdge(g, featurePen, featureResult.PositiveSideEdge, isVert);
+
+                // Draw split line in segments between features
+                var halfExt = GetFeatureHalfExtent(parameters);
+                var sorted = new List<double>(sl.FeaturePositions);
+                sorted.Sort();
+
+                var cursor = extStart - margin;
+                foreach (var fc in sorted)
+                {
+                    var gapStart = fc - halfExt;
+                    if (gapStart > cursor)
+                    {
+                        var p1 = isVert
+                            ? pnlPreview.PointWorldToGraph(sl.Position, cursor)
+                            : pnlPreview.PointWorldToGraph(cursor, sl.Position);
+                        var p2 = isVert
+                            ? pnlPreview.PointWorldToGraph(sl.Position, gapStart)
+                            : pnlPreview.PointWorldToGraph(gapStart, sl.Position);
+                        g.DrawLine(splitPen, p1, p2);
+                    }
+                    cursor = fc + halfExt;
+                }
+
+                // Final segment after last feature
+                var end = extEnd + margin;
+                if (end > cursor)
+                {
+                    var p1 = isVert
+                        ? pnlPreview.PointWorldToGraph(sl.Position, cursor)
+                        : pnlPreview.PointWorldToGraph(cursor, sl.Position);
+                    var p2 = isVert
+                        ? pnlPreview.PointWorldToGraph(sl.Position, end)
+                        : pnlPreview.PointWorldToGraph(end, sl.Position);
+                    g.DrawLine(splitPen, p1, p2);
+                }
             }
-            g.DrawLine(splitPen, p1, p2);
         }
 
         // Feature position handles
@@ -507,6 +548,41 @@ public partial class SplitDrawingForm : Form
     {
         var pieceCount = _splitLines.Count == 0 ? 1 : BuildPreviewRegions().Count;
         lblStatus.Text = $"Part: {_drawingBounds.Width:F2} x {_drawingBounds.Length:F2} | {_splitLines.Count} split lines | {pieceCount} pieces";
+    }
+
+    // --- Feature rendering helpers ---
+
+    private static ISplitFeature GetSplitFeature(SplitType type)
+    {
+        return type switch
+        {
+            SplitType.WeldGapTabs => new WeldGapTabSplit(),
+            SplitType.SpikeGroove => new SpikeGrooveSplit(),
+            _ => new StraightSplit()
+        };
+    }
+
+    private static double GetFeatureHalfExtent(SplitParameters p)
+    {
+        return p.Type switch
+        {
+            SplitType.WeldGapTabs => p.TabWidth / 2,
+            SplitType.SpikeGroove => p.GrooveDepth * System.Math.Tan(OpenNest.Math.Angle.ToRadians(p.SpikeAngle / 2)),
+            _ => 0
+        };
+    }
+
+    private void DrawFeatureEdge(Graphics g, Pen pen, List<Geometry.Entity> entities, bool isVertical)
+    {
+        foreach (var entity in entities)
+        {
+            if (entity is Geometry.Line line)
+            {
+                var p1 = pnlPreview.PointWorldToGraph(line.StartPoint.X, line.StartPoint.Y);
+                var p2 = pnlPreview.PointWorldToGraph(line.EndPoint.X, line.EndPoint.Y);
+                g.DrawLine(pen, p1, p2);
+            }
+        }
     }
 
     // --- SplitPreview control ---
