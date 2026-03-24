@@ -160,6 +160,7 @@ namespace OpenNest.IO
             nest.DateCreated = DateTime.Parse(dto.DateCreated);
             nest.DateLastModified = DateTime.Parse(dto.DateLastModified);
             nest.Notes = dto.Notes;
+            nest.AssistGas = dto.AssistGas ?? "";
 
             // Plate defaults
             var pd = dto.PlateDefaults;

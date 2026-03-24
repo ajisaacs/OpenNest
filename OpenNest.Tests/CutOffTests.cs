@@ -154,10 +154,10 @@ public class CutOffTests
 
         // Plate(100, 50) = Width=100, Length=50. Vertical cut runs along Y (Width axis).
         // BoundingBox Y extent = Size.Width = 100. With 2" overtravel = 102.
-        // Default TowardOrigin: RapidMove to far end (102), LinearMove to near end (0).
-        var rapidMoves = cutoff.Drawing.Program.Codes.OfType<RapidMove>().ToList();
-        Assert.Single(rapidMoves);
-        Assert.Equal(102.0, rapidMoves[0].EndPoint.Y, 5);
+        // Default AwayFromOrigin: RapidMove to near end (0), LinearMove to far end (102).
+        var linearMoves = cutoff.Drawing.Program.Codes.OfType<LinearMove>().ToList();
+        Assert.Single(linearMoves);
+        Assert.Equal(102.0, linearMoves[0].EndPoint.Y, 5);
     }
 
     [Fact]
@@ -171,11 +171,10 @@ public class CutOffTests
         };
         cutoff.Regenerate(plate, settings);
 
+        // AwayFromOrigin: RapidMove to near end (StartLimit=20), LinearMove to far end (100).
         var rapidMoves = cutoff.Drawing.Program.Codes.OfType<RapidMove>().ToList();
         Assert.Single(rapidMoves);
-        var linearMoves = cutoff.Drawing.Program.Codes.OfType<LinearMove>().ToList();
-        Assert.Single(linearMoves);
-        Assert.Equal(20.0, linearMoves[0].EndPoint.Y, 5);
+        Assert.Equal(20.0, rapidMoves[0].EndPoint.Y, 5);
     }
 
     [Fact]
@@ -189,9 +188,10 @@ public class CutOffTests
         };
         cutoff.Regenerate(plate, settings);
 
-        var rapidMoves = cutoff.Drawing.Program.Codes.OfType<RapidMove>().ToList();
-        Assert.Single(rapidMoves);
-        Assert.Equal(80.0, rapidMoves[0].EndPoint.Y, 5);
+        // AwayFromOrigin: RapidMove to near end (0), LinearMove to far end (EndLimit=80).
+        var linearMoves = cutoff.Drawing.Program.Codes.OfType<LinearMove>().ToList();
+        Assert.Single(linearMoves);
+        Assert.Equal(80.0, linearMoves[0].EndPoint.Y, 5);
     }
 
     [Fact]

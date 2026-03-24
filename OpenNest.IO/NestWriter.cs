@@ -77,6 +77,7 @@ namespace OpenNest.IO
                 DateCreated = nest.DateCreated.ToString("o"),
                 DateLastModified = nest.DateLastModified.ToString("o"),
                 Notes = nest.Notes ?? "",
+                AssistGas = nest.AssistGas ?? "",
                 PlateDefaults = BuildPlateDefaultsDto(),
                 Drawings = BuildDrawingDtos(),
                 Plates = BuildPlateDtos()

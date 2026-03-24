@@ -458,6 +458,7 @@ namespace OpenNest.Forms
             PlateView.ZoomToPlate();
             PlateView.Refresh();
             UpdatePlateList();
+            UpdatePlateHeader();
         }
 
         public void SelectAllParts()

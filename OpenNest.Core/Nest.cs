@@ -36,6 +36,8 @@ namespace OpenNest
 
         public string Notes { get; set; }
 
+        public string AssistGas { get; set; } = "";
+
         public Units Units { get; set; }
 
         public DateTime DateCreated { get; set; }

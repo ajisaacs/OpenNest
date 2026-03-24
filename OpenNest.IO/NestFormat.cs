@@ -23,6 +23,7 @@ namespace OpenNest.IO
             public string DateCreated { get; init; } = "";
             public string DateLastModified { get; init; } = "";
             public string Notes { get; init; } = "";
+            public string AssistGas { get; init; } = "";
             public PlateDefaultsDto PlateDefaults { get; init; } = new();
             public List<DrawingDto> Drawings { get; init; } = new();
             public List<PlateDto> Plates { get; init; } = new();

@@ -68,7 +68,18 @@ namespace OpenNest.Posts.Cincinnati
                 .Where(p => p.Parts.Count > 0)
                 .ToList();
 
-            // 3. Build part sub-program registry (if enabled)
+            // 3. Resolve gas and library files
+            var resolver = new MaterialLibraryResolver(Config);
+            var gas = MaterialLibraryResolver.ResolveGas(nest, Config);
+            var etchLibrary = resolver.ResolveEtchLibrary(Config.DefaultEtchGas);
+
+            // Resolve cut library from first plate for preamble
+            var firstPlate = plates.FirstOrDefault();
+            var initialCutLibrary = firstPlate != null
+                ? resolver.ResolveCutLibrary(firstPlate.Material?.Name ?? "", firstPlate.Thickness, gas)
+                : "";
+
+            // 4. Build part sub-program registry (if enabled)
             Dictionary<(int, long), int> partSubprograms = null;
             List<(int subNum, string name, Program program)> subprogramEntries = null;
 
@@ -100,21 +111,21 @@ namespace OpenNest.Posts.Cincinnati
                 }
             }
 
-            // 4. Create writers
+            // 5. Create writers
             var preamble = new CincinnatiPreambleWriter(Config);
             var sheetWriter = new CincinnatiSheetWriter(Config, vars);
 
-            // 5. Build material description from first plate
-            var material = plates.FirstOrDefault()?.Material;
+            // 6. Build material description from first plate
+            var material = firstPlate?.Material;
             var materialDesc = material != null
                 ? $"{material.Name}{(string.IsNullOrEmpty(material.Grade) ? "" : $", {material.Grade}")}"
                 : "";
 
-            // 6. Write to stream
+            // 7. Write to stream
             using var writer = new StreamWriter(outputStream, Encoding.UTF8, 1024, leaveOpen: true);
 
             // Main program
-            preamble.WriteMainProgram(writer, nest.Name ?? "NEST", materialDesc, plates.Count);
+            preamble.WriteMainProgram(writer, nest.Name ?? "NEST", materialDesc, plates.Count, initialCutLibrary);
 
             // Variable declaration subprogram
             preamble.WriteVariableDeclaration(writer, vars);
@@ -122,17 +133,18 @@ namespace OpenNest.Posts.Cincinnati
             // Sheet subprograms
             for (var i = 0; i < plates.Count; i++)
             {
+                var plate = plates[i];
                 var sheetIndex = i + 1;
                 var subNumber = Config.SheetSubprogramStart + i;
-                sheetWriter.Write(writer, plates[i], nest.Name ?? "NEST", sheetIndex, subNumber,
-                    partSubprograms);
+                var cutLibrary = resolver.ResolveCutLibrary(plate.Material?.Name ?? "", plate.Thickness, gas);
+                sheetWriter.Write(writer, plate, nest.Name ?? "NEST", sheetIndex, subNumber,
+                    cutLibrary, etchLibrary, partSubprograms);
             }
 
             // Part sub-programs (if enabled)
             if (subprogramEntries != null)
             {
                 var partSubWriter = new CincinnatiPartSubprogramWriter(Config);
-                var firstPlate = plates.FirstOrDefault();
                 var sheetDiagonal = firstPlate != null
                     ? System.Math.Sqrt(firstPlate.Size.Width * firstPlate.Size.Width
                         + firstPlate.Size.Length * firstPlate.Size.Length)
@@ -141,7 +153,7 @@ namespace OpenNest.Posts.Cincinnati
                 foreach (var (subNum, name, pgm) in subprogramEntries)
                 {
                     partSubWriter.Write(writer, pgm, name, subNum,
-                        Config.DefaultLibraryFile ?? "", sheetDiagonal);
+                        initialCutLibrary, etchLibrary, sheetDiagonal);
                 }
             }
 

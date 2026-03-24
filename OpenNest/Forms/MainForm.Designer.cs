@@ -149,6 +149,8 @@
             engineComboBox = new System.Windows.Forms.ToolStripComboBox();
             btnAutoNest = new System.Windows.Forms.ToolStripButton();
             btnShowRemnants = new System.Windows.Forms.ToolStripButton();
+            toolStripSeparator5 = new System.Windows.Forms.ToolStripSeparator();
+            btnCutOff = new System.Windows.Forms.ToolStripButton();
             pEPToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             openNestToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             menuStrip1.SuspendLayout();
@@ -917,7 +919,7 @@
             // toolStrip1
             // 
             toolStrip1.AutoSize = false;
-            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, btnZoomOut, btnZoomIn, btnZoomToFit, toolStripSeparator4, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants });
+            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, btnZoomOut, btnZoomIn, btnZoomToFit, toolStripSeparator4, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants, toolStripSeparator5, btnCutOff });
             toolStrip1.Location = new System.Drawing.Point(0, 24);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new System.Drawing.Size(1281, 40);
@@ -1044,11 +1046,30 @@
             //
             // btnShowRemnants
             //
-            btnShowRemnants.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            btnShowRemnants.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            btnShowRemnants.Image = Properties.Resources.remnants;
+            btnShowRemnants.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
             btnShowRemnants.Name = "btnShowRemnants";
-            btnShowRemnants.Size = new System.Drawing.Size(64, 37);
+            btnShowRemnants.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            btnShowRemnants.Size = new System.Drawing.Size(38, 37);
             btnShowRemnants.Text = "Remnants";
             btnShowRemnants.Click += ShowRemnants_Click;
+            //
+            // toolStripSeparator5
+            //
+            toolStripSeparator5.Name = "toolStripSeparator5";
+            toolStripSeparator5.Size = new System.Drawing.Size(6, 40);
+            //
+            // btnCutOff
+            //
+            btnCutOff.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            btnCutOff.Image = Properties.Resources.cutoff;
+            btnCutOff.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
+            btnCutOff.Name = "btnCutOff";
+            btnCutOff.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            btnCutOff.Size = new System.Drawing.Size(38, 37);
+            btnCutOff.Text = "Sheet Cut-Off";
+            btnCutOff.Click += CutOff_Click;
             //
             // pEPToolStripMenuItem
             // 
@@ -1213,6 +1234,8 @@
         private System.Windows.Forms.ToolStripComboBox engineComboBox;
         private System.Windows.Forms.ToolStripButton btnAutoNest;
         private System.Windows.Forms.ToolStripButton btnShowRemnants;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator5;
+        private System.Windows.Forms.ToolStripButton btnCutOff;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateCutOff;
     }
 }

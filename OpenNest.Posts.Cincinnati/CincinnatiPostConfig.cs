@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace OpenNest.Posts.Cincinnati
 {
     /// <summary>
@@ -153,16 +155,29 @@ namespace OpenNest.Posts.Cincinnati
         public G89Mode ProcessParameterMode { get; set; } = G89Mode.LibraryFile;
 
         /// <summary>
-        /// Gets or sets the default G89 library file path.
-        /// Default: empty string
+        /// Gets or sets the default assist gas when Nest.AssistGas is empty.
+        /// Default: "O2"
         /// </summary>
-        public string DefaultLibraryFile { get; set; } = "";
+        public string DefaultAssistGas { get; set; } = "O2";
 
         /// <summary>
-        /// Gets or sets whether to repeat G89 before each feature.
-        /// Default: true
+        /// Gets or sets the gas used for etch operations.
+        /// Independent of the cutting assist gas — etch typically requires a specific gas.
+        /// Default: "N2"
         /// </summary>
-        public bool RepeatG89BeforeEachFeature { get; set; } = true;
+        public string DefaultEtchGas { get; set; } = "N2";
+
+        /// <summary>
+        /// Gets or sets the material-to-library mapping for cut operations.
+        /// Each entry maps (material, thickness, gas) to a G89 library file.
+        /// </summary>
+        public List<MaterialLibraryEntry> MaterialLibraries { get; set; } = new();
+
+        /// <summary>
+        /// Gets or sets the gas-to-library mapping for etch operations.
+        /// Each entry maps a gas type to a G89 etch library file.
+        /// </summary>
+        public List<EtchLibraryEntry> EtchLibraries { get; set; } = new();
 
         /// <summary>
         /// Gets or sets whether to use exact stop mode (G61).
@@ -271,5 +286,19 @@ namespace OpenNest.Posts.Cincinnati
         /// Default: 111
         /// </summary>
         public int SheetLengthVariable { get; set; } = 111;
+    }
+
+    public class MaterialLibraryEntry
+    {
+        public string Material { get; set; } = "";
+        public double Thickness { get; set; }
+        public string Gas { get; set; } = "";
+        public string Library { get; set; } = "";
+    }
+
+    public class EtchLibraryEntry
+    {
+        public string Gas { get; set; } = "";
+        public string Library { get; set; } = "";
     }
 }
