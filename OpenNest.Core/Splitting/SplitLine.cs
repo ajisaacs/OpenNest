@@ -1,3 +1,4 @@
+using OpenNest.Geometry;
 using System.Collections.Generic;
 
 namespace OpenNest;
@@ -22,5 +23,17 @@ public class SplitLine
     {
         Position = position;
         Axis = axis;
+    }
+
+    /// <summary>
+    /// Returns a Line entity at the split position spanning the given extent range.
+    /// For Vertical: line from (Position, extentStart) to (Position, extentEnd).
+    /// For Horizontal: line from (extentStart, Position) to (extentEnd, Position).
+    /// </summary>
+    public Line ToLine(double extentStart, double extentEnd)
+    {
+        return Axis == CutOffAxis.Vertical
+            ? new Line(Position, extentStart, Position, extentEnd)
+            : new Line(extentStart, Position, extentEnd, Position);
     }
 }
