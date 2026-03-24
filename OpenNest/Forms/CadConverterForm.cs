@@ -23,6 +23,17 @@ namespace OpenNest.Forms
             Items = new BindingList<CadConverterItem>();
             dataGridView1.DataSource = Items;
             dataGridView1.DataError += dataGridView1_DataError;
+
+            var splitColumn = new DataGridViewButtonColumn
+            {
+                Name = "Split",
+                HeaderText = "",
+                Text = "Split",
+                UseColumnTextForButtonValue = true,
+                Width = 50
+            };
+            dataGridView1.Columns.Add(splitColumn);
+            dataGridView1.CellContentClick += OnCellContentClick;
         }
 
         private BindingList<CadConverterItem> Items { get; set; }
@@ -96,6 +107,14 @@ namespace OpenNest.Forms
 
             foreach (var item in Items)
             {
+                if (item.SplitDrawings != null && item.SplitDrawings.Count > 0)
+                {
+                    foreach (var splitDrawing in item.SplitDrawings)
+                        splitDrawing.Color = GetNextColor();
+                    drawings.AddRange(item.SplitDrawings);
+                    continue;
+                }
+
                 var entities = item.Entities.Where(e => e.Layer.IsVisible && e.IsVisible).ToList();
 
                 if (entities.Count == 0)
@@ -185,6 +204,43 @@ namespace OpenNest.Forms
         private void dataGridView1_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
             MessageBox.Show(e.Exception.Message);
+        }
+
+        private void OnCellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            if (dataGridView1.Columns[e.ColumnIndex].Name != "Split") return;
+
+            var item = Items[e.RowIndex];
+            var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
+            if (entities.Count == 0) return;
+
+            // Build a temporary drawing from the item's entities (same logic as GetDrawings)
+            var shape = new ShapeProfile(entities);
+            SetRotation(shape.Perimeter, RotationType.CW);
+            foreach (var cutout in shape.Cutouts)
+                SetRotation(cutout, RotationType.CCW);
+
+            var drawEntities = new List<Entity>();
+            drawEntities.AddRange(shape.Perimeter.Entities);
+            shape.Cutouts.ForEach(c => drawEntities.AddRange(c.Entities));
+
+            var pgm = ConvertGeometry.ToProgram(drawEntities);
+            if (pgm.Codes.Count > 0 && pgm[0].Type == CodeType.RapidMove)
+            {
+                var rapid = (RapidMove)pgm[0];
+                pgm.Offset(-rapid.EndPoint);
+                pgm.Codes.RemoveAt(0);
+            }
+
+            var drawing = new Drawing(item.Name, pgm);
+
+            using var form = new SplitDrawingForm(drawing);
+            if (form.ShowDialog(this) == DialogResult.OK && form.ResultDrawings?.Count > 1)
+            {
+                item.SplitDrawings = form.ResultDrawings;
+                dataGridView1.InvalidateRow(e.RowIndex);
+            }
         }
 
         private void dataGridView1_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
@@ -308,6 +364,9 @@ namespace OpenNest.Forms
 
         [Browsable(false)]
         public List<Entity> Entities { get; set; }
+
+        [Browsable(false)]
+        public List<Drawing> SplitDrawings { get; set; }
     }
 
     class ColorItem
