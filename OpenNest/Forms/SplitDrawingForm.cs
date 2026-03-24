@@ -70,16 +70,40 @@ public partial class SplitDrawingForm : Form
             var plateH = (double)nudPlateHeight.Value;
             var spacing = (double)nudEdgeSpacing.Value;
             var overhang = GetCurrentParameters().FeatureOverhang;
-            var lines = AutoSplitCalculator.FitToPlate(_drawingBounds, plateW, plateH, spacing, overhang);
-
-            // Filter by user-selected axis
             var axisIndex = cboSplitAxis.SelectedIndex;
-            if (axisIndex == 1) // Vertical Only
-                lines = lines.Where(l => l.Axis == CutOffAxis.Vertical).ToList();
-            else if (axisIndex == 2) // Horizontal Only
-                lines = lines.Where(l => l.Axis == CutOffAxis.Horizontal).ToList();
 
-            _splitLines.AddRange(lines);
+            if (axisIndex == 1) // Vertical Only — split the part width using the plate size
+            {
+                var usable = System.Math.Min(plateW, plateH) - 2 * spacing - overhang;
+                if (usable > 0)
+                {
+                    var splits = (int)System.Math.Ceiling(_drawingBounds.Width / usable) - 1;
+                    if (splits > 0)
+                    {
+                        var step = _drawingBounds.Width / (splits + 1);
+                        for (var i = 1; i <= splits; i++)
+                            _splitLines.Add(new SplitLine(_drawingBounds.X + step * i, CutOffAxis.Vertical));
+                    }
+                }
+            }
+            else if (axisIndex == 2) // Horizontal Only — split the part height using the plate size
+            {
+                var usable = System.Math.Min(plateW, plateH) - 2 * spacing - overhang;
+                if (usable > 0)
+                {
+                    var splits = (int)System.Math.Ceiling(_drawingBounds.Length / usable) - 1;
+                    if (splits > 0)
+                    {
+                        var step = _drawingBounds.Length / (splits + 1);
+                        for (var i = 1; i <= splits; i++)
+                            _splitLines.Add(new SplitLine(_drawingBounds.Y + step * i, CutOffAxis.Horizontal));
+                    }
+                }
+            }
+            else // Auto — both axes
+            {
+                _splitLines.AddRange(AutoSplitCalculator.FitToPlate(_drawingBounds, plateW, plateH, spacing, overhang));
+            }
         }
         else if (radByCount.Checked)
         {
