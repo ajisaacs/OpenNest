@@ -40,7 +40,8 @@ public partial class SplitDrawingForm : Form
             null, pnlPreview, new object[] { true });
 
         _drawing = drawing;
-        _drawingEntities = ConvertProgram.ToGeometry(drawing.Program);
+        _drawingEntities = ConvertProgram.ToGeometry(drawing.Program)
+            .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
         _drawingBounds = drawing.Program.BoundingBox();
 
         Text = $"Split Drawing: {drawing.Name}";
