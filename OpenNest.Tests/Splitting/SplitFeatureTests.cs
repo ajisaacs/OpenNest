@@ -93,4 +93,44 @@ public class SplitFeatureTests
     {
         Assert.Equal("Straight", new StraightSplit().Name);
     }
+
+    [Fact]
+    public void SpikeGrooveSplit_Vertical_TwoPairs_SpikesOnPositiveSide()
+    {
+        var feature = new SpikeGrooveSplit();
+        var line = new SplitLine(50.0, CutOffAxis.Vertical);
+        var parameters = new SplitParameters
+        {
+            Type = SplitType.SpikeGroove,
+            SpikeDepth = 1.0,
+            SpikeAngle = 60.0,
+            SpikePairCount = 2
+        };
+
+        var result = feature.GenerateFeatures(line, 0.0, 100.0, parameters);
+
+        // Both sides should have multiple entities (straight segments + spike/groove geometry)
+        Assert.True(result.NegativeSideEdge.Count > 1, "Negative side should have groove geometry");
+        Assert.True(result.PositiveSideEdge.Count > 1, "Positive side should have spike geometry");
+
+        // All entities should be lines
+        Assert.All(result.NegativeSideEdge, e => Assert.IsType<Line>(e));
+        Assert.All(result.PositiveSideEdge, e => Assert.IsType<Line>(e));
+
+        // Spikes protrude in negative-X direction (into the negative side's territory)
+        var posLines = result.PositiveSideEdge.Cast<Line>().ToList();
+        var minX = posLines.Min(l => System.Math.Min(l.StartPoint.X, l.EndPoint.X));
+        Assert.True(minX < 50.0, "Spikes should protrude past the split line");
+
+        // Grooves indent in the positive-X direction (into positive side's territory)
+        var negLines = result.NegativeSideEdge.Cast<Line>().ToList();
+        var maxX = negLines.Max(l => System.Math.Max(l.StartPoint.X, l.EndPoint.X));
+        Assert.True(maxX <= 50.0, "Grooves should not protrude past the split line");
+    }
+
+    [Fact]
+    public void SpikeGrooveSplit_Name()
+    {
+        Assert.Equal("Spike / V-Groove", new SpikeGrooveSplit().Name);
+    }
 }
