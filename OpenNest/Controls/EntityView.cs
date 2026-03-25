@@ -1,6 +1,7 @@
 ﻿using OpenNest.Bending;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -16,6 +17,20 @@ namespace OpenNest.Controls
 
         private readonly Pen gridPen = new Pen(Color.FromArgb(70, 70, 70));
         private readonly Dictionary<int, Pen> penCache = new Dictionary<int, Pen>();
+
+        public event EventHandler<Line> LinePicked;
+        public event EventHandler PickCancelled;
+
+        private bool isPickingBendLine;
+        public bool IsPickingBendLine
+        {
+            get => isPickingBendLine;
+            set
+            {
+                isPickingBendLine = value;
+                Cursor = value ? Cursors.Hand : Cursors.Cross;
+            }
+        }
 
         public EntityView()
         {
@@ -34,6 +49,13 @@ namespace OpenNest.Controls
         {
             base.OnMouseClick(e);
             if (!Focused) Focus();
+
+            if (IsPickingBendLine && e.Button == MouseButtons.Left)
+            {
+                var line = HitTestLine(e.Location);
+                if (line != null)
+                    LinePicked?.Invoke(this, line);
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -123,6 +145,12 @@ namespace OpenNest.Controls
 
             if (e.KeyCode == Keys.F)
                 ZoomToFit();
+
+            if (IsPickingBendLine && e.KeyCode == Keys.Escape)
+            {
+                IsPickingBendLine = false;
+                PickCancelled?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         private Pen GetEntityPen(Color color)
@@ -178,6 +206,32 @@ namespace OpenNest.Controls
                 var pt2 = PointWorldToGraph(bend.EndPoint);
                 g.DrawLine(i == SelectedBendIndex ? selectedPen : bendPen, pt1, pt2);
             }
+        }
+
+        private Line HitTestLine(Point controlPoint)
+        {
+            var worldPoint = PointControlToWorld(controlPoint);
+            var tolerance = LengthGuiToWorld(6);
+            Line bestLine = null;
+            var bestDistance = double.MaxValue;
+
+            foreach (var entity in Entities)
+            {
+                if (entity.Type != EntityType.Line || !entity.IsVisible)
+                    continue;
+
+                var line = (Line)entity;
+                var closest = line.ClosestPointTo(worldPoint);
+                var distance = worldPoint.DistanceTo(closest);
+
+                if (distance < tolerance && distance < bestDistance)
+                {
+                    bestLine = line;
+                    bestDistance = distance;
+                }
+            }
+
+            return bestLine;
         }
 
         protected override void Dispose(bool disposing)
