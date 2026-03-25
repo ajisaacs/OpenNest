@@ -11,7 +11,8 @@ namespace OpenNest.Controls
     {
         public List<Entity> Entities;
 
-        private Pen pen = new Pen(Color.FromArgb(70, 70, 70));
+        private readonly Pen gridPen = new Pen(Color.FromArgb(70, 70, 70));
+        private readonly Dictionary<int, Pen> penCache = new Dictionary<int, Pen>();
 
         public EntityView()
         {
@@ -37,13 +38,16 @@ namespace OpenNest.Controls
             base.OnPaint(e);
 
             e.Graphics.SmoothingMode = SmoothingMode.HighSpeed;
-            e.Graphics.DrawLine(pen, origin.X, 0, origin.X, Height);
-            e.Graphics.DrawLine(pen, 0, origin.Y, Width, origin.Y);
+            e.Graphics.DrawLine(gridPen, origin.X, 0, origin.X, Height);
+            e.Graphics.DrawLine(gridPen, 0, origin.Y, Width, origin.Y);
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);
 
             foreach (var entity in Entities)
-                DrawEntity(e.Graphics, entity, Pens.White);
+            {
+                var pen = GetEntityPen(entity.Color);
+                DrawEntity(e.Graphics, entity, pen);
+            }
 
 #if DRAW_OFFSET
 
@@ -98,6 +102,42 @@ namespace OpenNest.Controls
 
             if (e.Button == MouseButtons.Middle)
                 ZoomToFit();
+        }
+
+        private Pen GetEntityPen(Color color)
+        {
+            // Clamp dark colors to ensure visibility on dark background
+            var brightness = (color.R * 299 + color.G * 587 + color.B * 114) / 1000;
+            if (brightness < 80)
+                color = Color.FromArgb(color.A,
+                    System.Math.Max(color.R, (byte)80),
+                    System.Math.Max(color.G, (byte)80),
+                    System.Math.Max(color.B, (byte)80));
+
+            var argb = color.ToArgb();
+            if (!penCache.TryGetValue(argb, out var pen))
+            {
+                pen = new Pen(color);
+                penCache[argb] = pen;
+            }
+            return pen;
+        }
+
+        public void ClearPenCache()
+        {
+            foreach (var pen in penCache.Values)
+                pen.Dispose();
+            penCache.Clear();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                ClearPenCache();
+                gridPen.Dispose();
+            }
+            base.Dispose(disposing);
         }
 
         private void DrawEntity(Graphics g, Entity e, Pen pen)
