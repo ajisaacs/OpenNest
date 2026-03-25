@@ -194,8 +194,10 @@ namespace OpenNest.Forms
         private void OnQuantityChanged(object sender, EventArgs e)
         {
             var item = CurrentItem;
-            if (item != null)
-                item.Quantity = (int)numQuantity.Value;
+            if (item == null) return;
+
+            item.Quantity = (int)numQuantity.Value;
+            fileList.Invalidate();
         }
 
         private void OnCustomerChanged(object sender, EventArgs e)

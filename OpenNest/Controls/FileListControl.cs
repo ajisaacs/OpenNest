@@ -63,7 +63,11 @@ namespace OpenNest.Controls
         public void AddItem(FileListItem item)
         {
             items.Add(item);
-            if (items.Count == 1) selectedIndex = 0;
+            if (items.Count == 1)
+            {
+                selectedIndex = 0;
+                SelectedIndexChanged?.Invoke(this, selectedIndex);
+            }
             Invalidate();
         }
 
