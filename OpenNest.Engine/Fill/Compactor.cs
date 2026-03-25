@@ -157,7 +157,7 @@ namespace OpenNest.Engine.Fill
                         continue;
 
                     var gap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], direction);
-                    var d = gap - partSpacing;
+                    var d = gap - partSpacing - 2 * ChordTolerance;
                     if (d < 0) d = 0;
                     if (d < distance)
                         distance = d;

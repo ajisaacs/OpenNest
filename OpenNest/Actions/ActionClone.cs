@@ -154,11 +154,9 @@ namespace OpenNest.Actions
                     default: hDir = PushDirection.Left; vDir = PushDirection.Down; break;
                 }
 
-                // Phase 1: BB-only push to get past irregular geometry quickly.
                 Compactor.PushBoundingBox(movingParts, plateView.Plate, hDir);
                 Compactor.PushBoundingBox(movingParts, plateView.Plate, vDir);
 
-                // Phase 2: Geometry push to settle against actual contours.
                 Compactor.Push(movingParts, plateView.Plate, hDir);
                 Compactor.Push(movingParts, plateView.Plate, vDir);
 
