@@ -65,6 +65,24 @@ namespace OpenNest.IO
             return entities;
         }
 
+        /// <summary>
+        /// Imports a DXF file, returning both converted entities and the raw CadDocument
+        /// for bend detection. The CadDocument is NOT disposed — caller can use it for
+        /// additional analysis (e.g., MText extraction for bend notes).
+        /// </summary>
+        public DxfImportResult Import(string path)
+        {
+            using var reader = new DxfReader(path);
+            var doc = reader.Read();
+            var entities = GetGeometry(doc);
+
+            return new DxfImportResult
+            {
+                Entities = entities,
+                Document = doc
+            };
+        }
+
         public bool GetGeometry(Stream stream, out List<Entity> geometry)
         {
             var success = false;
