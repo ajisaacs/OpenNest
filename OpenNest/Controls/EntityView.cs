@@ -117,6 +117,14 @@ namespace OpenNest.Controls
                 ZoomToFit();
         }
 
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+
+            if (e.KeyCode == Keys.F)
+                ZoomToFit();
+        }
+
         private Pen GetEntityPen(Color color)
         {
             if (color.IsEmpty || color.A == 0)
