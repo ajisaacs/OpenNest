@@ -1,10 +1,13 @@
-﻿using OpenNest.CNC;
+using OpenNest.Bending;
+using OpenNest.CNC;
+using OpenNest.Controls;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using OpenNest.IO.Bending;
 using OpenNest.Properties;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -16,206 +19,203 @@ namespace OpenNest.Forms
 {
     public partial class CadConverterForm : Form
     {
+        private static int colorIndex;
+
         public CadConverterForm()
         {
             InitializeComponent();
 
-            Items = new BindingList<CadConverterItem>();
-            dataGridView1.DataSource = Items;
-            dataGridView1.DataError += dataGridView1_DataError;
+            fileList.SelectedIndexChanged += OnFileSelected;
+            filterPanel.FilterChanged += OnFilterChanged;
+            filterPanel.BendLineSelected += OnBendLineSelected;
+            filterPanel.BendLineRemoved += OnBendLineRemoved;
+            btnSplit.Click += OnSplitClicked;
+            numQuantity.ValueChanged += OnQuantityChanged;
+            txtCustomer.TextChanged += OnCustomerChanged;
+            cboBendDetector.SelectedIndexChanged += OnBendDetectorChanged;
 
-            var splitColumn = new DataGridViewButtonColumn
-            {
-                Name = "Split",
-                HeaderText = "",
-                Text = "Split",
-                UseColumnTextForButtonValue = true,
-                Width = 50
-            };
-            dataGridView1.Columns.Add(splitColumn);
-            dataGridView1.CellContentClick += OnCellContentClick;
+            // Populate bend detector dropdown
+            cboBendDetector.Items.Add("Auto");
+            foreach (var detector in BendDetectorRegistry.Detectors)
+                cboBendDetector.Items.Add(detector.Name);
+            cboBendDetector.SelectedIndex = 0;
+
+            // Drag & drop
+            AllowDrop = true;
+            DragEnter += OnDragEnter;
+            DragDrop += OnDragDrop;
         }
 
-        private BindingList<CadConverterItem> Items { get; set; }
+        private FileListItem CurrentItem => fileList.SelectedItem;
 
-        private void SetRotation(Shape shape, RotationType rotation)
+        #region File Import
+
+        public void AddFile(string file) => AddFile(file, 0, null);
+
+        private void AddFile(string file, int detectorIndex, string detectorName)
         {
             try
             {
-                var dir = shape.ToPolygon(3).RotationDirection();
+                var importer = new DxfImporter();
+                importer.SplinePrecision = Settings.Default.ImportSplinePrecision;
+                var result = importer.Import(file);
 
-                if (dir != rotation)
-                    shape.Reverse();
-            }
-            catch { }
-        }
+                if (result.Entities.Count == 0)
+                    return;
 
-        private void LoadItem(CadConverterItem item)
-        {
-            entityView1.Entities.Clear();
-            entityView1.Entities.AddRange(item.Entities);
-            entityView1.ZoomToFit();
+                // Compute bounds
+                var bounds = result.Entities.GetBoundingBox();
 
-            item.Entities.ForEach(e => e.IsVisible = true);
-
-            // Layers
-            checkedListBox1.Items.Clear();
-
-            var layers = item.Entities
-                .Where(e => e.Layer != null)
-                .Select(e => e.Layer.Name)
-                .ToList()
-                .Distinct();
-
-            foreach (var layer in layers)
-                checkedListBox1.Items.Add(layer, true);
-
-            // Colors
-            checkedListBox2.Items.Clear();
-
-            var colors = item.Entities
-                .Select(e => e.Color.ToArgb())
-                .Distinct()
-                .Select(argb => new ColorItem(Color.FromArgb(argb)));
-
-            foreach (var color in colors)
-                checkedListBox2.Items.Add(color, false);
-
-            // Line Types
-            checkedListBox3.Items.Clear();
-
-            var lineTypes = item.Entities
-                .Select(e => e.LineTypeName ?? "Continuous")
-                .Distinct();
-
-            foreach (var lineType in lineTypes)
-                checkedListBox3.Items.Add(lineType, false);
-        }
-
-        private static int colorIndex;
-
-        private static Color GetNextColor()
-        {
-            var color = ColorScheme.PartColors[colorIndex % ColorScheme.PartColors.Length];
-            colorIndex++;
-            return color;
-        }
-
-        public List<Drawing> GetDrawings()
-        {
-            var drawings = new List<Drawing>();
-
-            foreach (var item in Items)
-            {
-                if (item.SplitDrawings != null && item.SplitDrawings.Count > 0)
+                // Detect bends (detectorIndex/Name captured on UI thread)
+                var bends = new List<Bend>();
+                if (result.Document != null)
                 {
-                    foreach (var splitDrawing in item.SplitDrawings)
-                        splitDrawing.Color = GetNextColor();
-                    drawings.AddRange(item.SplitDrawings);
-                    continue;
+                    bends = detectorIndex == 0
+                        ? BendDetectorRegistry.AutoDetect(result.Document)
+                        : BendDetectorRegistry.GetByName(detectorName)
+                            ?.DetectBends(result.Document)
+                          ?? new List<Bend>();
                 }
 
-                var entities = item.Entities.Where(e => e.Layer.IsVisible && e.IsVisible).ToList();
-
-                if (entities.Count == 0)
-                    continue;
-
-                var drawing = new Drawing(item.Name);
-                drawing.Color = GetNextColor();
-                drawing.Customer = item.Customer;
-                drawing.Source.Path = item.Path;
-                drawing.Quantity.Required = item.Quantity;
-
-                var shape = new ShapeProfile(entities);
-
-                SetRotation(shape.Perimeter, RotationType.CW);
-
-                foreach (var cutout in shape.Cutouts)
-                    SetRotation(cutout, RotationType.CCW);
-
-                entities = new List<Entity>();
-                entities.AddRange(shape.Perimeter.Entities);
-
-                shape.Cutouts.ForEach(cutout => entities.AddRange(cutout.Entities));
-
-                var pgm = ConvertGeometry.ToProgram(entities);
-                var firstCode = pgm[0];
-
-                if (firstCode.Type == CodeType.RapidMove)
-                {
-                    var rapid = (RapidMove)firstCode;
-
-                    drawing.Source.Offset = rapid.EndPoint;
-
-                    pgm.Offset(-rapid.EndPoint);
-                    pgm.Codes.RemoveAt(0);
-                }
-
-                drawing.Program = pgm;
-                drawings.Add(drawing);
-
-                Thread.Sleep(20);
-            }
-
-            return drawings;
-        }
-
-        private CadConverterItem CurrentItem
-        {
-            get
-            {
-                return dataGridView1.SelectedRows.Count != 0
-                    ? Items[dataGridView1.SelectedRows[0].Index]
-                    : null;
-            }
-        }
-
-        public void AddFile(string file)
-        {
-            var importer = new DxfImporter();
-            importer.SplinePrecision = Settings.Default.ImportSplinePrecision;
-
-            var entities = new List<Entity>();
-
-            if (!importer.GetGeometry(file, out entities))
-            {
-                MessageBox.Show("Failed to import file \"" + file + "\"");
-                return;
-            }
-
-            lock (Items)
-            {
-                Items.Add(new CadConverterItem
+                var item = new FileListItem
                 {
                     Name = Path.GetFileNameWithoutExtension(file),
-                    Entities = entities,
+                    Entities = result.Entities,
                     Path = file,
                     Quantity = 1,
-                    Customer = string.Empty
-                });
+                    Customer = string.Empty,
+                    Bends = bends,
+                    Bounds = bounds,
+                    EntityCount = result.Entities.Count
+                };
+
+                if (InvokeRequired)
+                    BeginInvoke((Action)(() => fileList.AddItem(item)));
+                else
+                    fileList.AddItem(item);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error importing \"{file}\": {ex.Message}");
             }
         }
 
         public void AddFiles(IEnumerable<string> files)
         {
-            Parallel.ForEach(files, AddFile);
+            var fileArray = files.ToArray();
+            // Capture UI state on main thread before entering parallel loop
+            var detectorIndex = cboBendDetector.SelectedIndex;
+            var detectorName = cboBendDetector.SelectedItem?.ToString();
+
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                Parallel.ForEach(fileArray, file => AddFile(file, detectorIndex, detectorName));
+            });
         }
 
-        private void dataGridView1_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        #endregion
+
+        #region Event Handlers
+
+        private void OnFileSelected(object sender, int index)
         {
-            MessageBox.Show(e.Exception.Message);
+            var item = CurrentItem;
+            if (item == null)
+            {
+                ClearDetailBar();
+                return;
+            }
+
+            LoadItem(item);
         }
 
-        private void OnCellContentClick(object sender, DataGridViewCellEventArgs e)
+        private void LoadItem(FileListItem item)
         {
-            if (e.RowIndex < 0) return;
-            if (dataGridView1.Columns[e.ColumnIndex].Name != "Split") return;
+            entityView1.ClearPenCache();
+            entityView1.Entities.Clear();
+            entityView1.Entities.AddRange(item.Entities);
 
-            var item = Items[e.RowIndex];
+            item.Entities.ForEach(e => e.IsVisible = true);
+            if (item.Entities.Any(e => e.Layer != null))
+                item.Entities.ForEach(e => e.Layer.IsVisible = true);
+
+            filterPanel.LoadItem(item.Entities, item.Bends);
+
+            numQuantity.Value = item.Quantity;
+            txtCustomer.Text = item.Customer ?? "";
+
+            var bounds = item.Bounds;
+            lblDimensions.Text = bounds != null
+                ? $"{bounds.Width:0.#} x {bounds.Length:0.#}"
+                : "";
+            lblEntityCount.Text = $"{item.EntityCount} entities";
+
+            entityView1.ZoomToFit();
+        }
+
+        private void ClearDetailBar()
+        {
+            numQuantity.Value = 1;
+            txtCustomer.Text = "";
+            lblDimensions.Text = "";
+            lblEntityCount.Text = "";
+            entityView1.Entities.Clear();
+            entityView1.Invalidate();
+        }
+
+        private void OnFilterChanged(object sender, EventArgs e)
+        {
+            var item = CurrentItem;
+            if (item == null) return;
+
+            filterPanel.ApplyFilters(item.Entities);
+            entityView1.Invalidate();
+        }
+
+        private void OnBendLineSelected(object sender, int index)
+        {
+            // TODO: Highlight bend line in EntityView
+            entityView1.Invalidate();
+        }
+
+        private void OnBendLineRemoved(object sender, int index)
+        {
+            var item = CurrentItem;
+            if (item == null || index < 0 || index >= item.Bends.Count) return;
+
+            item.Bends.RemoveAt(index);
+            filterPanel.LoadItem(item.Entities, item.Bends);
+            entityView1.Invalidate();
+        }
+
+        private void OnQuantityChanged(object sender, EventArgs e)
+        {
+            var item = CurrentItem;
+            if (item != null)
+                item.Quantity = (int)numQuantity.Value;
+        }
+
+        private void OnCustomerChanged(object sender, EventArgs e)
+        {
+            var item = CurrentItem;
+            if (item != null)
+                item.Customer = txtCustomer.Text;
+        }
+
+        private void OnBendDetectorChanged(object sender, EventArgs e)
+        {
+            // Re-run bend detection on current item if it has a document
+            // For now, bend detection only runs at import time
+        }
+
+        private void OnSplitClicked(object sender, EventArgs e)
+        {
+            var item = CurrentItem;
+            if (item == null) return;
+
             var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
             if (entities.Count == 0) return;
 
-            // Build a temporary drawing from the item's entities (same logic as GetDrawings)
             var shape = new ShapeProfile(entities);
             SetRotation(shape.Perimeter, RotationType.CW);
             foreach (var cutout in shape.Cutouts)
@@ -236,153 +236,168 @@ namespace OpenNest.Forms
             var drawing = new Drawing(item.Name, pgm);
 
             using var form = new SplitDrawingForm(drawing);
-            if (form.ShowDialog(this) == DialogResult.OK && form.ResultDrawings?.Count > 1)
+            if (form.ShowDialog(this) != DialogResult.OK || form.ResultDrawings?.Count <= 1)
+                return;
+
+            // Write split DXF files and re-import
+            var sourceDir = Path.GetDirectoryName(item.Path);
+            var baseName = Path.GetFileNameWithoutExtension(item.Path);
+            var writableDir = Directory.Exists(sourceDir) && IsDirectoryWritable(sourceDir)
+                ? sourceDir
+                : Path.GetTempPath();
+
+            var index = fileList.SelectedIndex;
+            var newItems = new List<string>();
+
+            for (var i = 0; i < form.ResultDrawings.Count; i++)
             {
-                item.SplitDrawings = form.ResultDrawings;
-                dataGridView1.InvalidateRow(e.RowIndex);
+                var splitName = $"{baseName}_split{i + 1}.dxf";
+                var splitPath = GetUniquePath(Path.Combine(writableDir, splitName));
+
+                // TODO: Use SplitDxfWriter when implemented
+                // For now, export via DxfExporter
+                var exporter = new DxfExporter();
+                using var stream = new FileStream(splitPath, FileMode.Create);
+                exporter.ExportProgram(form.ResultDrawings[i].Program, stream);
+
+                newItems.Add(splitPath);
+            }
+
+            // Remove original and add split files
+            fileList.RemoveAt(index);
+            foreach (var path in newItems)
+                AddFile(path);
+
+            if (writableDir != sourceDir)
+                MessageBox.Show($"Split files written to: {writableDir}", "Split Output",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void OnDragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+                e.Effect = DragDropEffects.Copy;
+        }
+
+        private void OnDragDrop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                var dxfFiles = files.Where(f =>
+                    f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (dxfFiles.Length > 0)
+                    AddFiles(dxfFiles);
             }
         }
-
-        private void dataGridView1_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
-        {
-            dataGridView1.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
-        }
-
-        private void dataGridView1_SelectionChanged(object sender, System.EventArgs e)
-        {
-            var currentItem = CurrentItem;
-
-            if (currentItem != null)
-                LoadItem(currentItem);
-        }
-
-        #region Colors
-
-        private static Color[] Colors = new Color[]
-        {
-            Color.FromArgb(160, 255, 255),
-            Color.FromArgb(160, 255, 160),
-            Color.FromArgb(160, 160, 255),
-            Color.FromArgb(255, 255, 160),
-            Color.FromArgb(255, 160, 255),
-            Color.FromArgb(255, 160, 160),
-
-            Color.FromArgb(200, 255, 255),
-            Color.FromArgb(200, 255, 200),
-            Color.FromArgb(200, 200, 255),
-            Color.FromArgb(255, 255, 200),
-            Color.FromArgb(255, 200, 255),
-            Color.FromArgb(255, 200, 200),
-        };
 
         #endregion
 
-        private void checkedListBox1_SelectedIndexChanged(object sender, System.EventArgs e)
-        {
-            var index = checkedListBox1.SelectedIndex;
-            var layerName = checkedListBox1.Items[index].ToString();
-            var isVisible = checkedListBox1.CheckedItems.Contains(layerName);
+        #region Output
 
-            CurrentItem.Entities.ForEach(entity =>
+        public List<Drawing> GetDrawings()
+        {
+            var drawings = new List<Drawing>();
+
+            foreach (var item in fileList.Items)
             {
-                if (entity.Layer.Name == layerName)
-                    entity.Layer.IsVisible = isVisible;
-            });
+                var entities = item.Entities.Where(e => e.Layer.IsVisible && e.IsVisible).ToList();
 
-            entityView1.Invalidate();
-        }
+                if (entities.Count == 0)
+                    continue;
 
-        private void checkedListBox2_SelectedIndexChanged(object sender, System.EventArgs e)
-        {
-            UpdateEntityVisibility();
-        }
+                var drawing = new Drawing(item.Name);
+                drawing.Color = GetNextColor();
+                drawing.Customer = item.Customer;
+                drawing.Source.Path = item.Path;
+                drawing.Quantity.Required = item.Quantity;
 
-        private void checkedListBox3_SelectedIndexChanged(object sender, System.EventArgs e)
-        {
-            UpdateEntityVisibility();
-        }
+                // Copy bends
+                if (item.Bends != null)
+                    drawing.Bends.AddRange(item.Bends);
 
-        private void UpdateEntityVisibility()
-        {
-            var item = CurrentItem;
-            if (item == null) return;
+                var shape = new ShapeProfile(entities);
 
-            var checkedColors = new HashSet<int>();
-            for (var i = 0; i < checkedListBox2.Items.Count; i++)
-            {
-                if (checkedListBox2.GetItemChecked(i))
-                    checkedColors.Add(((ColorItem)checkedListBox2.Items[i]).Argb);
+                SetRotation(shape.Perimeter, RotationType.CW);
+
+                foreach (var cutout in shape.Cutouts)
+                    SetRotation(cutout, RotationType.CCW);
+
+                entities = new List<Entity>();
+                entities.AddRange(shape.Perimeter.Entities);
+                shape.Cutouts.ForEach(cutout => entities.AddRange(cutout.Entities));
+
+                var pgm = ConvertGeometry.ToProgram(entities);
+                var firstCode = pgm[0];
+
+                if (firstCode.Type == CodeType.RapidMove)
+                {
+                    var rapid = (RapidMove)firstCode;
+                    drawing.Source.Offset = rapid.EndPoint;
+                    pgm.Offset(-rapid.EndPoint);
+                    pgm.Codes.RemoveAt(0);
+                }
+
+                drawing.Program = pgm;
+                drawings.Add(drawing);
+
+                Thread.Sleep(20);
             }
 
-            var checkedLineTypes = new HashSet<string>();
-            for (var i = 0; i < checkedListBox3.Items.Count; i++)
+            return drawings;
+        }
+
+        #endregion
+
+        #region Helpers
+
+        private static void SetRotation(Shape shape, RotationType rotation)
+        {
+            try
             {
-                if (checkedListBox3.GetItemChecked(i))
-                    checkedLineTypes.Add(checkedListBox3.Items[i].ToString());
+                var dir = shape.ToPolygon(3).RotationDirection();
+                if (dir != rotation) shape.Reverse();
+            }
+            catch { }
+        }
+
+        private static Color GetNextColor()
+        {
+            var color = ColorScheme.PartColors[colorIndex % ColorScheme.PartColors.Length];
+            colorIndex++;
+            return color;
+        }
+
+        private static bool IsDirectoryWritable(string path)
+        {
+            try
+            {
+                var testFile = Path.Combine(path, $".writetest_{Guid.NewGuid()}");
+                File.WriteAllText(testFile, "");
+                File.Delete(testFile);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private static string GetUniquePath(string path)
+        {
+            if (!File.Exists(path)) return path;
+
+            var dir = Path.GetDirectoryName(path);
+            var name = Path.GetFileNameWithoutExtension(path);
+            var ext = Path.GetExtension(path);
+            var counter = 2;
+
+            while (File.Exists(path))
+            {
+                path = Path.Combine(dir, $"{name}_{counter}{ext}");
+                counter++;
             }
 
-            item.Entities.ForEach(entity =>
-            {
-                entity.IsVisible = !checkedColors.Contains(entity.Color.ToArgb())
-                                && !checkedLineTypes.Contains(entity.LineTypeName ?? "Continuous");
-            });
-
-            entityView1.Invalidate();
+            return path;
         }
 
-        private void checkedListBox2_DrawItem(object sender, DrawItemEventArgs e)
-        {
-            if (e.Index < 0) return;
-
-            e.DrawBackground();
-
-            var colorItem = (ColorItem)checkedListBox2.Items[e.Index];
-            var swatchRect = new Rectangle(e.Bounds.Left + 20, e.Bounds.Top + 2, 16, e.Bounds.Height - 4);
-
-            using (var brush = new SolidBrush(colorItem.Color))
-                e.Graphics.FillRectangle(brush, swatchRect);
-
-            e.Graphics.DrawRectangle(Pens.Gray, swatchRect);
-
-            var textRect = new Rectangle(swatchRect.Right + 4, e.Bounds.Top, e.Bounds.Width - swatchRect.Right - 4, e.Bounds.Height);
-            TextRenderer.DrawText(e.Graphics, colorItem.ToString(), e.Font, textRect, e.ForeColor, TextFormatFlags.VerticalCenter);
-
-            e.DrawFocusRectangle();
-        }
+        #endregion
     }
-
-    class CadConverterItem
-    {
-        public string Name { get; set; }
-
-        public string Customer { get; set; }
-
-        public int Quantity { get; set; }
-
-        [ReadOnly(true)]
-        public string Path { get; set; }
-
-        [Browsable(false)]
-        public List<Entity> Entities { get; set; }
-
-        [Browsable(false)]
-        public List<Drawing> SplitDrawings { get; set; }
-    }
-
-    class ColorItem
-    {
-        public int Argb { get; }
-        public Color Color { get; }
-
-        public ColorItem(Color color)
-        {
-            Color = color;
-            Argb = color.ToArgb();
-        }
-
-        public override string ToString() => $"RGB({Color.R}, {Color.G}, {Color.B})";
-        public override bool Equals(object obj) => obj is ColorItem other && Argb == other.Argb;
-        public override int GetHashCode() => Argb;
-    }
-
 }
