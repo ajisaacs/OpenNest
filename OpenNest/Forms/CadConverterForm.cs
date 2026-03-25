@@ -263,7 +263,7 @@ namespace OpenNest.Forms
                 // Assign bends from the source item — spatial filtering is a future enhancement
                 splitDrawing.Bends.AddRange(item.Bends);
 
-                var splitName = $"{baseName}_split{i + 1}.dxf";
+                var splitName = $"{baseName}-{i + 1}.dxf";
                 var splitPath = GetUniquePath(Path.Combine(writableDir, splitName));
 
                 splitWriter.Write(splitPath, splitDrawing);

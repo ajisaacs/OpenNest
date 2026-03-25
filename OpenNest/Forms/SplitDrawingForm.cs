@@ -74,7 +74,7 @@ public partial class SplitDrawingForm : Form
 
             if (axisIndex == 1)
             {
-                var usable = System.Math.Min(plateW, plateH) - 2 * spacing - overhang;
+                var usable = plateW - 2 * spacing - overhang;
                 if (usable > 0)
                 {
                     var splits = (int)System.Math.Ceiling(_drawingBounds.Width / usable) - 1;
@@ -88,7 +88,7 @@ public partial class SplitDrawingForm : Form
             }
             else if (axisIndex == 2)
             {
-                var usable = System.Math.Min(plateW, plateH) - 2 * spacing - overhang;
+                var usable = plateH - 2 * spacing - overhang;
                 if (usable > 0)
                 {
                     var splits = (int)System.Math.Ceiling(_drawingBounds.Length / usable) - 1;
@@ -379,6 +379,26 @@ public partial class SplitDrawingForm : Form
             var br = pnlPreview.PointWorldToGraph(r.Right, r.Bottom);
             g.FillRectangle(brush, System.Math.Min(tl.X, br.X), System.Math.Min(tl.Y, br.Y),
                 System.Math.Abs(br.X - tl.X), System.Math.Abs(br.Y - tl.Y));
+        }
+
+        // Piece number labels at center of each region
+        if (regions.Count > 1)
+        {
+            using var labelFont = new Font("Segoe UI", 14f, FontStyle.Bold, GraphicsUnit.Pixel);
+            using var labelBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255));
+            using var shadowBrush = new SolidBrush(Color.FromArgb(160, 0, 0, 0));
+            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+
+            for (var i = 0; i < regions.Count; i++)
+            {
+                var r = regions[i];
+                var center = pnlPreview.PointWorldToGraph(r.Center.X, r.Center.Y);
+                var label = (i + 1).ToString();
+
+                // Shadow offset for readability
+                g.DrawString(label, labelFont, shadowBrush, center.X + 1, center.Y + 1, sf);
+                g.DrawString(label, labelFont, labelBrush, center.X, center.Y, sf);
+            }
         }
 
         // Split lines — trimmed at feature positions with feature contours
