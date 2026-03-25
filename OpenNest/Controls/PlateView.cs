@@ -1,4 +1,5 @@
 ﻿using OpenNest.Actions;
+using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.Collections;
 using OpenNest.Engine.Fill;
@@ -133,6 +134,8 @@ namespace OpenNest.Controls
         public bool DrawBounds { get; set; }
 
         public bool DrawOffset { get; set; }
+
+        public bool ShowBendLines { get; set; }
 
         public double OffsetTolerance { get; set; } = 0.001;
 
@@ -578,6 +581,8 @@ namespace OpenNest.Controls
                     continue;
 
                 part.Draw(g, (i + 1).ToString());
+                DrawBendLines(g, part.BasePart);
+                DrawGrainWarning(g, part.BasePart);
             }
 
             // Draw preview parts — active (current strategy) takes precedence
@@ -612,6 +617,74 @@ namespace OpenNest.Controls
 
             if (DrawRapid)
                 DrawRapids(g);
+        }
+
+        private void DrawBendLines(Graphics g, Part part)
+        {
+            if (!ShowBendLines || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
+                return;
+
+            using var bendPen = new Pen(Color.Yellow, 1.5f)
+            {
+                DashStyle = System.Drawing.Drawing2D.DashStyle.Dash
+            };
+
+            foreach (var bend in part.BaseDrawing.Bends)
+            {
+                var start = bend.StartPoint;
+                var end = bend.EndPoint;
+
+                // Apply part rotation
+                if (part.Rotation != 0)
+                {
+                    start = start.Rotate(part.Rotation);
+                    end = end.Rotate(part.Rotation);
+                }
+
+                // Apply part offset
+                start = start + part.Location;
+                end = end + part.Location;
+
+                var pt1 = PointWorldToGraph(start);
+                var pt2 = PointWorldToGraph(end);
+
+                g.DrawLine(bendPen, pt1, pt2);
+            }
+        }
+
+        private void DrawGrainWarning(Graphics g, Part part)
+        {
+            if (!ShowBendLines || Plate == null || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
+                return;
+
+            var grainAngle = Plate.GrainAngle;
+            var tolerance = Angle.ToRadians(5);
+
+            foreach (var bend in part.BaseDrawing.Bends)
+            {
+                var bendAngle = bend.LineAngle + part.Rotation;
+                bendAngle = bendAngle % System.Math.PI;
+                if (bendAngle < 0) bendAngle += System.Math.PI;
+
+                var grainNormalized = grainAngle % System.Math.PI;
+                if (grainNormalized < 0) grainNormalized += System.Math.PI;
+
+                var diff = System.Math.Abs(bendAngle - grainNormalized);
+                diff = System.Math.Min(diff, System.Math.PI - diff);
+
+                if (diff > tolerance)
+                {
+                    var box = part.BaseDrawing.Program.BoundingBox();
+                    var location = part.Location;
+                    var pt1 = PointWorldToGraph(location);
+                    var pt2 = PointWorldToGraph(new Vector(
+                        location.X + box.Width, location.Y + box.Length));
+                    using var warnPen = new Pen(Color.FromArgb(180, 255, 140, 0), 2f);
+                    g.DrawRectangle(warnPen, pt1.X, pt2.Y,
+                        System.Math.Abs(pt2.X - pt1.X), System.Math.Abs(pt2.Y - pt1.Y));
+                    return;
+                }
+            }
         }
 
         private void DrawCutOffs(Graphics g)

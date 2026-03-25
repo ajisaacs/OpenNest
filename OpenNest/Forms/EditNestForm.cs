@@ -479,6 +479,12 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
+        public void ToggleBendLines()
+        {
+            PlateView.ShowBendLines = !PlateView.ShowBendLines;
+            PlateView.Invalidate();
+        }
+
         public void ToggleDrawOffset()
         {
             PlateView.DrawOffset = !PlateView.DrawOffset;
