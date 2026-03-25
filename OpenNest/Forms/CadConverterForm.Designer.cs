@@ -15,100 +15,155 @@ namespace OpenNest.Forms
 
         private void InitializeComponent()
         {
-            mainSplitter = new System.Windows.Forms.SplitContainer();
-            sidebarSplitter = new System.Windows.Forms.SplitContainer();
+            sidebarPanel = new System.Windows.Forms.Panel();
             fileList = new OpenNest.Controls.FileListControl();
             filterPanel = new OpenNest.Controls.FilterPanel();
-            rightPanel = new System.Windows.Forms.Panel();
+            splitterSidebar = new System.Windows.Forms.Splitter();
             entityView1 = new OpenNest.Controls.EntityView();
-            detailBar = new System.Windows.Forms.Panel();
+            detailBar = new System.Windows.Forms.FlowLayoutPanel();
+            lblQty = new System.Windows.Forms.Label();
+            numQuantity = new System.Windows.Forms.NumericUpDown();
+            lblCust = new System.Windows.Forms.Label();
+            txtCustomer = new System.Windows.Forms.TextBox();
             lblDimensions = new System.Windows.Forms.Label();
             lblEntityCount = new System.Windows.Forms.Label();
-            numQuantity = new System.Windows.Forms.NumericUpDown();
-            txtCustomer = new System.Windows.Forms.TextBox();
             btnSplit = new System.Windows.Forms.Button();
-            cboBendDetector = new System.Windows.Forms.ComboBox();
-            lblQty = new System.Windows.Forms.Label();
-            lblCust = new System.Windows.Forms.Label();
             lblDetect = new System.Windows.Forms.Label();
+            cboBendDetector = new System.Windows.Forms.ComboBox();
             bottomPanel1 = new OpenNest.Controls.BottomPanel();
             cancelButton = new System.Windows.Forms.Button();
             acceptButton = new System.Windows.Forms.Button();
 
-            ((System.ComponentModel.ISupportInitialize)mainSplitter).BeginInit();
-            mainSplitter.Panel1.SuspendLayout();
-            mainSplitter.Panel2.SuspendLayout();
-            mainSplitter.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)sidebarSplitter).BeginInit();
-            sidebarSplitter.Panel1.SuspendLayout();
-            sidebarSplitter.Panel2.SuspendLayout();
-            sidebarSplitter.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numQuantity).BeginInit();
+            sidebarPanel.SuspendLayout();
             bottomPanel1.SuspendLayout();
             SuspendLayout();
 
-            // mainSplitter (sidebar | preview)
-            mainSplitter.Dock = System.Windows.Forms.DockStyle.Fill;
-            mainSplitter.SplitterDistance = 260;
-            mainSplitter.SplitterWidth = 3;
-            mainSplitter.Panel1.Controls.Add(sidebarSplitter);
-            mainSplitter.Panel2.Controls.Add(rightPanel);
+            //
+            // sidebarPanel (Left dock — contains file list + filter panel)
+            //
+            sidebarPanel.Dock = System.Windows.Forms.DockStyle.Left;
+            sidebarPanel.Name = "sidebarPanel";
+            sidebarPanel.Size = new System.Drawing.Size(260, 670);
+            sidebarPanel.Controls.Add(filterPanel);
+            sidebarPanel.Controls.Add(fileList);
 
-            // sidebarSplitter (file list | filter panel)
-            sidebarSplitter.Dock = System.Windows.Forms.DockStyle.Fill;
-            sidebarSplitter.Orientation = System.Windows.Forms.Orientation.Horizontal;
-            sidebarSplitter.SplitterDistance = 280;
-            sidebarSplitter.SplitterWidth = 3;
-            sidebarSplitter.Panel1.Controls.Add(fileList);
-            sidebarSplitter.Panel2.Controls.Add(filterPanel);
-
-            // fileList
-            fileList.Dock = System.Windows.Forms.DockStyle.Fill;
+            //
+            // fileList (Top of sidebar)
+            //
+            fileList.Dock = System.Windows.Forms.DockStyle.Top;
             fileList.AllowDrop = true;
+            fileList.Name = "fileList";
+            fileList.Size = new System.Drawing.Size(260, 300);
 
-            // filterPanel
+            //
+            // filterPanel (Fill remainder of sidebar)
+            //
             filterPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            filterPanel.Name = "filterPanel";
+            filterPanel.Size = new System.Drawing.Size(260, 370);
 
-            // rightPanel
-            rightPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            rightPanel.Controls.Add(entityView1);
-            rightPanel.Controls.Add(detailBar);
+            //
+            // splitterSidebar (between sidebar and preview)
+            //
+            splitterSidebar.Location = new System.Drawing.Point(260, 0);
+            splitterSidebar.Name = "splitterSidebar";
+            splitterSidebar.Size = new System.Drawing.Size(3, 670);
+            splitterSidebar.TabStop = false;
 
-            // entityView1
+            //
+            // entityView1 (Fill — main preview area)
+            //
             entityView1.BackColor = System.Drawing.Color.FromArgb(33, 40, 48);
             entityView1.Cursor = System.Windows.Forms.Cursors.Cross;
             entityView1.Dock = System.Windows.Forms.DockStyle.Fill;
+            entityView1.Name = "entityView1";
+            entityView1.Size = new System.Drawing.Size(761, 634);
 
-            // detailBar
+            //
+            // detailBar (Bottom of preview area)
+            //
             detailBar.Dock = System.Windows.Forms.DockStyle.Bottom;
-            detailBar.Height = 36;
+            detailBar.Name = "detailBar";
+            detailBar.Size = new System.Drawing.Size(761, 36);
             detailBar.BackColor = System.Drawing.Color.FromArgb(245, 245, 245);
-            detailBar.Padding = new System.Windows.Forms.Padding(6, 4, 6, 4);
+            detailBar.Padding = new System.Windows.Forms.Padding(4, 6, 4, 4);
+            detailBar.WrapContents = false;
 
-            lblQty = new System.Windows.Forms.Label { Text = "Qty:", AutoSize = true, Location = new System.Drawing.Point(6, 9), Font = new System.Drawing.Font("Segoe UI", 9f) };
-            numQuantity.Location = new System.Drawing.Point(35, 5);
+            //
+            // lblQty
+            //
+            lblQty.Text = "Qty:";
+            lblQty.AutoSize = true;
+            lblQty.Font = new System.Drawing.Font("Segoe UI", 9f);
+            lblQty.Margin = new System.Windows.Forms.Padding(2, 3, 0, 0);
+
+            //
+            // numQuantity
+            //
             numQuantity.Size = new System.Drawing.Size(50, 24);
             numQuantity.Minimum = 1;
             numQuantity.Maximum = 9999;
             numQuantity.Value = 1;
             numQuantity.Font = new System.Drawing.Font("Segoe UI", 9f);
+            numQuantity.Margin = new System.Windows.Forms.Padding(2, 0, 8, 0);
 
-            lblCust = new System.Windows.Forms.Label { Text = "Customer:", AutoSize = true, Location = new System.Drawing.Point(95, 9), Font = new System.Drawing.Font("Segoe UI", 9f) };
-            txtCustomer.Location = new System.Drawing.Point(165, 5);
-            txtCustomer.Size = new System.Drawing.Size(120, 24);
+            //
+            // lblCust
+            //
+            lblCust.Text = "Customer:";
+            lblCust.AutoSize = true;
+            lblCust.Font = new System.Drawing.Font("Segoe UI", 9f);
+            lblCust.Margin = new System.Windows.Forms.Padding(2, 3, 0, 0);
+
+            //
+            // txtCustomer
+            //
+            txtCustomer.Size = new System.Drawing.Size(100, 24);
             txtCustomer.Font = new System.Drawing.Font("Segoe UI", 9f);
             txtCustomer.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            txtCustomer.Margin = new System.Windows.Forms.Padding(2, 0, 8, 0);
 
-            lblDimensions = new System.Windows.Forms.Label { AutoSize = true, Location = new System.Drawing.Point(300, 9), Font = new System.Drawing.Font("Segoe UI", 9f), ForeColor = System.Drawing.Color.Gray };
-            lblEntityCount = new System.Windows.Forms.Label { AutoSize = true, Location = new System.Drawing.Point(420, 9), Font = new System.Drawing.Font("Segoe UI", 9f), ForeColor = System.Drawing.Color.Gray };
+            //
+            // lblDimensions
+            //
+            lblDimensions.AutoSize = true;
+            lblDimensions.Font = new System.Drawing.Font("Segoe UI", 9f);
+            lblDimensions.ForeColor = System.Drawing.Color.Gray;
+            lblDimensions.Margin = new System.Windows.Forms.Padding(2, 3, 8, 0);
 
-            btnSplit = new System.Windows.Forms.Button { Text = "Split...", Location = new System.Drawing.Point(520, 4), Size = new System.Drawing.Size(60, 28), FlatStyle = System.Windows.Forms.FlatStyle.Flat, Font = new System.Drawing.Font("Segoe UI", 9f) };
+            //
+            // lblEntityCount
+            //
+            lblEntityCount.AutoSize = true;
+            lblEntityCount.Font = new System.Drawing.Font("Segoe UI", 9f);
+            lblEntityCount.ForeColor = System.Drawing.Color.Gray;
+            lblEntityCount.Margin = new System.Windows.Forms.Padding(2, 3, 8, 0);
 
-            lblDetect = new System.Windows.Forms.Label { Text = "Bends:", AutoSize = true, Location = new System.Drawing.Point(590, 9), Font = new System.Drawing.Font("Segoe UI", 9f) };
-            cboBendDetector.Location = new System.Drawing.Point(638, 5);
-            cboBendDetector.Size = new System.Drawing.Size(100, 24);
+            //
+            // btnSplit
+            //
+            btnSplit.Text = "Split...";
+            btnSplit.Size = new System.Drawing.Size(60, 24);
+            btnSplit.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnSplit.Font = new System.Drawing.Font("Segoe UI", 9f);
+            btnSplit.Margin = new System.Windows.Forms.Padding(2, 0, 8, 0);
+
+            //
+            // lblDetect
+            //
+            lblDetect.Text = "Bends:";
+            lblDetect.AutoSize = true;
+            lblDetect.Font = new System.Drawing.Font("Segoe UI", 9f);
+            lblDetect.Margin = new System.Windows.Forms.Padding(2, 3, 0, 0);
+
+            //
+            // cboBendDetector
+            //
+            cboBendDetector.Size = new System.Drawing.Size(90, 24);
             cboBendDetector.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             cboBendDetector.Font = new System.Drawing.Font("Segoe UI", 9f);
+            cboBendDetector.Margin = new System.Windows.Forms.Padding(2, 0, 0, 0);
 
             detailBar.Controls.AddRange(new System.Windows.Forms.Control[] {
                 lblQty, numQuantity, lblCust, txtCustomer,
@@ -116,32 +171,47 @@ namespace OpenNest.Forms
                 lblDetect, cboBendDetector
             });
 
+            //
             // bottomPanel1
+            //
             bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            bottomPanel1.Height = 50;
+            bottomPanel1.Name = "bottomPanel1";
+            bottomPanel1.Size = new System.Drawing.Size(1024, 50);
             bottomPanel1.Controls.Add(cancelButton);
             bottomPanel1.Controls.Add(acceptButton);
 
+            //
+            // cancelButton
+            //
             cancelButton.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
             cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            cancelButton.Location = new System.Drawing.Point(826, 10);
+            cancelButton.Location = new System.Drawing.Point(922, 10);
             cancelButton.Size = new System.Drawing.Size(90, 28);
             cancelButton.Text = "Cancel";
             cancelButton.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             cancelButton.Font = new System.Drawing.Font("Segoe UI", 9f);
 
+            //
+            // acceptButton
+            //
             acceptButton.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
             acceptButton.DialogResult = System.Windows.Forms.DialogResult.OK;
-            acceptButton.Location = new System.Drawing.Point(730, 10);
+            acceptButton.Location = new System.Drawing.Point(826, 10);
             acceptButton.Size = new System.Drawing.Size(90, 28);
             acceptButton.Text = "Accept";
             acceptButton.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             acceptButton.Font = new System.Drawing.Font("Segoe UI", 9f);
 
+            //
             // CadConverterForm
+            // Add order: Fill last so it gets remaining space
+            //
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             ClientSize = new System.Drawing.Size(1024, 720);
-            Controls.Add(mainSplitter);
+            Controls.Add(entityView1);
+            Controls.Add(detailBar);
+            Controls.Add(splitterSidebar);
+            Controls.Add(sidebarPanel);
             Controls.Add(bottomPanel1);
             Font = new System.Drawing.Font("Segoe UI", 9f);
             MinimizeBox = false;
@@ -151,24 +221,20 @@ namespace OpenNest.Forms
             Text = "CAD Converter";
             AllowDrop = true;
 
-            ((System.ComponentModel.ISupportInitialize)mainSplitter).EndInit();
-            mainSplitter.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)sidebarSplitter).EndInit();
-            sidebarSplitter.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)numQuantity).EndInit();
+            sidebarPanel.ResumeLayout(false);
             bottomPanel1.ResumeLayout(false);
             ResumeLayout(false);
         }
 
         #endregion
 
-        private System.Windows.Forms.SplitContainer mainSplitter;
-        private System.Windows.Forms.SplitContainer sidebarSplitter;
+        private System.Windows.Forms.Panel sidebarPanel;
+        private System.Windows.Forms.Splitter splitterSidebar;
         private Controls.FileListControl fileList;
         private Controls.FilterPanel filterPanel;
-        private System.Windows.Forms.Panel rightPanel;
         private Controls.EntityView entityView1;
-        private System.Windows.Forms.Panel detailBar;
+        private System.Windows.Forms.FlowLayoutPanel detailBar;
         private System.Windows.Forms.Label lblDimensions;
         private System.Windows.Forms.Label lblEntityCount;
         private System.Windows.Forms.NumericUpDown numQuantity;
