@@ -87,4 +87,30 @@ public class BendModelTests
         Assert.Contains("90", str);
         Assert.Contains("0.06", str);
     }
+
+    [Fact]
+    public void SourceEntity_DefaultsToNull()
+    {
+        var bend = new Bend
+        {
+            StartPoint = new Vector(0, 0),
+            EndPoint = new Vector(10, 0),
+            Direction = BendDirection.Down,
+            Angle = 90
+        };
+        Assert.Null(bend.SourceEntity);
+    }
+
+    [Fact]
+    public void SourceEntity_StoresReference()
+    {
+        var line = new Line(new Vector(0, 0), new Vector(10, 0));
+        var bend = new Bend
+        {
+            StartPoint = line.StartPoint,
+            EndPoint = line.EndPoint,
+            SourceEntity = line
+        };
+        Assert.Same(line, bend.SourceEntity);
+    }
 }

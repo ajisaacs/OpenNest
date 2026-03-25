@@ -12,6 +12,9 @@ namespace OpenNest.Bending
         public double? Radius { get; set; }
         public string NoteText { get; set; }
 
+        [System.Text.Json.Serialization.JsonIgnore]
+        public Entity SourceEntity { get; set; }
+
         public double Length => StartPoint.DistanceTo(EndPoint);
 
         public double AngleRadians => Angle.HasValue
