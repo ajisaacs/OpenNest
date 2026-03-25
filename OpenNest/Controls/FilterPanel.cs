@@ -19,6 +19,7 @@ namespace OpenNest.Controls
         private readonly CheckedListBox colorsList;
         private readonly CheckedListBox lineTypesList;
         private readonly ListBox bendLinesList;
+        private readonly LinkLabel bendAddLink;
 
         private List<Entity> currentEntities;
         private List<Bend> currentBends;
@@ -26,6 +27,7 @@ namespace OpenNest.Controls
         public event EventHandler FilterChanged;
         public event EventHandler<int> BendLineSelected;
         public event EventHandler<int> BendLineRemoved;
+        public event EventHandler AddBendLineClicked;
 
         public FilterPanel()
         {
@@ -51,9 +53,8 @@ namespace OpenNest.Controls
 
             var bendDeleteLink = new LinkLabel
             {
-                Text = "Remove Selected",
-                Dock = DockStyle.Bottom,
-                Height = 20,
+                Text = "Remove",
+                AutoSize = true,
                 Font = new Font("Segoe UI", 8f)
             };
             bendDeleteLink.LinkClicked += (s, e) =>
@@ -62,8 +63,27 @@ namespace OpenNest.Controls
                     BendLineRemoved?.Invoke(this, bendLinesList.SelectedIndex);
             };
 
+            bendAddLink = new LinkLabel
+            {
+                Text = "Add Bend Line",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8f)
+            };
+            bendAddLink.LinkClicked += (s, e) =>
+                AddBendLineClicked?.Invoke(this, EventArgs.Empty);
+
+            var bendLinksPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 20,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+            bendLinksPanel.Controls.Add(bendAddLink);
+            bendLinksPanel.Controls.Add(bendDeleteLink);
+
             bendLinesPanel.ContentPanel.Controls.Add(bendLinesList);
-            bendLinesPanel.ContentPanel.Controls.Add(bendDeleteLink);
+            bendLinesPanel.ContentPanel.Controls.Add(bendLinksPanel);
 
             // Line Types
             lineTypesPanel = new CollapsiblePanel
@@ -236,6 +256,12 @@ namespace OpenNest.Controls
             e.Graphics.DrawRectangle(Pens.Gray, swatchRect);
 
             e.DrawFocusRectangle();
+        }
+
+        public void SetPickMode(bool active)
+        {
+            bendAddLink.Text = active ? "Cancel (Esc)" : "Add Bend Line";
+            bendAddLink.LinkColor = active ? Color.OrangeRed : Color.Empty;
         }
     }
 
