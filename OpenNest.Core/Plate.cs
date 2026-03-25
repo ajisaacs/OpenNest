@@ -89,6 +89,11 @@ namespace OpenNest
         public Material Material { get; set; }
 
         /// <summary>
+        /// Material grain direction in radians. 0 = horizontal.
+        /// </summary>
+        public double GrainAngle { get; set; }
+
+        /// <summary>
         /// The parts that the plate contains.
         /// </summary>
         public ObservableList<Part> Parts { get; set; }

@@ -1,6 +1,8 @@
-﻿using OpenNest.CNC;
+﻿using OpenNest.Bending;
+using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
@@ -61,6 +63,8 @@ namespace OpenNest
         public NestConstraints Constraints { get; set; }
 
         public SourceInfo Source { get; set; }
+
+        public List<Bend> Bends { get; set; } = new List<Bend>();
 
         public double Area { get; protected set; }
 
