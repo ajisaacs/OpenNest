@@ -17,8 +17,12 @@ namespace OpenNest.IO.Bending
         public double MaxBendRadius { get; set; } = 4.0;
 
         private static readonly Regex BendNoteRegex = new Regex(
-            @"\b(?<direction>UP|DOWN|DN)\s+(?<angle>\d+(\.\d+)?)°?\s*R\s*(?<radius>\d+(\.\d+)?)\b",
+            @"(?<direction>UP|DOWN|DN)\s+(?<angle>\d+(\.\d+)?)[^A-Z\d]*R\s*(?<radius>\d+(\.\d+)?)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        private static readonly Regex MTextFormatRegex = new Regex(
+            @"\\[fHCTQWASpOoLlKk][^;]*;|\\P|[{}]|%%[dDpPcC]",
+            RegexOptions.Compiled);
 
         public List<Bend> DetectBends(CadDocument document)
         {
@@ -45,9 +49,10 @@ namespace OpenNest.IO.Bending
                 var note = FindClosestBendNote(line, bendNotes);
                 if (note != null)
                 {
-                    bend.Direction = GetBendDirection(note.Value);
-                    bend.NoteText = note.Value;
-                    ParseBendNote(note.Value, bend);
+                    var noteText = StripMTextFormatting(note.Value);
+                    bend.Direction = GetBendDirection(noteText);
+                    bend.NoteText = noteText;
+                    ParseBendNote(noteText, bend);
                 }
 
                 if (!bend.Radius.HasValue || bend.Radius.Value <= MaxBendRadius)
@@ -104,6 +109,24 @@ namespace OpenNest.IO.Bending
                 if (double.TryParse(match.Groups["angle"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var angle))
                     bend.Angle = angle;
             }
+        }
+
+        private static string StripMTextFormatting(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            // Replace known DXF special characters
+            var result = text
+                .Replace("%%d", "°").Replace("%%D", "°")
+                .Replace("%%p", "±").Replace("%%P", "±")
+                .Replace("%%c", "⌀").Replace("%%C", "⌀");
+
+            // Strip MText formatting codes and braces
+            result = MTextFormatRegex.Replace(result, " ");
+
+            // Collapse multiple spaces
+            return Regex.Replace(result.Trim(), @"\s+", " ");
         }
 
         private MText FindClosestBendNote(ACadSharp.Entities.Line bendLine, List<MText> notes)

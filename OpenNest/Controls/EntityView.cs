@@ -1,4 +1,5 @@
-﻿using OpenNest.Geometry;
+﻿using OpenNest.Bending;
+using OpenNest.Geometry;
 using OpenNest.Math;
 using System.Collections.Generic;
 using System.Drawing;
@@ -10,6 +11,8 @@ namespace OpenNest.Controls
     public class EntityView : DrawControl
     {
         public List<Entity> Entities;
+        public List<Bend> Bends = new List<Bend>();
+        public int SelectedBendIndex = -1;
 
         private readonly Pen gridPen = new Pen(Color.FromArgb(70, 70, 70));
         private readonly Dictionary<int, Pen> penCache = new Dictionary<int, Pen>();
@@ -48,6 +51,8 @@ namespace OpenNest.Controls
                 var pen = GetEntityPen(entity.Color);
                 DrawEntity(e.Graphics, entity, pen);
             }
+
+            DrawBendLines(e.Graphics);
 
 #if DRAW_OFFSET
 
@@ -106,6 +111,9 @@ namespace OpenNest.Controls
 
         private Pen GetEntityPen(Color color)
         {
+            if (color.IsEmpty || color.A == 0)
+                color = Color.White;
+
             // Clamp dark colors to ensure visibility on dark background
             var brightness = (color.R * 299 + color.G * 587 + color.B * 114) / 1000;
             if (brightness < 80)
@@ -128,6 +136,29 @@ namespace OpenNest.Controls
             foreach (var pen in penCache.Values)
                 pen.Dispose();
             penCache.Clear();
+        }
+
+        private void DrawBendLines(Graphics g)
+        {
+            if (Bends == null || Bends.Count == 0)
+                return;
+
+            using var bendPen = new Pen(Color.Yellow, 1.5f)
+            {
+                DashStyle = DashStyle.Dash
+            };
+            using var selectedPen = new Pen(Color.Cyan, 2.5f)
+            {
+                DashStyle = DashStyle.Dash
+            };
+
+            for (var i = 0; i < Bends.Count; i++)
+            {
+                var bend = Bends[i];
+                var pt1 = PointWorldToGraph(bend.StartPoint);
+                var pt2 = PointWorldToGraph(bend.EndPoint);
+                g.DrawLine(i == SelectedBendIndex ? selectedPen : bendPen, pt1, pt2);
+            }
         }
 
         protected override void Dispose(bool disposing)

@@ -59,9 +59,11 @@ namespace OpenNest.Converters
             if (mode == Mode.Incremental)
                 pt += curpos;
 
+            var layer = ConvertLayer(linearMove.Layer);
             var line = new Line(curpos, pt)
             {
-                Layer = ConvertLayer(linearMove.Layer)
+                Layer = layer,
+                Color = layer.Color
             };
             geometry.Add(line);
             curpos = pt;
@@ -76,7 +78,8 @@ namespace OpenNest.Converters
 
             var line = new Line(curpos, pt)
             {
-                Layer = SpecialLayers.Rapid
+                Layer = SpecialLayers.Rapid,
+                Color = SpecialLayers.Rapid.Color
             };
             geometry.Add(line);
             curpos = pt;
@@ -103,9 +106,9 @@ namespace OpenNest.Converters
             var layer = ConvertLayer(arcMove.Layer);
 
             if (startAngle.IsEqualTo(endAngle))
-                geometry.Add(new Circle(center, radius) { Layer = layer });
+                geometry.Add(new Circle(center, radius) { Layer = layer, Color = layer.Color });
             else
-                geometry.Add(new Arc(center, radius, startAngle, endAngle, arcMove.Rotation == RotationType.CW) { Layer = layer });
+                geometry.Add(new Arc(center, radius, startAngle, endAngle, arcMove.Rotation == RotationType.CW) { Layer = layer, Color = layer.Color });
 
             curpos = endpt;
         }

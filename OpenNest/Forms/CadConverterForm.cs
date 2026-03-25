@@ -134,6 +134,7 @@ namespace OpenNest.Forms
             entityView1.ClearPenCache();
             entityView1.Entities.Clear();
             entityView1.Entities.AddRange(item.Entities);
+            entityView1.Bends = item.Bends ?? new List<Bend>();
 
             item.Entities.ForEach(e => e.IsVisible = true);
             if (item.Entities.Any(e => e.Layer != null))
@@ -174,7 +175,7 @@ namespace OpenNest.Forms
 
         private void OnBendLineSelected(object sender, int index)
         {
-            // TODO: Highlight bend line in EntityView
+            entityView1.SelectedBendIndex = index;
             entityView1.Invalidate();
         }
 
@@ -184,6 +185,8 @@ namespace OpenNest.Forms
             if (item == null || index < 0 || index >= item.Bends.Count) return;
 
             item.Bends.RemoveAt(index);
+            entityView1.Bends = item.Bends;
+            entityView1.SelectedBendIndex = -1;
             filterPanel.LoadItem(item.Entities, item.Bends);
             entityView1.Invalidate();
         }
