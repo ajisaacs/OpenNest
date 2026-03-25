@@ -19,19 +19,11 @@ public static class AutoSplitCalculator
         if (verticalSplits < 0) verticalSplits = 0;
         if (horizontalSplits < 0) horizontalSplits = 0;
 
-        if (verticalSplits > 0)
-        {
-            var spacing = partBounds.Width / (verticalSplits + 1);
-            for (var i = 1; i <= verticalSplits; i++)
-                lines.Add(new SplitLine(partBounds.X + spacing * i, CutOffAxis.Vertical));
-        }
+        for (var i = 1; i <= verticalSplits; i++)
+            lines.Add(new SplitLine(partBounds.X + usableWidth * i, CutOffAxis.Vertical));
 
-        if (horizontalSplits > 0)
-        {
-            var spacing = partBounds.Length / (horizontalSplits + 1);
-            for (var i = 1; i <= horizontalSplits; i++)
-                lines.Add(new SplitLine(partBounds.Y + spacing * i, CutOffAxis.Horizontal));
-        }
+        for (var i = 1; i <= horizontalSplits; i++)
+            lines.Add(new SplitLine(partBounds.Y + usableHeight * i, CutOffAxis.Horizontal));
 
         return lines;
     }

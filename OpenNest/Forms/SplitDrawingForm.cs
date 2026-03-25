@@ -18,6 +18,7 @@ public partial class SplitDrawingForm : Form
     private readonly List<SplitLine> _splitLines = new();
     private CutOffAxis _currentAxis = CutOffAxis.Vertical;
     private bool _placingLine;
+    private Vector _placingCursor;
 
     // Feature handle drag state
     private int _dragLineIndex = -1;
@@ -78,12 +79,8 @@ public partial class SplitDrawingForm : Form
                 if (usable > 0)
                 {
                     var splits = (int)System.Math.Ceiling(_drawingBounds.Width / usable) - 1;
-                    if (splits > 0)
-                    {
-                        var step = _drawingBounds.Width / (splits + 1);
-                        for (var i = 1; i <= splits; i++)
-                            _splitLines.Add(new SplitLine(_drawingBounds.X + step * i, CutOffAxis.Vertical));
-                    }
+                    for (var i = 1; i <= splits; i++)
+                        _splitLines.Add(new SplitLine(_drawingBounds.X + usable * i, CutOffAxis.Vertical));
                 }
             }
             else if (axisIndex == 2)
@@ -92,12 +89,8 @@ public partial class SplitDrawingForm : Form
                 if (usable > 0)
                 {
                     var splits = (int)System.Math.Ceiling(_drawingBounds.Length / usable) - 1;
-                    if (splits > 0)
-                    {
-                        var step = _drawingBounds.Length / (splits + 1);
-                        for (var i = 1; i <= splits; i++)
-                            _splitLines.Add(new SplitLine(_drawingBounds.Y + step * i, CutOffAxis.Horizontal));
-                    }
+                    for (var i = 1; i <= splits; i++)
+                        _splitLines.Add(new SplitLine(_drawingBounds.Y + usable * i, CutOffAxis.Horizontal));
                 }
             }
             else
@@ -293,6 +286,12 @@ public partial class SplitDrawingForm : Form
             }
         }
 
+        if (_placingLine)
+        {
+            _placingCursor = SnapToMidpoint(worldPt);
+            pnlPreview.Invalidate();
+        }
+
         lblCursor.Text = $"Cursor: {worldPt.X:F2}, {worldPt.Y:F2}";
     }
 
@@ -339,6 +338,7 @@ public partial class SplitDrawingForm : Form
         if (keyData == Keys.Space)
         {
             _currentAxis = _currentAxis == CutOffAxis.Vertical ? CutOffAxis.Horizontal : CutOffAxis.Vertical;
+            pnlPreview.Invalidate();
             return true;
         }
         if (keyData == Keys.Escape)
@@ -381,10 +381,11 @@ public partial class SplitDrawingForm : Form
                 System.Math.Abs(br.X - tl.X), System.Math.Abs(br.Y - tl.Y));
         }
 
-        // Piece number labels at center of each region
+        // Piece number and dimension labels at center of each region
         if (regions.Count > 1)
         {
             using var labelFont = new Font("Segoe UI", 14f, FontStyle.Bold, GraphicsUnit.Pixel);
+            using var dimFont = new Font("Segoe UI", 11f, FontStyle.Regular, GraphicsUnit.Pixel);
             using var labelBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255));
             using var shadowBrush = new SolidBrush(Color.FromArgb(160, 0, 0, 0));
             var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
@@ -394,10 +395,13 @@ public partial class SplitDrawingForm : Form
                 var r = regions[i];
                 var center = pnlPreview.PointWorldToGraph(r.Center.X, r.Center.Y);
                 var label = (i + 1).ToString();
+                var dim = $"{r.Width:F2} x {r.Length:F2}";
 
                 // Shadow offset for readability
-                g.DrawString(label, labelFont, shadowBrush, center.X + 1, center.Y + 1, sf);
-                g.DrawString(label, labelFont, labelBrush, center.X, center.Y, sf);
+                g.DrawString(label, labelFont, shadowBrush, center.X + 1, center.Y - 7, sf);
+                g.DrawString(label, labelFont, labelBrush, center.X, center.Y - 8, sf);
+                g.DrawString(dim, dimFont, shadowBrush, center.X + 1, center.Y + 9, sf);
+                g.DrawString(dim, dimFont, labelBrush, center.X, center.Y + 8, sf);
             }
         }
 
@@ -467,6 +471,33 @@ public partial class SplitDrawingForm : Form
                     g.DrawLine(splitPen, p1, p2);
                 }
             }
+        }
+
+        // Placement preview line
+        if (_placingLine && _placingCursor != null)
+        {
+            var isVert = _currentAxis == CutOffAxis.Vertical;
+            var snapped = _placingCursor;
+            var pos = isVert ? snapped.X : snapped.Y;
+            var margin = 10.0;
+
+            PointF pp1, pp2;
+            if (isVert)
+            {
+                pp1 = pnlPreview.PointWorldToGraph(pos, _drawingBounds.Bottom - margin);
+                pp2 = pnlPreview.PointWorldToGraph(pos, _drawingBounds.Top + margin);
+            }
+            else
+            {
+                pp1 = pnlPreview.PointWorldToGraph(_drawingBounds.Left - margin, pos);
+                pp2 = pnlPreview.PointWorldToGraph(_drawingBounds.Right + margin, pos);
+            }
+
+            using var previewPen = new Pen(Color.FromArgb(180, 255, 213, 79), 1.5f);
+            previewPen.DashStyle = DashStyle.DashDot;
+            g.DrawLine(previewPen, pp1, pp2);
+
+
         }
 
         // Feature position handles

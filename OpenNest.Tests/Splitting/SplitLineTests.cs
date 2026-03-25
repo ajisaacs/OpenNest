@@ -42,7 +42,7 @@ public class AutoSplitCalculatorTests
 
         Assert.Single(lines);
         Assert.Equal(CutOffAxis.Vertical, lines[0].Axis);
-        Assert.Equal(50.0, lines[0].Position, 1);
+        Assert.Equal(58.0, lines[0].Position, 1);
     }
 
     [Fact]
