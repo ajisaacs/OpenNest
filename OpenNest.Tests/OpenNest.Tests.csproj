@@ -28,4 +28,10 @@
     <ProjectReference Include="..\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Bending\TestData\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

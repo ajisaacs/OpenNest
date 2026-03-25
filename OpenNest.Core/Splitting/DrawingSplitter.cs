@@ -47,7 +47,7 @@ public static class DrawingSplitter
             allEntities.AddRange(pieceEntities);
             allEntities.AddRange(cutoutEntities);
 
-            var piece = BuildPieceDrawing(drawing, allEntities, pieceIndex);
+            var piece = BuildPieceDrawing(drawing, allEntities, pieceIndex, region);
             results.Add(piece);
             pieceIndex++;
         }
@@ -80,7 +80,7 @@ public static class DrawingSplitter
         return entities;
     }
 
-    private static Drawing BuildPieceDrawing(Drawing source, List<Entity> entities, int pieceIndex)
+    private static Drawing BuildPieceDrawing(Drawing source, List<Entity> entities, int pieceIndex, Box region)
     {
         var pieceBounds = entities.Select(e => e.BoundingBox).ToList().GetBoundingBox();
         var offsetX = -pieceBounds.X;
@@ -98,7 +98,67 @@ public static class DrawingSplitter
         piece.Customer = source.Customer;
         piece.Source = source.Source;
         piece.Quantity.Required = source.Quantity.Required;
+
+        if (source.Bends != null && source.Bends.Count > 0)
+        {
+            piece.Bends = new List<Bending.Bend>();
+            foreach (var bend in source.Bends)
+            {
+                var clipped = ClipLineToBox(bend.StartPoint, bend.EndPoint, region);
+                if (clipped == null)
+                    continue;
+
+                piece.Bends.Add(new Bending.Bend
+                {
+                    StartPoint = new Vector(clipped.Value.Start.X + offsetX, clipped.Value.Start.Y + offsetY),
+                    EndPoint = new Vector(clipped.Value.End.X + offsetX, clipped.Value.End.Y + offsetY),
+                    Direction = bend.Direction,
+                    Angle = bend.Angle,
+                    Radius = bend.Radius,
+                    NoteText = bend.NoteText,
+                });
+            }
+        }
+
         return piece;
+    }
+
+    /// <summary>
+    /// Clips a line segment to an axis-aligned box using Liang-Barsky algorithm.
+    /// Returns the clipped start/end or null if the line is entirely outside.
+    /// </summary>
+    private static (Vector Start, Vector End)? ClipLineToBox(Vector start, Vector end, Box box)
+    {
+        var dx = end.X - start.X;
+        var dy = end.Y - start.Y;
+        double t0 = 0, t1 = 1;
+
+        double[] p = { -dx, dx, -dy, dy };
+        double[] q = { start.X - box.Left, box.Right - start.X, start.Y - box.Bottom, box.Top - start.Y };
+
+        for (var i = 0; i < 4; i++)
+        {
+            if (System.Math.Abs(p[i]) < Math.Tolerance.Epsilon)
+            {
+                if (q[i] < -Math.Tolerance.Epsilon)
+                    return null;
+            }
+            else
+            {
+                var t = q[i] / p[i];
+                if (p[i] < 0)
+                    t0 = System.Math.Max(t0, t);
+                else
+                    t1 = System.Math.Min(t1, t);
+
+                if (t0 > t1)
+                    return null;
+            }
+        }
+
+        var clippedStart = new Vector(start.X + t0 * dx, start.Y + t0 * dy);
+        var clippedEnd = new Vector(start.X + t1 * dx, start.Y + t1 * dy);
+        return (clippedStart, clippedEnd);
     }
 
     private static void DecomposeCircles(ShapeProfile profile)

@@ -231,14 +231,25 @@ namespace OpenNest.Forms
             shape.Cutouts.ForEach(c => drawEntities.AddRange(c.Entities));
 
             var pgm = ConvertGeometry.ToProgram(drawEntities);
+            var originOffset = Vector.Zero;
             if (pgm.Codes.Count > 0 && pgm[0].Type == CodeType.RapidMove)
             {
                 var rapid = (RapidMove)pgm[0];
-                pgm.Offset(-rapid.EndPoint);
+                originOffset = rapid.EndPoint;
+                pgm.Offset(-originOffset);
                 pgm.Codes.RemoveAt(0);
             }
 
             var drawing = new Drawing(item.Name, pgm);
+            drawing.Bends = item.Bends.Select(b => new Bend
+            {
+                StartPoint = new Vector(b.StartPoint.X - originOffset.X, b.StartPoint.Y - originOffset.Y),
+                EndPoint = new Vector(b.EndPoint.X - originOffset.X, b.EndPoint.Y - originOffset.Y),
+                Direction = b.Direction,
+                Angle = b.Angle,
+                Radius = b.Radius,
+                NoteText = b.NoteText,
+            }).ToList();
 
             using var form = new SplitDrawingForm(drawing);
             if (form.ShowDialog(this) != DialogResult.OK || form.ResultDrawings?.Count <= 1)
@@ -255,25 +266,41 @@ namespace OpenNest.Forms
             var newItems = new List<string>();
 
             var splitWriter = new SplitDxfWriter();
+            var splitItems = new List<FileListItem>();
 
             for (var i = 0; i < form.ResultDrawings.Count; i++)
             {
                 var splitDrawing = form.ResultDrawings[i];
-
-                // Assign bends from the source item — spatial filtering is a future enhancement
-                splitDrawing.Bends.AddRange(item.Bends);
 
                 var splitName = $"{baseName}-{i + 1}.dxf";
                 var splitPath = GetUniquePath(Path.Combine(writableDir, splitName));
 
                 splitWriter.Write(splitPath, splitDrawing);
                 newItems.Add(splitPath);
+
+                // Re-import geometry but keep bends from the split drawing
+                var importer = new DxfImporter();
+                importer.SplinePrecision = Settings.Default.ImportSplinePrecision;
+                var result = importer.Import(splitPath);
+
+                var splitItem = new FileListItem
+                {
+                    Name = Path.GetFileNameWithoutExtension(splitPath),
+                    Entities = result.Entities,
+                    Path = splitPath,
+                    Quantity = item.Quantity,
+                    Customer = item.Customer,
+                    Bends = splitDrawing.Bends ?? new List<Bend>(),
+                    Bounds = result.Entities.GetBoundingBox(),
+                    EntityCount = result.Entities.Count
+                };
+                splitItems.Add(splitItem);
             }
 
-            // Remove original and add split files
+            // Remove original and add split items directly (preserving bend info)
             fileList.RemoveAt(index);
-            foreach (var path in newItems)
-                AddFile(path);
+            foreach (var splitItem in splitItems)
+                fileList.AddItem(splitItem);
 
             if (writableDir != sourceDir)
                 MessageBox.Show($"Split files written to: {writableDir}", "Split Output",

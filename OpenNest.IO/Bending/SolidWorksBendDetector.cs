@@ -24,6 +24,10 @@ namespace OpenNest.IO.Bending
             @"\\[fHCTQWASpOoLlKk][^;]*;|\\P|[{}]|%%[dDpPcC]",
             RegexOptions.Compiled);
 
+        private static readonly Regex UnicodeEscapeRegex = new Regex(
+            @"\\U\+([0-9A-Fa-f]{4})",
+            RegexOptions.Compiled);
+
         public List<Bend> DetectBends(CadDocument document)
         {
             var bendLines = FindBendLines(document);
@@ -116,8 +120,15 @@ namespace OpenNest.IO.Bending
             if (string.IsNullOrEmpty(text))
                 return text;
 
+            // Convert \U+XXXX DXF unicode escapes to actual characters
+            var result = UnicodeEscapeRegex.Replace(text, m =>
+            {
+                var codePoint = int.Parse(m.Groups[1].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                return char.ConvertFromUtf32(codePoint);
+            });
+
             // Replace known DXF special characters
-            var result = text
+            result = result
                 .Replace("%%d", "°").Replace("%%D", "°")
                 .Replace("%%p", "±").Replace("%%P", "±")
                 .Replace("%%c", "⌀").Replace("%%C", "⌀");
