@@ -50,6 +50,7 @@ namespace OpenNest.IO
             public ConstraintsDto Constraints { get; init; } = new();
             public MaterialDto Material { get; init; } = new();
             public SourceDto Source { get; init; } = new();
+            public List<BendDto> Bends { get; init; } = new();
         }
 
         public record PlateDto
@@ -62,6 +63,7 @@ namespace OpenNest.IO
             public double PartSpacing { get; init; }
             public MaterialDto Material { get; init; } = new();
             public SpacingDto EdgeSpacing { get; init; } = new();
+            public double GrainAngle { get; init; }
             public List<PartDto> Parts { get; init; } = new();
             public List<CutOffDto> CutOffs { get; init; } = new();
         }
@@ -135,6 +137,18 @@ namespace OpenNest.IO
         {
             public double X { get; init; }
             public double Y { get; init; }
+        }
+
+        public record BendDto
+        {
+            public double StartX { get; init; }
+            public double StartY { get; init; }
+            public double EndX { get; init; }
+            public double EndY { get; init; }
+            public string Direction { get; init; } = "Unknown";
+            public double? Angle { get; init; }
+            public double? Radius { get; init; }
+            public string NoteText { get; init; } = "";
         }
 
         public record BestFitSetDto

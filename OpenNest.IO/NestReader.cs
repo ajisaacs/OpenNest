@@ -1,3 +1,4 @@
+using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
@@ -90,6 +91,23 @@ namespace OpenNest.IO
                 drawing.Material = new Material(d.Material.Name, d.Material.Grade, d.Material.Density);
                 drawing.Source.Path = d.Source.Path;
                 drawing.Source.Offset = new Vector(d.Source.Offset.X, d.Source.Offset.Y);
+
+                if (d.Bends != null)
+                {
+                    foreach (var b in d.Bends)
+                    {
+                        drawing.Bends.Add(new Bend
+                        {
+                            StartPoint = new Vector(b.StartX, b.StartY),
+                            EndPoint = new Vector(b.EndX, b.EndY),
+                            Direction = Enum.TryParse<BendDirection>(b.Direction, true, out var dir)
+                                ? dir : BendDirection.Unknown,
+                            Angle = b.Angle,
+                            Radius = b.Radius,
+                            NoteText = b.NoteText
+                        });
+                    }
+                }
 
                 if (programs.TryGetValue(d.Id, out var pgm))
                     drawing.Program = pgm;
@@ -186,6 +204,7 @@ namespace OpenNest.IO
                 plate.PartSpacing = p.PartSpacing;
                 plate.Material = new Material(p.Material.Name, p.Material.Grade, p.Material.Density);
                 plate.EdgeSpacing = new Spacing(p.EdgeSpacing.Left, p.EdgeSpacing.Bottom, p.EdgeSpacing.Right, p.EdgeSpacing.Top);
+                plate.GrainAngle = p.GrainAngle;
 
                 foreach (var partDto in p.Parts)
                 {

@@ -1,3 +1,4 @@
+using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.Engine.BestFit;
 using System;
@@ -140,7 +141,18 @@ namespace OpenNest.IO
                     {
                         Path = d.Source.Path ?? "",
                         Offset = new OffsetDto { X = d.Source.Offset.X, Y = d.Source.Offset.Y }
-                    }
+                    },
+                    Bends = d.Bends?.Select(b => new BendDto
+                    {
+                        StartX = b.StartPoint.X,
+                        StartY = b.StartPoint.Y,
+                        EndX = b.EndPoint.X,
+                        EndY = b.EndPoint.Y,
+                        Direction = b.Direction.ToString(),
+                        Angle = b.Angle,
+                        Radius = b.Radius,
+                        NoteText = b.NoteText ?? ""
+                    }).ToList() ?? new List<BendDto>()
                 });
             }
             return list;
@@ -200,7 +212,8 @@ namespace OpenNest.IO
                         Bottom = plate.EdgeSpacing.Bottom
                     },
                     Parts = parts,
-                    CutOffs = cutoffs
+                    CutOffs = cutoffs,
+                    GrainAngle = plate.GrainAngle
                 });
             }
             return list;
