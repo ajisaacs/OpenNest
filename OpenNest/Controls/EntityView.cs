@@ -48,11 +48,19 @@ namespace OpenNest.Controls
 
             foreach (var entity in Entities)
             {
+                if (IsEtchLayer(entity.Layer)) continue;
                 var pen = GetEntityPen(entity.Color);
                 DrawEntity(e.Graphics, entity, pen);
             }
 
             DrawBendLines(e.Graphics);
+
+            foreach (var entity in Entities)
+            {
+                if (!IsEtchLayer(entity.Layer)) continue;
+                var pen = GetEntityPen(entity.Color);
+                DrawEntity(e.Graphics, entity, pen);
+            }
 
 #if DRAW_OFFSET
 
@@ -138,6 +146,9 @@ namespace OpenNest.Controls
             penCache.Clear();
         }
 
+        private static bool IsEtchLayer(Layer layer) =>
+            string.Equals(layer?.Name, "ETCH", System.StringComparison.OrdinalIgnoreCase);
+
         private void DrawBendLines(Graphics g)
         {
             if (Bends == null || Bends.Count == 0)
@@ -145,11 +156,11 @@ namespace OpenNest.Controls
 
             using var bendPen = new Pen(Color.Yellow, 1.5f)
             {
-                DashStyle = DashStyle.Dash
+                DashPattern = new float[] { 8, 6 }
             };
             using var selectedPen = new Pen(Color.Cyan, 2.5f)
             {
-                DashStyle = DashStyle.Dash
+                DashPattern = new float[] { 8, 6 }
             };
 
             for (var i = 0; i < Bends.Count; i++)

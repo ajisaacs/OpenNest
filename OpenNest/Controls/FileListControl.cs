@@ -62,11 +62,19 @@ namespace OpenNest.Controls
 
         public void AddItem(FileListItem item)
         {
-            items.Add(item);
+            var index = items.BinarySearch(item, Comparer<FileListItem>.Create(
+                (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase)));
+            if (index < 0) index = ~index;
+            items.Insert(index, item);
+
             if (items.Count == 1)
             {
                 selectedIndex = 0;
                 SelectedIndexChanged?.Invoke(this, selectedIndex);
+            }
+            else if (selectedIndex >= 0 && index <= selectedIndex)
+            {
+                selectedIndex++;
             }
             Invalidate();
         }
