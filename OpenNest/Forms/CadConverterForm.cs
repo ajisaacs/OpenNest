@@ -29,6 +29,9 @@ namespace OpenNest.Forms
             filterPanel.FilterChanged += OnFilterChanged;
             filterPanel.BendLineSelected += OnBendLineSelected;
             filterPanel.BendLineRemoved += OnBendLineRemoved;
+            filterPanel.AddBendLineClicked += OnAddBendLineClicked;
+            entityView1.LinePicked += OnLinePicked;
+            entityView1.PickCancelled += OnPickCancelled;
             btnSplit.Click += OnSplitClicked;
             numQuantity.ValueChanged += OnQuantityChanged;
             txtCustomer.TextChanged += OnCustomerChanged;
@@ -132,6 +135,11 @@ namespace OpenNest.Forms
         private void LoadItem(FileListItem item)
         {
             entityView1.ClearPenCache();
+            if (entityView1.IsPickingBendLine)
+            {
+                entityView1.IsPickingBendLine = false;
+                filterPanel.SetPickMode(false);
+            }
             entityView1.Entities.Clear();
             entityView1.Entities.AddRange(item.Entities);
             entityView1.Bends = item.Bends ?? new List<Bend>();
@@ -139,6 +147,7 @@ namespace OpenNest.Forms
             item.Entities.ForEach(e => e.IsVisible = true);
             if (item.Entities.Any(e => e.Layer != null))
                 item.Entities.ForEach(e => e.Layer.IsVisible = true);
+            ReHidePromotedEntities(item.Bends);
 
             filterPanel.LoadItem(item.Entities, item.Bends);
 
@@ -170,6 +179,7 @@ namespace OpenNest.Forms
             if (item == null) return;
 
             filterPanel.ApplyFilters(item.Entities);
+            ReHidePromotedEntities(item.Bends);
             entityView1.Invalidate();
         }
 
@@ -183,6 +193,10 @@ namespace OpenNest.Forms
         {
             var item = CurrentItem;
             if (item == null || index < 0 || index >= item.Bends.Count) return;
+
+            var bend = item.Bends[index];
+            if (bend.SourceEntity != null)
+                bend.SourceEntity.IsVisible = true;
 
             item.Bends.RemoveAt(index);
             entityView1.Bends = item.Bends;
@@ -307,6 +321,45 @@ namespace OpenNest.Forms
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        private void OnAddBendLineClicked(object sender, EventArgs e)
+        {
+            var active = !entityView1.IsPickingBendLine;
+            entityView1.IsPickingBendLine = active;
+            filterPanel.SetPickMode(active);
+        }
+
+        private void OnLinePicked(object sender, Line line)
+        {
+            using var dialog = new BendLineDialog();
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            var item = CurrentItem;
+            if (item == null) return;
+
+            var bend = new Bend
+            {
+                StartPoint = line.StartPoint,
+                EndPoint = line.EndPoint,
+                Direction = dialog.Direction,
+                Angle = dialog.BendAngle,
+                Radius = dialog.BendRadius,
+                SourceEntity = line
+            };
+
+            line.IsVisible = false;
+            item.Bends.Add(bend);
+            entityView1.Bends = item.Bends;
+            filterPanel.LoadItem(item.Entities, item.Bends);
+            entityView1.Invalidate();
+        }
+
+        private void OnPickCancelled(object sender, EventArgs e)
+        {
+            entityView1.IsPickingBendLine = false;
+            filterPanel.SetPickMode(false);
+        }
+
         private void OnDragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -384,6 +437,16 @@ namespace OpenNest.Forms
         #endregion
 
         #region Helpers
+
+        private static void ReHidePromotedEntities(List<Bend> bends)
+        {
+            if (bends == null) return;
+            foreach (var bend in bends)
+            {
+                if (bend.SourceEntity != null)
+                    bend.SourceEntity.IsVisible = false;
+            }
+        }
 
         private static void SetRotation(Shape shape, RotationType rotation)
         {
