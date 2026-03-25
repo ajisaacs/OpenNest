@@ -249,17 +249,19 @@ namespace OpenNest.Forms
             var index = fileList.SelectedIndex;
             var newItems = new List<string>();
 
+            var splitWriter = new SplitDxfWriter();
+
             for (var i = 0; i < form.ResultDrawings.Count; i++)
             {
+                var splitDrawing = form.ResultDrawings[i];
+
+                // Assign bends from the source item — spatial filtering is a future enhancement
+                splitDrawing.Bends.AddRange(item.Bends);
+
                 var splitName = $"{baseName}_split{i + 1}.dxf";
                 var splitPath = GetUniquePath(Path.Combine(writableDir, splitName));
 
-                // TODO: Use SplitDxfWriter when implemented
-                // For now, export via DxfExporter
-                var exporter = new DxfExporter();
-                using var stream = new FileStream(splitPath, FileMode.Create);
-                exporter.ExportProgram(form.ResultDrawings[i].Program, stream);
-
+                splitWriter.Write(splitPath, splitDrawing);
                 newItems.Add(splitPath);
             }
 
