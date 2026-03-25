@@ -24,6 +24,11 @@ namespace OpenNest.IO
 
             foreach (var entity in doc.Entities)
             {
+                // Skip bend line entities — they are converted to Bend objects
+                // separately via bend detection, not cut geometry.
+                if (IsBendLayer(entity.Layer?.Name))
+                    continue;
+
                 switch (entity)
                 {
                     case ACadSharp.Entities.Line line:
@@ -130,6 +135,11 @@ namespace OpenNest.IO
             }
 
             return success;
+        }
+
+        private static bool IsBendLayer(string layerName)
+        {
+            return string.Equals(layerName, "BEND", System.StringComparison.OrdinalIgnoreCase);
         }
     }
 }
