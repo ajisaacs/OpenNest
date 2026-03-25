@@ -78,10 +78,24 @@ namespace OpenNest.Forms
 
         private string GetNestName(DateTime date, int id)
         {
-            var month = date.Month.ToString().PadLeft(2, '0');
-            var day = date.Day.ToString().PadLeft(2, '0');
+            var year = (date.Year % 100).ToString("D2");
+            var seq = ToBase36(id).PadLeft(3, '0');
 
-            return string.Format("N{0}{1}-{2}", month, day, id.ToString().PadLeft(3, '0'));
+            return $"N{year}-{seq}";
+        }
+
+        private static string ToBase36(int value)
+        {
+            const string chars = "2345679ACDEFGHJKLMNPQRSTUVWXYZ";
+            if (value == 0) return "0";
+
+            var result = "";
+            while (value > 0)
+            {
+                result = chars[value % 36] + result;
+                value /= 36;
+            }
+            return result;
         }
 
         private void LoadNest(Nest nest, FormWindowState windowState = FormWindowState.Maximized)
