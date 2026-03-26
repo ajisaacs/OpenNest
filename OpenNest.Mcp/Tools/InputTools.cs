@@ -122,7 +122,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Name for the drawing")] string name,
             [Description("Shape type: rectangle, circle, l_shape, t_shape, gcode")] string shape,
             [Description("Width of the shape (not used for circle or gcode)")] double width = 10,
-            [Description("Height of the shape (not used for circle or gcode)")] double height = 10,
+            [Description("Length of the shape (not used for circle or gcode)")] double length = 10,
             [Description("Radius for circle shape")] double radius = 5,
             [Description("G-code string (only used when shape is 'gcode')")] string gcode = null)
         {
@@ -131,7 +131,7 @@ namespace OpenNest.Mcp.Tools
             switch (shape.ToLower())
             {
                 case "rectangle":
-                    shapeDef = new RectangleShape { Name = name, Width = width, Height = height };
+                    shapeDef = new RectangleShape { Name = name, Width = width, Length = length };
                     break;
 
                 case "circle":
@@ -139,11 +139,11 @@ namespace OpenNest.Mcp.Tools
                     break;
 
                 case "l_shape":
-                    shapeDef = new LShape { Name = name, Width = width, Height = height };
+                    shapeDef = new LShape { Name = name, Width = width, Height = length };
                     break;
 
                 case "t_shape":
-                    shapeDef = new TShape { Name = name, Width = width, Height = height };
+                    shapeDef = new TShape { Name = name, Width = width, Height = length };
                     break;
 
                 case "gcode":

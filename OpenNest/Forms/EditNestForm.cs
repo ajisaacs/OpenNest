@@ -473,6 +473,12 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
+        public void TogglePiercePoints()
+        {
+            PlateView.DrawPiercePoints = !PlateView.DrawPiercePoints;
+            PlateView.Invalidate();
+        }
+
         public void ToggleDrawBounds()
         {
             PlateView.DrawBounds = !PlateView.DrawBounds;

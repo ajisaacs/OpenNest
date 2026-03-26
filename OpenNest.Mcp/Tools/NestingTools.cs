@@ -59,7 +59,7 @@ namespace OpenNest.Mcp.Tools
             [Description("X origin of the area")] double x,
             [Description("Y origin of the area")] double y,
             [Description("Width of the area")] double width,
-            [Description("Height of the area")] double height,
+            [Description("Length of the area")] double length,
             [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0)
         {
             var plate = _session.GetPlate(plateIndex);
@@ -73,14 +73,14 @@ namespace OpenNest.Mcp.Tools
             var countBefore = plate.Parts.Count;
             var engine = NestEngineRegistry.Create(plate);
             var item = new NestItem { Drawing = drawing, Quantity = quantity };
-            var area = new Box(x, y, width, height);
+            var area = new Box(x, y, width, length);
             var success = engine.Fill(item, area);
 
             var countAfter = plate.Parts.Count;
             var added = countAfter - countBefore;
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Fill area ({x:F1},{y:F1} {width:F1}x{height:F1}) on plate {plateIndex} with '{drawingName}': {(success ? "success" : "failed")}");
+            sb.AppendLine($"Fill area ({x:F1},{y:F1} {width:F1}x{length:F1}) on plate {plateIndex} with '{drawingName}': {(success ? "success" : "failed")}");
             sb.AppendLine($"  Parts added: {added}");
             sb.AppendLine($"  Total parts: {countAfter}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");

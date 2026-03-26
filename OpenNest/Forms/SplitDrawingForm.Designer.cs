@@ -29,9 +29,6 @@ namespace OpenNest.Forms
         private void InitializeComponent()
         {
             pnlSettings = new System.Windows.Forms.Panel();
-            pnlButtons = new System.Windows.Forms.Panel();
-            btnCancel = new System.Windows.Forms.Button();
-            btnOK = new System.Windows.Forms.Button();
             grpSpikeParams = new System.Windows.Forms.GroupBox();
             nudSpikePairCount = new System.Windows.Forms.NumericUpDown();
             lblSpikePairCount = new System.Windows.Forms.Label();
@@ -70,6 +67,9 @@ namespace OpenNest.Forms
             radByCount = new System.Windows.Forms.RadioButton();
             radFitToPlate = new System.Windows.Forms.RadioButton();
             radManual = new System.Windows.Forms.RadioButton();
+            pnlButtons = new System.Windows.Forms.Panel();
+            btnOK = new System.Windows.Forms.Button();
+            btnCancel = new System.Windows.Forms.Button();
             pnlPreview = new SplitPreview();
             toolStrip = new System.Windows.Forms.ToolStrip();
             btnAddLine = new System.Windows.Forms.ToolStripButton();
@@ -96,6 +96,7 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)nudPlateHeight).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudPlateWidth).BeginInit();
             grpMethod.SuspendLayout();
+            pnlButtons.SuspendLayout();
             toolStrip.SuspendLayout();
             statusStrip.SuspendLayout();
             SuspendLayout();
@@ -116,38 +117,6 @@ namespace OpenNest.Forms
             pnlSettings.Padding = new System.Windows.Forms.Padding(6);
             pnlSettings.Size = new System.Drawing.Size(220, 611);
             pnlSettings.TabIndex = 2;
-            //
-            // pnlButtons
-            //
-            pnlButtons.Controls.Add(btnOK);
-            pnlButtons.Controls.Add(btnCancel);
-            pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom;
-            pnlButtons.Name = "pnlButtons";
-            pnlButtons.Size = new System.Drawing.Size(208, 40);
-            pnlButtons.TabIndex = 8;
-            //
-            // btnCancel
-            //
-            btnCancel.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
-            btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            btnCancel.Location = new System.Drawing.Point(110, 6);
-            btnCancel.Name = "btnCancel";
-            btnCancel.Size = new System.Drawing.Size(80, 28);
-            btnCancel.TabIndex = 7;
-            btnCancel.Text = "Cancel";
-            btnCancel.UseVisualStyleBackColor = true;
-            btnCancel.Click += OnCancel;
-            //
-            // btnOK
-            //
-            btnOK.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
-            btnOK.Location = new System.Drawing.Point(20, 6);
-            btnOK.Name = "btnOK";
-            btnOK.Size = new System.Drawing.Size(80, 28);
-            btnOK.TabIndex = 6;
-            btnOK.Text = "OK";
-            btnOK.UseVisualStyleBackColor = true;
-            btnOK.Click += OnOK;
             // 
             // grpSpikeParams
             // 
@@ -216,7 +185,7 @@ namespace OpenNest.Forms
             nudGrooveDepth.Name = "nudGrooveDepth";
             nudGrooveDepth.Size = new System.Drawing.Size(88, 23);
             nudGrooveDepth.TabIndex = 1;
-            nudGrooveDepth.Value = new decimal(new int[] { 625, 0, 0, 196608 });
+            nudGrooveDepth.Value = new decimal(new int[] { 125, 0, 0, 196608 });
             nudGrooveDepth.ValueChanged += OnSpikeParamChanged;
             // 
             // lblGrooveDepth
@@ -568,6 +537,39 @@ namespace OpenNest.Forms
             radManual.Text = "Manual";
             radManual.CheckedChanged += OnMethodChanged;
             // 
+            // pnlButtons
+            // 
+            pnlButtons.Controls.Add(btnOK);
+            pnlButtons.Controls.Add(btnCancel);
+            pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom;
+            pnlButtons.Location = new System.Drawing.Point(6, 637);
+            pnlButtons.Name = "pnlButtons";
+            pnlButtons.Size = new System.Drawing.Size(191, 40);
+            pnlButtons.TabIndex = 8;
+            // 
+            // btnOK
+            // 
+            btnOK.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            btnOK.Location = new System.Drawing.Point(11, 6);
+            btnOK.Name = "btnOK";
+            btnOK.Size = new System.Drawing.Size(80, 28);
+            btnOK.TabIndex = 6;
+            btnOK.Text = "OK";
+            btnOK.UseVisualStyleBackColor = true;
+            btnOK.Click += OnOK;
+            // 
+            // btnCancel
+            // 
+            btnCancel.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            btnCancel.Location = new System.Drawing.Point(101, 6);
+            btnCancel.Name = "btnCancel";
+            btnCancel.Size = new System.Drawing.Size(80, 28);
+            btnCancel.TabIndex = 7;
+            btnCancel.Text = "Cancel";
+            btnCancel.UseVisualStyleBackColor = true;
+            btnCancel.Click += OnCancel;
+            // 
             // pnlPreview
             // 
             pnlPreview.BackColor = System.Drawing.Color.FromArgb(33, 40, 48);
@@ -667,6 +669,7 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)nudPlateWidth).EndInit();
             grpMethod.ResumeLayout(false);
             grpMethod.PerformLayout();
+            pnlButtons.ResumeLayout(false);
             toolStrip.ResumeLayout(false);
             toolStrip.PerformLayout();
             statusStrip.ResumeLayout(false);

@@ -194,9 +194,9 @@ namespace OpenNest.Controls
             {
                 DashPattern = new float[] { 8, 6 }
             };
-            using var selectedPen = new Pen(Color.Cyan, 2.5f)
+            using var glowPen = new Pen(Color.OrangeRed, 2.0f)
             {
-                DashPattern = new float[] { 8, 6 }
+                DashPattern = new float[] { 6, 4 }
             };
 
             for (var i = 0; i < Bends.Count; i++)
@@ -204,7 +204,15 @@ namespace OpenNest.Controls
                 var bend = Bends[i];
                 var pt1 = PointWorldToGraph(bend.StartPoint);
                 var pt2 = PointWorldToGraph(bend.EndPoint);
-                g.DrawLine(i == SelectedBendIndex ? selectedPen : bendPen, pt1, pt2);
+
+                if (i == SelectedBendIndex)
+                {
+                    g.DrawLine(glowPen, pt1, pt2);
+                }
+                else
+                {
+                    g.DrawLine(bendPen, pt1, pt2);
+                }
             }
         }
 

@@ -7,7 +7,7 @@ public class RoundedRectangleShapeTests
     [Fact]
     public void GetDrawing_BoundingBoxMatchesDimensions()
     {
-        var shape = new RoundedRectangleShape { Width = 20, Height = 10, Radius = 2 };
+        var shape = new RoundedRectangleShape { Length = 20, Width = 10, Radius = 2 };
         var drawing = shape.GetDrawing();
 
         var bbox = drawing.Program.BoundingBox();
@@ -18,7 +18,7 @@ public class RoundedRectangleShapeTests
     [Fact]
     public void GetDrawing_AreaIsLessThanFullRectangle()
     {
-        var shape = new RoundedRectangleShape { Width = 20, Height = 10, Radius = 2 };
+        var shape = new RoundedRectangleShape { Length = 20, Width = 10, Radius = 2 };
         var drawing = shape.GetDrawing();
 
         // Area should be less than 20*10=200 because corners are rounded
@@ -30,7 +30,7 @@ public class RoundedRectangleShapeTests
     [Fact]
     public void GetDrawing_ZeroRadius_MatchesRectangleArea()
     {
-        var shape = new RoundedRectangleShape { Width = 20, Height = 10, Radius = 0 };
+        var shape = new RoundedRectangleShape { Length = 20, Width = 10, Radius = 0 };
         var drawing = shape.GetDrawing();
 
         Assert.Equal(200, drawing.Area, 0.5);

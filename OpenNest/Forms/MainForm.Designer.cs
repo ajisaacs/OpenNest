@@ -48,6 +48,7 @@
             mnuEditSelectAll = new System.Windows.Forms.ToolStripMenuItem();
             mnuView = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawRapids = new System.Windows.Forms.ToolStripMenuItem();
+            mnuViewDrawPiercePoints = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawBounds = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawOffset = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem5 = new System.Windows.Forms.ToolStripSeparator();
@@ -297,7 +298,7 @@
             // 
             // mnuView
             // 
-            mnuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuViewDrawRapids, mnuViewDrawBounds, mnuViewDrawOffset, toolStripMenuItem5, mnuViewZoomTo, mnuViewZoomIn, mnuViewZoomOut });
+            mnuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuViewDrawRapids, mnuViewDrawPiercePoints, mnuViewDrawBounds, mnuViewDrawOffset, toolStripMenuItem5, mnuViewZoomTo, mnuViewZoomIn, mnuViewZoomOut });
             mnuView.Name = "mnuView";
             mnuView.Size = new System.Drawing.Size(44, 20);
             mnuView.Text = "&View";
@@ -308,7 +309,15 @@
             mnuViewDrawRapids.Size = new System.Drawing.Size(222, 22);
             mnuViewDrawRapids.Text = "Draw Rapids";
             mnuViewDrawRapids.Click += ToggleDrawRapids_Click;
-            // 
+            //
+            // mnuViewDrawPiercePoints
+            //
+            mnuViewDrawPiercePoints.CheckOnClick = true;
+            mnuViewDrawPiercePoints.Name = "mnuViewDrawPiercePoints";
+            mnuViewDrawPiercePoints.Size = new System.Drawing.Size(222, 22);
+            mnuViewDrawPiercePoints.Text = "Draw Pierce Points";
+            mnuViewDrawPiercePoints.Click += ToggleDrawPiercePoints_Click;
+            //
             // mnuViewDrawBounds
             // 
             mnuViewDrawBounds.CheckOnClick = true;
@@ -1131,6 +1140,7 @@
         private System.Windows.Forms.ToolStripMenuItem mnuEditSelectAll;
         private System.Windows.Forms.ToolStripMenuItem mnuView;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawRapids;
+        private System.Windows.Forms.ToolStripMenuItem mnuViewDrawPiercePoints;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawBounds;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawOffset;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem5;

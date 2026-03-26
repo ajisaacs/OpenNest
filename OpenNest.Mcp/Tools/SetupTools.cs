@@ -19,13 +19,13 @@ namespace OpenNest.Mcp.Tools
         [Description("Create a new plate with the given dimensions and spacing. Returns plate index and work area.")]
         public string CreatePlate(
             [Description("Plate width")] double width,
-            [Description("Plate height")] double height,
+            [Description("Plate length")] double length,
             [Description("Spacing between parts (default 0)")] double partSpacing = 0,
             [Description("Edge spacing on all sides (default 0)")] double edgeSpacing = 0,
             [Description("Quadrant 1-4 (default 1). 1=TopRight, 2=TopLeft, 3=BottomLeft, 4=BottomRight")] int quadrant = 1,
             [Description("Material name (optional)")] string material = null)
         {
-            var plate = new Plate(width, height);
+            var plate = new Plate(width, length);
             plate.PartSpacing = partSpacing;
             plate.EdgeSpacing = new Spacing(edgeSpacing, edgeSpacing);
             plate.Quadrant = quadrant;

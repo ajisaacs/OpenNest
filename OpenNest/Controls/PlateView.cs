@@ -131,6 +131,8 @@ namespace OpenNest.Controls
 
         public bool DrawRapid { get; set; }
 
+        public bool DrawPiercePoints { get; set; }
+
         public bool DrawBounds { get; set; }
 
         public bool DrawOffset { get; set; }
@@ -617,6 +619,9 @@ namespace OpenNest.Controls
 
             if (DrawRapid)
                 DrawRapids(g);
+
+            if (DrawPiercePoints)
+                DrawAllPiercePoints(g);
         }
 
         private void DrawBendLines(Graphics g, Part part)
@@ -809,6 +814,54 @@ namespace OpenNest.Controls
                             pos = motion.EndPoint;
                         }
                     }
+                }
+            }
+        }
+
+        private void DrawAllPiercePoints(Graphics g)
+        {
+            using var brush = new SolidBrush(Color.Red);
+            using var pen = new Pen(Color.DarkRed, 1f);
+
+            for (var i = 0; i < Plate.Parts.Count; ++i)
+            {
+                var part = Plate.Parts[i];
+                var pgm = part.Program;
+                var pos = part.Location;
+                DrawProgramPiercePoints(g, pgm, ref pos, brush, pen);
+            }
+        }
+
+        private void DrawProgramPiercePoints(Graphics g, Program pgm, ref Vector pos, Brush brush, Pen pen)
+        {
+            for (var i = 0; i < pgm.Length; ++i)
+            {
+                var code = pgm[i];
+
+                if (code.Type == CodeType.SubProgramCall)
+                {
+                    var subpgm = (SubProgramCall)code;
+                    if (subpgm.Program != null)
+                        DrawProgramPiercePoints(g, subpgm.Program, ref pos, brush, pen);
+                }
+                else
+                {
+                    var motion = code as Motion;
+                    if (motion == null) continue;
+
+                    var endpt = pgm.Mode == Mode.Incremental
+                        ? motion.EndPoint + pos
+                        : motion.EndPoint;
+
+                    if (code.Type == CodeType.RapidMove)
+                    {
+                        var pt = PointWorldToGraph(endpt);
+                        var radius = 2f;
+                        g.FillEllipse(brush, pt.X - radius, pt.Y - radius, radius * 2, radius * 2);
+                        g.DrawEllipse(pen, pt.X - radius, pt.Y - radius, radius * 2, radius * 2);
+                    }
+
+                    pos = endpt;
                 }
             }
         }

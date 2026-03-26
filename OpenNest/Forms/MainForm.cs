@@ -391,6 +391,7 @@ namespace OpenNest.Forms
             activeForm.PlateView.PartAdded += PlateView_PartAdded;
             activeForm.PlateView.PartRemoved += PlateView_PartRemoved;
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
+            mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
             statusLabel1.Text = activeForm.PlateView.Status;
         }
@@ -551,6 +552,13 @@ namespace OpenNest.Forms
             if (activeForm == null) return;
             activeForm.ToggleRapid();
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
+        }
+
+        private void ToggleDrawPiercePoints_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+            activeForm.TogglePiercePoints();
+            mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
         }
 
         private void ToggleDrawBounds_Click(object sender, EventArgs e)

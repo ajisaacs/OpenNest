@@ -7,7 +7,7 @@ public class RectangleShapeTests
     [Fact]
     public void GetDrawing_ReturnsDrawingWithCorrectBoundingBox()
     {
-        var shape = new RectangleShape { Width = 10, Height = 5 };
+        var shape = new RectangleShape { Length = 10, Width = 5 };
         var drawing = shape.GetDrawing();
 
         var bbox = drawing.Program.BoundingBox();
@@ -18,7 +18,7 @@ public class RectangleShapeTests
     [Fact]
     public void GetDrawing_DefaultName_IsRectangle()
     {
-        var shape = new RectangleShape { Width = 10, Height = 5 };
+        var shape = new RectangleShape { Length = 10, Width = 5 };
         var drawing = shape.GetDrawing();
 
         Assert.Equal("Rectangle", drawing.Name);
@@ -27,7 +27,7 @@ public class RectangleShapeTests
     [Fact]
     public void GetDrawing_CustomName_IsUsed()
     {
-        var shape = new RectangleShape { Name = "Plate1", Width = 10, Height = 5 };
+        var shape = new RectangleShape { Name = "Plate1", Length = 10, Width = 5 };
         var drawing = shape.GetDrawing();
 
         Assert.Equal("Plate1", drawing.Name);

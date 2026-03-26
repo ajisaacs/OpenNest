@@ -1,5 +1,6 @@
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using OpenNest.Shapes;
 
 namespace OpenNest.Tests.Splitting;
 
@@ -8,16 +9,7 @@ public class SplitIntegrationTest
     [Fact]
     public void Split_SpikeGroove_NoContinuityGaps()
     {
-        // Create a rectangle
-        var entities = new List<Entity>
-        {
-            new Line(new Vector(0, 0), new Vector(100, 0)),
-            new Line(new Vector(100, 0), new Vector(100, 50)),
-            new Line(new Vector(100, 50), new Vector(0, 50)),
-            new Line(new Vector(0, 50), new Vector(0, 0))
-        };
-        var pgm = ConvertGeometry.ToProgram(entities);
-        var drawing = new Drawing("TEST", pgm);
+        var drawing = new RectangleShape { Name = "TEST", Length = 100, Width = 50 }.GetDrawing();
 
         var sl = new SplitLine(50.0, CutOffAxis.Vertical);
         sl.FeaturePositions.Add(12.5);
@@ -60,15 +52,7 @@ public class SplitIntegrationTest
     [Fact]
     public void Split_SpikeGroove_Horizontal_NoContinuityGaps()
     {
-        var entities = new List<Entity>
-        {
-            new Line(new Vector(0, 0), new Vector(100, 0)),
-            new Line(new Vector(100, 0), new Vector(100, 50)),
-            new Line(new Vector(100, 50), new Vector(0, 50)),
-            new Line(new Vector(0, 50), new Vector(0, 0))
-        };
-        var pgm = ConvertGeometry.ToProgram(entities);
-        var drawing = new Drawing("TEST", pgm);
+        var drawing = new RectangleShape { Name = "TEST", Length = 100, Width = 50 }.GetDrawing();
 
         var sl = new SplitLine(25.0, CutOffAxis.Horizontal);
         sl.FeaturePositions.Add(25.0);
