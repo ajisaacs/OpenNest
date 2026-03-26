@@ -24,9 +24,10 @@ namespace OpenNest.IO
 
             foreach (var entity in doc.Entities)
             {
-                // Skip bend line entities — they are converted to Bend objects
-                // separately via bend detection, not cut geometry.
-                if (IsBendLayer(entity.Layer?.Name))
+                // Skip bend/etch entities — bends are converted to Bend objects
+                // separately via bend detection, and etch marks are generated from
+                // bends during DXF export. Neither should be treated as cut geometry.
+                if (IsNonCutLayer(entity.Layer?.Name))
                     continue;
 
                 switch (entity)
@@ -137,9 +138,10 @@ namespace OpenNest.IO
             return success;
         }
 
-        private static bool IsBendLayer(string layerName)
+        private static bool IsNonCutLayer(string layerName)
         {
-            return string.Equals(layerName, "BEND", System.StringComparison.OrdinalIgnoreCase);
+            return string.Equals(layerName, "BEND", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(layerName, "ETCH", System.StringComparison.OrdinalIgnoreCase);
         }
     }
 }

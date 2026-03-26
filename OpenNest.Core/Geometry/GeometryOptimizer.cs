@@ -76,6 +76,9 @@ namespace OpenNest.Geometry
             if (line1 == line2)
                 return false;
 
+            if (line1.Layer?.Name != line2.Layer?.Name)
+                return false;
+
             if (!line1.IsCollinearTo(line2))
                 return false;
 
@@ -113,9 +116,9 @@ namespace OpenNest.Geometry
             var b = b1 < b2 ? b1 : b2;
 
             if (!line1.IsVertical() && line1.Slope() < 0)
-                lineOut = new Line(new Vector(l, t), new Vector(r, b));
+                lineOut = new Line(new Vector(l, t), new Vector(r, b)) { Layer = line1.Layer, Color = line1.Color };
             else
-                lineOut = new Line(new Vector(l, b), new Vector(r, t));
+                lineOut = new Line(new Vector(l, b), new Vector(r, t)) { Layer = line1.Layer, Color = line1.Color };
 
             return true;
         }
@@ -125,6 +128,9 @@ namespace OpenNest.Geometry
             arcOut = null;
 
             if (arc1 == arc2)
+                return false;
+
+            if (arc1.Layer?.Name != arc2.Layer?.Name)
                 return false;
 
             if (arc1.Center != arc2.Center)
@@ -161,7 +167,7 @@ namespace OpenNest.Geometry
             if (startAngle < 0) startAngle += Angle.TwoPI;
             if (endAngle < 0) endAngle += Angle.TwoPI;
 
-            arcOut = new Arc(arc1.Center, arc1.Radius, startAngle, endAngle);
+            arcOut = new Arc(arc1.Center, arc1.Radius, startAngle, endAngle) { Layer = arc1.Layer, Color = arc1.Color };
 
             return true;
         }
