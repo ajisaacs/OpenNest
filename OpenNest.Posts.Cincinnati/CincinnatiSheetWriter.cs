@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using OpenNest.CNC;
-using OpenNest.Geometry;
 
 namespace OpenNest.Posts.Cincinnati;
 
@@ -128,7 +127,7 @@ public sealed class CincinnatiSheetWriter
             else
             {
                 // Inline features for cutoffs or parts without sub-programs
-                var features = SplitAndOrderFeatures(part);
+                var features = FeatureUtils.SplitAndClassify(part);
                 for (var f = 0; f < features.Count; f++)
                 {
                     var (codes, isEtch) = features[f];
@@ -137,7 +136,7 @@ public sealed class CincinnatiSheetWriter
                         : 1000 + featureIndex + 1;
 
                     var isLastFeature = isLastPart && f == features.Count - 1;
-                    var cutDistance = ComputeCutDistance(codes);
+                    var cutDistance = FeatureUtils.ComputeCutDistance(codes);
 
                     var ctx = new FeatureContext
                     {
@@ -205,7 +204,7 @@ public sealed class CincinnatiSheetWriter
         var features = new List<(Part part, List<ICode> codes, bool isEtch)>();
         foreach (var part in allParts)
         {
-            var partFeatures = SplitAndOrderFeatures(part);
+            var partFeatures = FeatureUtils.SplitAndClassify(part);
             foreach (var (codes, isEtch) in partFeatures)
                 features.Add((part, codes, isEtch));
         }
@@ -224,7 +223,7 @@ public sealed class CincinnatiSheetWriter
                 ? _config.FeatureLineNumberStart
                 : 1000 + i + 1;
 
-            var cutDistance = ComputeCutDistance(codes);
+            var cutDistance = FeatureUtils.ComputeCutDistance(codes);
 
             var ctx = new FeatureContext
             {
@@ -246,91 +245,4 @@ public sealed class CincinnatiSheetWriter
         }
     }
 
-    /// <summary>
-    /// Splits a part's program into features (by rapids), classifies each as etch or cut,
-    /// and orders etch features before cut features.
-    /// </summary>
-    public static List<(List<ICode> codes, bool isEtch)> SplitAndOrderFeatures(Part part)
-    {
-        var etchFeatures = new List<List<ICode>>();
-        var cutFeatures = new List<List<ICode>>();
-        List<ICode> current = null;
-
-        foreach (var code in part.Program.Codes)
-        {
-            if (code is RapidMove)
-            {
-                if (current != null)
-                    ClassifyAndAdd(current, etchFeatures, cutFeatures);
-                current = new List<ICode> { code };
-            }
-            else
-            {
-                current ??= new List<ICode>();
-                current.Add(code);
-            }
-        }
-
-        if (current != null && current.Count > 0)
-            ClassifyAndAdd(current, etchFeatures, cutFeatures);
-
-        // Etch features first, then cut features
-        var result = new List<(List<ICode>, bool)>();
-        foreach (var f in etchFeatures)
-            result.Add((f, true));
-        foreach (var f in cutFeatures)
-            result.Add((f, false));
-
-        return result;
-    }
-
-    private static void ClassifyAndAdd(List<ICode> codes,
-        List<List<ICode>> etchFeatures, List<List<ICode>> cutFeatures)
-    {
-        if (IsFeatureEtch(codes))
-            etchFeatures.Add(codes);
-        else
-            cutFeatures.Add(codes);
-    }
-
-    /// <summary>
-    /// A feature is etch if any non-rapid move has LayerType.Scribe.
-    /// </summary>
-    public static bool IsFeatureEtch(List<ICode> codes)
-    {
-        foreach (var code in codes)
-        {
-            if (code is LinearMove linear && linear.Layer == LayerType.Scribe)
-                return true;
-            if (code is ArcMove arc && arc.Layer == LayerType.Scribe)
-                return true;
-        }
-        return false;
-    }
-
-    private static double ComputeCutDistance(List<ICode> codes)
-    {
-        var distance = 0.0;
-        var currentPos = Vector.Zero;
-
-        foreach (var code in codes)
-        {
-            if (code is RapidMove rapid)
-            {
-                currentPos = rapid.EndPoint;
-            }
-            else if (code is LinearMove linear)
-            {
-                distance += currentPos.DistanceTo(linear.EndPoint);
-                currentPos = linear.EndPoint;
-            }
-            else if (code is ArcMove arc)
-            {
-                distance += currentPos.DistanceTo(arc.EndPoint);
-                currentPos = arc.EndPoint;
-            }
-        }
-
-        return distance;
-    }
 }

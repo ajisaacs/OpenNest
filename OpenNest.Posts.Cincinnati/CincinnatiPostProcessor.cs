@@ -84,32 +84,7 @@ namespace OpenNest.Posts.Cincinnati
             List<(int subNum, string name, Program program)> subprogramEntries = null;
 
             if (Config.UsePartSubprograms)
-            {
-                partSubprograms = new Dictionary<(int, long), int>();
-                subprogramEntries = new List<(int, string, Program)>();
-                var nextSubNum = Config.PartSubprogramStart;
-
-                foreach (var plate in plates)
-                {
-                    foreach (var part in plate.Parts)
-                    {
-                        if (part.BaseDrawing.IsCutOff) continue;
-                        var key = CincinnatiPartSubprogramWriter.SubprogramKey(part);
-                        if (!partSubprograms.ContainsKey(key))
-                        {
-                            var subNum = nextSubNum++;
-                            partSubprograms[key] = subNum;
-
-                            // Create normalized program at origin
-                            var pgm = part.Program.Clone() as Program;
-                            var bbox = pgm.BoundingBox();
-                            pgm.Offset(-bbox.Location.X, -bbox.Location.Y);
-
-                            subprogramEntries.Add((subNum, part.BaseDrawing.Name, pgm));
-                        }
-                    }
-                }
-            }
+                (partSubprograms, subprogramEntries) = CincinnatiPartSubprogramWriter.BuildRegistry(plates, Config.PartSubprogramStart);
 
             // 5. Create writers
             var preamble = new CincinnatiPreambleWriter(Config);

@@ -29,12 +29,12 @@ public sealed class CincinnatiPartSubprogramWriter
     public void Write(TextWriter w, Program normalizedProgram, string drawingName,
         int subNumber, string cutLibrary, string etchLibrary, double sheetDiagonal)
     {
-        var allFeatures = SplitFeatures(normalizedProgram.Codes);
+        var allFeatures = FeatureUtils.SplitByRapids(normalizedProgram.Codes);
         if (allFeatures.Count == 0)
             return;
 
         // Classify and order: etch features first, then cut features
-        var ordered = OrderFeatures(allFeatures);
+        var ordered = FeatureUtils.ClassifyAndOrder(allFeatures);
 
         w.WriteLine("(*****************************************************)");
         w.WriteLine($":{subNumber}");
@@ -46,7 +46,7 @@ public sealed class CincinnatiPartSubprogramWriter
             var featureNumber = i == 0
                 ? _config.FeatureLineNumberStart
                 : 1000 + i + 1;
-            var cutDistance = ComputeCutDistance(codes);
+            var cutDistance = FeatureUtils.ComputeCutDistance(codes);
 
             var ctx = new FeatureContext
             {
@@ -70,81 +70,43 @@ public sealed class CincinnatiPartSubprogramWriter
         w.WriteLine($"M99 (END OF {drawingName})");
     }
 
-    internal static List<(List<ICode> codes, bool isEtch)> OrderFeatures(List<List<ICode>> features)
-    {
-        var result = new List<(List<ICode>, bool)>();
-        var etch = new List<List<ICode>>();
-        var cut = new List<List<ICode>>();
-
-        foreach (var f in features)
-        {
-            if (CincinnatiSheetWriter.IsFeatureEtch(f))
-                etch.Add(f);
-            else
-                cut.Add(f);
-        }
-
-        foreach (var f in etch)
-            result.Add((f, true));
-        foreach (var f in cut)
-            result.Add((f, false));
-
-        return result;
-    }
-
     /// <summary>
     /// Creates a sub-program key for matching parts to their sub-programs.
     /// </summary>
     internal static (int drawingId, long rotationKey) SubprogramKey(Part part) =>
         (part.BaseDrawing.Id, (long)System.Math.Round(part.Rotation * 1e6));
 
-    internal static List<List<ICode>> SplitFeatures(List<ICode> codes)
+    /// <summary>
+    /// Scans all plates and builds a mapping of unique part geometries to sub-program numbers,
+    /// along with their normalized programs for writing.
+    /// </summary>
+    internal static (Dictionary<(int, long), int> mapping, List<(int subNum, string name, Program program)> entries)
+        BuildRegistry(IEnumerable<Plate> plates, int startNumber)
     {
-        var features = new List<List<ICode>>();
-        List<ICode> current = null;
+        var mapping = new Dictionary<(int, long), int>();
+        var entries = new List<(int, string, Program)>();
+        var nextSubNum = startNumber;
 
-        foreach (var code in codes)
+        foreach (var plate in plates)
         {
-            if (code is RapidMove)
+            foreach (var part in plate.Parts)
             {
-                if (current != null)
-                    features.Add(current);
-                current = new List<ICode> { code };
-            }
-            else
-            {
-                current ??= new List<ICode>();
-                current.Add(code);
+                if (part.BaseDrawing.IsCutOff) continue;
+                var key = SubprogramKey(part);
+                if (!mapping.ContainsKey(key))
+                {
+                    var subNum = nextSubNum++;
+                    mapping[key] = subNum;
+
+                    var pgm = part.Program.Clone() as Program;
+                    var bbox = pgm.BoundingBox();
+                    pgm.Offset(-bbox.Location.X, -bbox.Location.Y);
+
+                    entries.Add((subNum, part.BaseDrawing.Name, pgm));
+                }
             }
         }
 
-        if (current != null && current.Count > 0)
-            features.Add(current);
-
-        return features;
-    }
-
-    internal static double ComputeCutDistance(List<ICode> codes)
-    {
-        var distance = 0.0;
-        var currentPos = Vector.Zero;
-
-        foreach (var code in codes)
-        {
-            if (code is RapidMove rapid)
-                currentPos = rapid.EndPoint;
-            else if (code is LinearMove linear)
-            {
-                distance += currentPos.DistanceTo(linear.EndPoint);
-                currentPos = linear.EndPoint;
-            }
-            else if (code is ArcMove arc)
-            {
-                distance += currentPos.DistanceTo(arc.EndPoint);
-                currentPos = arc.EndPoint;
-            }
-        }
-
-        return distance;
+        return (mapping, entries);
     }
 }

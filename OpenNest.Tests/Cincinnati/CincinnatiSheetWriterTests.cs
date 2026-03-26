@@ -152,7 +152,7 @@ public class CincinnatiSheetWriterTests
             new LinearMove(1, 1) { Layer = LayerType.Scribe }
         };
 
-        Assert.True(CincinnatiSheetWriter.IsFeatureEtch(codes));
+        Assert.True(FeatureUtils.IsEtch(codes));
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public class CincinnatiSheetWriterTests
             new LinearMove(1, 1) { Layer = LayerType.Cut }
         };
 
-        Assert.False(CincinnatiSheetWriter.IsFeatureEtch(codes));
+        Assert.False(FeatureUtils.IsEtch(codes));
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class CincinnatiSheetWriterTests
             new RapidMove(0, 0)
         };
 
-        Assert.False(CincinnatiSheetWriter.IsFeatureEtch(codes));
+        Assert.False(FeatureUtils.IsEtch(codes));
     }
 
     private static Program CreateSimpleProgram()
