@@ -11,7 +11,10 @@ namespace OpenNest.Forms
     public class RemnantViewerForm : Form
     {
         private ListView listView;
+        private CheckBox filterCheckBox;
         private PlateView plateView;
+        private RemnantFinder finder;
+        private double minDim;
         private List<TieredRemnant> remnants = new();
         private int selectedIndex = -1;
 
@@ -23,6 +26,15 @@ namespace OpenNest.Forms
             FormBorderStyle = FormBorderStyle.SizableToolWindow;
             ShowInTaskbar = false;
             TopMost = true;
+
+            filterCheckBox = new CheckBox
+            {
+                Text = "Filter by part size",
+                Checked = true,
+                Dock = DockStyle.Top,
+                Padding = new Padding(4, 2, 0, 2),
+            };
+            filterCheckBox.CheckedChanged += FilterCheckBox_CheckedChanged;
 
             listView = new ListView
             {
@@ -42,6 +54,7 @@ namespace OpenNest.Forms
             listView.SelectedIndexChanged += ListView_SelectedIndexChanged;
 
             Controls.Add(listView);
+            Controls.Add(filterCheckBox);
         }
 
         protected override bool ProcessDialogKey(Keys keyData)
@@ -54,10 +67,25 @@ namespace OpenNest.Forms
             return base.ProcessDialogKey(keyData);
         }
 
-        public void LoadRemnants(List<TieredRemnant> tieredRemnants, PlateView view)
+        public void LoadRemnants(RemnantFinder finder, double minDim, PlateView view)
         {
             plateView = view;
-            remnants = tieredRemnants;
+            this.finder = finder;
+            this.minDim = minDim;
+
+            Refresh();
+        }
+
+        private void FilterCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            if (finder != null)
+                Refresh();
+        }
+
+        private new void Refresh()
+        {
+            var dim = filterCheckBox.Checked ? minDim : 0;
+            remnants = finder.FindTieredRemnants(dim);
             selectedIndex = -1;
 
             listView.BeginUpdate();

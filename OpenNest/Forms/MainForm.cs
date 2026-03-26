@@ -848,7 +848,6 @@ namespace OpenNest.Forms
             }
 
             var finder = RemnantFinder.FromPlate(plate);
-            var tiered = finder.FindTieredRemnants(minDim);
 
             if (remnantViewer == null || remnantViewer.IsDisposed)
             {
@@ -862,7 +861,7 @@ namespace OpenNest.Forms
                     Top);
             }
 
-            remnantViewer.LoadRemnants(tiered, activeForm.PlateView);
+            remnantViewer.LoadRemnants(finder, minDim, activeForm.PlateView);
             remnantViewer.Show();
             remnantViewer.BringToFront();
         }
