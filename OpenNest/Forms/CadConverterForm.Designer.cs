@@ -15,6 +15,7 @@ namespace OpenNest.Forms
 
         private void InitializeComponent()
         {
+            mainSplit = new System.Windows.Forms.SplitContainer();
             sidebarSplit = new System.Windows.Forms.SplitContainer();
             fileList = new OpenNest.Controls.FileListControl();
             filterPanel = new OpenNest.Controls.FilterPanel();
@@ -32,6 +33,10 @@ namespace OpenNest.Forms
             bottomPanel1 = new OpenNest.Controls.BottomPanel();
             cancelButton = new System.Windows.Forms.Button();
             acceptButton = new System.Windows.Forms.Button();
+            ((System.ComponentModel.ISupportInitialize)mainSplit).BeginInit();
+            mainSplit.Panel1.SuspendLayout();
+            mainSplit.Panel2.SuspendLayout();
+            mainSplit.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)sidebarSplit).BeginInit();
             sidebarSplit.Panel1.SuspendLayout();
             sidebarSplit.Panel2.SuspendLayout();
@@ -40,25 +45,46 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)numQuantity).BeginInit();
             bottomPanel1.SuspendLayout();
             SuspendLayout();
-            // 
+            //
+            // mainSplit
+            //
+            mainSplit.Dock = System.Windows.Forms.DockStyle.Fill;
+            mainSplit.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
+            mainSplit.Location = new System.Drawing.Point(0, 0);
+            mainSplit.Name = "mainSplit";
+            //
+            // mainSplit.Panel1
+            //
+            mainSplit.Panel1.Controls.Add(sidebarSplit);
+            mainSplit.Panel1MinSize = 200;
+            //
+            // mainSplit.Panel2
+            //
+            mainSplit.Panel2.Controls.Add(entityView1);
+            mainSplit.Panel2.Controls.Add(detailBar);
+            mainSplit.Size = new System.Drawing.Size(1024, 670);
+            mainSplit.SplitterDistance = 260;
+            mainSplit.SplitterWidth = 5;
+            mainSplit.TabIndex = 2;
+            //
             // sidebarSplit
-            // 
-            sidebarSplit.Dock = System.Windows.Forms.DockStyle.Left;
+            //
+            sidebarSplit.Dock = System.Windows.Forms.DockStyle.Fill;
             sidebarSplit.Location = new System.Drawing.Point(0, 0);
             sidebarSplit.Name = "sidebarSplit";
             sidebarSplit.Orientation = System.Windows.Forms.Orientation.Horizontal;
-            // 
+            //
             // sidebarSplit.Panel1
-            // 
+            //
             sidebarSplit.Panel1.Controls.Add(fileList);
-            // 
+            //
             // sidebarSplit.Panel2
-            // 
+            //
             sidebarSplit.Panel2.Controls.Add(filterPanel);
             sidebarSplit.Size = new System.Drawing.Size(260, 670);
             sidebarSplit.SplitterDistance = 300;
             sidebarSplit.SplitterWidth = 5;
-            sidebarSplit.TabIndex = 2;
+            sidebarSplit.TabIndex = 0;
             // 
             // fileList
             // 
@@ -86,9 +112,9 @@ namespace OpenNest.Forms
             entityView1.BackColor = System.Drawing.Color.FromArgb(33, 40, 48);
             entityView1.Cursor = System.Windows.Forms.Cursors.Cross;
             entityView1.Dock = System.Windows.Forms.DockStyle.Fill;
-            entityView1.Location = new System.Drawing.Point(260, 0);
+            entityView1.Location = new System.Drawing.Point(0, 0);
             entityView1.Name = "entityView1";
-            entityView1.Size = new System.Drawing.Size(764, 634);
+            entityView1.Size = new System.Drawing.Size(759, 634);
             entityView1.TabIndex = 0;
             // 
             // detailBar
@@ -104,10 +130,10 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(lblDetect);
             detailBar.Controls.Add(cboBendDetector);
             detailBar.Dock = System.Windows.Forms.DockStyle.Bottom;
-            detailBar.Location = new System.Drawing.Point(260, 634);
+            detailBar.Location = new System.Drawing.Point(0, 634);
             detailBar.Name = "detailBar";
             detailBar.Padding = new System.Windows.Forms.Padding(4, 6, 4, 4);
-            detailBar.Size = new System.Drawing.Size(764, 36);
+            detailBar.Size = new System.Drawing.Size(759, 36);
             detailBar.TabIndex = 1;
             detailBar.WrapContents = false;
             // 
@@ -248,9 +274,7 @@ namespace OpenNest.Forms
             AllowDrop = true;
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             ClientSize = new System.Drawing.Size(1024, 720);
-            Controls.Add(entityView1);
-            Controls.Add(detailBar);
-            Controls.Add(sidebarSplit);
+            Controls.Add(mainSplit);
             Controls.Add(bottomPanel1);
             Font = new System.Drawing.Font("Segoe UI", 9F);
             MinimizeBox = false;
@@ -260,6 +284,10 @@ namespace OpenNest.Forms
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             Text = "CAD Converter";
             WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            mainSplit.Panel1.ResumeLayout(false);
+            mainSplit.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)mainSplit).EndInit();
+            mainSplit.ResumeLayout(false);
             sidebarSplit.Panel1.ResumeLayout(false);
             sidebarSplit.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)sidebarSplit).EndInit();
@@ -273,6 +301,7 @@ namespace OpenNest.Forms
 
         #endregion
 
+        private System.Windows.Forms.SplitContainer mainSplit;
         private System.Windows.Forms.SplitContainer sidebarSplit;
         private Controls.FileListControl fileList;
         private Controls.FilterPanel filterPanel;
