@@ -79,7 +79,7 @@ namespace OpenNest.Forms
         private string GetNestName(DateTime date, int id)
         {
             var year = (date.Year % 100).ToString("D2");
-            var seq = ToBase36(id).PadLeft(3, '0');
+            var seq = ToBase36(id).PadLeft(3, '2');
 
             return $"N{year}-{seq}";
         }
@@ -87,13 +87,13 @@ namespace OpenNest.Forms
         private static string ToBase36(int value)
         {
             const string chars = "2345679ACDEFGHJKLMNPQRSTUVWXYZ";
-            if (value == 0) return "0";
+            if (value == 0) return chars[0].ToString();
 
             var result = "";
             while (value > 0)
             {
-                result = chars[value % 36] + result;
-                value /= 36;
+                result = chars[value % chars.Length] + result;
+                value /= chars.Length;
             }
             return result;
         }
