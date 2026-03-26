@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace OpenNest.Controls
@@ -14,6 +15,16 @@ namespace OpenNest.Controls
         public List<Entity> Entities;
         public List<Bend> Bends = new List<Bend>();
         public int SelectedBendIndex = -1;
+
+        private HashSet<Entity> simplifierHighlightSet;
+
+        public List<Entity> SimplifierHighlight
+        {
+            get => simplifierHighlightSet?.ToList();
+            set => simplifierHighlightSet = value != null ? new HashSet<Entity>(value) : null;
+        }
+
+        public Arc SimplifierPreview { get; set; }
 
         private readonly Pen gridPen = new Pen(Color.FromArgb(70, 70, 70));
         private readonly Dictionary<int, Pen> penCache = new Dictionary<int, Pen>();
@@ -71,7 +82,10 @@ namespace OpenNest.Controls
             foreach (var entity in Entities)
             {
                 if (IsEtchLayer(entity.Layer)) continue;
-                var pen = GetEntityPen(entity.Color);
+                var isHighlighted = simplifierHighlightSet != null && simplifierHighlightSet.Contains(entity);
+                var pen = isHighlighted
+                    ? GetEntityPen(Color.FromArgb(60, entity.Color))
+                    : GetEntityPen(entity.Color);
                 DrawEntity(e.Graphics, entity, pen);
             }
 
@@ -85,6 +99,12 @@ namespace OpenNest.Controls
             }
 
             DrawEtchMarks(e.Graphics);
+
+            if (SimplifierPreview != null)
+            {
+                using var previewPen = new Pen(Color.FromArgb(0, 200, 80), 2f / ViewScale);
+                DrawArc(e.Graphics, SimplifierPreview, previewPen);
+            }
 
 #if DRAW_OFFSET
 
@@ -398,6 +418,13 @@ namespace OpenNest.Controls
                         DrawPoint(g, pt, Pens.Yellow, Brushes.Red);
                 }
             }
+        }
+
+        public void ClearSimplifierPreview()
+        {
+            SimplifierHighlight = null;
+            SimplifierPreview = null;
+            Invalidate();
         }
 
         public void ZoomToFit(bool redraw = true)
