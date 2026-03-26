@@ -411,7 +411,14 @@ namespace OpenNest.Forms
             entityView1.ZoomToFit();
             entityView1.Invalidate();
 
-            // Update entity count label
+            var item = CurrentItem;
+            if (item != null)
+            {
+                item.Entities = entities;
+                item.EntityCount = entities.Count;
+                item.Bounds = entities.GetBoundingBox();
+            }
+
             lblEntityCount.Text = $"{entities.Count} entities";
         }
 
