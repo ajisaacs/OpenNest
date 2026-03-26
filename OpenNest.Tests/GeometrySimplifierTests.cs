@@ -107,4 +107,59 @@ public class GeometrySimplifierTests
         Assert.Equal(6, candidates[1].StartIndex);
         Assert.Equal(9, candidates[1].EndIndex);
     }
+
+    [Fact]
+    public void Apply_SingleCandidate_ReplacesLinesWithArc()
+    {
+        // 20 lines approximating a semicircle
+        var arc = new Arc(new Vector(0, 0), 10, 0, System.Math.PI, false);
+        var points = arc.ToPoints(20);
+        var shape = new Shape();
+        for (var i = 0; i < points.Count - 1; i++)
+            shape.Entities.Add(new Line(points[i], points[i + 1]));
+
+        var simplifier = new GeometrySimplifier { Tolerance = 0.1 };
+        var candidates = simplifier.Analyze(shape);
+        var result = simplifier.Apply(shape, candidates);
+
+        Assert.Single(result.Entities);
+        Assert.IsType<Arc>(result.Entities[0]);
+    }
+
+    [Fact]
+    public void Apply_OnlySelectedCandidates_LeavesUnselectedAsLines()
+    {
+        // Two runs of lines with an arc between them
+        var shape = new Shape();
+        var arc1 = new Arc(new Vector(0, 0), 10, 0, System.Math.PI / 2, false);
+        var pts1 = arc1.ToPoints(5);
+        for (var i = 0; i < pts1.Count - 1; i++)
+            shape.Entities.Add(new Line(pts1[i], pts1[i + 1]));
+
+        shape.Entities.Add(new Arc(new Vector(20, 0), 5, 0, System.Math.PI, false));
+
+        var arc2 = new Arc(new Vector(30, 0), 8, 0, System.Math.PI / 3, false);
+        var pts2 = arc2.ToPoints(4);
+        for (var i = 0; i < pts2.Count - 1; i++)
+            shape.Entities.Add(new Line(pts2[i], pts2[i + 1]));
+
+        var simplifier = new GeometrySimplifier { Tolerance = 0.5, MinLines = 3 };
+        var candidates = simplifier.Analyze(shape);
+
+        // Deselect the first candidate
+        candidates[0].IsSelected = false;
+
+        var result = simplifier.Apply(shape, candidates);
+
+        // First run (5 lines) stays as lines + middle arc + second run replaced by arc
+        // 5 original lines + 1 original arc + 1 fitted arc = 7 entities
+        Assert.Equal(7, result.Entities.Count);
+        // First 5 should be lines
+        for (var i = 0; i < 5; i++)
+            Assert.IsType<Line>(result.Entities[i]);
+        // Index 5 is the original arc
+        Assert.IsType<Arc>(result.Entities[5]);
+        // Index 6 is the fitted arc replacing the second run
+        Assert.IsType<Arc>(result.Entities[6]);
+    }
 }

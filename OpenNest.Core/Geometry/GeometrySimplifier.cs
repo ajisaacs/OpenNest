@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.Math;
 
 namespace OpenNest.Geometry;
@@ -51,7 +52,40 @@ public class GeometrySimplifier
 
     public Shape Apply(Shape shape, List<ArcCandidate> candidates)
     {
-        throw new NotImplementedException();
+        var selected = candidates
+            .Where(c => c.IsSelected)
+            .OrderBy(c => c.StartIndex)
+            .ToList();
+
+        var newEntities = new List<Entity>();
+        var i = 0;
+
+        foreach (var candidate in selected)
+        {
+            // Copy entities before this candidate
+            while (i < candidate.StartIndex)
+            {
+                newEntities.Add(shape.Entities[i]);
+                i++;
+            }
+
+            // Insert the fitted arc
+            newEntities.Add(candidate.FittedArc);
+
+            // Skip past the replaced lines
+            i = candidate.EndIndex + 1;
+        }
+
+        // Copy remaining entities
+        while (i < shape.Entities.Count)
+        {
+            newEntities.Add(shape.Entities[i]);
+            i++;
+        }
+
+        var result = new Shape();
+        result.Entities.AddRange(newEntities);
+        return result;
     }
 
     private void FindCandidatesInRun(List<Entity> entities, int runStart, int runEnd, List<ArcCandidate> candidates)
