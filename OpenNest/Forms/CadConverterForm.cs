@@ -20,6 +20,7 @@ namespace OpenNest.Forms
     public partial class CadConverterForm : Form
     {
         private static int colorIndex;
+        private SimplifierViewerForm simplifierViewer;
 
         public CadConverterForm()
         {
@@ -376,6 +377,42 @@ namespace OpenNest.Forms
                 if (dxfFiles.Length > 0)
                     AddFiles(dxfFiles);
             }
+        }
+
+        private void OnSimplifyClick(object sender, EventArgs e)
+        {
+            if (entityView1.Entities == null || entityView1.Entities.Count == 0)
+                return;
+
+            var shapes = ShapeBuilder.GetShapes(entityView1.Entities);
+            if (shapes.Count == 0)
+                return;
+
+            if (simplifierViewer == null || simplifierViewer.IsDisposed)
+            {
+                simplifierViewer = new SimplifierViewerForm();
+                simplifierViewer.Owner = this;
+                simplifierViewer.Applied += OnSimplifierApplied;
+
+                // Position next to this form
+                var screen = Screen.FromControl(this);
+                simplifierViewer.Location = new Point(
+                    System.Math.Min(Right, screen.WorkingArea.Right - simplifierViewer.Width),
+                    Top);
+            }
+
+            simplifierViewer.LoadShapes(shapes, entityView1);
+        }
+
+        private void OnSimplifierApplied(List<Entity> entities)
+        {
+            entityView1.Entities.Clear();
+            entityView1.Entities.AddRange(entities);
+            entityView1.ZoomToFit();
+            entityView1.Invalidate();
+
+            // Update entity count label
+            lblEntityCount.Text = $"{entities.Count} entities";
         }
 
         #endregion

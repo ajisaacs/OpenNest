@@ -28,6 +28,7 @@ namespace OpenNest.Forms
             lblDimensions = new System.Windows.Forms.Label();
             lblEntityCount = new System.Windows.Forms.Label();
             btnSplit = new System.Windows.Forms.Button();
+            btnSimplify = new System.Windows.Forms.Button();
             lblDetect = new System.Windows.Forms.Label();
             cboBendDetector = new System.Windows.Forms.ComboBox();
             bottomPanel1 = new OpenNest.Controls.BottomPanel();
@@ -127,6 +128,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(lblDimensions);
             detailBar.Controls.Add(lblEntityCount);
             detailBar.Controls.Add(btnSplit);
+            detailBar.Controls.Add(btnSimplify);
             detailBar.Controls.Add(lblDetect);
             detailBar.Controls.Add(cboBendDetector);
             detailBar.Dock = System.Windows.Forms.DockStyle.Bottom;
@@ -213,9 +215,18 @@ namespace OpenNest.Forms
             btnSplit.Size = new System.Drawing.Size(60, 24);
             btnSplit.TabIndex = 6;
             btnSplit.Text = "Split...";
-            // 
+            //
+            // btnSimplify
+            //
+            btnSimplify.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnSimplify.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnSimplify.Text = "Simplify...";
+            btnSimplify.AutoSize = true;
+            btnSimplify.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
+            btnSimplify.Click += new System.EventHandler(this.OnSimplifyClick);
+            //
             // lblDetect
-            // 
+            //
             lblDetect.AutoSize = true;
             lblDetect.Font = new System.Drawing.Font("Segoe UI", 9F);
             lblDetect.Location = new System.Drawing.Point(361, 9);
@@ -312,6 +323,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.NumericUpDown numQuantity;
         private System.Windows.Forms.TextBox txtCustomer;
         private System.Windows.Forms.Button btnSplit;
+        private System.Windows.Forms.Button btnSimplify;
         private System.Windows.Forms.ComboBox cboBendDetector;
         private System.Windows.Forms.Label lblQty;
         private System.Windows.Forms.Label lblCust;
