@@ -133,17 +133,30 @@ namespace OpenNest.Geometry
             if (!arc1.Radius.IsEqualTo(arc2.Radius))
                 return false;
 
-            if (arc1.StartAngle > arc1.EndAngle)
-                arc1.StartAngle -= Angle.TwoPI;
+            var start1 = arc1.StartAngle;
+            var end1 = arc1.EndAngle;
+            var start2 = arc2.StartAngle;
+            var end2 = arc2.EndAngle;
 
-            if (arc2.StartAngle > arc2.EndAngle)
-                arc2.StartAngle -= Angle.TwoPI;
+            if (start1 > end1)
+                start1 -= Angle.TwoPI;
 
-            if (arc1.EndAngle < arc2.StartAngle || arc1.StartAngle > arc2.EndAngle)
+            if (start2 > end2)
+                start2 -= Angle.TwoPI;
+
+            // Check that arcs are adjacent (endpoints touch), not overlapping
+            var touch1 = end1.IsEqualTo(start2) || (end1 + Angle.TwoPI).IsEqualTo(start2);
+            var touch2 = end2.IsEqualTo(start1) || (end2 + Angle.TwoPI).IsEqualTo(start1);
+            if (!touch1 && !touch2)
                 return false;
 
-            var startAngle = arc1.StartAngle < arc2.StartAngle ? arc1.StartAngle : arc2.StartAngle;
-            var endAngle = arc1.EndAngle > arc2.EndAngle ? arc1.EndAngle : arc2.EndAngle;
+            var startAngle = start1 < start2 ? start1 : start2;
+            var endAngle = end1 > end2 ? end1 : end2;
+
+            // Don't merge if the result would be a full circle (start == end)
+            var sweep = endAngle - startAngle;
+            if (sweep >= Angle.TwoPI - Tolerance.Epsilon)
+                return false;
 
             if (startAngle < 0) startAngle += Angle.TwoPI;
             if (endAngle < 0) endAngle += Angle.TwoPI;
