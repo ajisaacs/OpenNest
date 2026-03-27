@@ -128,6 +128,7 @@ public partial class SimplifierViewerForm : Form
 
     private void OnToleranceChanged(object sender, System.EventArgs e)
     {
+        if (simplifier == null) return;
         simplifier.Tolerance = (double)numTolerance.Value;
         entityView?.ClearSimplifierPreview();
         RunAnalysis();
