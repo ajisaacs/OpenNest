@@ -47,13 +47,21 @@ namespace OpenNest.Engine.Fill
 
             var adjusted = AdjustColumn(pair.Value, column, token);
 
+            // The iterative pair adjustment can shift parts enough to cause
+            // genuine overlap. Fall back to the unadjusted column when this happens.
+            if (HasOverlappingParts(adjusted))
+            {
+                Debug.WriteLine("[FillExtents] Adjusted column has overlaps, using unadjusted");
+                adjusted = column;
+            }
+
             NestEngineBase.ReportProgress(progress, new ProgressReport
             {
                 Phase = NestPhase.Extents,
                 PlateNumber = plateNumber,
                 Parts = adjusted,
                 WorkArea = workArea,
-                Description = $"Extents: adjusted column {adjusted.Count} parts",
+                Description = $"Extents: column {adjusted.Count} parts",
             });
 
             var result = RepeatColumns(adjusted, token);
@@ -385,6 +393,32 @@ namespace OpenNest.Engine.Fill
                    part.BoundingBox.Top <= workArea.Top + Tolerance.Epsilon &&
                    part.BoundingBox.Left >= workArea.Left - Tolerance.Epsilon &&
                    part.BoundingBox.Bottom >= workArea.Bottom - Tolerance.Epsilon;
+        }
+
+        private static bool HasOverlappingParts(List<Part> parts)
+        {
+            for (var i = 0; i < parts.Count; i++)
+            {
+                var b1 = parts[i].BoundingBox;
+
+                for (var j = i + 1; j < parts.Count; j++)
+                {
+                    var b2 = parts[j].BoundingBox;
+
+                    var overlapX = System.Math.Min(b1.Right, b2.Right)
+                                 - System.Math.Max(b1.Left, b2.Left);
+                    var overlapY = System.Math.Min(b1.Top, b2.Top)
+                                 - System.Math.Max(b1.Bottom, b2.Bottom);
+
+                    if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
+                        continue;
+
+                    if (parts[i].Intersects(parts[j], out _))
+                        return true;
+                }
+            }
+
+            return false;
         }
     }
 }

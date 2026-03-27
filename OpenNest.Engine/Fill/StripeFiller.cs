@@ -158,6 +158,15 @@ public class StripeFiller
         if (gridParts.Count == 0)
             return null;
 
+        // Reject results where bounding boxes overlap — the angle convergence
+        // can produce slightly off-axis rotations where FillLinear's copy
+        // distance calculation doesn't fully account for the rotated geometry.
+        if (HasOverlappingParts(gridParts))
+        {
+            Debug.WriteLine($"[StripeFiller] Rejected grid: overlapping bounding boxes detected");
+            return null;
+        }
+
         var allParts = new List<Part>(gridParts);
 
         var remnantParts = FillRemnant(gridParts, primaryAxis);
@@ -469,5 +478,35 @@ public class StripeFiller
     private static double GetDimension(Box box, NestDirection axis)
     {
         return axis == NestDirection.Horizontal ? box.Width : box.Length;
+    }
+
+    /// <summary>
+    /// Checks if any pair of parts geometrically overlap. Uses bounding box
+    /// pre-filtering for performance, then falls back to shape intersection.
+    /// </summary>
+    private static bool HasOverlappingParts(List<Part> parts)
+    {
+        for (var i = 0; i < parts.Count; i++)
+        {
+            var b1 = parts[i].BoundingBox;
+
+            for (var j = i + 1; j < parts.Count; j++)
+            {
+                var b2 = parts[j].BoundingBox;
+
+                var overlapX = System.Math.Min(b1.Right, b2.Right)
+                             - System.Math.Max(b1.Left, b2.Left);
+                var overlapY = System.Math.Min(b1.Top, b2.Top)
+                             - System.Math.Max(b1.Bottom, b2.Bottom);
+
+                if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
+                    continue;
+
+                if (parts[i].Intersects(parts[j], out _))
+                    return true;
+            }
+        }
+
+        return false;
     }
 }
