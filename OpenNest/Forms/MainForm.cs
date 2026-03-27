@@ -473,6 +473,13 @@ namespace OpenNest.Forms
             }
         }
 
+        private void ImportBom_Click(object sender, EventArgs e)
+        {
+            var form = new BomImportForm();
+            form.MdiParent = this;
+            form.ShowDialog(this);
+        }
+
         private void Save_Click(object sender, EventArgs e)
         {
             if (activeForm != null)

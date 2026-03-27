@@ -171,7 +171,7 @@
             // 
             // mnuFile
             // 
-            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, toolStripMenuItem3, mnuFileExit });
+            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, toolStripMenuItem3, mnuFileExit });
             mnuFile.Name = "mnuFile";
             mnuFile.Size = new System.Drawing.Size(37, 20);
             mnuFile.Text = "&File";
@@ -186,14 +186,22 @@
             mnuFileNew.Click += New_Click;
             // 
             // mnuFileOpen
-            // 
+            //
             mnuFileOpen.Image = Properties.Resources.doc_open;
             mnuFileOpen.Name = "mnuFileOpen";
             mnuFileOpen.ShortcutKeys = System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.O;
             mnuFileOpen.Size = new System.Drawing.Size(146, 22);
             mnuFileOpen.Text = "Open";
             mnuFileOpen.Click += Open_Click;
-            // 
+            //
+            // mnuFileImportBom
+            //
+            mnuFileImportBom = new System.Windows.Forms.ToolStripMenuItem();
+            mnuFileImportBom.Name = "mnuFileImportBom";
+            mnuFileImportBom.Size = new System.Drawing.Size(180, 22);
+            mnuFileImportBom.Text = "Import BOM...";
+            mnuFileImportBom.Click += ImportBom_Click;
+            //
             // toolStripMenuItem1
             // 
             toolStripMenuItem1.Name = "toolStripMenuItem1";
@@ -1125,6 +1133,7 @@
         private System.Windows.Forms.ToolStripMenuItem mnuFile;
         private System.Windows.Forms.ToolStripMenuItem mnuFileNew;
         private System.Windows.Forms.ToolStripMenuItem mnuFileOpen;
+        private System.Windows.Forms.ToolStripMenuItem mnuFileImportBom;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem1;
         private System.Windows.Forms.ToolStripMenuItem mnuFileSave;
         private System.Windows.Forms.ToolStripMenuItem mnuFileSaveAs;
