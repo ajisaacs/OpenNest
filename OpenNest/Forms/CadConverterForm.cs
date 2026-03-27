@@ -163,6 +163,50 @@ namespace OpenNest.Forms
             lblEntityCount.Text = $"{item.EntityCount} entities";
 
             entityView1.ZoomToFit();
+            CheckSimplifiable(item);
+        }
+
+        private void CheckSimplifiable(FileListItem item)
+        {
+            ResetSimplifyButton();
+
+            // Only check original (unsimplified) entities
+            var entities = item.OriginalEntities ?? item.Entities;
+            if (entities == null || entities.Count < 10) return;
+
+            // Quick line count check — need at least MinLines consecutive lines
+            var lineCount = entities.Count(e => e is Geometry.Line);
+            if (lineCount < 3) return;
+
+            // Run a quick analysis on a background thread
+            var capturedEntities = new List<Entity>(entities);
+            Task.Run(() =>
+            {
+                var shapes = ShapeBuilder.GetShapes(capturedEntities);
+                var simplifier = new GeometrySimplifier();
+                var count = 0;
+                foreach (var shape in shapes)
+                    count += simplifier.Analyze(shape).Count;
+                return count;
+            }).ContinueWith(t =>
+            {
+                if (t.IsCompletedSuccessfully && t.Result > 0)
+                    HighlightSimplifyButton(t.Result);
+            }, TaskScheduler.FromCurrentSynchronizationContext());
+        }
+
+        private void HighlightSimplifyButton(int candidateCount)
+        {
+            btnSimplify.Text = $"Simplify ({candidateCount})";
+            btnSimplify.BackColor = Color.FromArgb(60, 120, 60);
+            btnSimplify.ForeColor = Color.White;
+        }
+
+        private void ResetSimplifyButton()
+        {
+            btnSimplify.Text = "Simplify...";
+            btnSimplify.BackColor = SystemColors.Control;
+            btnSimplify.ForeColor = SystemColors.ControlText;
         }
 
         private void ClearDetailBar()
@@ -427,6 +471,7 @@ namespace OpenNest.Forms
             }
 
             lblEntityCount.Text = $"{entities.Count} entities";
+            ResetSimplifyButton();
         }
 
         private void OnShowOriginalChanged(object sender, EventArgs e)
