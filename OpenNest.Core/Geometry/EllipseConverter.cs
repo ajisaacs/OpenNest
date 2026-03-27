@@ -67,6 +67,11 @@ namespace OpenNest.Geometry
         public static List<Entity> Convert(Vector center, double semiMajor, double semiMinor,
             double rotation, double startParam, double endParam, double tolerance = 0.001)
         {
+            if (tolerance <= 0)
+                throw new ArgumentOutOfRangeException(nameof(tolerance), "Tolerance must be positive.");
+            if (semiMajor <= 0 || semiMinor <= 0)
+                throw new ArgumentOutOfRangeException("Semi-axis lengths must be positive.");
+
             if (endParam <= startParam)
                 endParam += Angle.TwoPI;
 

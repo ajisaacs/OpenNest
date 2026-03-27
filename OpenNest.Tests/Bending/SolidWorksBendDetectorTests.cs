@@ -70,7 +70,6 @@ public class SolidWorksBendDetectorTests
         // changing the entity count. Verify arcs are present and no
         // spurious closing chord exists.
         var arcCount = result.Entities.Count(e => e is OpenNest.Geometry.Arc);
-        var lineCount = result.Entities.Count(e => e is OpenNest.Geometry.Line);
         var circleCount = result.Entities.Count(e => e is OpenNest.Geometry.Circle);
 
         Assert.True(arcCount > 0, "Expected arcs from ellipse conversion");

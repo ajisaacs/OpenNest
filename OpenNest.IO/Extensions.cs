@@ -1,6 +1,7 @@
 using ACadSharp.Entities;
 using CSMath;
 using OpenNest.Geometry;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -68,8 +69,9 @@ namespace OpenNest.IO
             {
                 curvePoints = spline.PolygonalVertexes(precision > 0 ? precision : 200);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Spline curve evaluation failed: {ex.Message}");
                 curvePoints = null;
             }
 
