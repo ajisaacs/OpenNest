@@ -16,17 +16,12 @@ namespace OpenNest.Forms
         private void InitializeComponent()
         {
             grpInput = new System.Windows.Forms.GroupBox();
-            lblJobName = new System.Windows.Forms.Label();
             txtJobName = new System.Windows.Forms.TextBox();
-            lblBomFile = new System.Windows.Forms.Label();
             txtBomFile = new System.Windows.Forms.TextBox();
             btnBrowseBom = new System.Windows.Forms.Button();
-            lblDxfFolder = new System.Windows.Forms.Label();
             txtDxfFolder = new System.Windows.Forms.TextBox();
             btnBrowseDxf = new System.Windows.Forms.Button();
-            lblPlateSize = new System.Windows.Forms.Label();
             txtPlateWidth = new System.Windows.Forms.TextBox();
-            lblPlateX = new System.Windows.Forms.Label();
             txtPlateLength = new System.Windows.Forms.TextBox();
             btnAnalyze = new System.Windows.Forms.Button();
             grpGroups = new System.Windows.Forms.GroupBox();
@@ -35,177 +30,136 @@ namespace OpenNest.Forms
             lblSummary = new System.Windows.Forms.Label();
             btnClose = new System.Windows.Forms.Button();
             btnCreateNests = new System.Windows.Forms.Button();
+
+            var tbl = new System.Windows.Forms.TableLayoutPanel();
+            var lblJobName = new System.Windows.Forms.Label();
+            var lblBomFile = new System.Windows.Forms.Label();
+            var lblDxfFolder = new System.Windows.Forms.Label();
+            var lblPlateSize = new System.Windows.Forms.Label();
+            var lblPlateX = new System.Windows.Forms.Label();
+            var platePanel = new System.Windows.Forms.FlowLayoutPanel();
+
             grpInput.SuspendLayout();
             grpGroups.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvGroups).BeginInit();
             pnlBottom.SuspendLayout();
             SuspendLayout();
-            //
-            // grpInput
-            //
-            grpInput.Controls.Add(lblJobName);
-            grpInput.Controls.Add(txtJobName);
-            grpInput.Controls.Add(lblBomFile);
-            grpInput.Controls.Add(txtBomFile);
-            grpInput.Controls.Add(btnBrowseBom);
-            grpInput.Controls.Add(lblDxfFolder);
-            grpInput.Controls.Add(txtDxfFolder);
-            grpInput.Controls.Add(btnBrowseDxf);
-            grpInput.Controls.Add(lblPlateSize);
-            grpInput.Controls.Add(txtPlateWidth);
-            grpInput.Controls.Add(lblPlateX);
-            grpInput.Controls.Add(txtPlateLength);
-            grpInput.Controls.Add(btnAnalyze);
+
+            // ---- TableLayoutPanel for input fields ----
+            tbl.ColumnCount = 3;
+            tbl.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            tbl.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            tbl.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.AutoSize));
+            tbl.RowCount = 5;
+            tbl.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            tbl.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            tbl.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            tbl.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            tbl.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.AutoSize));
+            tbl.Dock = System.Windows.Forms.DockStyle.Fill;
+            tbl.Padding = new System.Windows.Forms.Padding(3);
+
+            // Row 0 — Job Name
+            lblJobName.Text = "Job Name:";
+            lblJobName.AutoSize = true;
+            lblJobName.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            lblJobName.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
+            tbl.Controls.Add(lblJobName, 0, 0);
+
+            txtJobName.Dock = System.Windows.Forms.DockStyle.Fill;
+            txtJobName.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
+            tbl.Controls.Add(txtJobName, 1, 0);
+            tbl.SetColumnSpan(txtJobName, 2);
+
+            // Row 1 — BOM File
+            lblBomFile.Text = "BOM File:";
+            lblBomFile.AutoSize = true;
+            lblBomFile.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            lblBomFile.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
+            tbl.Controls.Add(lblBomFile, 0, 1);
+
+            txtBomFile.Dock = System.Windows.Forms.DockStyle.Fill;
+            txtBomFile.ReadOnly = true;
+            txtBomFile.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
+            tbl.Controls.Add(txtBomFile, 1, 1);
+
+            btnBrowseBom.Text = "...";
+            btnBrowseBom.Size = new System.Drawing.Size(35, 25);
+            btnBrowseBom.Margin = new System.Windows.Forms.Padding(0, 5, 3, 3);
+            btnBrowseBom.Click += new System.EventHandler(BrowseBom_Click);
+            tbl.Controls.Add(btnBrowseBom, 2, 1);
+
+            // Row 2 — DXF Folder
+            lblDxfFolder.Text = "DXF Folder:";
+            lblDxfFolder.AutoSize = true;
+            lblDxfFolder.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            lblDxfFolder.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
+            tbl.Controls.Add(lblDxfFolder, 0, 2);
+
+            txtDxfFolder.Dock = System.Windows.Forms.DockStyle.Fill;
+            txtDxfFolder.ReadOnly = true;
+            txtDxfFolder.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
+            tbl.Controls.Add(txtDxfFolder, 1, 2);
+
+            btnBrowseDxf.Text = "...";
+            btnBrowseDxf.Size = new System.Drawing.Size(35, 25);
+            btnBrowseDxf.Margin = new System.Windows.Forms.Padding(0, 5, 3, 3);
+            btnBrowseDxf.Click += new System.EventHandler(BrowseDxf_Click);
+            tbl.Controls.Add(btnBrowseDxf, 2, 2);
+
+            // Row 3 — Plate Size
+            lblPlateSize.Text = "Plate Size:";
+            lblPlateSize.AutoSize = true;
+            lblPlateSize.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            lblPlateSize.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
+            tbl.Controls.Add(lblPlateSize, 0, 3);
+
+            platePanel.AutoSize = true;
+            platePanel.WrapContents = false;
+            platePanel.Margin = new System.Windows.Forms.Padding(0, 3, 0, 3);
+            txtPlateWidth.Size = new System.Drawing.Size(60, 23);
+            txtPlateWidth.Text = "60";
+            lblPlateX.Text = " x ";
+            lblPlateX.AutoSize = true;
+            lblPlateX.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            txtPlateLength.Size = new System.Drawing.Size(60, 23);
+            txtPlateLength.Text = "120";
+            platePanel.Controls.Add(txtPlateWidth);
+            platePanel.Controls.Add(lblPlateX);
+            platePanel.Controls.Add(txtPlateLength);
+            tbl.Controls.Add(platePanel, 1, 3);
+
+            // Row 4 — Analyze button
+            btnAnalyze.Text = "Analyze";
+            btnAnalyze.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            btnAnalyze.Size = new System.Drawing.Size(110, 30);
+            btnAnalyze.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
+            btnAnalyze.Anchor = System.Windows.Forms.AnchorStyles.Right;
+            btnAnalyze.Click += new System.EventHandler(Analyze_Click);
+            tbl.Controls.Add(btnAnalyze, 1, 4);
+            tbl.SetColumnSpan(btnAnalyze, 2);
+
+            // ---- grpInput ----
+            grpInput.Controls.Add(tbl);
             grpInput.Dock = System.Windows.Forms.DockStyle.Top;
-            grpInput.Font = new System.Drawing.Font("Segoe UI", 9F);
-            grpInput.Location = new System.Drawing.Point(0, 0);
             grpInput.Name = "grpInput";
-            grpInput.Height = 180;
-            grpInput.Padding = new System.Windows.Forms.Padding(10, 6, 10, 6);
+            grpInput.AutoSize = true;
+            grpInput.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            grpInput.Padding = new System.Windows.Forms.Padding(6);
             grpInput.TabIndex = 0;
             grpInput.TabStop = false;
             grpInput.Text = "Input";
-            //
-            // lblJobName
-            //
-            lblJobName.AutoSize = true;
-            lblJobName.Location = new System.Drawing.Point(13, 28);
-            lblJobName.Name = "lblJobName";
-            lblJobName.Size = new System.Drawing.Size(65, 15);
-            lblJobName.TabIndex = 0;
-            lblJobName.Text = "Job Name:";
-            //
-            // txtJobName
-            //
-            txtJobName.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
-            txtJobName.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            txtJobName.Location = new System.Drawing.Point(90, 25);
-            txtJobName.Name = "txtJobName";
-            txtJobName.Size = new System.Drawing.Size(378, 23);
-            txtJobName.TabIndex = 1;
-            //
-            // lblBomFile
-            //
-            lblBomFile.AutoSize = true;
-            lblBomFile.Location = new System.Drawing.Point(13, 58);
-            lblBomFile.Name = "lblBomFile";
-            lblBomFile.Size = new System.Drawing.Size(56, 15);
-            lblBomFile.TabIndex = 2;
-            lblBomFile.Text = "BOM File:";
-            //
-            // txtBomFile
-            //
-            txtBomFile.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
-            txtBomFile.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            txtBomFile.Location = new System.Drawing.Point(90, 55);
-            txtBomFile.Name = "txtBomFile";
-            txtBomFile.ReadOnly = true;
-            txtBomFile.Size = new System.Drawing.Size(343, 23);
-            txtBomFile.TabIndex = 3;
-            //
-            // btnBrowseBom
-            //
-            btnBrowseBom.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
-            btnBrowseBom.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnBrowseBom.Location = new System.Drawing.Point(438, 54);
-            btnBrowseBom.Name = "btnBrowseBom";
-            btnBrowseBom.Size = new System.Drawing.Size(30, 25);
-            btnBrowseBom.TabIndex = 4;
-            btnBrowseBom.Text = "...";
-            btnBrowseBom.Click += new System.EventHandler(BrowseBom_Click);
-            //
-            // lblDxfFolder
-            //
-            lblDxfFolder.AutoSize = true;
-            lblDxfFolder.Location = new System.Drawing.Point(13, 90);
-            lblDxfFolder.Name = "lblDxfFolder";
-            lblDxfFolder.Size = new System.Drawing.Size(65, 15);
-            lblDxfFolder.TabIndex = 5;
-            lblDxfFolder.Text = "DXF Folder:";
-            //
-            // txtDxfFolder
-            //
-            txtDxfFolder.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
-            txtDxfFolder.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            txtDxfFolder.Location = new System.Drawing.Point(90, 87);
-            txtDxfFolder.Name = "txtDxfFolder";
-            txtDxfFolder.ReadOnly = true;
-            txtDxfFolder.Size = new System.Drawing.Size(343, 23);
-            txtDxfFolder.TabIndex = 6;
-            //
-            // btnBrowseDxf
-            //
-            btnBrowseDxf.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
-            btnBrowseDxf.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnBrowseDxf.Location = new System.Drawing.Point(438, 86);
-            btnBrowseDxf.Name = "btnBrowseDxf";
-            btnBrowseDxf.Size = new System.Drawing.Size(30, 25);
-            btnBrowseDxf.TabIndex = 7;
-            btnBrowseDxf.Text = "...";
-            btnBrowseDxf.Click += new System.EventHandler(BrowseDxf_Click);
-            //
-            // lblPlateSize
-            //
-            lblPlateSize.AutoSize = true;
-            lblPlateSize.Location = new System.Drawing.Point(13, 122);
-            lblPlateSize.Name = "lblPlateSize";
-            lblPlateSize.Size = new System.Drawing.Size(62, 15);
-            lblPlateSize.TabIndex = 8;
-            lblPlateSize.Text = "Plate Size:";
-            //
-            // txtPlateWidth
-            //
-            txtPlateWidth.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            txtPlateWidth.Location = new System.Drawing.Point(90, 119);
-            txtPlateWidth.Name = "txtPlateWidth";
-            txtPlateWidth.Size = new System.Drawing.Size(60, 23);
-            txtPlateWidth.TabIndex = 9;
-            txtPlateWidth.Text = "60";
-            //
-            // lblPlateX
-            //
-            lblPlateX.AutoSize = true;
-            lblPlateX.Location = new System.Drawing.Point(155, 122);
-            lblPlateX.Name = "lblPlateX";
-            lblPlateX.Size = new System.Drawing.Size(13, 15);
-            lblPlateX.TabIndex = 10;
-            lblPlateX.Text = "x";
-            //
-            // txtPlateLength
-            //
-            txtPlateLength.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            txtPlateLength.Location = new System.Drawing.Point(173, 119);
-            txtPlateLength.Name = "txtPlateLength";
-            txtPlateLength.Size = new System.Drawing.Size(60, 23);
-            txtPlateLength.TabIndex = 11;
-            txtPlateLength.Text = "120";
-            //
-            // btnAnalyze
-            //
-            btnAnalyze.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
-            btnAnalyze.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnAnalyze.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            btnAnalyze.Location = new System.Drawing.Point(358, 118);
-            btnAnalyze.Name = "btnAnalyze";
-            btnAnalyze.Size = new System.Drawing.Size(110, 27);
-            btnAnalyze.TabIndex = 12;
-            btnAnalyze.Text = "Analyze";
-            btnAnalyze.Click += new System.EventHandler(Analyze_Click);
-            //
-            // grpGroups
-            //
+
+            // ---- grpGroups ----
             grpGroups.Controls.Add(dgvGroups);
             grpGroups.Dock = System.Windows.Forms.DockStyle.Fill;
-            grpGroups.Font = new System.Drawing.Font("Segoe UI", 9F);
-            grpGroups.Location = new System.Drawing.Point(0, 180);
             grpGroups.Name = "grpGroups";
             grpGroups.Padding = new System.Windows.Forms.Padding(10, 6, 10, 6);
             grpGroups.TabIndex = 1;
             grpGroups.TabStop = false;
             grpGroups.Text = "Material Groups";
-            //
-            // dgvGroups
-            //
+
+            // ---- dgvGroups ----
             dgvGroups.AllowUserToAddRows = false;
             dgvGroups.AllowUserToDeleteRows = false;
             dgvGroups.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
@@ -213,77 +167,62 @@ namespace OpenNest.Forms
             dgvGroups.BorderStyle = System.Windows.Forms.BorderStyle.None;
             dgvGroups.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dgvGroups.Dock = System.Windows.Forms.DockStyle.Fill;
-            dgvGroups.Location = new System.Drawing.Point(10, 22);
             dgvGroups.Name = "dgvGroups";
             dgvGroups.ReadOnly = true;
             dgvGroups.RowHeadersVisible = false;
             dgvGroups.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             dgvGroups.TabIndex = 0;
-            //
-            // pnlBottom
-            //
+
+            // ---- pnlBottom ----
             pnlBottom.Controls.Add(lblSummary);
             pnlBottom.Controls.Add(btnCreateNests);
             pnlBottom.Controls.Add(btnClose);
             pnlBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
-            pnlBottom.Height = 60;
+            pnlBottom.Height = 50;
             pnlBottom.Name = "pnlBottom";
+            pnlBottom.Padding = new System.Windows.Forms.Padding(10, 10, 10, 10);
             pnlBottom.TabIndex = 2;
-            //
-            // lblSummary
-            //
-            lblSummary.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom;
+
+            // ---- lblSummary ----
             lblSummary.AutoSize = true;
-            lblSummary.Font = new System.Drawing.Font("Segoe UI", 9F);
             lblSummary.ForeColor = System.Drawing.Color.Gray;
-            lblSummary.Location = new System.Drawing.Point(10, 20);
+            lblSummary.Dock = System.Windows.Forms.DockStyle.Left;
             lblSummary.Name = "lblSummary";
-            lblSummary.Size = new System.Drawing.Size(0, 15);
             lblSummary.TabIndex = 0;
-            //
-            // btnCreateNests
-            //
-            btnCreateNests.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
-            btnCreateNests.Enabled = false;
-            btnCreateNests.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnCreateNests.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
-            btnCreateNests.Location = new System.Drawing.Point(294, 16);
-            btnCreateNests.Name = "btnCreateNests";
-            btnCreateNests.Size = new System.Drawing.Size(110, 28);
-            btnCreateNests.TabIndex = 1;
-            btnCreateNests.Text = "Create Nests";
-            btnCreateNests.Click += new System.EventHandler(CreateNests_Click);
-            //
-            // btnClose
-            //
-            btnClose.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+            lblSummary.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+
+            // ---- btnClose ----
             btnClose.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            btnClose.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            btnClose.Font = new System.Drawing.Font("Segoe UI", 9F);
-            btnClose.Location = new System.Drawing.Point(410, 16);
+            btnClose.Dock = System.Windows.Forms.DockStyle.Right;
             btnClose.Name = "btnClose";
-            btnClose.Size = new System.Drawing.Size(75, 28);
+            btnClose.Size = new System.Drawing.Size(80, 30);
             btnClose.TabIndex = 2;
             btnClose.Text = "Close";
             btnClose.Click += new System.EventHandler(BtnClose_Click);
-            //
-            // BomImportForm
-            //
+
+            // ---- btnCreateNests ----
+            btnCreateNests.Enabled = false;
+            btnCreateNests.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            btnCreateNests.Dock = System.Windows.Forms.DockStyle.Right;
+            btnCreateNests.Name = "btnCreateNests";
+            btnCreateNests.Size = new System.Drawing.Size(110, 30);
+            btnCreateNests.TabIndex = 1;
+            btnCreateNests.Text = "Create Nests";
+            btnCreateNests.Margin = new System.Windows.Forms.Padding(0, 0, 6, 0);
+            btnCreateNests.Click += new System.EventHandler(CreateNests_Click);
+
+            // ---- BomImportForm ----
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             CancelButton = btnClose;
-            ClientSize = new System.Drawing.Size(530, 560);
+            ClientSize = new System.Drawing.Size(520, 500);
             Controls.Add(pnlBottom);
             Controls.Add(grpInput);
             Controls.Add(grpGroups);
             Font = new System.Drawing.Font("Segoe UI", 9F);
-            FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
-            MinimumSize = new System.Drawing.Size(450, 400);
+            MinimumSize = new System.Drawing.Size(400, 350);
             MaximizeBox = false;
-            MinimizeBox = false;
             Name = "BomImportForm";
-            ShowIcon = false;
-            ShowInTaskbar = false;
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             Text = "Import BOM";
             grpInput.ResumeLayout(false);
@@ -298,17 +237,12 @@ namespace OpenNest.Forms
         #endregion
 
         private System.Windows.Forms.GroupBox grpInput;
-        private System.Windows.Forms.Label lblJobName;
         private System.Windows.Forms.TextBox txtJobName;
-        private System.Windows.Forms.Label lblBomFile;
         private System.Windows.Forms.TextBox txtBomFile;
         private System.Windows.Forms.Button btnBrowseBom;
-        private System.Windows.Forms.Label lblDxfFolder;
         private System.Windows.Forms.TextBox txtDxfFolder;
         private System.Windows.Forms.Button btnBrowseDxf;
-        private System.Windows.Forms.Label lblPlateSize;
         private System.Windows.Forms.TextBox txtPlateWidth;
-        private System.Windows.Forms.Label lblPlateX;
         private System.Windows.Forms.TextBox txtPlateLength;
         private System.Windows.Forms.Button btnAnalyze;
         private System.Windows.Forms.GroupBox grpGroups;
