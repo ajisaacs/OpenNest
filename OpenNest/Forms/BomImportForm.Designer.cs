@@ -143,8 +143,7 @@ namespace OpenNest.Forms
             grpInput.Controls.Add(tbl);
             grpInput.Dock = System.Windows.Forms.DockStyle.Top;
             grpInput.Name = "grpInput";
-            grpInput.AutoSize = true;
-            grpInput.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
+            grpInput.Height = 200;
             grpInput.Padding = new System.Windows.Forms.Padding(6);
             grpInput.TabIndex = 0;
             grpInput.TabStop = false;
