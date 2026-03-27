@@ -115,9 +115,9 @@ namespace OpenNest.Forms
         {
             var parts = new List<string>();
             if (analysis.Skipped.Count > 0)
-                parts.Add($"{analysis.Skipped.Count} skipped");
+                parts.Add($"{analysis.Skipped.Count} skipped (no DXF file or thickness given)");
             if (analysis.Unmatched.Count > 0)
-                parts.Add($"{analysis.Unmatched.Count} unmatched");
+                parts.Add($"{analysis.Unmatched.Count} unmatched (DXF file not found)");
 
             lblSummary.Text = parts.Count > 0
                 ? string.Join(", ", parts)
@@ -126,6 +126,9 @@ namespace OpenNest.Forms
 
         private void CreateNests_Click(object sender, EventArgs e)
         {
+            if (_analysis == null || _analysis.Groups.Count == 0)
+                return;
+
             if (!double.TryParse(txtPlateWidth.Text, out var plateWidth) || plateWidth <= 0)
             {
                 MessageBox.Show("Plate width must be a positive number.", "Validation Error",
@@ -141,6 +144,7 @@ namespace OpenNest.Forms
             }
 
             var jobName = txtJobName.Text.Trim();
+            var importer = new DxfImporter();
             var nestsCreated = 0;
             var importErrors = new List<string>();
 
@@ -167,13 +171,13 @@ namespace OpenNest.Forms
 
                     try
                     {
-                        var importer = new DxfImporter();
                         var result = importer.Import(matched.DxfPath);
 
                         var drawingName = Path.GetFileNameWithoutExtension(matched.DxfPath);
                         var drawing = new Drawing(drawingName);
                         drawing.Source.Path = matched.DxfPath;
                         drawing.Quantity.Required = matched.Item.Qty ?? 1;
+                        drawing.Material = new Material(group.Material);
 
                         var pgm = ConvertGeometry.ToProgram(result.Entities);
 
