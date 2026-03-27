@@ -126,6 +126,95 @@ namespace OpenNest.Forms
 
         private void CreateNests_Click(object sender, EventArgs e)
         {
+            if (!double.TryParse(txtPlateWidth.Text, out var plateWidth) || plateWidth <= 0)
+            {
+                MessageBox.Show("Plate width must be a positive number.", "Validation Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (!double.TryParse(txtPlateLength.Text, out var plateLength) || plateLength <= 0)
+            {
+                MessageBox.Show("Plate length must be a positive number.", "Validation Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var jobName = txtJobName.Text.Trim();
+            var nestsCreated = 0;
+            var importErrors = new List<string>();
+
+            foreach (var group in _analysis.Groups)
+            {
+                var nestName = $"{jobName} - {group.Thickness:0.###} {group.Material}";
+                var nest = new Nest(nestName);
+                nest.DateCreated = DateTime.Now;
+                nest.DateLastModified = DateTime.Now;
+                nest.PlateDefaults.Size = new Size(plateWidth, plateLength);
+                nest.PlateDefaults.Thickness = group.Thickness;
+                nest.PlateDefaults.Material = new Material(group.Material);
+                nest.PlateDefaults.Quadrant = 1;
+                nest.PlateDefaults.PartSpacing = 1;
+                nest.PlateDefaults.EdgeSpacing = new Spacing(1, 1, 1, 1);
+
+                foreach (var matched in group.Parts)
+                {
+                    if (string.IsNullOrWhiteSpace(matched.DxfPath) || !File.Exists(matched.DxfPath))
+                    {
+                        importErrors.Add($"{matched.Item.FileName}: DXF file not found");
+                        continue;
+                    }
+
+                    try
+                    {
+                        var importer = new DxfImporter();
+                        var result = importer.Import(matched.DxfPath);
+
+                        var drawingName = Path.GetFileNameWithoutExtension(matched.DxfPath);
+                        var drawing = new Drawing(drawingName);
+                        drawing.Source.Path = matched.DxfPath;
+                        drawing.Quantity.Required = matched.Item.Qty ?? 1;
+
+                        var pgm = ConvertGeometry.ToProgram(result.Entities);
+
+                        if (pgm.Codes.Count > 0 && pgm[0].Type == CodeType.RapidMove)
+                        {
+                            var rapid = (RapidMove)pgm[0];
+                            drawing.Source.Offset = rapid.EndPoint;
+                            pgm.Offset(-rapid.EndPoint);
+                            pgm.Codes.RemoveAt(0);
+                        }
+
+                        drawing.Program = pgm;
+                        nest.Drawings.Add(drawing);
+                    }
+                    catch (Exception ex)
+                    {
+                        importErrors.Add($"{matched.Item.FileName}: {ex.Message}");
+                    }
+                }
+
+                if (nest.Drawings.Count == 0)
+                    continue;
+
+                nest.CreatePlate();
+
+                var editForm = new EditNestForm(nest);
+                editForm.MdiParent = MdiParentForm;
+                editForm.Show();
+                editForm.PlateView.ZoomToFit();
+
+                nestsCreated++;
+            }
+
+            var summary = $"{nestsCreated} nest{(nestsCreated != 1 ? "s" : "")} created.";
+            if (importErrors.Count > 0)
+                summary += $"\n\n{importErrors.Count} import error(s):\n" + string.Join("\n", importErrors);
+
+            MessageBox.Show(summary, "Import Complete", MessageBoxButtons.OK,
+                importErrors.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+
+            Close();
         }
 
         private void BtnClose_Click(object sender, EventArgs e)
