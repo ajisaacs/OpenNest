@@ -270,9 +270,10 @@ namespace OpenNest.Forms
             //
             // BomImportForm
             //
-            AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
+            AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             CancelButton = btnClose;
-            ClientSize = new System.Drawing.Size(500, 520);
+            ClientSize = new System.Drawing.Size(530, 560);
             Controls.Add(grpGroups);
             Controls.Add(grpInput);
             Controls.Add(pnlBottom);
