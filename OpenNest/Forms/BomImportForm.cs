@@ -6,6 +6,7 @@ using OpenNest.IO.Bom;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -14,14 +15,20 @@ namespace OpenNest.Forms
 {
     public partial class BomImportForm : Form
     {
-        private BomAnalysis _analysis;
+        private List<BomPartRow> _parts;
+        private Dictionary<string, (double Width, double Length)> _plateSizes;
+        private bool _suppressRegroup;
 
         public Form MdiParentForm { get; set; }
 
         public BomImportForm()
         {
             InitializeComponent();
+            _parts = new List<BomPartRow>();
+            _plateSizes = new Dictionary<string, (double, double)>();
         }
+
+        #region File Browsing
 
         private void BrowseBom_Click(object sender, EventArgs e)
         {
@@ -37,11 +44,9 @@ namespace OpenNest.Forms
 
             txtBomFile.Text = dlg.FileName;
 
-            // Default DXF folder to the same directory as the BOM file
             if (string.IsNullOrWhiteSpace(txtDxfFolder.Text))
                 txtDxfFolder.Text = Path.GetDirectoryName(dlg.FileName);
 
-            // Derive job name by stripping " BOM" suffix and extension
             if (string.IsNullOrWhiteSpace(txtJobName.Text))
             {
                 var name = Path.GetFileNameWithoutExtension(dlg.FileName);
@@ -65,6 +70,10 @@ namespace OpenNest.Forms
             txtDxfFolder.Text = dlg.SelectedPath;
         }
 
+        #endregion
+
+        #region Analyze
+
         private void Analyze_Click(object sender, EventArgs e)
         {
             if (!File.Exists(txtBomFile.Text))
@@ -80,11 +89,13 @@ namespace OpenNest.Forms
                 using (var reader = new BomReader(txtBomFile.Text))
                     items = reader.GetItems();
 
-                _analysis = BomAnalyzer.Analyze(items, txtDxfFolder.Text);
-
-                PopulateGrid(_analysis);
-                UpdateSummary(_analysis);
-                btnCreateNests.Enabled = _analysis.Groups.Count > 0;
+                var analysis = BomAnalyzer.Analyze(items, txtDxfFolder.Text);
+                BuildPartRows(items, analysis);
+                PopulatePartsGrid();
+                RebuildGroups();
+                UpdateSummary();
+                btnCreateNests.Enabled = true;
+                tabControl.SelectedTab = tabParts;
             }
             catch (Exception ex)
             {
@@ -93,53 +104,280 @@ namespace OpenNest.Forms
             }
         }
 
-        private void PopulateGrid(BomAnalysis analysis)
+        private void BuildPartRows(List<BomItem> items, BomAnalysis analysis)
         {
-            var table = new DataTable();
-            table.Columns.Add("Material", typeof(string));
-            table.Columns.Add("Thickness", typeof(string));
-            table.Columns.Add("Parts", typeof(int));
-            table.Columns.Add("Total Qty", typeof(int));
+            var matchedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var group in analysis.Groups)
+                foreach (var part in group.Parts)
+                    if (part.DxfPath != null)
+                        matchedPaths[part.Item.FileName ?? ""] = part.DxfPath;
+
+            _parts = new List<BomPartRow>();
+
+            foreach (var item in items)
             {
-                var partCount = group.Parts.Count;
-                var totalQty = group.Parts.Sum(p => p.Item.Qty ?? 0);
-                table.Rows.Add(group.Material, group.Thickness.ToString("0.###"), partCount, totalQty);
+                var row = new BomPartRow
+                {
+                    ItemNum = item.ItemNum,
+                    FileName = item.FileName,
+                    Qty = item.Qty,
+                    Description = item.Description,
+                    Material = item.Material,
+                    Thickness = item.Thickness,
+                };
+
+                if (string.IsNullOrWhiteSpace(item.FileName))
+                {
+                    row.Status = "Skipped";
+                    row.IsEditable = false;
+                }
+                else
+                {
+                    var lookupName = item.FileName;
+                    if (lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase))
+                        lookupName = Path.GetFileNameWithoutExtension(lookupName);
+
+                    if (matchedPaths.TryGetValue(lookupName, out var dxfPath))
+                    {
+                        row.DxfPath = dxfPath;
+                        row.Status = "Matched";
+                        row.IsEditable = true;
+                    }
+                    else
+                    {
+                        row.Status = "No DXF";
+                        row.IsEditable = false;
+                    }
+                }
+
+                _parts.Add(row);
+            }
+
+            _plateSizes.Clear();
+        }
+
+        #endregion
+
+        #region Parts Tab
+
+        private void PopulatePartsGrid()
+        {
+            _suppressRegroup = true;
+
+            var table = new DataTable();
+            table.Columns.Add("Item #", typeof(string));
+            table.Columns.Add("File Name", typeof(string));
+            table.Columns.Add("Qty", typeof(string));
+            table.Columns.Add("Description", typeof(string));
+            table.Columns.Add("Material", typeof(string));
+            table.Columns.Add("Thickness", typeof(string));
+            table.Columns.Add("Status", typeof(string));
+
+            foreach (var part in _parts)
+            {
+                table.Rows.Add(
+                    part.ItemNum?.ToString() ?? "",
+                    part.FileName ?? "",
+                    part.Qty?.ToString() ?? "",
+                    part.Description ?? "",
+                    part.Material ?? "",
+                    part.Thickness?.ToString("0.####") ?? "",
+                    part.Status
+                );
+            }
+
+            dgvParts.DataSource = table;
+
+            // Make non-editable columns read-only
+            foreach (DataGridViewColumn col in dgvParts.Columns)
+            {
+                if (col.Name != "Material" && col.Name != "Thickness")
+                    col.ReadOnly = true;
+            }
+
+            // Style rows by status
+            for (var i = 0; i < _parts.Count; i++)
+            {
+                if (!_parts[i].IsEditable)
+                {
+                    dgvParts.Rows[i].ReadOnly = true;
+                    dgvParts.Rows[i].DefaultCellStyle.ForeColor = Color.Gray;
+                }
+            }
+
+            dgvParts.CellValueChanged -= DgvParts_CellValueChanged;
+            dgvParts.CellValueChanged += DgvParts_CellValueChanged;
+
+            _suppressRegroup = false;
+        }
+
+        private void DgvParts_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (_suppressRegroup || e.RowIndex < 0)
+                return;
+
+            var colName = dgvParts.Columns[e.ColumnIndex].Name;
+            if (colName != "Material" && colName != "Thickness")
+                return;
+
+            var part = _parts[e.RowIndex];
+            if (!part.IsEditable)
+                return;
+
+            if (colName == "Material")
+                part.Material = dgvParts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
+
+            if (colName == "Thickness")
+            {
+                var text = dgvParts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
+                part.Thickness = double.TryParse(text, out var t) ? t : (double?)null;
+            }
+
+            RebuildGroups();
+            UpdateSummary();
+        }
+
+        #endregion
+
+        #region Groups Tab
+
+        private void RebuildGroups()
+        {
+            // Save existing plate sizes before rebuilding
+            SavePlateSizes();
+
+            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var w) ? w : 60;
+            var defaultLength = double.TryParse(txtPlateLength.Text, out var l) ? l : 120;
+
+            var groups = _parts
+                .Where(p => p.IsEditable
+                    && !string.IsNullOrWhiteSpace(p.Material)
+                    && p.Thickness.HasValue)
+                .GroupBy(p => new
+                {
+                    Material = p.Material.ToUpperInvariant(),
+                    Thickness = p.Thickness.Value
+                })
+                .OrderBy(g => g.First().Material)
+                .ThenBy(g => g.Key.Thickness)
+                .ToList();
+
+            var table = new DataTable();
+            table.Columns.Add("Material", typeof(string));
+            table.Columns.Add("Thickness", typeof(double));
+            table.Columns.Add("Parts", typeof(int));
+            table.Columns.Add("Total Qty", typeof(int));
+            table.Columns.Add("Plate Width", typeof(double));
+            table.Columns.Add("Plate Length", typeof(double));
+
+            foreach (var group in groups)
+            {
+                var material = group.First().Material;
+                var thickness = group.Key.Thickness;
+                var key = GroupKey(material, thickness);
+
+                var plateWidth = _plateSizes.TryGetValue(key, out var size) ? size.Width : defaultWidth;
+                var plateLength = _plateSizes.TryGetValue(key, out _) ? size.Length : defaultLength;
+
+                table.Rows.Add(
+                    material,
+                    thickness,
+                    group.Count(),
+                    group.Sum(p => p.Qty ?? 0),
+                    plateWidth,
+                    plateLength
+                );
             }
 
             dgvGroups.DataSource = table;
+
+            // Material, Thickness, Parts, Total Qty are read-only
+            if (dgvGroups.Columns.Count >= 6)
+            {
+                dgvGroups.Columns["Material"].ReadOnly = true;
+                dgvGroups.Columns["Thickness"].ReadOnly = true;
+                dgvGroups.Columns["Parts"].ReadOnly = true;
+                dgvGroups.Columns["Total Qty"].ReadOnly = true;
+            }
+
+            btnCreateNests.Enabled = table.Rows.Count > 0;
         }
 
-        private void UpdateSummary(BomAnalysis analysis)
+        private void SavePlateSizes()
         {
-            var parts = new List<string>();
-            if (analysis.Skipped.Count > 0)
-                parts.Add($"{analysis.Skipped.Count} skipped (no DXF file or thickness given)");
-            if (analysis.Unmatched.Count > 0)
-                parts.Add($"{analysis.Unmatched.Count} unmatched (DXF file not found)");
+            if (dgvGroups.DataSource is not DataTable table)
+                return;
 
-            lblSummary.Text = parts.Count > 0
-                ? string.Join(", ", parts)
-                : string.Empty;
+            _plateSizes.Clear();
+            foreach (DataRow row in table.Rows)
+            {
+                var material = row["Material"]?.ToString() ?? "";
+                var thickness = row["Thickness"] is double t ? t : 0;
+                var key = GroupKey(material, thickness);
+
+                var width = row["Plate Width"] is double pw ? pw : 60;
+                var length = row["Plate Length"] is double pl ? pl : 120;
+
+                _plateSizes[key] = (width, length);
+            }
         }
+
+        private static string GroupKey(string material, double thickness)
+            => $"{material?.ToUpperInvariant()}|{thickness}";
+
+        #endregion
+
+        #region Summary
+
+        private void UpdateSummary()
+        {
+            var skipped = _parts.Count(p => p.Status == "Skipped");
+            var noDxf = _parts.Count(p => p.Status == "No DXF");
+            var matched = _parts.Count(p => p.Status == "Matched");
+
+            var summaryParts = new List<string>();
+            if (skipped > 0)
+                summaryParts.Add($"{skipped} skipped (no file name)");
+            if (noDxf > 0)
+                summaryParts.Add($"{noDxf} no DXF found");
+
+            lblSummary.Text = summaryParts.Count > 0
+                ? string.Join(", ", summaryParts)
+                : $"{matched} parts matched";
+        }
+
+        #endregion
+
+        #region Create Nests
 
         private void CreateNests_Click(object sender, EventArgs e)
         {
-            if (_analysis == null || _analysis.Groups.Count == 0)
+            if (_parts == null || _parts.Count == 0)
                 return;
 
-            if (!double.TryParse(txtPlateWidth.Text, out var plateWidth) || plateWidth <= 0)
-            {
-                MessageBox.Show("Plate width must be a positive number.", "Validation Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            // Save latest plate size edits
+            SavePlateSizes();
 
-            if (!double.TryParse(txtPlateLength.Text, out var plateLength) || plateLength <= 0)
+            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var dw) ? dw : 60;
+            var defaultLength = double.TryParse(txtPlateLength.Text, out var dl) ? dl : 120;
+
+            var groups = _parts
+                .Where(p => p.IsEditable
+                    && !string.IsNullOrWhiteSpace(p.Material)
+                    && p.Thickness.HasValue
+                    && !string.IsNullOrWhiteSpace(p.DxfPath))
+                .GroupBy(p => new
+                {
+                    Material = p.Material.ToUpperInvariant(),
+                    Thickness = p.Thickness.Value
+                })
+                .ToList();
+
+            if (groups.Count == 0)
             {
-                MessageBox.Show("Plate length must be a positive number.", "Validation Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("No groups with matched DXF files to create nests from.", "Nothing to Create",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
@@ -148,36 +386,43 @@ namespace OpenNest.Forms
             var nestsCreated = 0;
             var importErrors = new List<string>();
 
-            foreach (var group in _analysis.Groups)
+            foreach (var group in groups)
             {
-                var nestName = $"{jobName} - {group.Thickness:0.###} {group.Material}";
+                var material = group.First().Material;
+                var thickness = group.Key.Thickness;
+                var key = GroupKey(material, thickness);
+
+                var plateWidth = _plateSizes.TryGetValue(key, out var size) ? size.Width : defaultWidth;
+                var plateLength = _plateSizes.TryGetValue(key, out _) ? size.Length : defaultLength;
+
+                var nestName = $"{jobName} - {thickness:0.###} {material}";
                 var nest = new Nest(nestName);
                 nest.DateCreated = DateTime.Now;
                 nest.DateLastModified = DateTime.Now;
-                nest.PlateDefaults.Size = new Size(plateWidth, plateLength);
-                nest.PlateDefaults.Thickness = group.Thickness;
-                nest.PlateDefaults.Material = new Material(group.Material);
+                nest.PlateDefaults.Size = new Geometry.Size(plateWidth, plateLength);
+                nest.PlateDefaults.Thickness = thickness;
+                nest.PlateDefaults.Material = new Material(material);
                 nest.PlateDefaults.Quadrant = 1;
                 nest.PlateDefaults.PartSpacing = 1;
                 nest.PlateDefaults.EdgeSpacing = new Spacing(1, 1, 1, 1);
 
-                foreach (var matched in group.Parts)
+                foreach (var part in group)
                 {
-                    if (string.IsNullOrWhiteSpace(matched.DxfPath) || !File.Exists(matched.DxfPath))
+                    if (!File.Exists(part.DxfPath))
                     {
-                        importErrors.Add($"{matched.Item.FileName}: DXF file not found");
+                        importErrors.Add($"{part.FileName}: DXF file not found");
                         continue;
                     }
 
                     try
                     {
-                        var result = importer.Import(matched.DxfPath);
+                        var result = importer.Import(part.DxfPath);
 
-                        var drawingName = Path.GetFileNameWithoutExtension(matched.DxfPath);
+                        var drawingName = Path.GetFileNameWithoutExtension(part.DxfPath);
                         var drawing = new Drawing(drawingName);
-                        drawing.Source.Path = matched.DxfPath;
-                        drawing.Quantity.Required = matched.Item.Qty ?? 1;
-                        drawing.Material = new Material(group.Material);
+                        drawing.Source.Path = part.DxfPath;
+                        drawing.Quantity.Required = part.Qty ?? 1;
+                        drawing.Material = new Material(material);
 
                         var pgm = ConvertGeometry.ToProgram(result.Entities);
 
@@ -194,7 +439,7 @@ namespace OpenNest.Forms
                     }
                     catch (Exception ex)
                     {
-                        importErrors.Add($"{matched.Item.FileName}: {ex.Message}");
+                        importErrors.Add($"{part.FileName}: {ex.Message}");
                     }
                 }
 
@@ -221,9 +466,24 @@ namespace OpenNest.Forms
             Close();
         }
 
+        #endregion
+
         private void BtnClose_Click(object sender, EventArgs e)
         {
             Close();
         }
+    }
+
+    internal class BomPartRow
+    {
+        public int? ItemNum { get; set; }
+        public string FileName { get; set; }
+        public int? Qty { get; set; }
+        public string Description { get; set; }
+        public string Material { get; set; }
+        public double? Thickness { get; set; }
+        public string DxfPath { get; set; }
+        public string Status { get; set; }
+        public bool IsEditable { get; set; }
     }
 }
