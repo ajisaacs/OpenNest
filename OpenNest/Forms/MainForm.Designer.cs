@@ -32,6 +32,7 @@
             mnuFile = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileNew = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileOpen = new System.Windows.Forms.ToolStripMenuItem();
+            mnuFileImportBom = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
             mnuFileSave = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileSaveAs = new System.Windows.Forms.ToolStripMenuItem();
@@ -196,7 +197,6 @@
             //
             // mnuFileImportBom
             //
-            mnuFileImportBom = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileImportBom.Name = "mnuFileImportBom";
             mnuFileImportBom.Size = new System.Drawing.Size(180, 22);
             mnuFileImportBom.Text = "Import BOM...";
