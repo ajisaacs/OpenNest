@@ -78,4 +78,175 @@ public class EllipseConverterTests
         var center = EllipseConverter.IntersectNormals(p1, n1, p2, n2);
         Assert.False(center.IsValid());
     }
+
+    [Fact]
+    public void Convert_Circle_ProducesOneOrTwoArcs()
+    {
+        var result = EllipseConverter.Convert(
+            new Vector(0, 0), semiMajor: 10, semiMinor: 10, rotation: 0,
+            startParam: 0, endParam: Angle.TwoPI, tolerance: 0.001);
+
+        Assert.All(result, e => Assert.IsType<Arc>(e));
+        Assert.InRange(result.Count, 1, 4);
+    }
+
+    [Fact]
+    public void Convert_ModerateEllipse_AllArcsWithinTolerance()
+    {
+        var a = 10.0;
+        var b = 7.0;
+        var tolerance = 0.001;
+        var result = EllipseConverter.Convert(
+            new Vector(0, 0), a, b, rotation: 0,
+            startParam: 0, endParam: Angle.TwoPI, tolerance: tolerance);
+
+        Assert.True(result.Count >= 4, $"Expected at least 4 arcs, got {result.Count}");
+        Assert.All(result, e => Assert.IsType<Arc>(e));
+
+        foreach (var entity in result)
+        {
+            var arc = (Arc)entity;
+            var maxDev = MaxDeviationFromEllipse(arc, new Vector(0, 0), a, b, 0, 50);
+            Assert.True(maxDev <= tolerance,
+                $"Arc at center ({arc.Center.X:F4},{arc.Center.Y:F4}) r={arc.Radius:F4} " +
+                $"deviates {maxDev:F6} from ellipse (tolerance={tolerance})");
+        }
+    }
+
+    [Fact]
+    public void Convert_HighlyEccentricEllipse_ProducesMoreArcs()
+    {
+        var a = 20.0;
+        var b = 3.0;
+        var tolerance = 0.001;
+        var result = EllipseConverter.Convert(
+            new Vector(0, 0), a, b, rotation: 0,
+            startParam: 0, endParam: Angle.TwoPI, tolerance: tolerance);
+
+        Assert.True(result.Count >= 8, $"Expected at least 8 arcs for eccentric ellipse, got {result.Count}");
+        Assert.All(result, e => Assert.IsType<Arc>(e));
+
+        foreach (var entity in result)
+        {
+            var arc = (Arc)entity;
+            var maxDev = MaxDeviationFromEllipse(arc, new Vector(0, 0), a, b, 0, 50);
+            Assert.True(maxDev <= tolerance,
+                $"Deviation {maxDev:F6} exceeds tolerance {tolerance}");
+        }
+    }
+
+    [Fact]
+    public void Convert_PartialEllipse_CoversArcOnly()
+    {
+        var a = 10.0;
+        var b = 5.0;
+        var tolerance = 0.001;
+        var result = EllipseConverter.Convert(
+            new Vector(0, 0), a, b, rotation: 0,
+            startParam: 0, endParam: System.Math.PI / 2, tolerance: tolerance);
+
+        Assert.NotEmpty(result);
+        Assert.All(result, e => Assert.IsType<Arc>(e));
+
+        var firstArc = (Arc)result[0];
+        var sp = firstArc.StartPoint();
+        Assert.InRange(sp.X, a - 0.01, a + 0.01);
+        Assert.InRange(sp.Y, -0.01, 0.01);
+
+        var lastArc = (Arc)result[^1];
+        var ep = lastArc.EndPoint();
+        Assert.InRange(ep.X, -0.01, 0.01);
+        Assert.InRange(ep.Y, b - 0.01, b + 0.01);
+    }
+
+    [Fact]
+    public void Convert_EndpointContinuity_ArcsConnect()
+    {
+        var result = EllipseConverter.Convert(
+            new Vector(5, 10), semiMajor: 15, semiMinor: 8, rotation: 0.5,
+            startParam: 0, endParam: Angle.TwoPI, tolerance: 0.001);
+
+        for (var i = 0; i < result.Count - 1; i++)
+        {
+            var current = (Arc)result[i];
+            var next = (Arc)result[i + 1];
+            var gap = current.EndPoint().DistanceTo(next.StartPoint());
+            Assert.True(gap < 0.001,
+                $"Gap of {gap:F6} between arc {i} and arc {i + 1}");
+        }
+
+        var lastArc = (Arc)result[^1];
+        var firstArc = (Arc)result[0];
+        var closingGap = lastArc.EndPoint().DistanceTo(firstArc.StartPoint());
+        Assert.True(closingGap < 0.001,
+            $"Closing gap of {closingGap:F6}");
+    }
+
+    [Fact]
+    public void Convert_WithRotationAndOffset_ProducesValidArcs()
+    {
+        var center = new Vector(50, -30);
+        var rotation = System.Math.PI / 3;
+        var a = 12.0;
+        var b = 6.0;
+        var tolerance = 0.001;
+
+        var result = EllipseConverter.Convert(center, a, b, rotation,
+            startParam: 0, endParam: Angle.TwoPI, tolerance: tolerance);
+
+        Assert.NotEmpty(result);
+        foreach (var entity in result)
+        {
+            var arc = (Arc)entity;
+            var maxDev = MaxDeviationFromEllipse(arc, center, a, b, rotation, 50);
+            Assert.True(maxDev <= tolerance,
+                $"Deviation {maxDev:F6} exceeds tolerance {tolerance}");
+        }
+    }
+
+    private static double MaxDeviationFromEllipse(Arc arc, Vector ellipseCenter,
+        double semiMajor, double semiMinor, double rotation, int samples)
+    {
+        var maxDev = 0.0;
+        var sweep = arc.SweepAngle();
+        var startAngle = arc.StartAngle;
+        if (arc.IsReversed)
+            startAngle = arc.EndAngle;
+
+        for (var i = 0; i <= samples; i++)
+        {
+            var frac = (double)i / samples;
+            var angle = startAngle + frac * sweep;
+            var px = arc.Center.X + arc.Radius * System.Math.Cos(angle);
+            var py = arc.Center.Y + arc.Radius * System.Math.Sin(angle);
+            var arcPoint = new Vector(px, py);
+
+            // Coarse search over 1000 samples
+            var bestT = 0.0;
+            var minDist = double.MaxValue;
+            for (var j = 0; j <= 1000; j++)
+            {
+                var t = (double)j / 1000 * Angle.TwoPI;
+                var ep2 = EllipseConverter.EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, t);
+                var dist = arcPoint.DistanceTo(ep2);
+                if (dist < minDist) { minDist = dist; bestT = t; }
+            }
+
+            // Refine with local bisection around bestT
+            var lo = bestT - Angle.TwoPI / 1000;
+            var hi = bestT + Angle.TwoPI / 1000;
+            for (var r = 0; r < 20; r++)
+            {
+                var t1 = lo + (hi - lo) / 3;
+                var t2 = lo + 2 * (hi - lo) / 3;
+                var d1 = arcPoint.DistanceTo(EllipseConverter.EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, t1));
+                var d2 = arcPoint.DistanceTo(EllipseConverter.EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, t2));
+                if (d1 < d2) hi = t2; else lo = t1;
+            }
+            var bestDist = arcPoint.DistanceTo(EllipseConverter.EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, (lo + hi) / 2));
+            if (bestDist > maxDev) maxDev = bestDist;
+        }
+
+        return maxDev;
+    }
 }
