@@ -227,7 +227,6 @@ namespace OpenNest.Forms
             pnlBottom.Controls.Add(btnClose);
             pnlBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
             pnlBottom.Height = 60;
-            pnlBottom.Location = new System.Drawing.Point(0, 460);
             pnlBottom.Name = "pnlBottom";
             pnlBottom.TabIndex = 2;
             //
@@ -274,11 +273,12 @@ namespace OpenNest.Forms
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             CancelButton = btnClose;
             ClientSize = new System.Drawing.Size(530, 560);
-            Controls.Add(grpGroups);
-            Controls.Add(grpInput);
             Controls.Add(pnlBottom);
+            Controls.Add(grpInput);
+            Controls.Add(grpGroups);
             Font = new System.Drawing.Font("Segoe UI", 9F);
-            FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
+            MinimumSize = new System.Drawing.Size(450, 400);
             MaximizeBox = false;
             MinimizeBox = false;
             Name = "BomImportForm";
