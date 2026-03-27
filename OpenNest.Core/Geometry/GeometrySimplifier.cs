@@ -19,7 +19,7 @@ public class ArcCandidate
 
 public class GeometrySimplifier
 {
-    public double Tolerance { get; set; } = 0.005;
+    public double Tolerance { get; set; } = 0.5;
     public int MinLines { get; set; } = 3;
 
     public List<ArcCandidate> Analyze(Shape shape)
@@ -30,21 +30,26 @@ public class GeometrySimplifier
 
         while (i < entities.Count)
         {
-            if (entities[i] is not Line firstLine)
+            if (entities[i] is not Line and not Arc)
             {
                 i++;
                 continue;
             }
 
-            // Collect consecutive lines on the same layer
+            // Collect consecutive lines and arcs on the same layer
             var runStart = i;
-            var layer = firstLine.Layer;
-            while (i < entities.Count && entities[i] is Line line && line.Layer == layer)
+            var layer = entities[i].Layer;
+            var lineCount = 0;
+            while (i < entities.Count && (entities[i] is Line || entities[i] is Arc) && entities[i].Layer == layer)
+            {
+                if (entities[i] is Line) lineCount++;
                 i++;
+            }
             var runEnd = i - 1;
 
-            // Try to find arc candidates within this run
-            FindCandidatesInRun(entities, runStart, runEnd, candidates);
+            // Only analyze runs that have enough line entities to simplify
+            if (lineCount >= MinLines)
+                FindCandidatesInRun(entities, runStart, runEnd, candidates);
         }
 
         return candidates;
@@ -94,12 +99,20 @@ public class GeometrySimplifier
 
         while (j <= runEnd - MinLines + 1)
         {
-            // Start with MinLines lines
+            // Need at least MinLines entities ahead
             var k = j + MinLines - 1;
-            var points = CollectPoints(entities, j, k);
-            var (center, radius) = FitCircle(points);
+            if (k > runEnd) break;
 
-            if (!center.IsValid() || MaxDeviation(points, center, radius) > Tolerance)
+            var points = CollectPoints(entities, j, k);
+            if (points.Count < 3)
+            {
+                j++;
+                continue;
+            }
+
+            var (center, radius, dev) = FitMirrorAxis(points);
+
+            if (!center.IsValid() || dev > Tolerance)
             {
                 j++;
                 continue;
@@ -108,34 +121,33 @@ public class GeometrySimplifier
             // Extend as far as possible
             var prevCenter = center;
             var prevRadius = radius;
-            var prevMaxDev = MaxDeviation(points, center, radius);
+            var prevDev = dev;
 
             while (k + 1 <= runEnd)
             {
                 k++;
                 points = CollectPoints(entities, j, k);
-                var (newCenter, newRadius) = FitCircle(points);
-                if (!newCenter.IsValid())
+                if (points.Count < 3)
                 {
                     k--;
                     break;
                 }
 
-                var newMaxDev = MaxDeviation(points, newCenter, newRadius);
-                if (newMaxDev > Tolerance)
+                var (nc, nr, nd) = FitMirrorAxis(points);
+
+                if (!nc.IsValid() || nd > Tolerance)
                 {
                     k--;
                     break;
                 }
 
-                prevCenter = newCenter;
-                prevRadius = newRadius;
-                prevMaxDev = newMaxDev;
+                prevCenter = nc;
+                prevRadius = nr;
+                prevDev = nd;
             }
 
-            // Build the candidate
             var finalPoints = CollectPoints(entities, j, k);
-            var arc = BuildArc(prevCenter, prevRadius, finalPoints, entities[j]);
+            var arc = CreateArc(prevCenter, prevRadius, finalPoints, entities[j]);
             var bbox = ComputeBoundingBox(finalPoints);
 
             candidates.Add(new ArcCandidate
@@ -143,7 +155,7 @@ public class GeometrySimplifier
                 StartIndex = j,
                 EndIndex = k,
                 FittedArc = arc,
-                MaxDeviation = prevMaxDev,
+                MaxDeviation = prevDev,
                 BoundingBox = bbox,
             });
 
@@ -151,28 +163,142 @@ public class GeometrySimplifier
         }
     }
 
-    private static List<Vector> CollectPoints(List<Entity> entities, int start, int end)
+    /// <summary>
+    /// Fits a circular arc through a set of points using the mirror axis approach.
+    /// The center is constrained to lie on the perpendicular bisector of the chord
+    /// (P1→Pn), guaranteeing the arc passes exactly through both endpoints.
+    /// Golden section search finds the optimal position along this axis.
+    /// </summary>
+    private (Vector center, double radius, double deviation) FitMirrorAxis(List<Vector> points)
     {
-        var points = new List<Vector>();
-        points.Add(((Line)entities[start]).StartPoint);
-        for (var i = start; i <= end; i++)
-            points.Add(((Line)entities[i]).EndPoint);
-        return points;
+        if (points.Count < 3)
+            return (Vector.Invalid, 0, double.MaxValue);
+
+        var p1 = points[0];
+        var pn = points[^1];
+
+        // Chord midpoint and length
+        var mx = (p1.X + pn.X) / 2;
+        var my = (p1.Y + pn.Y) / 2;
+        var dx = pn.X - p1.X;
+        var dy = pn.Y - p1.Y;
+        var chordLen = System.Math.Sqrt(dx * dx + dy * dy);
+
+        if (chordLen < 1e-10)
+            return (Vector.Invalid, 0, double.MaxValue);
+
+        var halfChord = chordLen / 2;
+
+        // Unit normal (mirror axis direction, perpendicular to chord)
+        var nx = -dy / chordLen;
+        var ny = dx / chordLen;
+
+        // Find max signed projection onto the normal (sagitta with sign)
+        var maxSagitta = 0.0;
+        for (var i = 1; i < points.Count - 1; i++)
+        {
+            var proj = (points[i].X - mx) * nx + (points[i].Y - my) * ny;
+            if (System.Math.Abs(proj) > System.Math.Abs(maxSagitta))
+                maxSagitta = proj;
+        }
+
+        if (System.Math.Abs(maxSagitta) < 1e-10)
+            return (Vector.Invalid, 0, double.MaxValue); // collinear
+
+        // Initial d estimate from sagitta geometry:
+        // Center at M + d*N, radius R = sqrt(halfChord² + d²)
+        // For a point on the arc at perpendicular distance s from chord:
+        //   (d - s)² = halfChord² + d²  →  d = (s² - halfChord²) / (2s)
+        var dInit = (maxSagitta * maxSagitta - halfChord * halfChord) / (2 * maxSagitta);
+
+        // Golden section search around initial estimate
+        var range = System.Math.Max(System.Math.Abs(dInit) * 2, halfChord);
+        var dLow = dInit - range;
+        var dHigh = dInit + range;
+
+        var phi = (System.Math.Sqrt(5) - 1) / 2;
+        for (var iter = 0; iter < 50; iter++)
+        {
+            var d1 = dHigh - phi * (dHigh - dLow);
+            var d2 = dLow + phi * (dHigh - dLow);
+
+            var dev1 = EvalDeviation(points, mx, my, nx, ny, halfChord, d1);
+            var dev2 = EvalDeviation(points, mx, my, nx, ny, halfChord, d2);
+
+            if (dev1 < dev2)
+                dHigh = d2;
+            else
+                dLow = d1;
+
+            if (dHigh - dLow < 1e-12)
+                break;
+        }
+
+        var dOpt = (dLow + dHigh) / 2;
+        var center = new Vector(mx + dOpt * nx, my + dOpt * ny);
+        var radius = System.Math.Sqrt(halfChord * halfChord + dOpt * dOpt);
+        var deviation = EvalDeviation(points, mx, my, nx, ny, halfChord, dOpt);
+
+        return (center, radius, deviation);
     }
 
-    private static double MaxDeviation(List<Vector> points, Vector center, double radius)
+    /// <summary>
+    /// Evaluates the max deviation of intermediate points from the circle
+    /// defined by center = M + d*N, radius = sqrt(halfChord² + d²).
+    /// Endpoints are excluded since they're on the circle by construction.
+    /// </summary>
+    private static double EvalDeviation(List<Vector> points,
+        double mx, double my, double nx, double ny, double halfChord, double d)
     {
+        var cx = mx + d * nx;
+        var cy = my + d * ny;
+        var r = System.Math.Sqrt(halfChord * halfChord + d * d);
+
         var maxDev = 0.0;
-        for (var i = 0; i < points.Count; i++)
+        for (var i = 1; i < points.Count - 1; i++)
         {
-            var dev = System.Math.Abs(points[i].DistanceTo(center) - radius);
+            var px = points[i].X - cx;
+            var py = points[i].Y - cy;
+            var dist = System.Math.Sqrt(px * px + py * py);
+            var dev = System.Math.Abs(dist - r);
             if (dev > maxDev)
                 maxDev = dev;
         }
         return maxDev;
     }
 
-    private static Arc BuildArc(Vector center, double radius, List<Vector> points, Entity sourceEntity)
+    private static List<Vector> CollectPoints(List<Entity> entities, int start, int end)
+    {
+        var points = new List<Vector>();
+
+        for (var i = start; i <= end; i++)
+        {
+            switch (entities[i])
+            {
+                case Line line:
+                    if (i == start)
+                        points.Add(line.StartPoint);
+                    points.Add(line.EndPoint);
+                    break;
+
+                case Arc arc:
+                    if (i == start)
+                        points.Add(arc.StartPoint());
+                    // Sample intermediate points so deviation is measured
+                    // accurately across the full arc span
+                    var segments = System.Math.Max(2, arc.SegmentsForTolerance(0.1));
+                    var arcPoints = arc.ToPoints(segments);
+                    // Skip first (already added or connects to previous) and add the rest
+                    for (var j = 1; j < arcPoints.Count; j++)
+                        points.Add(arcPoints[j]);
+                    break;
+            }
+        }
+
+        return points;
+    }
+
+    private static Arc CreateArc(Vector center, double radius, List<Vector> points, Entity sourceEntity)
     {
         var firstPoint = points[0];
         var lastPoint = points[^1];
@@ -246,9 +372,6 @@ public class GeometrySimplifier
             sumZ += z;
         }
 
-        // Solve: [sumX2 sumXY sumX] [A]   [sumXZ]
-        //        [sumXY sumY2 sumY] [B] = [sumYZ]
-        //        [sumX  sumY  n   ] [C]   [sumZ ]
         var det = sumX2 * (sumY2 * n - sumY * sumY)
                 - sumXY * (sumXY * n - sumY * sumX)
                 + sumX * (sumXY * sumY - sumY2 * sumX);

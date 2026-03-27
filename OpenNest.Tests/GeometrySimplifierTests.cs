@@ -77,9 +77,10 @@ public class GeometrySimplifierTests
     }
 
     [Fact]
-    public void Analyze_MixedEntitiesWithArc_OnlyAnalyzesLines()
+    public void Analyze_MixedEntitiesWithArc_FindsSeparateCandidates()
     {
-        // Line, Line, Line, Arc, Line, Line, Line — should find candidates only in line runs
+        // Lines on one curve, then an arc at a different center, then lines on another curve
+        // The arc is included in the run but can't merge with lines on different curves
         var shape = new Shape();
         // First run: 5 lines on a curve
         var arc1 = new Arc(new Vector(0, 0), 10, 0, System.Math.PI / 2, false);

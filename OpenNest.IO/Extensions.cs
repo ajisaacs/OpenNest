@@ -221,8 +221,9 @@ namespace OpenNest.IO
                 });
             }
 
-            // Close the ellipse if it's a full ellipse
-            if (lines.Count >= 2)
+            // Close only if it's a full ellipse (sweep ≈ 2π)
+            var sweep = endParam - startParam;
+            if (lines.Count >= 2 && System.Math.Abs(sweep - System.Math.PI * 2.0) < 0.01)
             {
                 var first = lines.First();
                 var last = lines.Last();

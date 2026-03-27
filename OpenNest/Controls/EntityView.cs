@@ -25,6 +25,9 @@ namespace OpenNest.Controls
         }
 
         public Arc SimplifierPreview { get; set; }
+        public List<Entity> SimplifierToleranceLeft { get; set; }
+        public List<Entity> SimplifierToleranceRight { get; set; }
+        public List<Entity> OriginalEntities { get; set; }
 
         private readonly Pen gridPen = new Pen(Color.FromArgb(70, 70, 70));
         private readonly Dictionary<int, Pen> penCache = new Dictionary<int, Pen>();
@@ -79,6 +82,17 @@ namespace OpenNest.Controls
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);
 
+            // Draw original geometry overlay (faded, behind current)
+            if (OriginalEntities != null)
+            {
+                using var origPen = new Pen(Color.FromArgb(50, 255, 140, 40));
+                foreach (var entity in OriginalEntities)
+                {
+                    if (!IsEtchLayer(entity.Layer))
+                        DrawEntity(e.Graphics, entity, origPen);
+                }
+            }
+
             foreach (var entity in Entities)
             {
                 if (IsEtchLayer(entity.Layer)) continue;
@@ -102,6 +116,25 @@ namespace OpenNest.Controls
 
             if (SimplifierPreview != null)
             {
+                // Draw tolerance zone (offset lines each side of original geometry)
+                if (SimplifierToleranceLeft != null)
+                {
+                    using var zonePen = new Pen(Color.FromArgb(40, 100, 200, 100));
+                    foreach (var entity in SimplifierToleranceLeft)
+                        DrawEntity(e.Graphics, entity, zonePen);
+                    foreach (var entity in SimplifierToleranceRight)
+                        DrawEntity(e.Graphics, entity, zonePen);
+                }
+
+                // Draw old geometry (highlighted lines) in orange dashed
+                if (simplifierHighlightSet != null)
+                {
+                    using var oldPen = new Pen(Color.FromArgb(180, 255, 160, 50), 1f / ViewScale) { DashPattern = new float[] { 6, 3 } };
+                    foreach (var entity in simplifierHighlightSet)
+                        DrawEntity(e.Graphics, entity, oldPen);
+                }
+
+                // Draw the new arc in bright green
                 using var previewPen = new Pen(Color.FromArgb(0, 200, 80), 2f / ViewScale);
                 DrawArc(e.Graphics, SimplifierPreview, previewPen);
             }
@@ -260,20 +293,26 @@ namespace OpenNest.Controls
             {
                 DashPattern = new float[] { 6, 4 }
             };
+            using var noteFont = new Font("Segoe UI", 9f);
+            using var noteBrush = new SolidBrush(Color.FromArgb(220, 255, 255, 200));
+            using var selectedNoteBrush = new SolidBrush(Color.FromArgb(220, 255, 180, 100));
 
             for (var i = 0; i < Bends.Count; i++)
             {
                 var bend = Bends[i];
                 var pt1 = PointWorldToGraph(bend.StartPoint);
                 var pt2 = PointWorldToGraph(bend.EndPoint);
+                var isSelected = i == SelectedBendIndex;
 
-                if (i == SelectedBendIndex)
-                {
+                if (isSelected)
                     g.DrawLine(glowPen, pt1, pt2);
-                }
                 else
-                {
                     g.DrawLine(bendPen, pt1, pt2);
+
+                if (!string.IsNullOrEmpty(bend.NoteText))
+                {
+                    var mid = new PointF((pt1.X + pt2.X) / 2f, (pt1.Y + pt2.Y) / 2f);
+                    g.DrawString(bend.NoteText, noteFont, isSelected ? selectedNoteBrush : noteBrush, mid.X + 4, mid.Y + 4);
                 }
             }
         }
@@ -424,6 +463,8 @@ namespace OpenNest.Controls
         {
             SimplifierHighlight = null;
             SimplifierPreview = null;
+            SimplifierToleranceLeft = null;
+            SimplifierToleranceRight = null;
             Invalidate();
         }
 

@@ -63,7 +63,70 @@ namespace OpenNest.IO.Bending
                     bends.Add(bend);
             }
 
+            PropagateCollinearBendNotes(bends);
+
             return bends;
+        }
+
+        /// <summary>
+        /// For bends without a note (e.g. split by a cutout), copy angle/radius/direction
+        /// from a collinear bend that does have a note.
+        /// </summary>
+        private static void PropagateCollinearBendNotes(List<Bend> bends)
+        {
+            const double angleTolerance = 0.01; // radians
+            const double distanceTolerance = 0.01;
+
+            foreach (var bend in bends)
+            {
+                if (!string.IsNullOrEmpty(bend.NoteText))
+                    continue;
+
+                foreach (var other in bends)
+                {
+                    if (string.IsNullOrEmpty(other.NoteText))
+                        continue;
+
+                    if (!AreCollinear(bend, other, angleTolerance, distanceTolerance))
+                        continue;
+
+                    bend.Direction = other.Direction;
+                    bend.Angle = other.Angle;
+                    bend.Radius = other.Radius;
+                    bend.NoteText = other.NoteText;
+                    break;
+                }
+            }
+        }
+
+        private static bool AreCollinear(Bend a, Bend b, double angleTolerance, double distanceTolerance)
+        {
+            var angleA = a.StartPoint.AngleTo(a.EndPoint);
+            var angleB = b.StartPoint.AngleTo(b.EndPoint);
+
+            // Normalize angle difference to [0, PI) since opposite directions are still collinear
+            var diff = System.Math.Abs(angleA - angleB) % System.Math.PI;
+            if (diff > angleTolerance && System.Math.PI - diff > angleTolerance)
+                return false;
+
+            // Perpendicular distance from midpoint of A to the infinite line through B
+            var midA = new Vector(
+                (a.StartPoint.X + a.EndPoint.X) / 2.0,
+                (a.StartPoint.Y + a.EndPoint.Y) / 2.0);
+
+            var dx = b.EndPoint.X - b.StartPoint.X;
+            var dy = b.EndPoint.Y - b.StartPoint.Y;
+            var len = System.Math.Sqrt(dx * dx + dy * dy);
+
+            if (len < 1e-9)
+                return false;
+
+            // 2D cross product gives signed perpendicular distance * length
+            var vx = midA.X - b.StartPoint.X;
+            var vy = midA.Y - b.StartPoint.Y;
+            var perp = System.Math.Abs(vx * dy - vy * dx) / len;
+
+            return perp <= distanceTolerance;
         }
 
         private List<ACadSharp.Entities.Line> FindBendLines(CadDocument document)

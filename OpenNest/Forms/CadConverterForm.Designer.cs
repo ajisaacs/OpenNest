@@ -29,6 +29,7 @@ namespace OpenNest.Forms
             lblEntityCount = new System.Windows.Forms.Label();
             btnSplit = new System.Windows.Forms.Button();
             btnSimplify = new System.Windows.Forms.Button();
+            chkShowOriginal = new System.Windows.Forms.CheckBox();
             lblDetect = new System.Windows.Forms.Label();
             cboBendDetector = new System.Windows.Forms.ComboBox();
             bottomPanel1 = new OpenNest.Controls.BottomPanel();
@@ -129,6 +130,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(lblEntityCount);
             detailBar.Controls.Add(btnSplit);
             detailBar.Controls.Add(btnSimplify);
+            detailBar.Controls.Add(chkShowOriginal);
             detailBar.Controls.Add(lblDetect);
             detailBar.Controls.Add(cboBendDetector);
             detailBar.Dock = System.Windows.Forms.DockStyle.Bottom;
@@ -224,6 +226,14 @@ namespace OpenNest.Forms
             btnSimplify.AutoSize = true;
             btnSimplify.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
             btnSimplify.Click += new System.EventHandler(this.OnSimplifyClick);
+            //
+            // chkShowOriginal
+            //
+            chkShowOriginal.AutoSize = true;
+            chkShowOriginal.Font = new System.Drawing.Font("Segoe UI", 9F);
+            chkShowOriginal.Text = "Original";
+            chkShowOriginal.Margin = new System.Windows.Forms.Padding(6, 3, 0, 0);
+            chkShowOriginal.CheckedChanged += new System.EventHandler(this.OnShowOriginalChanged);
             //
             // lblDetect
             //
@@ -324,6 +334,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.TextBox txtCustomer;
         private System.Windows.Forms.Button btnSplit;
         private System.Windows.Forms.Button btnSimplify;
+        private System.Windows.Forms.CheckBox chkShowOriginal;
         private System.Windows.Forms.ComboBox cboBendDetector;
         private System.Windows.Forms.Label lblQty;
         private System.Windows.Forms.Label lblCust;

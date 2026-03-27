@@ -141,6 +141,7 @@ namespace OpenNest.Forms
                 entityView1.IsPickingBendLine = false;
                 filterPanel.SetPickMode(false);
             }
+            entityView1.OriginalEntities = chkShowOriginal.Checked ? item.OriginalEntities : null;
             entityView1.Entities.Clear();
             entityView1.Entities.AddRange(item.Entities);
             entityView1.Bends = item.Bends ?? new List<Bend>();
@@ -384,7 +385,13 @@ namespace OpenNest.Forms
             if (entityView1.Entities == null || entityView1.Entities.Count == 0)
                 return;
 
-            var shapes = ShapeBuilder.GetShapes(entityView1.Entities);
+            // Always simplify from original geometry to prevent tolerance creep
+            var item = CurrentItem;
+            if (item != null && item.OriginalEntities == null)
+                item.OriginalEntities = new List<Entity>(item.Entities);
+
+            var sourceEntities = item?.OriginalEntities ?? entityView1.Entities;
+            var shapes = ShapeBuilder.GetShapes(sourceEntities);
             if (shapes.Count == 0)
                 return;
 
@@ -420,6 +427,13 @@ namespace OpenNest.Forms
             }
 
             lblEntityCount.Text = $"{entities.Count} entities";
+        }
+
+        private void OnShowOriginalChanged(object sender, EventArgs e)
+        {
+            var item = CurrentItem;
+            entityView1.OriginalEntities = chkShowOriginal.Checked ? item?.OriginalEntities : null;
+            entityView1.Invalidate();
         }
 
         #endregion

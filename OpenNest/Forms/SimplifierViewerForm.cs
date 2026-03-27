@@ -54,10 +54,10 @@ public class SimplifierViewerForm : Form
         numTolerance = new System.Windows.Forms.NumericUpDown
         {
             Minimum = 0.001m,
-            Maximum = 1.000m,
+            Maximum = 5.000m,
             DecimalPlaces = 3,
-            Increment = 0.001m,
-            Value = 0.005m,
+            Increment = 0.05m,
+            Value = 0.500m,
             Width = 70,
         };
         numTolerance.ValueChanged += OnToleranceChanged;
@@ -100,7 +100,7 @@ public class SimplifierViewerForm : Form
         Controls.Add(bottomPanel);
     }
 
-    public void LoadShapes(List<Shape> shapes, EntityView view, double tolerance = 0.005)
+    public void LoadShapes(List<Shape> shapes, EntityView view, double tolerance = 0.5)
     {
         this.shapes = shapes;
         this.entityView = view;
@@ -167,7 +167,28 @@ public class SimplifierViewerForm : Form
 
         entityView.SimplifierHighlight = highlightEntities;
         entityView.SimplifierPreview = candidate.FittedArc;
-        entityView.ZoomToArea(candidate.BoundingBox);
+
+        // Build tolerance zone by offsetting each original line both directions
+        var tol = simplifier.Tolerance;
+        var leftEntities = new List<Entity>();
+        var rightEntities = new List<Entity>();
+        foreach (var entity in highlightEntities)
+        {
+            var left = entity.OffsetEntity(tol, OffsetSide.Left);
+            var right = entity.OffsetEntity(tol, OffsetSide.Right);
+            if (left != null) leftEntities.Add(left);
+            if (right != null) rightEntities.Add(right);
+        }
+        entityView.SimplifierToleranceLeft = leftEntities;
+        entityView.SimplifierToleranceRight = rightEntities;
+
+        // Zoom with padding for the tolerance zone
+        var padded = new Box(
+            candidate.BoundingBox.X - tol * 2,
+            candidate.BoundingBox.Y - tol * 2,
+            candidate.BoundingBox.Width + tol * 4,
+            candidate.BoundingBox.Length + tol * 4);
+        entityView.ZoomToArea(padded);
     }
 
     private void OnItemChecked(object sender, ItemCheckedEventArgs e)

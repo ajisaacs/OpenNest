@@ -17,6 +17,7 @@ namespace OpenNest.Controls
         public int Quantity { get; set; } = 1;
         public string Path { get; set; }
         public List<Entity> Entities { get; set; } = new();
+        public List<Entity> OriginalEntities { get; set; }
         public List<Bend> Bends { get; set; } = new();
         public Box Bounds { get; set; }
         public int EntityCount { get; set; }
