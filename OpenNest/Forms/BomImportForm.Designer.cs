@@ -215,9 +215,9 @@ namespace OpenNest.Forms
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             CancelButton = btnClose;
             ClientSize = new System.Drawing.Size(520, 500);
+            Controls.Add(grpGroups);
             Controls.Add(pnlBottom);
             Controls.Add(grpInput);
-            Controls.Add(grpGroups);
             Font = new System.Drawing.Font("Segoe UI", 9F);
             MinimumSize = new System.Drawing.Size(400, 350);
             MaximizeBox = false;
