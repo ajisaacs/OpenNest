@@ -1,6 +1,7 @@
 ﻿using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -173,7 +174,53 @@ namespace OpenNest
             perimeter1.Offset(Location);
             perimeter2.Offset(part.Location);
 
-            return perimeter1.Intersects(perimeter2, out pts);
+            if (!perimeter1.Intersects(perimeter2, out var rawPts))
+                return false;
+
+            // Exclude intersection points that coincide with vertices of BOTH
+            // perimeters — these are touch points (shared corners/endpoints),
+            // not actual crossings where one shape enters the other's interior.
+            var verts1 = CollectVertices(perimeter1);
+            var verts2 = CollectVertices(perimeter2);
+
+            foreach (var pt in rawPts)
+            {
+                if (IsNearAnyVertex(pt, verts1) && IsNearAnyVertex(pt, verts2))
+                    continue;
+                pts.Add(pt);
+            }
+
+            return pts.Count > 0;
+        }
+
+        private static List<Vector> CollectVertices(Geometry.Shape shape)
+        {
+            var verts = new List<Vector>();
+            foreach (var entity in shape.Entities)
+            {
+                switch (entity)
+                {
+                    case Geometry.Line line:
+                        verts.Add(line.StartPoint);
+                        verts.Add(line.EndPoint);
+                        break;
+                    case Geometry.Arc arc:
+                        verts.Add(arc.StartPoint());
+                        verts.Add(arc.EndPoint());
+                        break;
+                }
+            }
+            return verts;
+        }
+
+        private static bool IsNearAnyVertex(Vector pt, List<Vector> vertices)
+        {
+            foreach (var v in vertices)
+            {
+                if (pt.X.IsEqualTo(v.X) && pt.Y.IsEqualTo(v.Y))
+                    return true;
+            }
+            return false;
         }
 
         public double Left

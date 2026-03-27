@@ -601,10 +601,24 @@ namespace OpenNest
             for (var i = 0; i < realParts.Count; i++)
             {
                 var part1 = realParts[i];
+                var b1 = part1.BoundingBox;
 
                 for (var j = i + 1; j < realParts.Count; j++)
                 {
                     var part2 = realParts[j];
+                    var b2 = part2.BoundingBox;
+
+                    // Skip pairs whose bounding boxes don't meaningfully overlap.
+                    // Floating-point rounding can produce sub-epsilon overlaps for
+                    // parts that are merely edge-touching, so require the overlap
+                    // region to exceed Epsilon in both dimensions.
+                    var overlapX = System.Math.Min(b1.Right, b2.Right)
+                                 - System.Math.Max(b1.Left, b2.Left);
+                    var overlapY = System.Math.Min(b1.Top, b2.Top)
+                                 - System.Math.Max(b1.Bottom, b2.Bottom);
+
+                    if (overlapX <= Math.Tolerance.Epsilon || overlapY <= Math.Tolerance.Epsilon)
+                        continue;
 
                     if (part1.Intersects(part2, out var pts2))
                         pts.AddRange(pts2);
