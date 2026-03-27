@@ -42,6 +42,7 @@
             this.saveButton = new System.Windows.Forms.Button();
             this.cancelButton = new System.Windows.Forms.Button();
             this.bottomPanel1 = new OpenNest.Controls.BottomPanel();
+            this.strategyGroupBox = new System.Windows.Forms.GroupBox();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown2)).BeginInit();
@@ -210,13 +211,23 @@
             this.bottomPanel1.Name = "bottomPanel1";
             this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
             this.bottomPanel1.TabIndex = 1;
-            // 
+            //
+            // strategyGroupBox
+            //
+            this.strategyGroupBox.Location = new System.Drawing.Point(12, 178);
+            this.strategyGroupBox.Name = "strategyGroupBox";
+            this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
+            this.strategyGroupBox.TabIndex = 2;
+            this.strategyGroupBox.TabStop = false;
+            this.strategyGroupBox.Text = "Fill Strategies";
+            //
             // OptionsForm
-            // 
+            //
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
             this.ClientSize = new System.Drawing.Size(708, 418);
+            this.Controls.Add(this.strategyGroupBox);
             this.Controls.Add(this.tableLayoutPanel1);
             this.Controls.Add(this.bottomPanel1);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -252,5 +263,6 @@
         private System.Windows.Forms.TextBox textBox1;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.GroupBox strategyGroupBox;
     }
 }

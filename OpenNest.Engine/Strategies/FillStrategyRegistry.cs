@@ -22,6 +22,17 @@ namespace OpenNest.Engine.Strategies
         public static IReadOnlyList<IFillStrategy> Strategies =>
             sorted ??= FilterStrategies();
 
+        /// <summary>
+        /// Returns all registered strategies regardless of enabled/disabled state.
+        /// </summary>
+        public static IReadOnlyList<IFillStrategy> AllStrategies =>
+            strategies.OrderBy(s => s.Order).ToList();
+
+        /// <summary>
+        /// Returns the names of all permanently disabled strategies.
+        /// </summary>
+        public static IReadOnlyCollection<string> DisabledNames => disabled;
+
         private static List<IFillStrategy> FilterStrategies()
         {
             var source = enabledFilter != null

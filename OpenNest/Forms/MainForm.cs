@@ -58,6 +58,8 @@ namespace OpenNest.Forms
             var enginesDir = Path.Combine(Application.StartupPath, "Engines");
             NestEngineRegistry.LoadPlugins(enginesDir);
 
+            OptionsForm.ApplyDisabledStrategies();
+
             foreach (var engine in NestEngineRegistry.AvailableEngines)
                 engineComboBox.Items.Add(engine.Name);
 

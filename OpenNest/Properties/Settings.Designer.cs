@@ -214,5 +214,17 @@ namespace OpenNest.Properties {
                 this["LastPierceTime"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DisabledStrategies {
+            get {
+                return ((string)(this["DisabledStrategies"]));
+            }
+            set {
+                this["DisabledStrategies"] = value;
+            }
+        }
     }
 }
