@@ -29,6 +29,7 @@ namespace OpenNest.Forms
             lblEntityCount = new System.Windows.Forms.Label();
             btnSplit = new System.Windows.Forms.Button();
             btnSimplify = new System.Windows.Forms.Button();
+            btnExportDxf = new System.Windows.Forms.Button();
             chkShowOriginal = new System.Windows.Forms.CheckBox();
             lblDetect = new System.Windows.Forms.Label();
             cboBendDetector = new System.Windows.Forms.ComboBox();
@@ -130,6 +131,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(lblEntityCount);
             detailBar.Controls.Add(btnSplit);
             detailBar.Controls.Add(btnSimplify);
+            detailBar.Controls.Add(btnExportDxf);
             detailBar.Controls.Add(chkShowOriginal);
             detailBar.Controls.Add(lblDetect);
             detailBar.Controls.Add(cboBendDetector);
@@ -226,6 +228,15 @@ namespace OpenNest.Forms
             btnSimplify.AutoSize = true;
             btnSimplify.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
             btnSimplify.Click += new System.EventHandler(this.OnSimplifyClick);
+            //
+            // btnExportDxf
+            //
+            btnExportDxf.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnExportDxf.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnExportDxf.Text = "Export DXF";
+            btnExportDxf.AutoSize = true;
+            btnExportDxf.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
+            btnExportDxf.Click += new System.EventHandler(this.OnExportDxfClick);
             //
             // chkShowOriginal
             //
@@ -334,6 +345,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.TextBox txtCustomer;
         private System.Windows.Forms.Button btnSplit;
         private System.Windows.Forms.Button btnSimplify;
+        private System.Windows.Forms.Button btnExportDxf;
         private System.Windows.Forms.CheckBox chkShowOriginal;
         private System.Windows.Forms.ComboBox cboBendDetector;
         private System.Windows.Forms.Label lblQty;

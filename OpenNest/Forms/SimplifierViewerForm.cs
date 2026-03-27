@@ -7,12 +7,8 @@ using OpenNest.Geometry;
 
 namespace OpenNest.Forms;
 
-public class SimplifierViewerForm : Form
+public partial class SimplifierViewerForm : Form
 {
-    private ListView listView;
-    private System.Windows.Forms.NumericUpDown numTolerance;
-    private Label lblCount;
-    private Button btnApply;
     private EntityView entityView;
     private GeometrySimplifier simplifier;
     private List<Shape> shapes;
@@ -22,85 +18,10 @@ public class SimplifierViewerForm : Form
 
     public SimplifierViewerForm()
     {
-        Text = "Geometry Simplifier";
-        FormBorderStyle = FormBorderStyle.SizableToolWindow;
-        ShowInTaskbar = false;
-        TopMost = true;
-        StartPosition = FormStartPosition.Manual;
-        Size = new System.Drawing.Size(420, 450);
-        Font = new Font("Segoe UI", 9f);
-
-        InitializeControls();
+        InitializeComponent();
     }
 
-    private void InitializeControls()
-    {
-        // Bottom panel
-        var bottomPanel = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Bottom,
-            Height = 36,
-            Padding = new Padding(4, 6, 4, 4),
-            WrapContents = false,
-        };
-
-        var lblTolerance = new Label
-        {
-            Text = "Tolerance:",
-            AutoSize = true,
-            Margin = new Padding(0, 3, 2, 0),
-        };
-
-        numTolerance = new System.Windows.Forms.NumericUpDown
-        {
-            Minimum = 0.001m,
-            Maximum = 5.000m,
-            DecimalPlaces = 3,
-            Increment = 0.05m,
-            Value = 0.500m,
-            Width = 70,
-        };
-        numTolerance.ValueChanged += OnToleranceChanged;
-
-        lblCount = new Label
-        {
-            Text = "0 of 0 selected",
-            AutoSize = true,
-            Margin = new Padding(8, 3, 4, 0),
-        };
-
-        btnApply = new Button
-        {
-            Text = "Apply",
-            FlatStyle = FlatStyle.Flat,
-            Width = 60,
-            Margin = new Padding(4, 0, 0, 0),
-        };
-        btnApply.Click += OnApplyClick;
-
-        bottomPanel.Controls.AddRange(new Control[] { lblTolerance, numTolerance, lblCount, btnApply });
-
-        // ListView
-        listView = new ListView
-        {
-            Dock = DockStyle.Fill,
-            View = View.Details,
-            FullRowSelect = true,
-            CheckBoxes = true,
-            GridLines = true,
-        };
-        listView.Columns.Add("Lines", 50);
-        listView.Columns.Add("Radius", 70);
-        listView.Columns.Add("Deviation", 75);
-        listView.Columns.Add("Location", 100);
-        listView.ItemSelectionChanged += OnItemSelected;
-        listView.ItemChecked += OnItemChecked;
-
-        Controls.Add(listView);
-        Controls.Add(bottomPanel);
-    }
-
-    public void LoadShapes(List<Shape> shapes, EntityView view, double tolerance = 0.5)
+    public void LoadShapes(List<Shape> shapes, EntityView view, double tolerance = 0.004)
     {
         this.shapes = shapes;
         this.entityView = view;
@@ -119,6 +40,11 @@ public class SimplifierViewerForm : Form
             var shapeCandidates = simplifier.Analyze(shapes[i]);
             foreach (var c in shapeCandidates)
                 c.ShapeIndex = i;
+
+            var axis = GeometrySimplifier.DetectMirrorAxis(shapes[i]);
+            if (axis.IsValid)
+                simplifier.Symmetrize(shapeCandidates, axis);
+
             candidates.AddRange(shapeCandidates);
         }
         RefreshList();

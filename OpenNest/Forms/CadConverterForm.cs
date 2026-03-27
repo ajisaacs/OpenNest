@@ -436,6 +436,60 @@ namespace OpenNest.Forms
             entityView1.Invalidate();
         }
 
+        private void OnExportDxfClick(object sender, EventArgs e)
+        {
+            var item = CurrentItem;
+            if (item == null) return;
+
+            using var dlg = new SaveFileDialog
+            {
+                Filter = "DXF Files|*.dxf",
+                FileName = Path.ChangeExtension(item.Name, ".dxf"),
+            };
+
+            if (dlg.ShowDialog() != DialogResult.OK) return;
+
+            var doc = new ACadSharp.CadDocument();
+            foreach (var entity in item.Entities)
+            {
+                switch (entity)
+                {
+                    case Geometry.Line line:
+                        doc.Entities.Add(new ACadSharp.Entities.Line
+                        {
+                            StartPoint = new CSMath.XYZ(line.StartPoint.X, line.StartPoint.Y, 0),
+                            EndPoint = new CSMath.XYZ(line.EndPoint.X, line.EndPoint.Y, 0),
+                        });
+                        break;
+
+                    case Geometry.Arc arc:
+                        var startAngle = arc.StartAngle;
+                        var endAngle = arc.EndAngle;
+                        if (arc.IsReversed)
+                            OpenNest.Math.Generic.Swap(ref startAngle, ref endAngle);
+                        doc.Entities.Add(new ACadSharp.Entities.Arc
+                        {
+                            Center = new CSMath.XYZ(arc.Center.X, arc.Center.Y, 0),
+                            Radius = arc.Radius,
+                            StartAngle = startAngle,
+                            EndAngle = endAngle,
+                        });
+                        break;
+
+                    case Geometry.Circle circle:
+                        doc.Entities.Add(new ACadSharp.Entities.Circle
+                        {
+                            Center = new CSMath.XYZ(circle.Center.X, circle.Center.Y, 0),
+                            Radius = circle.Radius,
+                        });
+                        break;
+                }
+            }
+
+            using var writer = new ACadSharp.IO.DxfWriter(dlg.FileName, doc, false);
+            writer.Write();
+        }
+
         #endregion
 
         #region Output
