@@ -1,6 +1,7 @@
 using OpenNest.Geometry;
 using OpenNest.Math;
 using Xunit;
+using System.Linq;
 
 namespace OpenNest.Tests;
 
@@ -201,6 +202,46 @@ public class EllipseConverterTests
             var maxDev = MaxDeviationFromEllipse(arc, center, a, b, rotation, 50);
             Assert.True(maxDev <= tolerance,
                 $"Deviation {maxDev:F6} exceeds tolerance {tolerance}");
+        }
+    }
+
+    [Fact]
+    public void DxfImporter_EllipseInDxf_ProducesArcsNotLines()
+    {
+        // Create a DXF in memory with an ellipse and verify import produces arcs
+        var doc = new ACadSharp.CadDocument();
+        var ellipse = new ACadSharp.Entities.Ellipse
+        {
+            Center = new CSMath.XYZ(0, 0, 0),
+            MajorAxisEndPoint = new CSMath.XYZ(10, 0, 0),
+            RadiusRatio = 0.6,
+            StartParameter = 0,
+            EndParameter = System.Math.PI * 2
+        };
+        doc.Entities.Add(ellipse);
+
+        // Write to temp file and re-import
+        var tempPath = System.IO.Path.GetTempFileName() + ".dxf";
+        try
+        {
+            using (var stream = System.IO.File.Create(tempPath))
+            using (var writer = new ACadSharp.IO.DxfWriter(stream, doc, false))
+                writer.Write();
+
+            var importer = new OpenNest.IO.DxfImporter { SplinePrecision = 200 };
+            var result = importer.Import(tempPath);
+
+            var arcCount = result.Entities.Count(e => e is Arc);
+            var lineCount = result.Entities.Count(e => e is Line);
+
+            // Should have arcs, not hundreds of lines
+            Assert.True(arcCount >= 4, $"Expected at least 4 arcs, got {arcCount}");
+            Assert.Equal(0, lineCount);
+        }
+        finally
+        {
+            if (System.IO.File.Exists(tempPath))
+                System.IO.File.Delete(tempPath);
         }
     }
 
