@@ -56,42 +56,45 @@ namespace OpenNest.IO
             return result;
         }
 
-        public static List<Geometry.Line> ToOpenNest(this Spline spline)
+        public static List<Geometry.Entity> ToOpenNest(this Spline spline, int precision)
         {
-            var lines = new List<Geometry.Line>();
-            var pts = spline.ControlPoints;
-
-            if (pts.Count == 0)
-                return lines;
-
             var layer = spline.Layer.ToOpenNest();
             var color = spline.ResolveColor();
             var lineTypeName = spline.ResolveLineTypeName();
-            var lastPoint = pts[0].ToOpenNest();
 
-            for (var i = 1; i < pts.Count; i++)
+            // Evaluate actual points on the spline curve (not control points)
+            List<XYZ> curvePoints;
+            try
             {
-                var nextPoint = pts[i].ToOpenNest();
-
-                lines.Add(new Geometry.Line(lastPoint, nextPoint)
-                {
-                    Layer = layer,
-                    Color = color,
-                    LineTypeName = lineTypeName
-                });
-
-                lastPoint = nextPoint;
+                curvePoints = spline.PolygonalVertexes(precision > 0 ? precision : 200);
+            }
+            catch
+            {
+                curvePoints = null;
             }
 
-            if (spline.IsClosed)
-                lines.Add(new Geometry.Line(lastPoint, pts[0].ToOpenNest())
-                {
-                    Layer = layer,
-                    Color = color,
-                    LineTypeName = lineTypeName
-                });
+            if (curvePoints == null || curvePoints.Count < 2)
+            {
+                // Fallback: use control points if evaluation fails
+                curvePoints = new List<XYZ>(spline.ControlPoints);
+                if (curvePoints.Count < 2)
+                    return new List<Geometry.Entity>();
+            }
 
-            return lines;
+            var points = new List<Vector>(curvePoints.Count);
+            foreach (var pt in curvePoints)
+                points.Add(pt.ToOpenNest());
+
+            var entities = SplineConverter.Convert(points, spline.IsClosed, tolerance: 0.001);
+
+            foreach (var entity in entities)
+            {
+                entity.Layer = layer;
+                entity.Color = color;
+                entity.LineTypeName = lineTypeName;
+            }
+
+            return entities;
         }
 
         public static List<Geometry.Line> ToOpenNest(this Polyline polyline)
@@ -172,70 +175,32 @@ namespace OpenNest.IO
             return lines;
         }
 
-        public static List<Geometry.Line> ToOpenNest(this ACadSharp.Entities.Ellipse ellipse, int precision = 200)
+        public static List<Geometry.Entity> ToOpenNest(this ACadSharp.Entities.Ellipse ellipse, double tolerance = 0.001)
         {
-            var lines = new List<Geometry.Line>();
-
             var center = new Vector(ellipse.Center.X, ellipse.Center.Y);
             var majorAxis = new Vector(ellipse.MajorAxisEndPoint.X, ellipse.MajorAxisEndPoint.Y);
-            var majorLength = System.Math.Sqrt(majorAxis.X * majorAxis.X + majorAxis.Y * majorAxis.Y);
-            var minorLength = majorLength * ellipse.RadiusRatio;
+            var semiMajor = System.Math.Sqrt(majorAxis.X * majorAxis.X + majorAxis.Y * majorAxis.Y);
+            var semiMinor = semiMajor * ellipse.RadiusRatio;
             var rotation = System.Math.Atan2(majorAxis.Y, majorAxis.X);
 
             var startParam = ellipse.StartParameter;
             var endParam = ellipse.EndParameter;
 
-            if (endParam <= startParam)
-                endParam += System.Math.PI * 2.0;
-
-            var step = (endParam - startParam) / precision;
-
-            var points = new List<Vector>();
-
-            for (var i = 0; i <= precision; i++)
-            {
-                var t = startParam + step * i;
-                var x = majorLength * System.Math.Cos(t);
-                var y = minorLength * System.Math.Sin(t);
-
-                // Rotate by the major axis angle and translate to center
-                var cos = System.Math.Cos(rotation);
-                var sin = System.Math.Sin(rotation);
-                var px = center.X + x * cos - y * sin;
-                var py = center.Y + x * sin + y * cos;
-
-                points.Add(new Vector(px, py));
-            }
-
             var layer = ellipse.Layer.ToOpenNest();
             var color = ellipse.ResolveColor();
             var lineTypeName = ellipse.ResolveLineTypeName();
 
-            for (var i = 0; i < points.Count - 1; i++)
+            var entities = EllipseConverter.Convert(center, semiMajor, semiMinor, rotation,
+                startParam, endParam, tolerance);
+
+            foreach (var entity in entities)
             {
-                lines.Add(new Geometry.Line(points[i], points[i + 1])
-                {
-                    Layer = layer,
-                    Color = color,
-                    LineTypeName = lineTypeName
-                });
+                entity.Layer = layer;
+                entity.Color = color;
+                entity.LineTypeName = lineTypeName;
             }
 
-            // Close only if it's a full ellipse (sweep ≈ 2π)
-            var sweep = endParam - startParam;
-            if (lines.Count >= 2 && System.Math.Abs(sweep - System.Math.PI * 2.0) < 0.01)
-            {
-                var first = lines.First();
-                var last = lines.Last();
-                lines.Add(new Geometry.Line(last.EndPoint, first.StartPoint)
-                {
-                    Layer = layer,
-                    Color = color,
-                    LineTypeName = lineTypeName
-                });
-            }
-
-            return lines;
+            return entities;
         }
 
         public static Geometry.Layer ToOpenNest(this ACadSharp.Tables.Layer layer)

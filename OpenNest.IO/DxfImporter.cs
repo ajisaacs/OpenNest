@@ -45,7 +45,11 @@ namespace OpenNest.IO
                         break;
 
                     case ACadSharp.Entities.Spline spline:
-                        lines.AddRange(spline.ToOpenNest());
+                        foreach (var e in spline.ToOpenNest(SplinePrecision))
+                        {
+                            if (e is Line l) lines.Add(l);
+                            else if (e is Arc a) arcs.Add(a);
+                        }
                         break;
 
                     case ACadSharp.Entities.LwPolyline lwPolyline:
@@ -57,7 +61,11 @@ namespace OpenNest.IO
                         break;
 
                     case ACadSharp.Entities.Ellipse ellipse:
-                        lines.AddRange(ellipse.ToOpenNest(SplinePrecision));
+                        foreach (var e in ellipse.ToOpenNest())
+                        {
+                            if (e is Line l) lines.Add(l);
+                            else if (e is Arc a) arcs.Add(a);
+                        }
                         break;
                 }
             }
