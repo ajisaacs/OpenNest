@@ -481,6 +481,12 @@ namespace OpenNest.Forms
             entityView1.Invalidate();
         }
 
+        private void OnLabelsChanged(object sender, EventArgs e)
+        {
+            entityView1.ShowEntityLabels = chkLabels.Checked;
+            entityView1.Invalidate();
+        }
+
         private void OnExportDxfClick(object sender, EventArgs e)
         {
             var item = CurrentItem;

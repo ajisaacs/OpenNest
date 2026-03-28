@@ -31,6 +31,7 @@ namespace OpenNest.Forms
             btnSimplify = new System.Windows.Forms.Button();
             btnExportDxf = new System.Windows.Forms.Button();
             chkShowOriginal = new System.Windows.Forms.CheckBox();
+            chkLabels = new System.Windows.Forms.CheckBox();
             lblDetect = new System.Windows.Forms.Label();
             cboBendDetector = new System.Windows.Forms.ComboBox();
             bottomPanel1 = new OpenNest.Controls.BottomPanel();
@@ -133,6 +134,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(btnSimplify);
             detailBar.Controls.Add(btnExportDxf);
             detailBar.Controls.Add(chkShowOriginal);
+            detailBar.Controls.Add(chkLabels);
             detailBar.Controls.Add(lblDetect);
             detailBar.Controls.Add(cboBendDetector);
             detailBar.Dock = System.Windows.Forms.DockStyle.Bottom;
@@ -246,6 +248,14 @@ namespace OpenNest.Forms
             chkShowOriginal.Margin = new System.Windows.Forms.Padding(6, 3, 0, 0);
             chkShowOriginal.CheckedChanged += new System.EventHandler(this.OnShowOriginalChanged);
             //
+            // chkLabels
+            //
+            chkLabels.AutoSize = true;
+            chkLabels.Font = new System.Drawing.Font("Segoe UI", 9F);
+            chkLabels.Text = "Labels";
+            chkLabels.Margin = new System.Windows.Forms.Padding(6, 3, 0, 0);
+            chkLabels.CheckedChanged += new System.EventHandler(this.OnLabelsChanged);
+            //
             // lblDetect
             //
             lblDetect.AutoSize = true;
@@ -347,6 +357,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button btnSimplify;
         private System.Windows.Forms.Button btnExportDxf;
         private System.Windows.Forms.CheckBox chkShowOriginal;
+        private System.Windows.Forms.CheckBox chkLabels;
         private System.Windows.Forms.ComboBox cboBendDetector;
         private System.Windows.Forms.Label lblQty;
         private System.Windows.Forms.Label lblCust;

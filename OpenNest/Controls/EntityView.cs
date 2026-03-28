@@ -28,9 +28,13 @@ namespace OpenNest.Controls
         public List<Entity> SimplifierToleranceLeft { get; set; }
         public List<Entity> SimplifierToleranceRight { get; set; }
         public List<Entity> OriginalEntities { get; set; }
+        public bool ShowEntityLabels { get; set; }
 
         private readonly Pen gridPen = new Pen(Color.FromArgb(70, 70, 70));
         private readonly Dictionary<int, Pen> penCache = new Dictionary<int, Pen>();
+        private readonly Font labelFont = new Font("Segoe UI", 7f);
+        private readonly SolidBrush labelBrush = new SolidBrush(Color.FromArgb(220, 255, 255, 200));
+        private readonly SolidBrush labelBackBrush = new SolidBrush(Color.FromArgb(33, 40, 48));
 
         public event EventHandler<Line> LinePicked;
         public event EventHandler PickCancelled;
@@ -111,6 +115,9 @@ namespace OpenNest.Controls
                 var pen = GetEntityPen(entity.Color);
                 DrawEntity(e.Graphics, entity, pen);
             }
+
+            if (ShowEntityLabels)
+                DrawEntityLabels(e.Graphics);
 
             if (SimplifierPreview != null)
             {
@@ -301,12 +308,60 @@ namespace OpenNest.Controls
             return bestLine;
         }
 
+        private void DrawEntityLabels(Graphics g)
+        {
+            for (var i = 0; i < Entities.Count; i++)
+            {
+                var entity = Entities[i];
+                if (!entity.Layer.IsVisible || !entity.IsVisible)
+                    continue;
+
+                var mid = GetEntityMidPoint(entity);
+                if (!mid.HasValue) continue;
+
+                var pt = PointWorldToGraph(mid.Value);
+                var text = i.ToString();
+                var size = g.MeasureString(text, labelFont);
+                var cx = pt.X - size.Width / 2f;
+                var cy = pt.Y - size.Height / 2f;
+                var radius = System.Math.Max(size.Width, size.Height) / 2f + 2f;
+                g.FillEllipse(labelBackBrush, pt.X - radius, pt.Y - radius, radius * 2f, radius * 2f);
+                g.DrawString(text, labelFont, labelBrush, cx, cy);
+            }
+        }
+
+        private static Vector? GetEntityMidPoint(Entity entity)
+        {
+            switch (entity)
+            {
+                case Line line:
+                    return line.MidPoint;
+
+                case Arc arc:
+                    var midAngle = arc.IsReversed
+                        ? arc.StartAngle - arc.SweepAngle() / 2.0
+                        : arc.StartAngle + arc.SweepAngle() / 2.0;
+                    return new Vector(
+                        arc.Center.X + arc.Radius * System.Math.Cos(midAngle),
+                        arc.Center.Y + arc.Radius * System.Math.Sin(midAngle));
+
+                case Circle circle:
+                    return circle.Center;
+
+                default:
+                    return null;
+            }
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
                 ClearPenCache();
                 gridPen.Dispose();
+                labelFont.Dispose();
+                labelBrush.Dispose();
+                labelBackBrush.Dispose();
             }
             base.Dispose(disposing);
         }
