@@ -71,6 +71,29 @@ public class LocalJsonProvider : IDataProvider
         }
     }
 
+    public void EnsureDefaults()
+    {
+        if (Directory.GetFiles(_directory, "*.json").Length > 0)
+            return;
+
+        var assembly = typeof(LocalJsonProvider).Assembly;
+        var resourceName = assembly.GetManifestResourceNames()
+            .FirstOrDefault(n => n.EndsWith("CL-980.json"));
+
+        if (resourceName is null) return;
+
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream is null) return;
+
+        using var reader = new StreamReader(stream);
+        var json = reader.ReadToEnd();
+
+        var config = JsonSerializer.Deserialize<MachineConfig>(json, JsonOptions);
+        if (config is null) return;
+
+        SaveMachine(config);
+    }
+
     private static void WriteWithRetry(string path, string json, int maxRetries = 3)
     {
         for (var attempt = 0; attempt < maxRetries; attempt++)
