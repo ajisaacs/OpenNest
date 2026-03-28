@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenNest.Api\OpenNest.Api.csproj" />
+    <ProjectReference Include="..\OpenNest.Data\OpenNest.Data.csproj" />
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
     <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />

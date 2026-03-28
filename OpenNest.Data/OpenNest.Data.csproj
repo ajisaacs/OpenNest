@@ -3,6 +3,8 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>OpenNest.Data</RootNamespace>
     <AssemblyName>OpenNest.Data</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
