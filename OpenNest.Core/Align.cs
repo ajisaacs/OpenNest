@@ -125,61 +125,36 @@ namespace OpenNest
             parts.ForEach(part => Bottom(fixedPart, part));
         }
 
-        public static void EvenlyDistributeHorizontally(List<Part> parts)
+        public static void EvenlyDistributeHorizontally(List<Part> parts) =>
+            EvenlyDistribute(parts, horizontal: true);
+
+        public static void EvenlyDistributeVertically(List<Part> parts) =>
+            EvenlyDistribute(parts, horizontal: false);
+
+        private static void EvenlyDistribute(List<Part> parts, bool horizontal)
         {
             if (parts.Count < 3)
                 return;
 
             var list = new List<Part>(parts);
-            list.Sort((p1, p2) => p1.BoundingBox.Center.X.CompareTo(p2.BoundingBox.Center.X));
+            list.Sort((p1, p2) => horizontal
+                ? p1.BoundingBox.Center.X.CompareTo(p2.BoundingBox.Center.X)
+                : p1.BoundingBox.Center.Y.CompareTo(p2.BoundingBox.Center.Y));
 
             var lastIndex = list.Count - 1;
 
-            var first = list[0];
-            var last = list[lastIndex];
+            var start = horizontal ? list[0].BoundingBox.Center.X : list[0].BoundingBox.Center.Y;
+            var end = horizontal ? list[lastIndex].BoundingBox.Center.X : list[lastIndex].BoundingBox.Center.Y;
 
-            var start = first.BoundingBox.Center.X;
-            var end = last.BoundingBox.Center.X;
-            var diff = end - start;
+            var spacing = (end - start) / lastIndex;
 
-            var spacing = diff / lastIndex;
-
-            for (int i = 1; i < lastIndex; ++i)
+            for (var i = 1; i < lastIndex; ++i)
             {
                 var part = list[i];
-                var newX = start + i * spacing;
-                var curX = part.BoundingBox.Center.X;
+                var cur = horizontal ? part.BoundingBox.Center.X : part.BoundingBox.Center.Y;
+                var delta = start + i * spacing - cur;
 
-                part.Offset(newX - curX, 0);
-            }
-        }
-
-        public static void EvenlyDistributeVertically(List<Part> parts)
-        {
-            if (parts.Count < 3)
-                return;
-
-            var list = new List<Part>(parts);
-            list.Sort((p1, p2) => p1.BoundingBox.Center.Y.CompareTo(p2.BoundingBox.Center.Y));
-
-            var lastIndex = list.Count - 1;
-
-            var first = list[0];
-            var last = list[lastIndex];
-
-            var start = first.BoundingBox.Center.Y;
-            var end = last.BoundingBox.Center.Y;
-            var diff = end - start;
-
-            var spacing = diff / lastIndex;
-
-            for (int i = 1; i < lastIndex; ++i)
-            {
-                var part = list[i];
-                var newX = start + i * spacing;
-                var curX = part.BoundingBox.Center.Y;
-
-                part.Offset(0, newX - curX);
+                part.Offset(horizontal ? delta : 0, horizontal ? 0 : delta);
             }
         }
     }
