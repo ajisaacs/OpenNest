@@ -104,8 +104,6 @@
             mnuPlateAdd = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRemove = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem16 = new System.Windows.Forms.ToolStripSeparator();
-            mnuPlateFill = new System.Windows.Forms.ToolStripMenuItem();
-            toolStripMenuItem9 = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRotate = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRotateCw = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRotateCcw = new System.Windows.Forms.ToolStripMenuItem();
@@ -655,7 +653,7 @@
             // 
             // mnuPlate
             // 
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateFill, toolStripMenuItem9, mnuPlateCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem });
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -699,20 +697,6 @@
             // 
             toolStripMenuItem16.Name = "toolStripMenuItem16";
             toolStripMenuItem16.Size = new System.Drawing.Size(174, 6);
-            // 
-            // mnuPlateFill
-            // 
-            mnuPlateFill.Name = "mnuPlateFill";
-            mnuPlateFill.Size = new System.Drawing.Size(177, 22);
-            mnuPlateFill.Text = "Fill";
-            mnuPlateFill.Click += FillPlate_Click;
-            // 
-            // toolStripMenuItem9
-            // 
-            toolStripMenuItem9.Name = "toolStripMenuItem9";
-            toolStripMenuItem9.Size = new System.Drawing.Size(177, 22);
-            toolStripMenuItem9.Text = "Fill Area";
-            toolStripMenuItem9.Click += FillArea_Click;
             //
             // mnuPlateCutOff
             //
@@ -1235,7 +1219,6 @@
         private System.Windows.Forms.ToolStripButton btnZoomIn;
         private System.Windows.Forms.ToolStripStatusLabel statusLabel1;
         private System.Windows.Forms.ToolStripStatusLabel spacerLabel;
-        private System.Windows.Forms.ToolStripMenuItem mnuPlateFill;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem18;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateRemove;
         private System.Windows.Forms.ToolStripButton btnSave;
@@ -1246,7 +1229,6 @@
         private System.Windows.Forms.ToolStripMenuItem mnuSequenceParts;
         private System.Windows.Forms.ToolStripMenuItem closeToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem runAutoNestToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem9;
         private System.Windows.Forms.ToolStripMenuItem autoSequenceCurrentPlateToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem manualSequenceToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem autoSequenceAllPlatesToolStripMenuItem;
