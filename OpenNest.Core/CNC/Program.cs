@@ -51,37 +51,7 @@ namespace OpenNest.CNC
             mode = Mode.Absolute;
         }
 
-        public virtual void Rotate(double angle)
-        {
-            var mode = Mode;
-
-            SetModeAbs();
-
-            for (int i = 0; i < Codes.Count; ++i)
-            {
-                var code = Codes[i];
-
-                if (code.Type == CodeType.SubProgramCall)
-                {
-                    var subpgm = (SubProgramCall)code;
-
-                    if (subpgm.Program != null)
-                        subpgm.Program.Rotate(angle);
-                }
-
-                if (code is Motion == false)
-                    continue;
-
-                var code2 = (Motion)code;
-
-                code2.Rotate(angle);
-            }
-
-            if (mode == Mode.Incremental)
-                SetModeInc();
-
-            Rotation = Angle.NormalizeRad(Rotation + angle);
-        }
+        public virtual void Rotate(double angle) => Rotate(angle, new Vector(0, 0));
 
         public override string ToString()
         {
