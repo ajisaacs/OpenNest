@@ -38,6 +38,8 @@ namespace OpenNest.Controls
         private readonly Pen separatorPen = new Pen(Color.FromArgb(230, 230, 230));
         private readonly SolidBrush emptyStateBrush = new SolidBrush(Color.FromArgb(160, 160, 160));
 
+        private readonly VScrollBar scrollBar = new VScrollBar();
+
         public event EventHandler<int> SelectedIndexChanged;
         public event EventHandler<FileListItem> ItemRightClicked;
 
@@ -47,10 +49,16 @@ namespace OpenNest.Controls
                 ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.UserPaint |
-                ControlStyles.ResizeRedraw, true);
+                ControlStyles.ResizeRedraw |
+                ControlStyles.Selectable, true);
 
             BackColor = Color.White;
             Font = new Font("Segoe UI", 9f);
+
+            scrollBar.Dock = DockStyle.Right;
+            scrollBar.Visible = false;
+            scrollBar.Scroll += (s, e) => { scrollOffset = e.NewValue; Invalidate(); };
+            Controls.Add(scrollBar);
         }
 
         public IReadOnlyList<FileListItem> Items => items;
@@ -77,6 +85,7 @@ namespace OpenNest.Controls
             {
                 selectedIndex++;
             }
+            UpdateScrollBar();
             Invalidate();
         }
 
@@ -85,6 +94,7 @@ namespace OpenNest.Controls
             items.RemoveAt(index);
             if (selectedIndex >= items.Count)
                 selectedIndex = items.Count - 1;
+            UpdateScrollBar();
             Invalidate();
             SelectedIndexChanged?.Invoke(this, selectedIndex);
         }
@@ -94,6 +104,7 @@ namespace OpenNest.Controls
             items.Clear();
             selectedIndex = -1;
             scrollOffset = 0;
+            UpdateScrollBar();
             Invalidate();
         }
 
@@ -101,6 +112,74 @@ namespace OpenNest.Controls
         {
             items.InsertRange(index, newItems);
             Invalidate();
+        }
+
+        private void UpdateScrollBar()
+        {
+            var totalHeight = items.Count * ItemHeight;
+            if (totalHeight > Height)
+            {
+                scrollBar.Maximum = totalHeight;
+                scrollBar.LargeChange = Height;
+                scrollBar.SmallChange = ItemHeight;
+                scrollBar.Visible = true;
+            }
+            else
+            {
+                scrollBar.Visible = false;
+                scrollOffset = 0;
+            }
+        }
+
+        private void EnsureVisible(int index)
+        {
+            if (index < 0 || index >= items.Count) return;
+            var itemTop = index * ItemHeight;
+            var itemBottom = itemTop + ItemHeight;
+
+            if (itemTop < scrollOffset)
+                scrollOffset = itemTop;
+            else if (itemBottom > scrollOffset + Height)
+                scrollOffset = itemBottom - Height;
+
+            if (scrollBar.Visible)
+                scrollBar.Value = System.Math.Min(scrollOffset, scrollBar.Maximum - scrollBar.LargeChange + 1);
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            UpdateScrollBar();
+        }
+
+        protected override bool IsInputKey(Keys keyData)
+        {
+            if (keyData == Keys.Up || keyData == Keys.Down)
+                return true;
+            return base.IsInputKey(keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (items.Count == 0) return;
+
+            var newIndex = selectedIndex;
+            if (e.KeyCode == Keys.Down)
+                newIndex = System.Math.Min(selectedIndex + 1, items.Count - 1);
+            else if (e.KeyCode == Keys.Up)
+                newIndex = System.Math.Max(selectedIndex - 1, 0);
+            else
+                return;
+
+            if (newIndex != selectedIndex)
+            {
+                selectedIndex = newIndex;
+                EnsureVisible(selectedIndex);
+                Invalidate();
+                SelectedIndexChanged?.Invoke(this, selectedIndex);
+            }
+            e.Handled = true;
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -120,6 +199,7 @@ namespace OpenNest.Controls
             var smallFont = new Font("Segoe UI", 8f);
             var mutedBrush = new SolidBrush(Color.FromArgb(130, 130, 130));
             var textBrush = new SolidBrush(ForeColor);
+            var contentWidth = scrollBar.Visible ? Width - scrollBar.Width : Width;
 
             for (var i = 0; i < items.Count; i++)
             {
@@ -127,7 +207,7 @@ namespace OpenNest.Controls
                 if (y + ItemHeight < 0 || y > Height) continue;
 
                 var item = items[i];
-                var rect = new Rectangle(0, y, Width, ItemHeight);
+                var rect = new Rectangle(0, y, contentWidth, ItemHeight);
 
                 // Background
                 if (i == selectedIndex)
@@ -140,7 +220,7 @@ namespace OpenNest.Controls
                     g.FillRectangle(accentBrush, 0, y, AccentBarWidth, ItemHeight);
 
                 // Name
-                var nameRect = new Rectangle(AccentBarWidth + 8, y + 6, Width - 70, 20);
+                var nameRect = new Rectangle(AccentBarWidth + 8, y + 6, contentWidth - 70, 20);
                 TextRenderer.DrawText(g, item.Name, boldFont, nameRect, ForeColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
 
                 // Dimensions + entity count
@@ -148,17 +228,17 @@ namespace OpenNest.Controls
                 var dimText = bounds != null
                     ? $"{bounds.Width:0.#} x {bounds.Length:0.#} — {item.EntityCount} entities"
                     : $"{item.EntityCount} entities";
-                var dimRect = new Rectangle(AccentBarWidth + 8, y + 26, Width - 70, 16);
+                var dimRect = new Rectangle(AccentBarWidth + 8, y + 26, contentWidth - 70, 16);
                 TextRenderer.DrawText(g, dimText, smallFont, dimRect, Color.FromArgb(130, 130, 130), TextFormatFlags.Left);
 
                 // Quantity badge
                 var qtyText = $"x{item.Quantity}";
-                var qtyRect = new Rectangle(Width - 50, y + 12, 40, 24);
+                var qtyRect = new Rectangle(contentWidth - 50, y + 12, 40, 24);
                 TextRenderer.DrawText(g, qtyText, Font, qtyRect, Color.FromArgb(100, 100, 100), TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
 
                 // Separator
                 if (i < items.Count - 1)
-                    g.DrawLine(separatorPen, AccentBarWidth + 8, y + ItemHeight - 1, Width - 8, y + ItemHeight - 1);
+                    g.DrawLine(separatorPen, AccentBarWidth + 8, y + ItemHeight - 1, contentWidth - 8, y + ItemHeight - 1);
             }
 
             boldFont.Dispose();
@@ -223,6 +303,8 @@ namespace OpenNest.Controls
             base.OnMouseWheel(e);
             var maxScroll = System.Math.Max(0, items.Count * ItemHeight - Height);
             scrollOffset = System.Math.Max(0, System.Math.Min(maxScroll, scrollOffset - e.Delta));
+            if (scrollBar.Visible)
+                scrollBar.Value = System.Math.Min(scrollOffset, scrollBar.Maximum - scrollBar.LargeChange + 1);
             Invalidate();
         }
 
@@ -237,6 +319,7 @@ namespace OpenNest.Controls
                 accentBrush.Dispose();
                 separatorPen.Dispose();
                 emptyStateBrush.Dispose();
+                scrollBar.Dispose();
             }
             base.Dispose(disposing);
         }
