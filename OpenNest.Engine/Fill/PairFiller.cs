@@ -321,9 +321,19 @@ namespace OpenNest.Engine.Fill
                 return cachedResult;
             }
 
-            var remnantEngine = NestEngineRegistry.Create(plate);
-            var item = new NestItem { Drawing = drawing };
-            var parts = remnantEngine.Fill(item, remnantBox, null, token);
+            var filler = new FillLinear(remnantBox, partSpacing);
+            List<Part> parts = null;
+
+            foreach (var angle in new[] { 0.0, Angle.HalfPI })
+            {
+                token.ThrowIfCancellationRequested();
+                var result = FillHelpers.FillWithDirectionPreference(
+                    dir => filler.Fill(drawing, angle, dir),
+                    null, comparer, remnantBox);
+
+                if (result != null && result.Count > (parts?.Count ?? 0))
+                    parts = result;
+            }
 
             Debug.WriteLine($"[PairFiller] Remnant: {parts?.Count ?? 0} parts in " +
                 $"{remnantBox.Width:F2}x{remnantBox.Length:F2}");

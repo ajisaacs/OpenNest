@@ -3,6 +3,7 @@ using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 
 namespace OpenNest.Engine.Fill
@@ -348,6 +349,21 @@ namespace OpenNest.Engine.Fill
 
             if (copyDistance <= Tolerance.Epsilon)
                 copyDistance = columnWidth + partSpacing;
+
+            // Safety: if the compacted test column overlaps the original column,
+            // fall back to bbox-based spacing.
+            var probe = new List<Part>(column);
+            probe.AddRange(testColumn.Where(IsWithinWorkArea));
+            if (HasOverlappingParts(probe))
+            {
+                Debug.WriteLine($"[FillExtents] Compacted column overlaps, falling back to bbox spacing");
+                copyDistance = columnWidth + partSpacing;
+
+                // Rebuild test column at safe distance.
+                testColumn.Clear();
+                foreach (var part in column)
+                    testColumn.Add(part.CloneAtOffset(new Vector(copyDistance, 0)));
+            }
 
             Debug.WriteLine($"[FillExtents] Column copy distance: {copyDistance:F2} (bbox width: {columnWidth:F2}, spacing: {partSpacing:F2})");
 

@@ -288,6 +288,65 @@ namespace OpenNest.Engine.Fill
         }
 
         /// <summary>
+        /// Fallback tiling using bounding-box spacing when geometry-aware tiling
+        /// produces overlapping parts.
+        /// </summary>
+        private List<Part> TilePatternBbox(Pattern basePattern, NestDirection direction)
+        {
+            var copyDistance = GetDimension(basePattern.BoundingBox, direction) + PartSpacing;
+
+            if (copyDistance <= 0)
+                return new List<Part>();
+
+            var dim = GetDimension(basePattern.BoundingBox, direction);
+            var start = GetStart(basePattern.BoundingBox, direction);
+            var limit = GetLimit(direction);
+
+            var result = new List<Part>();
+            var count = 1;
+
+            while (true)
+            {
+                var nextPos = start + copyDistance * count;
+
+                if (nextPos + dim > limit + Tolerance.Epsilon)
+                    break;
+
+                var offset = MakeOffset(direction, copyDistance * count);
+
+                foreach (var part in basePattern.Parts)
+                    result.Add(part.CloneAtOffset(offset));
+
+                count++;
+            }
+
+            return result;
+        }
+
+        private static bool HasOverlappingParts(List<Part> parts)
+        {
+            for (var i = 0; i < parts.Count; i++)
+            {
+                var b1 = parts[i].BoundingBox;
+
+                for (var j = i + 1; j < parts.Count; j++)
+                {
+                    var b2 = parts[j].BoundingBox;
+
+                    var overlapX = System.Math.Min(b1.Right, b2.Right)
+                                 - System.Math.Max(b1.Left, b2.Left);
+                    var overlapY = System.Math.Min(b1.Top, b2.Top)
+                                 - System.Math.Max(b1.Bottom, b2.Bottom);
+
+                    if (overlapX > Tolerance.Epsilon && overlapY > Tolerance.Epsilon)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Creates a seed pattern containing a single part positioned at the work area origin.
         /// Returns an empty pattern if the part does not fit.
         /// </summary>
@@ -325,10 +384,25 @@ namespace OpenNest.Engine.Fill
             var row = new List<Part>(pattern.Parts);
             row.AddRange(TilePattern(pattern, direction, boundaries));
 
+            // Safety: if geometry-aware spacing produced overlapping parts,
+            // fall back to bbox-based spacing for this axis.
+            if (pattern.Parts.Count > 1 && HasOverlappingParts(row))
+            {
+                row = new List<Part>(pattern.Parts);
+                row.AddRange(TilePatternBbox(pattern, direction));
+            }
+
             // If primary tiling didn't produce copies, just tile along perpendicular
             if (row.Count <= pattern.Parts.Count)
             {
                 row.AddRange(TilePattern(pattern, perpAxis, boundaries));
+
+                if (pattern.Parts.Count > 1 && HasOverlappingParts(row))
+                {
+                    row = new List<Part>(pattern.Parts);
+                    row.AddRange(TilePatternBbox(pattern, perpAxis));
+                }
+
                 return row;
             }
 

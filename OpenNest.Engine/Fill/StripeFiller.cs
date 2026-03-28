@@ -244,28 +244,29 @@ public class StripeFiller
             return cachedResult;
         }
 
-        FillStrategyRegistry.SetEnabled("Pairs", "RectBestFit", "Extents", "Linear");
-        try
+        var filler = new FillLinear(remnantBox, spacing);
+        List<Part> best = null;
+
+        foreach (var angle in new[] { 0.0, Angle.HalfPI })
         {
-            var engine = CreateRemnantEngine(_context.Plate);
-            var item = new NestItem { Drawing = drawing };
-            var parts = engine.Fill(item, remnantBox, _context.Progress, _context.Token);
+            _context.Token.ThrowIfCancellationRequested();
+            var result = FillHelpers.FillWithDirectionPreference(
+                dir => filler.Fill(drawing, angle, dir),
+                null, _comparer, remnantBox);
 
-            Debug.WriteLine($"[StripeFiller] Remnant engine ({engine.Name}): {parts?.Count ?? 0} parts, " +
-                $"winner={engine.WinnerPhase}");
-
-            if (parts != null && parts.Count > 0)
-            {
-                FillResultCache.Store(drawing, remnantBox, spacing, parts);
-                return parts;
-            }
-
-            return null;
+            if (result != null && result.Count > (best?.Count ?? 0))
+                best = result;
         }
-        finally
+
+        Debug.WriteLine($"[StripeFiller] Remnant linear: {best?.Count ?? 0} parts");
+
+        if (best != null && best.Count > 0)
         {
-            FillStrategyRegistry.SetEnabled(null);
+            FillResultCache.Store(drawing, remnantBox, spacing, best);
+            return best;
         }
+
+        return null;
     }
 
     public static double FindAngleForTargetSpan(
