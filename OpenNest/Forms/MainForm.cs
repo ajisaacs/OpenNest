@@ -1,5 +1,6 @@
 ﻿using OpenNest.Actions;
 using OpenNest.Collections;
+using OpenNest.Data;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
@@ -737,6 +738,17 @@ namespace OpenNest.Forms
         {
             var form = new OptionsForm();
             form.ShowDialog();
+        }
+
+        private void MachineConfig_Click(object sender, EventArgs e)
+        {
+            var appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenNest", "Machines");
+            var provider = new LocalJsonProvider(appDataPath);
+            provider.EnsureDefaults();
+            using (var form = new MachineConfigForm(provider))
+            {
+                form.ShowDialog(this);
+            }
         }
 
         private void AlignLeft_Click(object sender, EventArgs e)
