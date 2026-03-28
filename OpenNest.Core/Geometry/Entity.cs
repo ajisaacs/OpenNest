@@ -30,6 +30,11 @@ namespace OpenNest.Geometry
         public bool IsVisible { get; set; } = true;
 
         /// <summary>
+        /// Optional tag for identifying generated entities (e.g. bend etch marks).
+        /// </summary>
+        public string Tag { get; set; }
+
+        /// <summary>
         /// Smallest box that contains the entity.
         /// </summary>
         public Box BoundingBox

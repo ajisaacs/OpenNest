@@ -14,6 +14,7 @@ namespace OpenNest.Bending
         };
 
         private const double DefaultEtchLength = 1.0;
+        private const string BendEtchTag = "BendEtch";
 
         public Vector StartPoint { get; set; }
         public Vector EndPoint { get; set; }
@@ -73,7 +74,7 @@ namespace OpenNest.Bending
         /// </summary>
         public static void UpdateEtchEntities(List<Entity> entities, List<Bend> bends)
         {
-            entities.RemoveAll(e => e.Layer == EtchLayer);
+            entities.RemoveAll(e => e.Tag == BendEtchTag);
             if (bends == null) return;
 
             foreach (var bend in bends)
@@ -82,7 +83,7 @@ namespace OpenNest.Bending
 
         private static Line CreateEtchLine(Vector start, Vector end)
         {
-            return new Line(start, end) { Layer = EtchLayer, Color = Color.Green };
+            return new Line(start, end) { Layer = EtchLayer, Color = Color.Green, Tag = BendEtchTag };
         }
 
         public override string ToString()
