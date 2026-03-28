@@ -212,36 +212,7 @@ namespace OpenNest.Actions
             }
         }
 
-        private RectangleF GetRectangle()
-        {
-            var rect = new RectangleF();
-            var pt1 = plateView.PointWorldToGraph(Point1);
-            var pt2 = plateView.PointWorldToGraph(Point2);
-
-            if (pt1.X < pt2.X)
-            {
-                rect.X = pt1.X;
-                rect.Width = pt2.X - pt1.X;
-            }
-            else
-            {
-                rect.X = pt2.X;
-                rect.Width = pt1.X - pt2.X;
-            }
-
-            if (pt1.Y < pt2.Y)
-            {
-                rect.Y = pt1.Y;
-                rect.Height = pt2.Y - pt1.Y;
-            }
-            else
-            {
-                rect.Y = pt2.Y;
-                rect.Height = pt1.Y - pt2.Y;
-            }
-
-            return rect;
-        }
+        private RectangleF GetRectangle() => GetRectangle(Point1, Point2);
 
         public SelectionType SelectionType
         {
