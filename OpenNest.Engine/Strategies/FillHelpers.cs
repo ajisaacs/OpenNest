@@ -109,5 +109,35 @@ namespace OpenNest.Engine.Strategies
             var fallback = fillFunc(other);
             return fallback ?? new List<Part>();
         }
+
+        /// <summary>
+        /// Checks if any pair of parts geometrically overlap. Uses bounding box
+        /// pre-filtering for performance, then falls back to shape intersection.
+        /// </summary>
+        internal static bool HasOverlappingParts(List<Part> parts)
+        {
+            for (var i = 0; i < parts.Count; i++)
+            {
+                var b1 = parts[i].BoundingBox;
+
+                for (var j = i + 1; j < parts.Count; j++)
+                {
+                    var b2 = parts[j].BoundingBox;
+
+                    var overlapX = System.Math.Min(b1.Right, b2.Right)
+                                 - System.Math.Max(b1.Left, b2.Left);
+                    var overlapY = System.Math.Min(b1.Top, b2.Top)
+                                 - System.Math.Max(b1.Bottom, b2.Bottom);
+
+                    if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
+                        continue;
+
+                    if (parts[i].Intersects(parts[j], out _))
+                        return true;
+                }
+            }
+
+            return false;
+        }
     }
 }
