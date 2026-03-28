@@ -532,9 +532,29 @@ namespace OpenNest.Geometry
             Line line, Line offsetLine,
             double distance, OffsetSide side, Shape offsetShape)
         {
-            Vector intersection;
+            // Determine if this is a convex corner using the cross product of
+            // the original line directions. Convex corners need an arc; concave
+            // corners use the line intersection (miter join).
+            var d1 = lastLine.EndPoint - lastLine.StartPoint;
+            var d2 = line.EndPoint - line.StartPoint;
+            var cross = d1.X * d2.Y - d1.Y * d2.X;
 
-            if (Intersect.IntersectsUnbounded(offsetLine, lastOffsetLine, out intersection))
+            var isConvex = (side == OffsetSide.Left && cross < -OpenNest.Math.Tolerance.Epsilon) ||
+                           (side == OffsetSide.Right && cross > OpenNest.Math.Tolerance.Epsilon);
+
+            if (isConvex)
+            {
+                var arc = new Arc(
+                    line.StartPoint,
+                    distance,
+                    line.StartPoint.AngleTo(lastOffsetLine.EndPoint),
+                    line.StartPoint.AngleTo(offsetLine.StartPoint),
+                    side == OffsetSide.Left
+                    );
+
+                offsetShape.Entities.Add(arc);
+            }
+            else if (Intersect.IntersectsUnbounded(offsetLine, lastOffsetLine, out var intersection))
             {
                 offsetLine.StartPoint = intersection;
                 lastOffsetLine.EndPoint = intersection;
