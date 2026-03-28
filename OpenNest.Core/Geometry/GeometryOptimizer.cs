@@ -7,65 +7,46 @@ namespace OpenNest.Geometry
 {
     public static class GeometryOptimizer
     {
-        public static void Optimize(IList<Arc> arcs)
+        public static void Optimize(IList<Arc> arcs) =>
+            MergePass(arcs,
+                (list, item, i) => list.GetCoradialArs(item, i),
+                (Arc a, Arc b, out Arc joined) => TryJoinArcs(a, b, out joined));
+
+        public static void Optimize(IList<Line> lines) =>
+            MergePass(lines,
+                (list, item, i) => list.GetCollinearLines(item, i),
+                (Line a, Line b, out Line joined) => TryJoinLines(a, b, out joined));
+
+        private delegate bool TryJoin<T>(T a, T b, out T joined);
+
+        private static void MergePass<T>(IList<T> items,
+            Func<IList<T>, T, int, List<T>> findCandidates,
+            TryJoin<T> tryJoin) where T : class
         {
-            for (int i = 0; i < arcs.Count; ++i)
+            for (var i = 0; i < items.Count; ++i)
             {
-                var arc = arcs[i];
-
-                var coradialArcs = arcs.GetCoradialArs(arc, i);
-                int index = 0;
-
-                while (index < coradialArcs.Count)
-                {
-                    Arc arc2 = coradialArcs[index];
-                    Arc joinArc;
-
-                    if (!TryJoinArcs(arc, arc2, out joinArc))
-                    {
-                        index++;
-                        continue;
-                    }
-
-                    coradialArcs.Remove(arc2);
-                    arcs.Remove(arc2);
-
-                    arc = joinArc;
-                    index = 0;
-                }
-
-                arcs[i] = arc;
-            }
-        }
-
-        public static void Optimize(IList<Line> lines)
-        {
-            for (int i = 0; i < lines.Count; ++i)
-            {
-                var line = lines[i];
-
-                var collinearLines = lines.GetCollinearLines(line, i);
+                var item = items[i];
+                var candidates = findCandidates(items, item, i);
                 var index = 0;
 
-                while (index < collinearLines.Count)
+                while (index < candidates.Count)
                 {
-                    Line line2 = collinearLines[index];
-                    Line joinLine;
+                    var candidate = candidates[index];
 
-                    if (!TryJoinLines(line, line2, out joinLine))
+                    if (!tryJoin(item, candidate, out var joined))
                     {
                         index++;
                         continue;
                     }
 
-                    collinearLines.Remove(line2);
-                    lines.Remove(line2);
+                    candidates.Remove(candidate);
+                    items.Remove(candidate);
 
-                    line = joinLine;
+                    item = joined;
                     index = 0;
                 }
 
-                lines[i] = line;
+                items[i] = item;
             }
         }
 
