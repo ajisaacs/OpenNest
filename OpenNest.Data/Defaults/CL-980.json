@@ -1,0 +1,174 @@
+{
+  "id": "00000000-0000-0000-0000-000000980001",
+  "schemaVersion": 1,
+  "name": "CL-980",
+  "type": "laser",
+  "units": "inches",
+  "materials": [
+    {
+      "name": "Mild Steel",
+      "grade": "A36",
+      "density": 0.2836,
+      "thicknesses": [
+        {
+          "value": 0.060,
+          "kerf": 0.008,
+          "assistGas": "O2",
+          "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
+          "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x120", "60x120" ]
+        },
+        {
+          "value": 0.075,
+          "kerf": 0.008,
+          "assistGas": "O2",
+          "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
+          "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x120", "60x120" ]
+        },
+        {
+          "value": 0.105,
+          "kerf": 0.010,
+          "assistGas": "O2",
+          "leadIn": { "type": "Arc", "length": 0.1875, "angle": 90.0, "radius": 0.09375 },
+          "leadOut": { "type": "Line", "length": 0.09375, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.375, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x120", "60x120" ]
+        },
+        {
+          "value": 0.135,
+          "kerf": 0.010,
+          "assistGas": "O2",
+          "leadIn": { "type": "Arc", "length": 0.1875, "angle": 90.0, "radius": 0.09375 },
+          "leadOut": { "type": "Line", "length": 0.09375, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.375, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x120", "60x120", "60x144" ]
+        },
+        {
+          "value": 0.1875,
+          "kerf": 0.012,
+          "assistGas": "O2",
+          "leadIn": { "type": "Arc", "length": 0.25, "angle": 90.0, "radius": 0.125 },
+          "leadOut": { "type": "Line", "length": 0.125, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.5, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x120", "60x120", "60x144" ]
+        },
+        {
+          "value": 0.250,
+          "kerf": 0.012,
+          "assistGas": "O2",
+          "leadIn": { "type": "Arc", "length": 0.25, "angle": 90.0, "radius": 0.125 },
+          "leadOut": { "type": "Line", "length": 0.125, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.5, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x120", "60x120", "60x144" ]
+        },
+        {
+          "value": 0.375,
+          "kerf": 0.016,
+          "assistGas": "O2",
+          "leadIn": { "type": "Arc", "length": 0.375, "angle": 90.0, "radius": 0.1875 },
+          "leadOut": { "type": "Line", "length": 0.1875, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.625, "overtravel": 0.3125, "minSegmentLength": 1.25, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "60x120", "60x144", "72x120" ]
+        },
+        {
+          "value": 0.500,
+          "kerf": 0.020,
+          "assistGas": "O2",
+          "leadIn": { "type": "Arc", "length": 0.5, "angle": 90.0, "radius": 0.25 },
+          "leadOut": { "type": "Line", "length": 0.25, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.75, "overtravel": 0.375, "minSegmentLength": 1.5, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "60x120", "60x144", "72x120" ]
+        }
+      ]
+    },
+    {
+      "name": "Stainless Steel",
+      "grade": "304",
+      "density": 0.289,
+      "thicknesses": [
+        {
+          "value": 0.060,
+          "kerf": 0.008,
+          "assistGas": "N2",
+          "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
+          "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x96", "48x120", "60x120" ]
+        },
+        {
+          "value": 0.075,
+          "kerf": 0.008,
+          "assistGas": "N2",
+          "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
+          "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x96", "48x120", "60x120" ]
+        },
+        {
+          "value": 0.105,
+          "kerf": 0.010,
+          "assistGas": "N2",
+          "leadIn": { "type": "Arc", "length": 0.1875, "angle": 90.0, "radius": 0.09375 },
+          "leadOut": { "type": "Line", "length": 0.09375, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.375, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x96", "48x120", "60x120" ]
+        },
+        {
+          "value": 0.250,
+          "kerf": 0.014,
+          "assistGas": "N2",
+          "leadIn": { "type": "Arc", "length": 0.25, "angle": 90.0, "radius": 0.125 },
+          "leadOut": { "type": "Line", "length": 0.125, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.5, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x96", "48x120", "60x120" ]
+        }
+      ]
+    },
+    {
+      "name": "Aluminum",
+      "grade": "5052",
+      "density": 0.097,
+      "thicknesses": [
+        {
+          "value": 0.060,
+          "kerf": 0.008,
+          "assistGas": "N2",
+          "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
+          "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x96", "48x120", "60x120" ]
+        },
+        {
+          "value": 0.080,
+          "kerf": 0.008,
+          "assistGas": "N2",
+          "leadIn": { "type": "Arc", "length": 0.125, "angle": 90.0, "radius": 0.0625 },
+          "leadOut": { "type": "Line", "length": 0.0625, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.25, "overtravel": 0.125, "minSegmentLength": 0.5, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x96", "48x120", "60x120" ]
+        },
+        {
+          "value": 0.125,
+          "kerf": 0.010,
+          "assistGas": "N2",
+          "leadIn": { "type": "Arc", "length": 0.1875, "angle": 90.0, "radius": 0.09375 },
+          "leadOut": { "type": "Line", "length": 0.09375, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.375, "overtravel": 0.1875, "minSegmentLength": 0.75, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x96", "48x120", "60x120" ]
+        },
+        {
+          "value": 0.250,
+          "kerf": 0.014,
+          "assistGas": "N2",
+          "leadIn": { "type": "Arc", "length": 0.25, "angle": 90.0, "radius": 0.125 },
+          "leadOut": { "type": "Line", "length": 0.125, "angle": 90.0, "radius": 0.0 },
+          "cutOff": { "partClearance": 0.5, "overtravel": 0.25, "minSegmentLength": 1.0, "direction": "AwayFromOrigin" },
+          "plateSizes": [ "48x96", "48x120", "60x120" ]
+        }
+      ]
+    }
+  ]
+}

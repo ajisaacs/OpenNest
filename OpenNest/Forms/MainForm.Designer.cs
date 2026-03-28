@@ -79,6 +79,7 @@
             mnuSetOffsetIncrement = new System.Windows.Forms.ToolStripMenuItem();
             mnuSetRotationIncrement = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem15 = new System.Windows.Forms.ToolStripSeparator();
+            mnuToolsMachineConfig = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsOptions = new System.Windows.Forms.ToolStripMenuItem();
             mnuNest = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestEdit = new System.Windows.Forms.ToolStripMenuItem();
@@ -403,7 +404,7 @@
             // 
             // mnuTools
             // 
-            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsPatternTile, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsOptions });
+            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsPatternTile, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsMachineConfig, mnuToolsOptions });
             mnuTools.Name = "mnuTools";
             mnuTools.Size = new System.Drawing.Size(47, 20);
             mnuTools.Text = "&Tools";
@@ -528,8 +529,15 @@
             toolStripMenuItem15.Name = "toolStripMenuItem15";
             toolStripMenuItem15.Size = new System.Drawing.Size(211, 6);
             // 
+            // mnuToolsMachineConfig
+            //
+            mnuToolsMachineConfig.Name = "mnuToolsMachineConfig";
+            mnuToolsMachineConfig.Size = new System.Drawing.Size(214, 22);
+            mnuToolsMachineConfig.Text = "Machine Configuration...";
+            mnuToolsMachineConfig.Click += MachineConfig_Click;
+            //
             // mnuToolsOptions
-            // 
+            //
             mnuToolsOptions.Name = "mnuToolsOptions";
             mnuToolsOptions.Size = new System.Drawing.Size(214, 22);
             mnuToolsOptions.Text = "Options";
@@ -1154,6 +1162,7 @@
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawOffset;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem5;
         private System.Windows.Forms.ToolStripMenuItem mnuTools;
+        private System.Windows.Forms.ToolStripMenuItem mnuToolsMachineConfig;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsOptions;
         private System.Windows.Forms.ToolStripMenuItem mnuNest;
         private System.Windows.Forms.ToolStripMenuItem mnuNestEdit;
