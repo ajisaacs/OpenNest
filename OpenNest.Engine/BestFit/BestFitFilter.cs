@@ -8,6 +8,7 @@ namespace OpenNest.Engine.BestFit
         public double MaxPlateHeight { get; set; }
         public double MaxAspectRatio { get; set; } = 5.0;
         public double MinUtilization { get; set; } = 0.3;
+        public double UtilizationOverride { get; set; } = 0.75;
 
         public void Apply(List<BestFitResult> results)
         {
@@ -25,7 +26,7 @@ namespace OpenNest.Engine.BestFit
 
                 var aspect = result.LongestSide / result.ShortestSide;
 
-                if (aspect > MaxAspectRatio)
+                if (aspect > MaxAspectRatio && result.Utilization < UtilizationOverride)
                 {
                     result.Keep = false;
                     result.Reason = string.Format("Aspect ratio {0:F1} exceeds max {1}", aspect, MaxAspectRatio);
