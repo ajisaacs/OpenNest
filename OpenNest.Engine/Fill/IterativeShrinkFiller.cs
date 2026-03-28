@@ -167,134 +167,84 @@ namespace OpenNest.Engine.Fill
         /// Sorts pair columns by height (shortest first on the left) to create
         /// a staircase profile that maximizes usable remnant area.
         /// </summary>
-        internal static void SortColumnsByHeight(List<Part> parts, double spacing)
-        {
-            if (parts == null || parts.Count <= 1)
-                return;
-
-            // Sort parts by Left edge for grouping.
-            parts.Sort((a, b) => a.BoundingBox.Left.CompareTo(b.BoundingBox.Left));
-
-            // Group parts into columns by X overlap.
-            var columns = new List<List<Part>>();
-            var column = new List<Part> { parts[0] };
-            var columnRight = parts[0].BoundingBox.Right;
-
-            for (var i = 1; i < parts.Count; i++)
-            {
-                if (parts[i].BoundingBox.Left > columnRight + spacing / 2)
-                {
-                    columns.Add(column);
-                    column = new List<Part> { parts[i] };
-                    columnRight = parts[i].BoundingBox.Right;
-                }
-                else
-                {
-                    column.Add(parts[i]);
-                    if (parts[i].BoundingBox.Right > columnRight)
-                        columnRight = parts[i].BoundingBox.Right;
-                }
-            }
-            columns.Add(column);
-
-            if (columns.Count <= 1)
-                return;
-
-            // Measure inter-column gap from original layout.
-            var gap = MinLeft(columns[1]) - MaxRight(columns[0]);
-
-            // Sort columns by height ascending (shortest first).
-            columns.Sort((a, b) => MaxTop(a).CompareTo(MaxTop(b)));
-
-            // Reposition columns left-to-right.
-            var x = parts[0].BoundingBox.Left; // parts already sorted by Left
-
-            foreach (var col in columns)
-            {
-                var colLeft = MinLeft(col);
-                var dx = x - colLeft;
-
-                if (System.Math.Abs(dx) > OpenNest.Math.Tolerance.Epsilon)
-                {
-                    var offset = new Vector(dx, 0);
-                    foreach (var part in col)
-                        part.Offset(offset);
-                }
-
-                x = MaxRight(col) + gap;
-            }
-
-            // Rebuild the parts list in column order.
-            parts.Clear();
-            foreach (var col in columns)
-                parts.AddRange(col);
-        }
+        internal static void SortColumnsByHeight(List<Part> parts, double spacing) =>
+            SortStrips(parts, spacing,
+                primaryEdge: b => b.Left, extentEdge: b => b.Right,
+                sortMetric: MaxTop, stripMin: MinLeft, stripMax: MaxRight,
+                makeOffset: d => new Vector(d, 0));
 
         /// <summary>
         /// Sorts pair rows by width (narrowest first on the bottom) to create
         /// a staircase profile on the right side that maximizes usable remnant area.
         /// </summary>
-        internal static void SortRowsByWidth(List<Part> parts, double spacing)
+        internal static void SortRowsByWidth(List<Part> parts, double spacing) =>
+            SortStrips(parts, spacing,
+                primaryEdge: b => b.Bottom, extentEdge: b => b.Top,
+                sortMetric: MaxRight, stripMin: MinBottom, stripMax: MaxTop,
+                makeOffset: d => new Vector(0, d));
+
+        private static void SortStrips(
+            List<Part> parts, double spacing,
+            Func<Box, double> primaryEdge,
+            Func<Box, double> extentEdge,
+            Func<List<Part>, double> sortMetric,
+            Func<List<Part>, double> stripMin,
+            Func<List<Part>, double> stripMax,
+            Func<double, Vector> makeOffset)
         {
             if (parts == null || parts.Count <= 1)
                 return;
 
-            // Sort parts by Bottom edge for grouping.
-            parts.Sort((a, b) => a.BoundingBox.Bottom.CompareTo(b.BoundingBox.Bottom));
+            parts.Sort((a, b) => primaryEdge(a.BoundingBox).CompareTo(primaryEdge(b.BoundingBox)));
 
-            // Group parts into rows by Y overlap.
-            var rows = new List<List<Part>>();
-            var row = new List<Part> { parts[0] };
-            var rowTop = parts[0].BoundingBox.Top;
+            var strips = new List<List<Part>>();
+            var strip = new List<Part> { parts[0] };
+            var stripExtent = extentEdge(parts[0].BoundingBox);
 
             for (var i = 1; i < parts.Count; i++)
             {
-                if (parts[i].BoundingBox.Bottom > rowTop + spacing / 2)
+                if (primaryEdge(parts[i].BoundingBox) > stripExtent + spacing / 2)
                 {
-                    rows.Add(row);
-                    row = new List<Part> { parts[i] };
-                    rowTop = parts[i].BoundingBox.Top;
+                    strips.Add(strip);
+                    strip = new List<Part> { parts[i] };
+                    stripExtent = extentEdge(parts[i].BoundingBox);
                 }
                 else
                 {
-                    row.Add(parts[i]);
-                    if (parts[i].BoundingBox.Top > rowTop)
-                        rowTop = parts[i].BoundingBox.Top;
+                    strip.Add(parts[i]);
+                    var extent = extentEdge(parts[i].BoundingBox);
+                    if (extent > stripExtent)
+                        stripExtent = extent;
                 }
             }
-            rows.Add(row);
+            strips.Add(strip);
 
-            if (rows.Count <= 1)
+            if (strips.Count <= 1)
                 return;
 
-            // Measure inter-row gap from original layout.
-            var gap = MinBottom(rows[1]) - MaxTop(rows[0]);
+            var gap = stripMin(strips[1]) - stripMax(strips[0]);
 
-            // Sort rows by width ascending (narrowest first).
-            rows.Sort((a, b) => MaxRight(a).CompareTo(MaxRight(b)));
+            strips.Sort((a, b) => sortMetric(a).CompareTo(sortMetric(b)));
 
-            // Reposition rows bottom-to-top.
-            var y = parts[0].BoundingBox.Bottom; // parts already sorted by Bottom
+            var pos = primaryEdge(parts[0].BoundingBox);
 
-            foreach (var r in rows)
+            foreach (var s in strips)
             {
-                var rowBottom = MinBottom(r);
-                var dy = y - rowBottom;
+                var delta = pos - stripMin(s);
 
-                if (System.Math.Abs(dy) > OpenNest.Math.Tolerance.Epsilon)
+                if (System.Math.Abs(delta) > OpenNest.Math.Tolerance.Epsilon)
                 {
-                    var offset = new Vector(0, dy);
-                    foreach (var part in r)
+                    var offset = makeOffset(delta);
+                    foreach (var part in s)
                         part.Offset(offset);
                 }
 
-                y = MaxTop(r) + gap;
+                pos = stripMax(s) + gap;
             }
 
-            // Rebuild the parts list in row order.
             parts.Clear();
-            foreach (var r in rows)
-                parts.AddRange(r);
+            foreach (var s in strips)
+                parts.AddRange(s);
         }
 
         private static double MaxTop(List<Part> col)
