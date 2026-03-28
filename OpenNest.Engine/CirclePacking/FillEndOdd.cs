@@ -27,7 +27,11 @@ namespace OpenNest.CirclePacking
             throw new NotImplementedException();
         }
 
-        private Bin FillHorizontal(Item item)
+        private Bin FillHorizontal(Item item) => FillAxis(item, horizontal: true);
+
+        private Bin FillVertical(Item item) => FillAxis(item, horizontal: false);
+
+        private Bin FillAxis(Item item, bool horizontal)
         {
             var bin = Bin.Clone() as Bin;
 
@@ -35,65 +39,36 @@ namespace OpenNest.CirclePacking
                 bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
                 bin.Top - item.BoundingBox.Top + Tolerance.Epsilon);
 
-            var count = System.Math.Floor((bin.Width + Tolerance.Epsilon) / item.Diameter);
+            var primarySize = horizontal ? bin.Width : bin.Length;
+            var count = System.Math.Floor((primarySize + Tolerance.Epsilon) / item.Diameter);
 
             if (count == 0)
                 return bin;
 
-            var xoffset = (bin.Width - item.Diameter) / (count - 1);
-            var yoffset = Trigonometry.Height(xoffset * 0.5, item.Diameter);
+            var primaryOffset = (primarySize - item.Diameter) / (count - 1);
+            var secondaryOffset = horizontal
+                ? Trigonometry.Height(primaryOffset * 0.5, item.Diameter)
+                : Trigonometry.Base(primaryOffset * 0.5, item.Diameter);
 
-            int row = 0;
+            var outerStart = horizontal ? bin.Y : bin.X;
+            var outerMax = horizontal ? max.Y : max.X;
+            var innerStart = horizontal ? bin.X : bin.Y;
+            var innerMax = horizontal ? max.X : max.Y;
 
-            for (var y = bin.Y; y <= max.Y; y += yoffset)
+            var stripe = 0;
+
+            for (var outer = outerStart; outer <= outerMax; outer += secondaryOffset)
             {
-                var x = row.IsOdd() ? bin.X + xoffset * 0.5 : bin.X;
+                var inner = stripe.IsOdd() ? innerStart + primaryOffset * 0.5 : innerStart;
 
-                for (; x <= max.X; x += xoffset)
+                for (; inner <= innerMax; inner += primaryOffset)
                 {
                     var addedItem = item.Clone() as Item;
-                    addedItem.Center = new Vector(x, y);
-
+                    addedItem.Center = horizontal ? new Vector(inner, outer) : new Vector(outer, inner);
                     bin.Items.Add(addedItem);
                 }
 
-                row++;
-            }
-
-            return bin;
-        }
-
-        private Bin FillVertical(Item item)
-        {
-            var bin = Bin.Clone() as Bin;
-
-            var max = new Vector(
-                Bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
-                Bin.Top - item.BoundingBox.Top + Tolerance.Epsilon);
-
-            var count = System.Math.Floor((bin.Length + Tolerance.Epsilon) / item.Diameter);
-
-            if (count == 0)
-                return bin;
-
-            var yoffset = (bin.Length - item.Diameter) / (count - 1);
-            var xoffset = Trigonometry.Base(yoffset * 0.5, item.Diameter);
-
-            int column = 0;
-
-            for (var x = bin.X; x <= max.X; x += xoffset)
-            {
-                var y = column.IsOdd() ? bin.Y + yoffset * 0.5 : bin.Y;
-
-                for (; y <= max.Y; y += yoffset)
-                {
-                    var addedItem = item.Clone() as Item;
-                    addedItem.Center = new Vector(x, y);
-
-                    bin.Items.Add(addedItem);
-                }
-
-                column++;
+                stripe++;
             }
 
             return bin;
