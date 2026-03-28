@@ -277,7 +277,19 @@ namespace OpenNest.Controls
                 if (!string.IsNullOrEmpty(bend.NoteText))
                 {
                     var mid = new PointF((pt1.X + pt2.X) / 2f, (pt1.Y + pt2.Y) / 2f);
-                    g.DrawString(bend.NoteText, noteFont, isSelected ? selectedNoteBrush : noteBrush, mid.X + 4, mid.Y + 4);
+                    var angle = (float)(System.Math.Atan2(pt2.Y - pt1.Y, pt2.X - pt1.X) * 180.0 / System.Math.PI);
+
+                    // Keep text readable (not upside-down)
+                    if (angle > 90f) angle -= 180f;
+                    else if (angle < -90f) angle += 180f;
+
+                    var textSize = g.MeasureString(bend.NoteText, noteFont);
+                    var state = g.Save();
+                    g.TranslateTransform(mid.X, mid.Y);
+                    g.RotateTransform(angle);
+                    g.DrawString(bend.NoteText, noteFont, isSelected ? selectedNoteBrush : noteBrush,
+                        -textSize.Width / 2f, -textSize.Height);
+                    g.Restore(state);
                 }
             }
         }
