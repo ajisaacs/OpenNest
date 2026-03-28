@@ -36,52 +36,44 @@ namespace OpenNest.RectanglePacking
             throw new NotImplementedException();
         }
 
-        private Bin BestFitHorizontal(Item item)
+        private Bin BestFitHorizontal(Item item) => BestFitAxis(item, horizontal: true);
+
+        private Bin BestFitVertical(Item item) => BestFitAxis(item, horizontal: false);
+
+        private Bin BestFitAxis(Item item, bool horizontal)
         {
             var bin = Bin.Clone() as Bin;
 
-            int normalColumns = 0;
-            int rotateColumns = 0;
+            var primarySize = horizontal ? item.Width : item.Length;
+            var secondarySize = horizontal ? item.Length : item.Width;
+            var binPrimary = horizontal ? bin.Width : Bin.Length;
+            var binSecondary = horizontal ? bin.Length : Bin.Width;
 
-            if (!BestCombination.FindFrom2(item.Width, item.Length, bin.Width, out normalColumns, out rotateColumns))
+            if (!BestCombination.FindFrom2(primarySize, secondarySize, binPrimary, out var normalPrimary, out var rotatePrimary))
                 return bin;
 
-            var normalRows = (int)System.Math.Floor((bin.Length + Tolerance.Epsilon) / item.Length);
-            var rotateRows = (int)System.Math.Floor((bin.Length + Tolerance.Epsilon) / item.Width);
+            var normalSecondary = (int)System.Math.Floor((binSecondary + Tolerance.Epsilon) / secondarySize);
+            var rotateSecondary = (int)System.Math.Floor((binSecondary + Tolerance.Epsilon) / primarySize);
+
+            var (normalRows, normalCols) = horizontal
+                ? (normalSecondary, normalPrimary)
+                : (normalPrimary, normalSecondary);
+            var (rotateRows, rotateCols) = horizontal
+                ? (rotateSecondary, rotatePrimary)
+                : (rotatePrimary, rotateSecondary);
 
             item.Location = bin.Location;
 
-            bin.Items.AddRange(FillGrid(item, normalRows, normalColumns, int.MaxValue));
+            bin.Items.AddRange(FillGrid(item, normalRows, normalCols, int.MaxValue));
 
-            item.Location.X += item.Width * normalColumns;
+            if (horizontal)
+                item.Location.X += item.Width * normalPrimary;
+            else
+                item.Location.Y += item.Length * normalPrimary;
+
             item.Rotate();
 
-            bin.Items.AddRange(FillGrid(item, rotateRows, rotateColumns, int.MaxValue));
-
-            return bin;
-        }
-
-        private Bin BestFitVertical(Item item)
-        {
-            var bin = Bin.Clone() as Bin;
-
-            int normalRows = 0;
-            int rotateRows = 0;
-
-            if (!BestCombination.FindFrom2(item.Length, item.Width, Bin.Length, out normalRows, out rotateRows))
-                return bin;
-
-            var normalColumns = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
-            var rotateColumns = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Length);
-
-            item.Location = bin.Location;
-
-            bin.Items.AddRange(FillGrid(item, normalRows, normalColumns, int.MaxValue));
-
-            item.Location.Y += item.Length * normalRows;
-            item.Rotate();
-
-            bin.Items.AddRange(FillGrid(item, rotateRows, rotateColumns, int.MaxValue));
+            bin.Items.AddRange(FillGrid(item, rotateRows, rotateCols, int.MaxValue));
 
             return bin;
         }
