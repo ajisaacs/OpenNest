@@ -523,177 +523,17 @@ namespace OpenNest.Geometry
 
         #endregion
 
-        public static double ClosestDistanceLeft(Box box, List<Box> boxes)
-        {
-            var closestDistance = double.MaxValue;
-
-            for (int i = 0; i < boxes.Count; i++)
-            {
-                var compareBox = boxes[i];
-
-                RelativePosition pos;
-
-                if (!box.IsHorizontalTo(compareBox, out pos))
-                    continue;
-
-                if (pos != RelativePosition.Right)
-                    continue;
-
-                var distance = box.Left - compareBox.Right;
-
-                if (distance < closestDistance)
-                    closestDistance = distance;
-            }
-
-            return closestDistance == double.MaxValue ? double.NaN : closestDistance;
-        }
-
-        public static double ClosestDistanceRight(Box box, List<Box> boxes)
-        {
-            var closestDistance = double.MaxValue;
-
-            for (int i = 0; i < boxes.Count; i++)
-            {
-                var compareBox = boxes[i];
-
-                RelativePosition pos;
-
-                if (!box.IsHorizontalTo(compareBox, out pos))
-                    continue;
-
-                if (pos != RelativePosition.Left)
-                    continue;
-
-                var distance = compareBox.Left - box.Right;
-
-                if (distance < closestDistance)
-                    closestDistance = distance;
-            }
-
-            return closestDistance == double.MaxValue ? double.NaN : closestDistance;
-        }
-
-        public static double ClosestDistanceUp(Box box, List<Box> boxes)
-        {
-            var closestDistance = double.MaxValue;
-
-            for (int i = 0; i < boxes.Count; i++)
-            {
-                var compareBox = boxes[i];
-
-                RelativePosition pos;
-
-                if (!box.IsVerticalTo(compareBox, out pos))
-                    continue;
-
-                if (pos != RelativePosition.Bottom)
-                    continue;
-
-                var distance = compareBox.Bottom - box.Top;
-
-                if (distance < closestDistance)
-                    closestDistance = distance;
-            }
-
-            return closestDistance == double.MaxValue ? double.NaN : closestDistance;
-        }
-
-        public static double ClosestDistanceDown(Box box, List<Box> boxes)
-        {
-            var closestDistance = double.MaxValue;
-
-            for (int i = 0; i < boxes.Count; i++)
-            {
-                var compareBox = boxes[i];
-
-                RelativePosition pos;
-
-                if (!box.IsVerticalTo(compareBox, out pos))
-                    continue;
-
-                if (pos != RelativePosition.Top)
-                    continue;
-
-                var distance = box.Bottom - compareBox.Top;
-
-                if (distance < closestDistance)
-                    closestDistance = distance;
-            }
-
-            return closestDistance == double.MaxValue ? double.NaN : closestDistance;
-        }
-
         public static Box GetLargestBoxVertically(Vector pt, Box bounds, IEnumerable<Box> boxes)
         {
             var verticalBoxes = boxes.Where(b => !(b.Left > pt.X || b.Right < pt.X)).ToList();
 
-            #region Find Top/Bottom Limits
-
-            var top = double.MaxValue;
-            var btm = double.MinValue;
-
-            foreach (var box in verticalBoxes)
-            {
-                var boxBtm = box.Bottom;
-                var boxTop = box.Top;
-
-                if (boxBtm > pt.Y && boxBtm < top)
-                    top = boxBtm;
-
-                else if (box.Top < pt.Y && boxTop > btm)
-                    btm = boxTop;
-            }
-
-            if (top == double.MaxValue)
-            {
-                if (bounds.Top > pt.Y)
-                    top = bounds.Top;
-                else return Box.Empty;
-            }
-
-            if (btm == double.MinValue)
-            {
-                if (bounds.Bottom < pt.Y)
-                    btm = bounds.Bottom;
-                else return Box.Empty;
-            }
-
-            #endregion
+            if (!FindVerticalLimits(pt, bounds, verticalBoxes, out var top, out var btm))
+                return Box.Empty;
 
             var horizontalBoxes = boxes.Where(b => !(b.Bottom >= top || b.Top <= btm)).ToList();
 
-            #region Find Left/Right Limits
-
-            var lft = double.MinValue;
-            var rgt = double.MaxValue;
-
-            foreach (var box in horizontalBoxes)
-            {
-                var boxLft = box.Left;
-                var boxRgt = box.Right;
-
-                if (boxLft > pt.X && boxLft < rgt)
-                    rgt = boxLft;
-
-                else if (boxRgt < pt.X && boxRgt > lft)
-                    lft = boxRgt;
-            }
-
-            if (rgt == double.MaxValue)
-            {
-                if (bounds.Right > pt.X)
-                    rgt = bounds.Right;
-                else return Box.Empty;
-            }
-
-            if (lft == double.MinValue)
-            {
-                if (bounds.Left < pt.X)
-                    lft = bounds.Left;
-                else return Box.Empty;
-            }
-
-            #endregion
+            if (!FindHorizontalLimits(pt, bounds, horizontalBoxes, out var lft, out var rgt))
+                return Box.Empty;
 
             return new Box(lft, btm, rgt - lft, top - btm);
         }
@@ -702,75 +542,77 @@ namespace OpenNest.Geometry
         {
             var horizontalBoxes = boxes.Where(b => !(b.Bottom > pt.Y || b.Top < pt.Y)).ToList();
 
-            #region Find Left/Right Limits
-
-            var lft = double.MinValue;
-            var rgt = double.MaxValue;
-
-            foreach (var box in horizontalBoxes)
-            {
-                var boxLft = box.Left;
-                var boxRgt = box.Right;
-
-                if (boxLft > pt.X && boxLft < rgt)
-                    rgt = boxLft;
-
-                else if (boxRgt < pt.X && boxRgt > lft)
-                    lft = boxRgt;
-            }
-
-            if (rgt == double.MaxValue)
-            {
-                if (bounds.Right > pt.X)
-                    rgt = bounds.Right;
-                else return Box.Empty;
-            }
-
-            if (lft == double.MinValue)
-            {
-                if (bounds.Left < pt.X)
-                    lft = bounds.Left;
-                else return Box.Empty;
-            }
-
-            #endregion
+            if (!FindHorizontalLimits(pt, bounds, horizontalBoxes, out var lft, out var rgt))
+                return Box.Empty;
 
             var verticalBoxes = boxes.Where(b => !(b.Left >= rgt || b.Right <= lft)).ToList();
 
-            #region Find Top/Bottom Limits
+            if (!FindVerticalLimits(pt, bounds, verticalBoxes, out var top, out var btm))
+                return Box.Empty;
 
-            var top = double.MaxValue;
-            var btm = double.MinValue;
+            return new Box(lft, btm, rgt - lft, top - btm);
+        }
 
-            foreach (var box in verticalBoxes)
+        private static bool FindVerticalLimits(Vector pt, Box bounds, List<Box> boxes, out double top, out double btm)
+        {
+            top = double.MaxValue;
+            btm = double.MinValue;
+
+            foreach (var box in boxes)
             {
                 var boxBtm = box.Bottom;
                 var boxTop = box.Top;
 
                 if (boxBtm > pt.Y && boxBtm < top)
                     top = boxBtm;
-
                 else if (box.Top < pt.Y && boxTop > btm)
                     btm = boxTop;
             }
 
             if (top == double.MaxValue)
             {
-                if (bounds.Top > pt.Y)
-                    top = bounds.Top;
-                else return Box.Empty;
+                if (bounds.Top > pt.Y) top = bounds.Top;
+                else return false;
             }
 
             if (btm == double.MinValue)
             {
-                if (bounds.Bottom < pt.Y)
-                    btm = bounds.Bottom;
-                else return Box.Empty;
+                if (bounds.Bottom < pt.Y) btm = bounds.Bottom;
+                else return false;
             }
 
-            #endregion
+            return true;
+        }
 
-            return new Box(lft, btm, rgt - lft, top - btm);
+        private static bool FindHorizontalLimits(Vector pt, Box bounds, List<Box> boxes, out double lft, out double rgt)
+        {
+            lft = double.MinValue;
+            rgt = double.MaxValue;
+
+            foreach (var box in boxes)
+            {
+                var boxLft = box.Left;
+                var boxRgt = box.Right;
+
+                if (boxLft > pt.X && boxLft < rgt)
+                    rgt = boxLft;
+                else if (boxRgt < pt.X && boxRgt > lft)
+                    lft = boxRgt;
+            }
+
+            if (rgt == double.MaxValue)
+            {
+                if (bounds.Right > pt.X) rgt = bounds.Right;
+                else return false;
+            }
+
+            if (lft == double.MinValue)
+            {
+                if (bounds.Left < pt.X) lft = bounds.Left;
+                else return false;
+            }
+
+            return true;
         }
     }
 }
