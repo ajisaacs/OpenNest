@@ -64,6 +64,25 @@ namespace OpenNest.Geometry
             return new Vector(p1.X + s * n1.X, p1.Y + s * n1.Y);
         }
 
+        internal static Vector Circumcenter(Vector a, Vector b, Vector c)
+        {
+            var ax = a.X - c.X;
+            var ay = a.Y - c.Y;
+            var bx = b.X - c.X;
+            var by = b.Y - c.Y;
+            var D = 2.0 * (ax * by - ay * bx);
+
+            if (System.Math.Abs(D) < 1e-10)
+                return Vector.Invalid;
+
+            var a2 = ax * ax + ay * ay;
+            var b2 = bx * bx + by * by;
+            var ux = (by * a2 - ay * b2) / D;
+            var uy = (ax * b2 - bx * a2) / D;
+
+            return new Vector(ux + c.X, uy + c.Y);
+        }
+
         public static List<Entity> Convert(Vector center, double semiMajor, double semiMinor,
             double rotation, double startParam, double endParam, double tolerance = 0.001)
         {
@@ -185,11 +204,20 @@ namespace OpenNest.Geometry
         {
             var p0 = EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, t0);
             var p1 = EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, t1);
+            var pMid = EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, (t0 + t1) / 2);
+
+            // Use circumcircle of (p0, pMid, p1) so the arc passes through both
+            // endpoints exactly, eliminating gaps between adjacent arcs.
+            var cc = Circumcenter(p0, pMid, p1);
+            if (cc.IsValid())
+            {
+                arcCenter = cc;
+                radius = p0.DistanceTo(cc);
+            }
 
             var startAngle = System.Math.Atan2(p0.Y - arcCenter.Y, p0.X - arcCenter.X);
             var endAngle = System.Math.Atan2(p1.Y - arcCenter.Y, p1.X - arcCenter.X);
 
-            var pMid = EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, (t0 + t1) / 2);
             var points = new List<Vector> { p0, pMid, p1 };
             var isReversed = SumSignedAngles(arcCenter, points) < 0;
 

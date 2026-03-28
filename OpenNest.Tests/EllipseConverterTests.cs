@@ -172,15 +172,15 @@ public class EllipseConverterTests
             var current = (Arc)result[i];
             var next = (Arc)result[i + 1];
             var gap = current.EndPoint().DistanceTo(next.StartPoint());
-            Assert.True(gap < 0.001,
-                $"Gap of {gap:F6} between arc {i} and arc {i + 1}");
+            Assert.True(gap < 1e-6,
+                $"Gap of {gap:E4} between arc {i} and arc {i + 1}");
         }
 
         var lastArc = (Arc)result[^1];
         var firstArc = (Arc)result[0];
         var closingGap = lastArc.EndPoint().DistanceTo(firstArc.StartPoint());
-        Assert.True(closingGap < 0.001,
-            $"Closing gap of {closingGap:F6}");
+        Assert.True(closingGap < 1e-6,
+            $"Closing gap of {closingGap:E4}");
     }
 
     [Fact]
