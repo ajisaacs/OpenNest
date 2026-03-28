@@ -81,6 +81,8 @@ namespace OpenNest.Forms
                           ?? new List<Bend>();
                 }
 
+                Bend.UpdateEtchEntities(result.Entities, bends);
+
                 var item = new FileListItem
                 {
                     Name = Path.GetFileNameWithoutExtension(file),
@@ -245,6 +247,9 @@ namespace OpenNest.Forms
                 bend.SourceEntity.IsVisible = true;
 
             item.Bends.RemoveAt(index);
+            Bend.UpdateEtchEntities(item.Entities, item.Bends);
+            entityView1.Entities.Clear();
+            entityView1.Entities.AddRange(item.Entities);
             entityView1.Bends = item.Bends;
             entityView1.SelectedBendIndex = -1;
             filterPanel.LoadItem(item.Entities, item.Bends);
@@ -281,16 +286,8 @@ namespace OpenNest.Forms
             var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
             if (entities.Count == 0) return;
 
-            var shape = new ShapeProfile(entities);
-            SetRotation(shape.Perimeter, RotationType.CW);
-            foreach (var cutout in shape.Cutouts)
-                SetRotation(cutout, RotationType.CCW);
-
-            var drawEntities = new List<Entity>();
-            drawEntities.AddRange(shape.Perimeter.Entities);
-            shape.Cutouts.ForEach(c => drawEntities.AddRange(c.Entities));
-
-            var pgm = ConvertGeometry.ToProgram(drawEntities);
+            var normalized = ShapeProfile.NormalizeEntities(entities);
+            var pgm = ConvertGeometry.ToProgram(normalized);
             var originOffset = Vector.Zero;
             if (pgm.Codes.Count > 0 && pgm[0].Type == CodeType.RapidMove)
             {
@@ -395,6 +392,9 @@ namespace OpenNest.Forms
 
             line.IsVisible = false;
             item.Bends.Add(bend);
+            Bend.UpdateEtchEntities(item.Entities, item.Bends);
+            entityView1.Entities.Clear();
+            entityView1.Entities.AddRange(item.Entities);
             entityView1.Bends = item.Bends;
             filterPanel.LoadItem(item.Entities, item.Bends);
             entityView1.Invalidate();
@@ -560,18 +560,8 @@ namespace OpenNest.Forms
                 if (item.Bends != null)
                     drawing.Bends.AddRange(item.Bends);
 
-                var shape = new ShapeProfile(entities);
-
-                SetRotation(shape.Perimeter, RotationType.CW);
-
-                foreach (var cutout in shape.Cutouts)
-                    SetRotation(cutout, RotationType.CCW);
-
-                entities = new List<Entity>();
-                entities.AddRange(shape.Perimeter.Entities);
-                shape.Cutouts.ForEach(cutout => entities.AddRange(cutout.Entities));
-
-                var pgm = ConvertGeometry.ToProgram(entities);
+                var normalized = ShapeProfile.NormalizeEntities(entities);
+                var pgm = ConvertGeometry.ToProgram(normalized);
                 var firstCode = pgm[0];
 
                 if (firstCode.Type == CodeType.RapidMove)
@@ -605,15 +595,6 @@ namespace OpenNest.Forms
             }
         }
 
-        private static void SetRotation(Shape shape, RotationType rotation)
-        {
-            try
-            {
-                var dir = shape.ToPolygon(3).RotationDirection();
-                if (dir != rotation) shape.Reverse();
-            }
-            catch { }
-        }
 
         private static Color GetNextColor()
         {

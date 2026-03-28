@@ -424,7 +424,8 @@ namespace OpenNest.Forms
                         drawing.Quantity.Required = part.Qty ?? 1;
                         drawing.Material = new Material(material);
 
-                        var pgm = ConvertGeometry.ToProgram(result.Entities);
+                        var normalized = ShapeProfile.NormalizeEntities(result.Entities);
+                        var pgm = ConvertGeometry.ToProgram(normalized);
 
                         if (pgm.Codes.Count > 0 && pgm[0].Type == CodeType.RapidMove)
                         {

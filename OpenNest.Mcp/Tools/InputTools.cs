@@ -1,5 +1,6 @@
 using ModelContextProtocol.Server;
 using OpenNest.Converters;
+using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Shapes;
 using System.ComponentModel;
@@ -103,7 +104,8 @@ namespace OpenNest.Mcp.Tools
             if (geometry.Count == 0)
                 return "Error: no geometry found in DXF file";
 
-            var pgm = ConvertGeometry.ToProgram(geometry);
+            var normalized = ShapeProfile.NormalizeEntities(geometry);
+            var pgm = ConvertGeometry.ToProgram(normalized);
 
             if (pgm == null)
                 return "Error: failed to convert geometry to program";

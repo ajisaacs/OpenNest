@@ -255,7 +255,8 @@ static class NestConsole
             return null;
         }
 
-        var pgm = ConvertGeometry.ToProgram(geometry);
+        var normalized = ShapeProfile.NormalizeEntities(geometry);
+        var pgm = ConvertGeometry.ToProgram(normalized);
 
         if (pgm == null)
         {

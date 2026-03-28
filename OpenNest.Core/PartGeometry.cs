@@ -42,23 +42,17 @@ namespace OpenNest
         public static List<Line> GetOffsetPartLines(Part part, double spacing, double chordTolerance = 0.001)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var profile = new ShapeProfile(
+                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
             var lines = new List<Line>();
+            var totalSpacing = spacing + chordTolerance;
 
-            foreach (var shape in shapes)
-            {
-                // Add chord tolerance to compensate for inscribed polygon chords
-                // being inside the actual offset arcs.
-                var offsetEntity = shape.OffsetOutward(spacing + chordTolerance);
+            AddOffsetLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
+                chordTolerance, part.Location);
 
-                if (offsetEntity == null)
-                    continue;
-
-                var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
-                polygon.RemoveSelfIntersections();
-                polygon.Offset(part.Location);
-                lines.AddRange(polygon.ToLines());
-            }
+            foreach (var cutout in profile.Cutouts)
+                AddOffsetLines(lines, cutout.OffsetInward(totalSpacing),
+                    chordTolerance, part.Location);
 
             return lines;
         }
@@ -66,21 +60,17 @@ namespace OpenNest
         public static List<Line> GetOffsetPartLines(Part part, double spacing, PushDirection facingDirection, double chordTolerance = 0.001)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var profile = new ShapeProfile(
+                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
             var lines = new List<Line>();
+            var totalSpacing = spacing + chordTolerance;
 
-            foreach (var shape in shapes)
-            {
-                var offsetEntity = shape.OffsetOutward(spacing + chordTolerance);
+            AddOffsetDirectionalLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
+                chordTolerance, part.Location, facingDirection);
 
-                if (offsetEntity == null)
-                    continue;
-
-                var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
-                polygon.RemoveSelfIntersections();
-                polygon.Offset(part.Location);
-                lines.AddRange(GetDirectionalLines(polygon, facingDirection));
-            }
+            foreach (var cutout in profile.Cutouts)
+                AddOffsetDirectionalLines(lines, cutout.OffsetInward(totalSpacing),
+                    chordTolerance, part.Location, facingDirection);
 
             return lines;
         }
@@ -104,21 +94,17 @@ namespace OpenNest
         public static List<Line> GetOffsetPartLines(Part part, double spacing, Vector facingDirection, double chordTolerance = 0.001)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var profile = new ShapeProfile(
+                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
             var lines = new List<Line>();
+            var totalSpacing = spacing + chordTolerance;
 
-            foreach (var shape in shapes)
-            {
-                var offsetEntity = shape.OffsetOutward(spacing + chordTolerance);
+            AddOffsetDirectionalLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
+                chordTolerance, part.Location, facingDirection);
 
-                if (offsetEntity == null)
-                    continue;
-
-                var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
-                polygon.RemoveSelfIntersections();
-                polygon.Offset(part.Location);
-                lines.AddRange(GetDirectionalLines(polygon, facingDirection));
-            }
+            foreach (var cutout in profile.Cutouts)
+                AddOffsetDirectionalLines(lines, cutout.OffsetInward(totalSpacing),
+                    chordTolerance, part.Location, facingDirection);
 
             return lines;
         }
@@ -188,6 +174,42 @@ namespace OpenNest
             }
 
             return lines;
+        }
+
+        private static void AddOffsetLines(List<Line> lines, Shape offsetEntity,
+            double chordTolerance, Vector location)
+        {
+            if (offsetEntity == null)
+                return;
+
+            var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
+            polygon.RemoveSelfIntersections();
+            polygon.Offset(location);
+            lines.AddRange(polygon.ToLines());
+        }
+
+        private static void AddOffsetDirectionalLines(List<Line> lines, Shape offsetEntity,
+            double chordTolerance, Vector location, PushDirection facingDirection)
+        {
+            if (offsetEntity == null)
+                return;
+
+            var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
+            polygon.RemoveSelfIntersections();
+            polygon.Offset(location);
+            lines.AddRange(GetDirectionalLines(polygon, facingDirection));
+        }
+
+        private static void AddOffsetDirectionalLines(List<Line> lines, Shape offsetEntity,
+            double chordTolerance, Vector location, Vector facingDirection)
+        {
+            if (offsetEntity == null)
+                return;
+
+            var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
+            polygon.RemoveSelfIntersections();
+            polygon.Offset(location);
+            lines.AddRange(GetDirectionalLines(polygon, facingDirection));
         }
     }
 }

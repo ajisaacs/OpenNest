@@ -151,7 +151,8 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
             }
 
             var drawing = new Drawing(Path.GetFileName(file));
-            drawing.Program = OpenNest.Converters.ConvertGeometry.ToProgram(entities);
+            var normalized = ShapeProfile.NormalizeEntities(entities);
+            drawing.Program = OpenNest.Converters.ConvertGeometry.ToProgram(normalized);
             drawing.UpdateArea();
             drawing.Color = PartColors[colorIndex % PartColors.Length];
             colorIndex++;

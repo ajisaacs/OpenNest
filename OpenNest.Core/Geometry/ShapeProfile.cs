@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest.Geometry
 {
@@ -41,5 +42,52 @@ namespace OpenNest.Geometry
         public Shape Perimeter { get; set; }
 
         public List<Shape> Cutouts { get; set; }
+
+        /// <summary>
+        /// Ensures CNC-standard winding: perimeter CW (kerf left = outward),
+        /// cutouts CCW (kerf left = inward). Reverses contours in-place as needed.
+        /// </summary>
+        public void NormalizeWinding()
+        {
+            EnsureWinding(Perimeter, RotationType.CW);
+
+            foreach (var cutout in Cutouts)
+                EnsureWinding(cutout, RotationType.CCW);
+        }
+
+        /// <summary>
+        /// Returns the entities in normalized winding order (perimeter first, then cutouts).
+        /// </summary>
+        public List<Entity> ToNormalizedEntities()
+        {
+            NormalizeWinding();
+            var result = new List<Entity>(Perimeter.Entities);
+
+            foreach (var cutout in Cutouts)
+                result.AddRange(cutout.Entities);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Convenience method: builds a ShapeProfile from raw entities,
+        /// normalizes winding, and returns the corrected entity list.
+        /// </summary>
+        public static List<Entity> NormalizeEntities(IEnumerable<Entity> entities)
+        {
+            var profile = new ShapeProfile(entities.ToList());
+            return profile.ToNormalizedEntities();
+        }
+
+        private static void EnsureWinding(Shape shape, RotationType desired)
+        {
+            var poly = shape.ToPolygon();
+
+            if (poly != null && poly.Vertices.Count >= 3
+                && poly.RotationDirection() != desired)
+            {
+                shape.Reverse();
+            }
+        }
     }
 }

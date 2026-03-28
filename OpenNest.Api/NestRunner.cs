@@ -35,7 +35,8 @@ public static class NestRunner
             if (!importer.GetGeometry(part.DxfPath, out var geometry) || geometry.Count == 0)
                 throw new InvalidOperationException($"Failed to import DXF: {part.DxfPath}");
 
-            var pgm = ConvertGeometry.ToProgram(geometry);
+            var normalized = ShapeProfile.NormalizeEntities(geometry);
+            var pgm = ConvertGeometry.ToProgram(normalized);
             var name = Path.GetFileNameWithoutExtension(part.DxfPath);
             var drawing = new Drawing(name);
             drawing.Program = pgm;

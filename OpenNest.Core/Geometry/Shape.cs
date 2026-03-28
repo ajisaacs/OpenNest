@@ -599,6 +599,41 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Offsets the shape inward by the given distance.
+        /// Normalizes to CCW winding before offsetting Left (which is inward for CCW),
+        /// making the method independent of the original contour winding direction.
+        /// </summary>
+        public Shape OffsetInward(double distance)
+        {
+            var poly = ToPolygon();
+
+            if (poly == null || poly.Vertices.Count < 3
+                || poly.RotationDirection() == RotationType.CCW)
+                return OffsetEntity(distance, OffsetSide.Left) as Shape;
+
+            // Create a reversed copy to avoid mutating shared entity objects.
+            var copy = new Shape();
+
+            for (var i = Entities.Count - 1; i >= 0; i--)
+            {
+                switch (Entities[i])
+                {
+                    case Line l:
+                        copy.Entities.Add(new Line(l.EndPoint, l.StartPoint) { Layer = l.Layer });
+                        break;
+                    case Arc a:
+                        copy.Entities.Add(new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed) { Layer = a.Layer });
+                        break;
+                    case Circle c:
+                        copy.Entities.Add(new Circle(c.Center, c.Radius) { Layer = c.Layer });
+                        break;
+                }
+            }
+
+            return copy.OffsetEntity(distance, OffsetSide.Left) as Shape;
+        }
+
+        /// <summary>
         /// Gets the closest point on the shape to the given point.
         /// </summary>
         /// <param name="pt"></param>

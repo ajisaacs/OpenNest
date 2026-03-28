@@ -178,30 +178,34 @@ namespace OpenNest
         {
             var result = new List<PointF[]>();
             var entities = ConvertProgram.ToGeometry(BasePart.Program);
-            var shapes = ShapeBuilder.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var profile = new ShapeProfile(
+                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
 
-            foreach (var shape in shapes)
-            {
-                var offsetEntity = shape.OffsetOutward(spacing);
+            AddOffsetPolygon(result, profile.Perimeter.OffsetOutward(spacing), tolerance);
 
-                if (offsetEntity == null)
-                    continue;
-
-                var polygon = offsetEntity.ToPolygonWithTolerance(tolerance);
-                polygon.RemoveSelfIntersections();
-
-                if (polygon.Vertices.Count < 2)
-                    continue;
-
-                var pts = new PointF[polygon.Vertices.Count];
-
-                for (var j = 0; j < pts.Length; j++)
-                    pts[j] = new PointF((float)polygon.Vertices[j].X, (float)polygon.Vertices[j].Y);
-
-                result.Add(pts);
-            }
+            foreach (var cutout in profile.Cutouts)
+                AddOffsetPolygon(result, cutout.OffsetInward(spacing), tolerance);
 
             return result;
+        }
+
+        private static void AddOffsetPolygon(List<PointF[]> result, Shape offsetEntity, double tolerance)
+        {
+            if (offsetEntity == null)
+                return;
+
+            var polygon = offsetEntity.ToPolygonWithTolerance(tolerance);
+            polygon.RemoveSelfIntersections();
+
+            if (polygon.Vertices.Count < 2)
+                return;
+
+            var pts = new PointF[polygon.Vertices.Count];
+
+            for (var j = 0; j < pts.Length; j++)
+                pts[j] = new PointF((float)polygon.Vertices[j].X, (float)polygon.Vertices[j].Y);
+
+            result.Add(pts);
         }
 
         private void RebuildOffsetPath(Matrix matrix)

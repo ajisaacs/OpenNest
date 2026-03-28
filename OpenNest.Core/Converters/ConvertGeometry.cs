@@ -108,7 +108,10 @@ namespace OpenNest.Converters
             if (line.StartPoint != lastpt)
                 pgm.MoveTo(line.StartPoint);
 
-            pgm.LineTo(line.EndPoint);
+            var move = new LinearMove(line.EndPoint);
+            if (string.Equals(line.Layer?.Name, "ETCH", System.StringComparison.OrdinalIgnoreCase))
+                move.Layer = LayerType.Scribe;
+            pgm.Codes.Add(move);
 
             lastpt = line.EndPoint;
             return lastpt;

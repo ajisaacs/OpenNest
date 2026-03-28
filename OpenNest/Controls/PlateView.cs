@@ -584,6 +584,7 @@ namespace OpenNest.Controls
 
                 part.Draw(g, (i + 1).ToString());
                 DrawBendLines(g, part.BasePart);
+                DrawEtchMarks(g, part.BasePart);
                 DrawGrainWarning(g, part.BasePart);
             }
 
@@ -654,6 +655,58 @@ namespace OpenNest.Controls
                 var pt2 = PointWorldToGraph(end);
 
                 g.DrawLine(bendPen, pt1, pt2);
+            }
+        }
+
+        private void DrawEtchMarks(Graphics g, Part part)
+        {
+            if (!ShowBendLines || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
+                return;
+
+            using var etchPen = new Pen(Color.Green, 1.5f);
+            var etchLength = 1.0;
+
+            foreach (var bend in part.BaseDrawing.Bends)
+            {
+                if (bend.Direction != BendDirection.Up)
+                    continue;
+
+                var start = bend.StartPoint;
+                var end = bend.EndPoint;
+
+                // Apply part rotation
+                if (part.Rotation != 0)
+                {
+                    start = start.Rotate(part.Rotation);
+                    end = end.Rotate(part.Rotation);
+                }
+
+                // Apply part offset
+                start = start + part.Location;
+                end = end + part.Location;
+
+                var length = bend.Length;
+                var angle = bend.StartPoint.AngleTo(bend.EndPoint) + part.Rotation;
+
+                if (length < etchLength * 3.0)
+                {
+                    var pt1 = PointWorldToGraph(start);
+                    var pt2 = PointWorldToGraph(end);
+                    g.DrawLine(etchPen, pt1, pt2);
+                }
+                else
+                {
+                    var dx = System.Math.Cos(angle) * etchLength;
+                    var dy = System.Math.Sin(angle) * etchLength;
+
+                    var s1 = PointWorldToGraph(start);
+                    var e1 = PointWorldToGraph(new Vector(start.X + dx, start.Y + dy));
+                    g.DrawLine(etchPen, s1, e1);
+
+                    var s2 = PointWorldToGraph(end);
+                    var e2 = PointWorldToGraph(new Vector(end.X - dx, end.Y - dy));
+                    g.DrawLine(etchPen, s2, e2);
+                }
             }
         }
 

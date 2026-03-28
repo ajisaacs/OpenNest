@@ -22,18 +22,11 @@ namespace OpenNest.Engine.BestFit
             if (perimeter == null)
                 return new PolygonExtractionResult(null, Vector.Zero);
 
-            // Inflate by half-spacing if spacing is non-zero.
-            // Detect winding direction to choose the correct outward offset side.
-            var outwardSide = OffsetSide.Right;
-            if (halfSpacing > 0)
-            {
-                var testPoly = perimeter.ToPolygon();
-                if (testPoly.Vertices.Count >= 3 && testPoly.RotationDirection() == RotationType.CW)
-                    outwardSide = OffsetSide.Left;
-            }
+            // Ensure CW winding for correct outward offset direction.
+            definedShape.NormalizeWinding();
 
             var inflated = halfSpacing > 0
-                ? (perimeter.OffsetEntity(halfSpacing, outwardSide) as Shape ?? perimeter)
+                ? (perimeter.OffsetOutward(halfSpacing) ?? perimeter)
                 : perimeter;
 
             // Convert to polygon with circumscribed arcs for tight nesting.
