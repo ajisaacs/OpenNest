@@ -2,6 +2,7 @@ using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
+using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -275,8 +276,12 @@ namespace OpenNest
                 {
                     var box2 = parts[j].BoundingBox;
 
-                    if (box1.Right < box2.Left || box2.Right < box1.Left ||
-                        box1.Top < box2.Bottom || box2.Top < box1.Bottom)
+                    var overlapX = System.Math.Min(box1.Right, box2.Right)
+                                 - System.Math.Max(box1.Left, box2.Left);
+                    var overlapY = System.Math.Min(box1.Top, box2.Top)
+                                 - System.Math.Max(box1.Bottom, box2.Bottom);
+
+                    if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
                         continue;
 
                     List<Vector> pts;

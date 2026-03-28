@@ -45,7 +45,7 @@ namespace OpenNest
             var profile = new ShapeProfile(
                 entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
             var lines = new List<Line>();
-            var totalSpacing = spacing + chordTolerance;
+            var totalSpacing = spacing;
 
             AddOffsetLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
                 chordTolerance, part.Location);
@@ -63,7 +63,7 @@ namespace OpenNest
             var profile = new ShapeProfile(
                 entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
             var lines = new List<Line>();
-            var totalSpacing = spacing + chordTolerance;
+            var totalSpacing = spacing;
 
             AddOffsetDirectionalLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
                 chordTolerance, part.Location, facingDirection);
@@ -97,7 +97,7 @@ namespace OpenNest
             var profile = new ShapeProfile(
                 entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
             var lines = new List<Line>();
-            var totalSpacing = spacing + chordTolerance;
+            var totalSpacing = spacing;
 
             AddOffsetDirectionalLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
                 chordTolerance, part.Location, facingDirection);

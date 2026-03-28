@@ -177,15 +177,16 @@ namespace OpenNest
             if (!perimeter1.Intersects(perimeter2, out var rawPts))
                 return false;
 
-            // Exclude intersection points that coincide with vertices of BOTH
-            // perimeters — these are touch points (shared corners/endpoints),
+            // Exclude intersection points that coincide with a vertex of either
+            // perimeter — these are boundary contact points (shared corners,
+            // endpoints, or a corner touching an edge) with zero area overlap,
             // not actual crossings where one shape enters the other's interior.
             var verts1 = CollectVertices(perimeter1);
             var verts2 = CollectVertices(perimeter2);
 
             foreach (var pt in rawPts)
             {
-                if (IsNearAnyVertex(pt, verts1) && IsNearAnyVertex(pt, verts2))
+                if (IsNearAnyVertex(pt, verts1) || IsNearAnyVertex(pt, verts2))
                     continue;
                 pts.Add(pt);
             }
