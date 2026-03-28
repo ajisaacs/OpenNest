@@ -316,21 +316,47 @@ namespace OpenNest.Controls
                 if (!entity.Layer.IsVisible || !entity.IsVisible)
                     continue;
 
-                var mid = GetEntityMidPoint(entity);
+                var mid = GetEntityMidPoint(entity, i);
                 if (!mid.HasValue) continue;
 
-                var pt = PointWorldToGraph(mid.Value);
+                var screenExtent = GetEntityScreenExtent(entity);
                 var text = i.ToString();
                 var size = g.MeasureString(text, labelFont);
+                var radius = System.Math.Max(size.Width, size.Height) / 2f + 2f;
+
+                // Hide label when the entity is too small on screen to fit it
+                if (screenExtent < radius * 2f)
+                    continue;
+
+                var pt = PointWorldToGraph(mid.Value);
                 var cx = pt.X - size.Width / 2f;
                 var cy = pt.Y - size.Height / 2f;
-                var radius = System.Math.Max(size.Width, size.Height) / 2f + 2f;
                 g.FillEllipse(labelBackBrush, pt.X - radius, pt.Y - radius, radius * 2f, radius * 2f);
                 g.DrawString(text, labelFont, labelBrush, cx, cy);
             }
         }
 
-        private static Vector? GetEntityMidPoint(Entity entity)
+        private float GetEntityScreenExtent(Entity entity)
+        {
+            switch (entity)
+            {
+                case Line line:
+                    var dx = line.EndPoint.X - line.StartPoint.X;
+                    var dy = line.EndPoint.Y - line.StartPoint.Y;
+                    return LengthWorldToGui(System.Math.Sqrt(dx * dx + dy * dy));
+
+                case Arc arc:
+                    return LengthWorldToGui(arc.Radius * 2.0);
+
+                case Circle circle:
+                    return LengthWorldToGui(circle.Radius * 2.0);
+
+                default:
+                    return 0f;
+            }
+        }
+
+        private static Vector? GetEntityMidPoint(Entity entity, int index)
         {
             switch (entity)
             {
@@ -346,7 +372,11 @@ namespace OpenNest.Controls
                         arc.Center.Y + arc.Radius * System.Math.Sin(midAngle));
 
                 case Circle circle:
-                    return circle.Center;
+                    // Use golden angle (~137.5°) per index so concentric circles spread labels apart
+                    var circleAngle = index * 2.399;
+                    return new Vector(
+                        circle.Center.X + circle.Radius * System.Math.Cos(circleAngle),
+                        circle.Center.Y + circle.Radius * System.Math.Sin(circleAngle));
 
                 default:
                     return null;
