@@ -179,6 +179,31 @@ public class CollisionTests
         Assert.False(Collision.HasAnyOverlap(new List<Polygon> { a, b }));
     }
 
+    [Fact]
+    public void Check_IdenticalSquares_FullOverlap()
+    {
+        var a = MakeSquare(0, 0, 1, 1);
+        var b = MakeSquare(0, 0, 1, 1);
+
+        var result = Collision.Check(a, b);
+
+        Assert.True(result.Overlaps);
+        Assert.True(result.OverlapArea > 0.99 && result.OverlapArea < 1.01);
+    }
+
+    [Fact]
+    public void HasAnyOverlap_SinglePolygon_ReturnsFalse()
+    {
+        var a = MakeSquare(0, 0, 1, 1);
+        Assert.False(Collision.HasAnyOverlap(new List<Polygon> { a }));
+    }
+
+    [Fact]
+    public void HasAnyOverlap_EmptyList_ReturnsFalse()
+    {
+        Assert.False(Collision.HasAnyOverlap(new List<Polygon>()));
+    }
+
     private static Polygon MakeSquare(double left, double bottom, double right, double top)
     {
         var p = new Polygon();
