@@ -171,57 +171,18 @@ namespace OpenNest
             if (perimeter1 == null || perimeter2 == null)
                 return false;
 
-            perimeter1.Offset(Location);
-            perimeter2.Offset(part.Location);
+            var polygon1 = perimeter1.ToPolygon();
+            var polygon2 = perimeter2.ToPolygon();
 
-            if (!perimeter1.Intersects(perimeter2, out var rawPts))
+            if (polygon1 == null || polygon2 == null)
                 return false;
 
-            // Exclude intersection points that coincide with a vertex of either
-            // perimeter — these are boundary contact points (shared corners,
-            // endpoints, or a corner touching an edge) with zero area overlap,
-            // not actual crossings where one shape enters the other's interior.
-            var verts1 = CollectVertices(perimeter1);
-            var verts2 = CollectVertices(perimeter2);
+            polygon1.Offset(Location);
+            polygon2.Offset(part.Location);
 
-            foreach (var pt in rawPts)
-            {
-                if (IsNearAnyVertex(pt, verts1) || IsNearAnyVertex(pt, verts2))
-                    continue;
-                pts.Add(pt);
-            }
-
-            return pts.Count > 0;
-        }
-
-        private static List<Vector> CollectVertices(Geometry.Shape shape)
-        {
-            var verts = new List<Vector>();
-            foreach (var entity in shape.Entities)
-            {
-                switch (entity)
-                {
-                    case Geometry.Line line:
-                        verts.Add(line.StartPoint);
-                        verts.Add(line.EndPoint);
-                        break;
-                    case Geometry.Arc arc:
-                        verts.Add(arc.StartPoint());
-                        verts.Add(arc.EndPoint());
-                        break;
-                }
-            }
-            return verts;
-        }
-
-        private static bool IsNearAnyVertex(Vector pt, List<Vector> vertices)
-        {
-            foreach (var v in vertices)
-            {
-                if (pt.X.IsEqualTo(v.X) && pt.Y.IsEqualTo(v.Y))
-                    return true;
-            }
-            return false;
+            var result = Geometry.Collision.Check(polygon1, polygon2);
+            pts = result.IntersectionPoints.ToList();
+            return result.Overlaps;
         }
 
         public double Left
