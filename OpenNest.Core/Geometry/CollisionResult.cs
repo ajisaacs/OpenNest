@@ -16,8 +16,8 @@ namespace OpenNest.Geometry
         }
 
         public bool Overlaps { get; }
-        public List<Polygon> OverlapRegions { get; }
-        public List<Vector> IntersectionPoints { get; }
+        public IReadOnlyList<Polygon> OverlapRegions { get; }
+        public IReadOnlyList<Vector> IntersectionPoints { get; }
         public double OverlapArea { get; }
     }
 }
