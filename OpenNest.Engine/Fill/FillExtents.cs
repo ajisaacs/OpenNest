@@ -4,7 +4,6 @@ using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 
 namespace OpenNest.Engine.Fill
@@ -34,7 +33,7 @@ namespace OpenNest.Engine.Fill
             if (pair == null)
                 return new List<Part>();
 
-            var column = BuildColumn(pair.Value.part1, pair.Value.part2, pair.Value.pairBbox);
+            var column = BuildColumn(pair.Value);
             if (column.Count == 0)
                 return new List<Part>();
 
@@ -82,7 +81,7 @@ namespace OpenNest.Engine.Fill
 
         // --- Step 1: Pair Construction ---
 
-        private (Part part1, Part part2, Box pairBbox)? BuildPair(Drawing drawing, double rotationAngle)
+        private PartPair? BuildPair(Drawing drawing, double rotationAngle)
         {
             var part1 = Part.CreateAtOrigin(drawing, rotationAngle);
             var part2 = Part.CreateAtOrigin(drawing, rotationAngle + System.Math.PI);
@@ -112,46 +111,40 @@ namespace OpenNest.Engine.Fill
                 part2.UpdateBounds();
             }
 
-            // Re-anchor pair to work area origin.
-            var pairBbox = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
-            var anchor = new Vector(workArea.X - pairBbox.Left, workArea.Y - pairBbox.Bottom);
-            part1.Offset(anchor);
-            part2.Offset(anchor);
-            part1.UpdateBounds();
-            part2.UpdateBounds();
-
-            pairBbox = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
-
-            // Verify pair fits in work area.
-            if (pairBbox.Width > workArea.Width + Tolerance.Epsilon ||
-                pairBbox.Length > workArea.Length + Tolerance.Epsilon)
+            var pair = AnchorToWorkArea(part1, part2);
+            if (pair == null)
                 return null;
 
-            return (part1, part2, pairBbox);
+            // Verify pair fits in work area.
+            if (pair.Value.Bbox.Width > workArea.Width + Tolerance.Epsilon ||
+                pair.Value.Bbox.Length > workArea.Length + Tolerance.Epsilon)
+                return null;
+
+            return pair;
         }
 
         // --- Step 2: Build Column (tile vertically) ---
 
-        private List<Part> BuildColumn(Part part1, Part part2, Box pairBbox)
+        private List<Part> BuildColumn(PartPair pair)
         {
-            var column = new List<Part> { (Part)part1.Clone(), (Part)part2.Clone() };
+            var column = new List<Part> { (Part)pair.Part1.Clone(), (Part)pair.Part2.Clone() };
 
             // Find geometry-aware copy distance for the pair vertically.
-            var boundary1 = new PartBoundary(part1, halfSpacing);
-            var boundary2 = new PartBoundary(part2, halfSpacing);
+            var boundary1 = new PartBoundary(pair.Part1, halfSpacing);
+            var boundary2 = new PartBoundary(pair.Part2, halfSpacing);
 
             // Compute vertical copy distance using bounding boxes as starting point,
             // then slide down to find true geometry distance.
-            var pairHeight = pairBbox.Length;
+            var pairHeight = pair.Bbox.Length;
             var testOffset = new Vector(0, pairHeight);
 
             // Create test parts for slide distance measurement.
-            var testPart1 = part1.CloneAtOffset(testOffset);
-            var testPart2 = part2.CloneAtOffset(testOffset);
+            var testPart1 = pair.Part1.CloneAtOffset(testOffset);
+            var testPart2 = pair.Part2.CloneAtOffset(testOffset);
 
             // Find minimum distance from test pair sliding down toward original pair.
             var copyDistance = FindVerticalCopyDistance(
-                part1, part2, testPart1, testPart2,
+                pair.Part1, pair.Part2, testPart1, testPart2,
                 boundary1, boundary2, pairHeight);
 
             if (copyDistance <= 0)
@@ -160,13 +153,13 @@ namespace OpenNest.Engine.Fill
             var count = 1;
             while (true)
             {
-                var nextBottom = pairBbox.Bottom + copyDistance * count;
+                var nextBottom = pair.Bbox.Bottom + copyDistance * count;
                 if (nextBottom + pairHeight > workArea.Top + Tolerance.Epsilon)
                     break;
 
                 var offset = new Vector(0, copyDistance * count);
-                column.Add(part1.CloneAtOffset(offset));
-                column.Add(part2.CloneAtOffset(offset));
+                column.Add(pair.Part1.CloneAtOffset(offset));
+                column.Add(pair.Part2.CloneAtOffset(offset));
                 count++;
             }
 
@@ -180,23 +173,20 @@ namespace OpenNest.Engine.Fill
             double pairHeight)
         {
             // Check all 4 combinations: test parts sliding down toward original parts.
+            var slidePairs = new[]
+            {
+                (moving: boundary1, movingLoc: testPart1.Location, stationary: boundary1, stationaryLoc: origPart1.Location),
+                (moving: boundary1, movingLoc: testPart1.Location, stationary: boundary2, stationaryLoc: origPart2.Location),
+                (moving: boundary2, movingLoc: testPart2.Location, stationary: boundary1, stationaryLoc: origPart1.Location),
+                (moving: boundary2, movingLoc: testPart2.Location, stationary: boundary2, stationaryLoc: origPart2.Location),
+            };
+
             var minSlide = double.MaxValue;
-
-            // Test1 -> Orig1
-            var d = SlideDistance(boundary1, testPart1.Location, boundary1, origPart1.Location, PushDirection.Down);
-            if (d < minSlide) minSlide = d;
-
-            // Test1 -> Orig2
-            d = SlideDistance(boundary1, testPart1.Location, boundary2, origPart2.Location, PushDirection.Down);
-            if (d < minSlide) minSlide = d;
-
-            // Test2 -> Orig1
-            d = SlideDistance(boundary2, testPart2.Location, boundary1, origPart1.Location, PushDirection.Down);
-            if (d < minSlide) minSlide = d;
-
-            // Test2 -> Orig2
-            d = SlideDistance(boundary2, testPart2.Location, boundary2, origPart2.Location, PushDirection.Down);
-            if (d < minSlide) minSlide = d;
+            foreach (var (moving, movingLoc, stationary, stationaryLoc) in slidePairs)
+            {
+                var d = SlideDistance(moving, movingLoc, stationary, stationaryLoc, PushDirection.Down);
+                if (d < minSlide) minSlide = d;
+            }
 
             if (minSlide >= double.MaxValue || minSlide < 0)
                 return pairHeight + partSpacing;
@@ -226,12 +216,9 @@ namespace OpenNest.Engine.Fill
 
         // --- Step 3: Iterative Adjustment ---
 
-        private List<Part> AdjustColumn(
-            (Part part1, Part part2, Box pairBbox) pair,
-            List<Part> column,
-            CancellationToken token)
+        private List<Part> AdjustColumn(PartPair pair, List<Part> column, CancellationToken token)
         {
-            var originalPairWidth = pair.pairBbox.Width;
+            var originalPairWidth = pair.Bbox.Width;
 
             for (var iteration = 0; iteration < MaxIterations; iteration++)
             {
@@ -262,7 +249,7 @@ namespace OpenNest.Engine.Fill
                 if (adjusted == null)
                     break;
 
-                var newColumn = BuildColumn(adjusted.Value.part1, adjusted.Value.part2, adjusted.Value.pairBbox);
+                var newColumn = BuildColumn(adjusted.Value);
                 if (newColumn.Count == 0)
                     break;
 
@@ -273,9 +260,7 @@ namespace OpenNest.Engine.Fill
             return column;
         }
 
-        private (Part part1, Part part2, Box pairBbox)? TryAdjustPair(
-            (Part part1, Part part2, Box pairBbox) pair,
-            double adjustment, double originalPairWidth)
+        private PartPair? TryAdjustPair(PartPair pair, double adjustment, double originalPairWidth)
         {
             // Try shifting part2 up first.
             var result = TryShiftDirection(pair, adjustment, originalPairWidth);
@@ -287,13 +272,11 @@ namespace OpenNest.Engine.Fill
             return TryShiftDirection(pair, -adjustment, originalPairWidth);
         }
 
-        private (Part part1, Part part2, Box pairBbox)? TryShiftDirection(
-            (Part part1, Part part2, Box pairBbox) pair,
-            double verticalShift, double originalPairWidth)
+        private PartPair? TryShiftDirection(PartPair pair, double verticalShift, double originalPairWidth)
         {
             // Clone parts so we don't mutate the originals.
-            var p1 = (Part)pair.part1.Clone();
-            var p2 = (Part)pair.part2.Clone();
+            var p1 = (Part)pair.Part1.Clone();
+            var p2 = (Part)pair.Part2.Clone();
 
             // Separate: shift part2 right so bounding boxes don't touch.
             p2.Offset(partSpacing, 0);
@@ -309,20 +292,12 @@ namespace OpenNest.Engine.Fill
             Compactor.Push(moving, obstacles, workArea, partSpacing, PushDirection.Left);
 
             // Check if the pair got wider.
-            var newBbox = ((IEnumerable<IBoundable>)new IBoundable[] { p1, p2 }).GetBoundingBox();
+            var newBbox = PairBbox(p1, p2);
 
             if (newBbox.Width > originalPairWidth + Tolerance.Epsilon)
                 return null;
 
-            // Re-anchor to work area origin.
-            var anchor = new Vector(workArea.X - newBbox.Left, workArea.Y - newBbox.Bottom);
-            p1.Offset(anchor);
-            p2.Offset(anchor);
-            p1.UpdateBounds();
-            p2.UpdateBounds();
-
-            newBbox = ((IEnumerable<IBoundable>)new IBoundable[] { p1, p2 }).GetBoundingBox();
-            return (p1, p2, newBbox);
+            return AnchorToWorkArea(p1, p2);
         }
 
         // --- Step 4: Horizontal Repetition ---
@@ -332,87 +307,35 @@ namespace OpenNest.Engine.Fill
             if (column.Count == 0)
                 return column;
 
-            var columnBbox = ((IEnumerable<IBoundable>)column).GetBoundingBox();
-            var columnWidth = columnBbox.Width;
+            var pattern = new Pattern();
+            pattern.Parts.AddRange(column);
+            pattern.UpdateBounds();
 
-            // Create a test column shifted right by columnWidth + spacing.
-            var testOffset = columnWidth + partSpacing;
-            var testColumn = new List<Part>(column.Count);
-            foreach (var part in column)
-                testColumn.Add(part.CloneAtOffset(new Vector(testOffset, 0)));
-
-            // Compact the test column left against the original column.
-            var distanceMoved = Compactor.Push(testColumn, column, workArea, partSpacing, PushDirection.Left);
-
-            // Derive the true copy distance from where the test column ended up.
-            var testBbox = ((IEnumerable<IBoundable>)testColumn).GetBoundingBox();
-            var copyDistance = testBbox.Left - columnBbox.Left;
-
-            if (copyDistance <= Tolerance.Epsilon)
-                copyDistance = columnWidth + partSpacing;
-
-            // Safety: if the compacted test column overlaps the original column,
-            // fall back to bbox-based spacing.
-            var probe = new List<Part>(column);
-            probe.AddRange(testColumn.Where(IsWithinWorkArea));
-            if (HasOverlappingParts(probe))
-            {
-                Debug.WriteLine($"[FillExtents] Compacted column overlaps, falling back to bbox spacing");
-                copyDistance = columnWidth + partSpacing;
-
-                // Rebuild test column at safe distance.
-                testColumn.Clear();
-                foreach (var part in column)
-                    testColumn.Add(part.CloneAtOffset(new Vector(copyDistance, 0)));
-            }
-
-            Debug.WriteLine($"[FillExtents] Column copy distance: {copyDistance:F2} (bbox width: {columnWidth:F2}, spacing: {partSpacing:F2})");
-
-            // Build all columns.
-            var result = new List<Part>(column);
-
-            // Add the test column we already computed as column 2.
-            foreach (var part in testColumn)
-            {
-                if (IsWithinWorkArea(part))
-                    result.Add(part);
-            }
-
-            // Tile additional columns at the copy distance.
-            var colIndex = 2;
-            while (!token.IsCancellationRequested)
-            {
-                var offset = new Vector(copyDistance * colIndex, 0);
-                var anyFit = false;
-
-                foreach (var part in column)
-                {
-                    var clone = part.CloneAtOffset(offset);
-                    if (IsWithinWorkArea(clone))
-                    {
-                        result.Add(clone);
-                        anyFit = true;
-                    }
-                }
-
-                if (!anyFit)
-                    break;
-
-                colIndex++;
-            }
-
-            return result;
+            var linear = new FillLinear(workArea, partSpacing);
+            return linear.Fill(pattern, NestDirection.Horizontal);
         }
 
-        private bool IsWithinWorkArea(Part part)
+        // --- Helpers ---
+
+        private PartPair? AnchorToWorkArea(Part part1, Part part2)
         {
-            return part.BoundingBox.Right <= workArea.Right + Tolerance.Epsilon &&
-                   part.BoundingBox.Top <= workArea.Top + Tolerance.Epsilon &&
-                   part.BoundingBox.Left >= workArea.Left - Tolerance.Epsilon &&
-                   part.BoundingBox.Bottom >= workArea.Bottom - Tolerance.Epsilon;
+            var bbox = PairBbox(part1, part2);
+            var anchor = new Vector(workArea.X - bbox.Left, workArea.Y - bbox.Bottom);
+            part1.Offset(anchor);
+            part2.Offset(anchor);
+            part1.UpdateBounds();
+            part2.UpdateBounds();
+
+            bbox = PairBbox(part1, part2);
+            return new PartPair(part1, part2, bbox);
         }
+
+        private static Box PairBbox(Part part1, Part part2) =>
+            ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
 
         private static bool HasOverlappingParts(List<Part> parts) =>
             FillHelpers.HasOverlappingParts(parts);
+
+        private readonly record struct PartPair(Part Part1, Part Part2, Box Bbox);
     }
 }
