@@ -74,7 +74,7 @@ namespace OpenNest.Controls
 
             var bendLinksPanel = new FlowLayoutPanel
             {
-                Dock = DockStyle.Bottom,
+                Dock = DockStyle.Top,
                 Height = 20,
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false
