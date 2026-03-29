@@ -905,15 +905,24 @@ namespace OpenNest.Forms
 
             var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
 
+            var previewPlate = new Plate(activeForm.PlateView.Plate.Size)
+            {
+                Quadrant = activeForm.PlateView.Plate.Quadrant,
+                PartSpacing = activeForm.PlateView.Plate.PartSpacing,
+                Thickness = activeForm.PlateView.Plate.Thickness,
+                Material = activeForm.PlateView.Plate.Material,
+            };
+            previewPlate.EdgeSpacing = activeForm.PlateView.Plate.EdgeSpacing;
+            progressForm.PreviewPlate = previewPlate;
+
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
 
                 if (p.IsOverallBest)
-                    activeForm.PlateView.SetStationaryParts(p.BestParts);
-                else
-                    activeForm.PlateView.SetActiveParts(p.BestParts);
+                    progressForm.UpdatePreview(p.BestParts);
 
+                activeForm.PlateView.SetActiveParts(p.BestParts);
                 activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
 
@@ -939,7 +948,19 @@ namespace OpenNest.Forms
                         : activeForm.PlateView.Plate;
 
                     if (plate != activeForm.PlateView.Plate)
+                    {
                         activeForm.LoadLastPlate();
+
+                        var newPreviewPlate = new Plate(plate.Size)
+                        {
+                            Quadrant = plate.Quadrant,
+                            PartSpacing = plate.PartSpacing,
+                            Thickness = plate.Thickness,
+                            Material = plate.Material,
+                        };
+                        newPreviewPlate.EdgeSpacing = plate.EdgeSpacing;
+                        progressForm.PreviewPlate = newPreviewPlate;
+                    }
 
                     var anyPlaced = false;
 
