@@ -195,7 +195,7 @@ namespace OpenNest.Engine.Fill
                 if (pattern.Parts.Count == 0)
                     continue;
 
-                var engine = new FillLinear(workArea, partSpacing);
+                var engine = new FillLinear(workArea, partSpacing) { Label = "Pairs" };
                 foreach (var dir in new[] { NestDirection.Horizontal, NestDirection.Vertical })
                 {
                     if (!dedup.TryAdd(pattern.BoundingBox, workArea, dir))
@@ -321,7 +321,7 @@ namespace OpenNest.Engine.Fill
                 return cachedResult;
             }
 
-            var filler = new FillLinear(remnantBox, partSpacing);
+            var filler = new FillLinear(remnantBox, partSpacing) { Label = "Pairs-Remnant" };
             List<Part> parts = null;
 
             foreach (var angle in new[] { 0.0, Angle.HalfPI })

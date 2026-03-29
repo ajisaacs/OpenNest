@@ -1,6 +1,7 @@
 using OpenNest.Geometry;
 using OpenNest.Math;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace OpenNest.Engine.Fill
@@ -18,6 +19,11 @@ namespace OpenNest.Engine.Fill
         public double PartSpacing { get; }
 
         public double HalfSpacing => PartSpacing / 2;
+
+        /// <summary>
+        /// Diagnostic label set by callers to identify the engine/context in overlap logs.
+        /// </summary>
+        public string Label { get; set; }
 
         private static Vector MakeOffset(NestDirection direction, double distance)
         {
@@ -323,7 +329,7 @@ namespace OpenNest.Engine.Fill
             return result;
         }
 
-        private static bool HasOverlappingParts(List<Part> parts)
+        private static bool HasOverlappingParts(List<Part> parts, out int overlapA, out int overlapB)
         {
             for (var i = 0; i < parts.Count; i++)
             {
@@ -338,11 +344,20 @@ namespace OpenNest.Engine.Fill
                     var overlapY = System.Math.Min(b1.Top, b2.Top)
                                  - System.Math.Max(b1.Bottom, b2.Bottom);
 
-                    if (overlapX > Tolerance.Epsilon && overlapY > Tolerance.Epsilon)
+                    if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
+                        continue;
+
+                    if (parts[i].Intersects(parts[j], out _))
+                    {
+                        overlapA = i;
+                        overlapB = j;
                         return true;
+                    }
                 }
             }
 
+            overlapA = -1;
+            overlapB = -1;
             return false;
         }
 
@@ -384,10 +399,9 @@ namespace OpenNest.Engine.Fill
             var row = new List<Part>(pattern.Parts);
             row.AddRange(TilePattern(pattern, direction, boundaries));
 
-            // Safety: if geometry-aware spacing produced overlapping parts,
-            // fall back to bbox-based spacing for this axis.
-            if (pattern.Parts.Count > 1 && HasOverlappingParts(row))
+            if (pattern.Parts.Count > 1 && HasOverlappingParts(row, out var a1, out var b1))
             {
+                LogOverlap("Step1-Primary", direction, pattern, row, a1, b1);
                 row = new List<Part>(pattern.Parts);
                 row.AddRange(TilePatternBbox(pattern, direction));
             }
@@ -397,8 +411,9 @@ namespace OpenNest.Engine.Fill
             {
                 row.AddRange(TilePattern(pattern, perpAxis, boundaries));
 
-                if (pattern.Parts.Count > 1 && HasOverlappingParts(row))
+                if (pattern.Parts.Count > 1 && HasOverlappingParts(row, out var a2, out var b2))
                 {
+                    LogOverlap("Step1-PerpOnly", perpAxis, pattern, row, a2, b2);
                     row = new List<Part>(pattern.Parts);
                     row.AddRange(TilePatternBbox(pattern, perpAxis));
                 }
@@ -415,7 +430,43 @@ namespace OpenNest.Engine.Fill
             var gridResult = new List<Part>(rowPattern.Parts);
             gridResult.AddRange(TilePattern(rowPattern, perpAxis, rowBoundaries));
 
+            if (HasOverlappingParts(gridResult, out var a3, out var b3))
+            {
+                LogOverlap("Step2-Perp", perpAxis, rowPattern, gridResult, a3, b3);
+                gridResult = new List<Part>(rowPattern.Parts);
+                gridResult.AddRange(TilePatternBbox(rowPattern, perpAxis));
+            }
+
             return gridResult;
+        }
+
+        private void LogOverlap(string step, NestDirection tilingDir,
+            Pattern pattern, List<Part> parts, int idxA, int idxB)
+        {
+            var pa = parts[idxA];
+            var pb = parts[idxB];
+            var ba = pa.BoundingBox;
+            var bb = pb.BoundingBox;
+
+            Debug.WriteLine($"[FillLinear] OVERLAP FALLBACK ({Label ?? "unknown"})");
+            Debug.WriteLine($"  Step: {step}, TilingDir: {tilingDir}");
+            Debug.WriteLine($"  WorkArea: ({WorkArea.X:F4},{WorkArea.Y:F4}) {WorkArea.Width:F4}x{WorkArea.Length:F4}, Spacing: {PartSpacing}");
+            Debug.WriteLine($"  Pattern: {pattern.Parts.Count} parts, bbox {pattern.BoundingBox.Width:F4}x{pattern.BoundingBox.Length:F4}");
+            Debug.WriteLine($"  Total parts after tiling: {parts.Count}");
+            Debug.WriteLine($"  Overlapping pair [{idxA}] vs [{idxB}]:");
+            Debug.WriteLine($"    [{idxA}]: drawing={pa.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(pa.Rotation):F2}° " +
+                $"loc=({pa.Location.X:F4},{pa.Location.Y:F4}) bbox=({ba.Left:F4},{ba.Bottom:F4})-({ba.Right:F4},{ba.Top:F4})");
+            Debug.WriteLine($"    [{idxB}]: drawing={pb.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(pb.Rotation):F2}° " +
+                $"loc=({pb.Location.X:F4},{pb.Location.Y:F4}) bbox=({bb.Left:F4},{bb.Bottom:F4})-({bb.Right:F4},{bb.Top:F4})");
+
+            // Log all pattern seed parts for reproduction
+            Debug.WriteLine($"  Pattern seed parts:");
+            for (var i = 0; i < pattern.Parts.Count; i++)
+            {
+                var p = pattern.Parts[i];
+                Debug.WriteLine($"    [{i}]: drawing={p.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(p.Rotation):F2}° " +
+                    $"loc=({p.Location.X:F4},{p.Location.Y:F4}) bbox={p.BoundingBox.Width:F4}x{p.BoundingBox.Length:F4}");
+            }
         }
 
         /// <summary>

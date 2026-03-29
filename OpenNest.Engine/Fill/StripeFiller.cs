@@ -121,7 +121,7 @@ public class StripeFiller
         if (!_dedup.TryAdd(rotatedPattern.BoundingBox, workArea, primaryAxis))
             return null;
 
-        var stripeEngine = new FillLinear(stripeBox, spacing);
+        var stripeEngine = new FillLinear(stripeBox, spacing) { Label = "Stripe" };
         var stripeParts = stripeEngine.Fill(rotatedPattern, primaryAxis);
 
         if (stripeParts == null || stripeParts.Count == 0)
@@ -136,7 +136,7 @@ public class StripeFiller
         stripePattern.Parts.AddRange(stripeParts);
         stripePattern.UpdateBounds();
 
-        var gridEngine = new FillLinear(workArea, spacing);
+        var gridEngine = new FillLinear(workArea, spacing) { Label = "Stripe-Grid" };
         var gridParts = gridEngine.Fill(stripePattern, perpAxis);
 
         if (gridParts == null || gridParts.Count == 0)
@@ -244,7 +244,7 @@ public class StripeFiller
             return cachedResult;
         }
 
-        var filler = new FillLinear(remnantBox, spacing);
+        var filler = new FillLinear(remnantBox, spacing) { Label = "Stripe-Remnant" };
         List<Part> best = null;
 
         foreach (var angle in new[] { 0.0, Angle.HalfPI })
@@ -396,7 +396,7 @@ public class StripeFiller
             var stripeBox = axis == NestDirection.Horizontal
                 ? new Box(0, 0, sheetSpan, perpDim)
                 : new Box(0, 0, perpDim, sheetSpan);
-            var engine = new FillLinear(stripeBox, spacing);
+            var engine = new FillLinear(stripeBox, spacing) { Label = "Stripe-EstimateRow" };
             var filled = engine.Fill(rotated, axis);
             var n = filled?.Count ?? 0;
 

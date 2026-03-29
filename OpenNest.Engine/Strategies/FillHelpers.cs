@@ -111,6 +111,49 @@ namespace OpenNest.Engine.Strategies
         }
 
         /// <summary>
+        /// Sweeps a list of angles, calling fillAtAngle for each, and returns
+        /// the best result according to the context's comparer. Handles
+        /// cancellation and progress reporting.
+        /// </summary>
+        public static List<Part> BestOverAngles(
+            FillContext context,
+            IReadOnlyList<double> angles,
+            Func<double, List<Part>> fillAtAngle,
+            NestPhase phase,
+            string phaseLabel)
+        {
+            var workArea = context.WorkArea;
+            var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
+            List<Part> best = null;
+
+            for (var i = 0; i < angles.Count; i++)
+            {
+                context.Token.ThrowIfCancellationRequested();
+
+                var angle = angles[i];
+                var result = fillAtAngle(angle);
+                var angleDeg = Angle.ToDegrees(angle);
+
+                if (result != null && result.Count > 0)
+                {
+                    if (best == null || comparer.IsBetter(result, best, workArea))
+                        best = result;
+                }
+
+                NestEngineBase.ReportProgress(context.Progress, new ProgressReport
+                {
+                    Phase = phase,
+                    PlateNumber = context.PlateNumber,
+                    Parts = best,
+                    WorkArea = workArea,
+                    Description = $"{phaseLabel}: {i + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts",
+                });
+            }
+
+            return best ?? new List<Part>();
+        }
+
+        /// <summary>
         /// Checks if any pair of parts geometrically overlap. Uses bounding box
         /// pre-filtering for performance, then falls back to shape intersection.
         /// </summary>

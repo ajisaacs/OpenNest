@@ -20,22 +20,10 @@ namespace OpenNest.Engine.Strategies
 
             var angles = new[] { bestRotation, bestRotation + Angle.HalfPI };
 
-            List<Part> best = null;
-            var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
-
-            foreach (var angle in angles)
-            {
-                context.Token.ThrowIfCancellationRequested();
-                var result = filler.Fill(context.Item.Drawing, angle,
-                    context.PlateNumber, context.Token, context.Progress);
-                if (result != null && result.Count > 0)
-                {
-                    if (best == null || comparer.IsBetter(result, best, context.WorkArea))
-                        best = result;
-                }
-            }
-
-            return best ?? new List<Part>();
+            return FillHelpers.BestOverAngles(context, angles,
+                angle => filler.Fill(context.Item.Drawing, angle,
+                    context.PlateNumber, context.Token, context.Progress),
+                NestPhase.Extents, "Extents");
         }
     }
 }

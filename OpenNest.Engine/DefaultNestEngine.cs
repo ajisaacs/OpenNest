@@ -94,7 +94,7 @@ namespace OpenNest
 
             // Multi-part group: linear pattern fill only.
             PhaseResults.Clear();
-            var engine = new FillLinear(workArea, Plate.PartSpacing);
+            var engine = new FillLinear(workArea, Plate.PartSpacing) { Label = "GroupPattern" };
             var angles = RotationAnalysis.FindHullEdgeAngles(groupParts);
             var best = FillHelpers.FillPattern(engine, groupParts, angles, workArea, Comparer);
             PhaseResults.Add(new PhaseResult(NestPhase.Linear, best?.Count ?? 0, 0));

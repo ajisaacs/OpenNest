@@ -220,7 +220,7 @@ namespace OpenNest.Forms
                 return;
 
             var workArea = new Box(0, 0, plateSize.Length, plateSize.Width);
-            var filler = new FillLinear(workArea, PartSpacing);
+            var filler = new FillLinear(workArea, PartSpacing) { Label = "PatternTile-H" };
 
             var hParts = filler.Fill(pattern, NestDirection.Horizontal);
             foreach (var part in hParts)
@@ -228,7 +228,7 @@ namespace OpenNest.Forms
             hLabel.Text = $"Horizontal — {hParts.Count} parts";
             hPreview.ZoomToFit();
 
-            var vFiller = new FillLinear(workArea, PartSpacing);
+            var vFiller = new FillLinear(workArea, PartSpacing) { Label = "PatternTile-V" };
             var vParts = vFiller.Fill(pattern, NestDirection.Vertical);
             foreach (var part in vParts)
                 vPreview.Plate.Parts.Add(part);
@@ -328,7 +328,7 @@ namespace OpenNest.Forms
             if (pattern == null)
                 return;
 
-            var filler = new FillLinear(new Box(0, 0, plateSize.Length, plateSize.Width), PartSpacing);
+            var filler = new FillLinear(new Box(0, 0, plateSize.Length, plateSize.Width), PartSpacing) { Label = "PatternTile-Apply" };
             var tiledParts = filler.Fill(pattern, applyDirection);
 
             Result = new PatternTileResult

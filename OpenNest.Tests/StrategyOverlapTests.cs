@@ -107,4 +107,5 @@ public class StrategyOverlapTests
 
         Assert.Empty(failures);
     }
+
 }

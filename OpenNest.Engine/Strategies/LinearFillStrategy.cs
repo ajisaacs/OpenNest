@@ -19,45 +19,28 @@ namespace OpenNest.Engine.Strategies
             var workArea = context.WorkArea;
             var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
             var preferred = context.Policy?.PreferredDirection;
-            List<Part> best = null;
 
-            for (var ai = 0; ai < angles.Count; ai++)
-            {
-                context.Token.ThrowIfCancellationRequested();
-
-                var angle = angles[ai];
-                var engine = new FillLinear(workArea, context.Plate.PartSpacing);
-
-                var result = FillHelpers.FillWithDirectionPreference(
-                    dir => engine.Fill(context.Item.Drawing, angle, dir),
-                    preferred, comparer, workArea);
-
-                var angleDeg = Angle.ToDegrees(angle);
-
-                if (result != null && result.Count > 0)
+            return FillHelpers.BestOverAngles(context, angles,
+                angle =>
                 {
-                    context.AngleResults.Add(new AngleResult
+                    var engine = new FillLinear(workArea, context.Plate.PartSpacing) { Label = "Linear" };
+                    var result = FillHelpers.FillWithDirectionPreference(
+                        dir => engine.Fill(context.Item.Drawing, angle, dir),
+                        preferred, comparer, workArea);
+
+                    if (result != null && result.Count > 0)
                     {
-                        AngleDeg = angleDeg,
-                        Direction = preferred ?? NestDirection.Horizontal,
-                        PartCount = result.Count
-                    });
+                        context.AngleResults.Add(new AngleResult
+                        {
+                            AngleDeg = Angle.ToDegrees(angle),
+                            Direction = preferred ?? NestDirection.Horizontal,
+                            PartCount = result.Count
+                        });
+                    }
 
-                    if (best == null || comparer.IsBetter(result, best, workArea))
-                        best = result;
-                }
-
-                NestEngineBase.ReportProgress(context.Progress, new ProgressReport
-                {
-                    Phase = NestPhase.Linear,
-                    PlateNumber = context.PlateNumber,
-                    Parts = best,
-                    WorkArea = workArea,
-                    Description = $"Linear: {ai + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts",
-                });
-            }
-
-            return best ?? new List<Part>();
+                    return result;
+                },
+                NestPhase.Linear, "Linear");
         }
     }
 }
