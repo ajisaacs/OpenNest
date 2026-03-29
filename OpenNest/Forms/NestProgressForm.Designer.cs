@@ -41,6 +41,14 @@ namespace OpenNest.Forms
             buttonPanel = new System.Windows.Forms.FlowLayoutPanel();
             stopButton = new System.Windows.Forms.Button();
             acceptButton = new System.Windows.Forms.Button();
+            splitContainer = new System.Windows.Forms.SplitContainer();
+            statsPanel = new System.Windows.Forms.Panel();
+            previewPlateView = new OpenNest.Controls.PlateView();
+            ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
+            splitContainer.Panel1.SuspendLayout();
+            splitContainer.Panel2.SuspendLayout();
+            splitContainer.SuspendLayout();
+            statsPanel.SuspendLayout();
             resultsPanel.SuspendLayout();
             resultsTable.SuspendLayout();
             densityPanel.SuspendLayout();
@@ -48,19 +56,53 @@ namespace OpenNest.Forms
             statusTable.SuspendLayout();
             buttonPanel.SuspendLayout();
             SuspendLayout();
-            // 
+            //
+            // splitContainer
+            //
+            splitContainer.Dock = System.Windows.Forms.DockStyle.Fill;
+            splitContainer.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
+            splitContainer.Location = new System.Drawing.Point(0, 0);
+            splitContainer.Name = "splitContainer";
+            splitContainer.Panel1.Controls.Add(previewPlateView);
+            splitContainer.Panel2.Controls.Add(statsPanel);
+            splitContainer.Size = new System.Drawing.Size(750, 420);
+            splitContainer.SplitterDistance = 480;
+            splitContainer.TabIndex = 0;
+            //
+            // previewPlateView
+            //
+            previewPlateView.AllowDrop = false;
+            previewPlateView.Dock = System.Windows.Forms.DockStyle.Fill;
+            previewPlateView.Location = new System.Drawing.Point(0, 0);
+            previewPlateView.Name = "previewPlateView";
+            previewPlateView.Size = new System.Drawing.Size(480, 420);
+            previewPlateView.TabIndex = 0;
+            //
+            // statsPanel
+            //
+            statsPanel.AutoScroll = true;
+            statsPanel.Controls.Add(buttonPanel);
+            statsPanel.Controls.Add(statusPanel);
+            statsPanel.Controls.Add(resultsPanel);
+            statsPanel.Controls.Add(phaseStepper);
+            statsPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            statsPanel.Location = new System.Drawing.Point(0, 0);
+            statsPanel.Name = "statsPanel";
+            statsPanel.Size = new System.Drawing.Size(266, 420);
+            statsPanel.TabIndex = 0;
+            //
             // phaseStepper
-            // 
+            //
             phaseStepper.ActivePhase = null;
             phaseStepper.Dock = System.Windows.Forms.DockStyle.Top;
             phaseStepper.IsComplete = false;
             phaseStepper.Location = new System.Drawing.Point(0, 0);
             phaseStepper.Name = "phaseStepper";
-            phaseStepper.Size = new System.Drawing.Size(450, 60);
+            phaseStepper.Size = new System.Drawing.Size(266, 60);
             phaseStepper.TabIndex = 0;
-            // 
+            //
             // resultsPanel
-            // 
+            //
             resultsPanel.BackColor = System.Drawing.Color.White;
             resultsPanel.Controls.Add(resultsTable);
             resultsPanel.Controls.Add(resultsHeader);
@@ -69,11 +111,11 @@ namespace OpenNest.Forms
             resultsPanel.Margin = new System.Windows.Forms.Padding(10, 4, 10, 4);
             resultsPanel.Name = "resultsPanel";
             resultsPanel.Padding = new System.Windows.Forms.Padding(14, 10, 14, 10);
-            resultsPanel.Size = new System.Drawing.Size(450, 120);
+            resultsPanel.Size = new System.Drawing.Size(266, 120);
             resultsPanel.TabIndex = 1;
-            // 
+            //
             // resultsTable
-            // 
+            //
             resultsTable.AutoSize = true;
             resultsTable.ColumnCount = 2;
             resultsTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 90F));
@@ -91,11 +133,11 @@ namespace OpenNest.Forms
             resultsTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             resultsTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             resultsTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            resultsTable.Size = new System.Drawing.Size(422, 69);
+            resultsTable.Size = new System.Drawing.Size(238, 69);
             resultsTable.TabIndex = 1;
-            // 
+            //
             // partsLabel
-            // 
+            //
             partsLabel.AutoSize = true;
             partsLabel.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             partsLabel.ForeColor = System.Drawing.Color.FromArgb(51, 51, 51);
@@ -105,9 +147,9 @@ namespace OpenNest.Forms
             partsLabel.Size = new System.Drawing.Size(43, 17);
             partsLabel.TabIndex = 0;
             partsLabel.Text = "Parts:";
-            // 
+            //
             // partsValue
-            // 
+            //
             partsValue.AutoSize = true;
             partsValue.Font = new System.Drawing.Font("Consolas", 9.75F);
             partsValue.Location = new System.Drawing.Point(90, 3);
@@ -115,10 +157,10 @@ namespace OpenNest.Forms
             partsValue.Name = "partsValue";
             partsValue.Size = new System.Drawing.Size(13, 15);
             partsValue.TabIndex = 1;
-            partsValue.Text = "�";
-            // 
+            partsValue.Text = "\u2014";
+            //
             // densityLabel
-            // 
+            //
             densityLabel.AutoSize = true;
             densityLabel.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             densityLabel.ForeColor = System.Drawing.Color.FromArgb(51, 51, 51);
@@ -128,21 +170,21 @@ namespace OpenNest.Forms
             densityLabel.Size = new System.Drawing.Size(59, 17);
             densityLabel.TabIndex = 2;
             densityLabel.Text = "Density:";
-            // 
+            //
             // densityPanel
-            // 
+            //
             densityPanel.AutoSize = true;
             densityPanel.Controls.Add(densityValue);
             densityPanel.Controls.Add(densityBar);
             densityPanel.Location = new System.Drawing.Point(90, 23);
             densityPanel.Margin = new System.Windows.Forms.Padding(0);
             densityPanel.Name = "densityPanel";
-            densityPanel.Size = new System.Drawing.Size(262, 21);
+            densityPanel.Size = new System.Drawing.Size(148, 21);
             densityPanel.TabIndex = 3;
             densityPanel.WrapContents = false;
-            // 
+            //
             // densityValue
-            // 
+            //
             densityValue.AutoSize = true;
             densityValue.Font = new System.Drawing.Font("Consolas", 9.75F);
             densityValue.Location = new System.Drawing.Point(0, 3);
@@ -150,19 +192,19 @@ namespace OpenNest.Forms
             densityValue.Name = "densityValue";
             densityValue.Size = new System.Drawing.Size(13, 15);
             densityValue.TabIndex = 0;
-            densityValue.Text = "�";
-            // 
+            densityValue.Text = "\u2014";
+            //
             // densityBar
-            // 
+            //
             densityBar.Location = new System.Drawing.Point(21, 5);
             densityBar.Margin = new System.Windows.Forms.Padding(0, 5, 0, 0);
             densityBar.Name = "densityBar";
-            densityBar.Size = new System.Drawing.Size(241, 8);
+            densityBar.Size = new System.Drawing.Size(127, 8);
             densityBar.TabIndex = 1;
             densityBar.Value = 0D;
-            // 
+            //
             // nestedAreaLabel
-            // 
+            //
             nestedAreaLabel.AutoSize = true;
             nestedAreaLabel.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             nestedAreaLabel.ForeColor = System.Drawing.Color.FromArgb(51, 51, 51);
@@ -172,9 +214,9 @@ namespace OpenNest.Forms
             nestedAreaLabel.Size = new System.Drawing.Size(55, 17);
             nestedAreaLabel.TabIndex = 4;
             nestedAreaLabel.Text = "Nested:";
-            // 
+            //
             // nestedAreaValue
-            // 
+            //
             nestedAreaValue.AutoSize = true;
             nestedAreaValue.Font = new System.Drawing.Font("Consolas", 9.75F);
             nestedAreaValue.Location = new System.Drawing.Point(90, 49);
@@ -182,10 +224,10 @@ namespace OpenNest.Forms
             nestedAreaValue.Name = "nestedAreaValue";
             nestedAreaValue.Size = new System.Drawing.Size(13, 15);
             nestedAreaValue.TabIndex = 5;
-            nestedAreaValue.Text = "�";
-            // 
+            nestedAreaValue.Text = "\u2014";
+            //
             // resultsHeader
-            // 
+            //
             resultsHeader.AutoSize = true;
             resultsHeader.Dock = System.Windows.Forms.DockStyle.Top;
             resultsHeader.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold);
@@ -196,9 +238,9 @@ namespace OpenNest.Forms
             resultsHeader.Size = new System.Drawing.Size(65, 23);
             resultsHeader.TabIndex = 0;
             resultsHeader.Text = "RESULTS";
-            // 
+            //
             // statusPanel
-            // 
+            //
             statusPanel.BackColor = System.Drawing.Color.White;
             statusPanel.Controls.Add(statusTable);
             statusPanel.Controls.Add(statusHeader);
@@ -206,11 +248,11 @@ namespace OpenNest.Forms
             statusPanel.Location = new System.Drawing.Point(0, 180);
             statusPanel.Name = "statusPanel";
             statusPanel.Padding = new System.Windows.Forms.Padding(14, 10, 14, 10);
-            statusPanel.Size = new System.Drawing.Size(450, 115);
+            statusPanel.Size = new System.Drawing.Size(266, 115);
             statusPanel.TabIndex = 2;
-            // 
+            //
             // statusTable
-            // 
+            //
             statusTable.AutoSize = true;
             statusTable.ColumnCount = 2;
             statusTable.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 90F));
@@ -228,11 +270,11 @@ namespace OpenNest.Forms
             statusTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             statusTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             statusTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            statusTable.Size = new System.Drawing.Size(422, 69);
+            statusTable.Size = new System.Drawing.Size(238, 69);
             statusTable.TabIndex = 1;
-            // 
+            //
             // plateLabel
-            // 
+            //
             plateLabel.AutoSize = true;
             plateLabel.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             plateLabel.ForeColor = System.Drawing.Color.FromArgb(51, 51, 51);
@@ -242,9 +284,9 @@ namespace OpenNest.Forms
             plateLabel.Size = new System.Drawing.Size(43, 17);
             plateLabel.TabIndex = 0;
             plateLabel.Text = "Plate:";
-            // 
+            //
             // plateValue
-            // 
+            //
             plateValue.AutoSize = true;
             plateValue.Font = new System.Drawing.Font("Consolas", 9.75F);
             plateValue.Location = new System.Drawing.Point(90, 3);
@@ -252,10 +294,10 @@ namespace OpenNest.Forms
             plateValue.Name = "plateValue";
             plateValue.Size = new System.Drawing.Size(13, 15);
             plateValue.TabIndex = 1;
-            plateValue.Text = "�";
-            // 
+            plateValue.Text = "\u2014";
+            //
             // elapsedLabel
-            // 
+            //
             elapsedLabel.AutoSize = true;
             elapsedLabel.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             elapsedLabel.ForeColor = System.Drawing.Color.FromArgb(51, 51, 51);
@@ -265,9 +307,9 @@ namespace OpenNest.Forms
             elapsedLabel.Size = new System.Drawing.Size(59, 17);
             elapsedLabel.TabIndex = 2;
             elapsedLabel.Text = "Elapsed:";
-            // 
+            //
             // elapsedValue
-            // 
+            //
             elapsedValue.AutoSize = true;
             elapsedValue.Font = new System.Drawing.Font("Consolas", 9.75F);
             elapsedValue.Location = new System.Drawing.Point(90, 26);
@@ -276,9 +318,9 @@ namespace OpenNest.Forms
             elapsedValue.Size = new System.Drawing.Size(35, 15);
             elapsedValue.TabIndex = 3;
             elapsedValue.Text = "0:00";
-            // 
+            //
             // descriptionLabel
-            // 
+            //
             descriptionLabel.AutoSize = true;
             descriptionLabel.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold);
             descriptionLabel.ForeColor = System.Drawing.Color.FromArgb(51, 51, 51);
@@ -288,9 +330,9 @@ namespace OpenNest.Forms
             descriptionLabel.Size = new System.Drawing.Size(49, 17);
             descriptionLabel.TabIndex = 4;
             descriptionLabel.Text = "Detail:";
-            // 
+            //
             // descriptionValue
-            // 
+            //
             descriptionValue.AutoSize = true;
             descriptionValue.Font = new System.Drawing.Font("Segoe UI", 9.75F);
             descriptionValue.Location = new System.Drawing.Point(90, 49);
@@ -298,10 +340,10 @@ namespace OpenNest.Forms
             descriptionValue.Name = "descriptionValue";
             descriptionValue.Size = new System.Drawing.Size(20, 17);
             descriptionValue.TabIndex = 5;
-            descriptionValue.Text = "�";
-            // 
+            descriptionValue.Text = "\u2014";
+            //
             // statusHeader
-            // 
+            //
             statusHeader.AutoSize = true;
             statusHeader.Dock = System.Windows.Forms.DockStyle.Top;
             statusHeader.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold);
@@ -312,9 +354,9 @@ namespace OpenNest.Forms
             statusHeader.Size = new System.Drawing.Size(59, 23);
             statusHeader.TabIndex = 0;
             statusHeader.Text = "STATUS";
-            // 
+            //
             // buttonPanel
-            // 
+            //
             buttonPanel.AutoSize = true;
             buttonPanel.Controls.Add(stopButton);
             buttonPanel.Controls.Add(acceptButton);
@@ -323,14 +365,14 @@ namespace OpenNest.Forms
             buttonPanel.Location = new System.Drawing.Point(0, 295);
             buttonPanel.Name = "buttonPanel";
             buttonPanel.Padding = new System.Windows.Forms.Padding(9, 6, 9, 6);
-            buttonPanel.Size = new System.Drawing.Size(450, 45);
+            buttonPanel.Size = new System.Drawing.Size(266, 45);
             buttonPanel.TabIndex = 3;
-            // 
+            //
             // stopButton
-            // 
+            //
             stopButton.Enabled = false;
             stopButton.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            stopButton.Location = new System.Drawing.Point(339, 9);
+            stopButton.Location = new System.Drawing.Point(155, 9);
             stopButton.Margin = new System.Windows.Forms.Padding(0, 3, 0, 3);
             stopButton.Name = "stopButton";
             stopButton.Size = new System.Drawing.Size(93, 27);
@@ -338,12 +380,12 @@ namespace OpenNest.Forms
             stopButton.Text = "Stop";
             stopButton.UseVisualStyleBackColor = true;
             stopButton.Click += StopButton_Click;
-            // 
+            //
             // acceptButton
-            // 
+            //
             acceptButton.Enabled = false;
             acceptButton.Font = new System.Drawing.Font("Segoe UI", 9.75F);
-            acceptButton.Location = new System.Drawing.Point(246, 9);
+            acceptButton.Location = new System.Drawing.Point(56, 9);
             acceptButton.Margin = new System.Windows.Forms.Padding(6, 3, 0, 3);
             acceptButton.Name = "acceptButton";
             acceptButton.Size = new System.Drawing.Size(93, 27);
@@ -351,23 +393,27 @@ namespace OpenNest.Forms
             acceptButton.Text = "Accept";
             acceptButton.UseVisualStyleBackColor = true;
             acceptButton.Click += AcceptButton_Click;
-            // 
+            //
             // NestProgressForm
-            // 
+            //
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            ClientSize = new System.Drawing.Size(450, 345);
-            Controls.Add(buttonPanel);
-            Controls.Add(statusPanel);
-            Controls.Add(resultsPanel);
-            Controls.Add(phaseStepper);
-            FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
+            ClientSize = new System.Drawing.Size(750, 420);
+            Controls.Add(splitContainer);
+            FormBorderStyle = System.Windows.Forms.FormBorderStyle.SizableToolWindow;
             MaximizeBox = false;
             MinimizeBox = false;
+            MinimumSize = new System.Drawing.Size(550, 380);
             Name = "NestProgressForm";
             ShowInTaskbar = false;
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             Text = "Nesting Progress";
+            splitContainer.Panel1.ResumeLayout(false);
+            splitContainer.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
+            splitContainer.ResumeLayout(false);
+            statsPanel.ResumeLayout(false);
+            statsPanel.PerformLayout();
             resultsPanel.ResumeLayout(false);
             resultsPanel.PerformLayout();
             resultsTable.ResumeLayout(false);
@@ -380,7 +426,6 @@ namespace OpenNest.Forms
             statusTable.PerformLayout();
             buttonPanel.ResumeLayout(false);
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
@@ -409,5 +454,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.FlowLayoutPanel buttonPanel;
         private System.Windows.Forms.Button acceptButton;
         private System.Windows.Forms.Button stopButton;
+        private System.Windows.Forms.SplitContainer splitContainer;
+        private System.Windows.Forms.Panel statsPanel;
+        private Controls.PlateView previewPlateView;
     }
 }
