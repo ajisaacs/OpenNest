@@ -94,7 +94,7 @@ namespace OpenNest
         /// </summary>
         public double Rotation
         {
-            get { return Program.Rotation; }
+            get { return HasManualLeadIns ? preLeadInRotation : Program.Rotation; }
         }
 
         /// <summary>

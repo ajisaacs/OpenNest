@@ -135,6 +135,8 @@ namespace OpenNest
                         break;
 
                     case CodeType.RapidMove:
+                        cutPath.StartFigure();
+                        leadPath.StartFigure();
                         AddLine(cutPath, (RapidMove)code, mode, ref curpos);
                         break;
 
@@ -203,12 +205,6 @@ namespace OpenNest
                     size, size,
                     (float)startAngle,
                     (float)sweepAngle);
-
-                if (arc.Layer == LayerType.Leadin || arc.Layer == LayerType.Leadout)
-                {
-                    path.AddArc(pt.X, pt.Y, size, size, (float)(-startAngle + sweepAngle), (float)-sweepAngle);
-                    path.CloseFigure();
-                }
             }
 
             curpos = endpt;
@@ -226,9 +222,6 @@ namespace OpenNest
 
             path.AddLine(pt1, pt2);
 
-            if (line.Layer == LayerType.Leadin || line.Layer == LayerType.Leadout)
-                path.CloseFigure();
-
             curpos = pt;
         }
 
@@ -239,14 +232,23 @@ namespace OpenNest
             if (mode == Mode.Incremental)
                 pt += curpos;
 
-            path.CloseFigure();
-
             curpos = pt;
         }
 
         private static void AddProgram(GraphicsPath path, Program pgm, Mode mode, ref Vector curpos)
         {
             mode = pgm.Mode;
+            GraphicsPath currentFigure = null;
+
+            void Flush()
+            {
+                if (currentFigure != null)
+                {
+                    path.AddPath(currentFigure, false);
+                    currentFigure.Dispose();
+                    currentFigure = null;
+                }
+            }
 
             for (int i = 0; i < pgm.Length; ++i)
             {
@@ -255,25 +257,54 @@ namespace OpenNest
                 switch (code.Type)
                 {
                     case CodeType.ArcMove:
-                        AddArc(path, (ArcMove)code, mode, ref curpos);
+                        {
+                            var arc = (ArcMove)code;
+                            if (arc.Layer != LayerType.Leadin && arc.Layer != LayerType.Leadout)
+                            {
+                                if (currentFigure == null) currentFigure = new GraphicsPath();
+                                AddArc(currentFigure, arc, mode, ref curpos);
+                            }
+                            else
+                            {
+                                Flush();
+                                var endpt = arc.EndPoint;
+                                if (mode == Mode.Incremental) endpt += curpos;
+                                curpos = endpt;
+                            }
+                        }
                         break;
 
                     case CodeType.LinearMove:
-                        AddLine(path, (LinearMove)code, mode, ref curpos);
+                        {
+                            var line = (LinearMove)code;
+                            if (line.Layer != LayerType.Leadin && line.Layer != LayerType.Leadout)
+                            {
+                                if (currentFigure == null) currentFigure = new GraphicsPath();
+                                AddLine(currentFigure, line, mode, ref curpos);
+                            }
+                            else
+                            {
+                                Flush();
+                                var endpt = line.EndPoint;
+                                if (mode == Mode.Incremental) endpt += curpos;
+                                curpos = endpt;
+                            }
+                        }
                         break;
 
                     case CodeType.RapidMove:
+                        Flush();
                         AddLine(path, (RapidMove)code, mode, ref curpos);
                         break;
 
                     case CodeType.SubProgramCall:
                         {
+                            Flush();
                             var tmpmode = mode;
                             var subpgm = (SubProgramCall)code;
 
                             if (subpgm.Program != null)
                             {
-                                path.StartFigure();
                                 AddProgram(path, subpgm.Program, mode, ref curpos);
                             }
 
@@ -282,6 +313,8 @@ namespace OpenNest
                         }
                 }
             }
+
+            Flush();
         }
 
         private static void AddArc(GraphicsPath path, Arc arc)
@@ -331,6 +364,15 @@ namespace OpenNest
         {
             foreach (var entity in shape.Entities)
             {
+                if (entity.Layer != null)
+                {
+                    if (string.Equals(entity.Layer.Name, SpecialLayers.Leadin.Name, System.StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(entity.Layer.Name, SpecialLayers.Leadout.Name, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                }
+
                 switch (entity.Type)
                 {
                     case EntityType.Arc:

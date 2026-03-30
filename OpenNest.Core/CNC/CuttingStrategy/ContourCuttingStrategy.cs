@@ -11,6 +11,7 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             var exitPoint = approachPoint;
             var entities = partProgram.ToGeometry();
+            entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
             var profile = new ShapeProfile(entities);
 
             // Find closest point on perimeter from exit point
@@ -22,7 +23,7 @@ namespace OpenNest.CNC.CuttingStrategy
             orderedCutouts.Reverse();
 
             // Build output program: cutouts first (farthest to nearest), perimeter last
-            var result = new Program();
+            var result = new Program(Mode.Absolute);
             var currentPoint = exitPoint;
 
             foreach (var cutout in orderedCutouts)
