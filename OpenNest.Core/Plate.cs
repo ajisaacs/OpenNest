@@ -88,6 +88,8 @@ namespace OpenNest
         /// </summary>
         public Material Material { get; set; }
 
+        public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
+
         /// <summary>
         /// Material grain direction in radians. 0 = horizontal.
         /// </summary>
