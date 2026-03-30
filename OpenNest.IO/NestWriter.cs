@@ -173,7 +173,9 @@ namespace OpenNest.IO
                         DrawingId = match.Key,
                         X = part.Location.X,
                         Y = part.Location.Y,
-                        Rotation = part.Rotation
+                        Rotation = part.Rotation,
+                        HasManualLeadIns = part.HasManualLeadIns,
+                        LeadInsLocked = part.LeadInsLocked
                     });
                 }
 
@@ -336,6 +338,9 @@ namespace OpenNest.IO
                         if (arcMove.Layer != LayerType.Cut)
                             sb.Append(GetLayerString(arcMove.Layer));
 
+                        if (arcMove.Suppressed)
+                            sb.Append(":SUPPRESSED");
+
                         return sb.ToString();
                     }
 
@@ -356,6 +361,9 @@ namespace OpenNest.IO
 
                         if (linearMove.Layer != LayerType.Cut)
                             sb.Append(GetLayerString(linearMove.Layer));
+
+                        if (linearMove.Suppressed)
+                            sb.Append(":SUPPRESSED");
 
                         return sb.ToString();
                     }

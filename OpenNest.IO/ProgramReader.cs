@@ -142,6 +142,7 @@ namespace OpenNest.IO
             double x = 0;
             double y = 0;
             var layer = LayerType.Cut;
+            var suppressed = false;
 
             while (section == CodeSection.Line)
             {
@@ -164,25 +165,32 @@ namespace OpenNest.IO
 
                     case ':':
                         {
-                            var value = code.Value.Trim().ToUpper();
+                            var tags = code.Value.Trim().ToUpper().Split(':');
 
-                            switch (value)
+                            foreach (var tag in tags)
                             {
-                                case "DISPLAY":
-                                    layer = LayerType.Display;
-                                    break;
+                                switch (tag)
+                                {
+                                    case "DISPLAY":
+                                        layer = LayerType.Display;
+                                        break;
 
-                                case "LEADIN":
-                                    layer = LayerType.Leadin;
-                                    break;
+                                    case "LEADIN":
+                                        layer = LayerType.Leadin;
+                                        break;
 
-                                case "LEADOUT":
-                                    layer = LayerType.Leadout;
-                                    break;
+                                    case "LEADOUT":
+                                        layer = LayerType.Leadout;
+                                        break;
 
-                                case "SCRIBE":
-                                    layer = LayerType.Scribe;
-                                    break;
+                                    case "SCRIBE":
+                                        layer = LayerType.Scribe;
+                                        break;
+
+                                    case "SUPPRESSED":
+                                        suppressed = true;
+                                        break;
+                                }
                             }
                             break;
                         }
@@ -195,7 +203,7 @@ namespace OpenNest.IO
             if (isRapid)
                 program.Codes.Add(new RapidMove(x, y));
             else
-                program.Codes.Add(new LinearMove(x, y) { Layer = layer });
+                program.Codes.Add(new LinearMove(x, y) { Layer = layer, Suppressed = suppressed });
         }
 
         private void ReadArc(RotationType rotation)
@@ -205,6 +213,7 @@ namespace OpenNest.IO
             double i = 0;
             double j = 0;
             var layer = LayerType.Cut;
+            var suppressed = false;
 
             while (section == CodeSection.Arc)
             {
@@ -236,25 +245,32 @@ namespace OpenNest.IO
 
                     case ':':
                         {
-                            var value = code.Value.Trim().ToUpper();
+                            var tags = code.Value.Trim().ToUpper().Split(':');
 
-                            switch (value)
+                            foreach (var tag in tags)
                             {
-                                case "DISPLAY":
-                                    layer = LayerType.Display;
-                                    break;
+                                switch (tag)
+                                {
+                                    case "DISPLAY":
+                                        layer = LayerType.Display;
+                                        break;
 
-                                case "LEADIN":
-                                    layer = LayerType.Leadin;
-                                    break;
+                                    case "LEADIN":
+                                        layer = LayerType.Leadin;
+                                        break;
 
-                                case "LEADOUT":
-                                    layer = LayerType.Leadout;
-                                    break;
+                                    case "LEADOUT":
+                                        layer = LayerType.Leadout;
+                                        break;
 
-                                case "SCRIBE":
-                                    layer = LayerType.Scribe;
-                                    break;
+                                    case "SCRIBE":
+                                        layer = LayerType.Scribe;
+                                        break;
+
+                                    case "SUPPRESSED":
+                                        suppressed = true;
+                                        break;
+                                }
                             }
                             break;
                         }
@@ -269,7 +285,8 @@ namespace OpenNest.IO
                 EndPoint = new Vector(x, y),
                 CenterPoint = new Vector(i, j),
                 Rotation = rotation,
-                Layer = layer
+                Layer = layer,
+                Suppressed = suppressed
             });
         }
 

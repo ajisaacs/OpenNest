@@ -214,6 +214,8 @@ namespace OpenNest.IO
                     var part = new Part(dwg);
                     part.Rotate(partDto.Rotation);
                     part.Offset(new Vector(partDto.X, partDto.Y));
+                    part.HasManualLeadIns = partDto.HasManualLeadIns;
+                    part.LeadInsLocked = partDto.LeadInsLocked;
                     plate.Parts.Add(part);
                 }
 

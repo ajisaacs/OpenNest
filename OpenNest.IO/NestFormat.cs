@@ -74,6 +74,8 @@ namespace OpenNest.IO
             public double X { get; init; }
             public double Y { get; init; }
             public double Rotation { get; init; }
+            public bool HasManualLeadIns { get; init; }
+            public bool LeadInsLocked { get; init; }
         }
 
         public record CutOffDto
