@@ -1,6 +1,7 @@
 using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Tests;
 
@@ -109,5 +110,46 @@ public class AngleCandidateBuilderTests
 
         Assert.Single(angles);
         Assert.Equal(0, angles[0]);
+    }
+
+    [Fact]
+    public void Build_UserConstraints_OverrideRectangleClassification()
+    {
+        var builder = new AngleCandidateBuilder();
+        var item = new NestItem
+        {
+            Drawing = MakeRectDrawing(100, 50),
+            RotationStart = Angle.ToRadians(10),
+            RotationEnd = Angle.ToRadians(90),
+            StepAngle = Angle.ToRadians(10),
+        };
+        var classification = MakeClassification(0, PartType.Rectangle);
+        var workArea = new Box(0, 0, 1000, 500);
+
+        var angles = builder.Build(item, classification, workArea);
+
+        Assert.True(angles.Count > 2,
+            $"User constraints should override rect classification, got {angles.Count} angles");
+    }
+
+    [Fact]
+    public void Build_UserConstraints_StartingAtZero_AreRespected()
+    {
+        var builder = new AngleCandidateBuilder();
+        var item = new NestItem
+        {
+            Drawing = MakeRectDrawing(100, 50),
+            RotationStart = 0,
+            RotationEnd = System.Math.PI,
+            StepAngle = Angle.ToRadians(45),
+        };
+        var classification = MakeClassification(0, PartType.Rectangle);
+        var workArea = new Box(0, 0, 1000, 500);
+
+        var angles = builder.Build(item, classification, workArea);
+
+        // Start=0, End=PI is NOT "no constraints" — it's a real 0-180 range
+        Assert.True(angles.Count > 2,
+            $"0-to-PI constraint should produce multiple angles, got {angles.Count}");
     }
 }

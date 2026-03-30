@@ -1,4 +1,4 @@
-﻿using OpenNest.Geometry;
+using OpenNest.Geometry;
 using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,33 +7,50 @@ namespace OpenNest.RectanglePacking
 {
     internal class PackBottomLeft : PackEngine
     {
-        private List<Vector> points;
-
         public PackBottomLeft(Bin bin)
             : base(bin)
         {
-            points = new List<Vector>();
         }
 
         public override void Pack(List<Item> items)
         {
-            items = items.OrderBy(i => -i.Area()).ToList();
+            var byArea = items.Select(i => i.Clone() as Item).OrderByDescending(i => i.Area()).ToList();
+            var byLength = items.Select(i => i.Clone() as Item).OrderByDescending(i => System.Math.Max(i.Width, i.Length)).ToList();
 
-            points.Add(Bin.Location);
+            var resultA = PackWithOrder(byArea);
+            var resultB = PackWithOrder(byLength);
 
+            var winner = PickWinner(resultA, resultB);
+
+            Bin.Items.AddRange(winner);
+        }
+
+        private List<Item> PackWithOrder(List<Item> items)
+        {
+            var points = new List<Vector> { Bin.Location };
+            var placed = new List<Item>();
             var skip = new List<int>();
 
-            for (int i = 0; i < items.Count; i++)
+            for (var i = 0; i < items.Count; i++)
             {
                 var item = items[i];
 
                 if (skip.Contains(item.Id))
                     continue;
 
-                var pt = FindPointVertical(item);
+                var pt = FindPointVertical(item, points, placed);
+
+                // If it doesn't fit, try rotated.
+                if (pt == null)
+                {
+                    item.Rotate();
+                    pt = FindPointVertical(item, points, placed);
+                }
 
                 if (pt == null)
                 {
+                    if (item.IsRotated)
+                        item.Rotate();
                     skip.Add(item.Id);
                     continue;
                 }
@@ -44,23 +61,37 @@ namespace OpenNest.RectanglePacking
                 points.Add(new Vector(item.Left, item.Top));
                 points.Add(new Vector(item.Right, item.Bottom));
 
-                Bin.Items.Add(item);
+                placed.Add(item);
             }
 
-            points.Clear();
+            return placed;
         }
 
-        private Vector? FindPointVertical(Item item)
+        private static List<Item> PickWinner(List<Item> a, List<Item> b)
+        {
+            if (a.Count != b.Count)
+                return a.Count > b.Count ? a : b;
+
+            if (a.Count == 0)
+                return a;
+
+            var areaA = a.GetBoundingBox().Area();
+            var areaB = b.GetBoundingBox().Area();
+
+            return areaB < areaA ? b : a;
+        }
+
+        private Vector? FindPointVertical(Item item, List<Vector> points, List<Item> placed)
         {
             var pt = new Vector(double.MaxValue, double.MaxValue);
 
-            for (int i = 0; i < points.Count; i++)
+            for (var i = 0; i < points.Count; i++)
             {
                 var point = points[i];
 
                 item.Location = point;
 
-                if (!IsValid(item))
+                if (!IsValid(item, placed))
                     continue;
 
                 if (point.X < pt.X)
@@ -75,12 +106,12 @@ namespace OpenNest.RectanglePacking
             return null;
         }
 
-        private bool IsValid(Item item)
+        private bool IsValid(Item item, List<Item> placed)
         {
             if (!Bin.Contains(item))
                 return false;
 
-            foreach (var it in Bin.Items)
+            foreach (var it in placed)
             {
                 if (item.Intersects(it))
                     return false;

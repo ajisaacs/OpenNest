@@ -12,6 +12,8 @@ namespace OpenNest.Engine.Strategies
 
         public List<Part> Fill(FillContext context)
         {
+            if (context.PartType == PartType.Rectangle || context.PartType == PartType.Circle)
+                return null;
             var filler = new FillExtents(context.WorkArea, context.Plate.PartSpacing);
 
             var bestRotation = context.SharedState.TryGetValue("BestRotation", out var rot)

@@ -20,6 +20,9 @@ namespace OpenNest.Engine.Strategies
             if (active.Value)
                 return null;
 
+            if (context.PartType == PartType.Circle)
+                return null;
+
             active.Value = true;
             try
             {
