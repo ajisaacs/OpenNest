@@ -114,7 +114,7 @@ namespace OpenNest.Forms
             this.bottomPanel.Controls.Add(this.acceptButton);
             this.bottomPanel.Controls.Add(this.cancelButton);
             this.bottomPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.bottomPanel.Location = new System.Drawing.Point(0, 406);
+            this.bottomPanel.Location = new System.Drawing.Point(0, 466);
             this.bottomPanel.Name = "bottomPanel";
             this.bottomPanel.Size = new System.Drawing.Size(380, 50);
             this.bottomPanel.TabIndex = 1;
@@ -125,7 +125,7 @@ namespace OpenNest.Forms
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(380, 456);
+            this.ClientSize = new System.Drawing.Size(380, 516);
             this.Controls.Add(this.tabControl);
             this.Controls.Add(this.bottomPanel);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));

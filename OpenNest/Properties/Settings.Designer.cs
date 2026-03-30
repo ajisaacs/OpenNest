@@ -226,5 +226,17 @@ namespace OpenNest.Properties {
                 this["DisabledStrategies"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CuttingParametersJson {
+            get {
+                return ((string)(this["CuttingParametersJson"]));
+            }
+            set {
+                this["CuttingParametersJson"] = value;
+            }
+        }
     }
 }

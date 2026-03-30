@@ -22,8 +22,20 @@ namespace OpenNest.Forms
 
         private CheckBox chkTabsEnabled;
         private NumericUpDown nudTabWidth;
+        private NumericUpDown nudPierceClearance;
 
-        public CuttingParameters Parameters { get; set; } = new CuttingParameters();
+        private bool hasCustomParameters;
+        private CuttingParameters parameters = new CuttingParameters();
+
+        public CuttingParameters Parameters
+        {
+            get => parameters;
+            set
+            {
+                parameters = value;
+                hasCustomParameters = true;
+            }
+        }
 
         public CuttingParametersForm()
         {
@@ -54,7 +66,31 @@ namespace OpenNest.Forms
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
+
+            // If caller didn't provide custom parameters, try loading saved ones
+            if (!hasCustomParameters)
+            {
+                var json = Properties.Settings.Default.CuttingParametersJson;
+                if (!string.IsNullOrEmpty(json))
+                {
+                    try { Parameters = CuttingParametersSerializer.Deserialize(json); }
+                    catch { /* use defaults on corrupt data */ }
+                }
+            }
+
             LoadFromParameters(Parameters);
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+
+            if (DialogResult == System.Windows.Forms.DialogResult.OK)
+            {
+                var json = CuttingParametersSerializer.Serialize(BuildParameters());
+                Properties.Settings.Default.CuttingParametersJson = json;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private static void SetupTab(TabPage tab,
@@ -164,6 +200,35 @@ namespace OpenNest.Forms
             grpTabs.Controls.Add(nudTabWidth);
 
             Controls.Add(grpTabs);
+
+            var grpPierce = new GroupBox
+            {
+                Text = "Pierce",
+                Location = new System.Drawing.Point(4, 410),
+                Size = new System.Drawing.Size(372, 55),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            grpPierce.Controls.Add(new Label
+            {
+                Text = "Pierce Clearance:",
+                Location = new System.Drawing.Point(12, 23),
+                AutoSize = true
+            });
+
+            nudPierceClearance = new NumericUpDown
+            {
+                Location = new System.Drawing.Point(130, 20),
+                Size = new System.Drawing.Size(100, 22),
+                DecimalPlaces = 4,
+                Increment = 0.0625m,
+                Minimum = 0,
+                Maximum = 9999,
+                Value = 0.0625m
+            };
+            grpPierce.Controls.Add(nudPierceClearance);
+
+            Controls.Add(grpPierce);
         }
 
         private void PopulateDropdowns()
@@ -305,6 +370,8 @@ namespace OpenNest.Forms
             chkTabsEnabled.Checked = p.TabsEnabled;
             if (p.TabConfig != null)
                 nudTabWidth.Value = (decimal)p.TabConfig.Size;
+
+            nudPierceClearance.Value = (decimal)p.PierceClearance;
         }
 
         private static void LoadLeadIn(ComboBox combo, Panel panel, LeadIn leadIn)
@@ -379,7 +446,8 @@ namespace OpenNest.Forms
                 ArcCircleLeadIn = BuildLeadIn(cboArcCircleLeadIn, pnlArcCircleLeadIn),
                 ArcCircleLeadOut = BuildLeadOut(cboArcCircleLeadOut, pnlArcCircleLeadOut),
                 TabsEnabled = chkTabsEnabled.Checked,
-                TabConfig = new NormalTab { Size = (double)nudTabWidth.Value }
+                TabConfig = new NormalTab { Size = (double)nudTabWidth.Value },
+                PierceClearance = (double)nudPierceClearance.Value
             };
             return p;
         }
