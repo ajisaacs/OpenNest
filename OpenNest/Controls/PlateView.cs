@@ -1243,15 +1243,24 @@ namespace OpenNest.Controls
             var cts = new CancellationTokenSource();
             var progressForm = new NestProgressForm(cts, showPlateRow: false);
 
+            var previewPlate = new Plate(Plate.Size)
+            {
+                Quadrant = Plate.Quadrant,
+                PartSpacing = Plate.PartSpacing,
+                Thickness = Plate.Thickness,
+                Material = Plate.Material,
+            };
+            previewPlate.EdgeSpacing = Plate.EdgeSpacing;
+            progressForm.PreviewPlate = previewPlate;
+
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
 
                 if (p.IsOverallBest)
-                    SetStationaryParts(p.BestParts);
-                else
-                    SetActiveParts(p.BestParts);
+                    progressForm.UpdatePreview(p.BestParts);
 
+                SetActiveParts(p.BestParts);
                 ActiveWorkArea = p.ActiveWorkArea;
             });
 

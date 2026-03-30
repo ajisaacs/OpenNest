@@ -71,17 +71,20 @@ namespace OpenNest.Forms
             }
 
             phaseStepper.ActivePhase = progress.Phase;
-
             SetValueWithFlash(plateValue, progress.PlateNumber.ToString());
-            SetValueWithFlash(partsValue, progress.BestPartCount.ToString());
 
-            var densityText = progress.BestDensity.ToString("P1");
-            var densityFlashColor = GetDensityColor(progress.BestDensity);
-            SetValueWithFlash(densityValue, densityText, densityFlashColor);
-            densityBar.Value = progress.BestDensity;
+            if (progress.IsOverallBest)
+            {
+                SetValueWithFlash(partsValue, progress.BestPartCount.ToString());
 
-            SetValueWithFlash(nestedAreaValue,
-                $"{progress.NestedWidth:F1} x {progress.NestedLength:F1} ({progress.NestedArea:F1} sq in)");
+                var densityText = progress.BestDensity.ToString("P1");
+                var densityFlashColor = GetDensityColor(progress.BestDensity);
+                SetValueWithFlash(densityValue, densityText, densityFlashColor);
+                densityBar.Value = progress.BestDensity;
+
+                SetValueWithFlash(nestedAreaValue,
+                    $"{progress.NestedWidth:F1} x {progress.NestedLength:F1} ({progress.NestedArea:F1} sq in)");
+            }
 
             descriptionValue.Text = !string.IsNullOrEmpty(progress.Description)
                 ? progress.Description
