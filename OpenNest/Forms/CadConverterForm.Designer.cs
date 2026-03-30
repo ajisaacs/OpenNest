@@ -49,41 +49,41 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)numQuantity).BeginInit();
             bottomPanel1.SuspendLayout();
             SuspendLayout();
-            //
+            // 
             // mainSplit
-            //
+            // 
             mainSplit.Dock = System.Windows.Forms.DockStyle.Fill;
             mainSplit.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
             mainSplit.Location = new System.Drawing.Point(0, 0);
             mainSplit.Name = "mainSplit";
-            //
+            // 
             // mainSplit.Panel1
-            //
+            // 
             mainSplit.Panel1.Controls.Add(sidebarSplit);
             mainSplit.Panel1MinSize = 200;
-            //
+            // 
             // mainSplit.Panel2
-            //
+            // 
             mainSplit.Panel2.Controls.Add(entityView1);
             mainSplit.Panel2.Controls.Add(detailBar);
             mainSplit.Size = new System.Drawing.Size(1024, 670);
             mainSplit.SplitterDistance = 260;
             mainSplit.SplitterWidth = 5;
             mainSplit.TabIndex = 2;
-            //
+            // 
             // sidebarSplit
-            //
+            // 
             sidebarSplit.Dock = System.Windows.Forms.DockStyle.Fill;
             sidebarSplit.Location = new System.Drawing.Point(0, 0);
             sidebarSplit.Name = "sidebarSplit";
             sidebarSplit.Orientation = System.Windows.Forms.Orientation.Horizontal;
-            //
+            // 
             // sidebarSplit.Panel1
-            //
+            // 
             sidebarSplit.Panel1.Controls.Add(fileList);
-            //
+            // 
             // sidebarSplit.Panel2
-            //
+            // 
             sidebarSplit.Panel2.Controls.Add(filterPanel);
             sidebarSplit.Size = new System.Drawing.Size(260, 670);
             sidebarSplit.SplitterDistance = 300;
@@ -116,8 +116,15 @@ namespace OpenNest.Forms
             entityView1.BackColor = System.Drawing.Color.FromArgb(33, 40, 48);
             entityView1.Cursor = System.Windows.Forms.Cursors.Cross;
             entityView1.Dock = System.Windows.Forms.DockStyle.Fill;
+            entityView1.IsPickingBendLine = false;
             entityView1.Location = new System.Drawing.Point(0, 0);
             entityView1.Name = "entityView1";
+            entityView1.OriginalEntities = null;
+            entityView1.ShowEntityLabels = false;
+            entityView1.SimplifierHighlight = null;
+            entityView1.SimplifierPreview = null;
+            entityView1.SimplifierToleranceLeft = null;
+            entityView1.SimplifierToleranceRight = null;
             entityView1.Size = new System.Drawing.Size(759, 634);
             entityView1.TabIndex = 0;
             // 
@@ -215,52 +222,68 @@ namespace OpenNest.Forms
             // 
             btnSplit.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnSplit.Font = new System.Drawing.Font("Segoe UI", 9F);
-            btnSplit.Location = new System.Drawing.Point(291, 6);
-            btnSplit.Margin = new System.Windows.Forms.Padding(2, 0, 8, 0);
+            btnSplit.Location = new System.Drawing.Point(289, 6);
+            btnSplit.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
             btnSplit.Name = "btnSplit";
-            btnSplit.Size = new System.Drawing.Size(60, 24);
+            btnSplit.Size = new System.Drawing.Size(60, 27);
             btnSplit.TabIndex = 6;
             btnSplit.Text = "Split...";
-            //
+            // 
             // btnSimplify
-            //
+            // 
+            btnSimplify.AutoSize = true;
             btnSimplify.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnSimplify.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnSimplify.Location = new System.Drawing.Point(359, 6);
+            btnSimplify.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
+            btnSimplify.Name = "btnSimplify";
+            btnSimplify.Size = new System.Drawing.Size(75, 27);
+            btnSimplify.TabIndex = 7;
             btnSimplify.Text = "Simplify...";
-            btnSimplify.AutoSize = true;
-            btnSimplify.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
-            btnSimplify.Click += new System.EventHandler(this.OnSimplifyClick);
-            //
+            btnSimplify.Click += OnSimplifyClick;
+            // 
             // btnExportDxf
-            //
+            // 
+            btnExportDxf.AutoSize = true;
             btnExportDxf.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             btnExportDxf.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnExportDxf.Location = new System.Drawing.Point(444, 6);
+            btnExportDxf.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
+            btnExportDxf.Name = "btnExportDxf";
+            btnExportDxf.Size = new System.Drawing.Size(76, 27);
+            btnExportDxf.TabIndex = 8;
             btnExportDxf.Text = "Export DXF";
-            btnExportDxf.AutoSize = true;
-            btnExportDxf.Margin = new System.Windows.Forms.Padding(4, 0, 0, 0);
-            btnExportDxf.Click += new System.EventHandler(this.OnExportDxfClick);
-            //
+            btnExportDxf.Click += OnExportDxfClick;
+            // 
             // chkShowOriginal
-            //
+            // 
             chkShowOriginal.AutoSize = true;
             chkShowOriginal.Font = new System.Drawing.Font("Segoe UI", 9F);
-            chkShowOriginal.Text = "Original";
+            chkShowOriginal.Location = new System.Drawing.Point(536, 9);
             chkShowOriginal.Margin = new System.Windows.Forms.Padding(6, 3, 0, 0);
-            chkShowOriginal.CheckedChanged += new System.EventHandler(this.OnShowOriginalChanged);
-            //
+            chkShowOriginal.Name = "chkShowOriginal";
+            chkShowOriginal.Size = new System.Drawing.Size(68, 19);
+            chkShowOriginal.TabIndex = 9;
+            chkShowOriginal.Text = "Original";
+            chkShowOriginal.CheckedChanged += OnShowOriginalChanged;
+            // 
             // chkLabels
-            //
+            // 
             chkLabels.AutoSize = true;
             chkLabels.Font = new System.Drawing.Font("Segoe UI", 9F);
-            chkLabels.Text = "Labels";
+            chkLabels.Location = new System.Drawing.Point(610, 9);
             chkLabels.Margin = new System.Windows.Forms.Padding(6, 3, 0, 0);
-            chkLabels.CheckedChanged += new System.EventHandler(this.OnLabelsChanged);
-            //
+            chkLabels.Name = "chkLabels";
+            chkLabels.Size = new System.Drawing.Size(59, 19);
+            chkLabels.TabIndex = 10;
+            chkLabels.Text = "Labels";
+            chkLabels.CheckedChanged += OnLabelsChanged;
+            // 
             // lblDetect
-            //
+            // 
             lblDetect.AutoSize = true;
             lblDetect.Font = new System.Drawing.Font("Segoe UI", 9F);
-            lblDetect.Location = new System.Drawing.Point(361, 9);
+            lblDetect.Location = new System.Drawing.Point(671, 9);
             lblDetect.Margin = new System.Windows.Forms.Padding(2, 3, 0, 0);
             lblDetect.Name = "lblDetect";
             lblDetect.Size = new System.Drawing.Size(42, 15);
@@ -271,7 +294,7 @@ namespace OpenNest.Forms
             // 
             cboBendDetector.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             cboBendDetector.Font = new System.Drawing.Font("Segoe UI", 9F);
-            cboBendDetector.Location = new System.Drawing.Point(405, 6);
+            cboBendDetector.Location = new System.Drawing.Point(715, 6);
             cboBendDetector.Margin = new System.Windows.Forms.Padding(2, 0, 0, 0);
             cboBendDetector.Name = "cboBendDetector";
             cboBendDetector.Size = new System.Drawing.Size(90, 23);

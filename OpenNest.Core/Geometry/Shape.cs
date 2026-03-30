@@ -579,43 +579,38 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Offsets the shape outward by the given distance, detecting winding direction
-        /// to choose the correct offset side. Falls back to the opposite side if the
-        /// bounding box shrinks (indicating the offset went inward).
+        /// Offsets the shape outward by the given distance.
+        /// Normalizes to CW winding before offsetting Left (which is outward for CW),
+        /// making the method independent of the original contour winding direction.
         /// </summary>
         public Shape OffsetOutward(double distance)
         {
             var poly = ToPolygon();
-            var side = poly.Vertices.Count >= 3 && poly.RotationDirection() == RotationType.CW
-                ? OffsetSide.Left
-                : OffsetSide.Right;
 
-            var result = OffsetEntity(distance, side) as Shape;
+            if (poly == null || poly.Vertices.Count < 3
+                || poly.RotationDirection() == RotationType.CW)
+                return OffsetEntity(distance, OffsetSide.Left) as Shape;
 
-            if (result == null)
-                return null;
+            // Shape is CCW — reverse to CW so Left offset goes outward.
+            var copy = new Shape();
 
-            UpdateBounds();
-            var originalBB = BoundingBox;
-            result.UpdateBounds();
-            var offsetBB = result.BoundingBox;
-
-            if (offsetBB.Width < originalBB.Width || offsetBB.Length < originalBB.Length)
+            for (var i = Entities.Count - 1; i >= 0; i--)
             {
-                Trace.TraceWarning(
-                    "Shape.OffsetOutward: offset shrank bounding box " +
-                    $"(original={originalBB.Width:F3}x{originalBB.Length:F3}, " +
-                    $"offset={offsetBB.Width:F3}x{offsetBB.Length:F3}). " +
-                    "Retrying with opposite side.");
-
-                var opposite = side == OffsetSide.Left ? OffsetSide.Right : OffsetSide.Left;
-                var retry = OffsetEntity(distance, opposite) as Shape;
-
-                if (retry != null)
-                    result = retry;
+                switch (Entities[i])
+                {
+                    case Line l:
+                        copy.Entities.Add(new Line(l.EndPoint, l.StartPoint) { Layer = l.Layer });
+                        break;
+                    case Arc a:
+                        copy.Entities.Add(new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed) { Layer = a.Layer });
+                        break;
+                    case Circle c:
+                        copy.Entities.Add(new Circle(c.Center, c.Radius) { Layer = c.Layer });
+                        break;
+                }
             }
 
-            return result;
+            return copy.OffsetEntity(distance, OffsetSide.Left) as Shape;
         }
 
         /// <summary>
