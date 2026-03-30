@@ -9,5 +9,7 @@ namespace OpenNest.CNC.CuttingStrategy
             RotationType winding = RotationType.CW);
 
         public abstract Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle);
+
+        public virtual LeadIn Scale(double factor) => this;
     }
 }

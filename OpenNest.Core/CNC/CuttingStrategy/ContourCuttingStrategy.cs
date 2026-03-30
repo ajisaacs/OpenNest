@@ -36,6 +36,9 @@ namespace OpenNest.CNC.CuttingStrategy
                 var leadIn = SelectLeadIn(contourType);
                 var leadOut = SelectLeadOut(contourType);
 
+                if (contourType == ContourType.ArcCircle && entity is Circle circle)
+                    leadIn = ClampLeadInForCircle(leadIn, circle, closestPt, normal);
+
                 result.Codes.AddRange(leadIn.Generate(closestPt, normal, winding));
                 var reindexed = cutout.ReindexAt(closestPt, entity);
                 result.Codes.AddRange(ConvertShapeToMoves(reindexed, closestPt));
@@ -151,6 +154,50 @@ namespace OpenNest.CNC.CuttingStrategy
             // Use signed area: positive = CCW, negative = CW
             var area = shape.Area();
             return area >= 0 ? RotationType.CCW : RotationType.CW;
+        }
+
+        private LeadIn ClampLeadInForCircle(LeadIn leadIn, Circle circle, Vector contourPoint, double normalAngle)
+        {
+            if (leadIn is NoLeadIn || Parameters.PierceClearance <= 0)
+                return leadIn;
+
+            var piercePoint = leadIn.GetPiercePoint(contourPoint, normalAngle);
+            var maxRadius = circle.Radius - Parameters.PierceClearance;
+            if (maxRadius <= 0)
+                return leadIn;
+
+            var distFromCenter = piercePoint.DistanceTo(circle.Center);
+            if (distFromCenter <= maxRadius)
+                return leadIn;
+
+            // Compute max distance from contourPoint toward piercePoint that stays
+            // inside a circle of radius maxRadius centered at circle.Center.
+            // Solve: |contourPoint + t*d - center|^2 = maxRadius^2
+            var currentDist = contourPoint.DistanceTo(piercePoint);
+            if (currentDist < Math.Tolerance.Epsilon)
+                return leadIn;
+
+            var dx = (piercePoint.X - contourPoint.X) / currentDist;
+            var dy = (piercePoint.Y - contourPoint.Y) / currentDist;
+            var vx = contourPoint.X - circle.Center.X;
+            var vy = contourPoint.Y - circle.Center.Y;
+
+            var b = 2.0 * (vx * dx + vy * dy);
+            var c = vx * vx + vy * vy - maxRadius * maxRadius;
+            var discriminant = b * b - 4.0 * c;
+
+            if (discriminant < 0)
+                return leadIn;
+
+            var t = (-b + System.Math.Sqrt(discriminant)) / 2.0;
+            if (t <= 0)
+                return leadIn;
+
+            var scale = t / currentDist;
+            if (scale >= 1.0)
+                return leadIn;
+
+            return leadIn.Scale(scale);
         }
 
         private LeadIn SelectLeadIn(ContourType contourType)

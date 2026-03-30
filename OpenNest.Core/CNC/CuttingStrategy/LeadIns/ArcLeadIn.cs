@@ -32,5 +32,8 @@ namespace OpenNest.CNC.CuttingStrategy
                 arcCenterX + Radius * System.Math.Cos(contourNormalAngle),
                 arcCenterY + Radius * System.Math.Sin(contourNormalAngle));
         }
+
+        public override LeadIn Scale(double factor) =>
+            new ArcLeadIn { Radius = Radius * factor };
     }
 }

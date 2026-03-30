@@ -40,5 +40,8 @@ namespace OpenNest.CNC.CuttingStrategy
                 midX + Length1 * System.Math.Cos(firstAngle),
                 midY + Length1 * System.Math.Sin(firstAngle));
         }
+
+        public override LeadIn Scale(double factor) =>
+            new LineLineLeadIn { Length1 = Length1 * factor, ApproachAngle1 = ApproachAngle1, Length2 = Length2 * factor, ApproachAngle2 = ApproachAngle2 };
     }
 }

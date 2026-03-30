@@ -45,5 +45,8 @@ namespace OpenNest.CNC.CuttingStrategy
                 arcStartX + LineLength * System.Math.Cos(lineAngle),
                 arcStartY + LineLength * System.Math.Sin(lineAngle));
         }
+
+        public override LeadIn Scale(double factor) =>
+            new CleanHoleLeadIn { LineLength = LineLength * factor, ArcRadius = ArcRadius * factor, Kerf = Kerf };
     }
 }

@@ -21,6 +21,8 @@ namespace OpenNest.CNC.CuttingStrategy
         public LeadIn ArcCircleLeadIn { get; set; } = new NoLeadIn();
         public LeadOut ArcCircleLeadOut { get; set; } = new NoLeadOut();
 
+        public double PierceClearance { get; set; } = 0.0625;
+
         public Tab TabConfig { get; set; }
         public bool TabsEnabled { get; set; }
 

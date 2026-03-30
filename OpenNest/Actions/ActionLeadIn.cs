@@ -2,6 +2,7 @@ using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Controls;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -147,6 +148,35 @@ namespace OpenNest.Actions
             var leadIn = SelectLeadIn(parameters, snapContourType);
             if (leadIn == null)
                 return;
+
+            // Clamp lead-in for circle contours so it stays inside the hole
+            if (snapContourType == ContourType.ArcCircle && snapEntity is Circle snapCircle
+                && parameters.PierceClearance > 0)
+            {
+                var pierceCheck = leadIn.GetPiercePoint(snapPoint, snapNormal);
+                var distFromCenter = pierceCheck.DistanceTo(snapCircle.Center);
+                var maxRadius = snapCircle.Radius - parameters.PierceClearance;
+                if (maxRadius > 0 && distFromCenter > maxRadius)
+                {
+                    var currentDist = snapPoint.DistanceTo(pierceCheck);
+                    if (currentDist > Tolerance.Epsilon)
+                    {
+                        var dx = (pierceCheck.X - snapPoint.X) / currentDist;
+                        var dy = (pierceCheck.Y - snapPoint.Y) / currentDist;
+                        var vx = snapPoint.X - snapCircle.Center.X;
+                        var vy = snapPoint.Y - snapCircle.Center.Y;
+                        var b = 2.0 * (vx * dx + vy * dy);
+                        var c = vx * vx + vy * vy - maxRadius * maxRadius;
+                        var disc = b * b - 4.0 * c;
+                        if (disc >= 0)
+                        {
+                            var t = (-b + System.Math.Sqrt(disc)) / 2.0;
+                            if (t > 0 && t < currentDist)
+                                leadIn = leadIn.Scale(t / currentDist);
+                        }
+                    }
+                }
+            }
 
             // Get the pierce point (in local space)
             var piercePoint = leadIn.GetPiercePoint(snapPoint, snapNormal);
