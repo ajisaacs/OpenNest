@@ -134,13 +134,11 @@ public class GeometrySimplifier
 
         if (midpoints.Count < 4) return MirrorAxisResult.None;
 
-        // Centroid
-        var cx = 0.0;
-        var cy = 0.0;
-        foreach (var p in midpoints) { cx += p.X; cy += p.Y; }
-        cx /= midpoints.Count;
-        cy /= midpoints.Count;
-        var centroid = new Vector(cx, cy);
+        var centroid = new Vector(
+            midpoints.Average(p => p.X),
+            midpoints.Average(p => p.Y));
+        var cx = centroid.X;
+        var cy = centroid.Y;
 
         // Covariance matrix for PCA
         var cxx = 0.0;
@@ -192,10 +190,23 @@ public class GeometrySimplifier
         return bestResult.Score >= 0.8 ? bestResult : MirrorAxisResult.None;
     }
 
+    private static double NormalizeAngle(double angle) =>
+        angle < 0 ? angle + Angle.TwoPI : angle;
+
     private static Vector Normalize(Vector v)
     {
         var len = System.Math.Sqrt(v.X * v.X + v.Y * v.Y);
         return len < 1e-10 ? new Vector(1, 0) : new Vector(v.X / len, v.Y / len);
+    }
+
+    private static double PerpendicularDistance(Vector point, Vector axisPoint, Vector axisDir)
+    {
+        var dx = point.X - axisPoint.X;
+        var dy = point.Y - axisPoint.Y;
+        var dot = dx * axisDir.X + dy * axisDir.Y;
+        var px = dx - dot * axisDir.X;
+        var py = dy - dot * axisDir.Y;
+        return System.Math.Sqrt(px * px + py * py);
     }
 
     private static double MirrorMatchScore(List<Vector> points, Vector axisPoint, Vector axisDir)
@@ -206,14 +217,7 @@ public class GeometrySimplifier
         for (var i = 0; i < points.Count; i++)
         {
             var p = points[i];
-
-            // Distance from point to axis
-            var dx = p.X - axisPoint.X;
-            var dy = p.Y - axisPoint.Y;
-            var dot = dx * axisDir.X + dy * axisDir.Y;
-            var perpX = dx - dot * axisDir.X;
-            var perpY = dy - dot * axisDir.Y;
-            var dist = System.Math.Sqrt(perpX * perpX + perpY * perpY);
+            var dist = PerpendicularDistance(p, axisPoint, axisDir);
 
             // Points on the axis count as matched
             if (dist < matchTol)
@@ -223,14 +227,12 @@ public class GeometrySimplifier
             }
 
             // Reflect across axis and look for partner
-            var mx = p.X - 2 * perpX;
-            var my = p.Y - 2 * perpY;
+            var reflected = new MirrorAxisResult(axisPoint, axisDir, 0).Reflect(p);
 
             for (var j = 0; j < points.Count; j++)
             {
                 if (i == j) continue;
-                var d = System.Math.Sqrt((points[j].X - mx) * (points[j].X - mx) +
-                                         (points[j].Y - my) * (points[j].Y - my));
+                var d = reflected.DistanceTo(points[j]);
                 if (d < matchTol)
                 {
                     matched++;
@@ -259,14 +261,7 @@ public class GeometrySimplifier
 
             var ci = candidates[i];
             var ciCenter = ci.BoundingBox.Center;
-
-            // Distance from candidate center to axis
-            var dx = ciCenter.X - axis.Point.X;
-            var dy = ciCenter.Y - axis.Point.Y;
-            var dot = dx * axis.Direction.X + dy * axis.Direction.Y;
-            var perpDist = System.Math.Sqrt((dx - dot * axis.Direction.X) * (dx - dot * axis.Direction.X) +
-                                            (dy - dot * axis.Direction.Y) * (dy - dot * axis.Direction.Y));
-            if (perpDist < 0.1) continue; // on the axis
+            if (PerpendicularDistance(ciCenter, axis.Point, axis.Direction) < 0.1) continue; // on the axis
 
             var mirrorCenter = axis.Reflect(ciCenter);
 
@@ -328,12 +323,8 @@ public class GeometrySimplifier
         var mirrorEp = axis.Reflect(ep);
 
         // Mirroring reverses winding — swap start/end to preserve arc direction
-        var mirrorStart = System.Math.Atan2(mirrorEp.Y - mirrorCenter.Y, mirrorEp.X - mirrorCenter.X);
-        var mirrorEnd = System.Math.Atan2(mirrorSp.Y - mirrorCenter.Y, mirrorSp.X - mirrorCenter.X);
-
-        // Normalize to [0, 2pi)
-        if (mirrorStart < 0) mirrorStart += Angle.TwoPI;
-        if (mirrorEnd < 0) mirrorEnd += Angle.TwoPI;
+        var mirrorStart = NormalizeAngle(System.Math.Atan2(mirrorEp.Y - mirrorCenter.Y, mirrorEp.X - mirrorCenter.X));
+        var mirrorEnd = NormalizeAngle(System.Math.Atan2(mirrorSp.Y - mirrorCenter.Y, mirrorSp.X - mirrorCenter.X));
 
         var result = new Arc(mirrorCenter, arc.Radius, mirrorStart, mirrorEnd, arc.IsReversed);
         result.Layer = arc.Layer;
@@ -357,15 +348,16 @@ public class GeometrySimplifier
             }
 
             chainedTangent = ComputeEndTangent(result.Center, result.Points);
+            var arc = CreateArc(result.Center, result.Radius, result.Points, entities[j]);
             candidates.Add(new ArcCandidate
             {
                 StartIndex = j,
                 EndIndex = result.EndIndex,
-                FittedArc = CreateArc(result.Center, result.Radius, result.Points, entities[j]),
+                FittedArc = arc,
                 MaxDeviation = result.Deviation,
                 BoundingBox = result.Points.GetBoundingBox(),
-                FirstPoint = result.Points[0],
-                LastPoint = result.Points[^1],
+                FirstPoint = arc.StartPoint(),
+                LastPoint = arc.EndPoint(),
             });
 
             j = result.EndIndex + 1;
@@ -386,14 +378,16 @@ public class GeometrySimplifier
             ? chainedTangent
             : new Vector(points[1].X - points[0].X, points[1].Y - points[0].Y);
 
-        var (center, radius, dev) = TryFit(points, startTangent);
+        var endTangent = GetExitDirection(entities[k]);
+        var (center, radius, dev) = TryFit(points, startTangent, endTangent);
         if (!center.IsValid()) return null;
 
         // Extend the arc as far as possible
         while (k + 1 <= runEnd)
         {
             var extPoints = CollectPoints(entities, start, k + 1);
-            var (nc, nr, nd) = extPoints.Count >= 3 ? TryFit(extPoints, startTangent) : (Vector.Invalid, 0, 0d);
+            var extEndTangent = GetExitDirection(entities[k + 1]);
+            var (nc, nr, nd) = extPoints.Count >= 3 ? TryFit(extPoints, startTangent, extEndTangent) : (Vector.Invalid, 0, 0d);
             if (!nc.IsValid()) break;
 
             k++;
@@ -413,9 +407,23 @@ public class GeometrySimplifier
         return new ArcFitResult(center, radius, dev, points, k);
     }
 
-    private (Vector center, double radius, double deviation) TryFit(List<Vector> points, Vector startTangent)
+    private (Vector center, double radius, double deviation) TryFit(List<Vector> points, Vector startTangent, Vector endTangent)
     {
-        var (center, radius, dev) = FitWithStartTangent(points, startTangent);
+        // Try dual-tangent fit first (matches direction at both endpoints)
+        if (endTangent.IsValid())
+        {
+            var (dc, dr, dd) = ArcFit.FitWithDualTangent(points, startTangent, endTangent);
+            if (dc.IsValid() && dd <= Tolerance)
+            {
+                var isRev = SumSignedAngles(dc, points) < 0;
+                var aDev = MaxArcToSegmentDeviation(points, dc, dr, isRev);
+                if (aDev <= Tolerance)
+                    return (dc, dr, System.Math.Max(dd, aDev));
+            }
+        }
+
+        // Fall back to start-tangent-only, then mirror axis
+        var (center, radius, dev) = ArcFit.FitWithStartTangent(points, startTangent);
         if (!center.IsValid() || dev > Tolerance)
             (center, radius, dev) = FitMirrorAxis(points);
         if (!center.IsValid() || dev > Tolerance)
@@ -431,31 +439,16 @@ public class GeometrySimplifier
     }
 
     /// <summary>
-    /// Fits a circular arc constrained to be tangent to the given direction at the
-    /// first point. The center lies at the intersection of the normal at P1 (perpendicular
-    /// to the tangent) and the perpendicular bisector of the chord P1->Pn, guaranteeing
-    /// the arc passes through both endpoints and departs P1 in the given direction.
-    /// </summary>
-    private static (Vector center, double radius, double deviation) FitWithStartTangent(
-        List<Vector> points, Vector tangent) =>
-        ArcFit.FitWithStartTangent(points, tangent);
-
-    /// <summary>
     /// Computes the tangent direction at the last point of a fitted arc,
     /// used to chain tangent continuity to the next arc.
     /// </summary>
     private static Vector ComputeEndTangent(Vector center, List<Vector> points)
     {
         var lastPt = points[^1];
-        var totalAngle = SumSignedAngles(center, points);
-
         var rx = lastPt.X - center.X;
         var ry = lastPt.Y - center.Y;
-
-        if (totalAngle >= 0)
-            return new Vector(-ry, rx);
-        else
-            return new Vector(ry, -rx);
+        var sign = SumSignedAngles(center, points) >= 0 ? 1 : -1;
+        return new Vector(-sign * ry, sign * rx);
     }
 
     /// <summary>
@@ -496,12 +489,12 @@ public class GeometrySimplifier
         var range = System.Math.Max(System.Math.Abs(dInit) * 2, halfChord);
 
         var dOpt = GoldenSectionMin(dInit - range, dInit + range,
-            d => MaxRadialDeviation(points, mx + d * nx, my + d * ny,
+            d => ArcFit.MaxRadialDeviation(points, mx + d * nx, my + d * ny,
                 System.Math.Sqrt(halfChord * halfChord + d * d)));
 
         var center = new Vector(mx + dOpt * nx, my + dOpt * ny);
         var radius = System.Math.Sqrt(halfChord * halfChord + dOpt * dOpt);
-        return (center, radius, MaxRadialDeviation(points, center.X, center.Y, radius));
+        return (center, radius, ArcFit.MaxRadialDeviation(points, center.X, center.Y, radius));
     }
 
     private static double GoldenSectionMin(double low, double high, Func<double, double> eval)
@@ -554,19 +547,27 @@ public class GeometrySimplifier
         var firstPoint = points[0];
         var lastPoint = points[^1];
 
-        var startAngle = System.Math.Atan2(firstPoint.Y - center.Y, firstPoint.X - center.X);
-        var endAngle = System.Math.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X);
+        var startAngle = NormalizeAngle(System.Math.Atan2(firstPoint.Y - center.Y, firstPoint.X - center.X));
+        var endAngle = NormalizeAngle(System.Math.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X));
         var isReversed = SumSignedAngles(center, points) < 0;
-
-        // Normalize to [0, 2pi)
-        if (startAngle < 0) startAngle += Angle.TwoPI;
-        if (endAngle < 0) endAngle += Angle.TwoPI;
 
         var arc = new Arc(center, radius, startAngle, endAngle, isReversed);
         arc.Layer = sourceEntity.Layer;
         arc.Color = sourceEntity.Color;
         return arc;
     }
+
+    /// <summary>
+    /// Returns the exit direction (tangent at endpoint) of an entity.
+    /// </summary>
+    private static Vector GetExitDirection(Entity entity) => entity switch
+    {
+        Line line => new Vector(line.EndPoint.X - line.StartPoint.X, line.EndPoint.Y - line.StartPoint.Y),
+        Arc arc => arc.IsReversed
+            ? new Vector(System.Math.Sin(arc.EndAngle), -System.Math.Cos(arc.EndAngle))
+            : new Vector(-System.Math.Sin(arc.EndAngle), System.Math.Cos(arc.EndAngle)),
+        _ => Vector.Invalid,
+    };
 
     /// <summary>
     /// Sums signed angular change traversing consecutive points around a center.
@@ -586,12 +587,6 @@ public class GeometrySimplifier
         }
         return total;
     }
-
-    /// <summary>
-    /// Max deviation of intermediate points (excluding endpoints) from a circle.
-    /// </summary>
-    private static double MaxRadialDeviation(List<Vector> points, double cx, double cy, double radius) =>
-        ArcFit.MaxRadialDeviation(points, cx, cy, radius);
 
     /// <summary>
     /// Measures the maximum distance from sampled points along the fitted arc
