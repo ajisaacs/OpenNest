@@ -20,7 +20,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
             return new List<ICode>
             {
-                new ArcMove(endPoint, arcCenter, winding)
+                new ArcMove(endPoint, arcCenter, winding) { Layer = LayerType.Leadout }
             };
         }
     }

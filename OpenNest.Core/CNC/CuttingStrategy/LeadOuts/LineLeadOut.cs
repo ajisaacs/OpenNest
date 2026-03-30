@@ -19,7 +19,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
             return new List<ICode>
             {
-                new LinearMove(endPoint)
+                new LinearMove(endPoint) { Layer = LayerType.Leadout }
             };
         }
     }
