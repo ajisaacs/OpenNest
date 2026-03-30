@@ -1,4 +1,5 @@
 using OpenNest.Engine;
+using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
@@ -86,14 +87,16 @@ namespace OpenNest
             var workArea = Plate.WorkArea();
             var allParts = new List<Part>();
 
+            var plateArea = workArea.Width * workArea.Length;
+
             var fillItems = items
-                .Where(i => i.Quantity != 1)
+                .Where(i => ShouldFill(i, plateArea))
                 .OrderBy(i => i.Priority)
                 .ThenByDescending(i => i.Drawing.Area)
                 .ToList();
 
             var packItems = items
-                .Where(i => i.Quantity == 1)
+                .Where(i => !ShouldFill(i, plateArea))
                 .ToList();
 
             // Phase 1: Fill multi-quantity drawings using RemnantFiller.
@@ -129,25 +132,35 @@ namespace OpenNest
                 }
             }
 
-            // Phase 2: Pack single-quantity items into remaining space.
+            // Phase 2: Pack low-quantity items into remaining space.
+            // Separate qty=2 items — they'll be placed as best-fit pairs after packing.
             packItems = packItems.Where(i => i.Quantity > 0).ToList();
+            var pairItems = packItems.Where(i => i.Quantity == 2).ToList();
+            var regularPackItems = packItems.Where(i => i.Quantity != 2).ToList();
 
-            if (packItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0
+            if (regularPackItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0
                 && !token.IsCancellationRequested)
             {
-                var packParts = PackArea(workArea, packItems, progress, token);
+                var packParts = PackArea(workArea, regularPackItems, progress, token);
 
                 if (packParts.Count > 0)
                 {
                     allParts.AddRange(packParts);
 
-                    foreach (var item in packItems)
+                    foreach (var item in regularPackItems)
                     {
                         var placed = packParts.Count(p =>
                             p.BaseDrawing.Name == item.Drawing.Name);
                         item.Quantity = System.Math.Max(0, item.Quantity - placed);
                     }
                 }
+            }
+
+            // Phase 3: Place best-fit pairs for qty=2 items in remaining space.
+            if (pairItems.Count > 0 && !token.IsCancellationRequested)
+            {
+                var placed = PlaceBestFitPairs(pairItems, allParts, Plate.WorkArea());
+                allParts.AddRange(placed);
             }
 
             // Compact placed parts toward the origin to close gaps.
@@ -299,6 +312,91 @@ namespace OpenNest
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Places best-fit pairs for qty=2 items into remnant spaces around
+        /// already-placed parts. Returns all placed pair parts.
+        /// </summary>
+        private List<Part> PlaceBestFitPairs(List<NestItem> pairItems,
+            List<Part> existingParts, Box fullWorkArea)
+        {
+            var result = new List<Part>();
+            var obstacles = existingParts
+                .Select(p => p.BoundingBox.Offset(Plate.PartSpacing))
+                .ToList();
+            var finder = new RemnantFinder(fullWorkArea, obstacles);
+
+            foreach (var item in pairItems)
+            {
+                if (item.Quantity < 2) continue;
+
+                var bestFits = BestFitCache.GetOrCompute(
+                    item.Drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
+                var bestFit = bestFits.FirstOrDefault(r => r.Keep);
+                if (bestFit == null) continue;
+
+                var parts = bestFit.BuildParts(item.Drawing);
+                var pairBbox = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
+                var pairW = pairBbox.Width;
+                var pairL = pairBbox.Length;
+                var minDim = System.Math.Min(pairW, pairL);
+
+                var remnants = finder.FindRemnants(minDim);
+                Box target = null;
+
+                foreach (var r in remnants)
+                {
+                    if (pairW <= r.Width + Tolerance.Epsilon &&
+                        pairL <= r.Length + Tolerance.Epsilon)
+                    {
+                        target = r;
+                        break;
+                    }
+                }
+
+                if (target == null) continue;
+
+                var offset = target.Location - pairBbox.Location;
+                foreach (var p in parts)
+                {
+                    p.Offset(offset);
+                    p.UpdateBounds();
+                }
+
+                result.AddRange(parts);
+                item.Quantity = 0;
+
+                var envelope = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
+                finder.AddObstacle(envelope.Offset(Plate.PartSpacing));
+
+                Debug.WriteLine($"[Nest] Placed best-fit pair for {item.Drawing.Name} " +
+                    $"at ({target.X:F1},{target.Y:F1}), size {pairW:F1}x{pairL:F1}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Determines whether a drawing should use grid-fill (true) or bin-pack (false).
+        /// Low-quantity items whose total area is a small fraction of the plate are
+        /// better off being packed alongside other parts rather than filling first.
+        /// </summary>
+        private bool ShouldFill(NestItem item, double plateArea)
+        {
+            if (item.Quantity <= 1)
+                return false;
+
+            var bbox = item.Drawing.Program.BoundingBox();
+            var partArea = (bbox.Width + Plate.PartSpacing) * (bbox.Length + Plate.PartSpacing);
+            if (partArea <= 0)
+                return false;
+
+            var totalArea = partArea * item.Quantity;
+
+            // If the total area of all copies is less than 10% of the plate,
+            // packing produces better results than grid-filling.
+            return totalArea >= plateArea * 0.1;
         }
 
     }
