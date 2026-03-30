@@ -738,6 +738,38 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
+        private void RemoveLeadIns_Click(object sender, EventArgs e)
+        {
+            if (PlateView?.Plate == null)
+                return;
+
+            var plate = PlateView.Plate;
+            var count = 0;
+
+            foreach (var part in plate.Parts)
+            {
+                if (part.HasManualLeadIns)
+                {
+                    part.RemoveLeadIns();
+                    count++;
+                }
+            }
+
+            if (count == 0)
+                return;
+
+            plate.CuttingParameters = null;
+
+            // Rebuild all layout part graphics
+            foreach (var lp in PlateView.Parts)
+            {
+                lp.IsDirty = true;
+                lp.Update();
+            }
+
+            PlateView.Invalidate();
+        }
+
         private void PlaceLeadIn_Click(object sender, EventArgs e)
         {
             if (PlateView?.Plate == null)
