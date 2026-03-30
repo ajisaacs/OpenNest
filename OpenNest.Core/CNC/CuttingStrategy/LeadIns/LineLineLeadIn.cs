@@ -24,8 +24,8 @@ namespace OpenNest.CNC.CuttingStrategy
             return new List<ICode>
             {
                 new RapidMove(piercePoint),
-                new LinearMove(midPoint),
-                new LinearMove(contourStartPoint)
+                new LinearMove(midPoint) { Layer = LayerType.Leadin },
+                new LinearMove(contourStartPoint) { Layer = LayerType.Leadin }
             };
         }
 
