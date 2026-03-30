@@ -65,7 +65,8 @@ namespace OpenNest.CNC
         {
             return new ArcMove(EndPoint, CenterPoint, Rotation)
             {
-                Layer = Layer
+                Layer = Layer,
+                Suppressed = Suppressed
             };
         }
 

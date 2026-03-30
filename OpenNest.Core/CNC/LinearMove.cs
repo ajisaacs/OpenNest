@@ -31,7 +31,8 @@ namespace OpenNest.CNC
         {
             return new LinearMove(EndPoint)
             {
-                Layer = Layer
+                Layer = Layer,
+                Suppressed = Suppressed
             };
         }
 

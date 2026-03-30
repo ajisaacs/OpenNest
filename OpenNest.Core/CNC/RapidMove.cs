@@ -26,7 +26,10 @@ namespace OpenNest.CNC
 
         public override ICode Clone()
         {
-            return new RapidMove(EndPoint);
+            return new RapidMove(EndPoint)
+            {
+                Suppressed = Suppressed
+            };
         }
 
         public override string ToString()

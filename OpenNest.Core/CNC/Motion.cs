@@ -12,6 +12,8 @@ namespace OpenNest.CNC
 
         public int Feedrate { get; set; }
 
+        public bool Suppressed { get; set; }
+
         protected Motion()
         {
             Feedrate = CNC.Feedrate.UseDefault;
