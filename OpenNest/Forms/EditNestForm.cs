@@ -2,6 +2,7 @@
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Controls;
+using OpenNest.Engine;
 using OpenNest.Engine.Sequencing;
 using OpenNest.IO;
 using OpenNest.Math;
@@ -709,6 +710,32 @@ namespace OpenNest.Forms
         private void CalculateSelectedPlateCutTime_Click(object sender, EventArgs e)
         {
             CalculateCurrentPlateCutTime();
+        }
+
+        private void AssignLeadIns_Click(object sender, EventArgs e)
+        {
+            if (PlateView?.Plate == null)
+                return;
+
+            var plate = PlateView.Plate;
+
+            using var form = new CuttingParametersForm();
+            if (plate.CuttingParameters != null)
+                form.Parameters = plate.CuttingParameters;
+
+            if (form.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            var parameters = form.BuildParameters();
+            plate.CuttingParameters = parameters;
+
+            var assigner = new LeadInAssigner
+            {
+                Sequencer = new LeftSideSequencer()
+            };
+            assigner.Assign(plate);
+
+            PlateView.Invalidate();
         }
 
         private void ImportDrawings_Click(object sender, EventArgs e)

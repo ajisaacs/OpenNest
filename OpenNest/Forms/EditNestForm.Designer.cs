@@ -38,6 +38,7 @@
             this.qtyColumn = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.toolStripButton1 = new System.Windows.Forms.ToolStripButton();
+            this.btnAssignLeadIns = new System.Windows.Forms.ToolStripButton();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.drawingListBox1 = new OpenNest.Controls.DrawingListBox();
             this.toolStrip2 = new System.Windows.Forms.ToolStrip();
@@ -133,7 +134,8 @@
             this.toolStrip1.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.toolStripButton1});
+            this.toolStripButton1,
+            this.btnAssignLeadIns});
             this.toolStrip1.Location = new System.Drawing.Point(3, 3);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(227, 31);
@@ -151,7 +153,16 @@
             this.toolStripButton1.Size = new System.Drawing.Size(38, 28);
             this.toolStripButton1.Text = "Calculate Cut Time";
             this.toolStripButton1.Click += new System.EventHandler(this.CalculateSelectedPlateCutTime_Click);
-            // 
+            //
+            // btnAssignLeadIns
+            //
+            this.btnAssignLeadIns.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.btnAssignLeadIns.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnAssignLeadIns.Name = "btnAssignLeadIns";
+            this.btnAssignLeadIns.Size = new System.Drawing.Size(96, 28);
+            this.btnAssignLeadIns.Text = "Assign Lead-ins";
+            this.btnAssignLeadIns.Click += new System.EventHandler(this.AssignLeadIns_Click);
+            //
             // tabPage2
             // 
             this.tabPage2.Controls.Add(this.drawingListBox1);
@@ -266,5 +277,6 @@
         private System.Windows.Forms.ToolStripButton toolStripButton2;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripButton toolStripButton3;
+        private System.Windows.Forms.ToolStripButton btnAssignLeadIns;
     }
 }
