@@ -1279,6 +1279,7 @@ namespace OpenNest.Controls
 
                 if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
                 {
+                    SetActiveParts(parts);
                     AcceptPreviewParts(parts);
 
                     if (Plate.CutOffs.Count > 0)
