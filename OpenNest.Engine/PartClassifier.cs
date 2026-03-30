@@ -25,7 +25,7 @@ namespace OpenNest.Engine
 
         public static ClassificationResult Classify(Drawing drawing)
         {
-            var result = new ClassificationResult();
+            var result = new ClassificationResult { Type = PartType.Irregular };
 
             var entities = ConvertProgram.ToGeometry(drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);

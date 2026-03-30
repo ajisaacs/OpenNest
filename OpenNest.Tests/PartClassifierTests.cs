@@ -198,11 +198,7 @@ public class PartClassifierTests
 
         var result = PartClassifier.Classify(drawing);
 
-        // No shapes → early return with default struct (Type = Rectangle = 0, but
-        // the implementation returns early before setting Type, so default is Rectangle (0).
-        // Verify that no exception is thrown and we get the zero-value struct back.
-        // Per implementation: returns default(ClassificationResult) which has Type=Rectangle.
-        Assert.Equal(default(PartType), result.Type);
+        Assert.Equal(PartType.Irregular, result.Type);
         Assert.Equal(0.0, result.Rectangularity);
         Assert.Equal(0.0, result.Circularity);
     }

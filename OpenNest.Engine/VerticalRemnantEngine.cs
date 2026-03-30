@@ -24,9 +24,9 @@ namespace OpenNest
 
         public override NestDirection? PreferredDirection => NestDirection.Horizontal;
 
-        public override List<double> BuildAngles(NestItem item, double bestRotation, Box workArea)
+        public override List<double> BuildAngles(NestItem item, ClassificationResult classification, Box workArea)
         {
-            var baseAngles = new List<double> { bestRotation, bestRotation + Angle.HalfPI };
+            var baseAngles = new List<double> { classification.PrimaryAngle, classification.PrimaryAngle + Angle.HalfPI };
             baseAngles.Sort((a, b) => RotatedWidth(item, a).CompareTo(RotatedWidth(item, b)));
             return baseAngles;
         }

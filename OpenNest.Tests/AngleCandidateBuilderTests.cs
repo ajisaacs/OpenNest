@@ -1,3 +1,4 @@
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 
@@ -16,6 +17,9 @@ public class AngleCandidateBuilderTests
         return new Drawing("rect", pgm);
     }
 
+    private static ClassificationResult MakeClassification(double primaryAngle = 0, PartType type = PartType.Irregular)
+        => new ClassificationResult { PrimaryAngle = primaryAngle, Type = type };
+
     [Fact]
     public void Build_ReturnsAtLeastTwoAngles()
     {
@@ -23,21 +27,21 @@ public class AngleCandidateBuilderTests
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var workArea = new Box(0, 0, 100, 100);
 
-        var angles = builder.Build(item, 0, workArea);
+        var angles = builder.Build(item, MakeClassification(), workArea);
 
         Assert.True(angles.Count >= 2);
     }
 
     [Fact]
-    public void Build_NarrowWorkArea_UsesBaseAnglesOnly()
+    public void Build_RectangleType_NarrowWorkArea_UsesBaseAnglesOnly()
     {
         var builder = new AngleCandidateBuilder();
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var narrowArea = new Box(0, 0, 100, 8); // narrower than part's longest side
 
-        var angles = builder.Build(item, 0, narrowArea);
+        var angles = builder.Build(item, MakeClassification(0, PartType.Rectangle), narrowArea);
 
-        // Without ForceFullSweep, narrow areas use only base angles (0° and 90°)
+        // Rectangle classification always returns exactly 2 angles regardless of work area
         Assert.Equal(2, angles.Count);
     }
 
@@ -48,7 +52,7 @@ public class AngleCandidateBuilderTests
         var item = new NestItem { Drawing = MakeRectDrawing(5, 5) };
         var workArea = new Box(0, 0, 100, 100);
 
-        var angles = builder.Build(item, 0, workArea);
+        var angles = builder.Build(item, MakeClassification(), workArea);
 
         // Full sweep at 5deg steps = ~36 angles (0 to 175), plus base angles
         Assert.True(angles.Count > 10);
@@ -62,7 +66,7 @@ public class AngleCandidateBuilderTests
         var workArea = new Box(0, 0, 100, 8);
 
         // First build — full sweep
-        var firstAngles = builder.Build(item, 0, workArea);
+        var firstAngles = builder.Build(item, MakeClassification(), workArea);
 
         // Record some as productive
         var productive = new List<AngleResult>
@@ -74,9 +78,36 @@ public class AngleCandidateBuilderTests
 
         // Second build — should be pruned to known-good + base angles
         builder.ForceFullSweep = false;
-        var secondAngles = builder.Build(item, 0, workArea);
+        var secondAngles = builder.Build(item, MakeClassification(), workArea);
 
         Assert.True(secondAngles.Count < firstAngles.Count,
             $"Pruned ({secondAngles.Count}) should be fewer than full ({firstAngles.Count})");
+    }
+
+    [Fact]
+    public void Build_RectanglePart_ReturnsTwoAngles()
+    {
+        var builder = new AngleCandidateBuilder();
+        var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
+        var workArea = new Box(0, 0, 100, 100);
+        var classification = MakeClassification(0, PartType.Rectangle);
+
+        var angles = builder.Build(item, classification, workArea);
+
+        Assert.Equal(2, angles.Count);
+    }
+
+    [Fact]
+    public void Build_CirclePart_ReturnsOneAngle()
+    {
+        var builder = new AngleCandidateBuilder();
+        var item = new NestItem { Drawing = MakeRectDrawing(10, 10) };
+        var workArea = new Box(0, 0, 100, 100);
+        var classification = MakeClassification(0, PartType.Circle);
+
+        var angles = builder.Build(item, classification, workArea);
+
+        Assert.Single(angles);
+        Assert.Equal(0, angles[0]);
     }
 }

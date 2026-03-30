@@ -26,9 +26,9 @@ namespace OpenNest
 
         public override ShrinkAxis TrimAxis => ShrinkAxis.Length;
 
-        public override List<double> BuildAngles(NestItem item, double bestRotation, Box workArea)
+        public override List<double> BuildAngles(NestItem item, ClassificationResult classification, Box workArea)
         {
-            var baseAngles = new List<double> { bestRotation, bestRotation + Angle.HalfPI };
+            var baseAngles = new List<double> { classification.PrimaryAngle, classification.PrimaryAngle + Angle.HalfPI };
             baseAngles.Sort((a, b) => RotatedHeight(item, a).CompareTo(RotatedHeight(item, b)));
             return baseAngles;
         }

@@ -1,3 +1,4 @@
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
@@ -26,9 +27,9 @@ namespace OpenNest
             set => angleBuilder.ForceFullSweep = value;
         }
 
-        public override List<double> BuildAngles(NestItem item, double bestRotation, Box workArea)
+        public override List<double> BuildAngles(NestItem item, ClassificationResult classification, Box workArea)
         {
-            return angleBuilder.Build(item, bestRotation, workArea);
+            return angleBuilder.Build(item, classification, workArea);
         }
 
         protected override void RecordProductiveAngles(List<AngleResult> angleResults)
@@ -132,10 +133,12 @@ namespace OpenNest
 
         protected virtual void RunPipeline(FillContext context)
         {
-            var bestRotation = RotationAnalysis.FindBestRotation(context.Item);
-            context.SharedState["BestRotation"] = bestRotation;
+            var classification = PartClassifier.Classify(context.Item.Drawing);
+            context.PartType = classification.Type;
+            context.SharedState["BestRotation"] = classification.PrimaryAngle;
+            context.SharedState["Classification"] = classification;
 
-            var angles = BuildAngles(context.Item, bestRotation, context.WorkArea);
+            var angles = BuildAngles(context.Item, classification, context.WorkArea);
             context.SharedState["AngleCandidates"] = angles;
 
             try

@@ -46,9 +46,9 @@ namespace OpenNest
 
         public virtual ShrinkAxis TrimAxis => ShrinkAxis.Width;
 
-        public virtual List<double> BuildAngles(NestItem item, double bestRotation, Box workArea)
+        public virtual List<double> BuildAngles(NestItem item, ClassificationResult classification, Box workArea)
         {
-            return new List<double> { bestRotation, bestRotation + OpenNest.Math.Angle.HalfPI };
+            return new List<double> { classification.PrimaryAngle, classification.PrimaryAngle + OpenNest.Math.Angle.HalfPI };
         }
 
         protected virtual void RecordProductiveAngles(List<AngleResult> angleResults) { }

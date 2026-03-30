@@ -1,4 +1,5 @@
 using OpenNest.Converters;
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
@@ -33,7 +34,7 @@ public class StrategyOverlapTests
 
         var strategies = FillStrategyRegistry.Strategies.ToList();
         var item = new NestItem { Drawing = drawing };
-        var bestRotation = RotationAnalysis.FindBestRotation(item);
+        var classification = PartClassifier.Classify(drawing);
         var failures = new List<string>();
 
         foreach (var strategy in strategies)
@@ -50,9 +51,10 @@ public class StrategyOverlapTests
                 Token = System.Threading.CancellationToken.None,
                 Policy = policy,
             };
-            context.SharedState["BestRotation"] = bestRotation;
+            context.SharedState["BestRotation"] = classification.PrimaryAngle;
+            context.SharedState["Classification"] = classification;
             context.SharedState["AngleCandidates"] = new AngleCandidateBuilder().Build(
-                item, bestRotation, context.WorkArea);
+                item, classification, context.WorkArea);
 
             var parts = strategy.Fill(context);
             var count = parts?.Count ?? 0;

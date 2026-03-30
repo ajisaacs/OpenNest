@@ -1,3 +1,4 @@
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using System;
@@ -15,6 +16,7 @@ namespace OpenNest.Engine.Strategies
         public CancellationToken Token { get; init; }
         public IProgress<NestProgress> Progress { get; init; }
         public FillPolicy Policy { get; init; }
+        public PartType PartType { get; set; }
 
         public List<Part> CurrentBest { get; set; }
         /// <summary>For progress reporting only; comparisons use Policy.Comparer.</summary>

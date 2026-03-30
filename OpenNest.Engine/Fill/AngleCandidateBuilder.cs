@@ -7,31 +7,68 @@ using System.Linq;
 
 namespace OpenNest.Engine.Fill
 {
-    /// <summary>
-    /// Builds candidate rotation angles for single-item fill. Encapsulates the
-    /// full pipeline: base angles, narrow-area sweep, ML prediction, and
-    /// known-good pruning across fills.
-    /// </summary>
     public class AngleCandidateBuilder
     {
         private readonly HashSet<double> knownGoodAngles = new();
 
         public bool ForceFullSweep { get; set; }
 
-        public List<double> Build(NestItem item, double bestRotation, Box workArea)
+        public List<double> Build(NestItem item, ClassificationResult classification, Box workArea)
         {
-            var baseAngles = new[] { bestRotation, bestRotation + Angle.HalfPI };
+            // User constraints always take precedence over classification.
+            if (HasExplicitConstraints(item))
+                return BuildFromConstraints(item);
+
+            switch (classification.Type)
+            {
+                case PartType.Circle:
+                    return new List<double> { 0 };
+
+                case PartType.Rectangle:
+                    return new List<double> { classification.PrimaryAngle, classification.PrimaryAngle + Angle.HalfPI };
+
+                default:
+                    return BuildIrregularAngles(item, classification.PrimaryAngle, workArea);
+            }
+        }
+
+        private static bool HasExplicitConstraints(NestItem item)
+        {
+            // Default NestConstraints: Start=0, End=0. Both zero = no constraints.
+            return !(item.RotationStart.IsEqualTo(0) && item.RotationEnd.IsEqualTo(0));
+        }
+
+        private static List<double> BuildFromConstraints(NestItem item)
+        {
+            var angles = new List<double>();
+            var step = item.StepAngle > Tolerance.Epsilon ? item.StepAngle : Angle.ToRadians(5);
+
+            for (var a = item.RotationStart; a <= item.RotationEnd + Tolerance.Epsilon; a += step)
+            {
+                if (!ContainsAngle(angles, a))
+                    angles.Add(a);
+            }
+
+            if (angles.Count == 0)
+                angles.Add(item.RotationStart);
+
+            return angles;
+        }
+
+        private List<double> BuildIrregularAngles(NestItem item, double primaryAngle, Box workArea)
+        {
+            var baseAngles = new[] { primaryAngle, primaryAngle + Angle.HalfPI };
 
             if (knownGoodAngles.Count > 0 && !ForceFullSweep)
                 return BuildPrunedList(baseAngles);
 
             var angles = new List<double>(baseAngles);
 
-            if (ForceFullSweep)
-                AddSweepAngles(angles);
+            // Full 5-degree sweep for irregular parts.
+            AddSweepAngles(angles);
 
-            if (!ForceFullSweep && angles.Count > 2)
-                angles = ApplyMlPrediction(item, workArea, baseAngles, angles);
+            // ML prediction complements the sweep when available.
+            angles = ApplyMlPrediction(item, workArea, baseAngles, angles);
 
             return angles;
         }
@@ -64,7 +101,14 @@ namespace OpenNest.Engine.Fill
                     mlAngles.Add(b);
             }
 
-            Debug.WriteLine($"[AngleCandidateBuilder] ML: {fallback.Count} angles -> {mlAngles.Count} predicted");
+            // Merge ML angles into the existing sweep so both contribute.
+            foreach (var a in fallback)
+            {
+                if (!ContainsAngle(mlAngles, a))
+                    mlAngles.Add(a);
+            }
+
+            Debug.WriteLine($"[AngleCandidateBuilder] ML: {fallback.Count} sweep + {predicted.Count} predicted = {mlAngles.Count} total");
             return mlAngles;
         }
 
@@ -86,10 +130,6 @@ namespace OpenNest.Engine.Fill
             return angles.Any(existing => existing.IsEqualTo(angle));
         }
 
-        /// <summary>
-        /// Records angles that produced results. These are used to prune
-        /// subsequent Build() calls.
-        /// </summary>
         public void RecordProductive(List<AngleResult> angleResults)
         {
             foreach (var ar in angleResults)
