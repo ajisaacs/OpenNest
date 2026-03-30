@@ -94,8 +94,8 @@ namespace OpenNest.Engine.Fill
         /// that fits roughly the target count. Scales the shrink axis proportionally
         /// from the full-area count down to the target, with margin.
         /// </summary>
-        private static Box EstimateStartBox(NestItem item, Box box,
-            double spacing, ShrinkAxis axis, int targetCount)
+        internal static Box EstimateStartBox(NestItem item, Box box,
+            double spacing, ShrinkAxis axis, int targetCount, double marginFactor = 1.3)
         {
             var bbox = item.Drawing.Program.BoundingBox();
             if (bbox.Width <= 0 || bbox.Length <= 0)
@@ -115,7 +115,7 @@ namespace OpenNest.Engine.Fill
 
             // Scale dimension proportionally: target/full * maxDim, with margin.
             var ratio = (double)targetCount / fullCount;
-            var estimate = maxDim * ratio * 1.3;
+            var estimate = maxDim * ratio * marginFactor;
             estimate = System.Math.Min(estimate, maxDim);
 
             if (estimate <= 0 || estimate >= maxDim)
