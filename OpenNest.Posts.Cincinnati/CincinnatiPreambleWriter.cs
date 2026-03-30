@@ -37,14 +37,20 @@ public sealed class CincinnatiPreambleWriter
 
         w.WriteLine(CoordinateFormatter.Comment("MAIN PROGRAM"));
 
-        w.WriteLine(_config.PostedUnits == Units.Millimeters ? "G21" : "G20");
+        w.WriteLine(_config.PostedUnits == Units.Millimeters ? "G21 G90" : "G20 G90");
+
+        if (_config.UseSmartRapids)
+            w.WriteLine("G121 (SMART RAPIDS)");
 
         w.WriteLine("M42");
 
         if (_config.ProcessParameterMode == G89Mode.LibraryFile && !string.IsNullOrEmpty(initialLibrary))
-            w.WriteLine($"G89 P {initialLibrary}");
+            w.WriteLine($"G89 P{initialLibrary}");
 
         w.WriteLine($"M98 P{_config.VariableDeclarationSubprogram} (Variable Declaration)");
+
+        if (_config.PalletExchange == PalletMode.StartAndEnd)
+            w.WriteLine("M50");
 
         w.WriteLine("GOTO1 (GOTO SHEET NUMBER)");
 

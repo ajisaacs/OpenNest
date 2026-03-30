@@ -112,8 +112,9 @@ namespace OpenNest.Posts.Cincinnati
                 var sheetIndex = i + 1;
                 var subNumber = Config.SheetSubprogramStart + i;
                 var cutLibrary = resolver.ResolveCutLibrary(plate.Material?.Name ?? "", plate.Thickness, gas);
+                var isLastSheet = i == plates.Count - 1;
                 sheetWriter.Write(writer, plate, nest.Name ?? "NEST", sheetIndex, subNumber,
-                    cutLibrary, etchLibrary, partSubprograms);
+                    cutLibrary, etchLibrary, partSubprograms, isLastSheet);
             }
 
             // Part sub-programs (if enabled)
@@ -148,6 +149,18 @@ namespace OpenNest.Posts.Cincinnati
             vars.GetOrCreate("LeadInFeedrate", 126, $"[#148*{Config.LeadInFeedratePercent}]");
             vars.GetOrCreate("LeadInArcLine2Feedrate", 127, $"[#148*{Config.LeadInArcLine2FeedratePercent}]");
             vars.GetOrCreate("CircleFeedrate", 128, Config.CircleFeedrateMultiplier.ToString("0.#"));
+            vars.GetOrCreate("LeadOutFeedrate", 129, $"[#148*{Config.LeadOutFeedratePercent}]");
+
+            if (Config.ArcFeedrate == ArcFeedrateMode.Variables)
+            {
+                foreach (var range in Config.ArcFeedrateRanges)
+                {
+                    var name = $"ArcFeedR{range.MaxRadius.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}";
+                    vars.GetOrCreate(name, range.VariableNumber,
+                        $"[#148*{range.FeedratePercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}]");
+                }
+            }
+
             return vars;
         }
     }

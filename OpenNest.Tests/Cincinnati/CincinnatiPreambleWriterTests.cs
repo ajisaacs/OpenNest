@@ -24,9 +24,9 @@ public class CincinnatiPreambleWriterTests
         var output = sb.ToString();
         Assert.Contains("( NEST TestNest )", output);
         Assert.Contains("( CONFIGURATION - CL940 )", output);
-        Assert.Contains("G20", output);
+        Assert.Contains("G20 G90", output);
         Assert.Contains("M42", output);
-        Assert.Contains("G89 P MS135N2PANEL.lib", output);
+        Assert.Contains("G89 PMS135N2PANEL.lib", output);
         Assert.Contains("M98 P100 (Variable Declaration)", output);
         Assert.Contains("GOTO1 (GOTO SHEET NUMBER)", output);
         Assert.Contains("N1 M98 P101 (SHEET 1)", output);
@@ -44,7 +44,72 @@ public class CincinnatiPreambleWriterTests
 
         writer.WriteMainProgram(sw, "Test", "", 1, "");
 
-        Assert.Contains("G21", sb.ToString());
+        Assert.Contains("G21 G90", sb.ToString());
+    }
+
+    [Fact]
+    public void WriteMainProgram_EmitsG90WithUnits()
+    {
+        var config = new CincinnatiPostConfig { PostedUnits = Units.Inches };
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var writer = new CincinnatiPreambleWriter(config);
+
+        writer.WriteMainProgram(sw, "Test", "", 1, "");
+
+        Assert.Contains("G20 G90", sb.ToString());
+    }
+
+    [Fact]
+    public void WriteMainProgram_EmitsG121_WhenSmartRapidsEnabled()
+    {
+        var config = new CincinnatiPostConfig { UseSmartRapids = true };
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var writer = new CincinnatiPreambleWriter(config);
+
+        writer.WriteMainProgram(sw, "Test", "", 1, "");
+
+        Assert.Contains("G121 (SMART RAPIDS)", sb.ToString());
+    }
+
+    [Fact]
+    public void WriteMainProgram_OmitsG121_WhenSmartRapidsDisabled()
+    {
+        var config = new CincinnatiPostConfig { UseSmartRapids = false };
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var writer = new CincinnatiPreambleWriter(config);
+
+        writer.WriteMainProgram(sw, "Test", "", 1, "");
+
+        Assert.DoesNotContain("G121", sb.ToString());
+    }
+
+    [Fact]
+    public void WriteMainProgram_EmitsM50_WhenStartAndEnd()
+    {
+        var config = new CincinnatiPostConfig { PalletExchange = PalletMode.StartAndEnd };
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var writer = new CincinnatiPreambleWriter(config);
+
+        writer.WriteMainProgram(sw, "Test", "", 1, "");
+
+        Assert.Contains("M50", sb.ToString());
+    }
+
+    [Fact]
+    public void WriteMainProgram_OmitsM50_WhenEndOfSheet()
+    {
+        var config = new CincinnatiPostConfig { PalletExchange = PalletMode.EndOfSheet };
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var writer = new CincinnatiPreambleWriter(config);
+
+        writer.WriteMainProgram(sw, "Test", "", 1, "");
+
+        Assert.DoesNotContain("M50", sb.ToString());
     }
 
     [Fact]

@@ -44,6 +44,74 @@ public class CincinnatiPostProcessorTests
     }
 
     [Fact]
+    public void Post_EmitsLeadOutVariable()
+    {
+        var nest = CreateTestNest();
+        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+        Assert.Contains("#129=", output);
+    }
+
+    [Fact]
+    public void Post_WithArcFeedrateVariables_EmitsRangeVariables()
+    {
+        var nest = CreateTestNest();
+        var config = new CincinnatiPostConfig
+        {
+            PostedAccuracy = 4,
+            ArcFeedrate = ArcFeedrateMode.Variables
+        };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+        Assert.Contains("#123=", output);
+        Assert.Contains("#124=", output);
+        Assert.Contains("#125=", output);
+    }
+
+    [Fact]
+    public void Post_WithArcFeedrateNone_OmitsRangeVariables()
+    {
+        var nest = CreateTestNest();
+        var config = new CincinnatiPostConfig
+        {
+            PostedAccuracy = 4,
+            ArcFeedrate = ArcFeedrateMode.None
+        };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+        Assert.DoesNotContain("#123=", output);
+        Assert.DoesNotContain("#124=", output);
+        Assert.DoesNotContain("#125=", output);
+    }
+
+    [Fact]
+    public void Post_EmitsG90InPreamble()
+    {
+        var nest = CreateTestNest();
+        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+        Assert.Contains("G20 G90", output);
+    }
+
+    [Fact]
     public void Post_ImplementsIPostProcessor()
     {
         var post = new CincinnatiPostProcessor(new CincinnatiPostConfig());

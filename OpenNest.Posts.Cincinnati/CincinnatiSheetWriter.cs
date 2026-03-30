@@ -37,7 +37,8 @@ public sealed class CincinnatiSheetWriter
     /// </param>
     public void Write(TextWriter w, Plate plate, string nestName, int sheetIndex, int subNumber,
         string cutLibrary, string etchLibrary,
-        Dictionary<(int, long), int> partSubprograms = null)
+        Dictionary<(int, long), int> partSubprograms = null,
+        bool isLastSheet = false)
     {
         if (plate.Parts.Count == 0)
             return;
@@ -64,12 +65,12 @@ public sealed class CincinnatiSheetWriter
         w.WriteLine("N10000");
         w.WriteLine("G92 X#5021 Y#5022");
         if (!string.IsNullOrEmpty(cutLibrary))
-            w.WriteLine($"G89 P {cutLibrary}");
+            w.WriteLine($"G89 P{cutLibrary}");
         w.WriteLine($"M98 P{varDeclSub} (Variable Declaration)");
         w.WriteLine("G90");
         w.WriteLine("M47");
         if (!string.IsNullOrEmpty(cutLibrary))
-            w.WriteLine($"G89 P {cutLibrary}");
+            w.WriteLine($"G89 P{cutLibrary}");
         w.WriteLine("GOTO1( Goto Feature )");
 
         // 3. Order parts: non-cutoff sorted by Bottom then Left, cutoffs last
@@ -94,7 +95,9 @@ public sealed class CincinnatiSheetWriter
         // 5. Footer
         w.WriteLine("M42");
         w.WriteLine("G0 X0 Y0");
-        if (_config.PalletExchange != PalletMode.None)
+        var emitM50 = _config.PalletExchange == PalletMode.EndOfSheet
+            || (_config.PalletExchange == PalletMode.StartAndEnd && isLastSheet);
+        if (emitM50)
             w.WriteLine($"N{sheetIndex + 1} M50");
         w.WriteLine($"M99 (END OF {nestName}.{sheetIndex:D3})");
     }

@@ -270,10 +270,33 @@ namespace OpenNest.Posts.Cincinnati
         public double LeadInArcLine2FeedratePercent { get; set; } = 0.5;
 
         /// <summary>
+        /// Gets or sets the feedrate percentage for lead-out moves.
+        /// Default: 0.5 (50%)
+        /// </summary>
+        public double LeadOutFeedratePercent { get; set; } = 0.5;
+
+        /// <summary>
         /// Gets or sets the feedrate multiplier for circular cuts.
         /// Default: 0.8 (80%)
         /// </summary>
         public double CircleFeedrateMultiplier { get; set; } = 0.8;
+
+        /// <summary>
+        /// Gets or sets the arc feedrate calculation mode.
+        /// Default: ArcFeedrateMode.None
+        /// </summary>
+        public ArcFeedrateMode ArcFeedrate { get; set; } = ArcFeedrateMode.None;
+
+        /// <summary>
+        /// Gets or sets the radius-based arc feedrate ranges.
+        /// Ranges are matched from smallest MaxRadius to largest.
+        /// </summary>
+        public List<ArcFeedrateRange> ArcFeedrateRanges { get; set; } = new()
+        {
+            new() { MaxRadius = 0.125, FeedratePercent = 0.25, VariableNumber = 123 },
+            new() { MaxRadius = 0.750, FeedratePercent = 0.50, VariableNumber = 124 },
+            new() { MaxRadius = 4.500, FeedratePercent = 0.80, VariableNumber = 125 }
+        };
 
         /// <summary>
         /// Gets or sets the variable number for sheet width.
@@ -300,5 +323,35 @@ namespace OpenNest.Posts.Cincinnati
     {
         public string Gas { get; set; } = "";
         public string Library { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Specifies how arc feedrates are calculated based on radius.
+    /// </summary>
+    public enum ArcFeedrateMode
+    {
+        /// <summary>No radius-based arc feedrate adjustment (only full circles use multiplier).</summary>
+        None,
+
+        /// <summary>Inline percentage expressions: F [#148*pct] based on radius range.</summary>
+        Percentages,
+
+        /// <summary>Radius-range-based variables: F #varNum based on radius range.</summary>
+        Variables
+    }
+
+    /// <summary>
+    /// Defines a radius range and its associated feedrate for arc moves.
+    /// </summary>
+    public class ArcFeedrateRange
+    {
+        /// <summary>Maximum radius for this range (inclusive).</summary>
+        public double MaxRadius { get; set; }
+
+        /// <summary>Feedrate as a fraction of process feedrate (e.g. 0.25 = 25%).</summary>
+        public double FeedratePercent { get; set; }
+
+        /// <summary>Variable number for Variables mode (e.g. 123).</summary>
+        public int VariableNumber { get; set; }
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Posts.Cincinnati;
 
@@ -105,11 +106,48 @@ public static class FeatureUtils
             }
             else if (code is ArcMove arc)
             {
-                distance += currentPos.DistanceTo(arc.EndPoint);
+                distance += ComputeArcLength(currentPos, arc);
                 currentPos = arc.EndPoint;
             }
         }
 
         return distance;
+    }
+
+    /// <summary>
+    /// Computes the arc length from the current position through an arc move.
+    /// Uses radius * sweep angle instead of chord length.
+    /// </summary>
+    public static double ComputeArcLength(Vector startPos, ArcMove arc)
+    {
+        var radius = startPos.DistanceTo(arc.CenterPoint);
+        if (radius < Tolerance.Epsilon)
+            return 0.0;
+
+        // Full circle: start ≈ end
+        if (Tolerance.IsEqualTo(startPos.X, arc.EndPoint.X)
+            && Tolerance.IsEqualTo(startPos.Y, arc.EndPoint.Y))
+            return 2.0 * System.Math.PI * radius;
+
+        var startAngle = System.Math.Atan2(
+            startPos.Y - arc.CenterPoint.Y,
+            startPos.X - arc.CenterPoint.X);
+        var endAngle = System.Math.Atan2(
+            arc.EndPoint.Y - arc.CenterPoint.Y,
+            arc.EndPoint.X - arc.CenterPoint.X);
+
+        double sweep;
+        if (arc.Rotation == RotationType.CW)
+        {
+            sweep = startAngle - endAngle;
+            if (sweep <= 0) sweep += 2.0 * System.Math.PI;
+        }
+        else
+        {
+            sweep = endAngle - startAngle;
+            if (sweep <= 0) sweep += 2.0 * System.Math.PI;
+        }
+
+        return radius * sweep;
     }
 }

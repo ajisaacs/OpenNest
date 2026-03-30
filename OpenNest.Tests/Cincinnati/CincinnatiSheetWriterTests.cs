@@ -32,7 +32,7 @@ public class CincinnatiSheetWriterTests
         Assert.Contains("#110=", output);
         Assert.Contains("#111=", output);
         Assert.Contains("G92 X#5021 Y#5022", output);
-        Assert.Contains("G89 P MS135N2PANEL.lib", output);
+        Assert.Contains("G89 PMS135N2PANEL.lib", output);
         Assert.Contains("M99", output);
     }
 
@@ -137,9 +137,110 @@ public class CincinnatiSheetWriterTests
         Assert.True(g85Idx < g84Idx, "G85 (etch) should come before G84 (cut)");
 
         // Etch uses etch library
-        Assert.Contains("G89 P EtchN2.lib", output);
+        Assert.Contains("G89 PEtchN2.lib", output);
         // Cut uses cut library
-        Assert.Contains("G89 P MS250O2.lib", output);
+        Assert.Contains("G89 PMS250O2.lib", output);
+    }
+
+    [Fact]
+    public void WriteSheet_StartAndEnd_NoM50OnNonLastSheet()
+    {
+        var config = new CincinnatiPostConfig
+        {
+            PalletExchange = PalletMode.StartAndEnd,
+            PostedAccuracy = 4
+        };
+        var plate = new Plate(48.0, 96.0);
+        plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
+
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
+
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "", isLastSheet: false);
+
+        var output = sb.ToString();
+        Assert.DoesNotContain("M50", output);
+    }
+
+    [Fact]
+    public void WriteSheet_StartAndEnd_M50OnLastSheet()
+    {
+        var config = new CincinnatiPostConfig
+        {
+            PalletExchange = PalletMode.StartAndEnd,
+            PostedAccuracy = 4
+        };
+        var plate = new Plate(48.0, 96.0);
+        plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
+
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
+
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "", isLastSheet: true);
+
+        var output = sb.ToString();
+        Assert.Contains("M50", output);
+    }
+
+    [Fact]
+    public void WriteSheet_EndOfSheet_AlwaysEmitsM50()
+    {
+        var config = new CincinnatiPostConfig
+        {
+            PalletExchange = PalletMode.EndOfSheet,
+            PostedAccuracy = 4
+        };
+        var plate = new Plate(48.0, 96.0);
+        plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
+
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
+
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "", isLastSheet: false);
+
+        var output = sb.ToString();
+        Assert.Contains("M50", output);
+    }
+
+    [Fact]
+    public void ComputeArcLength_FullCircle_Returns2PiR()
+    {
+        var start = new Vector(10.0, 20.0);
+        var arc = new ArcMove(new Vector(10.0, 20.0), new Vector(15.0, 20.0), RotationType.CW);
+        var length = FeatureUtils.ComputeArcLength(start, arc);
+
+        // Radius = 5, full circle = 2 * PI * 5 ≈ 31.416
+        Assert.Equal(2.0 * System.Math.PI * 5.0, length, 4);
+    }
+
+    [Fact]
+    public void ComputeArcLength_Semicircle_ReturnsPiR()
+    {
+        // Semicircle from (0,0) to (10,0) with center at (5,0), CCW → goes through (5,5)
+        var start = new Vector(0.0, 0.0);
+        var arc = new ArcMove(new Vector(10.0, 0.0), new Vector(5.0, 0.0), RotationType.CCW);
+        var length = FeatureUtils.ComputeArcLength(start, arc);
+
+        // Radius = 5, semicircle = PI * 5 ≈ 15.708
+        Assert.Equal(System.Math.PI * 5.0, length, 4);
+    }
+
+    [Fact]
+    public void ComputeCutDistance_WithArcs_UsesArcLengthNotChord()
+    {
+        // Full circle: chord = 0 but arc length = 2πr
+        var codes = new List<ICode>
+        {
+            new RapidMove(10.0, 20.0),
+            new ArcMove(new Vector(10.0, 20.0), new Vector(15.0, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+        };
+        var distance = FeatureUtils.ComputeCutDistance(codes);
+
+        // Full circle with R=5 → 2πr ≈ 31.416
+        Assert.True(distance > 30.0, $"Expected arc length > 30 but got {distance}");
     }
 
     [Fact]

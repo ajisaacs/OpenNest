@@ -70,7 +70,7 @@ public sealed class CincinnatiFeatureWriter
             {
                 var speedClass = _speedClassifier.Classify(ctx.CutDistance, ctx.SheetDiagonal);
                 var cutDist = _speedClassifier.FormatCutDist(ctx.CutDistance, ctx.SheetDiagonal);
-                writer.WriteLine($"G89 P {lib} ({speedClass} {cutDist})");
+                writer.WriteLine($"G89 P{lib} ({speedClass} {cutDist})");
             }
             else
             {
@@ -108,7 +108,7 @@ public sealed class CincinnatiFeatureWriter
                 sb.Append($"G1 X{_fmt.FormatCoord(linear.EndPoint.X)} Y{_fmt.FormatCoord(linear.EndPoint.Y)}");
 
                 // Feedrate — etch always uses process feedrate
-                var feedVar = ctx.IsEtch ? "#148" : GetFeedVariable(linear.Layer);
+                var feedVar = ctx.IsEtch ? "#148" : GetLinearFeedVariable(linear.Layer);
                 if (feedVar != lastFeedVar)
                 {
                     sb.Append($" F{feedVar}");
@@ -138,11 +138,11 @@ public sealed class CincinnatiFeatureWriter
                 var j = arc.CenterPoint.Y - currentPos.Y;
                 sb.Append($" I{_fmt.FormatCoord(i)} J{_fmt.FormatCoord(j)}");
 
-                // Feedrate — etch always uses process feedrate, cut uses layer-based
+                // Feedrate — etch always uses process feedrate, cut uses layer/radius-based
+                var radius = currentPos.DistanceTo(arc.CenterPoint);
                 var isFullCircle = IsFullCircle(currentPos, arc.EndPoint);
                 var feedVar = ctx.IsEtch ? "#148"
-                    : isFullCircle ? "[#148*#128]"
-                    : GetFeedVariable(arc.Layer);
+                    : GetArcFeedrate(arc.Layer, radius, isFullCircle);
                 if (feedVar != lastFeedVar)
                 {
                     sb.Append($" F{feedVar}");
@@ -223,14 +223,43 @@ public sealed class CincinnatiFeatureWriter
         }
     }
 
-    private static string GetFeedVariable(LayerType layer)
+    private static string GetLinearFeedVariable(LayerType layer)
     {
         return layer switch
         {
             LayerType.Leadin => "#126",
-            LayerType.Cut => "#148",
+            LayerType.Leadout => "#129",
             _ => "#148"
         };
+    }
+
+    private string GetArcFeedrate(LayerType layer, double radius, bool isFullCircle)
+    {
+        if (layer == LayerType.Leadin) return "#127";
+        if (layer == LayerType.Leadout) return "#129";
+        if (isFullCircle) return "[#148*#128]";
+        return GetArcCutFeedrate(radius);
+    }
+
+    private string GetArcCutFeedrate(double radius)
+    {
+        if (_config.ArcFeedrate == ArcFeedrateMode.None)
+            return "#148";
+
+        // Find the smallest range that contains this radius
+        ArcFeedrateRange best = null;
+        foreach (var range in _config.ArcFeedrateRanges)
+        {
+            if (radius <= range.MaxRadius && (best == null || range.MaxRadius < best.MaxRadius))
+                best = range;
+        }
+
+        if (best == null)
+            return "#148";
+
+        return _config.ArcFeedrate == ArcFeedrateMode.Variables
+            ? $"#{best.VariableNumber}"
+            : $"[#148*{best.FeedratePercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}]";
     }
 
     private static bool IsFullCircle(Vector start, Vector end)

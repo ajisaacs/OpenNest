@@ -297,7 +297,7 @@ public class CincinnatiFeatureWriterTests
         ctx.SheetDiagonal = 30.0;
         var output = WriteFeature(config, ctx);
 
-        Assert.Contains("G89 P MILD10", output);
+        Assert.Contains("G89 PMILD10", output);
     }
 
     [Fact]
@@ -468,6 +468,123 @@ public class CincinnatiFeatureWriterTests
         Assert.True(g40Idx < m35Idx, "G40 should come before M35");
         Assert.True(m35Idx < m131Idx, "M35 should come before M131");
         Assert.True(m131Idx < m47Idx, "M131 should come before M47");
+    }
+
+    [Fact]
+    public void LeadoutFeedrate_UsesVariable129()
+    {
+        var config = DefaultConfig();
+        config.KerfCompensation = KerfMode.PreApplied;
+        var codes = new List<ICode>
+        {
+            new RapidMove(1.0, 1.0),
+            new LinearMove(2.0, 1.0) { Layer = LayerType.Leadout }
+        };
+        var ctx = SimpleContext(codes);
+        var output = WriteFeature(config, ctx);
+
+        Assert.Contains("F#129", output);
+    }
+
+    [Fact]
+    public void ArcLeadin_UsesVariable127()
+    {
+        var config = DefaultConfig();
+        config.KerfCompensation = KerfMode.PreApplied;
+        var codes = new List<ICode>
+        {
+            new RapidMove(10.0, 20.0),
+            new ArcMove(new Vector(12.0, 20.0), new Vector(11.0, 20.0), RotationType.CCW) { Layer = LayerType.Leadin }
+        };
+        var ctx = SimpleContext(codes);
+        var output = WriteFeature(config, ctx);
+
+        Assert.Contains("F#127", output);
+    }
+
+    [Fact]
+    public void ArcFeedrate_VariablesMode_UsesRadiusRangeVariable()
+    {
+        var config = DefaultConfig();
+        config.KerfCompensation = KerfMode.PreApplied;
+        config.ArcFeedrate = ArcFeedrateMode.Variables;
+        // Arc with radius 0.5 (center at 10.5, 20; start at 10, 20) → R=0.5 → #124 (R ≤ 0.750)
+        var codes = new List<ICode>
+        {
+            new RapidMove(10.0, 20.0),
+            new ArcMove(new Vector(11.0, 20.0), new Vector(10.5, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+        };
+        var ctx = SimpleContext(codes);
+        var output = WriteFeature(config, ctx);
+
+        Assert.Contains("F#124", output);
+    }
+
+    [Fact]
+    public void ArcFeedrate_PercentagesMode_UsesInlineExpression()
+    {
+        var config = DefaultConfig();
+        config.KerfCompensation = KerfMode.PreApplied;
+        config.ArcFeedrate = ArcFeedrateMode.Percentages;
+        // Arc with radius 0.1 (≤ 0.125) → 25%
+        var codes = new List<ICode>
+        {
+            new RapidMove(10.0, 20.0),
+            new ArcMove(new Vector(10.2, 20.0), new Vector(10.1, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+        };
+        var ctx = SimpleContext(codes);
+        var output = WriteFeature(config, ctx);
+
+        Assert.Contains("F[#148*0.25]", output);
+    }
+
+    [Fact]
+    public void ArcFeedrate_LargeRadius_UsesProcessFeedrate()
+    {
+        var config = DefaultConfig();
+        config.KerfCompensation = KerfMode.PreApplied;
+        config.ArcFeedrate = ArcFeedrateMode.Variables;
+        // Arc with radius 10 (> 4.500) → falls through to #148
+        var codes = new List<ICode>
+        {
+            new RapidMove(0.0, 0.0),
+            new ArcMove(new Vector(20.0, 0.0), new Vector(10.0, 0.0), RotationType.CCW) { Layer = LayerType.Cut }
+        };
+        var ctx = SimpleContext(codes);
+        var output = WriteFeature(config, ctx);
+
+        Assert.Contains("F#148", output);
+    }
+
+    [Fact]
+    public void ArcFeedrate_NoneMode_UsesProcessFeedrateForNonCircle()
+    {
+        var config = DefaultConfig();
+        config.KerfCompensation = KerfMode.PreApplied;
+        config.ArcFeedrate = ArcFeedrateMode.None;
+        // Small radius arc but mode is None → process feedrate
+        var codes = new List<ICode>
+        {
+            new RapidMove(10.0, 20.0),
+            new ArcMove(new Vector(10.2, 20.0), new Vector(10.1, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+        };
+        var ctx = SimpleContext(codes);
+        var output = WriteFeature(config, ctx);
+
+        Assert.Contains("F#148", output);
+    }
+
+    [Fact]
+    public void G89_PAdjacentToFilename()
+    {
+        var config = DefaultConfig();
+        var ctx = SimpleContext();
+        ctx.LibraryFile = "MS135N2.lib";
+        var output = WriteFeature(config, ctx);
+
+        // P must be directly adjacent to filename, no space
+        Assert.Contains("G89 PMS135N2.lib", output);
+        Assert.DoesNotContain("G89 P MS135N2.lib", output);
     }
 
     private static int CountOccurrences(string text, string pattern)
