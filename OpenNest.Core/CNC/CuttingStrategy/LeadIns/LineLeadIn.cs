@@ -23,7 +23,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
         public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle)
         {
-            var approachAngle = contourNormalAngle + Angle.ToRadians(ApproachAngle);
+            var approachAngle = contourNormalAngle + Angle.HalfPI - Angle.ToRadians(ApproachAngle);
             return new Vector(
                 contourStartPoint.X + Length * System.Math.Cos(approachAngle),
                 contourStartPoint.Y + Length * System.Math.Sin(approachAngle));

@@ -12,7 +12,7 @@ namespace OpenNest.CNC.CuttingStrategy
         public override List<ICode> Generate(Vector contourEndPoint, double contourNormalAngle,
             RotationType winding = RotationType.CW)
         {
-            var overcutAngle = contourNormalAngle + Angle.ToRadians(ApproachAngle);
+            var overcutAngle = contourNormalAngle + Angle.HalfPI - Angle.ToRadians(ApproachAngle);
             var endPoint = new Vector(
                 contourEndPoint.X + Length * System.Math.Cos(overcutAngle),
                 contourEndPoint.Y + Length * System.Math.Sin(overcutAngle));

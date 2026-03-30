@@ -35,7 +35,7 @@ namespace OpenNest
         {
             programIdFont = new Font(SystemFonts.DefaultFont, FontStyle.Bold | FontStyle.Underline);
             SelectedColor = Color.FromArgb(90, 150, 200, 255);
-            leadInPen = new Pen(Color.Yellow, 1.5f);
+            leadInPen = new Pen(Color.OrangeRed, 1.5f);
         }
 
         private LayoutPart(Part part)

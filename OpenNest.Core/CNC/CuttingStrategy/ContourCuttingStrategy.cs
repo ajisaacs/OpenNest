@@ -63,6 +63,10 @@ namespace OpenNest.CNC.CuttingStrategy
                 result.Codes.AddRange(leadOut.Generate(perimeterPt, normal, winding));
             }
 
+            // Convert to incremental mode to match the convention used by
+            // the rest of the system (rendering, bounding box, drag, etc.).
+            result.Mode = Mode.Incremental;
+
             return new CuttingResult
             {
                 Program = result,

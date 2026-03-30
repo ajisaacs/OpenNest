@@ -16,7 +16,12 @@ namespace OpenNest.Forms
         private ComboBox cboInternalLeadIn, cboInternalLeadOut;
         private ComboBox cboArcCircleLeadIn, cboArcCircleLeadOut;
 
-        private Panel pnlExternalParams, pnlInternalParams, pnlArcCircleParams;
+        private Panel pnlExternalLeadIn, pnlExternalLeadOut;
+        private Panel pnlInternalLeadIn, pnlInternalLeadOut;
+        private Panel pnlArcCircleLeadIn, pnlArcCircleLeadOut;
+
+        private CheckBox chkTabsEnabled;
+        private NumericUpDown nudTabWidth;
 
         public CuttingParameters Parameters { get; set; } = new CuttingParameters();
 
@@ -24,15 +29,26 @@ namespace OpenNest.Forms
         {
             InitializeComponent();
 
-            SetupTab(tabExternal, out cboExternalLeadIn, out cboExternalLeadOut, out pnlExternalParams);
-            SetupTab(tabInternal, out cboInternalLeadIn, out cboInternalLeadOut, out pnlInternalParams);
-            SetupTab(tabArcCircle, out cboArcCircleLeadIn, out cboArcCircleLeadOut, out pnlArcCircleParams);
+            SetupTab(tabExternal,
+                out cboExternalLeadIn, out pnlExternalLeadIn,
+                out cboExternalLeadOut, out pnlExternalLeadOut);
+            SetupTab(tabInternal,
+                out cboInternalLeadIn, out pnlInternalLeadIn,
+                out cboInternalLeadOut, out pnlInternalLeadOut);
+            SetupTab(tabArcCircle,
+                out cboArcCircleLeadIn, out pnlArcCircleLeadIn,
+                out cboArcCircleLeadOut, out pnlArcCircleLeadOut);
 
+            SetupTabsSection();
             PopulateDropdowns();
 
             cboExternalLeadIn.SelectedIndexChanged += OnLeadInTypeChanged;
             cboInternalLeadIn.SelectedIndexChanged += OnLeadInTypeChanged;
             cboArcCircleLeadIn.SelectedIndexChanged += OnLeadInTypeChanged;
+
+            cboExternalLeadOut.SelectedIndexChanged += OnLeadOutTypeChanged;
+            cboInternalLeadOut.SelectedIndexChanged += OnLeadOutTypeChanged;
+            cboArcCircleLeadOut.SelectedIndexChanged += OnLeadOutTypeChanged;
         }
 
         protected override void OnLoad(EventArgs e)
@@ -41,54 +57,113 @@ namespace OpenNest.Forms
             LoadFromParameters(Parameters);
         }
 
-        private static void SetupTab(TabPage tab, out ComboBox leadInCombo,
-            out ComboBox leadOutCombo, out Panel paramPanel)
+        private static void SetupTab(TabPage tab,
+            out ComboBox leadInCombo, out Panel leadInPanel,
+            out ComboBox leadOutCombo, out Panel leadOutPanel)
         {
-            var y = 12;
-
-            var lblLeadIn = new Label
+            var grpLeadIn = new GroupBox
             {
-                Text = "Lead-In:",
-                Location = new System.Drawing.Point(8, y + 3),
-                AutoSize = true
+                Text = "Lead-In",
+                Location = new System.Drawing.Point(4, 4),
+                Size = new System.Drawing.Size(364, 168)
             };
-            tab.Controls.Add(lblLeadIn);
+            tab.Controls.Add(grpLeadIn);
+
+            grpLeadIn.Controls.Add(new Label
+            {
+                Text = "Type:",
+                Location = new System.Drawing.Point(8, 22),
+                AutoSize = true
+            });
 
             leadInCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new System.Drawing.Point(100, y),
-                Size = new System.Drawing.Size(240, 24)
+                Location = new System.Drawing.Point(90, 19),
+                Size = new System.Drawing.Size(250, 24)
             };
-            tab.Controls.Add(leadInCombo);
+            grpLeadIn.Controls.Add(leadInCombo);
 
-            y += 32;
-
-            var lblLeadOut = new Label
+            leadInPanel = new Panel
             {
-                Text = "Lead-Out:",
-                Location = new System.Drawing.Point(8, y + 3),
-                AutoSize = true
+                Location = new System.Drawing.Point(8, 48),
+                Size = new System.Drawing.Size(340, 112),
+                AutoScroll = true
             };
-            tab.Controls.Add(lblLeadOut);
+            grpLeadIn.Controls.Add(leadInPanel);
+
+            var grpLeadOut = new GroupBox
+            {
+                Text = "Lead-Out",
+                Location = new System.Drawing.Point(4, 176),
+                Size = new System.Drawing.Size(364, 132)
+            };
+            tab.Controls.Add(grpLeadOut);
+
+            grpLeadOut.Controls.Add(new Label
+            {
+                Text = "Type:",
+                Location = new System.Drawing.Point(8, 22),
+                AutoSize = true
+            });
 
             leadOutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new System.Drawing.Point(100, y),
-                Size = new System.Drawing.Size(240, 24)
+                Location = new System.Drawing.Point(90, 19),
+                Size = new System.Drawing.Size(250, 24)
             };
-            tab.Controls.Add(leadOutCombo);
+            grpLeadOut.Controls.Add(leadOutCombo);
 
-            y += 40;
-
-            paramPanel = new Panel
+            leadOutPanel = new Panel
             {
-                Location = new System.Drawing.Point(8, y),
-                Size = new System.Drawing.Size(332, 170),
+                Location = new System.Drawing.Point(8, 48),
+                Size = new System.Drawing.Size(340, 76),
                 AutoScroll = true
             };
-            tab.Controls.Add(paramPanel);
+            grpLeadOut.Controls.Add(leadOutPanel);
+        }
+
+        private void SetupTabsSection()
+        {
+            var grpTabs = new GroupBox
+            {
+                Text = "Tabs",
+                Location = new System.Drawing.Point(4, 350),
+                Size = new System.Drawing.Size(372, 55),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            chkTabsEnabled = new CheckBox
+            {
+                Text = "Enable Tabs",
+                Location = new System.Drawing.Point(12, 22),
+                AutoSize = true
+            };
+            chkTabsEnabled.CheckedChanged += (s, e) => nudTabWidth.Enabled = chkTabsEnabled.Checked;
+            grpTabs.Controls.Add(chkTabsEnabled);
+
+            grpTabs.Controls.Add(new Label
+            {
+                Text = "Width:",
+                Location = new System.Drawing.Point(160, 23),
+                AutoSize = true
+            });
+
+            nudTabWidth = new NumericUpDown
+            {
+                Location = new System.Drawing.Point(215, 20),
+                Size = new System.Drawing.Size(100, 22),
+                DecimalPlaces = 4,
+                Increment = 0.0625m,
+                Minimum = 0,
+                Maximum = 9999,
+                Value = 0.25m,
+                Enabled = false
+            };
+            grpTabs.Controls.Add(nudTabWidth);
+
+            Controls.Add(grpTabs);
         }
 
         private void PopulateDropdowns()
@@ -109,20 +184,36 @@ namespace OpenNest.Forms
         private void OnLeadInTypeChanged(object sender, EventArgs e)
         {
             var combo = (ComboBox)sender;
-            var panel = GetParamPanel(combo);
+            var panel = GetLeadInPanel(combo);
             if (panel != null)
-                BuildParamControls(panel, combo.SelectedIndex);
+                BuildLeadInParamControls(panel, combo.SelectedIndex);
         }
 
-        private Panel GetParamPanel(ComboBox combo)
+        private void OnLeadOutTypeChanged(object sender, EventArgs e)
         {
-            if (combo == cboExternalLeadIn) return pnlExternalParams;
-            if (combo == cboInternalLeadIn) return pnlInternalParams;
-            if (combo == cboArcCircleLeadIn) return pnlArcCircleParams;
+            var combo = (ComboBox)sender;
+            var panel = GetLeadOutPanel(combo);
+            if (panel != null)
+                BuildLeadOutParamControls(panel, combo.SelectedIndex);
+        }
+
+        private Panel GetLeadInPanel(ComboBox combo)
+        {
+            if (combo == cboExternalLeadIn) return pnlExternalLeadIn;
+            if (combo == cboInternalLeadIn) return pnlInternalLeadIn;
+            if (combo == cboArcCircleLeadIn) return pnlArcCircleLeadIn;
             return null;
         }
 
-        private static void BuildParamControls(Panel panel, int typeIndex)
+        private Panel GetLeadOutPanel(ComboBox combo)
+        {
+            if (combo == cboExternalLeadOut) return pnlExternalLeadOut;
+            if (combo == cboInternalLeadOut) return pnlInternalLeadOut;
+            if (combo == cboArcCircleLeadOut) return pnlArcCircleLeadOut;
+            return null;
+        }
+
+        private static void BuildLeadInParamControls(Panel panel, int typeIndex)
         {
             panel.Controls.Clear();
             var y = 0;
@@ -155,18 +246,37 @@ namespace OpenNest.Forms
             }
         }
 
+        private static void BuildLeadOutParamControls(Panel panel, int typeIndex)
+        {
+            panel.Controls.Clear();
+            var y = 0;
+
+            switch (typeIndex)
+            {
+                case 1: // Line
+                    AddNumericField(panel, "Length:", 0.25, ref y, "Length");
+                    AddNumericField(panel, "Approach Angle:", 90, ref y, "ApproachAngle");
+                    break;
+                case 2: // Arc
+                    AddNumericField(panel, "Radius:", 0.25, ref y, "Radius");
+                    break;
+                case 3: // Microtab
+                    AddNumericField(panel, "Gap Size:", 0.06, ref y, "GapSize");
+                    break;
+            }
+        }
+
         private static void AddNumericField(Panel panel, string label, double defaultValue,
             ref int y, string tag)
         {
-            var lbl = new Label
+            panel.Controls.Add(new Label
             {
                 Text = label,
                 Location = new System.Drawing.Point(0, y + 3),
                 AutoSize = true
-            };
-            panel.Controls.Add(lbl);
+            });
 
-            var nud = new System.Windows.Forms.NumericUpDown
+            panel.Controls.Add(new NumericUpDown
             {
                 Location = new System.Drawing.Point(130, y),
                 Size = new System.Drawing.Size(120, 22),
@@ -176,22 +286,25 @@ namespace OpenNest.Forms
                 Maximum = 9999,
                 Value = (decimal)defaultValue,
                 Tag = tag
-            };
-            panel.Controls.Add(nud);
+            });
 
             y += 30;
         }
 
         private void LoadFromParameters(CuttingParameters p)
         {
-            LoadLeadIn(cboExternalLeadIn, pnlExternalParams, p.ExternalLeadIn);
-            LoadLeadOut(cboExternalLeadOut, p.ExternalLeadOut);
+            LoadLeadIn(cboExternalLeadIn, pnlExternalLeadIn, p.ExternalLeadIn);
+            LoadLeadOut(cboExternalLeadOut, pnlExternalLeadOut, p.ExternalLeadOut);
 
-            LoadLeadIn(cboInternalLeadIn, pnlInternalParams, p.InternalLeadIn);
-            LoadLeadOut(cboInternalLeadOut, p.InternalLeadOut);
+            LoadLeadIn(cboInternalLeadIn, pnlInternalLeadIn, p.InternalLeadIn);
+            LoadLeadOut(cboInternalLeadOut, pnlInternalLeadOut, p.InternalLeadOut);
 
-            LoadLeadIn(cboArcCircleLeadIn, pnlArcCircleParams, p.ArcCircleLeadIn);
-            LoadLeadOut(cboArcCircleLeadOut, p.ArcCircleLeadOut);
+            LoadLeadIn(cboArcCircleLeadIn, pnlArcCircleLeadIn, p.ArcCircleLeadIn);
+            LoadLeadOut(cboArcCircleLeadOut, pnlArcCircleLeadOut, p.ArcCircleLeadOut);
+
+            chkTabsEnabled.Checked = p.TabsEnabled;
+            if (p.TabConfig != null)
+                nudTabWidth.Value = (decimal)p.TabConfig.Size;
         }
 
         private static void LoadLeadIn(ComboBox combo, Panel panel, LeadIn leadIn)
@@ -232,18 +345,22 @@ namespace OpenNest.Forms
             }
         }
 
-        private static void LoadLeadOut(ComboBox combo, LeadOut leadOut)
+        private static void LoadLeadOut(ComboBox combo, Panel panel, LeadOut leadOut)
         {
             switch (leadOut)
             {
-                case LineLeadOut _:
+                case LineLeadOut line:
                     combo.SelectedIndex = 1;
+                    SetParam(panel, "Length", line.Length);
+                    SetParam(panel, "ApproachAngle", line.ApproachAngle);
                     break;
-                case ArcLeadOut _:
+                case ArcLeadOut arc:
                     combo.SelectedIndex = 2;
+                    SetParam(panel, "Radius", arc.Radius);
                     break;
-                case MicrotabLeadOut _:
+                case MicrotabLeadOut microtab:
                     combo.SelectedIndex = 3;
+                    SetParam(panel, "GapSize", microtab.GapSize);
                     break;
                 default:
                     combo.SelectedIndex = 0;
@@ -255,12 +372,14 @@ namespace OpenNest.Forms
         {
             var p = new CuttingParameters
             {
-                ExternalLeadIn = BuildLeadIn(cboExternalLeadIn, pnlExternalParams),
-                ExternalLeadOut = BuildLeadOut(cboExternalLeadOut),
-                InternalLeadIn = BuildLeadIn(cboInternalLeadIn, pnlInternalParams),
-                InternalLeadOut = BuildLeadOut(cboInternalLeadOut),
-                ArcCircleLeadIn = BuildLeadIn(cboArcCircleLeadIn, pnlArcCircleParams),
-                ArcCircleLeadOut = BuildLeadOut(cboArcCircleLeadOut)
+                ExternalLeadIn = BuildLeadIn(cboExternalLeadIn, pnlExternalLeadIn),
+                ExternalLeadOut = BuildLeadOut(cboExternalLeadOut, pnlExternalLeadOut),
+                InternalLeadIn = BuildLeadIn(cboInternalLeadIn, pnlInternalLeadIn),
+                InternalLeadOut = BuildLeadOut(cboInternalLeadOut, pnlInternalLeadOut),
+                ArcCircleLeadIn = BuildLeadIn(cboArcCircleLeadIn, pnlArcCircleLeadIn),
+                ArcCircleLeadOut = BuildLeadOut(cboArcCircleLeadOut, pnlArcCircleLeadOut),
+                TabsEnabled = chkTabsEnabled.Checked,
+                TabConfig = new NormalTab { Size = (double)nudTabWidth.Value }
             };
             return p;
         }
@@ -307,16 +426,26 @@ namespace OpenNest.Forms
             }
         }
 
-        private static LeadOut BuildLeadOut(ComboBox combo)
+        private static LeadOut BuildLeadOut(ComboBox combo, Panel panel)
         {
             switch (combo.SelectedIndex)
             {
                 case 1:
-                    return new LineLeadOut { Length = 0.25, ApproachAngle = 90 };
+                    return new LineLeadOut
+                    {
+                        Length = GetParam(panel, "Length", 0.25),
+                        ApproachAngle = GetParam(panel, "ApproachAngle", 90)
+                    };
                 case 2:
-                    return new ArcLeadOut { Radius = 0.25 };
+                    return new ArcLeadOut
+                    {
+                        Radius = GetParam(panel, "Radius", 0.25)
+                    };
                 case 3:
-                    return new MicrotabLeadOut();
+                    return new MicrotabLeadOut
+                    {
+                        GapSize = GetParam(panel, "GapSize", 0.06)
+                    };
                 default:
                     return new NoLeadOut();
             }
@@ -326,7 +455,7 @@ namespace OpenNest.Forms
         {
             foreach (Control c in panel.Controls)
             {
-                if (c is System.Windows.Forms.NumericUpDown nud && (string)nud.Tag == tag)
+                if (c is NumericUpDown nud && (string)nud.Tag == tag)
                 {
                     nud.Value = (decimal)value;
                     return;
@@ -338,7 +467,7 @@ namespace OpenNest.Forms
         {
             foreach (Control c in panel.Controls)
             {
-                if (c is System.Windows.Forms.NumericUpDown nud && (string)nud.Tag == tag)
+                if (c is NumericUpDown nud && (string)nud.Tag == tag)
                     return (double)nud.Value;
             }
             return defaultValue;

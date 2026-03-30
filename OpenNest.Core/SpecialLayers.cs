@@ -13,9 +13,9 @@ namespace OpenNest
 
         public static readonly Layer Display = new Layer("DISPLAY") { Color = Color.Cyan };
 
-        public static readonly Layer Leadin = new Layer("LEADIN") { Color = Color.Yellow };
+        public static readonly Layer Leadin = new Layer("LEADIN") { Color = Color.Brown };
 
-        public static readonly Layer Leadout = new Layer("LEADOUT") { Color = Color.Yellow };
+        public static readonly Layer Leadout = new Layer("LEADOUT") { Color = Color.Brown };
 
         public static readonly Layer Scribe = new Layer("SCRIBE") { Color = Color.Magenta };
     }
