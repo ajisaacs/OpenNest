@@ -22,6 +22,7 @@ namespace OpenNest
     {
         private Vector location;
         private bool ownsProgram;
+        private double preLeadInRotation;
 
         public readonly Drawing BaseDrawing;
 
@@ -55,6 +56,38 @@ namespace OpenNest
         public Program Program { get; private set; }
 
         public bool HasManualLeadIns { get; set; }
+
+        public bool LeadInsLocked { get; set; }
+
+        public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
+
+        public void ApplyLeadIns(CNC.CuttingStrategy.CuttingParameters parameters, Vector approachPoint)
+        {
+            preLeadInRotation = Rotation;
+            var strategy = new CNC.CuttingStrategy.ContourCuttingStrategy { Parameters = parameters };
+            var result = strategy.Apply(Program, approachPoint);
+            Program = result.Program;
+            CuttingParameters = parameters;
+            HasManualLeadIns = true;
+            UpdateBounds();
+        }
+
+        public void RemoveLeadIns()
+        {
+            var rotation = preLeadInRotation;
+            var location = Location;
+            Program = BaseDrawing.Program.Clone() as Program;
+            ownsProgram = true;
+
+            if (!Math.Tolerance.IsEqualTo(rotation, 0))
+                Program.Rotate(rotation);
+
+            Location = location;
+            HasManualLeadIns = false;
+            LeadInsLocked = false;
+            CuttingParameters = null;
+            UpdateBounds();
+        }
 
         /// <summary>
         /// Gets the rotation of the part in radians.

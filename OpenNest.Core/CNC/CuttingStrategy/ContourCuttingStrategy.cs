@@ -102,7 +102,7 @@ namespace OpenNest.CNC.CuttingStrategy
             return ordered;
         }
 
-        private ContourType DetectContourType(Shape cutout)
+        internal static ContourType DetectContourType(Shape cutout)
         {
             if (cutout.Entities.Count == 1 && cutout.Entities[0] is Circle)
                 return ContourType.ArcCircle;
@@ -110,7 +110,7 @@ namespace OpenNest.CNC.CuttingStrategy
             return ContourType.Internal;
         }
 
-        private double ComputeNormal(Vector point, Entity entity, ContourType contourType)
+        internal static double ComputeNormal(Vector point, Entity entity, ContourType contourType)
         {
             double normal;
 
@@ -141,7 +141,7 @@ namespace OpenNest.CNC.CuttingStrategy
             return Math.Angle.NormalizeRad(normal);
         }
 
-        private RotationType DetermineWinding(Shape shape)
+        internal static RotationType DetermineWinding(Shape shape)
         {
             // Use signed area: positive = CCW, negative = CW
             var area = shape.Area();
