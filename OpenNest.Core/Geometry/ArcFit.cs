@@ -57,6 +57,60 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Fits a circular arc constrained to be tangent to the given directions at both
+        /// the first and last points. The center lies at the intersection of the normals
+        /// at P1 and Pn, guaranteeing the arc departs P1 in the start direction and arrives
+        /// at Pn in the end direction. Uses the radius from P1 (exact start tangent);
+        /// deviation includes any endpoint gap at Pn.
+        /// </summary>
+        internal static (Vector center, double radius, double deviation) FitWithDualTangent(
+            List<Vector> points, Vector startTangent, Vector endTangent)
+        {
+            if (points.Count < 3)
+                return (Vector.Invalid, 0, double.MaxValue);
+
+            var p1 = points[0];
+            var pn = points[^1];
+
+            var stLen = System.Math.Sqrt(startTangent.X * startTangent.X + startTangent.Y * startTangent.Y);
+            var etLen = System.Math.Sqrt(endTangent.X * endTangent.X + endTangent.Y * endTangent.Y);
+            if (stLen < 1e-10 || etLen < 1e-10)
+                return (Vector.Invalid, 0, double.MaxValue);
+
+            // Normal to start tangent at P1 (perpendicular)
+            var n1x = -startTangent.Y / stLen;
+            var n1y = startTangent.X / stLen;
+
+            // Normal to end tangent at Pn
+            var n2x = -endTangent.Y / etLen;
+            var n2y = endTangent.X / etLen;
+
+            // Solve: P1 + t1*N1 = Pn + t2*N2
+            var det = n1x * (-n2y) - (-n2x) * n1y;
+            if (System.Math.Abs(det) < 1e-10)
+                return (Vector.Invalid, 0, double.MaxValue);
+
+            var dx = pn.X - p1.X;
+            var dy = pn.Y - p1.Y;
+            var t1 = (dx * (-n2y) - (-n2x) * dy) / det;
+
+            var cx = p1.X + t1 * n1x;
+            var cy = p1.Y + t1 * n1y;
+
+            // Use radius from P1 (guarantees exact start tangent and passes through P1)
+            var r1 = System.Math.Sqrt((cx - p1.X) * (cx - p1.X) + (cy - p1.Y) * (cy - p1.Y));
+            if (r1 < 1e-10)
+                return (Vector.Invalid, 0, double.MaxValue);
+
+            // Measure endpoint gap at Pn
+            var r2 = System.Math.Sqrt((cx - pn.X) * (cx - pn.X) + (cy - pn.Y) * (cy - pn.Y));
+            var endpointDev = System.Math.Abs(r2 - r1);
+
+            var interiorDev = MaxRadialDeviation(points, cx, cy, r1);
+            return (new Vector(cx, cy), r1, System.Math.Max(endpointDev, interiorDev));
+        }
+
+        /// <summary>
         /// Computes the maximum radial deviation of interior points from a circle.
         /// </summary>
         internal static double MaxRadialDeviation(List<Vector> points, double cx, double cy, double radius)

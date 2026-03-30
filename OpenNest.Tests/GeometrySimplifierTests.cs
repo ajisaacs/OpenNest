@@ -1,4 +1,7 @@
 using OpenNest.Geometry;
+using OpenNest.IO;
+using System.IO;
+using System.Linq;
 using Xunit;
 
 namespace OpenNest.Tests;
@@ -126,5 +129,53 @@ public class GeometrySimplifierTests
         Assert.IsType<Arc>(result.Entities[5]);
         // Index 6 is the fitted arc replacing the second run
         Assert.IsType<Arc>(result.Entities[6]);
+    }
+
+    [Fact]
+    public void Apply_DynaPanDxf_NoGapsAfterSimplification()
+    {
+        var path = @"C:\Users\aisaacs\Desktop\Sullys Q29 DXFs\SULLYS-031 Dyna Pan.dxf";
+        if (!File.Exists(path))
+            return; // skip if file not available
+
+        var importer = new DxfImporter();
+        var result = importer.Import(path);
+        var shapes = ShapeBuilder.GetShapes(result.Entities);
+
+        var simplifier = new GeometrySimplifier { Tolerance = 0.004 };
+
+        foreach (var shape in shapes)
+        {
+            var candidates = simplifier.Analyze(shape);
+            if (candidates.Count == 0) continue;
+
+            var simplified = simplifier.Apply(shape, candidates);
+
+            // Check for gaps between consecutive entities
+            for (var i = 0; i < simplified.Entities.Count - 1; i++)
+            {
+                var current = simplified.Entities[i];
+                var next = simplified.Entities[i + 1];
+
+                var currentEnd = current switch
+                {
+                    Line l => l.EndPoint,
+                    Arc a => a.EndPoint(),
+                    _ => Vector.Invalid
+                };
+                var nextStart = next switch
+                {
+                    Line l => l.StartPoint,
+                    Arc a => a.StartPoint(),
+                    _ => Vector.Invalid
+                };
+
+                if (!currentEnd.IsValid() || !nextStart.IsValid()) continue;
+
+                var gap = currentEnd.DistanceTo(nextStart);
+                Assert.True(gap < 0.005,
+                    $"Gap of {gap:F4} between entities {i} ({current.GetType().Name}) and {i + 1} ({next.GetType().Name})");
+            }
+        }
     }
 }

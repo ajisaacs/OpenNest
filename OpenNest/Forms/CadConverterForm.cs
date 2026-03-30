@@ -494,13 +494,30 @@ namespace OpenNest.Forms
 
             using var dlg = new SaveFileDialog
             {
-                Filter = "DXF Files|*.dxf",
+                Filter = "DXF 2018 (*.dxf)|*.dxf|" +
+                         "DXF 2013 (*.dxf)|*.dxf|" +
+                         "DXF 2010 (*.dxf)|*.dxf|" +
+                         "DXF 2007 (*.dxf)|*.dxf|" +
+                         "DXF 2004 (*.dxf)|*.dxf|" +
+                         "DXF 2000 (*.dxf)|*.dxf|" +
+                         "DXF R14 (*.dxf)|*.dxf",
                 FileName = Path.ChangeExtension(item.Name, ".dxf"),
             };
 
             if (dlg.ShowDialog() != DialogResult.OK) return;
 
-            var doc = new ACadSharp.CadDocument();
+            var version = dlg.FilterIndex switch
+            {
+                2 => ACadSharp.ACadVersion.AC1027,
+                3 => ACadSharp.ACadVersion.AC1024,
+                4 => ACadSharp.ACadVersion.AC1021,
+                5 => ACadSharp.ACadVersion.AC1018,
+                6 => ACadSharp.ACadVersion.AC1015,
+                7 => ACadSharp.ACadVersion.AC1014,
+                _ => ACadSharp.ACadVersion.AC1032,
+            };
+
+            var doc = new ACadSharp.CadDocument(version);
             foreach (var entity in item.Entities)
             {
                 switch (entity)
