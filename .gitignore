@@ -211,5 +211,8 @@ FakesAssemblies/
 .superpowers/
 docs/superpowers/
 
+# Documentation (manuals, templates, etc.)
+docs/
+
 # Launch settings
 **/Properties/launchSettings.json
