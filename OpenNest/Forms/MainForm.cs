@@ -901,19 +901,8 @@ namespace OpenNest.Forms
                 return;
 
             nestingCts = new CancellationTokenSource();
-            var token = nestingCts.Token;
-
             var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
-
-            var previewPlate = new Plate(activeForm.PlateView.Plate.Size)
-            {
-                Quadrant = activeForm.PlateView.Plate.Quadrant,
-                PartSpacing = activeForm.PlateView.Plate.PartSpacing,
-                Thickness = activeForm.PlateView.Plate.Thickness,
-                Material = activeForm.PlateView.Plate.Material,
-            };
-            previewPlate.EdgeSpacing = activeForm.PlateView.Plate.EdgeSpacing;
-            progressForm.PreviewPlate = previewPlate;
+            progressForm.PreviewPlate = CreatePreviewPlate(activeForm.PlateView.Plate);
 
             var progress = new Progress<NestProgress>(p =>
             {
@@ -931,60 +920,7 @@ namespace OpenNest.Forms
 
             try
             {
-                var maxPlates = 100;
-
-                for (var plateCount = 0; plateCount < maxPlates; plateCount++)
-                {
-                    var remaining = items.Where(i => i.Quantity > 0).ToList();
-
-                    if (remaining.Count == 0)
-                        break;
-
-                    if (token.IsCancellationRequested)
-                        break;
-
-                    var plate = activeForm.PlateView.Plate.Parts.Count > 0
-                        ? activeForm.Nest.CreatePlate()
-                        : activeForm.PlateView.Plate;
-
-                    if (plate != activeForm.PlateView.Plate)
-                    {
-                        activeForm.LoadLastPlate();
-
-                        var newPreviewPlate = new Plate(plate.Size)
-                        {
-                            Quadrant = plate.Quadrant,
-                            PartSpacing = plate.PartSpacing,
-                            Thickness = plate.Thickness,
-                            Material = plate.Material,
-                        };
-                        newPreviewPlate.EdgeSpacing = plate.EdgeSpacing;
-                        progressForm.PreviewPlate = newPreviewPlate;
-                    }
-
-                    var anyPlaced = false;
-
-                    var engine = NestEngineRegistry.Create(plate);
-                    engine.PlateNumber = plateCount;
-
-                    var nestParts = await Task.Run(() =>
-                        engine.Nest(remaining, progress, token));
-
-                    activeForm.PlateView.ClearPreviewParts();
-
-                    if (nestParts.Count > 0 && (!token.IsCancellationRequested || progressForm.Accepted))
-                    {
-                        plate.Parts.AddRange(nestParts);
-                        activeForm.PlateView.Invalidate();
-                        anyPlaced = true;
-                    }
-
-                    if (!anyPlaced)
-                        break;
-                }
-
-                activeForm.Nest.UpdateDrawingQuantities();
-                progressForm.ShowCompleted();
+                await RunAutoNestAsync(items, progressForm, progress, nestingCts.Token);
             }
             catch (Exception ex)
             {
@@ -1000,6 +936,84 @@ namespace OpenNest.Forms
                 nestingCts.Dispose();
                 nestingCts = null;
             }
+        }
+
+        private async Task RunAutoNestAsync(
+            List<NestItem> items,
+            NestProgressForm progressForm,
+            IProgress<NestProgress> progress,
+            CancellationToken token)
+        {
+            const int maxPlates = 100;
+
+            for (var plateIndex = 0; plateIndex < maxPlates; plateIndex++)
+            {
+                var remaining = items.Where(i => i.Quantity > 0).ToList();
+
+                if (remaining.Count == 0 || token.IsCancellationRequested)
+                    break;
+
+                var plate = GetOrCreatePlate(progressForm);
+
+                var placed = await NestSinglePlateAsync(
+                    plate, plateIndex, remaining, progressForm, progress, token);
+
+                if (!placed)
+                    break;
+            }
+
+            activeForm.Nest.UpdateDrawingQuantities();
+            progressForm.ShowCompleted();
+        }
+
+        private Plate GetOrCreatePlate(NestProgressForm progressForm)
+        {
+            var currentPlate = activeForm.PlateView.Plate;
+
+            if (currentPlate.Parts.Count == 0)
+                return currentPlate;
+
+            var plate = activeForm.Nest.CreatePlate();
+            activeForm.LoadLastPlate();
+            progressForm.PreviewPlate = CreatePreviewPlate(plate);
+            return plate;
+        }
+
+        private async Task<bool> NestSinglePlateAsync(
+            Plate plate,
+            int plateIndex,
+            List<NestItem> items,
+            NestProgressForm progressForm,
+            IProgress<NestProgress> progress,
+            CancellationToken token)
+        {
+            var engine = NestEngineRegistry.Create(plate);
+            engine.PlateNumber = plateIndex;
+
+            var nestParts = await Task.Run(() =>
+                engine.Nest(items, progress, token));
+
+            activeForm.PlateView.ClearPreviewParts();
+
+            if (nestParts.Count == 0 || (token.IsCancellationRequested && !progressForm.Accepted))
+                return false;
+
+            plate.Parts.AddRange(nestParts);
+            activeForm.PlateView.Invalidate();
+            return true;
+        }
+
+        private static Plate CreatePreviewPlate(Plate source)
+        {
+            var plate = new Plate(source.Size)
+            {
+                Quadrant = source.Quadrant,
+                PartSpacing = source.PartSpacing,
+                Thickness = source.Thickness,
+                Material = source.Material,
+            };
+            plate.EdgeSpacing = source.EdgeSpacing;
+            return plate;
         }
 
         private void SequenceAllPlates_Click(object sender, EventArgs e)
