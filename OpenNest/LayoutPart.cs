@@ -15,6 +15,7 @@ namespace OpenNest
         private static Color selectedColor;
         private static Pen selectedPen;
         private static Brush selectedBrush;
+        private static Pen leadInPen;
 
         private Color color;
         private Brush brush;
@@ -34,6 +35,7 @@ namespace OpenNest
         {
             programIdFont = new Font(SystemFonts.DefaultFont, FontStyle.Bold | FontStyle.Underline);
             SelectedColor = Color.FromArgb(90, 150, 200, 255);
+            leadInPen = new Pen(Color.Yellow, 1.5f);
         }
 
         private LayoutPart(Part part)
@@ -51,6 +53,8 @@ namespace OpenNest
         public bool IsSelected { get; set; }
 
         public GraphicsPath Path { get; private set; }
+
+        public GraphicsPath LeadInPath { get; private set; }
 
         public Color Color
         {
@@ -83,6 +87,9 @@ namespace OpenNest
                 g.FillPath(brush, Path);
                 g.DrawPath(pen, Path);
             }
+
+            if (LeadInPath != null)
+                g.DrawPath(leadInPen, LeadInPath);
         }
 
         public void Draw(Graphics g, string id)
@@ -97,6 +104,9 @@ namespace OpenNest
                 g.FillPath(brush, Path);
                 g.DrawPath(pen, Path);
             }
+
+            if (LeadInPath != null)
+                g.DrawPath(leadInPen, LeadInPath);
 
             using var sf = new StringFormat
             {
@@ -138,8 +148,22 @@ namespace OpenNest
 
         public void Update(DrawControl plateView)
         {
-            Path = GraphicsHelper.GetGraphicsPath(BasePart.Program, BasePart.Location);
-            Path.Transform(plateView.Matrix);
+            if (BasePart.HasManualLeadIns)
+            {
+                BasePart.Program.GetGraphicsPaths(BasePart.Location, out var cutPath, out var leadPath);
+                cutPath.Transform(plateView.Matrix);
+                leadPath.Transform(plateView.Matrix);
+                Path = cutPath;
+                LeadInPath?.Dispose();
+                LeadInPath = leadPath;
+            }
+            else
+            {
+                Path = GraphicsHelper.GetGraphicsPath(BasePart.Program, BasePart.Location);
+                Path.Transform(plateView.Matrix);
+                LeadInPath?.Dispose();
+                LeadInPath = null;
+            }
 
             _labelPoint ??= ComputeLabelPoint();
             var rotatedLabel = _labelPoint.Value.Rotate(BasePart.Rotation);
