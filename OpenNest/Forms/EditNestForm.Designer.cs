@@ -39,6 +39,7 @@
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.toolStripButton1 = new System.Windows.Forms.ToolStripButton();
             this.btnAssignLeadIns = new System.Windows.Forms.ToolStripButton();
+            this.btnPlaceLeadIn = new System.Windows.Forms.ToolStripButton();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.drawingListBox1 = new OpenNest.Controls.DrawingListBox();
             this.toolStrip2 = new System.Windows.Forms.ToolStrip();
@@ -135,7 +136,8 @@
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toolStripButton1,
-            this.btnAssignLeadIns});
+            this.btnAssignLeadIns,
+            this.btnPlaceLeadIn});
             this.toolStrip1.Location = new System.Drawing.Point(3, 3);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(227, 31);
@@ -162,6 +164,15 @@
             this.btnAssignLeadIns.Size = new System.Drawing.Size(96, 28);
             this.btnAssignLeadIns.Text = "Assign Lead-ins";
             this.btnAssignLeadIns.Click += new System.EventHandler(this.AssignLeadIns_Click);
+            //
+            // btnPlaceLeadIn
+            //
+            this.btnPlaceLeadIn.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.btnPlaceLeadIn.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.btnPlaceLeadIn.Name = "btnPlaceLeadIn";
+            this.btnPlaceLeadIn.Size = new System.Drawing.Size(90, 28);
+            this.btnPlaceLeadIn.Text = "Place Lead-in";
+            this.btnPlaceLeadIn.Click += new System.EventHandler(this.PlaceLeadIn_Click);
             //
             // tabPage2
             // 
@@ -278,5 +289,6 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripButton toolStripButton3;
         private System.Windows.Forms.ToolStripButton btnAssignLeadIns;
+        private System.Windows.Forms.ToolStripButton btnPlaceLeadIn;
     }
 }

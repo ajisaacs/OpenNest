@@ -738,6 +738,26 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
+        private void PlaceLeadIn_Click(object sender, EventArgs e)
+        {
+            if (PlateView?.Plate == null)
+                return;
+
+            var plate = PlateView.Plate;
+
+            // Ensure cutting parameters are configured
+            if (plate.CuttingParameters == null)
+            {
+                using var form = new CuttingParametersForm();
+                if (form.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                plate.CuttingParameters = form.BuildParameters();
+            }
+
+            PlateView.SetAction(typeof(Actions.ActionLeadIn));
+        }
+
         private void ImportDrawings_Click(object sender, EventArgs e)
         {
             Import();
