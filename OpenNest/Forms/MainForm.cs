@@ -1040,6 +1040,13 @@ namespace OpenNest.Forms
             if (postProcessor == null)
                 return;
 
+            if (postProcessor is IConfigurablePostProcessor configurable)
+            {
+                using var configForm = new PostProcessorConfigForm(configurable);
+                if (configForm.ShowDialog() != DialogResult.OK)
+                    return;
+            }
+
             var dialog = new SaveFileDialog();
             dialog.Filter = "CNC File (*.cnc) | *.cnc";
             dialog.FileName = activeForm.Nest.Name;
