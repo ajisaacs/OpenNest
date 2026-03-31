@@ -12,6 +12,11 @@ namespace OpenNest.CNC.CuttingStrategy
             var exitPoint = approachPoint;
             var entities = partProgram.ToGeometry();
             entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
+
+            // Separate scribe/etch entities — they don't get lead-ins or kerf
+            var scribeEntities = entities.FindAll(e => e.Layer == SpecialLayers.Scribe);
+            entities.RemoveAll(e => e.Layer == SpecialLayers.Scribe);
+
             var profile = new ShapeProfile(entities);
 
             // Find closest point on perimeter from exit point
@@ -22,9 +27,22 @@ namespace OpenNest.CNC.CuttingStrategy
             var orderedCutouts = SequenceCutouts(profile.Cutouts, perimeterPoint);
             orderedCutouts.Reverse();
 
-            // Build output program: cutouts first (farthest to nearest), perimeter last
+            // Build output program: scribe first, cutouts second, perimeter last
             var result = new Program(Mode.Absolute);
             var currentPoint = exitPoint;
+
+            // Emit scribe/etch contours first (no lead-ins, no kerf)
+            if (scribeEntities.Count > 0)
+            {
+                var scribeShapes = ShapeBuilder.GetShapes(scribeEntities);
+                foreach (var scribe in scribeShapes)
+                {
+                    var startPt = GetShapeStartPoint(scribe);
+                    result.Codes.Add(new RapidMove(startPt));
+                    result.Codes.AddRange(ConvertShapeToMoves(scribe, startPt, LayerType.Scribe));
+                    currentPoint = startPt;
+                }
+            }
 
             foreach (var cutout in orderedCutouts)
             {
@@ -220,7 +238,7 @@ namespace OpenNest.CNC.CuttingStrategy
             };
         }
 
-        private List<ICode> ConvertShapeToMoves(Shape shape, Vector startPoint)
+        private List<ICode> ConvertShapeToMoves(Shape shape, Vector startPoint, LayerType layer = LayerType.Display)
         {
             var moves = new List<ICode>();
 
@@ -228,15 +246,15 @@ namespace OpenNest.CNC.CuttingStrategy
             {
                 if (entity is Line line)
                 {
-                    moves.Add(new LinearMove(line.EndPoint));
+                    moves.Add(new LinearMove(line.EndPoint) { Layer = layer });
                 }
                 else if (entity is Arc arc)
                 {
-                    moves.Add(new ArcMove(arc.EndPoint(), arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW));
+                    moves.Add(new ArcMove(arc.EndPoint(), arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW) { Layer = layer });
                 }
                 else if (entity is Circle circle)
                 {
-                    moves.Add(new ArcMove(startPoint, circle.Center, circle.Rotation));
+                    moves.Add(new ArcMove(startPoint, circle.Center, circle.Rotation) { Layer = layer });
                 }
                 else
                 {
@@ -245,6 +263,15 @@ namespace OpenNest.CNC.CuttingStrategy
             }
 
             return moves;
+        }
+
+        private static Vector GetShapeStartPoint(Shape shape)
+        {
+            var first = shape.Entities[0];
+            if (first is Line line) return line.StartPoint;
+            if (first is Arc arc) return arc.StartPoint();
+            if (first is Circle circle) return new Vector(circle.Center.X + circle.Radius, circle.Center.Y);
+            return Vector.Zero;
         }
     }
 }

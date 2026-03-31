@@ -249,6 +249,7 @@ namespace OpenNest.Actions
             }
 
             var entities = ConvertProgram.ToGeometry(cleanProgram);
+            entities.RemoveAll(e => e.Layer == SpecialLayers.Scribe);
             profile = new ShapeProfile(entities);
 
             contours = new List<ShapeInfo>();
