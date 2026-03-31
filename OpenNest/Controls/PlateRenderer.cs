@@ -515,23 +515,22 @@ namespace OpenNest.Controls
 
         private void DrawAllCutDirectionArrows(Graphics g)
         {
-            using var pen = new Pen(Color.FromArgb(220, Color.DarkCyan), 1.5f);
-            using var brush = new SolidBrush(Color.FromArgb(220, Color.DarkCyan));
+            using var pen = new Pen(Color.FromArgb(220, Color.Black), 1.5f);
 
             var arrowSpacingWorld = view.LengthGuiToWorld(60f);
-            var arrowSize = 5f;
+            var arrowSize = 6f;
 
             for (var i = 0; i < view.Plate.Parts.Count; ++i)
             {
                 var part = view.Plate.Parts[i];
                 var pgm = part.Program;
                 var pos = part.Location;
-                DrawProgramCutDirectionArrows(g, pgm, ref pos, pen, brush, arrowSpacingWorld, arrowSize);
+                DrawProgramCutDirectionArrows(g, pgm, ref pos, pen, arrowSpacingWorld, arrowSize);
             }
         }
 
         private void DrawProgramCutDirectionArrows(Graphics g, Program pgm, ref Vector pos,
-            Pen pen, Brush brush, double spacing, float arrowSize)
+            Pen pen, double spacing, float arrowSize)
         {
             for (var i = 0; i < pgm.Length; ++i)
             {
@@ -541,7 +540,7 @@ namespace OpenNest.Controls
                 {
                     var subpgm = (SubProgramCall)code;
                     if (subpgm.Program != null)
-                        DrawProgramCutDirectionArrows(g, subpgm.Program, ref pos, pen, brush, spacing, arrowSize);
+                        DrawProgramCutDirectionArrows(g, subpgm.Program, ref pos, pen, spacing, arrowSize);
                     continue;
                 }
 
@@ -555,7 +554,7 @@ namespace OpenNest.Controls
                 {
                     var line = (LinearMove)code;
                     if (!line.Suppressed)
-                        DrawLineDirectionArrows(g, pos, endpt, brush, spacing, arrowSize);
+                        DrawLineDirectionArrows(g, pos, endpt, pen, spacing, arrowSize);
                 }
                 else if (code.Type == CodeType.ArcMove)
                 {
@@ -565,7 +564,7 @@ namespace OpenNest.Controls
                         var center = pgm.Mode == Mode.Incremental
                             ? arc.CenterPoint + pos
                             : arc.CenterPoint;
-                        DrawArcDirectionArrows(g, pos, endpt, center, arc.Rotation, brush, spacing, arrowSize);
+                        DrawArcDirectionArrows(g, pos, endpt, center, arc.Rotation, pen, spacing, arrowSize);
                     }
                 }
 
@@ -574,7 +573,7 @@ namespace OpenNest.Controls
         }
 
         private void DrawLineDirectionArrows(Graphics g, Vector start, Vector end,
-            Brush brush, double spacing, float arrowSize)
+            Pen pen, double spacing, float arrowSize)
         {
             var dx = end.X - start.X;
             var dy = end.Y - start.Y;
@@ -593,12 +592,12 @@ namespace OpenNest.Controls
                 var pt = new Vector(start.X + dirX * t, start.Y + dirY * t);
                 var screenPt = view.PointWorldToGraph(pt);
                 var angle = System.Math.Atan2(-dirY, dirX);
-                DrawArrowHead(g, brush, screenPt, angle, arrowSize);
+                DrawArrowHead(g, pen, screenPt, angle, arrowSize);
             }
         }
 
         private void DrawArcDirectionArrows(Graphics g, Vector start, Vector end, Vector center,
-            RotationType rotation, Brush brush, double spacing, float arrowSize)
+            RotationType rotation, Pen pen, double spacing, float arrowSize)
         {
             var radius = center.DistanceTo(start);
             if (radius < Tolerance.Epsilon) return;
@@ -644,11 +643,11 @@ namespace OpenNest.Controls
                     tangent = angle - System.Math.PI / 2;
 
                 var screenAngle = System.Math.Atan2(-System.Math.Sin(tangent), System.Math.Cos(tangent));
-                DrawArrowHead(g, brush, screenPt, screenAngle, arrowSize);
+                DrawArrowHead(g, pen, screenPt, screenAngle, arrowSize);
             }
         }
 
-        private static void DrawArrowHead(Graphics g, Brush brush, PointF tip, double angle, float size)
+        private static void DrawArrowHead(Graphics g, Pen pen, PointF tip, double angle, float size)
         {
             var sin = (float)System.Math.Sin(angle);
             var cos = (float)System.Math.Cos(angle);
@@ -658,14 +657,11 @@ namespace OpenNest.Controls
             var wingX = size * 0.5f * sin;
             var wingY = -size * 0.5f * cos;
 
-            var points = new PointF[]
-            {
-                tip,
-                new PointF(tip.X + backX + wingX, tip.Y + backY + wingY),
-                new PointF(tip.X + backX - wingX, tip.Y + backY - wingY),
-            };
+            var wing1 = new PointF(tip.X + backX + wingX, tip.Y + backY + wingY);
+            var wing2 = new PointF(tip.X + backX - wingX, tip.Y + backY - wingY);
 
-            g.FillPolygon(brush, points);
+            g.DrawLine(pen, wing1, tip);
+            g.DrawLine(pen, wing2, tip);
         }
 
         private void DrawLine(Graphics g, Vector pt1, Vector pt2, Pen pen)
