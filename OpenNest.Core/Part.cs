@@ -106,6 +106,7 @@ namespace OpenNest
             EnsureOwnedProgram();
             Program.Rotate(angle);
             location = Location.Rotate(angle);
+            preLeadInRotation = Program.Rotation;
             UpdateBounds();
         }
 
@@ -119,6 +120,7 @@ namespace OpenNest
             EnsureOwnedProgram();
             Program.Rotate(angle);
             location = Location.Rotate(angle, origin);
+            preLeadInRotation = Program.Rotation;
             UpdateBounds();
         }
 
