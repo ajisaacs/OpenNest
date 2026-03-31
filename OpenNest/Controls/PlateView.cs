@@ -826,14 +826,35 @@ namespace OpenNest.Controls
                 var part = Plate.Parts[i];
                 var pgm = part.Program;
 
-                DrawLine(g, pos, part.Location, ColorScheme.RapidPen);
+                // Draw approach rapid directly to the program's first pierce
+                // point instead of to part.Location (the coordinate origin),
+                // which may not be at a cutting feature.
+                var piercePoint = GetFirstPiercePoint(pgm, part.Location);
+                DrawLine(g, pos, piercePoint, ColorScheme.RapidPen);
+
                 pos = part.Location;
-                DrawRapids(g, pgm, ref pos);
+                DrawRapids(g, pgm, ref pos, skipFirstRapid: true);
             }
         }
 
-        private void DrawRapids(Graphics g, Program pgm, ref Vector pos)
+        private static Vector GetFirstPiercePoint(Program pgm, Vector partLocation)
         {
+            for (var i = 0; i < pgm.Length; i++)
+            {
+                if (pgm[i] is Motion motion)
+                {
+                    if (pgm.Mode == Mode.Incremental)
+                        return motion.EndPoint + partLocation;
+                    return motion.EndPoint;
+                }
+            }
+            return partLocation;
+        }
+
+        private void DrawRapids(Graphics g, Program pgm, ref Vector pos, bool skipFirstRapid = false)
+        {
+            var firstRapidSkipped = false;
+
             for (int i = 0; i < pgm.Length; ++i)
             {
                 var code = pgm[i];
@@ -857,13 +878,23 @@ namespace OpenNest.Controls
                             var endpt = motion.EndPoint + pos;
 
                             if (code.Type == CodeType.RapidMove)
-                                DrawLine(g, pos, endpt, ColorScheme.RapidPen);
+                            {
+                                if (skipFirstRapid && !firstRapidSkipped)
+                                    firstRapidSkipped = true;
+                                else
+                                    DrawLine(g, pos, endpt, ColorScheme.RapidPen);
+                            }
                             pos = endpt;
                         }
                         else
                         {
                             if (code.Type == CodeType.RapidMove)
-                                DrawLine(g, pos, motion.EndPoint, ColorScheme.RapidPen);
+                            {
+                                if (skipFirstRapid && !firstRapidSkipped)
+                                    firstRapidSkipped = true;
+                                else
+                                    DrawLine(g, pos, motion.EndPoint, ColorScheme.RapidPen);
+                            }
                             pos = motion.EndPoint;
                         }
                     }

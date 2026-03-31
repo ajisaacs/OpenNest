@@ -44,7 +44,7 @@ namespace OpenNest.Engine
                 }
 
                 // Pierce point: program start point in plate space
-                var pierceLocal = GetProgramStartPoint(part.Program);
+                var pierceLocal = GetProgramStartPoint(processedProgram);
                 var piercePoint = ToPlateSpace(pierceLocal, part);
 
                 // Plan rapid from currentPoint to pierce point
