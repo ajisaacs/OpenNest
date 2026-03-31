@@ -16,7 +16,7 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             var piercePoint = GetPiercePoint(contourStartPoint, contourNormalAngle);
 
-            var secondAngle = contourNormalAngle + Angle.HalfPI - Angle.ToRadians(ApproachAngle1);
+            var secondAngle = contourNormalAngle - Angle.HalfPI + Angle.ToRadians(ApproachAngle1);
             var midPoint = new Vector(
                 contourStartPoint.X + Length2 * System.Math.Cos(secondAngle),
                 contourStartPoint.Y + Length2 * System.Math.Sin(secondAngle));
@@ -31,7 +31,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
         public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle)
         {
-            var secondAngle = contourNormalAngle + Angle.HalfPI - Angle.ToRadians(ApproachAngle1);
+            var secondAngle = contourNormalAngle - Angle.HalfPI + Angle.ToRadians(ApproachAngle1);
             var midX = contourStartPoint.X + Length2 * System.Math.Cos(secondAngle);
             var midY = contourStartPoint.Y + Length2 * System.Math.Sin(secondAngle);
 
