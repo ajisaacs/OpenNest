@@ -26,6 +26,7 @@ namespace OpenNest.Actions
         private ShapeInfo hoveredContour;
         private ContextMenuStrip contextMenu;
         private static readonly Brush grayOverlay = new SolidBrush(Color.FromArgb(160, 180, 180, 180));
+        private static readonly Pen highlightPen = new Pen(Color.Cyan, 2.5f);
 
         public ActionLeadIn(PlateView plateView)
             : base(plateView)
@@ -149,6 +150,23 @@ namespace OpenNest.Actions
 
                 if (lp.Path != null)
                     g.FillPath(grayOverlay, lp.Path);
+            }
+
+            // Highlight the hovered contour
+            if (hoveredContour != null && selectedPart != null)
+            {
+                using var contourPath = hoveredContour.Shape.GetGraphicsPath();
+
+                // Translate from local part space to world space, then apply view transform
+                using var contourMatrix = new Matrix();
+                contourMatrix.Translate((float)selectedPart.Location.X, (float)selectedPart.Location.Y);
+                contourMatrix.Multiply(plateView.Matrix, MatrixOrder.Append);
+                contourPath.Transform(contourMatrix);
+
+                var prevSmooth = g.SmoothingMode;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.DrawPath(highlightPen, contourPath);
+                g.SmoothingMode = prevSmooth;
             }
 
             if (!hasSnap || selectedPart == null)
