@@ -9,7 +9,7 @@ using OpenNest.CNC;
 
 namespace OpenNest.Posts.Cincinnati
 {
-    public sealed class CincinnatiPostProcessor : IPostProcessor
+    public sealed class CincinnatiPostProcessor : IConfigurablePostProcessor
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -22,6 +22,8 @@ namespace OpenNest.Posts.Cincinnati
         public string Description => "Cincinnati CL-707/CL-800/CL-900/CL-940/CLX family";
 
         public CincinnatiPostConfig Config { get; }
+
+        object IConfigurablePostProcessor.Config => Config;
 
         public CincinnatiPostProcessor()
         {

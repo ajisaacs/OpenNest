@@ -122,6 +122,17 @@ public class CincinnatiPostProcessorTests
     }
 
     [Fact]
+    public void Post_ImplementsIConfigurablePostProcessor()
+    {
+        var post = new CincinnatiPostProcessor(new CincinnatiPostConfig());
+        var configurable = post as IConfigurablePostProcessor;
+
+        Assert.NotNull(configurable);
+        Assert.NotNull(configurable.Config);
+        Assert.IsType<CincinnatiPostConfig>(configurable.Config);
+    }
+
+    [Fact]
     public void Post_SkipsEmptyPlates()
     {
         var nest = new Nest("TestNest");
