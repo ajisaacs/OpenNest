@@ -153,7 +153,8 @@ public sealed class CincinnatiSheetWriter
                         IsEtch = isEtch,
                         LibraryFile = isEtch ? etchLibrary : cutLibrary,
                         CutDistance = cutDistance,
-                        SheetDiagonal = sheetDiagonal
+                        SheetDiagonal = sheetDiagonal,
+                        PartLocation = part.Location
                     };
 
                     _featureWriter.Write(w, ctx);
@@ -240,7 +241,8 @@ public sealed class CincinnatiSheetWriter
                 IsEtch = isEtch,
                 LibraryFile = isEtch ? etchLibrary : cutLibrary,
                 CutDistance = cutDistance,
-                SheetDiagonal = sheetDiagonal
+                SheetDiagonal = sheetDiagonal,
+                PartLocation = part.Location
             };
 
             _featureWriter.Write(w, ctx);

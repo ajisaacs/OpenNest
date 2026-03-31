@@ -280,6 +280,67 @@ public class CincinnatiSheetWriterTests
         Assert.False(FeatureUtils.IsEtch(codes));
     }
 
+    [Fact]
+    public void WriteSheet_InlineCoordinates_AreAbsoluteOnPlate()
+    {
+        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        // Part program is at origin: (0,0) to (2,0) to (2,2) to (0,2) to (0,0)
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(0, 0));
+        pgm.Codes.Add(new LinearMove(2, 0));
+        pgm.Codes.Add(new LinearMove(2, 2));
+        pgm.Codes.Add(new LinearMove(0, 2));
+        pgm.Codes.Add(new LinearMove(0, 0));
+
+        var plate = new Plate(48.0, 96.0);
+        // Place part at (10.5, 5.25) on the plate to produce non-integer coordinates
+        plate.Parts.Add(new Part(new Drawing("Square", pgm), new Vector(10.5, 5.25)));
+
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
+
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "");
+
+        var output = sb.ToString();
+        // Under G90, coordinates must be plate-absolute (part coords + part location)
+        Assert.Contains("G0 X10.5 Y5.25", output);      // rapid to pierce
+        Assert.Contains("G1 X12.5 Y5.25", output);       // (2,0) + (10.5,5.25)
+        Assert.Contains("G1 X12.5 Y7.25", output);       // (2,2) + (10.5,5.25)
+        Assert.Contains("G1 X10.5 Y7.25", output);       // (0,2) + (10.5,5.25)
+        Assert.Contains("G1 X10.5 Y5.25", output);       // (0,0) + (10.5,5.25)
+    }
+
+    [Fact]
+    public void WriteSheet_TwoPartsAtDifferentLocations_HaveDistinctAbsoluteCoords()
+    {
+        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(0, 0));
+        pgm.Codes.Add(new LinearMove(1, 0));
+        pgm.Codes.Add(new LinearMove(1, 1));
+        pgm.Codes.Add(new LinearMove(0, 0));
+
+        var drawing = new Drawing("Tri", pgm);
+        var plate = new Plate(48.0, 96.0);
+        plate.Parts.Add(new Part(drawing, new Vector(5.5, 3.25)));
+        plate.Parts.Add(new Part(drawing, new Vector(20.5, 10.25)));
+
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
+
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "");
+
+        var output = sb.ToString();
+        // First part at (5.5, 3.25)
+        Assert.Contains("G0 X5.5 Y3.25", output);
+        Assert.Contains("G1 X6.5 Y3.25", output);
+        // Second part at (20.5, 10.25)
+        Assert.Contains("G0 X20.5 Y10.25", output);
+        Assert.Contains("G1 X21.5 Y10.25", output);
+    }
+
     private static Program CreateSimpleProgram()
     {
         var pgm = new Program();

@@ -23,6 +23,12 @@ public sealed class FeatureContext
     public string LibraryFile { get; set; } = "";
     public double CutDistance { get; set; }
     public double SheetDiagonal { get; set; }
+
+    /// <summary>
+    /// Part location on the plate. Added to all output X/Y coordinates
+    /// so part-relative programs become plate-absolute under G90.
+    /// </summary>
+    public Vector PartLocation { get; set; } = Vector.Zero;
 }
 
 /// <summary>
@@ -51,12 +57,13 @@ public sealed class CincinnatiFeatureWriter
         var currentPos = Vector.Zero;
         var lastFeedVar = "";
         var kerfEmitted = false;
+        var offset = ctx.PartLocation;
 
         // Find the pierce point from the first rapid move
         var piercePoint = FindPiercePoint(ctx.Codes);
 
         // 1. Rapid to pierce point (with line number if configured)
-        WriteRapidToPierce(writer, ctx.FeatureNumber, piercePoint);
+        WriteRapidToPierce(writer, ctx.FeatureNumber, piercePoint, offset);
 
         // 2. Part name comment on first feature of each part
         if (ctx.IsFirstFeatureOfPart && !string.IsNullOrEmpty(ctx.PartName))
@@ -105,7 +112,7 @@ public sealed class CincinnatiFeatureWriter
                     kerfEmitted = true;
                 }
 
-                sb.Append($"G1 X{_fmt.FormatCoord(linear.EndPoint.X)} Y{_fmt.FormatCoord(linear.EndPoint.Y)}");
+                sb.Append($"G1 X{_fmt.FormatCoord(linear.EndPoint.X + offset.X)} Y{_fmt.FormatCoord(linear.EndPoint.Y + offset.Y)}");
 
                 // Feedrate — etch always uses process feedrate
                 var feedVar = ctx.IsEtch ? "#148" : GetLinearFeedVariable(linear.Layer);
@@ -131,7 +138,7 @@ public sealed class CincinnatiFeatureWriter
 
                 // G2 = CW, G3 = CCW
                 var gCode = arc.Rotation == RotationType.CW ? "G2" : "G3";
-                sb.Append($"{gCode} X{_fmt.FormatCoord(arc.EndPoint.X)} Y{_fmt.FormatCoord(arc.EndPoint.Y)}");
+                sb.Append($"{gCode} X{_fmt.FormatCoord(arc.EndPoint.X + offset.X)} Y{_fmt.FormatCoord(arc.EndPoint.Y + offset.Y)}");
 
                 // Convert absolute center to incremental I/J
                 var i = arc.CenterPoint.X - currentPos.X;
@@ -188,14 +195,14 @@ public sealed class CincinnatiFeatureWriter
         return Vector.Zero;
     }
 
-    private void WriteRapidToPierce(TextWriter writer, int featureNumber, Vector piercePoint)
+    private void WriteRapidToPierce(TextWriter writer, int featureNumber, Vector piercePoint, Vector offset)
     {
         var sb = new StringBuilder();
 
         if (_config.UseLineNumbers)
             sb.Append($"N{featureNumber} ");
 
-        sb.Append($"G0 X{_fmt.FormatCoord(piercePoint.X)} Y{_fmt.FormatCoord(piercePoint.Y)}");
+        sb.Append($"G0 X{_fmt.FormatCoord(piercePoint.X + offset.X)} Y{_fmt.FormatCoord(piercePoint.Y + offset.Y)}");
 
         writer.WriteLine(sb.ToString());
     }
