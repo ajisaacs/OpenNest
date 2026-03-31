@@ -741,6 +741,9 @@ namespace OpenNest.Forms
             };
             assigner.Assign(plate);
 
+            foreach (var lp in PlateView.Parts)
+                lp.IsDirty = true;
+
             PlateView.Invalidate();
         }
 
