@@ -23,6 +23,7 @@ namespace OpenNest.Actions
         private ContourType snapContourType;
         private double snapNormal;
         private bool hasSnap;
+        private ShapeInfo hoveredContour;
         private ContextMenuStrip contextMenu;
         private static readonly Brush grayOverlay = new SolidBrush(Color.FromArgb(160, 180, 180, 180));
 
@@ -55,6 +56,7 @@ namespace OpenNest.Actions
             profile = null;
             contours = null;
             hasSnap = false;
+            hoveredContour = null;
             plateView.Invalidate();
         }
 
@@ -78,6 +80,7 @@ namespace OpenNest.Actions
             // Find closest contour and point
             var bestDist = double.MaxValue;
             hasSnap = false;
+            hoveredContour = null;
 
             foreach (var info in contours)
             {
@@ -92,6 +95,7 @@ namespace OpenNest.Actions
                     snapContourType = info.ContourType;
                     snapNormal = ContourCuttingStrategy.ComputeNormal(closest, entity, info.ContourType);
                     hasSnap = true;
+                    hoveredContour = info;
                 }
             }
 
@@ -324,6 +328,7 @@ namespace OpenNest.Actions
             profile = null;
             contours = null;
             hasSnap = false;
+            hoveredContour = null;
             plateView.Invalidate();
         }
 
