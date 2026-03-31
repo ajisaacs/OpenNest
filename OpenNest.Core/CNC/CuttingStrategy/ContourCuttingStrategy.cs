@@ -1,4 +1,5 @@
 using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Generic;
 
 namespace OpenNest.CNC.CuttingStrategy
@@ -59,9 +60,18 @@ namespace OpenNest.CNC.CuttingStrategy
 
                 result.Codes.AddRange(leadIn.Generate(closestPt, normal, winding));
                 var reindexed = cutout.ReindexAt(closestPt, entity);
-                result.Codes.AddRange(ConvertShapeToMoves(reindexed, closestPt));
-                // TODO: MicrotabLeadOut — trim last cutting move by GapSize
-                result.Codes.AddRange(leadOut.Generate(closestPt, normal, winding));
+
+                if (Parameters.TabsEnabled && Parameters.TabConfig != null)
+                {
+                    var trimmed = TrimShapeForTab(reindexed, closestPt, Parameters.TabConfig.Size);
+                    result.Codes.AddRange(ConvertShapeToMoves(trimmed, closestPt));
+                    result.Codes.AddRange(leadOut.Generate(closestPt, normal, winding));
+                }
+                else
+                {
+                    result.Codes.AddRange(ConvertShapeToMoves(reindexed, closestPt));
+                    result.Codes.AddRange(leadOut.Generate(closestPt, normal, winding));
+                }
 
                 currentPoint = closestPt;
             }
@@ -80,9 +90,18 @@ namespace OpenNest.CNC.CuttingStrategy
 
                 result.Codes.AddRange(leadIn.Generate(perimeterPt, normal, winding));
                 var reindexed = profile.Perimeter.ReindexAt(perimeterPt, perimeterEntity);
-                result.Codes.AddRange(ConvertShapeToMoves(reindexed, perimeterPt));
-                // TODO: MicrotabLeadOut — trim last cutting move by GapSize
-                result.Codes.AddRange(leadOut.Generate(perimeterPt, normal, winding));
+
+                if (Parameters.TabsEnabled && Parameters.TabConfig != null)
+                {
+                    var trimmed = TrimShapeForTab(reindexed, perimeterPt, Parameters.TabConfig.Size);
+                    result.Codes.AddRange(ConvertShapeToMoves(trimmed, perimeterPt));
+                    result.Codes.AddRange(leadOut.Generate(perimeterPt, normal, winding));
+                }
+                else
+                {
+                    result.Codes.AddRange(ConvertShapeToMoves(reindexed, perimeterPt));
+                    result.Codes.AddRange(leadOut.Generate(perimeterPt, normal, winding));
+                }
             }
 
             // Convert to incremental mode to match the convention used by
@@ -236,6 +255,70 @@ namespace OpenNest.CNC.CuttingStrategy
                 ContourType.Internal => Parameters.InternalLeadOut,
                 _ => Parameters.ExternalLeadOut
             };
+        }
+
+        private static Shape TrimShapeForTab(Shape shape, Vector center, double tabSize)
+        {
+            var tabCircle = new Circle(center, tabSize);
+            var entities = new List<Entity>(shape.Entities);
+
+            // Trim end: walk backward removing entities inside the tab circle
+            while (entities.Count > 0)
+            {
+                var entity = entities[entities.Count - 1];
+                if (entity.Intersects(tabCircle, out var pts) && pts.Count > 0)
+                {
+                    // Find intersection furthest from center (furthest along path from end)
+                    var best = pts[0];
+                    var bestDist = best.DistanceTo(center);
+                    for (var j = 1; j < pts.Count; j++)
+                    {
+                        var dist = pts[j].DistanceTo(center);
+                        if (dist > bestDist)
+                        {
+                            best = pts[j];
+                            bestDist = dist;
+                        }
+                    }
+
+                    if (entity is Line line)
+                    {
+                        var (first, _) = line.SplitAt(best);
+                        entities.RemoveAt(entities.Count - 1);
+                        if (first != null)
+                            entities.Add(first);
+                    }
+                    else if (entity is Arc arc)
+                    {
+                        var (first, _) = arc.SplitAt(best);
+                        entities.RemoveAt(entities.Count - 1);
+                        if (first != null)
+                            entities.Add(first);
+                    }
+
+                    break;
+                }
+
+                // No intersection — entity is entirely inside circle, remove it
+                if (EntityStartPoint(entity).DistanceTo(center) <= tabSize + Tolerance.Epsilon)
+                {
+                    entities.RemoveAt(entities.Count - 1);
+                    continue;
+                }
+
+                break;
+            }
+
+            var result = new Shape();
+            result.Entities.AddRange(entities);
+            return result;
+        }
+
+        private static Vector EntityStartPoint(Entity entity)
+        {
+            if (entity is Line line) return line.StartPoint;
+            if (entity is Arc arc) return arc.StartPoint();
+            return Vector.Zero;
         }
 
         private List<ICode> ConvertShapeToMoves(Shape shape, Vector startPoint, LayerType layer = LayerType.Display)
