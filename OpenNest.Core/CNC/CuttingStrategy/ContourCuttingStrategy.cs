@@ -169,6 +169,12 @@ namespace OpenNest.CNC.CuttingStrategy
             {
                 // Radial direction from center to point
                 normal = point.AngleFrom(arc.Center);
+
+                // For CCW arcs the radial points the wrong way — flip it.
+                // CW arcs are convex features (corners) where radial = outward.
+                // CCW arcs are concave features (slots) where radial = inward.
+                if (arc.Rotation == RotationType.CCW)
+                    normal += System.Math.PI;
             }
             else if (entity is Circle circle)
             {
