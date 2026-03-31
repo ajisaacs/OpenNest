@@ -224,12 +224,12 @@ namespace OpenNest.Actions
             var pt1 = plateView.PointWorldToGraph(worldPierce);
             var pt2 = plateView.PointWorldToGraph(worldSnap);
 
-            using var previewPen = new Pen(Color.Yellow, 2.0f / plateView.ViewScale);
+            using var previewPen = new Pen(Color.Magenta, 2.0f / plateView.ViewScale);
             g.DrawLine(previewPen, pt1, pt2);
 
             // Draw a small circle at the pierce point
             var radius = 3.0f / plateView.ViewScale;
-            g.FillEllipse(Brushes.Yellow, pt1.X - radius, pt1.Y - radius, radius * 2, radius * 2);
+            g.FillEllipse(Brushes.Magenta, pt1.X - radius, pt1.Y - radius, radius * 2, radius * 2);
 
             // Draw a small circle at the contour start point
             g.FillEllipse(Brushes.Lime, pt2.X - radius, pt2.Y - radius, radius * 2, radius * 2);
@@ -247,10 +247,6 @@ namespace OpenNest.Actions
 
             // Don't allow lead-in placement on cut-off parts
             if (part.BaseDrawing.IsCutOff)
-                return;
-
-            // If part already has locked lead-ins, don't allow re-placement
-            if (part.LeadInsLocked)
                 return;
 
             selectedLayoutPart = layoutPart;
