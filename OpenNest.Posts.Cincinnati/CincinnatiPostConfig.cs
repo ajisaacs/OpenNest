@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace OpenNest.Posts.Cincinnati
 {
@@ -92,205 +93,159 @@ namespace OpenNest.Posts.Cincinnati
     /// </summary>
     public sealed class CincinnatiPostConfig
     {
-        /// <summary>
-        /// Gets or sets the configuration name/identifier.
-        /// Default: "CL940"
-        /// </summary>
+        [Category("1. Output")]
+        [DisplayName("Configuration Name")]
+        [Description("Configuration name/identifier (e.g. CL940).")]
         public string ConfigurationName { get; set; } = "CL940";
 
-        /// <summary>
-        /// Gets or sets the units for posted output.
-        /// Default: Units.Inches
-        /// </summary>
+        [Category("1. Output")]
+        [DisplayName("Posted Units")]
+        [Description("Units for posted output (Inches or Millimeters).")]
         public Units PostedUnits { get; set; } = Units.Inches;
 
-        /// <summary>
-        /// Gets or sets the decimal accuracy for numeric output.
-        /// Default: 4
-        /// </summary>
+        [Category("1. Output")]
+        [DisplayName("Decimal Accuracy")]
+        [Description("Number of decimal places for numeric output.")]
         public int PostedAccuracy { get; set; } = 4;
 
-        /// <summary>
-        /// Gets or sets how coordinate positioning is handled between parts.
-        /// Default: CoordinateMode.G92
-        /// </summary>
-        public CoordinateMode CoordModeBetweenParts { get; set; } = CoordinateMode.G92;
-
-        /// <summary>
-        /// Gets or sets whether to use subprograms for sheet operations.
-        /// Default: true
-        /// </summary>
-        public bool UseSheetSubprograms { get; set; } = true;
-
-        /// <summary>
-        /// Gets or sets the starting subprogram number for sheet operations.
-        /// Default: 101
-        /// </summary>
-        public int SheetSubprogramStart { get; set; } = 101;
-
-        /// <summary>
-        /// Gets or sets whether to use M98 sub-programs for part geometry.
-        /// When enabled, each unique part geometry is written as a reusable sub-program
-        /// called via M98, reducing output size for nests with repeated parts.
-        /// Default: false
-        /// </summary>
-        public bool UsePartSubprograms { get; set; } = false;
-
-        /// <summary>
-        /// Gets or sets the starting sub-program number for part geometry sub-programs.
-        /// Default: 200
-        /// </summary>
-        public int PartSubprogramStart { get; set; } = 200;
-
-        /// <summary>
-        /// Gets or sets the subprogram number for variable declarations.
-        /// Default: 100
-        /// </summary>
-        public int VariableDeclarationSubprogram { get; set; } = 100;
-
-        /// <summary>
-        /// Gets or sets how G89 parameters are provided.
-        /// Default: G89Mode.LibraryFile
-        /// </summary>
-        public G89Mode ProcessParameterMode { get; set; } = G89Mode.LibraryFile;
-
-        /// <summary>
-        /// Gets or sets the default assist gas when Nest.AssistGas is empty.
-        /// Default: "O2"
-        /// </summary>
-        public string DefaultAssistGas { get; set; } = "O2";
-
-        /// <summary>
-        /// Gets or sets the gas used for etch operations.
-        /// Independent of the cutting assist gas — etch typically requires a specific gas.
-        /// Default: "N2"
-        /// </summary>
-        public string DefaultEtchGas { get; set; } = "N2";
-
-        /// <summary>
-        /// Gets or sets the material-to-library mapping for cut operations.
-        /// Each entry maps (material, thickness, gas) to a G89 library file.
-        /// </summary>
-        public List<MaterialLibraryEntry> MaterialLibraries { get; set; } = new();
-
-        /// <summary>
-        /// Gets or sets the gas-to-library mapping for etch operations.
-        /// Each entry maps a gas type to a G89 etch library file.
-        /// </summary>
-        public List<EtchLibraryEntry> EtchLibraries { get; set; } = new();
-
-        /// <summary>
-        /// Gets or sets whether to use exact stop mode (G61).
-        /// Default: false
-        /// </summary>
-        public bool UseExactStopMode { get; set; } = false;
-
-        /// <summary>
-        /// Gets or sets where kerf compensation is applied.
-        /// Default: KerfMode.ControllerSide
-        /// </summary>
-        public KerfMode KerfCompensation { get; set; } = KerfMode.ControllerSide;
-
-        /// <summary>
-        /// Gets or sets the default side for kerf compensation.
-        /// Default: KerfSide.Left
-        /// </summary>
-        public KerfSide DefaultKerfSide { get; set; } = KerfSide.Left;
-
-        /// <summary>
-        /// Gets or sets how M47 is used in interior cuts.
-        /// Default: M47Mode.Always
-        /// </summary>
-        public M47Mode InteriorM47 { get; set; } = M47Mode.Always;
-
-        /// <summary>
-        /// Gets or sets how M47 is used in exterior cuts.
-        /// Default: M47Mode.Always
-        /// </summary>
-        public M47Mode ExteriorM47 { get; set; } = M47Mode.Always;
-
-        /// <summary>
-        /// Gets or sets the safety head raise distance (in machine units).
-        /// Default: 2000
-        /// </summary>
-        public int? SafetyHeadraiseDistance { get; set; } = 2000;
-
-        /// <summary>
-        /// Gets or sets the distance threshold for M47 override.
-        /// Default: null
-        /// </summary>
-        public double? M47OverrideDistanceThreshold { get; set; } = null;
-
-        /// <summary>
-        /// Gets or sets whether to use anti-dive functionality.
-        /// Default: true
-        /// </summary>
-        public bool UseAntiDive { get; set; } = true;
-
-        /// <summary>
-        /// Gets or sets whether to use smart rapids optimization.
-        /// Default: false
-        /// </summary>
-        public bool UseSmartRapids { get; set; } = false;
-
-        /// <summary>
-        /// Gets or sets when pallet exchange occurs.
-        /// Default: PalletMode.EndOfSheet
-        /// </summary>
-        public PalletMode PalletExchange { get; set; } = PalletMode.EndOfSheet;
-
-        /// <summary>
-        /// Gets or sets whether to use line numbers in output.
-        /// Default: true
-        /// </summary>
+        [Category("1. Output")]
+        [DisplayName("Use Line Numbers")]
+        [Description("Include line numbers in output.")]
         public bool UseLineNumbers { get; set; } = true;
 
-        /// <summary>
-        /// Gets or sets the starting line number for features.
-        /// Default: 1
-        /// </summary>
+        [Category("1. Output")]
+        [DisplayName("Feature Line Number Start")]
+        [Description("Starting line number for features.")]
         public int FeatureLineNumberStart { get; set; } = 1;
 
-        /// <summary>
-        /// Gets or sets whether to use speed/gas commands.
-        /// Default: false
-        /// </summary>
+        [Category("2. Subprograms")]
+        [DisplayName("Use Sheet Subprograms")]
+        [Description("Use subprograms for sheet operations.")]
+        public bool UseSheetSubprograms { get; set; } = true;
+
+        [Category("2. Subprograms")]
+        [DisplayName("Sheet Subprogram Start")]
+        [Description("Starting subprogram number for sheet operations.")]
+        public int SheetSubprogramStart { get; set; } = 101;
+
+        [Category("2. Subprograms")]
+        [DisplayName("Use Part Subprograms")]
+        [Description("Use M98 sub-programs for part geometry. Reduces output size for repeated parts.")]
+        public bool UsePartSubprograms { get; set; } = false;
+
+        [Category("2. Subprograms")]
+        [DisplayName("Part Subprogram Start")]
+        [Description("Starting sub-program number for part geometry sub-programs.")]
+        public int PartSubprogramStart { get; set; } = 200;
+
+        [Category("2. Subprograms")]
+        [DisplayName("Variable Declaration Subprogram")]
+        [Description("Subprogram number for variable declarations.")]
+        public int VariableDeclarationSubprogram { get; set; } = 100;
+
+        [Category("3. Positioning")]
+        [DisplayName("Coordinate Mode Between Parts")]
+        [Description("How coordinate positioning is handled between parts (G92, G91, or G53).")]
+        public CoordinateMode CoordModeBetweenParts { get; set; } = CoordinateMode.G92;
+
+        [Category("4. Process")]
+        [DisplayName("Process Parameter Mode")]
+        [Description("How G89 parameters are provided (LibraryFile or Explicit).")]
+        public G89Mode ProcessParameterMode { get; set; } = G89Mode.LibraryFile;
+
+        [Category("4. Process")]
+        [DisplayName("Default Assist Gas")]
+        [Description("Default assist gas when Nest.AssistGas is empty.")]
+        public string DefaultAssistGas { get; set; } = "O2";
+
+        [Category("4. Process")]
+        [DisplayName("Default Etch Gas")]
+        [Description("Gas used for etch operations.")]
+        public string DefaultEtchGas { get; set; } = "N2";
+
+        [Category("4. Process")]
+        [DisplayName("Use Exact Stop Mode")]
+        [Description("Enable exact stop mode (G61).")]
+        public bool UseExactStopMode { get; set; } = false;
+
+        [Category("4. Process")]
+        [DisplayName("Use Speed/Gas Commands")]
+        [Description("Enable speed/gas commands in output.")]
         public bool UseSpeedGas { get; set; } = false;
 
-        /// <summary>
-        /// Gets or sets the feedrate percentage for lead-in moves.
-        /// Default: 0.5 (50%)
-        /// </summary>
+        [Category("4. Process")]
+        [DisplayName("Use Anti-Dive")]
+        [Description("Enable anti-dive functionality.")]
+        public bool UseAntiDive { get; set; } = true;
+
+        [Category("4. Process")]
+        [DisplayName("Use Smart Rapids")]
+        [Description("Enable smart rapids optimization.")]
+        public bool UseSmartRapids { get; set; } = false;
+
+        [Category("5. Kerf")]
+        [DisplayName("Kerf Compensation")]
+        [Description("Where kerf compensation is applied (ControllerSide or PreApplied).")]
+        public KerfMode KerfCompensation { get; set; } = KerfMode.ControllerSide;
+
+        [Category("5. Kerf")]
+        [DisplayName("Default Kerf Side")]
+        [Description("Default side for kerf compensation (Left or Right).")]
+        public KerfSide DefaultKerfSide { get; set; } = KerfSide.Left;
+
+        [Category("6. M47 (Optional Stop)")]
+        [DisplayName("Interior M47")]
+        [Description("How M47 is used in interior cuts.")]
+        public M47Mode InteriorM47 { get; set; } = M47Mode.Always;
+
+        [Category("6. M47 (Optional Stop)")]
+        [DisplayName("Exterior M47")]
+        [Description("How M47 is used in exterior cuts.")]
+        public M47Mode ExteriorM47 { get; set; } = M47Mode.Always;
+
+        [Category("6. M47 (Optional Stop)")]
+        [DisplayName("M47 Override Distance Threshold")]
+        [Description("Distance threshold for M47 override. Null = no override.")]
+        public double? M47OverrideDistanceThreshold { get; set; } = null;
+
+        [Category("7. Safety")]
+        [DisplayName("Safety Headraise Distance")]
+        [Description("Safety head raise distance in machine units. Null = disabled.")]
+        public int? SafetyHeadraiseDistance { get; set; } = 2000;
+
+        [Category("8. Pallet")]
+        [DisplayName("Pallet Exchange")]
+        [Description("When pallet exchange occurs (None, EndOfSheet, or StartAndEnd).")]
+        public PalletMode PalletExchange { get; set; } = PalletMode.EndOfSheet;
+
+        [Category("9. Feedrates")]
+        [DisplayName("Lead-In Feedrate %")]
+        [Description("Feedrate percentage for lead-in moves (e.g. 0.5 = 50%).")]
         public double LeadInFeedratePercent { get; set; } = 0.5;
 
-        /// <summary>
-        /// Gets or sets the feedrate percentage for lead-in arc-to-line moves.
-        /// Default: 0.5 (50%)
-        /// </summary>
+        [Category("9. Feedrates")]
+        [DisplayName("Lead-In Arc Line 2 Feedrate %")]
+        [Description("Feedrate percentage for lead-in arc-to-line moves.")]
         public double LeadInArcLine2FeedratePercent { get; set; } = 0.5;
 
-        /// <summary>
-        /// Gets or sets the feedrate percentage for lead-out moves.
-        /// Default: 0.5 (50%)
-        /// </summary>
+        [Category("9. Feedrates")]
+        [DisplayName("Lead-Out Feedrate %")]
+        [Description("Feedrate percentage for lead-out moves.")]
         public double LeadOutFeedratePercent { get; set; } = 0.5;
 
-        /// <summary>
-        /// Gets or sets the feedrate multiplier for circular cuts.
-        /// Default: 0.8 (80%)
-        /// </summary>
+        [Category("9. Feedrates")]
+        [DisplayName("Circle Feedrate Multiplier")]
+        [Description("Feedrate multiplier for circular cuts (e.g. 0.8 = 80%).")]
         public double CircleFeedrateMultiplier { get; set; } = 0.8;
 
-        /// <summary>
-        /// Gets or sets the arc feedrate calculation mode.
-        /// Default: ArcFeedrateMode.None
-        /// </summary>
+        [Category("9. Feedrates")]
+        [DisplayName("Arc Feedrate Mode")]
+        [Description("Arc feedrate calculation mode (None, Percentages, or Variables).")]
         public ArcFeedrateMode ArcFeedrate { get; set; } = ArcFeedrateMode.None;
 
-        /// <summary>
-        /// Gets or sets the radius-based arc feedrate ranges.
-        /// Ranges are matched from smallest MaxRadius to largest.
-        /// </summary>
+        [Category("9. Feedrates")]
+        [DisplayName("Arc Feedrate Ranges")]
+        [Description("Radius-based arc feedrate ranges. Matched from smallest to largest MaxRadius.")]
         public List<ArcFeedrateRange> ArcFeedrateRanges { get; set; } = new()
         {
             new() { MaxRadius = 0.125, FeedratePercent = 0.25, VariableNumber = 123 },
@@ -298,17 +253,25 @@ namespace OpenNest.Posts.Cincinnati
             new() { MaxRadius = 4.500, FeedratePercent = 0.80, VariableNumber = 125 }
         };
 
-        /// <summary>
-        /// Gets or sets the variable number for sheet width.
-        /// Default: 110
-        /// </summary>
+        [Category("A. Variables")]
+        [DisplayName("Sheet Width Variable")]
+        [Description("Variable number for sheet width.")]
         public int SheetWidthVariable { get; set; } = 110;
 
-        /// <summary>
-        /// Gets or sets the variable number for sheet length.
-        /// Default: 111
-        /// </summary>
+        [Category("A. Variables")]
+        [DisplayName("Sheet Length Variable")]
+        [Description("Variable number for sheet length.")]
         public int SheetLengthVariable { get; set; } = 111;
+
+        [Category("B. Libraries")]
+        [DisplayName("Material Libraries")]
+        [Description("Material-to-library mapping for cut operations. Maps (material, thickness, gas) to a G89 library file.")]
+        public List<MaterialLibraryEntry> MaterialLibraries { get; set; } = new();
+
+        [Category("B. Libraries")]
+        [DisplayName("Etch Libraries")]
+        [Description("Gas-to-library mapping for etch operations.")]
+        public List<EtchLibraryEntry> EtchLibraries { get; set; } = new();
     }
 
     public class MaterialLibraryEntry
