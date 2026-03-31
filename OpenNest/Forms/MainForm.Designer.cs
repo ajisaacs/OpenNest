@@ -52,6 +52,7 @@
             mnuViewDrawPiercePoints = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawBounds = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawOffset = new System.Windows.Forms.ToolStripMenuItem();
+            mnuViewDrawCutDirection = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem5 = new System.Windows.Forms.ToolStripSeparator();
             mnuViewZoomTo = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewZoomToArea = new System.Windows.Forms.ToolStripMenuItem();
@@ -305,7 +306,7 @@
             // 
             // mnuView
             // 
-            mnuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuViewDrawRapids, mnuViewDrawPiercePoints, mnuViewDrawBounds, mnuViewDrawOffset, toolStripMenuItem5, mnuViewZoomTo, mnuViewZoomIn, mnuViewZoomOut });
+            mnuView.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuViewDrawRapids, mnuViewDrawPiercePoints, mnuViewDrawBounds, mnuViewDrawOffset, mnuViewDrawCutDirection, toolStripMenuItem5, mnuViewZoomTo, mnuViewZoomIn, mnuViewZoomOut });
             mnuView.Name = "mnuView";
             mnuView.Size = new System.Drawing.Size(44, 20);
             mnuView.Text = "&View";
@@ -340,7 +341,15 @@
             mnuViewDrawOffset.Size = new System.Drawing.Size(222, 22);
             mnuViewDrawOffset.Text = "Draw Offset";
             mnuViewDrawOffset.Click += ToggleDrawOffset_Click;
-            // 
+            //
+            // mnuViewDrawCutDirection
+            //
+            mnuViewDrawCutDirection.CheckOnClick = true;
+            mnuViewDrawCutDirection.Name = "mnuViewDrawCutDirection";
+            mnuViewDrawCutDirection.Size = new System.Drawing.Size(222, 22);
+            mnuViewDrawCutDirection.Text = "Draw Cut Direction";
+            mnuViewDrawCutDirection.Click += ToggleDrawCutDirection_Click;
+            //
             // toolStripMenuItem5
             // 
             toolStripMenuItem5.Name = "toolStripMenuItem5";
@@ -1144,6 +1153,7 @@
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawPiercePoints;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawBounds;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawOffset;
+        private System.Windows.Forms.ToolStripMenuItem mnuViewDrawCutDirection;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem5;
         private System.Windows.Forms.ToolStripMenuItem mnuTools;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsMachineConfig;

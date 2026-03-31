@@ -61,8 +61,8 @@ namespace OpenNest.Controls
             e.Graphics.SmoothingMode = SmoothingMode.HighSpeed;
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);
-            DrawPlate(e.Graphics);
-            DrawParts(e.Graphics);
+            Renderer.DrawPlate(e.Graphics);
+            Renderer.DrawParts(e.Graphics);
             e.Graphics.ResetTransform();
 
             PaintMetadata(e.Graphics);

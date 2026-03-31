@@ -498,6 +498,12 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
+        public void ToggleCutDirection()
+        {
+            PlateView.DrawCutDirection = !PlateView.DrawCutDirection;
+            PlateView.Invalidate();
+        }
+
         public void ToggleFillParts()
         {
             PlateView.FillParts = !PlateView.FillParts;

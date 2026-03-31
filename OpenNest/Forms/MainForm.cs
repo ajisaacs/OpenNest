@@ -396,6 +396,7 @@ namespace OpenNest.Forms
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
             mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
+            mnuViewDrawCutDirection.Checked = activeForm.PlateView.DrawCutDirection;
             statusLabel1.Text = activeForm.PlateView.Status;
         }
 
@@ -583,6 +584,13 @@ namespace OpenNest.Forms
             if (activeForm == null) return;
             activeForm.ToggleDrawOffset();
             mnuViewDrawOffset.Checked = activeForm.PlateView.DrawOffset;
+        }
+
+        private void ToggleDrawCutDirection_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+            activeForm.ToggleCutDirection();
+            mnuViewDrawCutDirection.Checked = activeForm.PlateView.DrawCutDirection;
         }
 
         private void ZoomToArea_Click(object sender, EventArgs e)

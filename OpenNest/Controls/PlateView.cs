@@ -1,5 +1,4 @@
 ﻿using OpenNest.Actions;
-using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.Collections;
 using OpenNest.Engine.Fill;
@@ -41,6 +40,7 @@ namespace OpenNest.Controls
         private Point middleMouseDownPoint;
         private Box activeWorkArea;
         private List<Box> debugRemnants;
+        private PlateRenderer renderer;
 
         public Box ActiveWorkArea
         {
@@ -114,6 +114,7 @@ namespace OpenNest.Controls
             DrawBounds = true;
             DrawOffset = false;
             FillParts = true;
+            renderer = new PlateRenderer(this);
             SetAction(typeof(ActionSelect));
 
             UpdateMatrix();
@@ -137,11 +138,29 @@ namespace OpenNest.Controls
 
         public bool DrawOffset { get; set; }
 
+        public bool DrawCutDirection { get; set; }
+
         public bool ShowBendLines { get; set; }
 
         public double OffsetTolerance { get; set; } = 0.001;
 
         public bool FillParts { get; set; }
+
+        internal List<LayoutPart> LayoutParts => parts;
+
+        internal IReadOnlyList<LayoutPart> PreviewParts =>
+            activeParts.Count > 0 ? activeParts : stationaryParts;
+
+        internal Brush PreviewBrush =>
+            activeParts.Count > 0 ? ColorScheme.ActivePreviewPartBrush : ColorScheme.PreviewPartBrush;
+
+        internal Pen PreviewPen =>
+            activeParts.Count > 0 ? ColorScheme.ActivePreviewPartPen : ColorScheme.PreviewPartPen;
+
+        internal RectangleF GetViewBounds() =>
+            new RectangleF(-origin.X, -origin.Y, Width, Height);
+
+        internal PlateRenderer Renderer => renderer;
 
         public CutOffSettings CutOffSettings
         {
@@ -465,11 +484,11 @@ namespace OpenNest.Controls
 
             e.Graphics.TranslateTransform(origin.X, origin.Y);
 
-            DrawPlate(e.Graphics);
-            DrawParts(e.Graphics);
-            DrawCutOffs(e.Graphics);
-            DrawActiveWorkArea(e.Graphics);
-            DrawDebugRemnants(e.Graphics);
+            renderer.DrawPlate(e.Graphics);
+            renderer.DrawParts(e.Graphics);
+            renderer.DrawCutOffs(e.Graphics);
+            renderer.DrawActiveWorkArea(e.Graphics);
+            renderer.DrawDebugRemnants(e.Graphics);
 
             base.OnPaint(e);
         }
@@ -492,284 +511,6 @@ namespace OpenNest.Controls
             stationaryParts.ForEach(p => p.Update(this));
             activeParts.ForEach(p => p.Update(this));
             Invalidate();
-        }
-
-        protected void DrawPlate(Graphics g)
-        {
-            var plateRect = new RectangleF
-            {
-                Width = LengthWorldToGui(Plate.Size.Length),
-                Height = LengthWorldToGui(Plate.Size.Width)
-            };
-
-            var edgeSpacingRect = new RectangleF
-            {
-                Width = LengthWorldToGui(Plate.Size.Length - Plate.EdgeSpacing.Left - Plate.EdgeSpacing.Right),
-                Height = LengthWorldToGui(Plate.Size.Width - Plate.EdgeSpacing.Top - Plate.EdgeSpacing.Bottom)
-            };
-
-            switch (Plate.Quadrant)
-            {
-                case 1:
-                    plateRect.Location = PointWorldToGraph(0, 0);
-                    edgeSpacingRect.Location = PointWorldToGraph(
-                        Plate.EdgeSpacing.Left,
-                        Plate.EdgeSpacing.Bottom);
-                    break;
-
-                case 2:
-                    plateRect.Location = PointWorldToGraph(-Plate.Size.Length, 0);
-                    edgeSpacingRect.Location = PointWorldToGraph(
-                        Plate.EdgeSpacing.Left - Plate.Size.Length,
-                        Plate.EdgeSpacing.Bottom);
-                    break;
-
-                case 3:
-                    plateRect.Location = PointWorldToGraph(-Plate.Size.Length, -Plate.Size.Width);
-                    edgeSpacingRect.Location = PointWorldToGraph(
-                        Plate.EdgeSpacing.Left - Plate.Size.Length,
-                        Plate.EdgeSpacing.Bottom - Plate.Size.Width);
-                    break;
-
-                case 4:
-                    plateRect.Location = PointWorldToGraph(0, -Plate.Size.Width);
-                    edgeSpacingRect.Location = PointWorldToGraph(
-                        Plate.EdgeSpacing.Left,
-                        Plate.EdgeSpacing.Bottom - Plate.Size.Width);
-                    break;
-
-                default:
-                    return;
-            }
-
-            plateRect.Y -= plateRect.Height;
-            edgeSpacingRect.Y -= edgeSpacingRect.Height;
-
-            g.FillRectangle(ColorScheme.LayoutFillBrush, plateRect);
-
-            var viewBounds = new RectangleF(-origin.X, -origin.Y, Width, Height);
-
-            if (!edgeSpacingRect.Contains(viewBounds))
-            {
-                g.DrawRectangle(ColorScheme.EdgeSpacingPen,
-                   edgeSpacingRect.X,
-                   edgeSpacingRect.Y,
-                   edgeSpacingRect.Width,
-                   edgeSpacingRect.Height);
-            }
-
-            g.DrawRectangle(ColorScheme.LayoutOutlinePen,
-                plateRect.X,
-                plateRect.Y,
-                plateRect.Width,
-                plateRect.Height);
-        }
-
-        protected void DrawParts(Graphics g)
-        {
-            var viewBounds = new RectangleF(-origin.X, -origin.Y, Width, Height);
-
-            for (int i = 0; i < parts.Count; ++i)
-            {
-                var part = parts[i];
-
-                if (part.IsDirty)
-                    part.Update(this);
-
-                var path = part.Path;
-                var pathBounds = path.GetBounds();
-
-                if (!pathBounds.IntersectsWith(viewBounds))
-                    continue;
-
-                part.Draw(g, (i + 1).ToString());
-                DrawBendLines(g, part.BasePart);
-                DrawEtchMarks(g, part.BasePart);
-                DrawGrainWarning(g, part.BasePart);
-            }
-
-            // Draw preview parts — active (current strategy) takes precedence
-            // over stationary (overall best) to avoid overlapping fills.
-            var previewParts = activeParts.Count > 0 ? activeParts : stationaryParts;
-            var previewBrush = activeParts.Count > 0 ? ColorScheme.ActivePreviewPartBrush : ColorScheme.PreviewPartBrush;
-            var previewPen = activeParts.Count > 0 ? ColorScheme.ActivePreviewPartPen : ColorScheme.PreviewPartPen;
-
-            for (var i = 0; i < previewParts.Count; i++)
-            {
-                var part = previewParts[i];
-
-                if (part.IsDirty)
-                    part.Update(this);
-
-                var path = part.Path;
-                if (!path.GetBounds().IntersectsWith(viewBounds))
-                    continue;
-
-                g.FillPath(previewBrush, path);
-                g.DrawPath(previewPen, path);
-            }
-
-            if (DrawOffset && Plate.PartSpacing > 0)
-                DrawOffsetGeometry(g);
-
-            if (DrawBounds)
-            {
-                var bounds = SelectedParts.Select(p => p.BasePart).ToList().GetBoundingBox();
-                DrawBox(g, bounds);
-            }
-
-            if (DrawRapid)
-                DrawRapids(g);
-
-            if (DrawPiercePoints)
-                DrawAllPiercePoints(g);
-        }
-
-        private void DrawBendLines(Graphics g, Part part)
-        {
-            if (!ShowBendLines || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
-                return;
-
-            using var bendPen = new Pen(Color.Yellow, 1.5f)
-            {
-                DashStyle = System.Drawing.Drawing2D.DashStyle.Dash
-            };
-
-            foreach (var bend in part.BaseDrawing.Bends)
-            {
-                var start = bend.StartPoint;
-                var end = bend.EndPoint;
-
-                // Apply part rotation
-                if (part.Rotation != 0)
-                {
-                    start = start.Rotate(part.Rotation);
-                    end = end.Rotate(part.Rotation);
-                }
-
-                // Apply part offset
-                start = start + part.Location;
-                end = end + part.Location;
-
-                var pt1 = PointWorldToGraph(start);
-                var pt2 = PointWorldToGraph(end);
-
-                g.DrawLine(bendPen, pt1, pt2);
-            }
-        }
-
-        private void DrawEtchMarks(Graphics g, Part part)
-        {
-            if (!ShowBendLines || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
-                return;
-
-            using var etchPen = new Pen(Color.Green, 1.5f);
-            var etchLength = 1.0;
-
-            foreach (var bend in part.BaseDrawing.Bends)
-            {
-                if (bend.Direction != BendDirection.Up)
-                    continue;
-
-                var start = bend.StartPoint;
-                var end = bend.EndPoint;
-
-                // Apply part rotation
-                if (part.Rotation != 0)
-                {
-                    start = start.Rotate(part.Rotation);
-                    end = end.Rotate(part.Rotation);
-                }
-
-                // Apply part offset
-                start = start + part.Location;
-                end = end + part.Location;
-
-                var length = bend.Length;
-                var angle = bend.StartPoint.AngleTo(bend.EndPoint) + part.Rotation;
-
-                if (length < etchLength * 3.0)
-                {
-                    var pt1 = PointWorldToGraph(start);
-                    var pt2 = PointWorldToGraph(end);
-                    g.DrawLine(etchPen, pt1, pt2);
-                }
-                else
-                {
-                    var dx = System.Math.Cos(angle) * etchLength;
-                    var dy = System.Math.Sin(angle) * etchLength;
-
-                    var s1 = PointWorldToGraph(start);
-                    var e1 = PointWorldToGraph(new Vector(start.X + dx, start.Y + dy));
-                    g.DrawLine(etchPen, s1, e1);
-
-                    var s2 = PointWorldToGraph(end);
-                    var e2 = PointWorldToGraph(new Vector(end.X - dx, end.Y - dy));
-                    g.DrawLine(etchPen, s2, e2);
-                }
-            }
-        }
-
-        private void DrawGrainWarning(Graphics g, Part part)
-        {
-            if (!ShowBendLines || Plate == null || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
-                return;
-
-            var grainAngle = Plate.GrainAngle;
-            var tolerance = Angle.ToRadians(5);
-
-            foreach (var bend in part.BaseDrawing.Bends)
-            {
-                var bendAngle = bend.LineAngle + part.Rotation;
-                bendAngle = bendAngle % System.Math.PI;
-                if (bendAngle < 0) bendAngle += System.Math.PI;
-
-                var grainNormalized = grainAngle % System.Math.PI;
-                if (grainNormalized < 0) grainNormalized += System.Math.PI;
-
-                var diff = System.Math.Abs(bendAngle - grainNormalized);
-                diff = System.Math.Min(diff, System.Math.PI - diff);
-
-                if (diff > tolerance)
-                {
-                    var box = part.BaseDrawing.Program.BoundingBox();
-                    var location = part.Location;
-                    var pt1 = PointWorldToGraph(location);
-                    var pt2 = PointWorldToGraph(new Vector(
-                        location.X + box.Width, location.Y + box.Length));
-                    using var warnPen = new Pen(Color.FromArgb(180, 255, 140, 0), 2f);
-                    g.DrawRectangle(warnPen, pt1.X, pt2.Y,
-                        System.Math.Abs(pt2.X - pt1.X), System.Math.Abs(pt2.Y - pt1.Y));
-                    return;
-                }
-            }
-        }
-
-        private void DrawCutOffs(Graphics g)
-        {
-            if (Plate?.CutOffs == null || Plate.CutOffs.Count == 0)
-                return;
-
-            using var pen = new Pen(Color.FromArgb(64, 64, 64), 1.5f);
-            using var selectedPen = new Pen(Color.FromArgb(0, 120, 255), 3.5f);
-
-            foreach (var cutoff in Plate.CutOffs)
-            {
-                var program = cutoff.Drawing?.Program;
-                if (program == null || program.Codes.Count == 0)
-                    continue;
-
-                var activePen = cutoff == selectedCutOff ? selectedPen : pen;
-
-                for (var i = 0; i < program.Codes.Count - 1; i += 2)
-                {
-                    if (program.Codes[i] is RapidMove rapid &&
-                        program.Codes[i + 1] is LinearMove linear)
-                    {
-                        DrawLine(g, rapid.EndPoint, linear.EndPoint, activePen);
-                    }
-                }
-            }
         }
 
         public CutOff GetCutOffAtPoint(Vector point, double tolerance)
@@ -796,243 +537,6 @@ namespace OpenNest.Controls
             }
 
             return null;
-        }
-
-        private void DrawOffsetGeometry(Graphics g)
-        {
-            using (var offsetPen = new Pen(Color.FromArgb(120, 255, 100, 100)))
-            {
-                for (var i = 0; i < parts.Count; i++)
-                {
-                    var layoutPart = parts[i];
-
-                    if (layoutPart.IsDirty)
-                        layoutPart.Update(this);
-
-                    layoutPart.UpdateOffset(Plate.PartSpacing, OffsetTolerance, Matrix);
-
-                    if (layoutPart.OffsetPath != null)
-                        g.DrawPath(offsetPen, layoutPart.OffsetPath);
-                }
-            }
-        }
-
-        private void DrawRapids(Graphics g)
-        {
-            var pos = new Vector(0, 0);
-
-            for (int i = 0; i < Plate.Parts.Count; ++i)
-            {
-                var part = Plate.Parts[i];
-                var pgm = part.Program;
-
-                // Draw approach rapid directly to the program's first pierce
-                // point instead of to part.Location (the coordinate origin),
-                // which may not be at a cutting feature.
-                var piercePoint = GetFirstPiercePoint(pgm, part.Location);
-                DrawLine(g, pos, piercePoint, ColorScheme.RapidPen);
-
-                pos = part.Location;
-                DrawRapids(g, pgm, ref pos, skipFirstRapid: true);
-            }
-        }
-
-        private static Vector GetFirstPiercePoint(Program pgm, Vector partLocation)
-        {
-            for (var i = 0; i < pgm.Length; i++)
-            {
-                if (pgm[i] is Motion motion)
-                {
-                    if (pgm.Mode == Mode.Incremental)
-                        return motion.EndPoint + partLocation;
-                    return motion.EndPoint;
-                }
-            }
-            return partLocation;
-        }
-
-        private void DrawRapids(Graphics g, Program pgm, ref Vector pos, bool skipFirstRapid = false)
-        {
-            var firstRapidSkipped = false;
-
-            for (int i = 0; i < pgm.Length; ++i)
-            {
-                var code = pgm[i];
-
-                if (code.Type == CodeType.SubProgramCall)
-                {
-                    var subpgm = (SubProgramCall)code;
-                    var program = subpgm.Program;
-
-                    if (program != null)
-                        DrawRapids(g, program, ref pos);
-                }
-                else
-                {
-                    var motion = code as Motion;
-
-                    if (motion != null)
-                    {
-                        if (pgm.Mode == Mode.Incremental)
-                        {
-                            var endpt = motion.EndPoint + pos;
-
-                            if (code.Type == CodeType.RapidMove)
-                            {
-                                if (skipFirstRapid && !firstRapidSkipped)
-                                    firstRapidSkipped = true;
-                                else
-                                    DrawLine(g, pos, endpt, ColorScheme.RapidPen);
-                            }
-                            pos = endpt;
-                        }
-                        else
-                        {
-                            if (code.Type == CodeType.RapidMove)
-                            {
-                                if (skipFirstRapid && !firstRapidSkipped)
-                                    firstRapidSkipped = true;
-                                else
-                                    DrawLine(g, pos, motion.EndPoint, ColorScheme.RapidPen);
-                            }
-                            pos = motion.EndPoint;
-                        }
-                    }
-                }
-            }
-        }
-
-        private void DrawAllPiercePoints(Graphics g)
-        {
-            using var brush = new SolidBrush(Color.Red);
-            using var pen = new Pen(Color.DarkRed, 1f);
-
-            for (var i = 0; i < Plate.Parts.Count; ++i)
-            {
-                var part = Plate.Parts[i];
-                var pgm = part.Program;
-                var pos = part.Location;
-                DrawProgramPiercePoints(g, pgm, ref pos, brush, pen);
-            }
-        }
-
-        private void DrawProgramPiercePoints(Graphics g, Program pgm, ref Vector pos, Brush brush, Pen pen)
-        {
-            for (var i = 0; i < pgm.Length; ++i)
-            {
-                var code = pgm[i];
-
-                if (code.Type == CodeType.SubProgramCall)
-                {
-                    var subpgm = (SubProgramCall)code;
-                    if (subpgm.Program != null)
-                        DrawProgramPiercePoints(g, subpgm.Program, ref pos, brush, pen);
-                }
-                else
-                {
-                    var motion = code as Motion;
-                    if (motion == null) continue;
-
-                    var endpt = pgm.Mode == Mode.Incremental
-                        ? motion.EndPoint + pos
-                        : motion.EndPoint;
-
-                    if (code.Type == CodeType.RapidMove)
-                    {
-                        var pt = PointWorldToGraph(endpt);
-                        var radius = 2f;
-                        g.FillEllipse(brush, pt.X - radius, pt.Y - radius, radius * 2, radius * 2);
-                        g.DrawEllipse(pen, pt.X - radius, pt.Y - radius, radius * 2, radius * 2);
-                    }
-
-                    pos = endpt;
-                }
-            }
-        }
-
-        private void DrawLine(Graphics g, Vector pt1, Vector pt2, Pen pen)
-        {
-            var point1 = PointWorldToGraph(pt1);
-            var point2 = PointWorldToGraph(pt2);
-
-            g.DrawLine(pen, point1, point2);
-        }
-
-        private void DrawBox(Graphics g, Box box)
-        {
-            var rect = new RectangleF
-            {
-                Location = PointWorldToGraph(box.Location),
-                Width = LengthWorldToGui(box.Width),
-                Height = LengthWorldToGui(box.Length)
-            };
-
-            g.DrawRectangle(ColorScheme.BoundingBoxPen, rect.X, rect.Y - rect.Height, rect.Width, rect.Height);
-        }
-
-        private void DrawActiveWorkArea(Graphics g)
-        {
-            if (activeWorkArea == null)
-                return;
-
-            var rect = new RectangleF
-            {
-                Location = PointWorldToGraph(activeWorkArea.Location),
-                Width = LengthWorldToGui(activeWorkArea.Width),
-                Height = LengthWorldToGui(activeWorkArea.Length)
-            };
-            rect.Y -= rect.Height;
-
-            using var pen = new Pen(Color.Red, 1.5f)
-            {
-                DashStyle = DashStyle.Dash
-            };
-            g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        // Priority 0 = green (preferred), 1 = yellow (extend), 2 = red (last resort)
-        private static readonly Color[] PriorityFills =
-        {
-            Color.FromArgb(60, Color.LimeGreen),
-            Color.FromArgb(60, Color.Gold),
-            Color.FromArgb(60, Color.Salmon),
-        };
-
-        private static readonly Color[] PriorityBorders =
-        {
-            Color.FromArgb(180, Color.Green),
-            Color.FromArgb(180, Color.DarkGoldenrod),
-            Color.FromArgb(180, Color.DarkRed),
-        };
-
-        private void DrawDebugRemnants(Graphics g)
-        {
-            if (debugRemnants == null || debugRemnants.Count == 0)
-                return;
-
-            for (var i = 0; i < debugRemnants.Count; i++)
-            {
-                var box = debugRemnants[i];
-                var loc = PointWorldToGraph(box.Location);
-                var w = LengthWorldToGui(box.Width);
-                var h = LengthWorldToGui(box.Length);
-                var rect = new RectangleF(loc.X, loc.Y - h, w, h);
-
-                var priority = DebugRemnantPriorities != null && i < DebugRemnantPriorities.Count
-                    ? System.Math.Min(DebugRemnantPriorities[i], 2)
-                    : 0;
-
-                using var brush = new SolidBrush(PriorityFills[priority]);
-                g.FillRectangle(brush, rect);
-
-                using var pen = new Pen(PriorityBorders[priority], 1.5f);
-                g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
-
-                var label = $"P{priority} {box.Width:F1}x{box.Length:F1}";
-                using var font = new Font("Segoe UI", 8f);
-                using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                g.DrawString(label, font, Brushes.Black, rect, sf);
-            }
         }
 
         public LayoutPart GetPartAtControlPoint(Point pt)
