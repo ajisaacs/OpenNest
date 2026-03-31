@@ -24,6 +24,7 @@ namespace OpenNest.Actions
         private double snapNormal;
         private bool hasSnap;
         private ContextMenuStrip contextMenu;
+        private static readonly Brush grayOverlay = new SolidBrush(Color.FromArgb(160, 180, 180, 180));
 
         public ActionLeadIn(PlateView plateView)
             : base(plateView)
@@ -134,6 +135,18 @@ namespace OpenNest.Actions
 
         private void OnPaint(object sender, PaintEventArgs e)
         {
+            var g = e.Graphics;
+
+            // Gray overlay on all parts except the selected one
+            foreach (var lp in plateView.LayoutParts)
+            {
+                if (lp == selectedLayoutPart)
+                    continue;
+
+                if (lp.Path != null)
+                    g.FillPath(grayOverlay, lp.Path);
+            }
+
             if (!hasSnap || selectedPart == null)
                 return;
 
@@ -182,7 +195,6 @@ namespace OpenNest.Actions
             var piercePoint = leadIn.GetPiercePoint(snapPoint, snapNormal);
             var worldPierce = TransformToWorld(piercePoint);
 
-            var g = e.Graphics;
             var oldSmooth = g.SmoothingMode;
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -190,8 +202,8 @@ namespace OpenNest.Actions
             var pt1 = plateView.PointWorldToGraph(worldPierce);
             var pt2 = plateView.PointWorldToGraph(worldSnap);
 
-            using var pen = new Pen(Color.Yellow, 2.0f / plateView.ViewScale);
-            g.DrawLine(pen, pt1, pt2);
+            using var previewPen = new Pen(Color.Yellow, 2.0f / plateView.ViewScale);
+            g.DrawLine(previewPen, pt1, pt2);
 
             // Draw a small circle at the pierce point
             var radius = 3.0f / plateView.ViewScale;
