@@ -515,7 +515,7 @@ namespace OpenNest.Controls
 
         private void DrawAllCutDirectionArrows(Graphics g)
         {
-            using var pen = new Pen(Color.FromArgb(220, Color.Black), 1.5f);
+            using var pen = new Pen(Color.FromArgb(60, 60, 60), 1.5f);
 
             var arrowSpacingWorld = view.LengthGuiToWorld(60f);
             var arrowSize = 6f;

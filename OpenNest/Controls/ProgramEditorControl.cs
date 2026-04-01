@@ -273,7 +273,7 @@ namespace OpenNest.Controls
                 var pgm = ConvertGeometry.ToProgram(contour.Shape);
                 if (pgm == null) continue;
 
-                using var pen = new Pen(Color.FromArgb(220, Color.Black), 1.5f);
+                using var pen = new Pen(Color.FromArgb(60, 60, 60), 1.5f);
                 var pos = new Vector();
                 CutDirectionArrows.DrawProgram(e.Graphics, preview, pgm, ref pos, pen, spacing, arrowSize);
             }

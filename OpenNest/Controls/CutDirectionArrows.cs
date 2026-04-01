@@ -1,7 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System;
 using System.Drawing;
 
 namespace OpenNest.Controls
@@ -128,19 +127,18 @@ namespace OpenNest.Controls
 
         private static void DrawArrowHead(Graphics g, Pen pen, PointF tip, double angle, float size)
         {
-            var sin = (float)System.Math.Sin(angle);
-            var cos = (float)System.Math.Cos(angle);
+            var leftAngle = angle + System.Math.PI + 0.5;
+            var rightAngle = angle + System.Math.PI - 0.5;
 
-            var backX = -size * cos;
-            var backY = -size * sin;
-            var wingX = size * 0.5f * sin;
-            var wingY = -size * 0.5f * cos;
+            var left = new PointF(
+                tip.X + size * (float)System.Math.Cos(leftAngle),
+                tip.Y + size * (float)System.Math.Sin(leftAngle));
+            var right = new PointF(
+                tip.X + size * (float)System.Math.Cos(rightAngle),
+                tip.Y + size * (float)System.Math.Sin(rightAngle));
 
-            var wing1 = new PointF(tip.X + backX + wingX, tip.Y + backY + wingY);
-            var wing2 = new PointF(tip.X + backX - wingX, tip.Y + backY - wingY);
-
-            g.DrawLine(pen, wing1, tip);
-            g.DrawLine(pen, wing2, tip);
+            g.DrawLine(pen, left, tip);
+            g.DrawLine(pen, right, tip);
         }
     }
 }
