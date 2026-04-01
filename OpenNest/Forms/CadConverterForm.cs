@@ -161,6 +161,8 @@ namespace OpenNest.Forms
                 item.Entities.ForEach(e => e.Layer.IsVisible = true);
             ReHidePromotedEntities(item.Bends);
 
+            ApplyContourColors(item.Entities);
+
             filterPanel.LoadItem(item.Entities, item.Bends);
 
             numQuantity.Value = item.Quantity;
@@ -174,6 +176,30 @@ namespace OpenNest.Forms
 
             entityView1.ZoomToFit();
             CheckSimplifiable(item);
+        }
+
+        private static void ApplyContourColors(List<Entity> entities)
+        {
+            var visible = entities.Where(e => e.IsVisible && e.Layer != null && e.Layer.IsVisible).ToList();
+            if (visible.Count == 0) return;
+
+            var shapes = ShapeBuilder.GetShapes(visible);
+            if (shapes.Count == 0) return;
+
+            var contours = ContourInfo.Classify(shapes);
+            foreach (var contour in contours)
+            {
+                var color = contour.Type switch
+                {
+                    ContourClassification.Perimeter => System.Drawing.Color.FromArgb(80, 180, 120),
+                    ContourClassification.Hole => System.Drawing.Color.FromArgb(100, 140, 255),
+                    ContourClassification.Etch => System.Drawing.Color.FromArgb(255, 170, 50),
+                    ContourClassification.Open => System.Drawing.Color.FromArgb(200, 200, 100),
+                    _ => System.Drawing.Color.Gray,
+                };
+                foreach (var entity in contour.Shape.Entities)
+                    entity.Color = color;
+            }
         }
 
         private void CheckSimplifiable(FileListItem item)
