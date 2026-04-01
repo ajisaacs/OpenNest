@@ -69,8 +69,11 @@ public static class FeatureUtils
     /// Splits a part's program into features by rapids, classifies each as etch or cut,
     /// and orders etch features before cut features.
     /// </summary>
-    public static List<(List<ICode> codes, bool isEtch)> SplitAndClassify(Part part) =>
-        ClassifyAndOrder(SplitByRapids(part.Program.Codes));
+    public static List<(List<ICode> codes, bool isEtch)> SplitAndClassify(Part part)
+    {
+        part.Program.Mode = Mode.Absolute;
+        return ClassifyAndOrder(SplitByRapids(part.Program.Codes));
+    }
 
     /// <summary>
     /// Returns true if any non-rapid move in the feature has LayerType.Scribe.

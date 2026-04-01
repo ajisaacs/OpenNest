@@ -99,6 +99,7 @@ public sealed class CincinnatiPartSubprogramWriter
                     mapping[key] = subNum;
 
                     var pgm = part.Program.Clone() as Program;
+                    pgm.Mode = Mode.Absolute;
                     var bbox = pgm.BoundingBox();
                     pgm.Offset(-bbox.Location.X, -bbox.Location.Y);
 

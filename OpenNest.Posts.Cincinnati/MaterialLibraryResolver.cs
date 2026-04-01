@@ -24,7 +24,7 @@ public sealed class MaterialLibraryResolver
             System.Math.Abs(e.Thickness - thickness) <= ThicknessTolerance &&
             string.Equals(e.Gas, gas, StringComparison.OrdinalIgnoreCase));
 
-        return entry?.Library ?? "";
+        return EnsureLibExtension(entry?.Library ?? "");
     }
 
     public string ResolveEtchLibrary(string gas)
@@ -32,7 +32,18 @@ public sealed class MaterialLibraryResolver
         var entry = _etchLibraries.FirstOrDefault(e =>
             string.Equals(e.Gas, gas, StringComparison.OrdinalIgnoreCase));
 
-        return entry?.Library ?? "";
+        return EnsureLibExtension(entry?.Library ?? "");
+    }
+
+    private static string EnsureLibExtension(string library)
+    {
+        if (string.IsNullOrEmpty(library))
+            return library;
+
+        if (!library.EndsWith(".lib", StringComparison.OrdinalIgnoreCase))
+            return library + ".lib";
+
+        return library;
     }
 
     public static string ResolveGas(Nest nest, CincinnatiPostConfig config)
