@@ -8,111 +8,99 @@ namespace OpenNest.CNC.CuttingStrategy
     {
         public CuttingParameters Parameters { get; set; }
 
+        private record ContourEntry(Shape Shape, Vector Point, Entity Entity);
+
         public CuttingResult Apply(Program partProgram, Vector approachPoint)
         {
-            var exitPoint = approachPoint;
             var entities = partProgram.ToGeometry();
             entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
 
-            // Separate scribe/etch entities — they don't get lead-ins or kerf
             var scribeEntities = entities.FindAll(e => e.Layer == SpecialLayers.Scribe);
             entities.RemoveAll(e => e.Layer == SpecialLayers.Scribe);
 
             var profile = new ShapeProfile(entities);
 
-            // Find closest point on perimeter from exit point
-            var perimeterPoint = profile.Perimeter.ClosestPointTo(exitPoint, out var perimeterEntity);
-
-            // Chain cutouts by nearest-neighbor from perimeter point, then reverse
-            // so farthest cutouts are cut first, nearest-to-perimeter cut last
+            // Forward pass: sequence cutouts nearest-neighbor from perimeter
+            var perimeterPoint = profile.Perimeter.ClosestPointTo(approachPoint, out _);
             var orderedCutouts = SequenceCutouts(profile.Cutouts, perimeterPoint);
             orderedCutouts.Reverse();
 
-            // Build output program: scribe first, cutouts second, perimeter last
+            // Backward pass: walk from perimeter back through cutting order
+            // so each lead-in faces the next cutout to be cut, not the previous
+            var cutoutEntries = ResolveLeadInPoints(orderedCutouts, perimeterPoint);
+
             var result = new Program(Mode.Absolute);
-            var currentPoint = exitPoint;
 
-            // Emit scribe/etch contours first (no lead-ins, no kerf)
-            if (scribeEntities.Count > 0)
-            {
-                var scribeShapes = ShapeBuilder.GetShapes(scribeEntities);
-                foreach (var scribe in scribeShapes)
-                {
-                    var startPt = GetShapeStartPoint(scribe);
-                    result.Codes.Add(new RapidMove(startPt));
-                    result.Codes.AddRange(ConvertShapeToMoves(scribe, startPt, LayerType.Scribe));
-                    currentPoint = startPt;
-                }
-            }
+            EmitScribeContours(result, scribeEntities);
 
-            foreach (var cutout in orderedCutouts)
-            {
-                var contourType = DetectContourType(cutout);
-                var closestPt = cutout.ClosestPointTo(currentPoint, out var entity);
-                var normal = ComputeNormal(closestPt, entity, contourType);
-                var winding = DetermineWinding(cutout);
-
-                var leadIn = SelectLeadIn(contourType);
-                var leadOut = SelectLeadOut(contourType);
-
-                if (contourType == ContourType.ArcCircle && entity is Circle circle)
-                    leadIn = ClampLeadInForCircle(leadIn, circle, closestPt, normal);
-
-                result.Codes.AddRange(leadIn.Generate(closestPt, normal, winding));
-                var reindexed = cutout.ReindexAt(closestPt, entity);
-
-                if (Parameters.TabsEnabled && Parameters.TabConfig != null)
-                {
-                    var trimmed = TrimShapeForTab(reindexed, closestPt, Parameters.TabConfig.Size);
-                    result.Codes.AddRange(ConvertShapeToMoves(trimmed, closestPt));
-                    result.Codes.AddRange(leadOut.Generate(closestPt, normal, winding));
-                }
-                else
-                {
-                    result.Codes.AddRange(ConvertShapeToMoves(reindexed, closestPt));
-                    result.Codes.AddRange(leadOut.Generate(closestPt, normal, winding));
-                }
-
-                currentPoint = closestPt;
-            }
-
-            var lastCutPoint = exitPoint;
+            foreach (var entry in cutoutEntries)
+                EmitContour(result, entry.Shape, entry.Point, entry.Entity);
 
             // Perimeter last
-            {
-                var perimeterPt = profile.Perimeter.ClosestPointTo(currentPoint, out perimeterEntity);
-                lastCutPoint = perimeterPt;
-                var normal = ComputeNormal(perimeterPt, perimeterEntity, ContourType.External);
-                var winding = DetermineWinding(profile.Perimeter);
+            var lastRefPoint = cutoutEntries.Count > 0 ? cutoutEntries[cutoutEntries.Count - 1].Point : approachPoint;
+            var perimeterPt = profile.Perimeter.ClosestPointTo(lastRefPoint, out var perimeterEntity);
+            EmitContour(result, profile.Perimeter, perimeterPt, perimeterEntity, ContourType.External);
 
-                var leadIn = SelectLeadIn(ContourType.External);
-                var leadOut = SelectLeadOut(ContourType.External);
-
-                result.Codes.AddRange(leadIn.Generate(perimeterPt, normal, winding));
-                var reindexed = profile.Perimeter.ReindexAt(perimeterPt, perimeterEntity);
-
-                if (Parameters.TabsEnabled && Parameters.TabConfig != null)
-                {
-                    var trimmed = TrimShapeForTab(reindexed, perimeterPt, Parameters.TabConfig.Size);
-                    result.Codes.AddRange(ConvertShapeToMoves(trimmed, perimeterPt));
-                    result.Codes.AddRange(leadOut.Generate(perimeterPt, normal, winding));
-                }
-                else
-                {
-                    result.Codes.AddRange(ConvertShapeToMoves(reindexed, perimeterPt));
-                    result.Codes.AddRange(leadOut.Generate(perimeterPt, normal, winding));
-                }
-            }
-
-            // Convert to incremental mode to match the convention used by
-            // the rest of the system (rendering, bounding box, drag, etc.).
             result.Mode = Mode.Incremental;
 
             return new CuttingResult
             {
                 Program = result,
-                LastCutPoint = lastCutPoint
+                LastCutPoint = perimeterPt
             };
+        }
+
+        private static List<ContourEntry> ResolveLeadInPoints(List<Shape> cutouts, Vector startPoint)
+        {
+            var entries = new ContourEntry[cutouts.Count];
+            var currentPoint = startPoint;
+
+            // Walk backward through cutting order (from perimeter outward)
+            // so each cutout's lead-in point faces the next cutout to be cut
+            for (var i = cutouts.Count - 1; i >= 0; i--)
+            {
+                var closestPt = cutouts[i].ClosestPointTo(currentPoint, out var entity);
+                entries[i] = new ContourEntry(cutouts[i], closestPt, entity);
+                currentPoint = closestPt;
+            }
+
+            return new List<ContourEntry>(entries);
+        }
+
+        private void EmitContour(Program program, Shape shape, Vector point, Entity entity, ContourType? forceType = null)
+        {
+            var contourType = forceType ?? DetectContourType(shape);
+            var normal = ComputeNormal(point, entity, contourType);
+            var winding = DetermineWinding(shape);
+
+            var leadIn = SelectLeadIn(contourType);
+            var leadOut = SelectLeadOut(contourType);
+
+            if (contourType == ContourType.ArcCircle && entity is Circle circle)
+                leadIn = ClampLeadInForCircle(leadIn, circle, point, normal);
+
+            program.Codes.AddRange(leadIn.Generate(point, normal, winding));
+
+            var reindexed = shape.ReindexAt(point, entity);
+
+            if (Parameters.TabsEnabled && Parameters.TabConfig != null)
+                reindexed = TrimShapeForTab(reindexed, point, Parameters.TabConfig.Size);
+
+            program.Codes.AddRange(ConvertShapeToMoves(reindexed, point));
+            program.Codes.AddRange(leadOut.Generate(point, normal, winding));
+        }
+
+        private void EmitScribeContours(Program program, List<Entity> scribeEntities)
+        {
+            if (scribeEntities.Count == 0) return;
+
+            var shapes = ShapeBuilder.GetShapes(scribeEntities);
+            foreach (var shape in shapes)
+            {
+                var startPt = GetShapeStartPoint(shape);
+                program.Codes.Add(new RapidMove(startPt));
+                program.Codes.AddRange(ConvertShapeToMoves(shape, startPt, LayerType.Scribe));
+            }
         }
 
         private List<Shape> SequenceCutouts(List<Shape> cutouts, Vector startPoint)
