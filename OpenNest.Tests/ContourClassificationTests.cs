@@ -140,4 +140,18 @@ public class ContourClassificationTests
         Assert.Equal(ContourClassification.Perimeter, contours[0].Type);
         Assert.Equal("Perimeter", contours[0].Label);
     }
+
+    [Fact]
+    public void Reverse_changes_direction_label()
+    {
+        var shape = MakeRectShape(0, 0, 100, 50);
+        var contours = ContourInfo.Classify(new List<Shape> { shape });
+        var contour = contours[0];
+
+        var originalDirection = contour.DirectionLabel;
+        contour.Reverse();
+        var newDirection = contour.DirectionLabel;
+
+        Assert.NotEqual(originalDirection, newDirection);
+    }
 }

@@ -22,6 +22,8 @@ namespace OpenNest.Controls
             contourList.DrawItem += OnDrawContourItem;
             contourList.MeasureItem += OnMeasureContourItem;
             contourList.SelectedIndexChanged += OnContourSelectionChanged;
+            reverseButton.Click += OnReverseClicked;
+            menuReverse.Click += OnReverseClicked;
         }
 
         public Program Program { get; private set; }
@@ -101,6 +103,9 @@ namespace OpenNest.Controls
                     entity.Color = color;
                     preview.Entities.Add(entity);
                 }
+
+                if (selected)
+                    AddDirectionArrows(contour.Shape, color);
             }
 
             preview.ZoomToFit();
@@ -177,6 +182,138 @@ namespace OpenNest.Controls
         private void OnContourSelectionChanged(object sender, EventArgs e)
         {
             RefreshPreview();
+        }
+
+        private void OnReverseClicked(object sender, EventArgs e)
+        {
+            if (contourList.SelectedIndices.Count == 0) return;
+
+            foreach (int index in contourList.SelectedIndices)
+            {
+                if (index >= 0 && index < contours.Count)
+                    contours[index].Reverse();
+            }
+
+            Program = BuildProgram(contours);
+            isDirty = true;
+
+            contourList.Invalidate();
+            UpdateGcodeText();
+            RefreshPreview();
+            ProgramChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void AddDirectionArrows(Shape shape, Color color)
+        {
+            var entities = shape.Entities;
+            if (entities.Count == 0) return;
+
+            var totalLength = shape.Length;
+            if (totalLength < 0.001) return;
+
+            var arrowSize = totalLength * 0.02;
+            if (arrowSize < 0.5) arrowSize = 0.5;
+            if (arrowSize > 5) arrowSize = 5;
+
+            foreach (var fraction in new[] { 0.25, 0.75 })
+            {
+                var targetDist = totalLength * fraction;
+                var accumulated = 0.0;
+                var found = false;
+
+                foreach (var entity in entities)
+                {
+                    var entityLen = entity.Length;
+                    if (accumulated + entityLen >= targetDist)
+                    {
+                        var localFraction = (targetDist - accumulated) / entityLen;
+                        var (point, angle) = GetPointAndAngle(entity, localFraction);
+                        AddArrowHead(point, angle, arrowSize, color);
+                        found = true;
+                        break;
+                    }
+                    accumulated += entityLen;
+                }
+
+                if (!found && entities.Count > 0)
+                {
+                    var last = entities[^1];
+                    var (point, angle) = GetPointAndAngle(last, 0.5);
+                    AddArrowHead(point, angle, arrowSize, color);
+                }
+            }
+        }
+
+        private static (Vector point, double angle) GetPointAndAngle(Entity entity, double fraction)
+        {
+            switch (entity)
+            {
+                case Line line:
+                {
+                    var dx = line.EndPoint.X - line.StartPoint.X;
+                    var dy = line.EndPoint.Y - line.StartPoint.Y;
+                    var pt = new Vector(
+                        line.StartPoint.X + dx * fraction,
+                        line.StartPoint.Y + dy * fraction);
+                    var angle = System.Math.Atan2(dy, dx);
+                    return (pt, angle);
+                }
+                case Arc arc:
+                {
+                    var startAngle = arc.StartAngle;
+                    var endAngle = arc.EndAngle;
+                    if (arc.IsReversed)
+                    {
+                        var span = startAngle - endAngle;
+                        if (span < 0) span += 2 * System.Math.PI;
+                        var a = startAngle - span * fraction;
+                        var pt = new Vector(
+                            arc.Center.X + arc.Radius * System.Math.Cos(a),
+                            arc.Center.Y + arc.Radius * System.Math.Sin(a));
+                        var tangent = a - System.Math.PI / 2;
+                        return (pt, tangent);
+                    }
+                    else
+                    {
+                        var span = endAngle - startAngle;
+                        if (span < 0) span += 2 * System.Math.PI;
+                        var a = startAngle + span * fraction;
+                        var pt = new Vector(
+                            arc.Center.X + arc.Radius * System.Math.Cos(a),
+                            arc.Center.Y + arc.Radius * System.Math.Sin(a));
+                        var tangent = a + System.Math.PI / 2;
+                        return (pt, tangent);
+                    }
+                }
+                case Circle circle:
+                {
+                    var a = 2 * System.Math.PI * fraction;
+                    var pt = new Vector(
+                        circle.Center.X + circle.Radius * System.Math.Cos(a),
+                        circle.Center.Y + circle.Radius * System.Math.Sin(a));
+                    var tangent = a + System.Math.PI / 2;
+                    return (pt, tangent);
+                }
+                default:
+                    return (new Vector(), 0);
+            }
+        }
+
+        private void AddArrowHead(Vector tip, double angle, double size, Color color)
+        {
+            var leftAngle = angle + System.Math.PI + 0.4;
+            var rightAngle = angle + System.Math.PI - 0.4;
+
+            var left = new Vector(
+                tip.X + size * System.Math.Cos(leftAngle),
+                tip.Y + size * System.Math.Sin(leftAngle));
+            var right = new Vector(
+                tip.X + size * System.Math.Cos(rightAngle),
+                tip.Y + size * System.Math.Sin(rightAngle));
+
+            var arrowColor = Color.FromArgb(255, 140, 50);
+            preview.Entities.Add(new Line(left, tip) { Color = arrowColor });
+            preview.Entities.Add(new Line(right, tip) { Color = arrowColor });
         }
     }
 }
