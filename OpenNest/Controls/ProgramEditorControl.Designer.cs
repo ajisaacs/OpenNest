@@ -102,7 +102,6 @@ namespace OpenNest.Controls
             rightSplit.Dock = System.Windows.Forms.DockStyle.Fill;
             rightSplit.Location = new System.Drawing.Point(0, 0);
             rightSplit.Name = "rightSplit";
-            rightSplit.Orientation = System.Windows.Forms.Orientation.Horizontal;
             //
             // rightSplit.Panel1 — preview
             //
@@ -112,7 +111,7 @@ namespace OpenNest.Controls
             //
             rightSplit.Panel2.Controls.Add(editorPanel);
             rightSplit.Size = new System.Drawing.Size(615, 500);
-            rightSplit.SplitterDistance = 300;
+            rightSplit.SplitterDistance = 350;
             rightSplit.SplitterWidth = 5;
             rightSplit.TabIndex = 0;
             //
