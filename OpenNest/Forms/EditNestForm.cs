@@ -718,7 +718,7 @@ namespace OpenNest.Forms
             CalculateCurrentPlateCutTime();
         }
 
-        private void AssignLeadIns_Click(object sender, EventArgs e)
+        public void AssignLeadIns_Click(object sender, EventArgs e)
         {
             if (PlateView?.Plate == null)
                 return;
@@ -747,7 +747,7 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
-        private void RemoveLeadIns_Click(object sender, EventArgs e)
+        public void RemoveLeadIns_Click(object sender, EventArgs e)
         {
             if (PlateView?.Plate == null)
                 return;
@@ -779,7 +779,56 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
-        private void PlaceLeadIn_Click(object sender, EventArgs e)
+        public void AssignLeadInsAllPlates()
+        {
+            if (Nest == null)
+                return;
+
+            using var form = new CuttingParametersForm();
+            if (form.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            var parameters = form.BuildParameters();
+            var assigner = new LeadInAssigner
+            {
+                Sequencer = new LeftSideSequencer()
+            };
+
+            foreach (var plate in Nest.Plates)
+            {
+                plate.CuttingParameters = parameters;
+                assigner.Assign(plate);
+            }
+
+            PlateView.Invalidate();
+        }
+
+        public void RemoveLeadInsAllPlates()
+        {
+            if (Nest == null)
+                return;
+
+            foreach (var plate in Nest.Plates)
+            {
+                foreach (var part in plate.Parts)
+                {
+                    if (part.HasManualLeadIns)
+                        part.RemoveLeadIns();
+                }
+
+                plate.CuttingParameters = null;
+            }
+
+            foreach (var lp in PlateView.Parts)
+            {
+                lp.IsDirty = true;
+                lp.Update();
+            }
+
+            PlateView.Invalidate();
+        }
+
+        public void PlaceLeadIn_Click(object sender, EventArgs e)
         {
             if (PlateView?.Plate == null)
                 return;

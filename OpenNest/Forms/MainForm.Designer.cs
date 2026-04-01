@@ -98,6 +98,9 @@
             mnuNestPost = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem19 = new System.Windows.Forms.ToolStripSeparator();
             calculateCutTimeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem22 = new System.Windows.Forms.ToolStripSeparator();
+            mnuNestAssignLeadIns = new System.Windows.Forms.ToolStripMenuItem();
+            mnuNestRemoveLeadIns = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlate = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateEdit = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateSetAsDefault = new System.Windows.Forms.ToolStripMenuItem();
@@ -120,6 +123,10 @@
             calculateCutTimeToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             centerPartsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateCutOff = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem21 = new System.Windows.Forms.ToolStripSeparator();
+            mnuPlateAssignLeadIns = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlatePlaceLeadIn = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateRemoveLeadIns = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindow = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindowCascade = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindowTileVertical = new System.Windows.Forms.ToolStripMenuItem();
@@ -552,7 +559,7 @@
             // 
             // mnuNest
             // 
-            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestImportDrawing, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem });
+            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestImportDrawing, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
             mnuNest.Name = "mnuNest";
             mnuNest.Size = new System.Drawing.Size(43, 20);
             mnuNest.Text = "&Nest";
@@ -659,10 +666,29 @@
             calculateCutTimeToolStripMenuItem.Size = new System.Drawing.Size(205, 22);
             calculateCutTimeToolStripMenuItem.Text = "Calculate Cut Time";
             calculateCutTimeToolStripMenuItem.Click += CalculateNestCutTime_Click;
-            // 
+            //
+            // toolStripMenuItem22
+            //
+            toolStripMenuItem22.Name = "toolStripMenuItem22";
+            toolStripMenuItem22.Size = new System.Drawing.Size(202, 6);
+            //
+            // mnuNestAssignLeadIns
+            //
+            mnuNestAssignLeadIns.Name = "mnuNestAssignLeadIns";
+            mnuNestAssignLeadIns.Size = new System.Drawing.Size(205, 22);
+            mnuNestAssignLeadIns.Text = "Assign Lead-ins (All Plates)";
+            mnuNestAssignLeadIns.Click += NestAssignLeadIns_Click;
+            //
+            // mnuNestRemoveLeadIns
+            //
+            mnuNestRemoveLeadIns.Name = "mnuNestRemoveLeadIns";
+            mnuNestRemoveLeadIns.Size = new System.Drawing.Size(205, 22);
+            mnuNestRemoveLeadIns.Text = "Remove Lead-ins (All Plates)";
+            mnuNestRemoveLeadIns.Click += NestRemoveLeadIns_Click;
+            //
             // mnuPlate
             // 
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem });
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem, toolStripMenuItem21, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -808,7 +834,33 @@
             centerPartsToolStripMenuItem.Size = new System.Drawing.Size(177, 22);
             centerPartsToolStripMenuItem.Text = "Center Parts";
             centerPartsToolStripMenuItem.Click += centerPartsToolStripMenuItem_Click;
-            // 
+            //
+            // toolStripMenuItem21
+            //
+            toolStripMenuItem21.Name = "toolStripMenuItem21";
+            toolStripMenuItem21.Size = new System.Drawing.Size(174, 6);
+            //
+            // mnuPlateAssignLeadIns
+            //
+            mnuPlateAssignLeadIns.Name = "mnuPlateAssignLeadIns";
+            mnuPlateAssignLeadIns.Size = new System.Drawing.Size(177, 22);
+            mnuPlateAssignLeadIns.Text = "Assign Lead-ins";
+            mnuPlateAssignLeadIns.Click += PlateAssignLeadIns_Click;
+            //
+            // mnuPlatePlaceLeadIn
+            //
+            mnuPlatePlaceLeadIn.Name = "mnuPlatePlaceLeadIn";
+            mnuPlatePlaceLeadIn.Size = new System.Drawing.Size(177, 22);
+            mnuPlatePlaceLeadIn.Text = "Place Lead-in";
+            mnuPlatePlaceLeadIn.Click += PlatePlaceLeadIn_Click;
+            //
+            // mnuPlateRemoveLeadIns
+            //
+            mnuPlateRemoveLeadIns.Name = "mnuPlateRemoveLeadIns";
+            mnuPlateRemoveLeadIns.Size = new System.Drawing.Size(177, 22);
+            mnuPlateRemoveLeadIns.Text = "Remove Lead-ins";
+            mnuPlateRemoveLeadIns.Click += PlateRemoveLeadIns_Click;
+            //
             // mnuWindow
             // 
             mnuWindow.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuWindowCascade, mnuWindowTileVertical, mnuWindowTileHorizontal, toolStripMenuItem10, closeToolStripMenuItem, mnuCloseAll });
@@ -1257,5 +1309,12 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator5;
         private System.Windows.Forms.ToolStripButton btnCutOff;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateCutOff;
+        private System.Windows.Forms.ToolStripSeparator toolStripMenuItem21;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateAssignLeadIns;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlatePlaceLeadIn;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateRemoveLeadIns;
+        private System.Windows.Forms.ToolStripSeparator toolStripMenuItem22;
+        private System.Windows.Forms.ToolStripMenuItem mnuNestAssignLeadIns;
+        private System.Windows.Forms.ToolStripMenuItem mnuNestRemoveLeadIns;
     }
 }

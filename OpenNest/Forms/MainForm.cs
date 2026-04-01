@@ -1066,6 +1066,18 @@ namespace OpenNest.Forms
             activeForm.CalculateNestCutTime();
         }
 
+        private void NestAssignLeadIns_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+            activeForm.AssignLeadInsAllPlates();
+        }
+
+        private void NestRemoveLeadIns_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+            activeForm.RemoveLeadInsAllPlates();
+        }
+
         #endregion Nest Menu Events
 
         #region Plate Menu Events
@@ -1156,6 +1168,24 @@ namespace OpenNest.Forms
                 return;
 
             activeForm.PlateView.SetAction(typeof(ActionCutOff));
+        }
+
+        private void PlateAssignLeadIns_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+            activeForm.AssignLeadIns_Click(sender, e);
+        }
+
+        private void PlatePlaceLeadIn_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+            activeForm.PlaceLeadIn_Click(sender, e);
+        }
+
+        private void PlateRemoveLeadIns_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+            activeForm.RemoveLeadIns_Click(sender, e);
         }
 
         #endregion Plate Menu Events
