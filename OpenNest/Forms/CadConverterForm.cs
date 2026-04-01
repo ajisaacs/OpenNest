@@ -362,7 +362,6 @@ namespace OpenNest.Forms
                 var rapid = (RapidMove)pgm[0];
                 originOffset = rapid.EndPoint;
                 pgm.Offset(-originOffset);
-                pgm.Codes.RemoveAt(0);
             }
 
             var drawing = new Drawing(item.Name, pgm);
@@ -660,7 +659,8 @@ namespace OpenNest.Forms
                     var rapid = (RapidMove)firstCode;
                     drawing.Source.Offset = rapid.EndPoint;
                     pgm.Offset(-rapid.EndPoint);
-                    pgm.Codes.RemoveAt(0);
+                    // Keep the rapid (now at origin) — it marks the contour
+                    // start and is needed by the post for correct pierce placement.
                 }
 
                 if (item == CurrentItem && programEditor.IsDirty && programEditor.Program != null)

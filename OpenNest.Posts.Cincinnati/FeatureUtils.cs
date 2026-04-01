@@ -72,7 +72,27 @@ public static class FeatureUtils
     public static List<(List<ICode> codes, bool isEtch)> SplitAndClassify(Part part)
     {
         part.Program.Mode = Mode.Absolute;
-        return ClassifyAndOrder(SplitByRapids(part.Program.Codes));
+        var codes = part.Program.Codes;
+
+        // If no leading rapid, the first contour segment would be lost because
+        // the feature writer pierces at the first motion endpoint. Insert a
+        // synthetic rapid at the contour's return point to preserve closure.
+        if (codes.Count > 0 && codes[0] is not RapidMove)
+        {
+            for (var i = codes.Count - 1; i >= 0; i--)
+            {
+                if (codes[i] is Motion lastMotion)
+                {
+                    var withRapid = new List<ICode>(codes.Count + 1);
+                    withRapid.Add(new RapidMove(lastMotion.EndPoint));
+                    withRapid.AddRange(codes);
+                    codes = withRapid;
+                    break;
+                }
+            }
+        }
+
+        return ClassifyAndOrder(SplitByRapids(codes));
     }
 
     /// <summary>

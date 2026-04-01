@@ -432,7 +432,6 @@ namespace OpenNest.Forms
                             var rapid = (RapidMove)pgm[0];
                             drawing.Source.Offset = rapid.EndPoint;
                             pgm.Offset(-rapid.EndPoint);
-                            pgm.Codes.RemoveAt(0);
                         }
 
                         drawing.Program = pgm;

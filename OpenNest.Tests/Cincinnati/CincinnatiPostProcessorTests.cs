@@ -388,6 +388,57 @@ public class CincinnatiPostProcessorTests
         Assert.Equal(300, deserialized.PartSubprogramStart);
     }
 
+    [Fact]
+    public void Post_ClosedContourWithoutRapid_OutputsAllSegments()
+    {
+        // Reproduce bug: a closed contour with no leading rapid loses its
+        // first segment in the CNC output because the feature writer uses
+        // the first LinearMove endpoint as the pierce point.
+        var pgm = new Program(Mode.Incremental);
+        pgm.Codes.Add(new LinearMove(0, 2));    // (0,0) → (0,2)
+        pgm.Codes.Add(new LinearMove(2, 0));    // (0,2) → (2,2)
+        pgm.Codes.Add(new LinearMove(0, -2));   // (2,2) → (2,0)
+        pgm.Codes.Add(new LinearMove(-2, 0));   // (2,0) → (0,0)
+
+        var drawing = new Drawing("ClosedSquare", pgm);
+        var nest = new Nest("TestClosure");
+        nest.Drawings.Add(drawing);
+        var plate = new Plate(24, 24);
+        plate.Parts.Add(new Part(drawing, new Vector(1, 1)));
+        nest.Plates.Add(plate);
+
+        var config = new CincinnatiPostConfig
+        {
+            UsePartSubprograms = true,
+            PostedAccuracy = 4
+        };
+        var post = new CincinnatiPostProcessor(config);
+
+        using var ms = new MemoryStream();
+        post.Post(nest, ms);
+        var output = Encoding.UTF8.GetString(ms.ToArray());
+
+        // The subprogram should contain all 4 segments of the square.
+        // Without the fix, the first segment (0,0)→(0,2) was lost
+        // because the feature writer pierced at (0,2) making it zero-length.
+        var lines = output.Split('\n').Select(l => l.Trim()).ToArray();
+
+        // Count G1 moves in the subprogram (should be 4 for a square)
+        var subStart = Array.FindIndex(lines, l => l.StartsWith(":200") || l.StartsWith(":300"));
+        Assert.True(subStart >= 0, "Expected a part subprogram");
+
+        var g1Count = 0;
+        for (var i = subStart; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("M99"))
+                break;
+            if (lines[i].Contains("G1 "))
+                g1Count++;
+        }
+
+        Assert.Equal(4, g1Count);
+    }
+
     private static Nest CreateTestNest()
     {
         var nest = new Nest("TestNest");

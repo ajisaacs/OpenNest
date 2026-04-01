@@ -71,6 +71,26 @@ public sealed class CincinnatiPartSubprogramWriter
     }
 
     /// <summary>
+    /// If the program has no leading rapid, inserts a synthetic rapid at the
+    /// last motion endpoint (the contour return point). This ensures the feature
+    /// writer knows the true pierce location and preserves the first contour segment.
+    /// </summary>
+    internal static void EnsureLeadingRapid(Program pgm)
+    {
+        if (pgm.Codes.Count == 0 || pgm.Codes[0] is RapidMove)
+            return;
+
+        for (var i = pgm.Codes.Count - 1; i >= 0; i--)
+        {
+            if (pgm.Codes[i] is Motion lastMotion)
+            {
+                pgm.Codes.Insert(0, new RapidMove(lastMotion.EndPoint));
+                return;
+            }
+        }
+    }
+
+    /// <summary>
     /// Creates a sub-program key for matching parts to their sub-programs.
     /// </summary>
     internal static (int drawingId, long rotationKey) SubprogramKey(Part part) =>
@@ -102,6 +122,13 @@ public sealed class CincinnatiPartSubprogramWriter
                     pgm.Mode = Mode.Absolute;
                     var bbox = pgm.BoundingBox();
                     pgm.Offset(-bbox.Location.X, -bbox.Location.Y);
+
+                    // If the program has no leading rapid, the feature writer
+                    // will use the first motion endpoint as the pierce point,
+                    // losing the first contour segment. Insert a synthetic rapid
+                    // at the contour's return point (last motion endpoint) so
+                    // the full contour is preserved.
+                    EnsureLeadingRapid(pgm);
 
                     entries.Add((subNum, part.BaseDrawing.Name, pgm));
                 }
