@@ -263,9 +263,9 @@ namespace OpenNest.Controls
             if (contours.Count == 0) return;
 
             var spacing = preview.LengthGuiToWorld(60f);
-            var arrowSize = 5f;
+            var arrowSize = 8f;
 
-            using var pen = new Pen(Color.FromArgb(60, 60, 60), 1.5f);
+            using var pen = new Pen(Color.LightGray, 1.5f);
 
             for (var i = 0; i < contours.Count; i++)
             {
