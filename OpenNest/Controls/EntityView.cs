@@ -152,7 +152,11 @@ namespace OpenNest.Controls
             foreach (var entity in ((Shape)offsetShape.OffsetEntity(0.25, OffsetSide.Left)).Entities)
                 DrawEntity(e.Graphics, entity, Pens.RoyalBlue);
 #endif
+
+            PaintOverlay?.Invoke(e.Graphics);
         }
+
+        public Action<Graphics> PaintOverlay { get; set; }
 
         protected override void OnMouseWheel(MouseEventArgs e)
         {

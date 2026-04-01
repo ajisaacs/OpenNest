@@ -26,7 +26,7 @@ namespace OpenNest.Controls
             reverseButton.Click += OnReverseClicked;
             menuReverse.Click += OnReverseClicked;
             applyButton.Click += OnApplyClicked;
-            preview.Paint += OnPreviewPaint;
+            preview.PaintOverlay = OnPreviewPaintOverlay;
         }
 
         public Program Program { get; private set; }
@@ -258,12 +258,14 @@ namespace OpenNest.Controls
             ProgramChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private void OnPreviewPaint(object sender, PaintEventArgs e)
+        private void OnPreviewPaintOverlay(Graphics g)
         {
             if (contours.Count == 0) return;
 
             var spacing = preview.LengthGuiToWorld(60f);
             var arrowSize = 5f;
+
+            using var pen = new Pen(Color.FromArgb(60, 60, 60), 1.5f);
 
             for (var i = 0; i < contours.Count; i++)
             {
@@ -273,9 +275,8 @@ namespace OpenNest.Controls
                 var pgm = ConvertGeometry.ToProgram(contour.Shape);
                 if (pgm == null) continue;
 
-                using var pen = new Pen(Color.FromArgb(60, 60, 60), 1.5f);
                 var pos = new Vector();
-                CutDirectionArrows.DrawProgram(e.Graphics, preview, pgm, ref pos, pen, spacing, arrowSize);
+                CutDirectionArrows.DrawProgram(g, preview, pgm, ref pos, pen, spacing, arrowSize);
             }
         }
 
