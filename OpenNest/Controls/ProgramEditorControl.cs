@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using OpenNest.IO;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -24,6 +25,7 @@ namespace OpenNest.Controls
             contourList.SelectedIndexChanged += OnContourSelectionChanged;
             reverseButton.Click += OnReverseClicked;
             menuReverse.Click += OnReverseClicked;
+            applyButton.Click += OnApplyClicked;
         }
 
         public Program Program { get; private set; }
@@ -314,6 +316,52 @@ namespace OpenNest.Controls
             var arrowColor = Color.FromArgb(255, 140, 50);
             preview.Entities.Add(new Line(left, tip) { Color = arrowColor });
             preview.Entities.Add(new Line(right, tip) { Color = arrowColor });
+        }
+
+        private void OnApplyClicked(object sender, EventArgs e)
+        {
+            var text = gcodeEditor.Text;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                MessageBox.Show("G-code is empty.", "Apply", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                using var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(text));
+                var reader = new ProgramReader(stream);
+                var parsed = reader.Read();
+
+                if (parsed == null || parsed.Length == 0)
+                {
+                    MessageBox.Show("No valid G-code found.", "Apply", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Rebuild shapes from the parsed program
+                var entities = ConvertProgram.ToGeometry(parsed);
+                var shapes = ShapeBuilder.GetShapes(entities);
+
+                if (shapes.Count == 0)
+                {
+                    MessageBox.Show("No contours found in parsed G-code.", "Apply", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                contours = ContourInfo.Classify(shapes);
+                Program = parsed;
+                isDirty = true;
+
+                PopulateContourList();
+                RefreshPreview();
+                ProgramChanged?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error parsing G-code: {ex.Message}", "Apply",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
