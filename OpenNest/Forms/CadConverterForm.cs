@@ -21,6 +21,7 @@ namespace OpenNest.Forms
     {
         private static int colorIndex;
         private SimplifierViewerForm simplifierViewer;
+        private bool staleProgram = true;
 
         public CadConverterForm()
         {
@@ -43,6 +44,8 @@ namespace OpenNest.Forms
             foreach (var detector in BendDetectorRegistry.Detectors)
                 cboBendDetector.Items.Add(detector.Name);
             cboBendDetector.SelectedIndex = 0;
+
+            viewTabs.SelectedIndexChanged += OnViewTabChanged;
 
             // Drag & drop
             AllowDrop = true;
@@ -133,6 +136,8 @@ namespace OpenNest.Forms
             }
 
             LoadItem(item);
+            staleProgram = true;
+            programEditor.Clear();
         }
 
         private void LoadItem(FileListItem item)
@@ -229,6 +234,23 @@ namespace OpenNest.Forms
             filterPanel.ApplyFilters(item.Entities);
             ReHidePromotedEntities(item.Bends);
             entityView1.Invalidate();
+            staleProgram = true;
+        }
+
+        private void OnViewTabChanged(object sender, EventArgs e)
+        {
+            if (viewTabs.SelectedTab == tabProgram && staleProgram)
+            {
+                var item = CurrentItem;
+                if (item == null) return;
+
+                var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
+                if (entities.Count == 0) return;
+
+                var normalized = ShapeProfile.NormalizeEntities(entities);
+                programEditor.LoadEntities(normalized);
+                staleProgram = false;
+            }
         }
 
         private void OnBendLineSelected(object sender, int index)
@@ -595,7 +617,10 @@ namespace OpenNest.Forms
                     pgm.Codes.RemoveAt(0);
                 }
 
-                drawing.Program = pgm;
+                if (item == CurrentItem && programEditor.IsDirty && programEditor.Program != null)
+                    drawing.Program = programEditor.Program;
+                else
+                    drawing.Program = pgm;
                 drawings.Add(drawing);
 
                 Thread.Sleep(20);
