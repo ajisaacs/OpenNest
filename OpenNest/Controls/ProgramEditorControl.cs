@@ -44,6 +44,15 @@ namespace OpenNest.Controls
             }
 
             contours = ContourInfo.Classify(shapes);
+
+            // Assign contour-type colors once so the CAD view also picks them up
+            foreach (var contour in contours)
+            {
+                var color = GetContourColor(contour.Type, false);
+                foreach (var entity in contour.Shape.Entities)
+                    entity.Color = color;
+            }
+
             Program = BuildProgram(contours);
             isDirty = false;
             isLoaded = true;
@@ -86,7 +95,43 @@ namespace OpenNest.Controls
 
         private void UpdateGcodeText()
         {
-            gcodeEditor.Text = Program?.ToString() ?? string.Empty;
+            gcodeEditor.Text = Program != null ? FormatProgram(Program) : string.Empty;
+        }
+
+        private static string FormatProgram(Program pgm)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine(pgm.Mode == Mode.Absolute ? "G90" : "G91");
+
+            var lastWasRapid = false;
+            foreach (var code in pgm.Codes)
+            {
+                if (code is RapidMove rapid)
+                {
+                    if (!lastWasRapid && sb.Length > 0)
+                        sb.AppendLine();
+                    sb.AppendLine($"G00 X{FormatCoord(rapid.EndPoint.X)} Y{FormatCoord(rapid.EndPoint.Y)}");
+                    lastWasRapid = true;
+                }
+                else if (code is ArcMove arc)
+                {
+                    var g = arc.Rotation == RotationType.CW ? "G02" : "G03";
+                    sb.AppendLine($"{g} X{FormatCoord(arc.EndPoint.X)} Y{FormatCoord(arc.EndPoint.Y)} I{FormatCoord(arc.CenterPoint.X)} J{FormatCoord(arc.CenterPoint.Y)}");
+                    lastWasRapid = false;
+                }
+                else if (code is LinearMove linear)
+                {
+                    sb.AppendLine($"G01 X{FormatCoord(linear.EndPoint.X)} Y{FormatCoord(linear.EndPoint.Y)}");
+                    lastWasRapid = false;
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        private static string FormatCoord(double value)
+        {
+            return System.Math.Round(value, 4).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private void RefreshPreview()
@@ -94,20 +139,28 @@ namespace OpenNest.Controls
             preview.ClearPenCache();
             preview.Entities.Clear();
 
+            // Restore base colors first (undo any selection highlight)
+            foreach (var contour in contours)
+            {
+                var baseColor = GetContourColor(contour.Type, false);
+                foreach (var entity in contour.Shape.Entities)
+                    entity.Color = baseColor;
+            }
+
             for (var i = 0; i < contours.Count; i++)
             {
                 var contour = contours[i];
                 var selected = contourList.SelectedIndices.Contains(i);
-                var color = GetContourColor(contour.Type, selected);
-
-                foreach (var entity in contour.Shape.Entities)
-                {
-                    entity.Color = color;
-                    preview.Entities.Add(entity);
-                }
 
                 if (selected)
-                    AddDirectionArrows(contour.Shape, color);
+                {
+                    var selColor = GetContourColor(contour.Type, true);
+                    foreach (var entity in contour.Shape.Entities)
+                        entity.Color = selColor;
+                    AddDirectionArrows(contour.Shape, selColor);
+                }
+
+                preview.Entities.AddRange(contour.Shape.Entities);
             }
 
             preview.ZoomToFit();

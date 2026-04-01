@@ -137,7 +137,10 @@ namespace OpenNest.Forms
 
             LoadItem(item);
             staleProgram = true;
-            programEditor.Clear();
+            if (viewTabs.SelectedTab == tabProgram)
+                LoadProgramTab();
+            else
+                programEditor.Clear();
         }
 
         private void LoadItem(FileListItem item)
@@ -240,17 +243,34 @@ namespace OpenNest.Forms
         private void OnViewTabChanged(object sender, EventArgs e)
         {
             if (viewTabs.SelectedTab == tabProgram && staleProgram)
+                LoadProgramTab();
+        }
+
+        private void LoadProgramTab()
+        {
+            var item = CurrentItem;
+            if (item == null)
             {
-                var item = CurrentItem;
-                if (item == null) return;
-
-                var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
-                if (entities.Count == 0) return;
-
-                var normalized = ShapeProfile.NormalizeEntities(entities);
-                programEditor.LoadEntities(normalized);
+                programEditor.Clear();
                 staleProgram = false;
+                return;
             }
+
+            var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
+            if (entities.Count == 0)
+            {
+                programEditor.Clear();
+                staleProgram = false;
+                return;
+            }
+
+            var normalized = ShapeProfile.NormalizeEntities(entities);
+            programEditor.LoadEntities(normalized);
+            staleProgram = false;
+
+            // Refresh CAD view to show contour-type colors
+            entityView1.ClearPenCache();
+            entityView1.Invalidate();
         }
 
         private void OnBendLineSelected(object sender, int index)
