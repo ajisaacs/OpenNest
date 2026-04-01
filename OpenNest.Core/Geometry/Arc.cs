@@ -156,6 +156,17 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Mid point of the arc (point at the angle midway between start and end).
+        /// </summary>
+        public Vector MidPoint()
+        {
+            var midAngle = StartAngle + (IsReversed ? -SweepAngle() / 2 : SweepAngle() / 2);
+            return new Vector(
+                Center.X + Radius * System.Math.Cos(midAngle),
+                Center.Y + Radius * System.Math.Sin(midAngle));
+        }
+
+        /// <summary>
         /// Splits the arc at the given point, returning two sub-arcs.
         /// Either half may be null if the split point coincides with an endpoint.
         /// </summary>

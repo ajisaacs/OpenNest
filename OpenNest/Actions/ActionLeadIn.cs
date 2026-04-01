@@ -14,6 +14,10 @@ namespace OpenNest.Actions
     [DisplayName("Place Lead-in")]
     public class ActionLeadIn : Action
     {
+        private enum SnapType { None, Endpoint, Midpoint }
+
+        private const double SnapCapturePixels = 10.0;
+
         private LayoutPart selectedLayoutPart;
         private Part selectedPart;
         private ShapeProfile profile;
@@ -23,6 +27,7 @@ namespace OpenNest.Actions
         private ContourType snapContourType;
         private double snapNormal;
         private bool hasSnap;
+        private SnapType activeSnapType;
         private ShapeInfo hoveredContour;
         private ContextMenuStrip contextMenu;
         private static readonly Brush grayOverlay = new SolidBrush(Color.FromArgb(160, 180, 180, 180));
@@ -57,6 +62,7 @@ namespace OpenNest.Actions
             profile = null;
             contours = null;
             hasSnap = false;
+            activeSnapType = SnapType.None;
             hoveredContour = null;
             plateView.Invalidate();
         }
@@ -81,6 +87,7 @@ namespace OpenNest.Actions
             // Find closest contour and point
             var bestDist = double.MaxValue;
             hasSnap = false;
+            activeSnapType = SnapType.None;
             hoveredContour = null;
 
             foreach (var info in contours)
@@ -99,6 +106,10 @@ namespace OpenNest.Actions
                     hoveredContour = info;
                 }
             }
+
+            // Check endpoint/midpoint snaps on the hovered contour
+            if (hoveredContour != null)
+                TrySnapToEntityPoints(localPt);
 
             plateView.Invalidate();
         }
@@ -142,33 +153,39 @@ namespace OpenNest.Actions
         {
             var g = e.Graphics;
 
-            // Gray overlay on all parts except the selected one
+            DrawOverlay(g);
+            DrawHoveredContour(g);
+            DrawLeadInPreview(g);
+        }
+
+        private void DrawOverlay(Graphics g)
+        {
             foreach (var lp in plateView.LayoutParts)
             {
-                if (lp == selectedLayoutPart)
-                    continue;
-
-                if (lp.Path != null)
+                if (lp != selectedLayoutPart && lp.Path != null)
                     g.FillPath(grayOverlay, lp.Path);
             }
+        }
 
-            // Highlight the hovered contour
-            if (hoveredContour != null && selectedPart != null)
-            {
-                using var contourPath = hoveredContour.Shape.GetGraphicsPath();
+        private void DrawHoveredContour(Graphics g)
+        {
+            if (hoveredContour == null || selectedPart == null)
+                return;
 
-                // Translate from local part space to world space, then apply view transform
-                using var contourMatrix = new Matrix();
-                contourMatrix.Translate((float)selectedPart.Location.X, (float)selectedPart.Location.Y);
-                contourMatrix.Multiply(plateView.Matrix, MatrixOrder.Append);
-                contourPath.Transform(contourMatrix);
+            using var contourPath = hoveredContour.Shape.GetGraphicsPath();
+            using var contourMatrix = new Matrix();
+            contourMatrix.Translate((float)selectedPart.Location.X, (float)selectedPart.Location.Y);
+            contourMatrix.Multiply(plateView.Matrix, MatrixOrder.Append);
+            contourPath.Transform(contourMatrix);
 
-                var prevSmooth = g.SmoothingMode;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                g.DrawPath(highlightPen, contourPath);
-                g.SmoothingMode = prevSmooth;
-            }
+            var prevSmooth = g.SmoothingMode;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.DrawPath(highlightPen, contourPath);
+            g.SmoothingMode = prevSmooth;
+        }
 
+        private void DrawLeadInPreview(Graphics g)
+        {
             if (!hasSnap || selectedPart == null)
                 return;
 
@@ -176,65 +193,111 @@ namespace OpenNest.Actions
             if (parameters == null)
                 return;
 
-            // Transform snap point from local part space to world space
-            var worldSnap = TransformToWorld(snapPoint);
-
-            // Get the appropriate lead-in for this contour type
             var leadIn = SelectLeadIn(parameters, snapContourType);
             if (leadIn == null)
                 return;
 
-            // Clamp lead-in for circle contours so it stays inside the hole
-            if (snapContourType == ContourType.ArcCircle && snapEntity is Circle snapCircle
-                && parameters.PierceClearance > 0)
-            {
-                var pierceCheck = leadIn.GetPiercePoint(snapPoint, snapNormal);
-                var distFromCenter = pierceCheck.DistanceTo(snapCircle.Center);
-                var maxRadius = snapCircle.Radius - parameters.PierceClearance;
-                if (maxRadius > 0 && distFromCenter > maxRadius)
-                {
-                    var currentDist = snapPoint.DistanceTo(pierceCheck);
-                    if (currentDist > Tolerance.Epsilon)
-                    {
-                        var dx = (pierceCheck.X - snapPoint.X) / currentDist;
-                        var dy = (pierceCheck.Y - snapPoint.Y) / currentDist;
-                        var vx = snapPoint.X - snapCircle.Center.X;
-                        var vy = snapPoint.Y - snapCircle.Center.Y;
-                        var b = 2.0 * (vx * dx + vy * dy);
-                        var c = vx * vx + vy * vy - maxRadius * maxRadius;
-                        var disc = b * b - 4.0 * c;
-                        if (disc >= 0)
-                        {
-                            var t = (-b + System.Math.Sqrt(disc)) / 2.0;
-                            if (t > 0 && t < currentDist)
-                                leadIn = leadIn.Scale(t / currentDist);
-                        }
-                    }
-                }
-            }
+            leadIn = ClampLeadInForCircle(leadIn, parameters);
 
-            // Get the pierce point (in local space)
             var piercePoint = leadIn.GetPiercePoint(snapPoint, snapNormal);
-            var worldPierce = TransformToWorld(piercePoint);
+            var pt1 = plateView.PointWorldToGraph(TransformToWorld(piercePoint));
+            var pt2 = plateView.PointWorldToGraph(TransformToWorld(snapPoint));
 
             var oldSmooth = g.SmoothingMode;
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
-            // Draw the lead-in preview as a line from pierce point to contour point
-            var pt1 = plateView.PointWorldToGraph(worldPierce);
-            var pt2 = plateView.PointWorldToGraph(worldSnap);
-
             using var previewPen = new Pen(Color.Magenta, 2.0f / plateView.ViewScale);
             g.DrawLine(previewPen, pt1, pt2);
 
-            // Draw a small circle at the pierce point
             var radius = 3.0f / plateView.ViewScale;
             g.FillEllipse(Brushes.Magenta, pt1.X - radius, pt1.Y - radius, radius * 2, radius * 2);
 
-            // Draw a small circle at the contour start point
-            g.FillEllipse(Brushes.Lime, pt2.X - radius, pt2.Y - radius, radius * 2, radius * 2);
+            if (activeSnapType != SnapType.None)
+                DrawSnapMarker(g, pt2, activeSnapType);
+            else
+                g.FillEllipse(Brushes.Lime, pt2.X - radius, pt2.Y - radius, radius * 2, radius * 2);
 
             g.SmoothingMode = oldSmooth;
+        }
+
+        private LeadIn ClampLeadInForCircle(LeadIn leadIn, CuttingParameters parameters)
+        {
+            if (snapContourType != ContourType.ArcCircle
+                || !(snapEntity is Circle snapCircle)
+                || parameters.PierceClearance <= 0)
+                return leadIn;
+
+            var pierceCheck = leadIn.GetPiercePoint(snapPoint, snapNormal);
+            var maxRadius = snapCircle.Radius - parameters.PierceClearance;
+
+            if (maxRadius <= 0 || pierceCheck.DistanceTo(snapCircle.Center) <= maxRadius)
+                return leadIn;
+
+            var currentDist = snapPoint.DistanceTo(pierceCheck);
+            if (currentDist <= Tolerance.Epsilon)
+                return leadIn;
+
+            var dx = (pierceCheck.X - snapPoint.X) / currentDist;
+            var dy = (pierceCheck.Y - snapPoint.Y) / currentDist;
+            var vx = snapPoint.X - snapCircle.Center.X;
+            var vy = snapPoint.Y - snapCircle.Center.Y;
+            var b = 2.0 * (vx * dx + vy * dy);
+            var c = vx * vx + vy * vy - maxRadius * maxRadius;
+            var disc = b * b - 4.0 * c;
+
+            if (disc < 0)
+                return leadIn;
+
+            var t = (-b + System.Math.Sqrt(disc)) / 2.0;
+            return (t > 0 && t < currentDist) ? leadIn.Scale(t / currentDist) : leadIn;
+        }
+
+        private void TrySnapToEntityPoints(Vector localPt)
+        {
+            var captureRadius = SnapCapturePixels / plateView.ViewScale;
+            var bestDist = captureRadius;
+            var bestPoint = default(Vector);
+            var bestEntity = default(Entity);
+            var bestType = SnapType.None;
+
+            foreach (var entity in hoveredContour.Shape.Entities)
+            {
+                switch (entity)
+                {
+                    case Line line:
+                        TryCandidate(line.StartPoint, line, SnapType.Endpoint);
+                        TryCandidate(line.EndPoint, line, SnapType.Endpoint);
+                        TryCandidate(line.MidPoint, line, SnapType.Midpoint);
+                        break;
+                    case Arc arc:
+                        TryCandidate(arc.StartPoint(), arc, SnapType.Endpoint);
+                        TryCandidate(arc.EndPoint(), arc, SnapType.Endpoint);
+                        TryCandidate(arc.MidPoint(), arc, SnapType.Midpoint);
+                        break;
+                }
+            }
+
+            if (bestType != SnapType.None)
+            {
+                snapPoint = bestPoint;
+                snapEntity = bestEntity;
+                snapNormal = ContourCuttingStrategy.ComputeNormal(bestPoint, bestEntity, snapContourType);
+                activeSnapType = bestType;
+            }
+
+            return;
+
+            void TryCandidate(Vector pt, Entity ent, SnapType type)
+            {
+                var dist = pt.DistanceTo(localPt);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestPoint = pt;
+                    bestEntity = ent;
+                    bestType = type;
+                }
+            }
         }
 
         private void SelectPartAtCursor()
@@ -342,6 +405,7 @@ namespace OpenNest.Actions
             profile = null;
             contours = null;
             hasSnap = false;
+            activeSnapType = SnapType.None;
             hoveredContour = null;
             plateView.Invalidate();
         }
@@ -363,6 +427,35 @@ namespace OpenNest.Actions
 
             contextMenu.Items.Add(removeItem);
             contextMenu.Show(plateView, location);
+        }
+
+        private void DrawSnapMarker(Graphics g, PointF pt, SnapType type)
+        {
+            var size = 5f;
+
+            if (type == SnapType.Endpoint)
+            {
+                // Diamond
+                var points = new[]
+                {
+                    new PointF(pt.X, pt.Y - size),
+                    new PointF(pt.X + size, pt.Y),
+                    new PointF(pt.X, pt.Y + size),
+                    new PointF(pt.X - size, pt.Y)
+                };
+                g.FillPolygon(Brushes.Red, points);
+            }
+            else if (type == SnapType.Midpoint)
+            {
+                // Triangle
+                var points = new[]
+                {
+                    new PointF(pt.X, pt.Y - size),
+                    new PointF(pt.X + size, pt.Y + size),
+                    new PointF(pt.X - size, pt.Y + size)
+                };
+                g.FillPolygon(Brushes.Red, points);
+            }
         }
 
         private Vector TransformToWorld(Vector localPt)
