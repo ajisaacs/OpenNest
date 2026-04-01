@@ -25,6 +25,10 @@ namespace OpenNest.Controls
             contourList.SelectedIndexChanged += OnContourSelectionChanged;
             reverseButton.Click += OnReverseClicked;
             menuReverse.Click += OnReverseClicked;
+            menuMoveUp.Click += OnMoveUpClicked;
+            menuMoveDown.Click += OnMoveDownClicked;
+            menuSequence.Click += OnSequenceClicked;
+            contourMenu.Opening += OnContourMenuOpening;
             applyButton.Click += OnApplyClicked;
             preview.PaintOverlay = OnPreviewPaintOverlay;
         }
@@ -256,6 +260,143 @@ namespace OpenNest.Controls
             UpdateGcodeText();
             RefreshPreview();
             ProgramChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void OnContourMenuOpening(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            var index = contourList.SelectedIndex;
+            var perimeterIndex = contours.FindIndex(c => c.Type == ContourClassification.Perimeter);
+            var isPerimeter = index >= 0 && index == perimeterIndex;
+
+            // Can't move perimeter, can't move past perimeter
+            menuMoveUp.Enabled = index > 0 && !isPerimeter;
+            menuMoveDown.Enabled = index >= 0 && index < perimeterIndex - 1;
+        }
+
+        private void OnMoveUpClicked(object sender, EventArgs e)
+        {
+            var index = contourList.SelectedIndex;
+            if (index <= 0) return;
+            if (contours[index].Type == ContourClassification.Perimeter) return;
+
+            (contours[index], contours[index - 1]) = (contours[index - 1], contours[index]);
+            RebuildAfterReorder(index - 1);
+        }
+
+        private void OnMoveDownClicked(object sender, EventArgs e)
+        {
+            var index = contourList.SelectedIndex;
+            if (index < 0 || index >= contours.Count - 1) return;
+            if (contours[index].Type == ContourClassification.Perimeter) return;
+            if (contours[index + 1].Type == ContourClassification.Perimeter) return;
+
+            (contours[index], contours[index + 1]) = (contours[index + 1], contours[index]);
+            RebuildAfterReorder(index + 1);
+        }
+
+        private void OnSequenceClicked(object sender, EventArgs e)
+        {
+            // Nearest-neighbor sort for non-perimeter contours
+            var perimeterIndex = contours.FindIndex(c => c.Type == ContourClassification.Perimeter);
+            if (perimeterIndex < 0) return;
+
+            var nonPerimeter = contours.Where(c => c.Type != ContourClassification.Perimeter).ToList();
+            if (nonPerimeter.Count <= 1) return;
+
+            var sorted = new List<ContourInfo>();
+            var remaining = new List<ContourInfo>(nonPerimeter);
+            var pos = new Vector();
+
+            while (remaining.Count > 0)
+            {
+                var nearest = 0;
+                var nearestDist = double.MaxValue;
+
+                for (var i = 0; i < remaining.Count; i++)
+                {
+                    var startPt = GetContourStartPoint(remaining[i]);
+                    var dist = pos.DistanceTo(startPt);
+                    if (dist < nearestDist)
+                    {
+                        nearestDist = dist;
+                        nearest = i;
+                    }
+                }
+
+                var next = remaining[nearest];
+                sorted.Add(next);
+                pos = GetContourEndPoint(next);
+                remaining.RemoveAt(nearest);
+            }
+
+            // Put perimeter back at the end
+            sorted.Add(contours[perimeterIndex]);
+            contours = sorted;
+            RebuildAfterReorder(-1);
+        }
+
+        private static Vector GetContourStartPoint(ContourInfo contour)
+        {
+            var entity = contour.Shape.Entities[0];
+            return entity switch
+            {
+                Line line => line.StartPoint,
+                Arc arc => arc.StartPoint(),
+                Circle circle => new Vector(circle.Center.X + circle.Radius, circle.Center.Y),
+                _ => new Vector(),
+            };
+        }
+
+        private static Vector GetContourEndPoint(ContourInfo contour)
+        {
+            var entity = contour.Shape.Entities[^1];
+            return entity switch
+            {
+                Line line => line.EndPoint,
+                Arc arc => arc.EndPoint(),
+                Circle circle => new Vector(circle.Center.X + circle.Radius, circle.Center.Y),
+                _ => new Vector(),
+            };
+        }
+
+        private void RebuildAfterReorder(int selectIndex)
+        {
+            RelabelContours();
+            Program = BuildProgram(contours);
+            isDirty = true;
+
+            PopulateContourList();
+            if (selectIndex >= 0 && selectIndex < contourList.Items.Count)
+                contourList.SelectedIndex = selectIndex;
+            UpdateGcodeText();
+            RefreshPreview();
+            ProgramChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void RelabelContours()
+        {
+            var holeCount = 0;
+            var etchCount = 0;
+            var openCount = 0;
+
+            foreach (var contour in contours)
+            {
+                switch (contour.Type)
+                {
+                    case ContourClassification.Hole:
+                        holeCount++;
+                        contour.SetLabel($"Hole {holeCount}");
+                        break;
+                    case ContourClassification.Etch:
+                        etchCount++;
+                        contour.SetLabel(etchCount == 1 ? "Etch" : $"Etch {etchCount}");
+                        break;
+                    case ContourClassification.Open:
+                        openCount++;
+                        contour.SetLabel(openCount == 1 ? "Open" : $"Open {openCount}");
+                        break;
+                }
+            }
         }
 
         private void OnPreviewPaintOverlay(Graphics g)

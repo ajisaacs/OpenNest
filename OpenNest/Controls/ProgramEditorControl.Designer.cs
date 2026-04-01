@@ -21,6 +21,9 @@ namespace OpenNest.Controls
             contourList = new System.Windows.Forms.ListBox();
             contourMenu = new System.Windows.Forms.ContextMenuStrip(components);
             menuReverse = new System.Windows.Forms.ToolStripMenuItem();
+            menuMoveUp = new System.Windows.Forms.ToolStripMenuItem();
+            menuMoveDown = new System.Windows.Forms.ToolStripMenuItem();
+            menuSequence = new System.Windows.Forms.ToolStripMenuItem();
             reverseButton = new System.Windows.Forms.Button();
             rightSplit = new System.Windows.Forms.SplitContainer();
             preview = new EntityView();
@@ -90,15 +93,33 @@ namespace OpenNest.Controls
             // 
             // contourMenu
             // 
-            contourMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { menuReverse });
+            contourMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { menuReverse, menuMoveUp, menuMoveDown, new System.Windows.Forms.ToolStripSeparator(), menuSequence });
             contourMenu.Name = "contourMenu";
-            contourMenu.Size = new System.Drawing.Size(166, 26);
-            // 
+            contourMenu.Size = new System.Drawing.Size(180, 120);
+            //
             // menuReverse
-            // 
+            //
             menuReverse.Name = "menuReverse";
-            menuReverse.Size = new System.Drawing.Size(165, 22);
+            menuReverse.Size = new System.Drawing.Size(179, 22);
             menuReverse.Text = "Reverse Direction";
+            //
+            // menuMoveUp
+            //
+            menuMoveUp.Name = "menuMoveUp";
+            menuMoveUp.Size = new System.Drawing.Size(179, 22);
+            menuMoveUp.Text = "Move Up";
+            //
+            // menuMoveDown
+            //
+            menuMoveDown.Name = "menuMoveDown";
+            menuMoveDown.Size = new System.Drawing.Size(179, 22);
+            menuMoveDown.Text = "Move Down";
+            //
+            // menuSequence
+            //
+            menuSequence.Name = "menuSequence";
+            menuSequence.Size = new System.Drawing.Size(179, 22);
+            menuSequence.Text = "Auto Sequence";
             // 
             // reverseButton
             // 
@@ -246,5 +267,8 @@ namespace OpenNest.Controls
         private System.Windows.Forms.TextBox gcodeEditor;
         private System.Windows.Forms.ContextMenuStrip contourMenu;
         private System.Windows.Forms.ToolStripMenuItem menuReverse;
+        private System.Windows.Forms.ToolStripMenuItem menuMoveUp;
+        private System.Windows.Forms.ToolStripMenuItem menuMoveDown;
+        private System.Windows.Forms.ToolStripMenuItem menuSequence;
     }
 }

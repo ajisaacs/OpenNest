@@ -56,6 +56,11 @@ namespace OpenNest.Converters
             Shape.Reverse();
         }
 
+        public void SetLabel(string label)
+        {
+            Label = label;
+        }
+
         public static List<ContourInfo> Classify(List<Shape> shapes)
         {
             if (shapes.Count == 0)
