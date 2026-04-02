@@ -305,6 +305,15 @@ namespace OpenNest.IO
             var writer = new StreamWriter(stream);
             writer.AutoFlush = true;
 
+            // Emit variable definitions before G-code
+            foreach (var v in program.Variables.Values)
+            {
+                var line = $"{v.Name} = {v.Expression}";
+                if (v.Inline) line += " inline";
+                if (v.Global) line += " global";
+                writer.WriteLine(line);
+            }
+
             writer.WriteLine(program.Mode == Mode.Absolute ? "G90" : "G91");
 
             for (var i = 0; i < drawing.Program.Length; ++i)
@@ -316,6 +325,13 @@ namespace OpenNest.IO
             stream.Position = 0;
         }
 
+        private string FormatCoord(double value, string axis, Dictionary<string, string> variableRefs)
+        {
+            if (variableRefs != null && variableRefs.TryGetValue(axis, out var varName))
+                return $"${varName}";
+            return System.Math.Round(value, OutputPrecision).ToString(CoordinateFormat);
+        }
+
         private string GetCodeString(ICode code)
         {
             switch (code.Type)
@@ -324,16 +340,16 @@ namespace OpenNest.IO
                     {
                         var sb = new StringBuilder();
                         var arcMove = (ArcMove)code;
+                        var refs = arcMove.VariableRefs;
 
-                        var x = System.Math.Round(arcMove.EndPoint.X, OutputPrecision).ToString(CoordinateFormat);
-                        var y = System.Math.Round(arcMove.EndPoint.Y, OutputPrecision).ToString(CoordinateFormat);
-                        var i = System.Math.Round(arcMove.CenterPoint.X, OutputPrecision).ToString(CoordinateFormat);
-                        var j = System.Math.Round(arcMove.CenterPoint.Y, OutputPrecision).ToString(CoordinateFormat);
+                        var x = FormatCoord(arcMove.EndPoint.X, "X", refs);
+                        var y = FormatCoord(arcMove.EndPoint.Y, "Y", refs);
+                        var i = FormatCoord(arcMove.CenterPoint.X, "I", refs);
+                        var j = FormatCoord(arcMove.CenterPoint.Y, "J", refs);
 
-                        if (arcMove.Rotation == RotationType.CW)
-                            sb.Append(string.Format("G02X{0}Y{1}I{2}J{3}", x, y, i, j));
-                        else
-                            sb.Append(string.Format("G03X{0}Y{1}I{2}J{3}", x, y, i, j));
+                        sb.Append(arcMove.Rotation == RotationType.CW
+                            ? $"G02X{x}Y{y}I{i}J{j}"
+                            : $"G03X{x}Y{y}I{i}J{j}");
 
                         if (arcMove.Layer != LayerType.Cut)
                             sb.Append(GetLayerString(arcMove.Layer));
@@ -354,10 +370,9 @@ namespace OpenNest.IO
                     {
                         var sb = new StringBuilder();
                         var linearMove = (LinearMove)code;
+                        var refs = linearMove.VariableRefs;
 
-                        sb.Append(string.Format("G01X{0}Y{1}",
-                            System.Math.Round(linearMove.EndPoint.X, OutputPrecision).ToString(CoordinateFormat),
-                            System.Math.Round(linearMove.EndPoint.Y, OutputPrecision).ToString(CoordinateFormat)));
+                        sb.Append($"G01X{FormatCoord(linearMove.EndPoint.X, "X", refs)}Y{FormatCoord(linearMove.EndPoint.Y, "Y", refs)}");
 
                         if (linearMove.Layer != LayerType.Cut)
                             sb.Append(GetLayerString(linearMove.Layer));
@@ -371,15 +386,16 @@ namespace OpenNest.IO
                 case CodeType.RapidMove:
                     {
                         var rapidMove = (RapidMove)code;
+                        var refs = rapidMove.VariableRefs;
 
-                        return string.Format("G00X{0}Y{1}",
-                            System.Math.Round(rapidMove.EndPoint.X, OutputPrecision).ToString(CoordinateFormat),
-                            System.Math.Round(rapidMove.EndPoint.Y, OutputPrecision).ToString(CoordinateFormat));
+                        return $"G00X{FormatCoord(rapidMove.EndPoint.X, "X", refs)}Y{FormatCoord(rapidMove.EndPoint.Y, "Y", refs)}";
                     }
 
                 case CodeType.SetFeedrate:
                     {
                         var setFeedrate = (Feedrate)code;
+                        if (setFeedrate.VariableRef != null)
+                            return $"F${setFeedrate.VariableRef}";
                         return "F" + setFeedrate.Value;
                     }
 
