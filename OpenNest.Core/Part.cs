@@ -72,6 +72,18 @@ namespace OpenNest
             UpdateBounds();
         }
 
+        public void ApplySingleLeadIn(CNC.CuttingStrategy.CuttingParameters parameters,
+            Geometry.Vector point, Geometry.Entity entity, CNC.CuttingStrategy.ContourType contourType)
+        {
+            preLeadInRotation = Rotation;
+            var strategy = new CNC.CuttingStrategy.ContourCuttingStrategy { Parameters = parameters };
+            var result = strategy.ApplySingle(Program, point, entity, contourType);
+            Program = result.Program;
+            CuttingParameters = parameters;
+            HasManualLeadIns = true;
+            UpdateBounds();
+        }
+
         public void RemoveLeadIns()
         {
             var rotation = preLeadInRotation;

@@ -50,6 +50,126 @@ namespace OpenNest.CNC.CuttingStrategy
             };
         }
 
+        public CuttingResult ApplySingle(Program partProgram, Vector point, Entity entity, ContourType contourType)
+        {
+            var entities = partProgram.ToGeometry();
+            entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
+
+            var scribeEntities = entities.FindAll(e => e.Layer == SpecialLayers.Scribe);
+            entities.RemoveAll(e => e.Layer == SpecialLayers.Scribe);
+
+            var profile = new ShapeProfile(entities);
+
+            var result = new Program(Mode.Absolute);
+
+            EmitScribeContours(result, scribeEntities);
+
+            // Find the target shape that contains the clicked entity
+            var (targetShape, matchedEntity) = FindTargetShape(profile, point, entity);
+
+            // Emit cutouts — only the target gets lead-in/out
+            foreach (var cutout in profile.Cutouts)
+            {
+                if (cutout == targetShape)
+                {
+                    var ct = DetectContourType(cutout);
+                    EmitContour(result, cutout, point, matchedEntity, ct);
+                }
+                else
+                {
+                    EmitRawContour(result, cutout);
+                }
+            }
+
+            // Emit perimeter
+            if (profile.Perimeter == targetShape)
+            {
+                EmitContour(result, profile.Perimeter, point, matchedEntity, ContourType.External);
+            }
+            else
+            {
+                EmitRawContour(result, profile.Perimeter);
+            }
+
+            result.Mode = Mode.Incremental;
+
+            return new CuttingResult
+            {
+                Program = result,
+                LastCutPoint = point
+            };
+        }
+
+        private static (Shape Shape, Entity Entity) FindTargetShape(ShapeProfile profile, Vector point, Entity clickedEntity)
+        {
+            var matched = FindMatchingEntity(profile.Perimeter, clickedEntity);
+            if (matched != null)
+                return (profile.Perimeter, matched);
+
+            foreach (var cutout in profile.Cutouts)
+            {
+                matched = FindMatchingEntity(cutout, clickedEntity);
+                if (matched != null)
+                    return (cutout, matched);
+            }
+
+            // Fallback: closest shape, use closest point to find entity
+            var best = profile.Perimeter;
+            var bestPt = profile.Perimeter.ClosestPointTo(point, out var bestEntity);
+            var bestDist = bestPt.DistanceTo(point);
+
+            foreach (var cutout in profile.Cutouts)
+            {
+                var pt = cutout.ClosestPointTo(point, out var cutoutEntity);
+                var dist = pt.DistanceTo(point);
+                if (dist < bestDist)
+                {
+                    best = cutout;
+                    bestEntity = cutoutEntity;
+                    bestDist = dist;
+                }
+            }
+
+            return (best, bestEntity);
+        }
+
+        private static Entity FindMatchingEntity(Shape shape, Entity clickedEntity)
+        {
+            foreach (var shapeEntity in shape.Entities)
+            {
+                if (shapeEntity.GetType() != clickedEntity.GetType())
+                    continue;
+
+                if (shapeEntity is Line sLine && clickedEntity is Line cLine)
+                {
+                    if (sLine.StartPoint.DistanceTo(cLine.StartPoint) < Math.Tolerance.Epsilon
+                        && sLine.EndPoint.DistanceTo(cLine.EndPoint) < Math.Tolerance.Epsilon)
+                        return shapeEntity;
+                }
+                else if (shapeEntity is Arc sArc && clickedEntity is Arc cArc)
+                {
+                    if (System.Math.Abs(sArc.Radius - cArc.Radius) < Math.Tolerance.Epsilon
+                        && sArc.Center.DistanceTo(cArc.Center) < Math.Tolerance.Epsilon)
+                        return shapeEntity;
+                }
+                else if (shapeEntity is Circle sCircle && clickedEntity is Circle cCircle)
+                {
+                    if (System.Math.Abs(sCircle.Radius - cCircle.Radius) < Math.Tolerance.Epsilon
+                        && sCircle.Center.DistanceTo(cCircle.Center) < Math.Tolerance.Epsilon)
+                        return shapeEntity;
+                }
+            }
+
+            return null;
+        }
+
+        private void EmitRawContour(Program program, Shape shape)
+        {
+            var startPoint = GetShapeStartPoint(shape);
+            program.Codes.Add(new RapidMove(startPoint));
+            program.Codes.AddRange(ConvertShapeToMoves(shape, startPoint));
+        }
+
         private static List<ContourEntry> ResolveLeadInPoints(List<Shape> cutouts, Vector startPoint)
         {
             var entries = new ContourEntry[cutouts.Count];
