@@ -186,9 +186,10 @@ namespace OpenNest.CNC.CuttingStrategy
 
         public static RotationType DetermineWinding(Shape shape)
         {
-            // Use signed area: positive = CCW, negative = CW
-            var area = shape.Area();
-            return area >= 0 ? RotationType.CCW : RotationType.CW;
+            if (shape.Entities.Count == 1 && shape.Entities[0] is Circle circle)
+                return circle.Rotation;
+
+            return shape.ToPolygon().RotationDirection();
         }
 
         private LeadIn ClampLeadInForCircle(LeadIn leadIn, Circle circle, Vector contourPoint, double normalAngle)
