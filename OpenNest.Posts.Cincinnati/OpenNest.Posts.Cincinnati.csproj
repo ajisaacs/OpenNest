@@ -11,6 +11,6 @@
       <PostsDir>..\OpenNest\bin\$(Configuration)\$(TargetFramework)\Posts\</PostsDir>
     </PropertyGroup>
     <MakeDir Directories="$(PostsDir)" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
   </Target>
 </Project>
