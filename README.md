@@ -22,6 +22,7 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 - **Lead-In/Lead-Out & Tabs** — Configurable approach paths, exit paths, and holding tabs for CNC cutting, with snap-to-endpoint/midpoint placement
 - **Contour & Program Editing** — Inline G-code editor with contour reordering, direction arrows, and cut direction reversal
 - **G-code Output** — Post-process nested layouts to G-code via plugin post-processors
+- **User-Defined Variables** — Define named variables in G-code (`diameter = 0.3`) referenced with `$name` syntax; Cincinnati post emits numbered machine variables (`#200`) so operators can adjust values at the control
 - **Built-in Shapes** — 12 parametric shapes (circles, rectangles, L-shapes, T-shapes, flanges, etc.) for quick testing or simple parts
 - **Interactive Editing** — Zoom, pan, select, clone, push, and manually arrange parts on the plate view
 - **Pluggable Engine Architecture** — Swap between built-in nesting engines or load custom engines from plugin DLLs
@@ -212,7 +213,7 @@ Custom post-processors implement the `IPostProcessor` interface and are auto-dis
 Nest files (`.nest`) are ZIP archives containing:
 
 - `nest.json` — JSON metadata: nest info, plate defaults, drawings (with bend data), and plates (with parts and cut-offs)
-- `programs/program-N` — G-code text for each drawing's cut program
+- `programs/program-N` — G-code text for each drawing's cut program (may include variable definitions and `$name` references)
 - `bestfits/bestfit-N` — Cached best-fit pair evaluation results (optional)
 
 ## Roadmap
