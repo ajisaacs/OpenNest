@@ -1,7 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
-using OpenNest.IO;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -29,7 +28,6 @@ namespace OpenNest.Controls
             menuMoveDown.Click += OnMoveDownClicked;
             menuSequence.Click += OnSequenceClicked;
             contourMenu.Opening += OnContourMenuOpening;
-            applyButton.Click += OnApplyClicked;
             preview.PaintOverlay = OnPreviewPaintOverlay;
         }
 
@@ -92,34 +90,47 @@ namespace OpenNest.Controls
 
         private void UpdateGcodeText()
         {
-            gcodeEditor.Text = Program != null ? FormatProgram(Program) : string.Empty;
+            gcodeEditor.Text = Program != null ? FormatProgram(Program, contours) : string.Empty;
         }
 
-        private static string FormatProgram(Program pgm)
+        private static string FormatProgram(Program pgm, List<ContourInfo> contours)
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine(pgm.Mode == Mode.Absolute ? "G90" : "G91");
 
-            var lastWasRapid = false;
-            foreach (var code in pgm.Codes)
+            var codeIndex = 0;
+            var codes = pgm.Codes;
+
+            foreach (var contour in contours)
             {
-                if (code is RapidMove rapid)
+                var sub = ConvertGeometry.ToProgram(contour.Shape);
+                if (sub == null) continue;
+
+                sb.AppendLine();
+                sb.AppendLine($"; {contour.Label} ({contour.DirectionLabel})");
+
+                var lastWasRapid = false;
+                for (var i = 0; i < sub.Length && codeIndex < codes.Count; i++, codeIndex++)
                 {
-                    if (!lastWasRapid && sb.Length > 0)
-                        sb.AppendLine();
-                    sb.AppendLine($"G00 X{FormatCoord(rapid.EndPoint.X)} Y{FormatCoord(rapid.EndPoint.Y)}");
-                    lastWasRapid = true;
-                }
-                else if (code is ArcMove arc)
-                {
-                    var g = arc.Rotation == RotationType.CW ? "G02" : "G03";
-                    sb.AppendLine($"{g} X{FormatCoord(arc.EndPoint.X)} Y{FormatCoord(arc.EndPoint.Y)} I{FormatCoord(arc.CenterPoint.X)} J{FormatCoord(arc.CenterPoint.Y)}");
-                    lastWasRapid = false;
-                }
-                else if (code is LinearMove linear)
-                {
-                    sb.AppendLine($"G01 X{FormatCoord(linear.EndPoint.X)} Y{FormatCoord(linear.EndPoint.Y)}");
-                    lastWasRapid = false;
+                    var code = codes[codeIndex];
+                    if (code is RapidMove rapid)
+                    {
+                        if (!lastWasRapid)
+                            sb.AppendLine();
+                        sb.AppendLine($"G00 X{FormatCoord(rapid.EndPoint.X)} Y{FormatCoord(rapid.EndPoint.Y)}");
+                        lastWasRapid = true;
+                    }
+                    else if (code is ArcMove arc)
+                    {
+                        var g = arc.Rotation == RotationType.CW ? "G02" : "G03";
+                        sb.AppendLine($"{g} X{FormatCoord(arc.EndPoint.X)} Y{FormatCoord(arc.EndPoint.Y)} I{FormatCoord(arc.CenterPoint.X)} J{FormatCoord(arc.CenterPoint.Y)}");
+                        lastWasRapid = false;
+                    }
+                    else if (code is LinearMove linear)
+                    {
+                        sb.AppendLine($"G01 X{FormatCoord(linear.EndPoint.X)} Y{FormatCoord(linear.EndPoint.Y)}");
+                        lastWasRapid = false;
+                    }
                 }
             }
 
@@ -418,50 +429,5 @@ namespace OpenNest.Controls
             }
         }
 
-        private void OnApplyClicked(object sender, EventArgs e)
-        {
-            var text = gcodeEditor.Text;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                MessageBox.Show("G-code is empty.", "Apply", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            try
-            {
-                using var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(text));
-                var reader = new ProgramReader(stream);
-                var parsed = reader.Read();
-
-                if (parsed == null || parsed.Length == 0)
-                {
-                    MessageBox.Show("No valid G-code found.", "Apply", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                // Rebuild shapes from the parsed program
-                var entities = ConvertProgram.ToGeometry(parsed);
-                var shapes = ShapeBuilder.GetShapes(entities);
-
-                if (shapes.Count == 0)
-                {
-                    MessageBox.Show("No contours found in parsed G-code.", "Apply", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                contours = ContourInfo.Classify(shapes);
-                Program = parsed;
-                isDirty = true;
-
-                PopulateContourList();
-                RefreshPreview();
-                ProgramChanged?.Invoke(this, EventArgs.Empty);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error parsing G-code: {ex.Message}", "Apply",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
     }
 }

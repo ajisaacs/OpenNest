@@ -30,7 +30,6 @@ namespace OpenNest.Controls
             editorPanel = new System.Windows.Forms.Panel();
             gcodeEditor = new System.Windows.Forms.TextBox();
             editorToolbar = new System.Windows.Forms.Panel();
-            applyButton = new System.Windows.Forms.Button();
             lblGcode = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)mainSplit).BeginInit();
             mainSplit.Panel1.SuspendLayout();
@@ -189,6 +188,7 @@ namespace OpenNest.Controls
             gcodeEditor.Multiline = true;
             gcodeEditor.Name = "gcodeEditor";
             gcodeEditor.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+            gcodeEditor.ReadOnly = true;
             gcodeEditor.Size = new System.Drawing.Size(260, 470);
             gcodeEditor.TabIndex = 1;
             gcodeEditor.WordWrap = false;
@@ -196,7 +196,6 @@ namespace OpenNest.Controls
             // editorToolbar
             // 
             editorToolbar.BackColor = System.Drawing.Color.FromArgb(245, 245, 245);
-            editorToolbar.Controls.Add(applyButton);
             editorToolbar.Controls.Add(lblGcode);
             editorToolbar.Dock = System.Windows.Forms.DockStyle.Top;
             editorToolbar.Location = new System.Drawing.Point(0, 0);
@@ -204,18 +203,7 @@ namespace OpenNest.Controls
             editorToolbar.Padding = new System.Windows.Forms.Padding(6, 4, 6, 4);
             editorToolbar.Size = new System.Drawing.Size(260, 30);
             editorToolbar.TabIndex = 0;
-            // 
-            // applyButton
-            // 
-            applyButton.Dock = System.Windows.Forms.DockStyle.Right;
-            applyButton.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            applyButton.Font = new System.Drawing.Font("Segoe UI", 9F);
-            applyButton.Location = new System.Drawing.Point(184, 4);
-            applyButton.Name = "applyButton";
-            applyButton.Size = new System.Drawing.Size(70, 22);
-            applyButton.TabIndex = 1;
-            applyButton.Text = "Apply";
-            // 
+            //
             // lblGcode
             // 
             lblGcode.AutoSize = true;
@@ -263,7 +251,6 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Panel editorPanel;
         private System.Windows.Forms.Panel editorToolbar;
         private System.Windows.Forms.Label lblGcode;
-        private System.Windows.Forms.Button applyButton;
         private System.Windows.Forms.TextBox gcodeEditor;
         private System.Windows.Forms.ContextMenuStrip contourMenu;
         private System.Windows.Forms.ToolStripMenuItem menuReverse;
