@@ -37,6 +37,9 @@ namespace OpenNest.Forms
         private Button btnNextPlate;
         private Button btnLastPlate;
 
+        private SplitContainer viewSplitContainer;
+        private Panel sidePanel;
+
         /// <summary>
         /// Used to distinguish between single/double click on drawing within drawinglistbox.
         /// If double click, this is set to false so the single click action won't be triggered.
@@ -53,8 +56,9 @@ namespace OpenNest.Forms
 
             InitializeComponent();
             CreatePlateHeader();
+            CreateSidePanel();
 
-            splitContainer.Panel2.Controls.Add(PlateView);
+            splitContainer.Panel2.Controls.Add(viewSplitContainer);
             splitContainer.Panel2.Controls.Add(plateHeaderPanel);
 
             var renderer = new ToolStripRenderer(ToolbarTheme.Toolbar);
@@ -144,6 +148,43 @@ namespace OpenNest.Forms
         {
             navPanel.Left = (plateHeaderPanel.Width - navPanel.Width) / 2;
             navPanel.Top = (plateHeaderPanel.Height - navPanel.Height) / 2;
+        }
+
+        private void CreateSidePanel()
+        {
+            sidePanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = Color.White
+            };
+
+            viewSplitContainer = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                FixedPanel = FixedPanel.Panel2,
+                Panel2MinSize = 0
+            };
+
+            viewSplitContainer.Panel1.Controls.Add(PlateView);
+            viewSplitContainer.Panel2.Controls.Add(sidePanel);
+            viewSplitContainer.Panel2Collapsed = true;
+        }
+
+        public void ShowSidePanel(Control content, int width = 390)
+        {
+            sidePanel.Controls.Clear();
+            content.Dock = DockStyle.Fill;
+            sidePanel.Controls.Add(content);
+            viewSplitContainer.SplitterDistance = viewSplitContainer.Width - width;
+            viewSplitContainer.Panel2Collapsed = false;
+        }
+
+        public void HideSidePanel()
+        {
+            viewSplitContainer.Panel2Collapsed = true;
+            sidePanel.Controls.Clear();
         }
 
         private static Button CreateNavButton(System.Drawing.Image image)

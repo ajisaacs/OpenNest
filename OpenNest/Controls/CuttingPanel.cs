@@ -76,14 +76,10 @@ namespace OpenNest.Controls
             AutoScroll = true;
             BackColor = Color.White;
 
-            var y = 0;
-
-            // Tab control for contour types
+            // Tab control for contour types — wrapped in a fixed-height panel for Dock.Top
             tabControl = new TabControl
             {
-                Location = new Point(4, y),
-                Size = new Size(372, 340),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Dock = DockStyle.Fill
             };
 
             var tabExternal = new TabPage("External") { Padding = new Padding(4) };
@@ -101,18 +97,20 @@ namespace OpenNest.Controls
             tabControl.Controls.Add(tabInternal);
             tabControl.Controls.Add(tabArcCircle);
 
-            Controls.Add(tabControl);
-            y += tabControl.Height + 4;
+            var tabWrapper = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 340
+            };
+            tabWrapper.Controls.Add(tabControl);
 
             // Tabs section
             var tabsPanel = new CollapsiblePanel
             {
                 HeaderText = "Tabs",
-                Location = new Point(0, y),
-                Size = new Size(380, 120),
+                Dock = DockStyle.Top,
                 ExpandedHeight = 120,
-                IsExpanded = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                IsExpanded = false
             };
 
             chkTabsEnabled = new CheckBox
@@ -159,18 +157,13 @@ namespace OpenNest.Controls
             nudAutoTabMax = CreateNumeric(140, 55, 0, 0.0625);
             tabsPanel.ContentPanel.Controls.Add(nudAutoTabMax);
 
-            Controls.Add(tabsPanel);
-            y += tabsPanel.Height + 4;
-
             // Pierce section
             var piercePanel = new CollapsiblePanel
             {
                 HeaderText = "Pierce",
-                Location = new Point(0, y),
-                Size = new Size(380, 60),
+                Dock = DockStyle.Top,
                 ExpandedHeight = 60,
-                IsExpanded = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                IsExpanded = true
             };
 
             piercePanel.ContentPanel.Controls.Add(new Label
@@ -183,20 +176,29 @@ namespace OpenNest.Controls
             nudPierceClearance = CreateNumeric(130, 3, 0.0625, 0.0625);
             piercePanel.ContentPanel.Controls.Add(nudPierceClearance);
 
-            Controls.Add(piercePanel);
-            y += piercePanel.Height + 4;
-
-            // Auto-Assign button
+            // Auto-Assign button — wrapped in a panel for Dock.Top with padding
             btnAutoAssign = new Button
             {
                 Text = "Auto-Assign Lead-ins",
-                Location = new Point(4, y),
-                Size = new Size(372, 32),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Dock = DockStyle.Top,
+                Height = 32,
                 Visible = false
             };
             btnAutoAssign.Click += (s, e) => AutoAssignClicked?.Invoke(this, EventArgs.Empty);
-            Controls.Add(btnAutoAssign);
+
+            var btnWrapper = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 36,
+                Padding = new Padding(4, 2, 4, 2)
+            };
+            btnWrapper.Controls.Add(btnAutoAssign);
+
+            // Add in reverse order — Dock.Top stacks top-down
+            Controls.Add(btnWrapper);
+            Controls.Add(piercePanel);
+            Controls.Add(tabsPanel);
+            Controls.Add(tabWrapper);
 
             // Wire up change events
             PopulateDropdowns();

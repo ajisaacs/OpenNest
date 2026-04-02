@@ -31,10 +31,12 @@ namespace OpenNest.Actions
         private bool hasSnap;
         private SnapType activeSnapType;
         private ShapeInfo hoveredContour;
+        private ShapeInfo lockedContour;
         private ContextMenuStrip contextMenu;
-        private LeadInToolWindow toolWindow;
+        private CuttingPanel cuttingPanel;
         private static readonly Brush grayOverlay = new SolidBrush(Color.FromArgb(160, 180, 180, 180));
         private static readonly Pen highlightPen = new Pen(Color.Cyan, 2.5f);
+        private static readonly Pen lockedPen = new Pen(Color.Yellow, 3.0f);
 
         public ActionLeadIn(PlateView plateView)
             : base(plateView)
@@ -48,7 +50,7 @@ namespace OpenNest.Actions
             plateView.MouseDown += OnMouseDown;
             plateView.KeyDown += OnKeyDown;
             plateView.Paint += OnPaint;
-            ShowToolWindow();
+            ShowSidePanel();
         }
 
         public override void DisconnectEvents()
@@ -58,7 +60,7 @@ namespace OpenNest.Actions
             plateView.KeyDown -= OnKeyDown;
             plateView.Paint -= OnPaint;
 
-            HideToolWindow();
+            HideSidePanel();
 
             contextMenu?.Dispose();
             contextMenu = null;
@@ -77,18 +79,20 @@ namespace OpenNest.Actions
 
         public override bool IsBusy() => selectedPart != null;
 
-        private void ShowToolWindow()
+        private void ShowSidePanel()
         {
-            if (toolWindow == null)
-            {
-                toolWindow = new LeadInToolWindow();
-                toolWindow.AutoAssignClicked += OnAutoAssignClicked;
-            }
+            var form = plateView.FindForm() as EditNestForm;
+            if (form == null)
+                return;
+
+            cuttingPanel = new CuttingPanel { ShowAutoAssign = true };
+            cuttingPanel.AutoAssignClicked += OnAutoAssignClicked;
+            cuttingPanel.ParametersChanged += OnToolParametersChanged;
 
             // Load current parameters or defaults
             var plate = plateView.Plate;
             if (plate?.CuttingParameters != null)
-                toolWindow.LoadFromParameters(plate.CuttingParameters);
+                cuttingPanel.LoadFromParameters(plate.CuttingParameters);
             else
             {
                 var json = Properties.Settings.Default.CuttingParametersJson;
@@ -97,46 +101,42 @@ namespace OpenNest.Actions
                     try
                     {
                         var saved = CuttingParametersSerializer.Deserialize(json);
-                        toolWindow.LoadFromParameters(saved);
+                        cuttingPanel.LoadFromParameters(saved);
                     }
                     catch { /* use defaults */ }
                 }
             }
 
-            toolWindow.ParametersChanged += OnToolParametersChanged;
-
-            var mainForm = plateView.FindForm();
-            if (mainForm != null)
-                toolWindow.Owner = mainForm;
-
-            toolWindow.Show();
+            form.ShowSidePanel(cuttingPanel);
         }
 
-        private void HideToolWindow()
+        private void HideSidePanel()
         {
-            if (toolWindow == null)
+            if (cuttingPanel == null)
                 return;
 
             SaveParameters();
 
-            toolWindow.ParametersChanged -= OnToolParametersChanged;
-            toolWindow.AutoAssignClicked -= OnAutoAssignClicked;
-            toolWindow.Close();
-            toolWindow.Dispose();
-            toolWindow = null;
+            cuttingPanel.ParametersChanged -= OnToolParametersChanged;
+            cuttingPanel.AutoAssignClicked -= OnAutoAssignClicked;
+
+            var form = plateView.FindForm() as EditNestForm;
+            form?.HideSidePanel();
+
+            cuttingPanel = null;
         }
 
         private CuttingParameters GetCurrentParameters()
         {
-            return toolWindow?.BuildParameters() ?? plateView.Plate?.CuttingParameters ?? new CuttingParameters();
+            return cuttingPanel?.BuildParameters() ?? plateView.Plate?.CuttingParameters ?? new CuttingParameters();
         }
 
         private void SaveParameters()
         {
-            if (toolWindow == null)
+            if (cuttingPanel == null)
                 return;
 
-            var parameters = toolWindow.BuildParameters();
+            var parameters = cuttingPanel.BuildParameters();
             var json = CuttingParametersSerializer.Serialize(parameters);
             Properties.Settings.Default.CuttingParametersJson = json;
             Properties.Settings.Default.Save();
@@ -169,7 +169,12 @@ namespace OpenNest.Actions
             activeSnapType = SnapType.None;
             hoveredContour = null;
 
-            foreach (var info in contours)
+            // When a contour is locked, only snap within that contour
+            var searchContours = lockedContour != null
+                ? new List<ShapeInfo> { lockedContour }
+                : contours;
+
+            foreach (var info in searchContours)
             {
                 var closest = info.Shape.ClosestPointTo(localPt, out var entity);
                 var dist = closest.DistanceTo(localPt);
@@ -191,9 +196,9 @@ namespace OpenNest.Actions
             {
                 TrySnapToEntityPoints(localPt);
 
-                // Auto-switch tool window tab
-                if (toolWindow != null)
-                    toolWindow.ActiveContourType = snapContourType;
+                // Auto-switch tool window tab only when no contour is locked
+                if (cuttingPanel != null && lockedContour == null)
+                    cuttingPanel.ActiveContourType = snapContourType;
             }
 
             plateView.Invalidate();
@@ -208,15 +213,22 @@ namespace OpenNest.Actions
                     // First click: select a part
                     SelectPartAtCursor();
                 }
-                else if (hasSnap)
+                else if (lockedContour == null && hasSnap)
                 {
-                    // Second click: commit lead-in at snap point
+                    // Second click: lock the hovered contour
+                    LockContour(hoveredContour);
+                }
+                else if (lockedContour != null && hasSnap)
+                {
+                    // Third click: commit lead-in at snap point on locked contour
                     CommitLeadIn();
                 }
             }
             else if (e.Button == MouseButtons.Right)
             {
-                if (selectedPart != null && selectedPart.HasManualLeadIns)
+                if (lockedContour != null)
+                    UnlockContour();
+                else if (selectedPart != null && selectedPart.HasManualLeadIns)
                     ShowContextMenu(e.Location);
                 else
                     DeselectPart();
@@ -227,7 +239,9 @@ namespace OpenNest.Actions
         {
             if (e.KeyCode == Keys.Escape)
             {
-                if (selectedPart != null)
+                if (lockedContour != null)
+                    UnlockContour();
+                else if (selectedPart != null)
                     DeselectPart();
                 else
                     plateView.SetAction(typeof(ActionSelect));
@@ -243,6 +257,23 @@ namespace OpenNest.Actions
             DrawLeadInPreview(g);
         }
 
+        private void LockContour(ShapeInfo contour)
+        {
+            lockedContour = contour;
+
+            // Lock the tab to this contour type
+            if (cuttingPanel != null)
+                cuttingPanel.ActiveContourType = contour.ContourType;
+
+            plateView.Invalidate();
+        }
+
+        private void UnlockContour()
+        {
+            lockedContour = null;
+            plateView.Invalidate();
+        }
+
         private void DrawOverlay(Graphics g)
         {
             foreach (var lp in plateView.LayoutParts)
@@ -254,10 +285,24 @@ namespace OpenNest.Actions
 
         private void DrawHoveredContour(Graphics g)
         {
-            if (hoveredContour == null || selectedPart == null)
+            if (selectedPart == null)
                 return;
 
-            using var contourPath = hoveredContour.Shape.GetGraphicsPath();
+            // Draw locked contour with distinct pen
+            if (lockedContour != null)
+            {
+                DrawContourHighlight(g, lockedContour.Shape, lockedPen);
+                return;
+            }
+
+            // Draw hovered contour
+            if (hoveredContour != null)
+                DrawContourHighlight(g, hoveredContour.Shape, highlightPen);
+        }
+
+        private void DrawContourHighlight(Graphics g, Shape shape, Pen pen)
+        {
+            using var contourPath = shape.GetGraphicsPath();
             using var contourMatrix = new Matrix();
             contourMatrix.Translate((float)selectedPart.Location.X, (float)selectedPart.Location.Y);
             contourMatrix.Multiply(plateView.Matrix, MatrixOrder.Append);
@@ -265,7 +310,7 @@ namespace OpenNest.Actions
 
             var prevSmooth = g.SmoothingMode;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.DrawPath(highlightPen, contourPath);
+            g.DrawPath(pen, contourPath);
             g.SmoothingMode = prevSmooth;
         }
 
@@ -468,7 +513,7 @@ namespace OpenNest.Actions
             selectedPart.LeadInsLocked = true;
 
             selectedLayoutPart.IsDirty = true;
-            DeselectPart();
+            UnlockContour();
             plateView.Invalidate();
         }
 
@@ -488,7 +533,7 @@ namespace OpenNest.Actions
             selectedPart.LeadInsLocked = true;
 
             selectedLayoutPart.IsDirty = true;
-            DeselectPart();
+            UnlockContour();
             plateView.Invalidate();
         }
 
@@ -515,6 +560,7 @@ namespace OpenNest.Actions
             selectedPart = null;
             profile = null;
             contours = null;
+            lockedContour = null;
             hasSnap = false;
             activeSnapType = SnapType.None;
             hoveredContour = null;
