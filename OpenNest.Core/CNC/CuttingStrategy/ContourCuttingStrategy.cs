@@ -70,8 +70,8 @@ namespace OpenNest.CNC.CuttingStrategy
         private void EmitContour(Program program, Shape shape, Vector point, Entity entity, ContourType? forceType = null)
         {
             var contourType = forceType ?? DetectContourType(shape);
-            var normal = ComputeNormal(point, entity, contourType);
             var winding = DetermineWinding(shape);
+            var normal = ComputeNormal(point, entity, contourType, winding);
 
             var leadIn = SelectLeadIn(contourType);
             var leadOut = SelectLeadOut(contourType);
@@ -143,29 +143,33 @@ namespace OpenNest.CNC.CuttingStrategy
             return ContourType.Internal;
         }
 
-        public static double ComputeNormal(Vector point, Entity entity, ContourType contourType)
+        public static double ComputeNormal(Vector point, Entity entity, ContourType contourType,
+            RotationType winding = RotationType.CW)
         {
             double normal;
 
             if (entity is Line line)
             {
-                // Perpendicular to line direction
+                // Perpendicular to line direction: tangent + π/2 = left side.
+                // Left side = outward for CW winding; for CCW winding, outward
+                // is on the right side, so flip.
                 var tangent = line.EndPoint.AngleFrom(line.StartPoint);
                 normal = tangent + Math.Angle.HalfPI;
+                if (winding == RotationType.CCW)
+                    normal += System.Math.PI;
             }
             else if (entity is Arc arc)
             {
-                // Radial direction from center to point
+                // Radial direction from center to point.
+                // Flip when the arc direction differs from the contour winding —
+                // that indicates a concave feature where radial points inward.
                 normal = point.AngleFrom(arc.Center);
-
-                // For CCW arcs the radial points the wrong way — flip it.
-                // CW arcs are convex features (corners) where radial = outward.
-                // CCW arcs are concave features (slots) where radial = inward.
-                if (arc.Rotation == RotationType.CCW)
+                if (arc.Rotation != winding)
                     normal += System.Math.PI;
             }
             else if (entity is Circle circle)
             {
+                // Radial outward — always correct regardless of winding
                 normal = point.AngleFrom(circle.Center);
             }
             else

@@ -102,7 +102,7 @@ namespace OpenNest.Actions
                     snapPoint = closest;
                     snapEntity = entity;
                     snapContourType = info.ContourType;
-                    snapNormal = ContourCuttingStrategy.ComputeNormal(closest, entity, info.ContourType);
+                    snapNormal = ContourCuttingStrategy.ComputeNormal(closest, entity, info.ContourType, info.Winding);
                     hasSnap = true;
                     hoveredContour = info;
                 }
@@ -282,7 +282,7 @@ namespace OpenNest.Actions
             {
                 snapPoint = bestPoint;
                 snapEntity = bestEntity;
-                snapNormal = ContourCuttingStrategy.ComputeNormal(bestPoint, bestEntity, snapContourType);
+                snapNormal = ContourCuttingStrategy.ComputeNormal(bestPoint, bestEntity, snapContourType, hoveredContour.Winding);
                 activeSnapType = bestType;
             }
 
@@ -356,7 +356,8 @@ namespace OpenNest.Actions
                 contours.Add(new ShapeInfo
                 {
                     Shape = profile.Perimeter,
-                    ContourType = ContourType.External
+                    ContourType = ContourType.External,
+                    Winding = ContourCuttingStrategy.DetermineWinding(profile.Perimeter)
                 });
             }
 
@@ -366,7 +367,8 @@ namespace OpenNest.Actions
                 contours.Add(new ShapeInfo
                 {
                     Shape = cutout,
-                    ContourType = ContourCuttingStrategy.DetectContourType(cutout)
+                    ContourType = ContourCuttingStrategy.DetectContourType(cutout),
+                    Winding = ContourCuttingStrategy.DetermineWinding(cutout)
                 });
             }
         }
@@ -483,6 +485,7 @@ namespace OpenNest.Actions
         {
             public Shape Shape { get; set; }
             public ContourType ContourType { get; set; }
+            public RotationType Winding { get; set; }
         }
     }
 }
