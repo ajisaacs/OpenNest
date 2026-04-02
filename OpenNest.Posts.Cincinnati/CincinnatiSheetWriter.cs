@@ -89,9 +89,9 @@ public sealed class CincinnatiSheetWriter
 
         // 4. Emit parts
         if (partSubprograms != null)
-            WritePartsWithSubprograms(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, partSubprograms, userVarMapping);
+            WritePartsWithSubprograms(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, width, length, partSubprograms, userVarMapping);
         else
-            WritePartsInline(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, userVarMapping);
+            WritePartsInline(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, width, length, userVarMapping);
 
         // 5. Footer
         w.WriteLine("M42");
@@ -105,6 +105,7 @@ public sealed class CincinnatiSheetWriter
 
     private void WritePartsWithSubprograms(TextWriter w, List<Part> allParts,
         string cutLibrary, string etchLibrary, double sheetDiagonal,
+        double plateWidth, double plateLength,
         Dictionary<(int, long), int> partSubprograms,
         Dictionary<(int drawingId, string varName), int> userVarMapping)
     {
@@ -158,7 +159,10 @@ public sealed class CincinnatiSheetWriter
                         SheetDiagonal = sheetDiagonal,
                         PartLocation = part.Location,
                         UserVariableMapping = userVarMapping,
-                        DrawingId = part.BaseDrawing.Id
+                        DrawingId = part.BaseDrawing.Id,
+                        IsCutOff = part.BaseDrawing.IsCutOff,
+                        PlateWidth = plateWidth,
+                        PlateLength = plateLength
                     };
 
                     _featureWriter.Write(w, ctx);
@@ -207,6 +211,7 @@ public sealed class CincinnatiSheetWriter
 
     private void WritePartsInline(TextWriter w, List<Part> allParts,
         string cutLibrary, string etchLibrary, double sheetDiagonal,
+        double plateWidth, double plateLength,
         Dictionary<(int drawingId, string varName), int> userVarMapping)
     {
         // Split and classify features, ordering etch before cut per part
@@ -249,7 +254,10 @@ public sealed class CincinnatiSheetWriter
                 SheetDiagonal = sheetDiagonal,
                 PartLocation = part.Location,
                 UserVariableMapping = userVarMapping,
-                DrawingId = part.BaseDrawing.Id
+                DrawingId = part.BaseDrawing.Id,
+                IsCutOff = part.BaseDrawing.IsCutOff,
+                PlateWidth = plateWidth,
+                PlateLength = plateLength
             };
 
             _featureWriter.Write(w, ctx);

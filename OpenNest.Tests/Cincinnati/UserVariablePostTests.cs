@@ -108,6 +108,71 @@ public class UserVariablePostTests
         Assert.Contains("#300=48", output);
     }
 
+    [Fact]
+    public void CutOff_VerticalCut_UsesSheetWidthVariable()
+    {
+        // Create a plate with a vertical cutoff
+        var config = new CincinnatiPostConfig { SheetWidthVariable = 110, SheetLengthVariable = 111 };
+        var nest = new Nest { Name = "Test" };
+        var plate = new Plate(new Size(48, 96));
+
+        // Add a simple part so the plate isn't empty
+        var partPgm = new Program();
+        partPgm.Codes.Add(new RapidMove(0, 0));
+        partPgm.Codes.Add(new LinearMove(10, 0));
+        partPgm.Codes.Add(new LinearMove(10, 10));
+        partPgm.Codes.Add(new LinearMove(0, 10));
+        partPgm.Codes.Add(new LinearMove(0, 0));
+        var drawing = new Drawing("Part1", partPgm);
+        nest.Drawings.Add(drawing);
+        plate.Parts.Add(new Part(drawing, new Vector(0, 0)));
+
+        // Add a vertical cutoff that goes full width (Y=0 to Y=48)
+        var cutoff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+
+        nest.Plates.Add(plate);
+
+        var post = new CincinnatiPostProcessor(config);
+        var output = PostToString(post, nest);
+
+        // The cutoff line end at Y=48 (sheet width) should use #110
+        Assert.Contains("Y#110", output);
+    }
+
+    [Fact]
+    public void CutOff_SegmentedCut_OnlyEdgeUsesVariable()
+    {
+        // Create a plate with a part in the middle and a vertical cutoff
+        var config = new CincinnatiPostConfig { SheetWidthVariable = 110 };
+        var nest = new Nest { Name = "Test" };
+        var plate = new Plate(new Size(48, 96));
+
+        // Part in the middle — cutoff will be segmented around it
+        var partPgm = new Program();
+        partPgm.Codes.Add(new RapidMove(0, 0));
+        partPgm.Codes.Add(new LinearMove(10, 0));
+        partPgm.Codes.Add(new LinearMove(10, 10));
+        partPgm.Codes.Add(new LinearMove(0, 10));
+        partPgm.Codes.Add(new LinearMove(0, 0));
+        var drawing = new Drawing("Part1", partPgm);
+        nest.Drawings.Add(drawing);
+        plate.Parts.Add(new Part(drawing, new Vector(15, 20)));  // Part at Y=20-30, should create gap
+
+        var cutoff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+
+        nest.Plates.Add(plate);
+
+        var post = new CincinnatiPostProcessor(config);
+        var output = PostToString(post, nest);
+
+        // The last segment endpoint at Y=48 should use #110
+        Assert.Contains("Y#110", output);
+    }
+
     private static string PostNestWithVariables(string gcode, CincinnatiPostConfig config = null)
     {
         var program = ParseProgram(gcode);

@@ -40,6 +40,18 @@ public sealed class FeatureContext
     /// The drawing ID for the current part, used to look up user variable mappings.
     /// </summary>
     public int DrawingId { get; set; }
+
+    /// <summary>
+    /// True if this feature is a cut-off line. Used to substitute plate-edge
+    /// coordinates with sheet width/length variables.
+    /// </summary>
+    public bool IsCutOff { get; set; }
+
+    /// <summary>Plate width (Y extent for vertical cutoffs).</summary>
+    public double PlateWidth { get; set; }
+
+    /// <summary>Plate length (X extent for horizontal cutoffs).</summary>
+    public double PlateLength { get; set; }
 }
 
 /// <summary>
@@ -74,7 +86,7 @@ public sealed class CincinnatiFeatureWriter
         var piercePoint = FindPiercePoint(ctx.Codes);
 
         // 1. Rapid to pierce point (with line number if configured)
-        WriteRapidToPierce(writer, ctx.FeatureNumber, piercePoint, offset);
+        WriteRapidToPierce(writer, ctx, piercePoint, offset);
 
         // 2. Part name comment on first feature of each part
         if (ctx.IsFirstFeatureOfPart && !string.IsNullOrEmpty(ctx.PartName))
@@ -195,11 +207,14 @@ public sealed class CincinnatiFeatureWriter
     /// <summary>
     /// Formats a coordinate value, using a #number variable reference if the motion
     /// has a VariableRef for this axis and the variable is mapped (non-inline).
+    /// For cut-off features, plate-edge coordinates are substituted with
+    /// the sheet width/length variables.
     /// Inline variables fall through to literal formatting.
     /// </summary>
     private string FormatCoordWithVars(double value, string axis,
         Dictionary<string, string> variableRefs, FeatureContext ctx)
     {
+        // User-defined variable references take priority
         if (variableRefs != null
             && variableRefs.TryGetValue(axis, out var varName)
             && ctx.UserVariableMapping != null
@@ -208,7 +223,31 @@ public sealed class CincinnatiFeatureWriter
             return $"#{varNum}";
         }
 
+        // Cut-off plate-edge substitution
+        if (ctx.IsCutOff)
+        {
+            var sheetVar = MatchCutOffSheetVariable(value, axis, ctx);
+            if (sheetVar != null)
+                return sheetVar;
+        }
+
         return _fmt.FormatCoord(value);
+    }
+
+    /// <summary>
+    /// For cut-off coordinates, checks if the value matches a plate edge dimension
+    /// and returns the sheet variable reference (e.g., "#110") if so.
+    /// </summary>
+    private string MatchCutOffSheetVariable(double value, string axis, FeatureContext ctx)
+    {
+        // Vertical cutoffs travel along Y — the Y endpoint at the plate edge = sheet width
+        // Horizontal cutoffs travel along X — the X endpoint at the plate edge = sheet length
+        if (axis == "Y" && Tolerance.IsEqualTo(value, ctx.PlateWidth))
+            return $"#{_config.SheetWidthVariable}";
+        if (axis == "X" && Tolerance.IsEqualTo(value, ctx.PlateLength))
+            return $"#{_config.SheetLengthVariable}";
+
+        return null;
     }
 
     private Vector FindPiercePoint(List<ICode> codes)
@@ -229,14 +268,16 @@ public sealed class CincinnatiFeatureWriter
         return Vector.Zero;
     }
 
-    private void WriteRapidToPierce(TextWriter writer, int featureNumber, Vector piercePoint, Vector offset)
+    private void WriteRapidToPierce(TextWriter writer, FeatureContext ctx, Vector piercePoint, Vector offset)
     {
         var sb = new StringBuilder();
 
         if (_config.UseLineNumbers)
-            sb.Append($"N{featureNumber} ");
+            sb.Append($"N{ctx.FeatureNumber} ");
 
-        sb.Append($"G0 X{_fmt.FormatCoord(piercePoint.X + offset.X)} Y{_fmt.FormatCoord(piercePoint.Y + offset.Y)}");
+        var xCoord = FormatCoordWithVars(piercePoint.X + offset.X, "X", null, ctx);
+        var yCoord = FormatCoordWithVars(piercePoint.Y + offset.Y, "Y", null, ctx);
+        sb.Append($"G0 X{xCoord} Y{yCoord}");
 
         writer.WriteLine(sb.ToString());
     }
