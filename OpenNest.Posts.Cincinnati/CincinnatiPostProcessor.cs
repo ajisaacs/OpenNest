@@ -103,21 +103,20 @@ namespace OpenNest.Posts.Cincinnati
             using var writer = new StreamWriter(outputStream, Encoding.UTF8, 1024, leaveOpen: true);
 
             // Main program
-            preamble.WriteMainProgram(writer, nest.Name ?? "NEST", materialDesc, plates.Count, initialCutLibrary);
+            preamble.WriteMainProgram(writer, nest.Name ?? "NEST", materialDesc, plates, initialCutLibrary);
 
             // Variable declaration subprogram
             preamble.WriteVariableDeclaration(writer, vars);
 
-            // Sheet subprograms
+            // Sheet subprograms (one per unique layout, quantity handled via L count in main)
             for (var i = 0; i < plates.Count; i++)
             {
                 var plate = plates[i];
-                var sheetIndex = i + 1;
+                var layoutIndex = i + 1;
                 var subNumber = Config.SheetSubprogramStart + i;
                 var cutLibrary = resolver.ResolveCutLibrary(nest.Material?.Name ?? "", nest.Thickness, gas);
-                var isLastSheet = i == plates.Count - 1;
-                sheetWriter.Write(writer, plate, nest.Name ?? "NEST", sheetIndex, subNumber,
-                    cutLibrary, etchLibrary, partSubprograms, isLastSheet, userVarMapping);
+                sheetWriter.Write(writer, plate, nest.Name ?? "NEST", layoutIndex, subNumber,
+                    cutLibrary, etchLibrary, partSubprograms, userVarMapping);
             }
 
             // Part sub-programs (if enabled)

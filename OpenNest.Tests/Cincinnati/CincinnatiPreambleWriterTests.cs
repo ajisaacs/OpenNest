@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using OpenNest.CNC;
@@ -19,7 +20,8 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "TestNest", "Mild Steel, 10GA", 2, "MS135N2PANEL.lib");
+        var plates = new List<Plate> { new(48, 96), new(48, 96) };
+        writer.WriteMainProgram(sw, "TestNest", "Mild Steel, 10GA", plates, "MS135N2PANEL.lib");
 
         var output = sb.ToString();
         Assert.Contains("( NEST TestNest )", output);
@@ -29,8 +31,8 @@ public class CincinnatiPreambleWriterTests
         Assert.Contains("G89 PMS135N2PANEL.lib", output);
         Assert.Contains("M98 P100 (Variable Declaration)", output);
         Assert.Contains("GOTO1 (GOTO SHEET NUMBER)", output);
-        Assert.Contains("N1 M98 P101 (SHEET 1)", output);
-        Assert.Contains("N2 M98 P102 (SHEET 2)", output);
+        Assert.Contains("N1 M98 P101 (LAYOUT 1)", output);
+        Assert.Contains("N2 M98 P102 (LAYOUT 2)", output);
         Assert.Contains("M30 (END OF MAIN)", output);
     }
 
@@ -42,7 +44,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1, "");
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
 
         Assert.Contains("G21 G90", sb.ToString());
     }
@@ -55,7 +57,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1, "");
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
 
         Assert.Contains("G20 G90", sb.ToString());
     }
@@ -68,7 +70,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1, "");
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
 
         Assert.Contains("G121 (SMART RAPIDS)", sb.ToString());
     }
@@ -81,7 +83,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1, "");
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
 
         Assert.DoesNotContain("G121", sb.ToString());
     }
@@ -94,7 +96,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1, "");
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
 
         Assert.Contains("M50", sb.ToString());
     }
@@ -107,7 +109,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1, "");
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
 
         Assert.DoesNotContain("M50", sb.ToString());
     }
@@ -120,7 +122,7 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1, "");
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
 
         Assert.Contains("G61", sb.ToString());
     }
@@ -133,9 +135,31 @@ public class CincinnatiPreambleWriterTests
         using var sw = new StringWriter(sb);
         var writer = new CincinnatiPreambleWriter(config);
 
-        writer.WriteMainProgram(sw, "Test", "", 1, "");
+        writer.WriteMainProgram(sw, "Test", "", new List<Plate> { new(48, 96) }, "");
 
         Assert.DoesNotContain("G61", sb.ToString());
+    }
+
+    [Fact]
+    public void WriteMainProgram_EmitsLCount_WhenQuantityGreaterThanOne()
+    {
+        var config = new CincinnatiPostConfig { PostedUnits = Units.Inches };
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var writer = new CincinnatiPreambleWriter(config);
+
+        var plates = new List<Plate>
+        {
+            new(48, 96) { Quantity = 5 },
+            new(72, 48) { Quantity = 2 },
+            new(36, 48) { Quantity = 1 }
+        };
+        writer.WriteMainProgram(sw, "Test", "", plates, "");
+
+        var output = sb.ToString();
+        Assert.Contains("N1 M98 P101 L5 (LAYOUT 1 - 5 SHEETS)", output);
+        Assert.Contains("N2 M98 P102 L2 (LAYOUT 2 - 2 SHEETS)", output);
+        Assert.Contains("N3 M98 P103 (LAYOUT 3)", output);
     }
 
     [Fact]

@@ -38,7 +38,7 @@ public class CincinnatiPostProcessorTests
 
         // Sheet subprogram
         Assert.Contains(":101", output);
-        Assert.Contains("( Sheet 1 )", output);
+        Assert.Contains("( Layout 1 )", output);
         Assert.Contains("G84", output);
         Assert.Contains("M99", output);
     }
@@ -150,8 +150,8 @@ public class CincinnatiPostProcessorTests
         var output = Encoding.UTF8.GetString(ms.ToArray());
 
         // Should only have one sheet subprogram call in main
-        Assert.Contains("N1 M98 P101 (SHEET 1)", output);
-        Assert.DoesNotContain("SHEET 2", output);
+        Assert.Contains("N1 M98 P101 (LAYOUT 1)", output);
+        Assert.DoesNotContain("LAYOUT 2", output);
     }
 
     [Fact]

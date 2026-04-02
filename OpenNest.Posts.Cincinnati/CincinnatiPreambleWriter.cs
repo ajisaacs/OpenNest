@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using OpenNest;
 using OpenNest.CNC;
@@ -23,7 +24,7 @@ public sealed class CincinnatiPreambleWriter
     /// </summary>
     /// <param name="initialLibrary">Resolved G89 library file for the initial process setup.</param>
     public void WriteMainProgram(TextWriter w, string nestName, string materialDescription,
-        int sheetCount, string initialLibrary)
+        List<Plate> plates, string initialLibrary)
     {
         w.WriteLine(CoordinateFormatter.Comment($"NEST {nestName}"));
         w.WriteLine(CoordinateFormatter.Comment($"CONFIGURATION - {_config.ConfigurationName}"));
@@ -54,10 +55,16 @@ public sealed class CincinnatiPreambleWriter
 
         w.WriteLine("GOTO1 (GOTO SHEET NUMBER)");
 
-        for (var i = 1; i <= sheetCount; i++)
+        for (var i = 0; i < plates.Count; i++)
         {
-            var subNum = _config.SheetSubprogramStart + (i - 1);
-            w.WriteLine($"N{i} M98 P{subNum} (SHEET {i})");
+            var layoutNumber = i + 1;
+            var subNum = _config.SheetSubprogramStart + i;
+            var qty = System.Math.Max(plates[i].Quantity, 1);
+            var lParam = qty > 1 ? $" L{qty}" : "";
+            var sheetLabel = qty > 1
+                ? $"LAYOUT {layoutNumber} - {qty} SHEETS"
+                : $"LAYOUT {layoutNumber}";
+            w.WriteLine($"N{layoutNumber} M98 P{subNum}{lParam} ({sheetLabel})");
         }
 
         w.WriteLine("M42");

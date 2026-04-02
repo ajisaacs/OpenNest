@@ -28,7 +28,7 @@ public class CincinnatiSheetWriterTests
 
         var output = sb.ToString();
         Assert.Contains(":101", output);
-        Assert.Contains("( Sheet 1 )", output);
+        Assert.Contains("( Layout 1 )", output);
         Assert.Contains("#110=", output);
         Assert.Contains("#111=", output);
         Assert.Contains("G92 X#5021 Y#5022", output);
@@ -142,7 +142,7 @@ public class CincinnatiSheetWriterTests
     }
 
     [Fact]
-    public void WriteSheet_StartAndEnd_NoM50OnNonLastSheet()
+    public void WriteSheet_StartAndEnd_EmitsM50()
     {
         var config = new CincinnatiPostConfig
         {
@@ -156,31 +156,31 @@ public class CincinnatiSheetWriterTests
         using var sw = new StringWriter(sb);
         var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
 
-        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "", isLastSheet: false);
-
-        var output = sb.ToString();
-        Assert.DoesNotContain("M50", output);
-    }
-
-    [Fact]
-    public void WriteSheet_StartAndEnd_M50OnLastSheet()
-    {
-        var config = new CincinnatiPostConfig
-        {
-            PalletExchange = PalletMode.StartAndEnd,
-            PostedAccuracy = 4
-        };
-        var plate = new Plate(48.0, 96.0);
-        plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
-
-        var sb = new StringBuilder();
-        using var sw = new StringWriter(sb);
-        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
-
-        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "", isLastSheet: true);
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "");
 
         var output = sb.ToString();
         Assert.Contains("M50", output);
+    }
+
+    [Fact]
+    public void WriteSheet_NoPalletExchange_OmitsM50()
+    {
+        var config = new CincinnatiPostConfig
+        {
+            PalletExchange = PalletMode.None,
+            PostedAccuracy = 4
+        };
+        var plate = new Plate(48.0, 96.0);
+        plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
+
+        var sb = new StringBuilder();
+        using var sw = new StringWriter(sb);
+        var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
+
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "");
+
+        var output = sb.ToString();
+        Assert.DoesNotContain("M50", output);
     }
 
     [Fact]
@@ -198,7 +198,7 @@ public class CincinnatiSheetWriterTests
         using var sw = new StringWriter(sb);
         var sheetWriter = new CincinnatiSheetWriter(config, new ProgramVariableManager());
 
-        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "", isLastSheet: false);
+        sheetWriter.Write(sw, plate, "TestNest", 1, 101, "", "");
 
         var output = sb.ToString();
         Assert.Contains("M50", output);

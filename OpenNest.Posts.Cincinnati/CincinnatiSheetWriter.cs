@@ -35,10 +35,9 @@ public sealed class CincinnatiSheetWriter
     /// Optional mapping of (drawingId, rotationKey) to sub-program number.
     /// When provided, non-cutoff parts are emitted as M98 calls instead of inline features.
     /// </param>
-    public void Write(TextWriter w, Plate plate, string nestName, int sheetIndex, int subNumber,
+    public void Write(TextWriter w, Plate plate, string nestName, int layoutIndex, int subNumber,
         string cutLibrary, string etchLibrary,
         Dictionary<(int, long), int> partSubprograms = null,
-        bool isLastSheet = false,
         Dictionary<(int drawingId, string varName), int> userVarMapping = null)
     {
         if (plate.Parts.Count == 0)
@@ -52,11 +51,10 @@ public sealed class CincinnatiSheetWriter
 
         // 1. Sheet header
         w.WriteLine("(*****************************************************)");
-        w.WriteLine($"( START OF {nestName}.{sheetIndex:D3} )");
+        w.WriteLine($"( START OF {nestName}.{layoutIndex:D3} )");
         w.WriteLine($":{subNumber}");
-        w.WriteLine($"( Sheet {sheetIndex} )");
-        w.WriteLine($"( Layout {sheetIndex} )");
-        w.WriteLine($"( SHEET NAME = {_fmt.FormatCoord(length)} X {_fmt.FormatCoord(width)} )");
+        w.WriteLine($"( Layout {layoutIndex} )");
+        w.WriteLine($"( SHEET NAME = {_fmt.FormatCoord(width)} X {_fmt.FormatCoord(length)} )");
         w.WriteLine($"( Total parts on sheet = {partCount} )");
         w.WriteLine($"#{_config.SheetWidthVariable}={_fmt.FormatCoord(width)} (SHEET WIDTH FOR CUTOFFS)");
         w.WriteLine($"#{_config.SheetLengthVariable}={_fmt.FormatCoord(length)} (SHEET LENGTH FOR CUTOFFS)");
@@ -95,11 +93,9 @@ public sealed class CincinnatiSheetWriter
 
         // 5. Footer
         w.WriteLine("M42");
-        var emitM50 = _config.PalletExchange == PalletMode.EndOfSheet
-            || (_config.PalletExchange == PalletMode.StartAndEnd && isLastSheet);
-        if (emitM50)
-            w.WriteLine($"N{sheetIndex + 1} M50");
-        w.WriteLine($"M99 (END OF {nestName}.{sheetIndex:D3})");
+        if (_config.PalletExchange != PalletMode.None)
+            w.WriteLine("M50");
+        w.WriteLine($"M99 (END OF {nestName}.{layoutIndex:D3})");
     }
 
     private void WritePartsWithSubprograms(TextWriter w, List<Part> allParts,
