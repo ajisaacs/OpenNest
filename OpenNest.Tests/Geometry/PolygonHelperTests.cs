@@ -57,12 +57,12 @@ public class PolygonHelperTests
     public void ExtractPerimeterPolygon_InflatedPolygonIsLarger_ForCCWWinding()
     {
         // CCW winding: (0,0)→(10,0)→(10,10)→(0,10)→(0,0)
-        var pgm = new CNC.Program();
-        pgm.Codes.Add(new CNC.RapidMove(new Vector(0, 0)));
-        pgm.Codes.Add(new CNC.LinearMove(new Vector(10, 0)));
-        pgm.Codes.Add(new CNC.LinearMove(new Vector(10, 10)));
-        pgm.Codes.Add(new CNC.LinearMove(new Vector(0, 10)));
-        pgm.Codes.Add(new CNC.LinearMove(new Vector(0, 0)));
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
         var drawing = new Drawing("ccw-square", pgm);
 
         var noSpacing = PolygonHelper.ExtractPerimeterPolygon(drawing, 0);

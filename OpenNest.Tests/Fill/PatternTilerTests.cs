@@ -1,3 +1,4 @@
+using OpenNest.CNC;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 
@@ -7,11 +8,11 @@ public class PatternTilerTests
 {
     private static Drawing MakeSquareDrawing(double size)
     {
-        var pgm = new CNC.Program();
-        pgm.Codes.Add(new CNC.LinearMove(size, 0));
-        pgm.Codes.Add(new CNC.LinearMove(size, size));
-        pgm.Codes.Add(new CNC.LinearMove(0, size));
-        pgm.Codes.Add(new CNC.LinearMove(0, 0));
+        var pgm = new Program();
+        pgm.Codes.Add(new LinearMove(size, 0));
+        pgm.Codes.Add(new LinearMove(size, size));
+        pgm.Codes.Add(new LinearMove(0, size));
+        pgm.Codes.Add(new LinearMove(0, 0));
         return new Drawing("square", pgm);
     }
 
