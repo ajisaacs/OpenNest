@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace OpenNest.Controls
@@ -90,7 +91,9 @@ namespace OpenNest.Controls
 
         private void UpdateGcodeText()
         {
-            gcodeEditor.Text = Program != null ? FormatProgram(Program, contours) : string.Empty;
+            var text = Program != null ? FormatProgram(Program, contours) : string.Empty;
+            gcodeEditor.Text = text;
+            ApplyHighlighting();
         }
 
         private static string FormatProgram(Program pgm, List<ContourInfo> contours)
@@ -140,6 +143,45 @@ namespace OpenNest.Controls
         private static string FormatCoord(double value)
         {
             return System.Math.Round(value, 4).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private void ApplyHighlighting()
+        {
+            var text = gcodeEditor.Text;
+            if (string.IsNullOrEmpty(text)) return;
+
+            gcodeEditor.SuspendLayout();
+
+            var rapidColor = Color.FromArgb(230, 180, 80);
+            var linearColor = Color.FromArgb(130, 200, 140);
+            var arcColor = Color.FromArgb(120, 160, 255);
+            var commentColor = Color.FromArgb(120, 120, 140);
+            var modeColor = Color.FromArgb(200, 140, 220);
+            var coordColor = Color.FromArgb(180, 200, 180);
+
+            gcodeEditor.SelectAll();
+            gcodeEditor.SelectionColor = coordColor;
+
+            var rules = new (Regex pattern, Color color)[]
+            {
+                (new Regex(@"^;.*$", RegexOptions.Multiline), commentColor),
+                (new Regex(@"^G9[01]\b", RegexOptions.Multiline), modeColor),
+                (new Regex(@"^G00\b", RegexOptions.Multiline), rapidColor),
+                (new Regex(@"^G01\b", RegexOptions.Multiline), linearColor),
+                (new Regex(@"^G0[23]\b", RegexOptions.Multiline), arcColor),
+            };
+
+            foreach (var (pattern, color) in rules)
+            {
+                foreach (Match match in pattern.Matches(text))
+                {
+                    gcodeEditor.Select(match.Index, match.Length);
+                    gcodeEditor.SelectionColor = color;
+                }
+            }
+
+            gcodeEditor.Select(0, 0);
+            gcodeEditor.ResumeLayout();
         }
 
         private void RefreshPreview()

@@ -28,7 +28,7 @@ namespace OpenNest.Controls
             rightSplit = new System.Windows.Forms.SplitContainer();
             preview = new EntityView();
             editorPanel = new System.Windows.Forms.Panel();
-            gcodeEditor = new System.Windows.Forms.TextBox();
+            gcodeEditor = new System.Windows.Forms.RichTextBox();
             editorToolbar = new System.Windows.Forms.Panel();
             lblGcode = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)mainSplit).BeginInit();
@@ -185,10 +185,9 @@ namespace OpenNest.Controls
             gcodeEditor.Font = new System.Drawing.Font("Consolas", 10F);
             gcodeEditor.ForeColor = System.Drawing.Color.FromArgb(180, 200, 180);
             gcodeEditor.Location = new System.Drawing.Point(0, 30);
-            gcodeEditor.Multiline = true;
             gcodeEditor.Name = "gcodeEditor";
-            gcodeEditor.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             gcodeEditor.ReadOnly = true;
+            gcodeEditor.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Both;
             gcodeEditor.Size = new System.Drawing.Size(260, 470);
             gcodeEditor.TabIndex = 1;
             gcodeEditor.WordWrap = false;
@@ -251,7 +250,7 @@ namespace OpenNest.Controls
         private System.Windows.Forms.Panel editorPanel;
         private System.Windows.Forms.Panel editorToolbar;
         private System.Windows.Forms.Label lblGcode;
-        private System.Windows.Forms.TextBox gcodeEditor;
+        private System.Windows.Forms.RichTextBox gcodeEditor;
         private System.Windows.Forms.ContextMenuStrip contourMenu;
         private System.Windows.Forms.ToolStripMenuItem menuReverse;
         private System.Windows.Forms.ToolStripMenuItem menuMoveUp;
