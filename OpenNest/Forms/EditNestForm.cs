@@ -725,15 +725,19 @@ namespace OpenNest.Forms
 
             var plate = PlateView.Plate;
 
-            using var form = new CuttingParametersForm();
-            if (plate.CuttingParameters != null)
-                form.Parameters = plate.CuttingParameters;
-
-            if (form.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            var parameters = form.BuildParameters();
-            plate.CuttingParameters = parameters;
+            if (plate.CuttingParameters == null)
+            {
+                var json = Properties.Settings.Default.CuttingParametersJson;
+                if (!string.IsNullOrEmpty(json))
+                {
+                    try { plate.CuttingParameters = CuttingParametersSerializer.Deserialize(json); }
+                    catch { plate.CuttingParameters = new CuttingParameters(); }
+                }
+                else
+                {
+                    plate.CuttingParameters = new CuttingParameters();
+                }
+            }
 
             var assigner = new LeadInAssigner
             {
@@ -784,11 +788,18 @@ namespace OpenNest.Forms
             if (Nest == null)
                 return;
 
-            using var form = new CuttingParametersForm();
-            if (form.ShowDialog(this) != DialogResult.OK)
-                return;
+            CuttingParameters parameters;
+            var json = Properties.Settings.Default.CuttingParametersJson;
+            if (!string.IsNullOrEmpty(json))
+            {
+                try { parameters = CuttingParametersSerializer.Deserialize(json); }
+                catch { parameters = new CuttingParameters(); }
+            }
+            else
+            {
+                parameters = new CuttingParameters();
+            }
 
-            var parameters = form.BuildParameters();
             var assigner = new LeadInAssigner
             {
                 Sequencer = new LeftSideSequencer()
@@ -835,14 +846,19 @@ namespace OpenNest.Forms
 
             var plate = PlateView.Plate;
 
-            // Ensure cutting parameters are configured
+            // If no cutting parameters exist, initialize from saved settings or defaults
             if (plate.CuttingParameters == null)
             {
-                using var form = new CuttingParametersForm();
-                if (form.ShowDialog(this) != DialogResult.OK)
-                    return;
-
-                plate.CuttingParameters = form.BuildParameters();
+                var json = Properties.Settings.Default.CuttingParametersJson;
+                if (!string.IsNullOrEmpty(json))
+                {
+                    try { plate.CuttingParameters = CuttingParametersSerializer.Deserialize(json); }
+                    catch { plate.CuttingParameters = new CuttingParameters(); }
+                }
+                else
+                {
+                    plate.CuttingParameters = new CuttingParameters();
+                }
             }
 
             PlateView.SetAction(typeof(Actions.ActionLeadIn));
