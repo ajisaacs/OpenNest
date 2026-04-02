@@ -124,4 +124,74 @@ public class PartLeadInTests
         var part = MakeSquarePart();
         Assert.False(part.LeadInsLocked);
     }
+
+    [Fact]
+    public void ApplySingleLeadIn_SetsHasManualLeadIns()
+    {
+        var part = MakeSquarePart();
+        var parameters = new CuttingParameters
+        {
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+        };
+
+        var entity = new Line(new Vector(10, 0), new Vector(0, 0));
+        part.ApplySingleLeadIn(parameters, new Vector(5, 0), entity, ContourType.External);
+
+        Assert.True(part.HasManualLeadIns);
+    }
+
+    [Fact]
+    public void ApplySingleLeadIn_ProgramContainsLeadinCodes()
+    {
+        var part = MakeSquarePart();
+        var parameters = new CuttingParameters
+        {
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+        };
+
+        var entity = new Line(new Vector(10, 0), new Vector(0, 0));
+        part.ApplySingleLeadIn(parameters, new Vector(5, 0), entity, ContourType.External);
+
+        var hasLeadin = part.Program.Codes.OfType<LinearMove>().Any(m => m.Layer == LayerType.Leadin);
+        Assert.True(hasLeadin);
+    }
+
+    [Fact]
+    public void ApplySingleLeadIn_ThenRemove_RestoresOriginal()
+    {
+        var part = MakeSquarePart();
+        var originalCodeCount = part.Program.Codes.Count;
+        var parameters = new CuttingParameters
+        {
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+        };
+
+        var entity = new Line(new Vector(10, 0), new Vector(0, 0));
+        part.ApplySingleLeadIn(parameters, new Vector(5, 0), entity, ContourType.External);
+        part.RemoveLeadIns();
+
+        Assert.False(part.HasManualLeadIns);
+        Assert.Equal(originalCodeCount, part.Program.Codes.Count);
+    }
+
+    [Fact]
+    public void ApplySingleLeadIn_PreservesRotation()
+    {
+        var part = MakeSquarePart();
+        part.Rotate(System.Math.PI / 4);
+        var rotation = part.Rotation;
+
+        var parameters = new CuttingParameters
+        {
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+        };
+
+        // After rotation, the edges change. Use a point on the rotated bottom edge.
+        // The rotated square has vertices roughly at rotated positions.
+        // We'll use a generic entity that will be matched via fallback.
+        var entity = new Line(new Vector(10, 0), new Vector(0, 0));
+        part.ApplySingleLeadIn(parameters, new Vector(5, 0), entity, ContourType.External);
+
+        Assert.Equal(rotation, part.Rotation, 6);
+    }
 }
