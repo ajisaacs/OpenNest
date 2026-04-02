@@ -106,6 +106,12 @@ namespace OpenNest.Forms
             set { thicknessBox.Value = (decimal)value; }
         }
 
+        public string MaterialName
+        {
+            get { return materialBox.Text; }
+            set { materialBox.Text = value; }
+        }
+
         public void SetUnits(Units units)
         {
             switch (units)
@@ -189,7 +195,8 @@ namespace OpenNest.Forms
             Customer = nest.Customer;
             DateCreated = nest.DateCreated;
             DateLastModified = nest.DateLastModified;
-            Thickness = nest.PlateDefaults.Thickness;
+            Thickness = nest.Thickness;
+            MaterialName = nest.Material?.Name ?? "";
             SizeString = nest.PlateDefaults.Size.ToString();
             PartSpacing = nest.PlateDefaults.PartSpacing;
             LeftSpacing = nest.PlateDefaults.EdgeSpacing.Left;
@@ -209,7 +216,8 @@ namespace OpenNest.Forms
             nest.Customer = Customer;
             nest.DateCreated = DateCreated;
             nest.DateLastModified = DateLastModified;
-            nest.PlateDefaults.Thickness = Thickness;
+            nest.Thickness = Thickness;
+            nest.Material = new Material(MaterialName);
             nest.PlateDefaults.Size = OpenNest.Geometry.Size.Parse(SizeString);
             nest.PlateDefaults.PartSpacing = PartSpacing;
             nest.PlateDefaults.EdgeSpacing = new Spacing(LeftSpacing, BottomSpacing, RightSpacing, TopSpacing);

@@ -21,6 +21,7 @@ namespace OpenNest
             Plates.ItemRemoved += Plates_PlateRemoved;
             Drawings = new DrawingCollection();
             PlateDefaults = new PlateSettings();
+            Material = new Material();
             Customer = string.Empty;
             Notes = string.Empty;
         }
@@ -37,6 +38,10 @@ namespace OpenNest
         public string Notes { get; set; }
 
         public string AssistGas { get; set; } = "";
+
+        public double Thickness { get; set; }
+
+        public Material Material { get; set; }
 
         public Units Units { get; set; }
 
@@ -84,18 +89,6 @@ namespace OpenNest
                 set { plate.Quadrant = value; }
             }
 
-            public double Thickness
-            {
-                get { return plate.Thickness; }
-                set { plate.Thickness = value; }
-            }
-
-            public Material Material
-            {
-                get { return plate.Material; }
-                set { plate.Material = value; }
-            }
-
             public Size Size
             {
                 get { return plate.Size; }
@@ -116,9 +109,7 @@ namespace OpenNest
 
             public void SetFromExisting(Plate plate)
             {
-                Thickness = plate.Thickness;
                 Quadrant = plate.Quadrant;
-                Material = plate.Material;
                 Size = plate.Size;
                 EdgeSpacing = plate.EdgeSpacing;
                 PartSpacing = plate.PartSpacing;
@@ -128,11 +119,9 @@ namespace OpenNest
             {
                 return new Plate()
                 {
-                    Thickness = Thickness,
                     Size = Size,
                     EdgeSpacing = EdgeSpacing,
                     PartSpacing = PartSpacing,
-                    Material = Material,
                     Quadrant = Quadrant,
                     Quantity = 1
                 };

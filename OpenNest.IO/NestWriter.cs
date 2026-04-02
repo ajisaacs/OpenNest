@@ -79,6 +79,13 @@ namespace OpenNest.IO
                 DateLastModified = nest.DateLastModified.ToString("o"),
                 Notes = nest.Notes ?? "",
                 AssistGas = nest.AssistGas ?? "",
+                Thickness = nest.Thickness,
+                Material = new MaterialDto
+                {
+                    Name = nest.Material.Name ?? "",
+                    Grade = nest.Material.Grade ?? "",
+                    Density = nest.Material.Density
+                },
                 PlateDefaults = BuildPlateDefaultsDto(),
                 Drawings = BuildDrawingDtos(),
                 Plates = BuildPlateDtos()
@@ -91,14 +98,14 @@ namespace OpenNest.IO
             return new PlateDefaultsDto
             {
                 Size = new SizeDto { Width = pd.Size.Width, Length = pd.Size.Length },
-                Thickness = pd.Thickness,
+                Thickness = nest.Thickness,
                 Quadrant = pd.Quadrant,
                 PartSpacing = pd.PartSpacing,
                 Material = new MaterialDto
                 {
-                    Name = pd.Material.Name ?? "",
-                    Grade = pd.Material.Grade ?? "",
-                    Density = pd.Material.Density
+                    Name = nest.Material.Name ?? "",
+                    Grade = nest.Material.Grade ?? "",
+                    Density = nest.Material.Density
                 },
                 EdgeSpacing = new SpacingDto
                 {
@@ -196,16 +203,9 @@ namespace OpenNest.IO
                 {
                     Id = i + 1,
                     Size = new SizeDto { Width = plate.Size.Width, Length = plate.Size.Length },
-                    Thickness = plate.Thickness,
                     Quadrant = plate.Quadrant,
                     Quantity = plate.Quantity,
                     PartSpacing = plate.PartSpacing,
-                    Material = new MaterialDto
-                    {
-                        Name = plate.Material.Name ?? "",
-                        Grade = plate.Material.Grade ?? "",
-                        Density = plate.Material.Density
-                    },
                     EdgeSpacing = new SpacingDto
                     {
                         Left = plate.EdgeSpacing.Left,

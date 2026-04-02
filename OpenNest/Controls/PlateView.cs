@@ -782,8 +782,6 @@ namespace OpenNest.Controls
             {
                 Quadrant = Plate.Quadrant,
                 PartSpacing = Plate.PartSpacing,
-                Thickness = Plate.Thickness,
-                Material = Plate.Material,
             };
             previewPlate.EdgeSpacing = Plate.EdgeSpacing;
             progressForm.PreviewPlate = previewPlate;

@@ -58,7 +58,6 @@ namespace OpenNest.Forms
 
             var controls = new[]
             {
-                numericUpDownThickness,
                 numericUpDownPartSpacing,
                 numericUpDownEdgeSpacingBottom,
                 numericUpDownEdgeSpacingLeft,
@@ -110,12 +109,6 @@ namespace OpenNest.Forms
             set { numericUpDownPartSpacing.Value = (decimal)value; }
         }
 
-        public double Thickness
-        {
-            get { return (double)numericUpDownThickness.Value; }
-            set { numericUpDownThickness.Value = (decimal)value; }
-        }
-
         public int Quantity
         {
             get { return (int)numericUpDownQty.Value; }
@@ -163,7 +156,6 @@ namespace OpenNest.Forms
             PartSpacing = plate.PartSpacing;
             Quantity = plate.Quantity;
             Quadrant = plate.Quadrant;
-            Thickness = plate.Thickness;
         }
 
         private void Save()
@@ -176,7 +168,6 @@ namespace OpenNest.Forms
             plate.PartSpacing = PartSpacing;
             plate.Quantity = Quantity;
             plate.Quadrant = Quadrant;
-            plate.Thickness = Thickness;
         }
 
         private void textBox1_TextChanged(object sender, EventArgs e)

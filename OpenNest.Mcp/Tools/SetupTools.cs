@@ -31,8 +31,8 @@ namespace OpenNest.Mcp.Tools
             plate.Quadrant = quadrant;
             plate.Quantity = 1;
 
-            if (!string.IsNullOrEmpty(material))
-                plate.Material.Name = material;
+            if (!string.IsNullOrEmpty(material) && _session.Nest != null)
+                _session.Nest.Material = new Material(material);
 
             _session.Plates.Add(plate);
 

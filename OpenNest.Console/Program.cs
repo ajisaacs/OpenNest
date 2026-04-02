@@ -279,10 +279,9 @@ static class NestConsole
             return;
         }
 
-        var templatePlate = new NestReader(options.TemplateFile).Read().PlateDefaults.CreateNew();
-        plate.Thickness = templatePlate.Thickness;
+        var templateNest = new NestReader(options.TemplateFile).Read();
+        var templatePlate = templateNest.PlateDefaults.CreateNew();
         plate.Quadrant = templatePlate.Quadrant;
-        plate.Material = templatePlate.Material;
         plate.EdgeSpacing = templatePlate.EdgeSpacing;
         plate.PartSpacing = templatePlate.PartSpacing;
         Console.WriteLine($"Template: {options.TemplateFile}");

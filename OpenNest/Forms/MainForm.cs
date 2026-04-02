@@ -1017,8 +1017,6 @@ namespace OpenNest.Forms
             {
                 Quadrant = source.Quadrant,
                 PartSpacing = source.PartSpacing,
-                Thickness = source.Thickness,
-                Material = source.Material,
             };
             plate.EdgeSpacing = source.EdgeSpacing;
             return plate;

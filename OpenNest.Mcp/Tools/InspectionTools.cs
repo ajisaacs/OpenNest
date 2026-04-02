@@ -33,8 +33,8 @@ namespace OpenNest.Mcp.Tools
             sb.AppendLine($"Plate {plateIndex}:");
             sb.AppendLine($"  Size: {plate.Size.Width:F1} x {plate.Size.Length:F1}");
             sb.AppendLine($"  Quadrant: {plate.Quadrant}");
-            sb.AppendLine($"  Thickness: {plate.Thickness:F2}");
-            sb.AppendLine($"  Material: {plate.Material.Name}");
+            sb.AppendLine($"  Thickness: {_session.Nest?.Thickness:F2}");
+            sb.AppendLine($"  Material: {_session.Nest?.Material?.Name}");
             sb.AppendLine($"  Part spacing: {plate.PartSpacing:F2}");
             sb.AppendLine($"  Edge spacing: L={plate.EdgeSpacing.Left:F2} B={plate.EdgeSpacing.Bottom:F2} R={plate.EdgeSpacing.Right:F2} T={plate.EdgeSpacing.Top:F2}");
             sb.AppendLine($"  Work area: {work.X:F1},{work.Y:F1} {work.Width:F1}x{work.Length:F1}");

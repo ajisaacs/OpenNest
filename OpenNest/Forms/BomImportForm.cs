@@ -400,8 +400,8 @@ namespace OpenNest.Forms
                 nest.DateCreated = DateTime.Now;
                 nest.DateLastModified = DateTime.Now;
                 nest.PlateDefaults.Size = new Geometry.Size(plateWidth, plateLength);
-                nest.PlateDefaults.Thickness = thickness;
-                nest.PlateDefaults.Material = new Material(material);
+                nest.Thickness = thickness;
+                nest.Material = new Material(material);
                 nest.PlateDefaults.Quadrant = 1;
                 nest.PlateDefaults.PartSpacing = 1;
                 nest.PlateDefaults.EdgeSpacing = new Spacing(1, 1, 1, 1);

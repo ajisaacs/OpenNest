@@ -32,7 +32,6 @@
             this.labelQty = new System.Windows.Forms.Label();
             this.labelSize = new System.Windows.Forms.Label();
             this.textBoxSize = new System.Windows.Forms.TextBox();
-            this.labelThk = new System.Windows.Forms.Label();
             this.labelPartSpacing = new System.Windows.Forms.Label();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.tableLayoutPanel2 = new System.Windows.Forms.TableLayoutPanel();
@@ -50,7 +49,6 @@
             this.numericUpDownEdgeSpacingRight = new OpenNest.Controls.NumericUpDown();
             this.numericUpDownEdgeSpacingBottom = new OpenNest.Controls.NumericUpDown();
             this.numericUpDownQty = new OpenNest.Controls.NumericUpDown();
-            this.numericUpDownThickness = new OpenNest.Controls.NumericUpDown();
             this.numericUpDownPartSpacing = new OpenNest.Controls.NumericUpDown();
             this.tableLayoutPanel1.SuspendLayout();
             this.groupBox1.SuspendLayout();
@@ -62,7 +60,6 @@
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownEdgeSpacingRight)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownEdgeSpacingBottom)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownQty)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownThickness)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownPartSpacing)).BeginInit();
             this.SuspendLayout();
             // 
@@ -75,18 +72,15 @@
             this.tableLayoutPanel1.Controls.Add(this.labelSize, 0, 0);
             this.tableLayoutPanel1.Controls.Add(this.textBoxSize, 1, 0);
             this.tableLayoutPanel1.Controls.Add(this.numericUpDownQty, 1, 1);
-            this.tableLayoutPanel1.Controls.Add(this.numericUpDownThickness, 1, 2);
-            this.tableLayoutPanel1.Controls.Add(this.labelThk, 0, 2);
-            this.tableLayoutPanel1.Controls.Add(this.labelPartSpacing, 0, 3);
-            this.tableLayoutPanel1.Controls.Add(this.numericUpDownPartSpacing, 1, 3);
+            this.tableLayoutPanel1.Controls.Add(this.labelPartSpacing, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.numericUpDownPartSpacing, 1, 2);
             this.tableLayoutPanel1.Location = new System.Drawing.Point(18, 12);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 4;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(236, 144);
+            this.tableLayoutPanel1.RowCount = 3;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.33333F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.33333F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.33333F));
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(236, 108);
             this.tableLayoutPanel1.TabIndex = 0;
             // 
             // labelQty
@@ -119,18 +113,7 @@
             this.textBoxSize.Size = new System.Drawing.Size(133, 22);
             this.textBoxSize.TabIndex = 1;
             this.textBoxSize.TextChanged += new System.EventHandler(this.textBox1_TextChanged);
-            // 
-            // labelThk
-            // 
-            this.labelThk.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.labelThk.AutoSize = true;
-            this.labelThk.Location = new System.Drawing.Point(3, 82);
-            this.labelThk.Name = "labelThk";
-            this.labelThk.Size = new System.Drawing.Size(91, 16);
-            this.labelThk.TabIndex = 4;
-            this.labelThk.Text = "Thickness :";
-            this.labelThk.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            // 
+            //
             // labelPartSpacing
             // 
             this.labelPartSpacing.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
@@ -352,22 +335,7 @@
             this.numericUpDownQty.Size = new System.Drawing.Size(133, 22);
             this.numericUpDownQty.Suffix = "";
             this.numericUpDownQty.TabIndex = 3;
-            // 
-            // numericUpDownThickness
-            // 
-            this.numericUpDownThickness.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.numericUpDownThickness.DecimalPlaces = 4;
-            this.numericUpDownThickness.Increment = new decimal(new int[] {
-            25,
-            0,
-            0,
-            131072});
-            this.numericUpDownThickness.Location = new System.Drawing.Point(100, 79);
-            this.numericUpDownThickness.Name = "numericUpDownThickness";
-            this.numericUpDownThickness.Size = new System.Drawing.Size(133, 22);
-            this.numericUpDownThickness.Suffix = "";
-            this.numericUpDownThickness.TabIndex = 5;
-            // 
+            //
             // numericUpDownPartSpacing
             // 
             this.numericUpDownPartSpacing.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
@@ -414,7 +382,6 @@
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownEdgeSpacingRight)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownEdgeSpacingBottom)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownQty)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDownThickness)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDownPartSpacing)).EndInit();
             this.ResumeLayout(false);
 
@@ -441,8 +408,6 @@
         private Controls.NumericUpDown numericUpDownQty;
         private Controls.QuadrantSelect quadrantSelect1;
         private System.Windows.Forms.GroupBox groupBox2;
-        private Controls.NumericUpDown numericUpDownThickness;
-        private System.Windows.Forms.Label labelThk;
         private System.Windows.Forms.Label labelPartSpacing;
         private Controls.NumericUpDown numericUpDownPartSpacing;
         private Controls.BottomPanel bottomPanel1;

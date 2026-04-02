@@ -43,7 +43,6 @@ namespace OpenNest
         {
             EdgeSpacing = new Spacing();
             Size = size;
-            Material = new Material();
             Parts = new ObservableList<Part>();
             Parts.ItemAdded += Parts_PartAdded;
             Parts.ItemRemoved += Parts_PartRemoved;
@@ -64,11 +63,6 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Thickness of the plate.
-        /// </summary>
-        public double Thickness { get; set; }
-
-        /// <summary>
         /// The spacing between parts.
         /// </summary>
         public double PartSpacing { get; set; }
@@ -82,11 +76,6 @@ namespace OpenNest
         /// The size of the plate.
         /// </summary>
         public Size Size { get; set; }
-
-        /// <summary>
-        /// Material the plate is made out of.
-        /// </summary>
-        public Material Material { get; set; }
 
         public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
 
@@ -571,19 +560,17 @@ namespace OpenNest
         /// <summary>
         /// Gets the volume of the plate.
         /// </summary>
-        /// <returns></returns>
-        public double Volume()
+        public double Volume(double thickness)
         {
-            return Area() * Thickness;
+            return Area() * thickness;
         }
 
         /// <summary>
         /// Gets the weight of the plate.
         /// </summary>
-        /// <returns></returns>
-        public double Weight()
+        public double Weight(double thickness, double density)
         {
-            return Volume() * Material.Density;
+            return Volume(thickness) * density;
         }
 
         /// <summary>

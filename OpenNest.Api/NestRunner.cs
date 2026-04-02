@@ -59,6 +59,8 @@ public static class NestRunner
 
         // 3. Multi-plate loop
         var nest = new Nest();
+        nest.Thickness = request.Thickness;
+        nest.Material = new Material(request.Material);
         var remaining = items.Select(item => item.Quantity).ToList();
 
         while (remaining.Any(q => q > 0))
@@ -67,9 +69,7 @@ public static class NestRunner
 
             var plate = new Plate(request.SheetSize)
             {
-                Thickness = request.Thickness,
                 PartSpacing = request.Spacing,
-                Material = new Material(request.Material)
             };
 
             // Build items for this pass with remaining quantities

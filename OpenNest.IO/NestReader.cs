@@ -180,13 +180,16 @@ namespace OpenNest.IO
             nest.Notes = dto.Notes;
             nest.AssistGas = dto.AssistGas ?? "";
 
-            // Plate defaults
+            // Nest-level material and thickness (fall back to PlateDefaults for old files)
             var pd = dto.PlateDefaults;
+            var matDto = dto.Material ?? pd.Material;
+            nest.Thickness = dto.Thickness > 0 ? dto.Thickness : pd.Thickness;
+            nest.Material = new Material(matDto.Name, matDto.Grade, matDto.Density);
+
+            // Plate defaults
             nest.PlateDefaults.Size = new OpenNest.Geometry.Size(pd.Size.Width, pd.Size.Length);
-            nest.PlateDefaults.Thickness = pd.Thickness;
             nest.PlateDefaults.Quadrant = pd.Quadrant;
             nest.PlateDefaults.PartSpacing = pd.PartSpacing;
-            nest.PlateDefaults.Material = new Material(pd.Material.Name, pd.Material.Grade, pd.Material.Density);
             nest.PlateDefaults.EdgeSpacing = new Spacing(pd.EdgeSpacing.Left, pd.EdgeSpacing.Bottom, pd.EdgeSpacing.Right, pd.EdgeSpacing.Top);
 
             // Drawings
@@ -198,11 +201,9 @@ namespace OpenNest.IO
             {
                 var plate = new Plate();
                 plate.Size = new OpenNest.Geometry.Size(p.Size.Width, p.Size.Length);
-                plate.Thickness = p.Thickness;
                 plate.Quadrant = p.Quadrant;
                 plate.Quantity = p.Quantity;
                 plate.PartSpacing = p.PartSpacing;
-                plate.Material = new Material(p.Material.Name, p.Material.Grade, p.Material.Density);
                 plate.EdgeSpacing = new Spacing(p.EdgeSpacing.Left, p.EdgeSpacing.Bottom, p.EdgeSpacing.Right, p.EdgeSpacing.Top);
                 plate.GrainAngle = p.GrainAngle;
 

@@ -24,6 +24,8 @@ namespace OpenNest.IO
             public string DateLastModified { get; init; } = "";
             public string Notes { get; init; } = "";
             public string AssistGas { get; init; } = "";
+            public double Thickness { get; init; }
+            public MaterialDto Material { get; init; } = new();
             public PlateDefaultsDto PlateDefaults { get; init; } = new();
             public List<DrawingDto> Drawings { get; init; } = new();
             public List<PlateDto> Plates { get; init; } = new();
@@ -57,11 +59,9 @@ namespace OpenNest.IO
         {
             public int Id { get; init; }
             public SizeDto Size { get; init; } = new();
-            public double Thickness { get; init; }
             public int Quadrant { get; init; } = 1;
             public int Quantity { get; init; } = 1;
             public double PartSpacing { get; init; }
-            public MaterialDto Material { get; init; } = new();
             public SpacingDto EdgeSpacing { get; init; } = new();
             public double GrainAngle { get; init; }
             public List<PartDto> Parts { get; init; } = new();

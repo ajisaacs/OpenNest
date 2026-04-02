@@ -75,11 +75,9 @@ namespace OpenNest.Posts.Cincinnati
             var gas = MaterialLibraryResolver.ResolveGas(nest, Config);
             var etchLibrary = resolver.ResolveEtchLibrary(Config.DefaultEtchGas);
 
-            // Resolve cut library from first plate for preamble
+            // Resolve cut library from nest material/thickness for preamble
             var firstPlate = plates.FirstOrDefault();
-            var initialCutLibrary = firstPlate != null
-                ? resolver.ResolveCutLibrary(firstPlate.Material?.Name ?? "", firstPlate.Thickness, gas)
-                : "";
+            var initialCutLibrary = resolver.ResolveCutLibrary(nest.Material?.Name ?? "", nest.Thickness, gas);
 
             // 4. Build part sub-program registry (if enabled)
             Dictionary<(int, long), int> partSubprograms = null;
@@ -92,8 +90,8 @@ namespace OpenNest.Posts.Cincinnati
             var preamble = new CincinnatiPreambleWriter(Config);
             var sheetWriter = new CincinnatiSheetWriter(Config, vars);
 
-            // 6. Build material description from first plate
-            var material = firstPlate?.Material;
+            // 6. Build material description from nest
+            var material = nest.Material;
             var materialDesc = material != null
                 ? $"{material.Name}{(string.IsNullOrEmpty(material.Grade) ? "" : $", {material.Grade}")}"
                 : "";
@@ -113,7 +111,7 @@ namespace OpenNest.Posts.Cincinnati
                 var plate = plates[i];
                 var sheetIndex = i + 1;
                 var subNumber = Config.SheetSubprogramStart + i;
-                var cutLibrary = resolver.ResolveCutLibrary(plate.Material?.Name ?? "", plate.Thickness, gas);
+                var cutLibrary = resolver.ResolveCutLibrary(nest.Material?.Name ?? "", nest.Thickness, gas);
                 var isLastSheet = i == plates.Count - 1;
                 sheetWriter.Write(writer, plate, nest.Name ?? "NEST", sheetIndex, subNumber,
                     cutLibrary, etchLibrary, partSubprograms, isLastSheet);
