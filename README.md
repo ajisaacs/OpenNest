@@ -17,8 +17,10 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 - **Multi-Plate Support** — Work with multiple plates of different sizes and materials in a single nest
 - **Sheet Cut-Offs** — Automatically cut the plate to size after nesting, with geometry-aware clearance that avoids placed parts
 - **Drawing Splitting** — Split oversized parts into pieces that fit your plate, with straight cuts, weld-gap tabs, or interlocking spike-groove joints
+- **BOM Import** — Read bills of materials from Excel spreadsheets to batch-import part lists with quantities
 - **Bend Line Detection** — Import bend lines from DXF files with pluggable detectors (SolidWorks flat pattern support built in)
-- **Lead-In/Lead-Out & Tabs** — Configurable approach paths, exit paths, and holding tabs for CNC cutting
+- **Lead-In/Lead-Out & Tabs** — Configurable approach paths, exit paths, and holding tabs for CNC cutting, with snap-to-endpoint/midpoint placement
+- **Contour & Program Editing** — Inline G-code editor with contour reordering, direction arrows, and cut direction reversal
 - **G-code Output** — Post-process nested layouts to G-code via plugin post-processors
 - **Built-in Shapes** — 12 parametric shapes (circles, rectangles, L-shapes, T-shapes, flanges, etc.) for quick testing or simple parts
 - **Interactive Editing** — Zoom, pan, select, clone, push, and manually arrange parts on the plate view
@@ -114,6 +116,7 @@ OpenNest.sln
 ├── OpenNest.IO/                # File I/O — DXF import/export, nest file format
 ├── OpenNest.Console/           # Command-line interface for batch nesting
 ├── OpenNest.Api/               # Programmatic nesting API (NestRunner pipeline)
+├── OpenNest.Data/              # Machine configuration and cutting parameters
 ├── OpenNest.Gpu/               # GPU-accelerated pair evaluation (ILGPU)
 ├── OpenNest.Training/          # ML training data collection (SQLite + EF Core)
 ├── OpenNest.Mcp/               # MCP server for AI tool integration
@@ -127,12 +130,13 @@ OpenNest.sln
 | **OpenNest.Console** | Command-line interface for batch nesting, scripting, and automation. |
 | **OpenNest.Core** | The building blocks — parts, plates, drawings, geometry, G-code representation, bend lines, cut-offs, and drawing splitting. |
 | **OpenNest.Engine** | The brains — fill strategies (linear, pairs, rect best-fit, extents), NFP-based pair evaluation, gravity compaction, and a pluggable engine registry. |
-| **OpenNest.IO** | Reads and writes files — DXF/DWG (via ACadSharp), G-code, and the `.nest` ZIP format. |
+| **OpenNest.IO** | Reads and writes files — DXF/DWG (via ACadSharp), G-code, the `.nest` ZIP format, BOM spreadsheets (via ClosedXML), and bend detection from CAD files. |
 | **OpenNest.Api** | High-level API for running the full nesting pipeline programmatically (import, nest, export). |
+| **OpenNest.Data** | Machine configuration data layer — stores machine profiles, material/thickness parameters, lead-in/lead-out settings, and cut-off defaults. JSON-based local storage with an `IDataProvider` interface. |
 | **OpenNest.Gpu** | GPU-accelerated bitmap overlap detection for best-fit pair evaluation using ILGPU. |
 | **OpenNest.Posts.Cincinnati** | Post-processor plugin for Cincinnati CL-707/800/900/940/CLX laser cutting machines. Outputs Cincinnati-format G-code with material library, kerf compensation, and pierce logic. |
 | **OpenNest.Mcp** | MCP (Model Context Protocol) server exposing nesting operations as tools for AI assistants. |
-| **OpenNest.Tests** | 75+ test files covering core geometry, fill strategies, splitting, bending, post-processing, and the API. |
+| **OpenNest.Tests** | 89 test files covering core geometry, fill strategies, splitting, bending, BOM import, post-processing, and the API. |
 
 ## Nesting Engines
 
@@ -199,6 +203,7 @@ Custom post-processors implement the `IPostProcessor` interface and are auto-dis
 |--------|--------|--------|
 | DXF (AutoCAD Drawing Exchange) | Yes | Yes |
 | DWG (AutoCAD Drawing) | Yes | No |
+| Excel BOM (Bill of Materials) | Yes | No |
 | G-code | No | Yes (via post-processors) |
 | `.nest` (ZIP-based project format) | Yes | Yes |
 
