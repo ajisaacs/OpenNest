@@ -1,4 +1,5 @@
-﻿using OpenNest.Geometry;
+﻿using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC
 {
@@ -14,6 +15,8 @@ namespace OpenNest.CNC
 
         public bool Suppressed { get; set; }
 
+        public Dictionary<string, string> VariableRefs { get; set; }
+
         protected Motion()
         {
             Feedrate = CNC.Feedrate.UseDefault;
@@ -22,21 +25,25 @@ namespace OpenNest.CNC
         public virtual void Rotate(double angle)
         {
             EndPoint = EndPoint.Rotate(angle);
+            VariableRefs = null;
         }
 
         public virtual void Rotate(double angle, Vector origin)
         {
             EndPoint = EndPoint.Rotate(angle, origin);
+            VariableRefs = null;
         }
 
         public virtual void Offset(double x, double y)
         {
             EndPoint = new Vector(EndPoint.X + x, EndPoint.Y + y);
+            VariableRefs = null;
         }
 
         public virtual void Offset(Vector voffset)
         {
             EndPoint += voffset;
+            VariableRefs = null;
         }
 
         public abstract CodeType Type { get; }

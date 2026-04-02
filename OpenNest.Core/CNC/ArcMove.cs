@@ -1,4 +1,5 @@
-﻿using OpenNest.Geometry;
+﻿using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC
 {
@@ -66,7 +67,8 @@ namespace OpenNest.CNC
             return new ArcMove(EndPoint, CenterPoint, Rotation)
             {
                 Layer = Layer,
-                Suppressed = Suppressed
+                Suppressed = Suppressed,
+                VariableRefs = VariableRefs != null ? new Dictionary<string, string>(VariableRefs) : null
             };
         }
 

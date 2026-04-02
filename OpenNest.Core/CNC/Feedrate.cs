@@ -17,6 +17,8 @@
 
         public double Value { get; set; }
 
+        public string VariableRef { get; set; }
+
         public CodeType Type
         {
             get { return CodeType.SetFeedrate; }
@@ -24,7 +26,7 @@
 
         public ICode Clone()
         {
-            return new Feedrate(Value);
+            return new Feedrate(Value) { VariableRef = VariableRef };
         }
 
         public override string ToString()
