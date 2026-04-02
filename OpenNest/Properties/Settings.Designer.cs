@@ -238,5 +238,29 @@ namespace OpenNest.Properties {
                 this["CuttingParametersJson"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0, 0")]
+        public global::System.Drawing.Point LeadInToolWindowLocation {
+            get {
+                return ((global::System.Drawing.Point)(this["LeadInToolWindowLocation"]));
+            }
+            set {
+                this["LeadInToolWindowLocation"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0, 0")]
+        public global::System.Drawing.Size LeadInToolWindowSize {
+            get {
+                return ((global::System.Drawing.Size)(this["LeadInToolWindowSize"]));
+            }
+            set {
+                this["LeadInToolWindowSize"] = value;
+            }
+        }
     }
 }
