@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace OpenNest.Forms
 {
-    internal static class CuttingParametersSerializer
+    public static class CuttingParametersSerializer
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -23,7 +23,9 @@ namespace OpenNest.Forms
                 ArcCircleLeadOut = ToLeadOutDto(p.ArcCircleLeadOut),
                 TabsEnabled = p.TabsEnabled,
                 TabWidth = p.TabConfig?.Size ?? 0.25,
-                PierceClearance = p.PierceClearance
+                PierceClearance = p.PierceClearance,
+                AutoTabMinSize = p.AutoTabMinSize,
+                AutoTabMaxSize = p.AutoTabMaxSize
             };
             return JsonSerializer.Serialize(dto, JsonOptions);
         }
@@ -44,7 +46,9 @@ namespace OpenNest.Forms
                 ArcCircleLeadOut = FromLeadOutDto(dto.ArcCircleLeadOut),
                 TabsEnabled = dto.TabsEnabled,
                 TabConfig = new NormalTab { Size = dto.TabWidth },
-                PierceClearance = dto.PierceClearance
+                PierceClearance = dto.PierceClearance,
+                AutoTabMinSize = dto.AutoTabMinSize,
+                AutoTabMaxSize = dto.AutoTabMaxSize
             };
         }
 
@@ -109,6 +113,8 @@ namespace OpenNest.Forms
             public bool TabsEnabled { get; set; }
             public double TabWidth { get; set; }
             public double PierceClearance { get; set; }
+            public double AutoTabMinSize { get; set; }
+            public double AutoTabMaxSize { get; set; }
         }
 
         private class LeadInDto

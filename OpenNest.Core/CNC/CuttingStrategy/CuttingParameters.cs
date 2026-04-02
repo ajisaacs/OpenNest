@@ -23,6 +23,9 @@ namespace OpenNest.CNC.CuttingStrategy
 
         public double PierceClearance { get; set; } = 0.0625;
 
+        public double AutoTabMinSize { get; set; }
+        public double AutoTabMaxSize { get; set; }
+
         public Tab TabConfig { get; set; }
         public bool TabsEnabled { get; set; }
 
