@@ -66,7 +66,6 @@ public sealed class CincinnatiPartSubprogramWriter
             _featureWriter.Write(w, ctx);
         }
 
-        w.WriteLine("G0 X0 Y0");
         w.WriteLine($"M99 (END OF {drawingName})");
     }
 

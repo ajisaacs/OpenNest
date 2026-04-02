@@ -258,8 +258,7 @@ public class CincinnatiPostProcessorTests
         Assert.Contains(":200", output);
         Assert.Contains("G84", output);
 
-        // Sub-program ends with G0 X0 Y0 and M99
-        Assert.Contains("G0 X0 Y0", output);
+        // Sub-program ends with M99
         Assert.Contains("M99 (END OF Square)", output);
 
         // G92 restore after M98 call

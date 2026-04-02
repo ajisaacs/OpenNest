@@ -95,7 +95,6 @@ public sealed class CincinnatiSheetWriter
 
         // 5. Footer
         w.WriteLine("M42");
-        w.WriteLine("G0 X0 Y0");
         var emitM50 = _config.PalletExchange == PalletMode.EndOfSheet
             || (_config.PalletExchange == PalletMode.StartAndEnd && isLastSheet);
         if (emitM50)

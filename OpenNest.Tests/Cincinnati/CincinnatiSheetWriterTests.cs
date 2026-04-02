@@ -55,7 +55,6 @@ public class CincinnatiSheetWriterTests
 
         var output = sb.ToString();
         Assert.Contains("M42", output);
-        Assert.Contains("G0 X0 Y0", output);
         Assert.Contains("M50", output);
     }
 
