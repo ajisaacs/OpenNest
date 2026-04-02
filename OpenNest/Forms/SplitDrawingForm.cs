@@ -474,7 +474,7 @@ public partial class SplitDrawingForm : Form
         }
 
         // Placement preview line
-        if (_placingLine && _placingCursor != null)
+        if (_placingLine)
         {
             var isVert = _currentAxis == CutOffAxis.Vertical;
             var snapped = _placingCursor;

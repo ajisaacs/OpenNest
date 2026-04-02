@@ -17,14 +17,12 @@ namespace OpenNest.Forms
         {
             mainSplit = new System.Windows.Forms.SplitContainer();
             fileList = new OpenNest.Controls.FileListControl();
+            viewTabs = new System.Windows.Forms.TabControl();
+            tabCadView = new System.Windows.Forms.TabPage();
             cadViewSplit = new System.Windows.Forms.SplitContainer();
             filterPanel = new OpenNest.Controls.FilterPanel();
             entityView1 = new OpenNest.Controls.EntityView();
             detailBar = new System.Windows.Forms.FlowLayoutPanel();
-            viewTabs = new System.Windows.Forms.TabControl();
-            tabCadView = new System.Windows.Forms.TabPage();
-            tabProgram = new System.Windows.Forms.TabPage();
-            programEditor = new OpenNest.Controls.ProgramEditorControl();
             lblQty = new System.Windows.Forms.Label();
             numQuantity = new System.Windows.Forms.NumericUpDown();
             lblCust = new System.Windows.Forms.Label();
@@ -38,6 +36,8 @@ namespace OpenNest.Forms
             chkLabels = new System.Windows.Forms.CheckBox();
             lblDetect = new System.Windows.Forms.Label();
             cboBendDetector = new System.Windows.Forms.ComboBox();
+            tabProgram = new System.Windows.Forms.TabPage();
+            programEditor = new OpenNest.Controls.ProgramEditorControl();
             bottomPanel1 = new OpenNest.Controls.BottomPanel();
             cancelButton = new System.Windows.Forms.Button();
             acceptButton = new System.Windows.Forms.Button();
@@ -45,40 +45,40 @@ namespace OpenNest.Forms
             mainSplit.Panel1.SuspendLayout();
             mainSplit.Panel2.SuspendLayout();
             mainSplit.SuspendLayout();
+            viewTabs.SuspendLayout();
+            tabCadView.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)cadViewSplit).BeginInit();
             cadViewSplit.Panel1.SuspendLayout();
             cadViewSplit.Panel2.SuspendLayout();
             cadViewSplit.SuspendLayout();
             detailBar.SuspendLayout();
-            viewTabs.SuspendLayout();
-            tabCadView.SuspendLayout();
-            tabProgram.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numQuantity).BeginInit();
+            tabProgram.SuspendLayout();
             bottomPanel1.SuspendLayout();
             SuspendLayout();
-            //
+            // 
             // mainSplit
-            //
+            // 
             mainSplit.Dock = System.Windows.Forms.DockStyle.Fill;
             mainSplit.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
             mainSplit.Location = new System.Drawing.Point(0, 0);
             mainSplit.Name = "mainSplit";
-            //
+            // 
             // mainSplit.Panel1
-            //
+            // 
             mainSplit.Panel1.Controls.Add(fileList);
             mainSplit.Panel1MinSize = 200;
-            //
+            // 
             // mainSplit.Panel2
-            //
+            // 
             mainSplit.Panel2.Controls.Add(viewTabs);
             mainSplit.Size = new System.Drawing.Size(1024, 670);
             mainSplit.SplitterDistance = 260;
             mainSplit.SplitterWidth = 5;
             mainSplit.TabIndex = 2;
-            //
+            // 
             // fileList
-            //
+            // 
             fileList.AllowDrop = true;
             fileList.BackColor = System.Drawing.Color.White;
             fileList.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -87,30 +87,51 @@ namespace OpenNest.Forms
             fileList.Name = "fileList";
             fileList.Size = new System.Drawing.Size(260, 670);
             fileList.TabIndex = 0;
-            //
+            // 
+            // viewTabs
+            // 
+            viewTabs.Controls.Add(tabCadView);
+            viewTabs.Controls.Add(tabProgram);
+            viewTabs.Dock = System.Windows.Forms.DockStyle.Fill;
+            viewTabs.Location = new System.Drawing.Point(0, 0);
+            viewTabs.Name = "viewTabs";
+            viewTabs.SelectedIndex = 0;
+            viewTabs.Size = new System.Drawing.Size(759, 670);
+            viewTabs.TabIndex = 0;
+            // 
+            // tabCadView
+            // 
+            tabCadView.Controls.Add(cadViewSplit);
+            tabCadView.Location = new System.Drawing.Point(4, 24);
+            tabCadView.Name = "tabCadView";
+            tabCadView.Size = new System.Drawing.Size(751, 642);
+            tabCadView.TabIndex = 0;
+            tabCadView.Text = "CAD View";
+            tabCadView.UseVisualStyleBackColor = true;
+            // 
             // cadViewSplit
-            //
+            // 
             cadViewSplit.Dock = System.Windows.Forms.DockStyle.Fill;
             cadViewSplit.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
             cadViewSplit.Location = new System.Drawing.Point(0, 0);
             cadViewSplit.Name = "cadViewSplit";
-            //
-            // cadViewSplit.Panel1 — filter panel
-            //
+            // 
+            // cadViewSplit.Panel1
+            // 
             cadViewSplit.Panel1.Controls.Add(filterPanel);
             cadViewSplit.Panel1MinSize = 150;
-            //
-            // cadViewSplit.Panel2 — entity view + detail bar
-            //
+            // 
+            // cadViewSplit.Panel2
+            // 
             cadViewSplit.Panel2.Controls.Add(entityView1);
             cadViewSplit.Panel2.Controls.Add(detailBar);
             cadViewSplit.Size = new System.Drawing.Size(751, 642);
             cadViewSplit.SplitterDistance = 200;
             cadViewSplit.SplitterWidth = 5;
             cadViewSplit.TabIndex = 0;
-            //
+            // 
             // filterPanel
-            //
+            // 
             filterPanel.AutoScroll = true;
             filterPanel.BackColor = System.Drawing.Color.White;
             filterPanel.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -118,6 +139,7 @@ namespace OpenNest.Forms
             filterPanel.Name = "filterPanel";
             filterPanel.Size = new System.Drawing.Size(200, 642);
             filterPanel.TabIndex = 0;
+            filterPanel.Paint += filterPanel_Paint;
             // 
             // entityView1
             // 
@@ -128,6 +150,7 @@ namespace OpenNest.Forms
             entityView1.Location = new System.Drawing.Point(0, 0);
             entityView1.Name = "entityView1";
             entityView1.OriginalEntities = null;
+            entityView1.PaintOverlay = null;
             entityView1.ShowEntityLabels = false;
             entityView1.SimplifierHighlight = null;
             entityView1.SimplifierPreview = null;
@@ -153,7 +176,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(lblDetect);
             detailBar.Controls.Add(cboBendDetector);
             detailBar.Dock = System.Windows.Forms.DockStyle.Bottom;
-            detailBar.Location = new System.Drawing.Point(0, 634);
+            detailBar.Location = new System.Drawing.Point(0, 606);
             detailBar.Name = "detailBar";
             detailBar.Padding = new System.Windows.Forms.Padding(4, 6, 4, 4);
             detailBar.Size = new System.Drawing.Size(546, 36);
@@ -308,6 +331,24 @@ namespace OpenNest.Forms
             cboBendDetector.Size = new System.Drawing.Size(90, 23);
             cboBendDetector.TabIndex = 8;
             // 
+            // tabProgram
+            // 
+            tabProgram.Controls.Add(programEditor);
+            tabProgram.Location = new System.Drawing.Point(4, 24);
+            tabProgram.Name = "tabProgram";
+            tabProgram.Size = new System.Drawing.Size(751, 642);
+            tabProgram.TabIndex = 1;
+            tabProgram.Text = "Program";
+            tabProgram.UseVisualStyleBackColor = true;
+            // 
+            // programEditor
+            // 
+            programEditor.Dock = System.Windows.Forms.DockStyle.Fill;
+            programEditor.Location = new System.Drawing.Point(0, 0);
+            programEditor.Name = "programEditor";
+            programEditor.Size = new System.Drawing.Size(751, 642);
+            programEditor.TabIndex = 0;
+            // 
             // bottomPanel1
             // 
             bottomPanel1.Controls.Add(cancelButton);
@@ -341,50 +382,9 @@ namespace OpenNest.Forms
             acceptButton.Size = new System.Drawing.Size(90, 28);
             acceptButton.TabIndex = 1;
             acceptButton.Text = "Accept";
-            //
-            // viewTabs
-            //
-            viewTabs.Controls.Add(tabCadView);
-            viewTabs.Controls.Add(tabProgram);
-            viewTabs.Dock = System.Windows.Forms.DockStyle.Fill;
-            viewTabs.Location = new System.Drawing.Point(0, 0);
-            viewTabs.Name = "viewTabs";
-            viewTabs.SelectedIndex = 0;
-            viewTabs.Size = new System.Drawing.Size(759, 670);
-            viewTabs.TabIndex = 0;
-            //
-            // tabCadView
-            //
-            tabCadView.Controls.Add(cadViewSplit);
-            tabCadView.Location = new System.Drawing.Point(4, 24);
-            tabCadView.Name = "tabCadView";
-            tabCadView.Padding = new System.Windows.Forms.Padding(0);
-            tabCadView.Size = new System.Drawing.Size(751, 642);
-            tabCadView.TabIndex = 0;
-            tabCadView.Text = "CAD View";
-            tabCadView.UseVisualStyleBackColor = true;
-            //
-            // tabProgram
-            //
-            tabProgram.Controls.Add(programEditor);
-            tabProgram.Location = new System.Drawing.Point(4, 24);
-            tabProgram.Name = "tabProgram";
-            tabProgram.Padding = new System.Windows.Forms.Padding(0);
-            tabProgram.Size = new System.Drawing.Size(751, 642);
-            tabProgram.TabIndex = 1;
-            tabProgram.Text = "Program";
-            tabProgram.UseVisualStyleBackColor = true;
-            //
-            // programEditor
-            //
-            programEditor.Dock = System.Windows.Forms.DockStyle.Fill;
-            programEditor.Location = new System.Drawing.Point(0, 0);
-            programEditor.Name = "programEditor";
-            programEditor.Size = new System.Drawing.Size(751, 642);
-            programEditor.TabIndex = 0;
-            //
+            // 
             // CadConverterForm
-            //
+            // 
             AllowDrop = true;
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             ClientSize = new System.Drawing.Size(1024, 720);
@@ -402,6 +402,8 @@ namespace OpenNest.Forms
             mainSplit.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)mainSplit).EndInit();
             mainSplit.ResumeLayout(false);
+            viewTabs.ResumeLayout(false);
+            tabCadView.ResumeLayout(false);
             cadViewSplit.Panel1.ResumeLayout(false);
             cadViewSplit.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)cadViewSplit).EndInit();
@@ -409,8 +411,6 @@ namespace OpenNest.Forms
             detailBar.ResumeLayout(false);
             detailBar.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)numQuantity).EndInit();
-            viewTabs.ResumeLayout(false);
-            tabCadView.ResumeLayout(false);
             tabProgram.ResumeLayout(false);
             bottomPanel1.ResumeLayout(false);
             ResumeLayout(false);

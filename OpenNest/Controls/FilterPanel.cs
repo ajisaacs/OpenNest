@@ -16,7 +16,7 @@ namespace OpenNest.Controls
         private readonly CollapsiblePanel bendLinesPanel;
 
         private readonly CheckedListBox layersList;
-        private readonly CheckedListBox colorsList;
+        private readonly ListBox colorsList;
         private readonly CheckedListBox lineTypesList;
         private readonly ListBox bendLinesList;
         private readonly LinkLabel bendAddLink;
@@ -91,7 +91,7 @@ namespace OpenNest.Controls
                 HeaderText = "Line Types (0)",
                 Dock = DockStyle.Top,
                 ExpandedHeight = 100,
-                IsExpanded = false
+                IsExpanded = true
             };
             lineTypesList = CreateCheckedList();
             lineTypesPanel.ContentPanel.Controls.Add(lineTypesList);
@@ -102,12 +102,19 @@ namespace OpenNest.Controls
                 HeaderText = "Colors (0)",
                 Dock = DockStyle.Top,
                 ExpandedHeight = 100,
-                IsExpanded = false
+                IsExpanded = true
             };
-            colorsList = CreateCheckedList();
-            colorsList.DrawMode = DrawMode.OwnerDrawFixed;
-            colorsList.ItemHeight = 20;
+            colorsList = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Segoe UI", 9f),
+                DrawMode = DrawMode.OwnerDrawFixed,
+                ItemHeight = 20,
+                SelectionMode = SelectionMode.None
+            };
             colorsList.DrawItem += ColorsList_DrawItem;
+            colorsList.MouseClick += ColorsList_MouseClick;
             colorsPanel.ContentPanel.Controls.Add(colorsList);
 
             // Layers (always expanded)
@@ -174,7 +181,7 @@ namespace OpenNest.Controls
                 .Distinct()
                 .Select(argb => new ColorItem(Color.FromArgb(argb)));
             foreach (var color in colors)
-                colorsList.Items.Add(color, true); // checked = visible
+                colorsList.Items.Add(color);
 
             colorsPanel.HeaderText = $"Colors ({colorsList.Items.Count})";
 
@@ -213,8 +220,9 @@ namespace OpenNest.Controls
             var hiddenColors = new HashSet<int>();
             for (var i = 0; i < colorsList.Items.Count; i++)
             {
-                if (!colorsList.GetItemChecked(i))
-                    hiddenColors.Add(((ColorItem)colorsList.Items[i]).Argb);
+                var item = (ColorItem)colorsList.Items[i];
+                if (!item.IsChecked)
+                    hiddenColors.Add(item.Argb);
             }
 
             var hiddenLineTypes = new HashSet<string>();
@@ -242,20 +250,39 @@ namespace OpenNest.Controls
                 list.SetItemChecked(i, isChecked);
         }
 
+        private void ColorsList_MouseClick(object sender, MouseEventArgs e)
+        {
+            var index = colorsList.IndexFromPoint(e.Location);
+            if (index < 0) return;
+            var item = (ColorItem)colorsList.Items[index];
+            item.IsChecked = !item.IsChecked;
+            colorsList.Invalidate(colorsList.GetItemRectangle(index));
+            FilterChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         private void ColorsList_DrawItem(object sender, DrawItemEventArgs e)
         {
             if (e.Index < 0) return;
 
-            e.DrawBackground();
+            e.Graphics.FillRectangle(Brushes.White, e.Bounds);
 
             var colorItem = (ColorItem)colorsList.Items[e.Index];
-            var swatchRect = new Rectangle(e.Bounds.Left + 20, e.Bounds.Top + 2, 16, e.Bounds.Height - 4);
+            var checkSize = CheckBoxRenderer.GetGlyphSize(e.Graphics,
+                System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal);
+            var checkY = e.Bounds.Top + (e.Bounds.Height - checkSize.Height) / 2;
+            var checkState = colorItem.IsChecked
+                ? System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal
+                : System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal;
+            CheckBoxRenderer.DrawCheckBox(e.Graphics, new Point(e.Bounds.Left + 2, checkY), checkState);
 
+            var swatchX = e.Bounds.Left + checkSize.Width + 6;
+            var swatchRect = new Rectangle(swatchX, e.Bounds.Top + 2, 16, e.Bounds.Height - 4);
             using (var brush = new SolidBrush(colorItem.Color))
                 e.Graphics.FillRectangle(brush, swatchRect);
             e.Graphics.DrawRectangle(Pens.Gray, swatchRect);
 
-            e.DrawFocusRectangle();
+            TextRenderer.DrawText(e.Graphics, colorItem.ToString(), e.Font,
+                new Point(swatchRect.Right + 4, e.Bounds.Top + 1), SystemColors.WindowText);
         }
 
         public void SetPickMode(bool active)
@@ -269,6 +296,7 @@ namespace OpenNest.Controls
     {
         public int Argb { get; }
         public Color Color { get; }
+        public bool IsChecked { get; set; } = true;
 
         public ColorItem(Color color)
         {

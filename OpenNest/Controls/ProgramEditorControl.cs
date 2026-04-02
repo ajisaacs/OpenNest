@@ -50,14 +50,6 @@ namespace OpenNest.Controls
 
             contours = ContourInfo.Classify(shapes);
 
-            // Assign contour-type colors once so the CAD view also picks them up
-            foreach (var contour in contours)
-            {
-                var color = GetContourColor(contour.Type, false);
-                foreach (var entity in contour.Shape.Entities)
-                    entity.Color = color;
-            }
-
             Program = BuildProgram(contours);
             isDirty = false;
             isLoaded = true;
@@ -144,31 +136,36 @@ namespace OpenNest.Controls
             preview.ClearPenCache();
             preview.Entities.Clear();
 
-            // Restore base colors first (undo any selection highlight)
-            foreach (var contour in contours)
-            {
-                var baseColor = GetContourColor(contour.Type, false);
-                foreach (var entity in contour.Shape.Entities)
-                    entity.Color = baseColor;
-            }
-
             for (var i = 0; i < contours.Count; i++)
             {
                 var contour = contours[i];
                 var selected = contourList.SelectedIndices.Contains(i);
+                var color = GetContourColor(contour.Type, selected);
 
-                if (selected)
+                foreach (var entity in contour.Shape.Entities)
                 {
-                    var selColor = GetContourColor(contour.Type, true);
-                    foreach (var entity in contour.Shape.Entities)
-                        entity.Color = selColor;
+                    var clone = CloneEntity(entity, color);
+                    if (clone != null)
+                        preview.Entities.Add(clone);
                 }
-
-                preview.Entities.AddRange(contour.Shape.Entities);
             }
 
             preview.ZoomToFit();
             preview.Invalidate();
+        }
+
+        private static Entity CloneEntity(Entity entity, Color color)
+        {
+            Entity clone = entity switch
+            {
+                Line line => new Line(line.StartPoint, line.EndPoint) { Layer = line.Layer, IsVisible = line.IsVisible },
+                Arc arc => new Arc(arc.Center, arc.Radius, arc.StartAngle, arc.EndAngle, arc.IsReversed) { Layer = arc.Layer, IsVisible = arc.IsVisible },
+                Circle circle => new Circle(circle.Center, circle.Radius) { Layer = circle.Layer, IsVisible = circle.IsVisible },
+                _ => null,
+            };
+            if (clone != null)
+                clone.Color = color;
+            return clone;
         }
 
         private static Color GetContourColor(ContourClassification type, bool selected)
