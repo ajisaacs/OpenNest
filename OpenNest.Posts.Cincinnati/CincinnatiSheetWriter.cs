@@ -38,7 +38,8 @@ public sealed class CincinnatiSheetWriter
     public void Write(TextWriter w, Plate plate, string nestName, int sheetIndex, int subNumber,
         string cutLibrary, string etchLibrary,
         Dictionary<(int, long), int> partSubprograms = null,
-        bool isLastSheet = false)
+        bool isLastSheet = false,
+        Dictionary<(int drawingId, string varName), int> userVarMapping = null)
     {
         if (plate.Parts.Count == 0)
             return;
@@ -88,9 +89,9 @@ public sealed class CincinnatiSheetWriter
 
         // 4. Emit parts
         if (partSubprograms != null)
-            WritePartsWithSubprograms(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, partSubprograms);
+            WritePartsWithSubprograms(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, partSubprograms, userVarMapping);
         else
-            WritePartsInline(w, allParts, cutLibrary, etchLibrary, sheetDiagonal);
+            WritePartsInline(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, userVarMapping);
 
         // 5. Footer
         w.WriteLine("M42");
@@ -104,7 +105,8 @@ public sealed class CincinnatiSheetWriter
 
     private void WritePartsWithSubprograms(TextWriter w, List<Part> allParts,
         string cutLibrary, string etchLibrary, double sheetDiagonal,
-        Dictionary<(int, long), int> partSubprograms)
+        Dictionary<(int, long), int> partSubprograms,
+        Dictionary<(int drawingId, string varName), int> userVarMapping)
     {
         var lastPartName = "";
         var featureIndex = 0;
@@ -154,7 +156,9 @@ public sealed class CincinnatiSheetWriter
                         LibraryFile = isEtch ? etchLibrary : cutLibrary,
                         CutDistance = cutDistance,
                         SheetDiagonal = sheetDiagonal,
-                        PartLocation = part.Location
+                        PartLocation = part.Location,
+                        UserVariableMapping = userVarMapping,
+                        DrawingId = part.BaseDrawing.Id
                     };
 
                     _featureWriter.Write(w, ctx);
@@ -202,7 +206,8 @@ public sealed class CincinnatiSheetWriter
     }
 
     private void WritePartsInline(TextWriter w, List<Part> allParts,
-        string cutLibrary, string etchLibrary, double sheetDiagonal)
+        string cutLibrary, string etchLibrary, double sheetDiagonal,
+        Dictionary<(int drawingId, string varName), int> userVarMapping)
     {
         // Split and classify features, ordering etch before cut per part
         var features = new List<(Part part, List<ICode> codes, bool isEtch)>();
@@ -242,7 +247,9 @@ public sealed class CincinnatiSheetWriter
                 LibraryFile = isEtch ? etchLibrary : cutLibrary,
                 CutDistance = cutDistance,
                 SheetDiagonal = sheetDiagonal,
-                PartLocation = part.Location
+                PartLocation = part.Location,
+                UserVariableMapping = userVarMapping,
+                DrawingId = part.BaseDrawing.Id
             };
 
             _featureWriter.Write(w, ctx);

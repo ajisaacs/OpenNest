@@ -254,6 +254,11 @@ namespace OpenNest.Posts.Cincinnati
         };
 
         [Category("A. Variables")]
+        [DisplayName("User Variable Start")]
+        [Description("Starting variable number for user-defined variables (#200, #201, etc.).")]
+        public int UserVariableStart { get; set; } = 200;
+
+        [Category("A. Variables")]
         [DisplayName("Sheet Width Variable")]
         [Description("Variable number for sheet width.")]
         public int SheetWidthVariable { get; set; } = 110;

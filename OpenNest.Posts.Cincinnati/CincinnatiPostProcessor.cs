@@ -70,7 +70,10 @@ namespace OpenNest.Posts.Cincinnati
                 .Where(p => p.Parts.Count > 0)
                 .ToList();
 
-            // 3. Resolve gas and library files
+            // 3. Register user variables from drawing programs
+            var userVarMapping = RegisterUserVariables(vars, plates);
+
+            // 4. Resolve gas and library files
             var resolver = new MaterialLibraryResolver(Config);
             var gas = MaterialLibraryResolver.ResolveGas(nest, Config);
             var etchLibrary = resolver.ResolveEtchLibrary(Config.DefaultEtchGas);
@@ -79,24 +82,24 @@ namespace OpenNest.Posts.Cincinnati
             var firstPlate = plates.FirstOrDefault();
             var initialCutLibrary = resolver.ResolveCutLibrary(nest.Material?.Name ?? "", nest.Thickness, gas);
 
-            // 4. Build part sub-program registry (if enabled)
+            // 5. Build part sub-program registry (if enabled)
             Dictionary<(int, long), int> partSubprograms = null;
             List<(int subNum, string name, Program program)> subprogramEntries = null;
 
             if (Config.UsePartSubprograms)
                 (partSubprograms, subprogramEntries) = CincinnatiPartSubprogramWriter.BuildRegistry(plates, Config.PartSubprogramStart);
 
-            // 5. Create writers
+            // 6. Create writers
             var preamble = new CincinnatiPreambleWriter(Config);
             var sheetWriter = new CincinnatiSheetWriter(Config, vars);
 
-            // 6. Build material description from nest
+            // 7. Build material description from nest
             var material = nest.Material;
             var materialDesc = material != null
                 ? $"{material.Name}{(string.IsNullOrEmpty(material.Grade) ? "" : $", {material.Grade}")}"
                 : "";
 
-            // 7. Write to stream
+            // 8. Write to stream
             using var writer = new StreamWriter(outputStream, Encoding.UTF8, 1024, leaveOpen: true);
 
             // Main program
@@ -114,7 +117,7 @@ namespace OpenNest.Posts.Cincinnati
                 var cutLibrary = resolver.ResolveCutLibrary(nest.Material?.Name ?? "", nest.Thickness, gas);
                 var isLastSheet = i == plates.Count - 1;
                 sheetWriter.Write(writer, plate, nest.Name ?? "NEST", sheetIndex, subNumber,
-                    cutLibrary, etchLibrary, partSubprograms, isLastSheet);
+                    cutLibrary, etchLibrary, partSubprograms, isLastSheet, userVarMapping);
             }
 
             // Part sub-programs (if enabled)
@@ -140,6 +143,103 @@ namespace OpenNest.Posts.Cincinnati
         {
             using var fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write);
             Post(nest, fs);
+        }
+
+        private Dictionary<(int drawingId, string varName), int> RegisterUserVariables(
+            ProgramVariableManager vars, List<Plate> plates)
+        {
+            var mapping = new Dictionary<(int drawingId, string varName), int>();
+            var nextNumber = Config.UserVariableStart;
+
+            // Track global variables by name so they share a single number
+            var globalNumbers = new Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+
+            // Collect unique drawings from all plates
+            var seenDrawings = new HashSet<int>();
+            foreach (var plate in plates)
+            {
+                foreach (var part in plate.Parts)
+                {
+                    var drawing = part.BaseDrawing;
+                    if (drawing.IsCutOff || !seenDrawings.Add(drawing.Id))
+                        continue;
+
+                    foreach (var kvp in drawing.Program.Variables)
+                    {
+                        var varDef = kvp.Value;
+
+                        // Skip inline variables — they emit literal values
+                        if (varDef.Inline)
+                            continue;
+
+                        if (varDef.Global)
+                        {
+                            if (!globalNumbers.TryGetValue(varDef.Name, out var globalNum))
+                            {
+                                globalNum = nextNumber++;
+                                globalNumbers[varDef.Name] = globalNum;
+
+                                // Register once in the variable manager
+                                var commentName = ToPascalCase(varDef.Name);
+                                var expression = FormatVariableValue(varDef.Value);
+                                vars.GetOrCreate(commentName, globalNum, expression);
+                            }
+
+                            mapping[(drawing.Id, varDef.Name)] = globalNum;
+                        }
+                        else
+                        {
+                            var num = nextNumber++;
+                            mapping[(drawing.Id, varDef.Name)] = num;
+
+                            // Register with drawing name prefix in the comment
+                            var drawingLabel = ToPascalCase(drawing.Name);
+                            var varLabel = ToPascalCase(varDef.Name);
+                            var commentName = $"{drawingLabel}{varLabel}";
+                            var expression = FormatVariableValue(varDef.Value);
+                            vars.GetOrCreate(commentName, num, expression);
+                        }
+                    }
+                }
+            }
+
+            return mapping;
+        }
+
+        /// <summary>
+        /// Converts a variable name from snake_case or camelCase to PascalCase.
+        /// Examples: "sheet_width" → "SheetWidth", "holeSpacing" → "HoleSpacing"
+        /// </summary>
+        private static string ToPascalCase(string name)
+        {
+            var sb = new StringBuilder(name.Length);
+            var capitalizeNext = true;
+
+            foreach (var c in name)
+            {
+                if (c == '_')
+                {
+                    capitalizeNext = true;
+                    continue;
+                }
+
+                if (capitalizeNext)
+                {
+                    sb.Append(char.ToUpper(c));
+                    capitalizeNext = false;
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        private static string FormatVariableValue(double value)
+        {
+            return value.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private ProgramVariableManager CreateVariableManager()

@@ -29,6 +29,17 @@ public sealed class FeatureContext
     /// so part-relative programs become plate-absolute under G90.
     /// </summary>
     public Vector PartLocation { get; set; } = Vector.Zero;
+
+    /// <summary>
+    /// Maps (drawingId, variableName) to assigned machine variable numbers.
+    /// Used to emit #number references instead of literal values for user variables.
+    /// </summary>
+    public Dictionary<(int drawingId, string varName), int> UserVariableMapping { get; set; }
+
+    /// <summary>
+    /// The drawing ID for the current part, used to look up user variable mappings.
+    /// </summary>
+    public int DrawingId { get; set; }
 }
 
 /// <summary>
@@ -112,7 +123,9 @@ public sealed class CincinnatiFeatureWriter
                     kerfEmitted = true;
                 }
 
-                sb.Append($"G1 X{_fmt.FormatCoord(linear.EndPoint.X + offset.X)} Y{_fmt.FormatCoord(linear.EndPoint.Y + offset.Y)}");
+                var xCoord = FormatCoordWithVars(linear.EndPoint.X + offset.X, "X", linear.VariableRefs, ctx);
+                var yCoord = FormatCoordWithVars(linear.EndPoint.Y + offset.Y, "Y", linear.VariableRefs, ctx);
+                sb.Append($"G1 X{xCoord} Y{yCoord}");
 
                 // Feedrate — etch always uses process feedrate
                 var feedVar = ctx.IsEtch ? "#148" : GetLinearFeedVariable(linear.Layer);
@@ -138,7 +151,9 @@ public sealed class CincinnatiFeatureWriter
 
                 // G2 = CW, G3 = CCW
                 var gCode = arc.Rotation == RotationType.CW ? "G2" : "G3";
-                sb.Append($"{gCode} X{_fmt.FormatCoord(arc.EndPoint.X + offset.X)} Y{_fmt.FormatCoord(arc.EndPoint.Y + offset.Y)}");
+                var xCoord = FormatCoordWithVars(arc.EndPoint.X + offset.X, "X", arc.VariableRefs, ctx);
+                var yCoord = FormatCoordWithVars(arc.EndPoint.Y + offset.Y, "Y", arc.VariableRefs, ctx);
+                sb.Append($"{gCode} X{xCoord} Y{yCoord}");
 
                 // Convert absolute center to incremental I/J
                 var i = arc.CenterPoint.X - currentPos.X;
@@ -175,6 +190,25 @@ public sealed class CincinnatiFeatureWriter
         // 10. Head raise (unless last feature on sheet)
         if (!ctx.IsLastFeatureOnSheet)
             WriteM47(writer, ctx);
+    }
+
+    /// <summary>
+    /// Formats a coordinate value, using a #number variable reference if the motion
+    /// has a VariableRef for this axis and the variable is mapped (non-inline).
+    /// Inline variables fall through to literal formatting.
+    /// </summary>
+    private string FormatCoordWithVars(double value, string axis,
+        Dictionary<string, string> variableRefs, FeatureContext ctx)
+    {
+        if (variableRefs != null
+            && variableRefs.TryGetValue(axis, out var varName)
+            && ctx.UserVariableMapping != null
+            && ctx.UserVariableMapping.TryGetValue((ctx.DrawingId, varName), out var varNum))
+        {
+            return $"#{varNum}";
+        }
+
+        return _fmt.FormatCoord(value);
     }
 
     private Vector FindPiercePoint(List<ICode> codes)
