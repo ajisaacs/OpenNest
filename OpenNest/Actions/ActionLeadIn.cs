@@ -1,6 +1,7 @@
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Controls;
 using OpenNest.Converters;
+using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using System.Collections.Generic;
@@ -31,6 +32,7 @@ namespace OpenNest.Actions
         private SnapType activeSnapType;
         private ShapeInfo hoveredContour;
         private ContextMenuStrip contextMenu;
+        private LeadInToolWindow toolWindow;
         private static readonly Brush grayOverlay = new SolidBrush(Color.FromArgb(160, 180, 180, 180));
         private static readonly Pen highlightPen = new Pen(Color.Cyan, 2.5f);
 
@@ -46,6 +48,7 @@ namespace OpenNest.Actions
             plateView.MouseDown += OnMouseDown;
             plateView.KeyDown += OnKeyDown;
             plateView.Paint += OnPaint;
+            ShowToolWindow();
         }
 
         public override void DisconnectEvents()
@@ -54,6 +57,8 @@ namespace OpenNest.Actions
             plateView.MouseDown -= OnMouseDown;
             plateView.KeyDown -= OnKeyDown;
             plateView.Paint -= OnPaint;
+
+            HideToolWindow();
 
             contextMenu?.Dispose();
             contextMenu = null;
@@ -71,6 +76,79 @@ namespace OpenNest.Actions
         public override void CancelAction() { }
 
         public override bool IsBusy() => selectedPart != null;
+
+        private void ShowToolWindow()
+        {
+            if (toolWindow == null)
+            {
+                toolWindow = new LeadInToolWindow();
+                toolWindow.AutoAssignClicked += OnAutoAssignClicked;
+            }
+
+            // Load current parameters or defaults
+            var plate = plateView.Plate;
+            if (plate?.CuttingParameters != null)
+                toolWindow.LoadFromParameters(plate.CuttingParameters);
+            else
+            {
+                var json = Properties.Settings.Default.CuttingParametersJson;
+                if (!string.IsNullOrEmpty(json))
+                {
+                    try
+                    {
+                        var saved = CuttingParametersSerializer.Deserialize(json);
+                        toolWindow.LoadFromParameters(saved);
+                    }
+                    catch { /* use defaults */ }
+                }
+            }
+
+            toolWindow.ParametersChanged += OnToolParametersChanged;
+
+            var mainForm = plateView.FindForm();
+            if (mainForm != null)
+                toolWindow.Owner = mainForm;
+
+            toolWindow.Show();
+        }
+
+        private void HideToolWindow()
+        {
+            if (toolWindow == null)
+                return;
+
+            SaveParameters();
+
+            toolWindow.ParametersChanged -= OnToolParametersChanged;
+            toolWindow.AutoAssignClicked -= OnAutoAssignClicked;
+            toolWindow.Close();
+            toolWindow.Dispose();
+            toolWindow = null;
+        }
+
+        private CuttingParameters GetCurrentParameters()
+        {
+            return toolWindow?.BuildParameters() ?? plateView.Plate?.CuttingParameters ?? new CuttingParameters();
+        }
+
+        private void SaveParameters()
+        {
+            if (toolWindow == null)
+                return;
+
+            var parameters = toolWindow.BuildParameters();
+            var json = CuttingParametersSerializer.Serialize(parameters);
+            Properties.Settings.Default.CuttingParametersJson = json;
+            Properties.Settings.Default.Save();
+
+            if (plateView.Plate != null)
+                plateView.Plate.CuttingParameters = parameters;
+        }
+
+        private void OnToolParametersChanged(object sender, System.EventArgs e)
+        {
+            plateView.Invalidate();
+        }
 
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
@@ -110,7 +188,13 @@ namespace OpenNest.Actions
 
             // Check endpoint/midpoint snaps on the hovered contour
             if (hoveredContour != null)
+            {
                 TrySnapToEntityPoints(localPt);
+
+                // Auto-switch tool window tab
+                if (toolWindow != null)
+                    toolWindow.ActiveContourType = snapContourType;
+            }
 
             plateView.Invalidate();
         }
@@ -190,9 +274,7 @@ namespace OpenNest.Actions
             if (!hasSnap || selectedPart == null)
                 return;
 
-            var parameters = plateView.Plate?.CuttingParameters;
-            if (parameters == null)
-                return;
+            var parameters = GetCurrentParameters();
 
             var leadIn = SelectLeadIn(parameters, snapContourType);
             if (leadIn == null)
@@ -375,27 +457,51 @@ namespace OpenNest.Actions
 
         private void CommitLeadIn()
         {
-            var parameters = plateView.Plate?.CuttingParameters;
-            if (parameters == null)
-                return;
+            var parameters = GetCurrentParameters();
 
-            // Remove any existing lead-ins first
             if (selectedPart.HasManualLeadIns)
                 selectedPart.RemoveLeadIns();
 
-            // Apply lead-ins using the snap point as the approach point.
-            // snapPoint is in the program's local coordinate space (rotated, not offset),
-            // which is what Part.ApplyLeadIns expects.
-            selectedPart.ApplyLeadIns(parameters, snapPoint);
+            ApplyAutoTab(parameters);
+
+            selectedPart.ApplySingleLeadIn(parameters, snapPoint, snapEntity, snapContourType);
             selectedPart.LeadInsLocked = true;
 
-            // Rebuild the layout part's graphics
             selectedLayoutPart.IsDirty = true;
-            selectedLayoutPart.Update();
-
-            // Deselect and reset
             DeselectPart();
             plateView.Invalidate();
+        }
+
+        private void OnAutoAssignClicked(object sender, System.EventArgs e)
+        {
+            if (selectedPart == null)
+                return;
+
+            var parameters = GetCurrentParameters();
+
+            if (selectedPart.HasManualLeadIns)
+                selectedPart.RemoveLeadIns();
+
+            ApplyAutoTab(parameters);
+
+            selectedPart.ApplyLeadIns(parameters, Vector.Zero);
+            selectedPart.LeadInsLocked = true;
+
+            selectedLayoutPart.IsDirty = true;
+            DeselectPart();
+            plateView.Invalidate();
+        }
+
+        private void ApplyAutoTab(CuttingParameters parameters)
+        {
+            if (parameters.AutoTabMinSize <= 0 && parameters.AutoTabMaxSize <= 0)
+                return;
+
+            var bbox = selectedPart.Program.BoundingBox();
+            var minDim = System.Math.Min(bbox.Width, bbox.Length);
+
+            if (minDim >= parameters.AutoTabMinSize && minDim <= parameters.AutoTabMaxSize)
+                parameters.TabsEnabled = true;
         }
 
         private void DeselectPart()
