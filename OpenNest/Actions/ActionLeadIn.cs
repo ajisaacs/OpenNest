@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace OpenNest.Actions
@@ -341,8 +342,10 @@ namespace OpenNest.Actions
                 cleanProgram = selectedPart.Program;
             }
 
-            var entities = ConvertProgram.ToGeometry(cleanProgram);
-            entities.RemoveAll(e => e.Layer == SpecialLayers.Scribe);
+            var entities = ConvertProgram.ToGeometry(cleanProgram)
+                .Where(e => e.Layer == SpecialLayers.Cut)
+                .ToList();
+
             profile = new ShapeProfile(entities);
 
             contours = new List<ShapeInfo>();
