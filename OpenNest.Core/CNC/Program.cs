@@ -1,6 +1,7 @@
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System;
 using System.Collections.Generic;
 
 namespace OpenNest.CNC
@@ -8,6 +9,8 @@ namespace OpenNest.CNC
     public class Program
     {
         public List<ICode> Codes;
+
+        public Dictionary<string, VariableDefinition> Variables { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         private Mode mode;
 
@@ -453,6 +456,9 @@ namespace OpenNest.CNC
                 codes[i] = this.Codes[i].Clone();
 
             pgm.Codes.AddRange(codes);
+
+            foreach (var kvp in Variables)
+                pgm.Variables[kvp.Key] = kvp.Value;
 
             return pgm;
         }

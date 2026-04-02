@@ -101,4 +101,35 @@ public class ProgramVariableTests
         move.Offset(5.0, 0);
         Assert.Null(move.VariableRefs);
     }
+
+    [Fact]
+    public void Program_Variables_EmptyByDefault()
+    {
+        var pgm = new Program();
+        Assert.Empty(pgm.Variables);
+    }
+
+    [Fact]
+    public void Program_Variables_CaseInsensitive()
+    {
+        var pgm = new Program();
+        pgm.Variables["Diameter"] = new VariableDefinition("Diameter", "0.3", 0.3);
+        Assert.True(pgm.Variables.ContainsKey("diameter"));
+    }
+
+    [Fact]
+    public void Program_Clone_DeepCopiesVariables()
+    {
+        var pgm = new Program();
+        pgm.Variables["diameter"] = new VariableDefinition("diameter", "0.3", 0.3);
+        pgm.Codes.Add(new LinearMove(1.0, 0));
+
+        var clone = (Program)pgm.Clone();
+
+        Assert.Single(clone.Variables);
+        Assert.Equal(0.3, clone.Variables["diameter"].Value);
+        // Verify it's a separate dictionary
+        clone.Variables.Remove("diameter");
+        Assert.Single(pgm.Variables);
+    }
 }
