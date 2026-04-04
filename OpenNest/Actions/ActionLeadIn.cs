@@ -65,6 +65,9 @@ namespace OpenNest.Actions
             contextMenu?.Dispose();
             contextMenu = null;
 
+            if (selectedLayoutPart != null)
+                selectedLayoutPart.IsSelected = false;
+
             selectedLayoutPart = null;
             selectedPart = null;
             profile = null;
