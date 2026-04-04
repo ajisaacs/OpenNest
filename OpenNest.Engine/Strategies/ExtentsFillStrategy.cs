@@ -24,8 +24,8 @@ namespace OpenNest.Engine.Strategies
 
             return FillHelpers.BestOverAngles(context, angles,
                 angle => filler.Fill(context.Item.Drawing, angle,
-                    context.PlateNumber, context.Token, context.Progress),
-                NestPhase.Extents, "Extents");
+                    context.Token, context.ReportProgress),
+                "Extents");
         }
     }
 }

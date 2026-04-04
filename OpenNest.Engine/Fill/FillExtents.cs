@@ -24,10 +24,8 @@ namespace OpenNest.Engine.Fill
         }
 
         public List<Part> Fill(Drawing drawing, double rotationAngle = 0,
-            int plateNumber = 0,
             CancellationToken token = default,
-            IProgress<NestProgress> progress = null,
-            List<Engine.BestFit.BestFitResult> bestFits = null)
+            Action<List<Part>, string> reportProgress = null)
         {
             var pair = BuildPair(drawing, rotationAngle);
             if (pair == null)
@@ -37,14 +35,7 @@ namespace OpenNest.Engine.Fill
             if (column.Count == 0)
                 return new List<Part>();
 
-            NestEngineBase.ReportProgress(progress, new ProgressReport
-            {
-                Phase = NestPhase.Extents,
-                PlateNumber = plateNumber,
-                Parts = column,
-                WorkArea = workArea,
-                Description = $"Extents: initial column {column.Count} parts",
-            });
+            reportProgress?.Invoke(column, $"Extents: initial column {column.Count} parts");
 
             var adjusted = AdjustColumn(pair.Value, column, token);
 
@@ -56,25 +47,11 @@ namespace OpenNest.Engine.Fill
                 adjusted = column;
             }
 
-            NestEngineBase.ReportProgress(progress, new ProgressReport
-            {
-                Phase = NestPhase.Extents,
-                PlateNumber = plateNumber,
-                Parts = adjusted,
-                WorkArea = workArea,
-                Description = $"Extents: column {adjusted.Count} parts",
-            });
+            reportProgress?.Invoke(adjusted, $"Extents: column {adjusted.Count} parts");
 
             var result = RepeatColumns(adjusted, token);
 
-            NestEngineBase.ReportProgress(progress, new ProgressReport
-            {
-                Phase = NestPhase.Extents,
-                PlateNumber = plateNumber,
-                Parts = result,
-                WorkArea = workArea,
-                Description = $"Extents: {result.Count} parts total",
-            });
+            reportProgress?.Invoke(result, $"Extents: {result.Count} parts total");
 
             return result;
         }

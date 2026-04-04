@@ -40,7 +40,7 @@ namespace OpenNest.Engine.Strategies
 
                     return result;
                 },
-                NestPhase.Linear, "Linear");
+                "Linear");
         }
     }
 }

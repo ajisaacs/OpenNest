@@ -113,13 +113,12 @@ namespace OpenNest.Engine.Strategies
         /// <summary>
         /// Sweeps a list of angles, calling fillAtAngle for each, and returns
         /// the best result according to the context's comparer. Handles
-        /// cancellation and progress reporting.
+        /// cancellation and progress reporting via context.ReportProgress.
         /// </summary>
         public static List<Part> BestOverAngles(
             FillContext context,
             IReadOnlyList<double> angles,
             Func<double, List<Part>> fillAtAngle,
-            NestPhase phase,
             string phaseLabel)
         {
             var workArea = context.WorkArea;
@@ -140,14 +139,8 @@ namespace OpenNest.Engine.Strategies
                         best = result;
                 }
 
-                NestEngineBase.ReportProgress(context.Progress, new ProgressReport
-                {
-                    Phase = phase,
-                    PlateNumber = context.PlateNumber,
-                    Parts = best,
-                    WorkArea = workArea,
-                    Description = $"{phaseLabel}: {i + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts",
-                });
+                context.ReportProgress(best,
+                    $"{phaseLabel}: {i + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts");
             }
 
             return best ?? new List<Part>();

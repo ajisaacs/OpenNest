@@ -30,7 +30,7 @@ namespace OpenNest.Engine.Strategies
                 var dedup = GridDedup.GetOrCreate(context.SharedState);
                 var filler = new PairFiller(context.Plate, comparer, dedup);
                 var result = filler.Fill(context.Item, context.WorkArea,
-                    context.PlateNumber, context.Token, context.Progress);
+                    context.Token, context.ReportProgress);
 
                 context.SharedState["BestFits"] = result.BestFits;
 

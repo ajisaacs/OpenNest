@@ -23,9 +23,26 @@ namespace OpenNest.Engine.Strategies
         /// <summary>For progress reporting only; comparisons use Policy.Comparer.</summary>
         public FillScore CurrentBestScore { get; set; }
         public NestPhase WinnerPhase { get; set; }
+        public NestPhase ActivePhase { get; set; }
         public List<PhaseResult> PhaseResults { get; } = new();
         public List<AngleResult> AngleResults { get; } = new();
 
         public Dictionary<string, object> SharedState { get; } = new();
+
+        /// <summary>
+        /// Standard progress reporting for strategies and fillers. Reports intermediate
+        /// results using the current ActivePhase, PlateNumber, and WorkArea.
+        /// </summary>
+        public void ReportProgress(List<Part> parts, string description)
+        {
+            NestEngineBase.ReportProgress(Progress, new ProgressReport
+            {
+                Phase = ActivePhase,
+                PlateNumber = PlateNumber,
+                Parts = parts,
+                WorkArea = WorkArea,
+                Description = description,
+            });
+        }
     }
 }

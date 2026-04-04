@@ -45,9 +45,8 @@ namespace OpenNest.Engine.Fill
         }
 
         public PairFillResult Fill(NestItem item, Box workArea,
-            int plateNumber = 0,
             CancellationToken token = default,
-            IProgress<NestProgress> progress = null)
+            Action<List<Part>, string> reportProgress = null)
         {
             var bestFits = BestFitCache.GetOrCompute(
                 item.Drawing, plateSize.Length, plateSize.Width, partSpacing);
@@ -58,7 +57,7 @@ namespace OpenNest.Engine.Fill
 
             var targetCount = item.Quantity > 0 ? item.Quantity : 0;
             var parts = EvaluateCandidates(candidates, item.Drawing, workArea, targetCount,
-                plateNumber, token, progress);
+                token, reportProgress);
 
             return new PairFillResult { Parts = parts, BestFits = bestFits };
         }
@@ -66,7 +65,7 @@ namespace OpenNest.Engine.Fill
         private List<Part> EvaluateCandidates(
             List<BestFitResult> candidates, Drawing drawing,
             Box workArea, int targetCount,
-            int plateNumber, CancellationToken token, IProgress<NestProgress> progress)
+            CancellationToken token, Action<List<Part>, string> reportProgress)
         {
             List<Part> best = null;
             var sinceImproved = 0;
@@ -112,14 +111,8 @@ namespace OpenNest.Engine.Fill
                             sinceImproved++;
                         }
 
-                        NestEngineBase.ReportProgress(progress, new ProgressReport
-                        {
-                            Phase = NestPhase.Pairs,
-                            PlateNumber = plateNumber,
-                            Parts = best,
-                            WorkArea = workArea,
-                            Description = $"Pairs: {batchStart + j + 1}/{candidates.Count} candidates, best = {best?.Count ?? 0} parts",
-                        });
+                        reportProgress?.Invoke(best,
+                            $"Pairs: {batchStart + j + 1}/{candidates.Count} candidates, best = {best?.Count ?? 0} parts");
                     }
 
                     if (batchEnd >= EarlyExitMinTried && sinceImproved >= EarlyExitStaleLimit)

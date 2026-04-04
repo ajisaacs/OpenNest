@@ -295,6 +295,7 @@ namespace OpenNest
                 foreach (var strategy in FillStrategyRegistry.Strategies)
                 {
                     context.Token.ThrowIfCancellationRequested();
+                    context.ActivePhase = strategy.Phase;
 
                     var sw = Stopwatch.StartNew();
                     var result = strategy.Fill(context);
