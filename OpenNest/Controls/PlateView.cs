@@ -386,11 +386,7 @@ namespace OpenNest.Controls
             switch (e.KeyCode)
             {
                 case Keys.Delete:
-                    if (currentAction is ActionClone)
-                    {
-                        SetAction(typeof(ActionSelect));
-                    }
-                    else if (selectedCutOff != null)
+                    if (selectedCutOff != null)
                     {
                         Plate.CutOffs.Remove(selectedCutOff);
                         selectedCutOff = null;
@@ -852,6 +848,7 @@ namespace OpenNest.Controls
             DeselectAll();
             Invalidate();
         }
+
 
         private void redrawTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {

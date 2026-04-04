@@ -12,6 +12,7 @@ namespace OpenNest.Actions
     public class ActionClone : Action
     {
         private readonly List<LayoutPart> parts;
+        private readonly List<Part> sourceParts;
 
         private double lastScale;
 
@@ -28,6 +29,7 @@ namespace OpenNest.Actions
             plateView.MouseDown += plateView_MouseDown;
             plateView.Paint += plateView_Paint;
 
+            sourceParts = partsToClone;
             parts = new List<LayoutPart>();
             lastScale = double.NaN;
 
@@ -59,6 +61,16 @@ namespace OpenNest.Actions
                 case Keys.F1:
                 case Keys.Enter:
                     Apply();
+                    break;
+
+                case Keys.Delete:
+                    foreach (var part in sourceParts)
+                        plateView.Plate.Parts.Remove(part);
+
+                    if (plateView.Plate.CutOffs.Count > 0)
+                        plateView.Plate.RegenerateCutOffs(plateView.CutOffSettings);
+
+                    plateView.Invalidate();
                     break;
 
                 case Keys.F:
