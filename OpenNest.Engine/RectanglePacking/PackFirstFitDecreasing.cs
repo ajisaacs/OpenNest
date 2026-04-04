@@ -16,11 +16,11 @@ namespace OpenNest.RectanglePacking
 
         public override void Pack(List<Item> items)
         {
-            items = items.OrderBy(i => -i.Length).ToList();
+            items = items.OrderBy(i => -i.Width).ToList();
 
             foreach (var item in items)
             {
-                if (item.Length > Bin.Length)
+                if (item.Width > Bin.Width)
                     continue;
 
                 var level = FindLevel(item);
@@ -36,10 +36,10 @@ namespace OpenNest.RectanglePacking
         {
             foreach (var level in levels)
             {
-                if (level.Height < item.Length)
+                if (level.Height < item.Width)
                     continue;
 
-                if (level.RemainingWidth < item.Width)
+                if (level.RemainingLength < item.Length)
                     continue;
 
                 return level;
@@ -58,12 +58,12 @@ namespace OpenNest.RectanglePacking
 
             var remaining = Bin.Top - y;
 
-            if (remaining < item.Length)
+            if (remaining < item.Width)
                 return null;
 
             var level = new Level(Bin);
             level.Y = y;
-            level.Height = item.Length;
+            level.Height = item.Width;
 
             levels.Add(level);
 
@@ -93,9 +93,9 @@ namespace OpenNest.RectanglePacking
                 set { NextItemLocation.Y = value; }
             }
 
-            public double Width
+            public double LevelLength
             {
-                get { return Parent.Width; }
+                get { return Parent.Length; }
             }
 
             public double Height { get; set; }
@@ -105,9 +105,9 @@ namespace OpenNest.RectanglePacking
                 get { return Y + Height; }
             }
 
-            public double RemainingWidth
+            public double RemainingLength
             {
-                get { return X + Width - NextItemLocation.X; }
+                get { return X + LevelLength - NextItemLocation.X; }
             }
 
             public void AddItem(Item item)
@@ -115,7 +115,7 @@ namespace OpenNest.RectanglePacking
                 item.Location = NextItemLocation;
                 Parent.Items.Add(item);
 
-                NextItemLocation = new Vector(NextItemLocation.X + item.Width, NextItemLocation.Y);
+                NextItemLocation = new Vector(NextItemLocation.X + item.Length, NextItemLocation.Y);
             }
         }
     }

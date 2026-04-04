@@ -13,8 +13,8 @@ public static class AutoSplitCalculator
 
         var lines = new List<SplitLine>();
 
-        var verticalSplits = usableWidth > 0 ? (int)System.Math.Ceiling(partBounds.Width / usableWidth) - 1 : 0;
-        var horizontalSplits = usableHeight > 0 ? (int)System.Math.Ceiling(partBounds.Length / usableHeight) - 1 : 0;
+        var verticalSplits = usableWidth > 0 ? (int)System.Math.Ceiling(partBounds.Length / usableWidth) - 1 : 0;
+        var horizontalSplits = usableHeight > 0 ? (int)System.Math.Ceiling(partBounds.Width / usableHeight) - 1 : 0;
 
         if (verticalSplits < 0) verticalSplits = 0;
         if (horizontalSplits < 0) horizontalSplits = 0;
@@ -34,14 +34,14 @@ public static class AutoSplitCalculator
 
         if (verticalPieces > 1)
         {
-            var spacing = partBounds.Width / verticalPieces;
+            var spacing = partBounds.Length / verticalPieces;
             for (var i = 1; i < verticalPieces; i++)
                 lines.Add(new SplitLine(partBounds.X + spacing * i, CutOffAxis.Vertical));
         }
 
         if (horizontalPieces > 1)
         {
-            var spacing = partBounds.Length / horizontalPieces;
+            var spacing = partBounds.Width / horizontalPieces;
             for (var i = 1; i < horizontalPieces; i++)
                 lines.Add(new SplitLine(partBounds.Y + spacing * i, CutOffAxis.Horizontal));
         }

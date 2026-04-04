@@ -190,8 +190,8 @@ namespace OpenNest.Controls
             var rect = new RectangleF
             {
                 Location = view.PointWorldToGraph(workArea.Location),
-                Width = view.LengthWorldToGui(workArea.Width),
-                Height = view.LengthWorldToGui(workArea.Length)
+                Width = view.LengthWorldToGui(workArea.Length),
+                Height = view.LengthWorldToGui(workArea.Width)
             };
             rect.Y -= rect.Height;
 
@@ -226,8 +226,8 @@ namespace OpenNest.Controls
             {
                 var box = remnants[i];
                 var loc = view.PointWorldToGraph(box.Location);
-                var w = view.LengthWorldToGui(box.Width);
-                var h = view.LengthWorldToGui(box.Length);
+                var w = view.LengthWorldToGui(box.Length);
+                var h = view.LengthWorldToGui(box.Width);
                 var rect = new RectangleF(loc.X, loc.Y - h, w, h);
 
                 var priority = view.DebugRemnantPriorities != null && i < view.DebugRemnantPriorities.Count
@@ -355,7 +355,7 @@ namespace OpenNest.Controls
                     var location = part.Location;
                     var pt1 = view.PointWorldToGraph(location);
                     var pt2 = view.PointWorldToGraph(new Vector(
-                        location.X + box.Width, location.Y + box.Length));
+                        location.X + box.Length, location.Y + box.Width));
                     using var warnPen = new Pen(Color.FromArgb(180, 255, 140, 0), 2f);
                     g.DrawRectangle(warnPen, pt1.X, pt2.Y,
                         System.Math.Abs(pt2.X - pt1.X), System.Math.Abs(pt2.Y - pt1.Y));
@@ -542,8 +542,8 @@ namespace OpenNest.Controls
             var rect = new RectangleF
             {
                 Location = view.PointWorldToGraph(box.Location),
-                Width = view.LengthWorldToGui(box.Width),
-                Height = view.LengthWorldToGui(box.Length)
+                Width = view.LengthWorldToGui(box.Length),
+                Height = view.LengthWorldToGui(box.Width)
             };
 
             g.DrawRectangle(view.ColorScheme.BoundingBoxPen, rect.X, rect.Y - rect.Height, rect.Width, rect.Height);

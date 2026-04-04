@@ -24,7 +24,7 @@ namespace OpenNest.Engine.Fill
         public PartBoundary(Part part, double spacing)
         {
             var entities = ConvertProgram.ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .Where(e => e.Layer == SpecialLayers.Cut)
                 .ToList();
 
             var definedShape = new ShapeProfile(entities);

@@ -50,13 +50,13 @@ namespace OpenNest
             {
                 cutPosition = Position.X;
                 lineStart = StartLimit ?? bounds.Y;
-                lineEnd = EndLimit ?? (bounds.Y + bounds.Length + settings.Overtravel);
+                lineEnd = EndLimit ?? (bounds.Y + bounds.Width + settings.Overtravel);
             }
             else
             {
                 cutPosition = Position.Y;
                 lineStart = StartLimit ?? bounds.X;
-                lineEnd = EndLimit ?? (bounds.X + bounds.Width + settings.Overtravel);
+                lineEnd = EndLimit ?? (bounds.X + bounds.Length + settings.Overtravel);
             }
 
             var exclusions = new List<(double Start, double End)>();
@@ -176,13 +176,13 @@ namespace OpenNest
 
         private (double Min, double Max) AxisBounds(Box bb, double clearance) =>
             Axis == CutOffAxis.Vertical
-                ? (bb.X - clearance, bb.X + bb.Width + clearance)
-                : (bb.Y - clearance, bb.Y + bb.Length + clearance);
+                ? (bb.X - clearance, bb.X + bb.Length + clearance)
+                : (bb.Y - clearance, bb.Y + bb.Width + clearance);
 
         private (double Start, double End) CrossAxisBounds(Box bb, double clearance) =>
             Axis == CutOffAxis.Vertical
-                ? (bb.Y - clearance, bb.Y + bb.Length + clearance)
-                : (bb.X - clearance, bb.X + bb.Width + clearance);
+                ? (bb.Y - clearance, bb.Y + bb.Width + clearance)
+                : (bb.X - clearance, bb.X + bb.Length + clearance);
 
         private Program BuildProgram(List<(double Start, double End)> segments, CutOffSettings settings)
         {

@@ -2,13 +2,15 @@
 
 namespace OpenNest
 {
+    internal record CombinationResult(bool Found, int Count1, int Count2);
+
     internal static class BestCombination
     {
-        public static bool FindFrom2(double length1, double length2, double overallLength, out int count1, out int count2)
+        public static CombinationResult FindFrom2(double length1, double length2, double overallLength)
         {
             overallLength += Tolerance.Epsilon;
-            count1 = 0;
-            count2 = 0;
+            var count1 = 0;
+            var count2 = 0;
 
             var maxCount1 = (int)System.Math.Floor(overallLength / length1);
             var bestRemnant = overallLength + 1;
@@ -30,7 +32,7 @@ namespace OpenNest
                     break;
             }
 
-            return count1 > 0 || count2 > 0;
+            return new CombinationResult(count1 > 0 || count2 > 0, count1, count2);
         }
     }
 }

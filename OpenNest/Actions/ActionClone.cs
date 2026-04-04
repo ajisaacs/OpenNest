@@ -198,9 +198,9 @@ namespace OpenNest.Actions
                 Box cutoffBox;
 
                 if (cutoff.Axis == CutOffAxis.Vertical)
-                    cutoffBox = new Box(cutoff.Position.X, plateBounds.Y, 0, plateBounds.Length);
+                    cutoffBox = new Box(cutoff.Position.X, plateBounds.Y, 0, plateBounds.Width);
                 else
-                    cutoffBox = new Box(plateBounds.X, cutoff.Position.Y, plateBounds.Width, 0);
+                    cutoffBox = new Box(plateBounds.X, cutoff.Position.Y, plateBounds.Length, 0);
 
                 boxes.Add(cutoffBox.Offset(plate.PartSpacing));
             }

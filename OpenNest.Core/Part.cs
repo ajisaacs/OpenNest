@@ -277,7 +277,7 @@ namespace OpenNest
             var part = new Part(BaseDrawing, Program,
                 location + offset,
                 new Box(BoundingBox.X + offset.X, BoundingBox.Y + offset.Y,
-                    BoundingBox.Width, BoundingBox.Length));
+                    BoundingBox.Length, BoundingBox.Width));
 
             return part;
         }

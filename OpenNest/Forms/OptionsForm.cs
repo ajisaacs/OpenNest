@@ -1,4 +1,4 @@
-﻿using OpenNest.Engine.Strategies;
+using OpenNest.Engine.Strategies;
 using OpenNest.Properties;
 using System;
 using System.Collections.Generic;
@@ -9,12 +9,10 @@ namespace OpenNest.Forms
 {
     public partial class OptionsForm : Form
     {
-        private readonly List<CheckBox> _strategyCheckBoxes = new();
-
         public OptionsForm()
         {
             InitializeComponent();
-            BuildStrategyCheckBoxes();
+            BuildStrategyGrid();
         }
 
         protected override void OnLoad(EventArgs e)
@@ -23,23 +21,44 @@ namespace OpenNest.Forms
             LoadSettings();
         }
 
-        private void BuildStrategyCheckBoxes()
+        private void BuildStrategyGrid()
         {
-            var strategies = FillStrategyRegistry.AllStrategies;
-            var y = 20;
+            strategyGrid.AutoGenerateColumns = false;
 
-            foreach (var strategy in strategies)
+            strategyGrid.Columns.Add(new DataGridViewCheckBoxColumn
             {
-                var cb = new CheckBox
-                {
-                    Text = strategy.Name,
-                    Tag = strategy.Name,
-                    AutoSize = true,
-                    Location = new System.Drawing.Point(10, y),
-                };
-                strategyGroupBox.Controls.Add(cb);
-                _strategyCheckBoxes.Add(cb);
-                y += 24;
+                Name = "Enabled",
+                HeaderText = "",
+                Width = 30,
+            });
+
+            strategyGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "Name",
+                HeaderText = "Strategy",
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+            });
+
+            strategyGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "Phase",
+                HeaderText = "Phase",
+                ReadOnly = true,
+                Width = 100,
+            });
+
+            strategyGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "Order",
+                HeaderText = "Order",
+                ReadOnly = true,
+                Width = 55,
+            });
+
+            foreach (var strategy in FillStrategyRegistry.AllStrategies)
+            {
+                strategyGrid.Rows.Add(true, strategy.Name, strategy.Phase, strategy.Order);
             }
         }
 
@@ -51,8 +70,8 @@ namespace OpenNest.Forms
             numericUpDown2.Value = (decimal)Settings.Default.ImportSplinePrecision;
 
             var disabledNames = ParseDisabledStrategies(Settings.Default.DisabledStrategies);
-            foreach (var cb in _strategyCheckBoxes)
-                cb.Checked = !disabledNames.Contains((string)cb.Tag);
+            foreach (DataGridViewRow row in strategyGrid.Rows)
+                row.Cells["Enabled"].Value = !disabledNames.Contains((string)row.Cells["Name"].Value);
         }
 
         private void SaveSettings()
@@ -62,9 +81,12 @@ namespace OpenNest.Forms
             Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
             Settings.Default.ImportSplinePrecision = (int)numericUpDown2.Value;
 
-            var disabledNames = _strategyCheckBoxes
-                .Where(cb => !cb.Checked)
-                .Select(cb => (string)cb.Tag);
+            var disabledNames = new List<string>();
+            foreach (DataGridViewRow row in strategyGrid.Rows)
+            {
+                if (row.Cells["Enabled"].Value is false)
+                    disabledNames.Add((string)row.Cells["Name"].Value);
+            }
             Settings.Default.DisabledStrategies = string.Join(",", disabledNames);
 
             Settings.Default.Save();

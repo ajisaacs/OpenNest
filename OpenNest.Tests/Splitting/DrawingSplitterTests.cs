@@ -161,11 +161,11 @@ public class DrawingSplitterTests
         var bb2 = results[1].Program.BoundingBox();
 
         // Piece lengths should sum to original length
-        Assert.Equal(100.0, bb1.Width + bb2.Width, 1);
+        Assert.Equal(100.0, bb1.Length + bb2.Length, 1);
 
         // Both pieces should have the same width as the original
-        Assert.Equal(100.0, bb1.Length, 1);
-        Assert.Equal(100.0, bb2.Length, 1);
+        Assert.Equal(100.0, bb1.Width, 1);
+        Assert.Equal(100.0, bb2.Width, 1);
     }
 
     [Fact]
@@ -183,11 +183,11 @@ public class DrawingSplitterTests
         var bb2 = results[1].Program.BoundingBox();
 
         // Piece widths should sum to original width
-        Assert.Equal(100.0, bb1.Length + bb2.Length, 1);
+        Assert.Equal(100.0, bb1.Width + bb2.Width, 1);
 
         // Both pieces should have the same length as the original
-        Assert.Equal(100.0, bb1.Width, 1);
-        Assert.Equal(100.0, bb2.Width, 1);
+        Assert.Equal(100.0, bb1.Length, 1);
+        Assert.Equal(100.0, bb2.Length, 1);
     }
 
     [Fact]
@@ -287,8 +287,8 @@ public class DrawingSplitterTests
         var bb2 = results[1].Program.BoundingBox();
 
         // Left piece should be 30 long, right piece should be 70 long
-        Assert.Equal(30.0, bb1.Width, 1);
-        Assert.Equal(70.0, bb2.Width, 1);
+        Assert.Equal(30.0, bb1.Length, 1);
+        Assert.Equal(70.0, bb2.Length, 1);
     }
 
     [Fact]

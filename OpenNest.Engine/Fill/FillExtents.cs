@@ -96,7 +96,7 @@ namespace OpenNest.Engine.Fill
             var boundary2 = new PartBoundary(part2, halfSpacing);
 
             // Position part2 to the right of part1 at bounding box width distance.
-            var startOffset = part1.BoundingBox.Width + part2.BoundingBox.Width + partSpacing;
+            var startOffset = part1.BoundingBox.Length + part2.BoundingBox.Length + partSpacing;
             part2.Offset(startOffset, 0);
             part2.UpdateBounds();
 
@@ -135,7 +135,7 @@ namespace OpenNest.Engine.Fill
 
             // Compute vertical copy distance using bounding boxes as starting point,
             // then slide down to find true geometry distance.
-            var pairHeight = pair.Bbox.Length;
+            var pairHeight = pair.Bbox.Width;
             var testOffset = new Vector(0, pairHeight);
 
             // Create test parts for slide distance measurement.
@@ -218,7 +218,7 @@ namespace OpenNest.Engine.Fill
 
         private List<Part> AdjustColumn(PartPair pair, List<Part> column, CancellationToken token)
         {
-            var originalPairWidth = pair.Bbox.Width;
+            var originalPairWidth = pair.Bbox.Length;
 
             for (var iteration = 0; iteration < MaxIterations; iteration++)
             {
@@ -294,7 +294,7 @@ namespace OpenNest.Engine.Fill
             // Check if the pair got wider.
             var newBbox = PairBbox(p1, p2);
 
-            if (newBbox.Width > originalPairWidth + Tolerance.Epsilon)
+            if (newBbox.Length > originalPairWidth + Tolerance.Epsilon)
                 return null;
 
             return AnchorToWorkArea(p1, p2);

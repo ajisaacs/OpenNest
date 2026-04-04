@@ -29,11 +29,15 @@ namespace OpenNest.RectanglePacking
                 Bin.Items.AddRange(bin1.Items);
             else
                 Bin.Items.AddRange(bin2.Items);
-        }
+        }   
+
 
         public override void Fill(Item item, int maxCount)
         {
-            throw new NotImplementedException();
+            Fill(item);
+
+            if (Bin.Items.Count > maxCount)
+                Bin.Items.RemoveRange(maxCount, Bin.Items.Count - maxCount);
         }
 
         private Bin BestFitHorizontal(Item item) => BestFitAxis(item, horizontal: true);
@@ -44,13 +48,17 @@ namespace OpenNest.RectanglePacking
         {
             var bin = Bin.Clone() as Bin;
 
-            var primarySize = horizontal ? item.Width : item.Length;
-            var secondarySize = horizontal ? item.Length : item.Width;
-            var binPrimary = horizontal ? bin.Width : Bin.Length;
-            var binSecondary = horizontal ? bin.Length : Bin.Width;
+            var primarySize = horizontal ? item.Length : item.Width;
+            var secondarySize = horizontal ? item.Width : item.Length;
+            var binPrimary = horizontal ? bin.Length : Bin.Width;
+            var binSecondary = horizontal ? bin.Width : Bin.Length;
 
-            if (!BestCombination.FindFrom2(primarySize, secondarySize, binPrimary, out var normalPrimary, out var rotatePrimary))
+            var combo = BestCombination.FindFrom2(primarySize, secondarySize, binPrimary);
+            if (!combo.Found)
                 return bin;
+
+            var normalPrimary = combo.Count1;
+            var rotatePrimary = combo.Count2;
 
             var normalSecondary = (int)System.Math.Floor((binSecondary + Tolerance.Epsilon) / secondarySize);
             var rotateSecondary = (int)System.Math.Floor((binSecondary + Tolerance.Epsilon) / primarySize);
@@ -67,9 +75,9 @@ namespace OpenNest.RectanglePacking
             bin.Items.AddRange(FillGrid(item, normalRows, normalCols, int.MaxValue));
 
             if (horizontal)
-                item.Location.X += item.Width * normalPrimary;
+                item.Location.X += item.Length * normalPrimary;
             else
-                item.Location.Y += item.Length * normalPrimary;
+                item.Location.Y += item.Width * normalPrimary;
 
             item.Rotate();
 

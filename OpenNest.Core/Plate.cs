@@ -424,7 +424,7 @@ namespace OpenNest
         {
             var plateBox = new Box();
 
-            // Convention: Size.Length = X axis (horizontal), Size.Width = Y axis (vertical)
+            // Width = Y axis (vertical), Length = X axis (horizontal)
             switch (Quadrant)
             {
                 case 1:
@@ -451,8 +451,8 @@ namespace OpenNest
                     return new Box();
             }
 
-            plateBox.Width = Size.Length;
-            plateBox.Length = Size.Width;
+            plateBox.Width = Size.Width;
+            plateBox.Length = Size.Length;
 
             if (!includeParts)
                 return plateBox;
@@ -468,11 +468,11 @@ namespace OpenNest
                 ? partsBox.Bottom
                 : plateBox.Bottom;
 
-            boundingBox.Width = partsBox.Right > plateBox.Right
+            boundingBox.Length = partsBox.Right > plateBox.Right
                 ? partsBox.Right - boundingBox.X
                 : plateBox.Right - boundingBox.X;
 
-            boundingBox.Length = partsBox.Top > plateBox.Top
+            boundingBox.Width = partsBox.Top > plateBox.Top
                 ? partsBox.Top - boundingBox.Y
                 : plateBox.Top - boundingBox.Y;
 
@@ -489,8 +489,8 @@ namespace OpenNest
 
             box.X += EdgeSpacing.Left;
             box.Y += EdgeSpacing.Bottom;
-            box.Width -= EdgeSpacing.Left + EdgeSpacing.Right;
-            box.Length -= EdgeSpacing.Top + EdgeSpacing.Bottom;
+            box.Length -= EdgeSpacing.Left + EdgeSpacing.Right;
+            box.Width -= EdgeSpacing.Top + EdgeSpacing.Bottom;
 
             return box;
         }

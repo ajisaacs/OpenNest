@@ -47,7 +47,7 @@ namespace OpenNest.Engine.ML
             {
                 Area = drawing.Area,
                 Convexity = drawing.Area / (hullArea > 0 ? hullArea : 1.0),
-                AspectRatio = bb.Width / (bb.Length > 0 ? bb.Length : 1.0),
+                AspectRatio = bb.Length / (bb.Width > 0 ? bb.Width : 1.0),
                 BoundingBoxFill = drawing.Area / (bb.Area() > 0 ? bb.Area() : 1.0),
                 VertexCount = polygon.Vertices.Count,
                 Bitmask = GenerateBitmask(polygon, 32)
@@ -72,8 +72,8 @@ namespace OpenNest.Engine.ML
                 for (int x = 0; x < size; x++)
                 {
                     // Map grid coordinate (0..size) to bounding box coordinate
-                    var px = bb.Left + (x + 0.5) * (bb.Width / size);
-                    var py = bb.Bottom + (y + 0.5) * (bb.Length / size);
+                    var px = bb.Left + (x + 0.5) * (bb.Length / size);
+                    var py = bb.Bottom + (y + 0.5) * (bb.Width / size);
 
                     if (polygon.ContainsPoint(new Vector(px, py)))
                     {

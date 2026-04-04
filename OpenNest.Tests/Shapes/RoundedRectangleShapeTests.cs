@@ -11,8 +11,8 @@ public class RoundedRectangleShapeTests
         var drawing = shape.GetDrawing();
 
         var bbox = drawing.Program.BoundingBox();
-        Assert.Equal(20, bbox.Width, 0.1);
-        Assert.Equal(10, bbox.Length, 0.1);
+        Assert.Equal(20, bbox.Length, 0.1);
+        Assert.Equal(10, bbox.Width, 0.1);
     }
 
     [Fact]

@@ -42,6 +42,7 @@
             this.saveButton = new System.Windows.Forms.Button();
             this.cancelButton = new System.Windows.Forms.Button();
             this.bottomPanel1 = new OpenNest.Controls.BottomPanel();
+            this.strategyGrid = new System.Windows.Forms.DataGridView();
             this.strategyGroupBox = new System.Windows.Forms.GroupBox();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
@@ -212,8 +213,24 @@
             this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
             this.bottomPanel1.TabIndex = 1;
             //
+            // strategyGrid
+            //
+            this.strategyGrid.AllowUserToAddRows = false;
+            this.strategyGrid.AllowUserToDeleteRows = false;
+            this.strategyGrid.AllowUserToResizeRows = false;
+            this.strategyGrid.BackgroundColor = System.Drawing.SystemColors.Window;
+            this.strategyGrid.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.strategyGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.strategyGrid.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.strategyGrid.Location = new System.Drawing.Point(3, 18);
+            this.strategyGrid.Name = "strategyGrid";
+            this.strategyGrid.RowHeadersVisible = false;
+            this.strategyGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.strategyGrid.TabIndex = 0;
+            //
             // strategyGroupBox
             //
+            this.strategyGroupBox.Controls.Add(this.strategyGrid);
             this.strategyGroupBox.Location = new System.Drawing.Point(12, 178);
             this.strategyGroupBox.Name = "strategyGroupBox";
             this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
@@ -263,6 +280,7 @@
         private System.Windows.Forms.TextBox textBox1;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.DataGridView strategyGrid;
         private System.Windows.Forms.GroupBox strategyGroupBox;
     }
 }

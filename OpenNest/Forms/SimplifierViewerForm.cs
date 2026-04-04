@@ -112,8 +112,8 @@ public partial class SimplifierViewerForm : Form
         var padded = new Box(
             candidate.BoundingBox.X - tol * 2,
             candidate.BoundingBox.Y - tol * 2,
-            candidate.BoundingBox.Width + tol * 4,
-            candidate.BoundingBox.Length + tol * 4);
+            candidate.BoundingBox.Length + tol * 4,
+            candidate.BoundingBox.Width + tol * 4);
         entityView.ZoomToArea(padded);
     }
 

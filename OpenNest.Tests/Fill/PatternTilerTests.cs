@@ -30,8 +30,8 @@ public class PatternTilerTests
 
         foreach (var part in result)
         {
-            Assert.True(part.BoundingBox.Right <= plateSize.Width + 0.001);
-            Assert.True(part.BoundingBox.Top <= plateSize.Length + 0.001);
+            Assert.True(part.BoundingBox.Right <= plateSize.Length + 0.001);
+            Assert.True(part.BoundingBox.Top <= plateSize.Width + 0.001);
             Assert.True(part.BoundingBox.Left >= -0.001);
             Assert.True(part.BoundingBox.Bottom >= -0.001);
         }
@@ -87,8 +87,8 @@ public class PatternTilerTests
 
         var maxRight = result.Max(p => p.BoundingBox.Right);
         var maxTop = result.Max(p => p.BoundingBox.Top);
-        Assert.True(maxRight <= 50.001);
-        Assert.True(maxTop <= 10.001);
+        Assert.True(maxRight <= 10.001);
+        Assert.True(maxTop <= 50.001);
     }
 
     [Fact]

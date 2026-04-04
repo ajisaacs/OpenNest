@@ -11,7 +11,7 @@ namespace OpenNest.Engine.Fill
         public FillLinear(Box workArea, double partSpacing)
         {
             PartSpacing = partSpacing;
-            WorkArea = new Box(workArea.X, workArea.Y, workArea.Width, workArea.Length);
+            WorkArea = new Box(workArea.X, workArea.Y, workArea.Length, workArea.Width);
         }
 
         public Box WorkArea { get; }
@@ -41,7 +41,7 @@ namespace OpenNest.Engine.Fill
 
         private static double GetDimension(Box box, NestDirection direction)
         {
-            return direction == NestDirection.Horizontal ? box.Width : box.Length;
+            return direction == NestDirection.Horizontal ? box.Length : box.Width;
         }
 
         private static double GetStart(Box box, NestDirection direction)

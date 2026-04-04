@@ -14,16 +14,16 @@ namespace OpenNest.RectanglePacking
 
         public override void Fill(Item item)
         {
-            var ycount = (int)System.Math.Floor((Bin.Length + Tolerance.Epsilon) / item.Length);
-            var xcount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
+            var ycount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
+            var xcount = (int)System.Math.Floor((Bin.Length + Tolerance.Epsilon) / item.Length);
 
             for (int i = 0; i < xcount; i++)
             {
-                var x = item.Width * i + Bin.X;
+                var x = item.Length * i + Bin.X;
 
                 for (int j = 0; j < ycount; j++)
                 {
-                    var y = item.Length * j + Bin.Y;
+                    var y = item.Width * j + Bin.Y;
 
                     var addedItem = item.Clone() as Item;
                     addedItem.Location = new Vector(x, y);
@@ -35,8 +35,8 @@ namespace OpenNest.RectanglePacking
 
         public override void Fill(Item item, int maxCount)
         {
-            var ycount = (int)System.Math.Floor((Bin.Length + Tolerance.Epsilon) / item.Length);
-            var xcount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
+            var ycount = (int)System.Math.Floor((Bin.Width + Tolerance.Epsilon) / item.Width);
+            var xcount = (int)System.Math.Floor((Bin.Length + Tolerance.Epsilon) / item.Length);
             var count = ycount * xcount;
 
             if (count <= maxCount)

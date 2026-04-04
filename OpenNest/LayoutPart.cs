@@ -128,7 +128,7 @@ namespace OpenNest
             if (shapes.Count == 0)
             {
                 var bbox = BasePart.BaseDrawing.Program.BoundingBox();
-                return new Vector(bbox.Location.X + bbox.Width / 2, bbox.Location.Y + bbox.Length / 2);
+                return new Vector(bbox.Location.X + bbox.Length / 2, bbox.Location.Y + bbox.Width / 2);
             }
 
             var profile = new ShapeProfile(nonRapid);

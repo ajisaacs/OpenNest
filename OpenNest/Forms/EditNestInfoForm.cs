@@ -173,13 +173,13 @@ namespace OpenNest.Forms
                 return;
             }
 
-            if (LeftSpacing + RightSpacing >= size.Width)
+            if (LeftSpacing + RightSpacing >= size.Length)
             {
                 applyButton.Enabled = false;
                 return;
             }
 
-            if (TopSpacing + BottomSpacing >= size.Length)
+            if (TopSpacing + BottomSpacing >= size.Width)
             {
                 applyButton.Enabled = false;
                 return;

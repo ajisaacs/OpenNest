@@ -27,8 +27,8 @@ namespace OpenNest.RectanglePacking
             {
                 for (var j = 0; j < innerCount; j++)
                 {
-                    var x = (columnMajor ? i : j) * item.Width + item.X;
-                    var y = (columnMajor ? j : i) * item.Length + item.Y;
+                    var x = (columnMajor ? i : j) * item.Length + item.X;
+                    var y = (columnMajor ? j : i) * item.Width + item.Y;
 
                     var clone = item.Clone() as Item;
                     clone.Location = new Vector(x, y);

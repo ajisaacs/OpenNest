@@ -38,7 +38,7 @@ namespace OpenNest
             var bb = item.Drawing.Program.BoundingBox();
             var cos = System.Math.Abs(System.Math.Cos(angle));
             var sin = System.Math.Abs(System.Math.Sin(angle));
-            return bb.Length * cos + bb.Width * sin;
+            return bb.Width * cos + bb.Length * sin;
         }
     }
 }

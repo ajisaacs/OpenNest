@@ -13,15 +13,15 @@ namespace OpenNest.Engine.Fill
             var cellBox = cell.GetBoundingBox();
             var halfSpacing = partSpacing / 2;
 
-            var cellWidth = cellBox.Width + partSpacing;
-            var cellHeight = cellBox.Length + partSpacing;
+            var cellW = cellBox.Width + partSpacing;
+            var cellL = cellBox.Length + partSpacing;
 
-            if (cellWidth <= 0 || cellHeight <= 0)
+            if (cellW <= 0 || cellL <= 0)
                 return new List<Part>();
 
-            // Size.Width = X-axis, Size.Length = Y-axis
-            var cols = (int)System.Math.Floor(plateSize.Width / cellWidth);
-            var rows = (int)System.Math.Floor(plateSize.Length / cellHeight);
+            // Width = Y axis, Length = X axis
+            var cols = (int)System.Math.Floor(plateSize.Length / cellL);
+            var rows = (int)System.Math.Floor(plateSize.Width / cellW);
 
             if (cols <= 0 || rows <= 0)
                 return new List<Part>();
@@ -37,7 +37,7 @@ namespace OpenNest.Engine.Fill
             {
                 for (var col = 0; col < cols; col++)
                 {
-                    var tileOffset = baseOffset + new Vector(col * cellWidth, row * cellHeight);
+                    var tileOffset = baseOffset + new Vector(col * cellL, row * cellW);
 
                     foreach (var part in cell)
                     {

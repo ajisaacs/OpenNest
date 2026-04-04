@@ -123,7 +123,7 @@ public class PolygonHelperTests
         var rotated = PolygonHelper.RotatePolygon(polygon, Angle.HalfPI);
         rotated.UpdateBounds();
 
-        Assert.True(System.Math.Abs(rotated.BoundingBox.Width - 10) < 0.1);
-        Assert.True(System.Math.Abs(rotated.BoundingBox.Length - 20) < 0.1);
+        Assert.True(System.Math.Abs(rotated.BoundingBox.Length - 10) < 0.1);
+        Assert.True(System.Math.Abs(rotated.BoundingBox.Width - 20) < 0.1);
     }
 }

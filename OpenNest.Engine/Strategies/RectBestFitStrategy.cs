@@ -14,8 +14,7 @@ namespace OpenNest.Engine.Strategies
             var binItem = BinConverter.ToItem(context.Item, context.Plate.PartSpacing);
             var bin = BinConverter.CreateBin(context.WorkArea, context.Plate.PartSpacing);
 
-            var engine = new FillBestFit(bin);
-            engine.Fill(binItem);
+            RectFill.FillBest(bin, binItem);
 
             return BinConverter.ToParts(bin, new List<NestItem> { context.Item });
         }

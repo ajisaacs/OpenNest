@@ -201,8 +201,8 @@ public class StripeFiller
     private static Box MakeStripeBox(Box workArea, double perpDim, NestDirection primaryAxis)
     {
         return primaryAxis == NestDirection.Horizontal
-            ? new Box(workArea.X, workArea.Y, workArea.Width, perpDim)
-            : new Box(workArea.X, workArea.Y, perpDim, workArea.Length);
+            ? new Box(workArea.X, workArea.Y, workArea.Length, perpDim)
+            : new Box(workArea.X, workArea.Y, perpDim, workArea.Width);
     }
 
     private List<Part> FillRemnant(List<Part> gridParts, NestDirection primaryAxis)
@@ -224,7 +224,7 @@ public class StripeFiller
             var remnantLength = workArea.Top - remnantY;
             if (remnantLength < minDim)
                 return null;
-            remnantBox = new Box(workArea.X, remnantY, workArea.Width, remnantLength);
+            remnantBox = new Box(workArea.X, remnantY, workArea.Length, remnantLength);
         }
         else
         {
@@ -232,7 +232,7 @@ public class StripeFiller
             var remnantWidth = workArea.Right - remnantX;
             if (remnantWidth < minDim)
                 return null;
-            remnantBox = new Box(remnantX, workArea.Y, remnantWidth, workArea.Length);
+            remnantBox = new Box(remnantX, workArea.Y, remnantWidth, workArea.Width);
         }
 
         Debug.WriteLine($"[StripeFiller] Remnant box: {remnantBox.Width:F2}x{remnantBox.Length:F2}");
@@ -324,7 +324,7 @@ public class StripeFiller
     {
         var box = FillHelpers.BuildRotatedPattern(patternParts, 0).BoundingBox;
         var span0 = GetDimension(box, axis);
-        var perpSpan0 = axis == NestDirection.Horizontal ? box.Length : box.Width;
+        var perpSpan0 = axis == NestDirection.Horizontal ? box.Width : box.Length;
 
         if (span0 <= perpSpan0)
             return 0;
@@ -388,7 +388,7 @@ public class StripeFiller
             var rotated = FillHelpers.BuildRotatedPattern(patternParts, currentAngle);
             var pairSpan = GetDimension(rotated.BoundingBox, axis);
             var perpDim = axis == NestDirection.Horizontal
-                ? rotated.BoundingBox.Length : rotated.BoundingBox.Width;
+                ? rotated.BoundingBox.Width : rotated.BoundingBox.Length;
 
             if (pairSpan + spacing <= 0)
                 break;
@@ -472,13 +472,13 @@ public class StripeFiller
     {
         var rotated = FillHelpers.BuildRotatedPattern(patternParts, angle);
         return axis == NestDirection.Horizontal
-            ? rotated.BoundingBox.Width
-            : rotated.BoundingBox.Length;
+            ? rotated.BoundingBox.Length
+            : rotated.BoundingBox.Width;
     }
 
     private static double GetDimension(Box box, NestDirection axis)
     {
-        return axis == NestDirection.Horizontal ? box.Width : box.Length;
+        return axis == NestDirection.Horizontal ? box.Length : box.Width;
     }
 
     private static bool HasOverlappingParts(List<Part> parts) =>

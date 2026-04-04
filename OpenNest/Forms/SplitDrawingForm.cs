@@ -78,7 +78,7 @@ public partial class SplitDrawingForm : Form
                 var usable = plateW - 2 * spacing - overhang;
                 if (usable > 0)
                 {
-                    var splits = (int)System.Math.Ceiling(_drawingBounds.Width / usable) - 1;
+                    var splits = (int)System.Math.Ceiling(_drawingBounds.Length / usable) - 1;
                     for (var i = 1; i <= splits; i++)
                         _splitLines.Add(new SplitLine(_drawingBounds.X + usable * i, CutOffAxis.Vertical));
                 }
@@ -88,7 +88,7 @@ public partial class SplitDrawingForm : Form
                 var usable = plateH - 2 * spacing - overhang;
                 if (usable > 0)
                 {
-                    var splits = (int)System.Math.Ceiling(_drawingBounds.Length / usable) - 1;
+                    var splits = (int)System.Math.Ceiling(_drawingBounds.Width / usable) - 1;
                     for (var i = 1; i <= splits; i++)
                         _splitLines.Add(new SplitLine(_drawingBounds.Y + usable * i, CutOffAxis.Horizontal));
                 }

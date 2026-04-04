@@ -420,8 +420,8 @@ namespace OpenNest.Geometry
 
             boundingBox.X = minX;
             boundingBox.Y = minY;
-            boundingBox.Width = maxX - minX;
-            boundingBox.Length = maxY - minY;
+            boundingBox.Length = maxX - minX;
+            boundingBox.Width = maxY - minY;
         }
 
         public override Entity OffsetEntity(double distance, OffsetSide side)

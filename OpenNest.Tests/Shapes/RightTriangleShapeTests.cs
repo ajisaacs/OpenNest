@@ -11,8 +11,8 @@ public class RightTriangleShapeTests
         var drawing = shape.GetDrawing();
 
         var bbox = drawing.Program.BoundingBox();
-        Assert.Equal(12, bbox.Width, 0.01);
-        Assert.Equal(8, bbox.Length, 0.01);
+        Assert.Equal(12, bbox.Length, 0.01);
+        Assert.Equal(8, bbox.Width, 0.01);
     }
 
     [Fact]

@@ -175,8 +175,8 @@ namespace OpenNest.Engine.Fill
             var newTop = remaining.Max(p => p.BoundingBox.Top);
 
             return new Box(workArea.X, workArea.Y,
-                workArea.Width,
-                System.Math.Min(newTop - workArea.Y, workArea.Length));
+                workArea.Length,
+                System.Math.Min(newTop - workArea.Y, workArea.Width));
         }
 
         private List<Part> EvaluateCandidate(BestFitResult candidate, Drawing drawing,
@@ -271,8 +271,8 @@ namespace OpenNest.Engine.Fill
             var topHeight = System.Math.Max(0, workArea.Top - gridBox.Top);
             var rightWidth = System.Math.Max(0, workArea.Right - gridBox.Right);
 
-            var topArea = workArea.Width * topHeight;
-            var rightArea = rightWidth * System.Math.Min(gridBox.Top - workArea.Y, workArea.Length);
+            var topArea = workArea.Length * topHeight;
+            var rightArea = rightWidth * System.Math.Min(gridBox.Top - workArea.Y, workArea.Width);
             var remnantArea = topArea + rightArea;
 
             return (int)(remnantArea * maxUtilization / partArea) + 1;
@@ -292,7 +292,7 @@ namespace OpenNest.Engine.Fill
             var topLength = workArea.Top - topY;
             if (topLength >= minDim)
             {
-                var topBox = new Box(workArea.X, topY, workArea.Width, topLength);
+                var topBox = new Box(workArea.X, topY, workArea.Length, topLength);
                 var parts = FillRemnantBox(drawing, topBox, token);
                 if (parts != null && parts.Count > (bestRemnant?.Count ?? 0))
                     bestRemnant = parts;
@@ -303,7 +303,7 @@ namespace OpenNest.Engine.Fill
             var rightWidth = workArea.Right - rightX;
             if (rightWidth >= minDim)
             {
-                var rightBox = new Box(rightX, workArea.Y, rightWidth, workArea.Length);
+                var rightBox = new Box(rightX, workArea.Y, rightWidth, workArea.Width);
                 var parts = FillRemnantBox(drawing, rightBox, token);
                 if (parts != null && parts.Count > (bestRemnant?.Count ?? 0))
                     bestRemnant = parts;

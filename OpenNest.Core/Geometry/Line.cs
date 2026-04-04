@@ -370,23 +370,23 @@ namespace OpenNest.Geometry
             if (StartPoint.X < EndPoint.X)
             {
                 boundingBox.X = StartPoint.X;
-                boundingBox.Width = EndPoint.X - StartPoint.X;
+                boundingBox.Length = EndPoint.X - StartPoint.X;
             }
             else
             {
                 boundingBox.X = EndPoint.X;
-                boundingBox.Width = StartPoint.X - EndPoint.X;
+                boundingBox.Length = StartPoint.X - EndPoint.X;
             }
 
             if (StartPoint.Y < EndPoint.Y)
             {
                 boundingBox.Y = StartPoint.Y;
-                boundingBox.Length = EndPoint.Y - StartPoint.Y;
+                boundingBox.Width = EndPoint.Y - StartPoint.Y;
             }
             else
             {
                 boundingBox.Y = EndPoint.Y;
-                boundingBox.Length = StartPoint.Y - EndPoint.Y;
+                boundingBox.Width = StartPoint.Y - EndPoint.Y;
             }
         }
 

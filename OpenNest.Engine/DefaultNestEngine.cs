@@ -203,7 +203,7 @@ namespace OpenNest
             if (newWidth >= workArea.Width && newLength >= workArea.Length)
                 return workArea;
 
-            return new Box(workArea.X, workArea.Y, newWidth, newLength);
+            return new Box(workArea.X, workArea.Y, newLength, newWidth);
         }
 
         private List<Part> RunFillPipeline(NestItem item, Box workArea,

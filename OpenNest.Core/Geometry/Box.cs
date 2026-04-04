@@ -14,15 +14,15 @@ namespace OpenNest.Geometry
         public Box(double x, double y, double w, double h)
         {
             Location = new Vector(x, y);
-            Width = w;
-            Length = h;
+            Length = w;
+            Width = h;
         }
 
         public Vector Location;
 
         public Vector Center
         {
-            get { return new Vector(X + Width * 0.5, Y + Length * 0.5); }
+            get { return new Vector(X + Length * 0.5, Y + Width * 0.5); }
         }
 
         public Size Size;
@@ -76,12 +76,12 @@ namespace OpenNest.Geometry
 
         public Box Translate(double x, double y)
         {
-            return new Box(X + x, Y + y, Width, Length);
+            return new Box(X + x, Y + y, Length, Width);
         }
 
         public Box Translate(Vector offset)
         {
-            return new Box(X + offset.X, Y + offset.Y, Width, Length);
+            return new Box(X + offset.X, Y + offset.Y, Length, Width);
         }
 
         public double Left
@@ -91,12 +91,12 @@ namespace OpenNest.Geometry
 
         public double Right
         {
-            get { return X + Width; }
+            get { return X + Length; }
         }
 
         public double Top
         {
-            get { return Y + Length; }
+            get { return Y + Width; }
         }
 
         public double Bottom
@@ -207,7 +207,7 @@ namespace OpenNest.Geometry
 
         public Box Offset(double d)
         {
-            return new Box(X - d, Y - d, Width + d * 2, Length + d * 2);
+            return new Box(X - d, Y - d, Length + d * 2, Width + d * 2);
         }
 
         public override string ToString()

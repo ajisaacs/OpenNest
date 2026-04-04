@@ -304,10 +304,10 @@ namespace OpenNest.Engine.Fill
 
             // Edge extensions (priority 1).
             if (remnant.Right > envelope.Right + eps)
-                TryAdd(results, envelope.Right, remnant.Bottom, remnant.Right - envelope.Right, remnant.Length, 1, minDim);
+                TryAdd(results, envelope.Right, remnant.Bottom, remnant.Right - envelope.Right, remnant.Width, 1, minDim);
 
             if (remnant.Left < envelope.Left - eps)
-                TryAdd(results, remnant.Left, remnant.Bottom, envelope.Left - remnant.Left, remnant.Length, 1, minDim);
+                TryAdd(results, remnant.Left, remnant.Bottom, envelope.Left - remnant.Left, remnant.Width, 1, minDim);
 
             if (remnant.Top > envelope.Top + eps)
                 TryAdd(results, innerLeft, envelope.Top, innerRight - innerLeft, remnant.Top - envelope.Top, 1, minDim);

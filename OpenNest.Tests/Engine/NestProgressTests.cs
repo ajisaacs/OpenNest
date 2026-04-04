@@ -49,7 +49,7 @@ public class NestProgressTests
         var parts = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 5),
-            TestHelpers.MakePartAt(10, 0, 5),
+            TestHelpers.MakePartAt(0, 10, 5),
         };
         var progress = new NestProgress { BestParts = parts };
         Assert.Equal(15, progress.NestedWidth, precision: 4);
@@ -61,7 +61,7 @@ public class NestProgressTests
         var parts = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 5),
-            TestHelpers.MakePartAt(0, 10, 5),
+            TestHelpers.MakePartAt(10, 0, 5),
         };
         var progress = new NestProgress { BestParts = parts };
         Assert.Equal(15, progress.NestedLength, precision: 4);

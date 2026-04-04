@@ -11,8 +11,8 @@ public class TShapeTests
         var drawing = shape.GetDrawing();
 
         var bbox = drawing.Program.BoundingBox();
-        Assert.Equal(12, bbox.Width, 0.01);
-        Assert.Equal(18, bbox.Length, 0.01);
+        Assert.Equal(12, bbox.Length, 0.01);
+        Assert.Equal(18, bbox.Width, 0.01);
     }
 
     [Fact]

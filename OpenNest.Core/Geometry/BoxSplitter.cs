@@ -9,7 +9,7 @@
 
             var x = large.Left;
             var y = small.Top;
-            var w = large.Width;
+            var w = large.Length;
             var h = large.Top - y;
 
             return new Box(x, y, w, h);
@@ -23,7 +23,7 @@
             var x = large.Left;
             var y = large.Bottom;
             var w = small.Left - x;
-            var h = large.Length;
+            var h = large.Width;
 
             return new Box(x, y, w, h);
         }
@@ -35,7 +35,7 @@
 
             var x = large.Left;
             var y = large.Bottom;
-            var w = large.Width;
+            var w = large.Length;
             var h = small.Top - y;
 
             return new Box(x, y, w, h);
@@ -49,7 +49,7 @@
             var x = small.Right;
             var y = large.Bottom;
             var w = large.Right - x;
-            var h = large.Length;
+            var h = large.Width;
 
             return new Box(x, y, w, h);
         }

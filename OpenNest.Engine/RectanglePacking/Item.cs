@@ -37,8 +37,8 @@ namespace OpenNest.RectanglePacking
 
             double minX = items[0].X;
             double minY = items[0].Y;
-            double maxX = items[0].X + items[0].Width;
-            double maxY = items[0].Y + items[0].Length;
+            double maxX = items[0].Right;
+            double maxY = items[0].Top;
 
             foreach (var box in items)
             {

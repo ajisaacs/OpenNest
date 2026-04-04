@@ -37,8 +37,8 @@ public class StripeFillerTests
         Drawing drawing, double spacing)
     {
         var bb = drawing.Program.BoundingBox();
-        var w = bb.Width;
-        var h = bb.Length;
+        var w = bb.Length;
+        var h = bb.Width;
 
         var candidate = new PairCandidate
         {
@@ -85,7 +85,7 @@ public class StripeFillerTests
             pattern.Parts, 22.0, NestDirection.Horizontal);
 
         var rotated = FillHelpers.BuildRotatedPattern(pattern.Parts, angle);
-        var span = rotated.BoundingBox.Width;
+        var span = rotated.BoundingBox.Length;
         Assert.True(System.Math.Abs(span - 22.0) < 0.5,
             $"Expected span ~22, got {span:F2} at {OpenNest.Math.Angle.ToDegrees(angle):F1}°");
     }

@@ -108,8 +108,8 @@ public class RemnantFinderTests
         var remnants = finder.FindRemnants();
 
         var gap = remnants.FirstOrDefault(r =>
-            r.Width >= 19.9 && r.Width <= 20.1 &&
-            r.Length >= 99.9);
+            r.Length >= 19.9 && r.Length <= 20.1 &&
+            r.Width >= 99.9);
         Assert.NotNull(gap);
     }
 
@@ -146,8 +146,8 @@ public class RemnantFinderTests
 
         // Should find the 80x100 strip on the left
         var left = remnants.FirstOrDefault(r =>
-            r.Width >= 79.9 && r.Width <= 80.1 &&
-            r.Length >= 99.9);
+            r.Length >= 79.9 && r.Length <= 80.1 &&
+            r.Width >= 99.9);
         Assert.NotNull(left);
     }
 
@@ -186,7 +186,7 @@ public class RemnantFinderTests
         var remnants = finder.FindRemnants();
 
         var gap = remnants.FirstOrDefault(r =>
-            r.Width >= 19.9 && r.Width <= 20.1);
+            r.Length >= 19.9 && r.Length <= 20.1);
         Assert.NotNull(gap);
     }
 
@@ -202,7 +202,7 @@ public class RemnantFinderTests
         var remnants = finder.FindRemnants();
 
         var gap = remnants.FirstOrDefault(r =>
-            r.Width >= 19.9 && r.Width <= 20.1);
+            r.Length >= 19.9 && r.Length <= 20.1);
         Assert.NotNull(gap);
     }
 
@@ -280,9 +280,9 @@ public class RemnantFinderTests
         finder.AddObstacle(new Box(0, 47, 21, 6));
         var remnants = finder.FindRemnants();
 
-        var above = remnants.FirstOrDefault(r => r.Bottom >= 53 - 0.1 && r.Width > 50);
-        var below = remnants.FirstOrDefault(r => r.Top <= 47 + 0.1 && r.Width > 50);
-        var right = remnants.FirstOrDefault(r => r.Left >= 21 - 0.1 && r.Length > 50);
+        var above = remnants.FirstOrDefault(r => r.Bottom >= 53 - 0.1 && r.Length > 50);
+        var below = remnants.FirstOrDefault(r => r.Top <= 47 + 0.1 && r.Length > 50);
+        var right = remnants.FirstOrDefault(r => r.Left >= 21 - 0.1 && r.Width > 50);
 
         Assert.NotNull(above);
         Assert.NotNull(below);
@@ -312,10 +312,10 @@ public class RemnantFinderTests
         var topGap = tiered.FirstOrDefault(t =>
             t.Box.Bottom > 50 && t.Box.Bottom < 55 &&
             t.Box.Left < 1 &&
-            t.Box.Width > 100 &&
-            t.Box.Length > 5);
+            t.Box.Length > 100 &&
+            t.Box.Width > 5);
 
-        Assert.True(topGap.Box.Width > 0, "Expected remnant above main grid");
+        Assert.True(topGap.Box.Length > 0, "Expected remnant above main grid");
     }
 
     [Fact]
@@ -361,11 +361,11 @@ public class RemnantFinderTests
 
         // The gap at x < 106 from y=53.14 to y=59.8 should be found.
         Assert.True(remnants.Count > 0, "Should find gap above main grid");
-        var topRemnant = remnants.FirstOrDefault(r => r.Length >= 5.375 && r.Width > 50);
+        var topRemnant = remnants.FirstOrDefault(r => r.Width >= 5.375 && r.Length > 50);
         Assert.NotNull(topRemnant);
 
         // Verify dimensions are close to the expected ~104 x 6.6 gap.
-        Assert.True(topRemnant.Width > 100, $"Expected width > 100, got {topRemnant.Width:F1}");
-        Assert.True(topRemnant.Length > 6, $"Expected length > 6, got {topRemnant.Length:F1}");
+        Assert.True(topRemnant.Length > 100, $"Expected length > 100, got {topRemnant.Length:F1}");
+        Assert.True(topRemnant.Width > 6, $"Expected width > 6, got {topRemnant.Width:F1}");
     }
 }
