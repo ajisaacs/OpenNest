@@ -89,15 +89,17 @@ namespace OpenNest.Engine.BestFit
 
                 if (isHorizontalPush)
                 {
-                    perpMin = -(bbox2.Length + spacing);
-                    perpMax = bbox1.Length + bbox2.Length + spacing;
-                    pushStartOffset = bbox1.Width + bbox2.Width + spacing * 2;
-                }
-                else
-                {
+                    // Perpendicular sweep along Y → Width; push extent along X → Length
                     perpMin = -(bbox2.Width + spacing);
                     perpMax = bbox1.Width + bbox2.Width + spacing;
                     pushStartOffset = bbox1.Length + bbox2.Length + spacing * 2;
+                }
+                else
+                {
+                    // Perpendicular sweep along X → Length; push extent along Y → Width
+                    perpMin = -(bbox2.Length + spacing);
+                    perpMax = bbox1.Length + bbox2.Length + spacing;
+                    pushStartOffset = bbox1.Width + bbox2.Width + spacing * 2;
                 }
 
                 var alignedStart = System.Math.Ceiling(perpMin / stepSize) * stepSize;
