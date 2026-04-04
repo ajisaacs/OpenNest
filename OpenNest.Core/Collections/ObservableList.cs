@@ -46,7 +46,8 @@ namespace OpenNest.Collections
         public bool Remove(T item)
         {
             var success = items.Remove(item);
-            ItemRemoved?.Invoke(this, new ItemRemovedEventArgs<T>(item, success));
+            if (success)
+                ItemRemoved?.Invoke(this, new ItemRemovedEventArgs<T>(item, success));
             return success;
         }
 

@@ -386,7 +386,11 @@ namespace OpenNest.Controls
             switch (e.KeyCode)
             {
                 case Keys.Delete:
-                    if (selectedCutOff != null)
+                    if (currentAction is ActionClone)
+                    {
+                        SetAction(typeof(ActionSelect));
+                    }
+                    else if (selectedCutOff != null)
                     {
                         Plate.CutOffs.Remove(selectedCutOff);
                         selectedCutOff = null;
