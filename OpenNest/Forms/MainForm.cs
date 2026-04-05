@@ -906,6 +906,12 @@ namespace OpenNest.Forms
             if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                 return;
 
+            if (form.EngineName != null)
+            {
+                NestEngineRegistry.ActiveEngineName = form.EngineName;
+                engineComboBox.SelectedItem = form.EngineName;
+            }
+
             var items = form.GetNestItems();
 
             if (!items.Any(it => it.Quantity > 0))

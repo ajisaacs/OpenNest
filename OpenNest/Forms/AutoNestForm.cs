@@ -1,20 +1,34 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using OpenNest.Engine;
 
 namespace OpenNest.Forms
 {
     public partial class AutoNestForm : Form
     {
+        private static readonly Regex SizePattern = new(@"^(\d+\.?\d*)\s*[xX×]\s*(\d+\.?\d*)$");
+
         public AutoNestForm(Nest nest)
         {
             InitializeComponent();
+            SetupPartsGrid();
+            SetupPlateGrid();
+            LoadEngines();
             LoadDrawings(nest);
-
-            dataGridView1.DataError += dataGridView1_DataError;
             LoadDefaultPlateOptions();
+            SetPlateOptimizerVisible(false);
+
+            partsGrid.DataError += PartsGrid_DataError;
+        }
+
+        public string EngineName
+        {
+            get { return engineComboBox.SelectedItem as string; }
+            set { engineComboBox.SelectedItem = value; }
         }
 
         public bool AllowPlateCreation
@@ -40,86 +54,102 @@ namespace OpenNest.Forms
             set { salvageRateBox.Text = (value * 100).ToString("F0"); }
         }
 
-        public List<PlateOption> GetPlateOptions()
+        private void LoadEngines()
         {
-            var result = new List<PlateOption>();
-            var gridItems = plateOptionsGrid.DataSource as List<PlateOptionItem>;
-            if (gridItems == null) return result;
-
-            foreach (var item in gridItems)
-            {
-                if (item.Width <= 0 || item.Length <= 0) continue;
-                result.Add(new PlateOption
-                {
-                    Width = item.Width,
-                    Length = item.Length,
-                    Cost = item.Cost,
-                });
-            }
-
-            return result;
+            foreach (var engine in NestEngineRegistry.AvailableEngines)
+                engineComboBox.Items.Add(engine.Name);
+            engineComboBox.SelectedItem = NestEngineRegistry.ActiveEngineName;
         }
 
-        private void LoadDefaultPlateOptions()
+        private void SetupPartsGrid()
         {
-            var items = new List<PlateOptionItem>
+            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
-                new() { Width = 48, Length = 96, Cost = 0 },
-                new() { Width = 48, Length = 120, Cost = 0 },
-                new() { Width = 48, Length = 144, Cost = 0 },
-                new() { Width = 60, Length = 96, Cost = 0 },
-                new() { Width = 60, Length = 120, Cost = 0 },
-                new() { Width = 60, Length = 144, Cost = 0 },
-                new() { Width = 72, Length = 96, Cost = 0 },
-                new() { Width = 72, Length = 120, Cost = 0 },
-                new() { Width = 72, Length = 144, Cost = 0 },
+                DataPropertyName = "DrawingName",
+                HeaderText = "Drawing Name",
+                Width = 160,
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            });
+            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Quantity",
+                HeaderText = "Qty",
+                Width = 50,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            });
+            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Priority",
+                HeaderText = "Priority",
+                Width = 55,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            });
+            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "RotationStart",
+                HeaderText = "Rot Start",
+                Width = 65,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            });
+            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "RotationEnd",
+                HeaderText = "Rot End",
+                Width = 60,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            });
+            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "StepAngle",
+                HeaderText = "Step",
+                Width = 55,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            });
+
+            partsGrid.CellValueChanged += PartsGrid_CellValueChanged;
+            partsGrid.CurrentCellDirtyStateChanged += (s, e) =>
+            {
+                if (partsGrid.IsCurrentCellDirty)
+                    partsGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
             };
-            plateOptionsGrid.DataSource = items;
         }
 
-        public void LoadPlateOptions(List<PlateOption> options, double salvageRate)
+        private void SetupPlateGrid()
         {
-            if (options != null && options.Count > 0)
+            plateGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
-                var items = options.Select(o => new PlateOptionItem
-                {
-                    Width = o.Width,
-                    Length = o.Length,
-                    Cost = o.Cost,
-                }).ToList();
-                plateOptionsGrid.DataSource = items;
-                optimizePlateSizeBox.Checked = true;
-            }
-            SalvageRate = salvageRate;
-        }
+                DataPropertyName = "Size",
+                HeaderText = "Size",
+                Width = 120,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            });
+            plateGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Cost",
+                HeaderText = "Cost",
+                Width = 70,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            });
 
-        private void optimizePlateSizeBox_CheckedChanged(object sender, EventArgs e)
-        {
-            plateOptionsPanel.Visible = optimizePlateSizeBox.Checked;
-        }
-
-        internal class PlateOptionItem
-        {
-            public double Width { get; set; }
-            public double Length { get; set; }
-            public double Cost { get; set; }
+            plateGrid.CellValidating += PlateGrid_CellValidating;
         }
 
         private void LoadDrawings(Nest nest)
         {
             var items = new List<DataGridViewItem>();
-            dataGridView1.Rows.Clear();
 
             foreach (var drawing in nest.Drawings)
                 items.Add(GetDataGridViewItem(drawing));
 
-            dataGridView1.DataSource = items;
+            partsGrid.DataSource = items;
+            UpdateSummary();
         }
 
         public List<NestItem> GetNestItems()
         {
             var nestItems = new List<NestItem>();
-            var gridItems = dataGridView1.DataSource as List<DataGridViewItem>;
+            var gridItems = partsGrid.DataSource as List<DataGridViewItem>;
 
             if (gridItems == null)
                 return nestItems;
@@ -143,6 +173,139 @@ namespace OpenNest.Forms
             return nestItems;
         }
 
+        public List<PlateOption> GetPlateOptions()
+        {
+            var result = new List<PlateOption>();
+            var gridItems = plateGrid.DataSource as List<PlateOptionItem>;
+            if (gridItems == null) return result;
+
+            foreach (var item in gridItems)
+            {
+                if (!TryParseSize(item.Size, out var width, out var length))
+                    continue;
+                if (width <= 0 || length <= 0)
+                    continue;
+
+                result.Add(new PlateOption
+                {
+                    Width = width,
+                    Length = length,
+                    Cost = item.Cost,
+                });
+            }
+
+            return result;
+        }
+
+        public void LoadPlateOptions(List<PlateOption> options, double salvageRate)
+        {
+            if (options != null && options.Count > 0)
+            {
+                var items = options.Select(o => new PlateOptionItem
+                {
+                    Size = FormatSize(o.Width, o.Length),
+                    Cost = o.Cost,
+                }).ToList();
+                plateGrid.DataSource = items;
+                optimizePlateSizeBox.Checked = true;
+            }
+            SalvageRate = salvageRate;
+        }
+
+        private void LoadDefaultPlateOptions()
+        {
+            var items = new List<PlateOptionItem>
+            {
+                new() { Size = "48 x 96", Cost = 0 },
+                new() { Size = "48 x 120", Cost = 0 },
+                new() { Size = "48 x 144", Cost = 0 },
+                new() { Size = "60 x 96", Cost = 0 },
+                new() { Size = "60 x 120", Cost = 0 },
+                new() { Size = "60 x 144", Cost = 0 },
+                new() { Size = "72 x 96", Cost = 0 },
+                new() { Size = "72 x 120", Cost = 0 },
+                new() { Size = "72 x 144", Cost = 0 },
+            };
+            plateGrid.DataSource = items;
+        }
+
+        private void optimizePlateSizeBox_CheckedChanged(object sender, EventArgs e)
+        {
+            SetPlateOptimizerVisible(optimizePlateSizeBox.Checked);
+        }
+
+        private void SetPlateOptimizerVisible(bool visible)
+        {
+            plateGrid.Visible = visible;
+            salvageRateLabel.Visible = visible;
+            salvageRateBox.Visible = visible;
+            salvageRatePercentLabel.Visible = visible;
+        }
+
+        private void UpdateSummary()
+        {
+            var gridItems = partsGrid.DataSource as List<DataGridViewItem>;
+            if (gridItems == null)
+            {
+                summaryLabel.Text = "";
+                return;
+            }
+
+            var totalQty = gridItems.Sum(i => System.Math.Max(0, i.Quantity));
+            var drawingCount = gridItems.Count(i => i.Quantity > 0);
+            summaryLabel.Text = $"{totalQty} parts across {drawingCount} drawings";
+        }
+
+        private void PartsGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            if (partsGrid.Columns[e.ColumnIndex].DataPropertyName == "Quantity")
+                UpdateSummary();
+        }
+
+        private void PlateGrid_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        {
+            if (plateGrid.Columns[e.ColumnIndex].DataPropertyName != "Size")
+                return;
+
+            var value = e.FormattedValue?.ToString();
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            if (!TryParseSize(value, out _, out _))
+            {
+                e.Cancel = true;
+                plateGrid.Rows[e.RowIndex].ErrorText = "Enter size as W x L (e.g. 48 x 96)";
+            }
+            else
+            {
+                plateGrid.Rows[e.RowIndex].ErrorText = "";
+            }
+        }
+
+        private static bool TryParseSize(string value, out double width, out double length)
+        {
+            width = 0;
+            length = 0;
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            var match = SizePattern.Match(value.Trim());
+            if (!match.Success) return false;
+            width = double.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            length = double.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        private static string FormatSize(double width, double length)
+        {
+            return $"{width:G} x {length:G}";
+        }
+
+        private void PartsGrid_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            MessageBox.Show("Invalid input. Expected input type is " +
+                partsGrid[e.ColumnIndex, e.RowIndex].ValueType.Name);
+        }
+
         private DataGridViewItem GetDataGridViewItem(Drawing dwg)
         {
             var item = new DataGridViewItem();
@@ -154,11 +317,6 @@ namespace OpenNest.Forms
             item.StepAngle = dwg.Constraints.StepAngle;
 
             return item;
-        }
-
-        private void dataGridView1_DataError(object sender, DataGridViewDataErrorEventArgs e)
-        {
-            MessageBox.Show("Invalid input. Expected input type is " + dataGridView1[e.ColumnIndex, e.RowIndex].ValueType.Name);
         }
 
         private class DataGridViewItem
@@ -177,17 +335,20 @@ namespace OpenNest.Forms
 
             public int Priority { get; set; }
 
-            [Browsable(false)] // hide until implemented
-            [DisplayName("Rotation Start")]
+            [DisplayName("Rot Start")]
             public double RotationStart { get; set; }
 
-            [Browsable(false)] // hide until implemented
-            [DisplayName("Rotation End")]
+            [DisplayName("Rot End")]
             public double RotationEnd { get; set; }
 
-            [Browsable(false)] // hide until implemented
-            [DisplayName("Step Angle")]
+            [DisplayName("Step")]
             public double StepAngle { get; set; }
+        }
+
+        private class PlateOptionItem
+        {
+            public string Size { get; set; }
+            public double Cost { get; set; }
         }
     }
 }
