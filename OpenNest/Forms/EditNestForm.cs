@@ -317,7 +317,12 @@ namespace OpenNest.Forms
             drawingListBox1.Items.Clear();
 
             foreach (var dwg in Nest.Drawings.OrderBy(d => d.Name).ToList())
+            {
+                if (hideNestedButton.Checked && dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
+                    continue;
+
                 drawingListBox1.Items.Add(dwg);
+            }
         }
 
         public void Save()
@@ -926,6 +931,11 @@ namespace OpenNest.Forms
             }
         }
 
+        private void HideNestedButton_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateDrawingList();
+        }
+
         #endregion
 
         #region Plate Collection Events
@@ -986,7 +996,10 @@ namespace OpenNest.Forms
 
             drawingListBox1.Invoke(new MethodInvoker(() =>
             {
-                drawingListBox1.Refresh();
+                if (hideNestedButton.Checked)
+                    UpdateDrawingList();
+                else
+                    drawingListBox1.Refresh();
             }));
         }
 

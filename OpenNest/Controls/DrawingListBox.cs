@@ -43,14 +43,29 @@ namespace OpenNest.Controls
             var isSelected = (e.State & DrawItemState.Selected) != 0;
             Brush bgBrush;
 
-            if (isSelected)
-                bgBrush = SystemBrushes.Highlight;
-            else if (!HideQuantity && dwg.Quantity.Nested > 0 && dwg.Quantity.Remaining == 0)
+            if (!HideQuantity && dwg.Quantity.Nested > 0 && dwg.Quantity.Remaining == 0)
                 bgBrush = SystemBrushes.Info;
             else
                 bgBrush = Brushes.White;
 
             e.Graphics.FillRectangle(bgBrush, e.Bounds);
+
+            if (isSelected)
+            {
+                var borderRect = new Rectangle(e.Bounds.X, e.Bounds.Y, e.Bounds.Width - 1, e.Bounds.Height - 1);
+                using var borderPen = new Pen(SystemColors.Highlight, 2);
+                e.Graphics.DrawRectangle(borderPen, borderRect);
+            }
+
+            if (!HideQuantity && dwg.Quantity.Required > 0)
+            {
+                var barWidth = 4;
+                var barColor = dwg.Quantity.Nested >= dwg.Quantity.Required
+                    ? Color.FromArgb(76, 175, 80)
+                    : Color.FromArgb(255, 152, 0);
+                using var barBrush = new SolidBrush(barColor);
+                e.Graphics.FillRectangle(barBrush, e.Bounds.X, e.Bounds.Y, barWidth, e.Bounds.Height);
+            }
 
             var pt = new PointF(5, e.Bounds.Y + 5);
 
@@ -66,8 +81,8 @@ namespace OpenNest.Controls
 
             pt.X += imageSize.Width + 10;
 
-            var textBrush = isSelected ? SystemBrushes.HighlightText : Brushes.Black;
-            var detailBrush = isSelected ? SystemBrushes.HighlightText : Brushes.Gray;
+            var textBrush = Brushes.Black;
+            var detailBrush = Brushes.Gray;
 
             e.Graphics.DrawString(dwg.Name, nameFont, textBrush, pt);
 
