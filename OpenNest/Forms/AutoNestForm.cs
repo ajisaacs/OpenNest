@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows.Forms;
 
@@ -12,12 +13,79 @@ namespace OpenNest.Forms
             LoadDrawings(nest);
 
             dataGridView1.DataError += dataGridView1_DataError;
+            LoadDefaultPlateOptions();
         }
 
         public bool AllowPlateCreation
         {
             get { return createNewPlatesAsNeededBox.Checked; }
             set { createNewPlatesAsNeededBox.Checked = value; }
+        }
+
+        public bool OptimizePlateSize
+        {
+            get { return optimizePlateSizeBox.Checked; }
+            set { optimizePlateSizeBox.Checked = value; }
+        }
+
+        public double SalvageRate
+        {
+            get
+            {
+                if (double.TryParse(salvageRateBox.Text, out var val))
+                    return System.Math.Clamp(val / 100.0, 0, 1);
+                return 0.5;
+            }
+            set { salvageRateBox.Text = (value * 100).ToString("F0"); }
+        }
+
+        public List<PlateOption> GetPlateOptions()
+        {
+            var result = new List<PlateOption>();
+            var gridItems = plateOptionsGrid.DataSource as List<PlateOptionItem>;
+            if (gridItems == null) return result;
+
+            foreach (var item in gridItems)
+            {
+                if (item.Width <= 0 || item.Length <= 0) continue;
+                result.Add(new PlateOption
+                {
+                    Width = item.Width,
+                    Length = item.Length,
+                    Cost = item.Cost,
+                });
+            }
+
+            return result;
+        }
+
+        private void LoadDefaultPlateOptions()
+        {
+            var items = new List<PlateOptionItem>
+            {
+                new() { Width = 48, Length = 96, Cost = 0 },
+                new() { Width = 48, Length = 120, Cost = 0 },
+                new() { Width = 48, Length = 144, Cost = 0 },
+                new() { Width = 60, Length = 96, Cost = 0 },
+                new() { Width = 60, Length = 120, Cost = 0 },
+                new() { Width = 60, Length = 144, Cost = 0 },
+                new() { Width = 72, Length = 96, Cost = 0 },
+                new() { Width = 72, Length = 120, Cost = 0 },
+                new() { Width = 72, Length = 144, Cost = 0 },
+            };
+            plateOptionsGrid.DataSource = items;
+        }
+
+        private void optimizePlateSizeBox_CheckedChanged(object sender, EventArgs e)
+        {
+            plateOptionsPanel.Visible = optimizePlateSizeBox.Checked;
+        }
+
+        internal class PlateOptionItem
+        {
+            public double Width { get; set; }
+            public double Length { get; set; }
+            public double Cost { get; set; }
         }
 
         private void LoadDrawings(Nest nest)
