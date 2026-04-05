@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace OpenNest.Forms
@@ -74,6 +75,22 @@ namespace OpenNest.Forms
                 new() { Width = 72, Length = 144, Cost = 0 },
             };
             plateOptionsGrid.DataSource = items;
+        }
+
+        public void LoadPlateOptions(List<PlateOption> options, double salvageRate)
+        {
+            if (options != null && options.Count > 0)
+            {
+                var items = options.Select(o => new PlateOptionItem
+                {
+                    Width = o.Width,
+                    Length = o.Length,
+                    Cost = o.Cost,
+                }).ToList();
+                plateOptionsGrid.DataSource = items;
+                optimizePlateSizeBox.Checked = true;
+            }
+            SalvageRate = salvageRate;
         }
 
         private void optimizePlateSizeBox_CheckedChanged(object sender, EventArgs e)

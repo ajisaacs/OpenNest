@@ -900,6 +900,9 @@ namespace OpenNest.Forms
             var form = new AutoNestForm(activeForm.Nest);
             form.AllowPlateCreation = true;
 
+            if (activeForm.Nest.PlateOptions.Count > 0)
+                form.LoadPlateOptions(activeForm.Nest.PlateOptions, activeForm.Nest.SalvageRate);
+
             if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                 return;
 
@@ -911,6 +914,12 @@ namespace OpenNest.Forms
             var optimizePlateSize = form.OptimizePlateSize;
             var plateOptions = optimizePlateSize ? form.GetPlateOptions() : null;
             var salvageRate = form.SalvageRate;
+
+            if (optimizePlateSize)
+            {
+                activeForm.Nest.PlateOptions = plateOptions;
+                activeForm.Nest.SalvageRate = salvageRate;
+            }
 
             nestingCts = new CancellationTokenSource();
             var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
