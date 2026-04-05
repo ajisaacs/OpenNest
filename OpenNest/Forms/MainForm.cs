@@ -29,6 +29,17 @@ namespace OpenNest.Forms
         private const float ZoomInFactor = 1.5f;
         private const float ZoomOutFactor = 1.0f / ZoomInFactor;
 
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape && activeForm?.PlateView != null)
+            {
+                activeForm.PlateView.ProcessEscapeKey();
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         public MainForm()
         {
             InitializeComponent();

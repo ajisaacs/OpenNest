@@ -11,6 +11,9 @@ public class ColumnFillStrategy : IFillStrategy
 
     public List<Part> Fill(FillContext context)
     {
+        if (context.PartType == PartType.Rectangle)
+            return null;
+
         var filler = new StripeFiller(context, NestDirection.Vertical) { CompleteStripesOnly = true };
         return filler.Fill();
     }

@@ -139,28 +139,63 @@ namespace OpenNest
             var bestFits = BestFitCache.GetOrCompute(
                 drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
 
-            var best = bestFits.FirstOrDefault(r => r.Keep);
+            var best = SelectBestFitPair(bestFits);
             if (best == null)
                 return null;
 
-            var parts = best.BuildParts(drawing);
+            // BuildParts produces landscape orientation (Width >= Height).
+            // Try both landscape and portrait (90° rotated) and let the
+            // engine's comparer pick the better orientation.
+            var landscape = best.BuildParts(drawing);
+            var portrait = RotatePair90(landscape);
 
-            // BuildParts positions at origin — offset to work area.
+            var lFits = TryOffsetToWorkArea(landscape, workArea);
+            var pFits = TryOffsetToWorkArea(portrait, workArea);
+
+            if (!lFits && !pFits)
+                return null;
+            if (lFits && pFits)
+                return IsBetterFill(portrait, landscape, workArea) ? portrait : landscape;
+            return lFits ? landscape : portrait;
+        }
+
+        private static List<Part> RotatePair90(List<Part> parts)
+        {
+            var rotated = new List<Part>(parts.Count);
+            foreach (var p in parts)
+                rotated.Add((Part)p.Clone());
+
+            var bbox = ((IEnumerable<IBoundable>)rotated).GetBoundingBox();
+            var center = bbox.Center;
+
+            foreach (var p in rotated)
+                p.Rotate(-Angle.HalfPI, center);
+
+            var newBbox = ((IEnumerable<IBoundable>)rotated).GetBoundingBox();
+            var offset = new Vector(-newBbox.Left, -newBbox.Bottom);
+            foreach (var p in rotated)
+            {
+                p.Offset(offset);
+                p.UpdateBounds();
+            }
+
+            return rotated;
+        }
+
+        private static bool TryOffsetToWorkArea(List<Part> parts, Box workArea)
+        {
             var bbox = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
+            if (bbox.Width > workArea.Width + Tolerance.Epsilon ||
+                bbox.Length > workArea.Length + Tolerance.Epsilon)
+                return false;
+
             var offset = workArea.Location - bbox.Location;
             foreach (var p in parts)
             {
                 p.Offset(offset);
                 p.UpdateBounds();
             }
-
-            // Verify pair fits in work area.
-            bbox = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
-            if (bbox.Width > workArea.Width + Tolerance.Epsilon ||
-                bbox.Length > workArea.Length + Tolerance.Epsilon)
-                return null;
-
-            return parts;
+            return true;
         }
 
         /// <summary>
@@ -309,14 +344,18 @@ namespace OpenNest
                     // during progress reporting.
                     PhaseResults.Add(phaseResult);
 
-                    if (context.Policy.Comparer.IsBetter(result, context.CurrentBest, context.WorkArea))
+                    // FillContext.ReportProgress updates CurrentBest during the
+                    // strategy's angle sweep. This catches strategies that return a
+                    // result without reporting it (e.g. RectBestFit).
+                    var improved = context.Policy.Comparer.IsBetter(result, context.CurrentBest, context.WorkArea);
+                    if (improved)
                     {
                         context.CurrentBest = result;
                         context.CurrentBestScore = FillScore.Compute(result, context.WorkArea);
                         context.WinnerPhase = strategy.Phase;
                     }
 
-                    if (context.CurrentBest != null && context.CurrentBest.Count > 0)
+                    if (improved && context.CurrentBest != null && context.CurrentBest.Count > 0)
                     {
                         ReportProgress(context.Progress, new ProgressReport
                         {

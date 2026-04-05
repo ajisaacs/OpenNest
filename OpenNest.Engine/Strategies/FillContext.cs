@@ -32,16 +32,29 @@ namespace OpenNest.Engine.Strategies
         /// <summary>
         /// Standard progress reporting for strategies and fillers. Reports intermediate
         /// results using the current ActivePhase, PlateNumber, and WorkArea.
+        /// When the reported parts beat the current pipeline best, promotes the
+        /// result to IsOverallBest so the UI updates immediately.
         /// </summary>
         public void ReportProgress(List<Part> parts, string description)
         {
+            var isNewBest = parts != null && parts.Count > 0
+                && Policy.Comparer.IsBetter(parts, CurrentBest, WorkArea);
+
+            if (isNewBest)
+            {
+                CurrentBest = parts;
+                CurrentBestScore = FillScore.Compute(parts, WorkArea);
+                WinnerPhase = ActivePhase;
+            }
+
             NestEngineBase.ReportProgress(Progress, new ProgressReport
             {
                 Phase = ActivePhase,
                 PlateNumber = PlateNumber,
-                Parts = parts,
+                Parts = isNewBest ? parts : CurrentBest,
                 WorkArea = WorkArea,
                 Description = description,
+                IsOverallBest = isNewBest,
             });
         }
     }

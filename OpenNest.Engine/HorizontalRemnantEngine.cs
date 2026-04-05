@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OpenNest.Engine;
+using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -25,6 +26,20 @@ namespace OpenNest
         public override NestDirection? PreferredDirection => NestDirection.Vertical;
 
         public override ShrinkAxis TrimAxis => ShrinkAxis.Length;
+
+        protected override BestFitResult SelectBestFitPair(List<BestFitResult> results)
+        {
+            BestFitResult best = null;
+
+            foreach (var r in results)
+            {
+                if (!r.Keep) continue;
+                if (best == null || r.BoundingHeight < best.BoundingHeight)
+                    best = r;
+            }
+
+            return best;
+        }
 
         public override List<double> BuildAngles(NestItem item, ClassificationResult classification, Box workArea)
         {

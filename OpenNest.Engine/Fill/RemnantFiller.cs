@@ -106,7 +106,7 @@ namespace OpenNest.Engine.Fill
                 // rectangular obstacle boundary. Without this, gaps between
                 // individual bounding boxes cause the next drawing to fill
                 // into inter-row spaces, producing an interleaved layout.
-                if (placed.Count > 1)
+                if (placed.Count > 2)
                     RemoveTopmostPart(placed);
 
                 allParts.AddRange(placed);

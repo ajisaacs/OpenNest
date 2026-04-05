@@ -56,6 +56,11 @@ namespace OpenNest
 
         protected FillPolicy BuildPolicy() => new FillPolicy(Comparer, PreferredDirection);
 
+        protected virtual BestFitResult SelectBestFitPair(List<BestFitResult> results)
+        {
+            return results.FirstOrDefault(r => r.Keep);
+        }
+
         // --- Virtual methods (side-effect-free, return parts) ---
 
         public virtual List<Part> Fill(NestItem item, Box workArea,
@@ -333,7 +338,7 @@ namespace OpenNest
 
                 var bestFits = BestFitCache.GetOrCompute(
                     item.Drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
-                var bestFit = bestFits.FirstOrDefault(r => r.Keep);
+                var bestFit = SelectBestFitPair(bestFits);
                 if (bestFit == null) continue;
 
                 var parts = bestFit.BuildParts(item.Drawing);

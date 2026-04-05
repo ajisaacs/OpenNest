@@ -412,6 +412,16 @@ namespace OpenNest.Controls
             }
         }
 
+        public void ProcessEscapeKey()
+        {
+            if (currentAction.IsBusy())
+                currentAction.CancelAction();
+            else if (currentAction is ActionSelect && previousAction != null)
+                RestorePreviousAction();
+            else
+                SetAction(typeof(ActionSelect));
+        }
+
         protected override bool ProcessDialogKey(Keys keyData)
         {
             // Only handle TAB, RETURN, ESC, and ARROW KEYS here.
@@ -420,12 +430,7 @@ namespace OpenNest.Controls
             switch (keyData)
             {
                 case Keys.Escape:
-                    if (currentAction.IsBusy())
-                        currentAction.CancelAction();
-                    else if (currentAction is ActionSelect && previousAction != null)
-                        RestorePreviousAction();
-                    else
-                        SetAction(typeof(ActionSelect));
+                    ProcessEscapeKey();
                     break;
 
                 case Keys.Left:
@@ -791,9 +796,11 @@ namespace OpenNest.Controls
                 progressForm.UpdateProgress(p);
 
                 if (p.IsOverallBest)
+                {
                     progressForm.UpdatePreview(p.BestParts);
+                    SetActiveParts(p.BestParts);
+                }
 
-                SetActiveParts(p.BestParts);
                 ActiveWorkArea = p.ActiveWorkArea;
             });
 
@@ -837,6 +844,7 @@ namespace OpenNest.Controls
                 ActiveWorkArea = null;
                 progressForm.Close();
                 cts.Dispose();
+                Focus();
             }
         }
 
