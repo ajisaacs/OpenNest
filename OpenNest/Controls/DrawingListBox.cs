@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace OpenNest.Controls
@@ -22,7 +23,24 @@ namespace OpenNest.Controls
 
             imageSize = new Size(ItemHeight, ItemHeight - 10);
             nameFont = new Font(Font.FontFamily, 10, FontStyle.Bold);
+
+            var menu = new ContextMenuStrip();
+            var deleteItem = new ToolStripMenuItem("Delete");
+            deleteItem.Click += (s, e) =>
+            {
+                if (SelectedItem is Drawing drawing)
+                    DeleteRequested?.Invoke(this, drawing);
+            };
+            menu.Opening += (s, e) =>
+            {
+                if (SelectedItem == null)
+                    e.Cancel = true;
+            };
+            menu.Items.Add(deleteItem);
+            ContextMenuStrip = menu;
         }
+
+        public event EventHandler<Drawing> DeleteRequested;
 
         public Units Units { get; set; }
 

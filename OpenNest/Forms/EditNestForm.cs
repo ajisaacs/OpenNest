@@ -225,6 +225,7 @@ namespace OpenNest.Forms
 
             Text = Nest.Name;
             drawingListBox1.Units = Nest.Units;
+            drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
         }
 
         public string LastSavePath { get; private set; }
@@ -1024,6 +1025,32 @@ namespace OpenNest.Forms
 
                 PlateView.Invalidate();
             }
+        }
+
+        private void drawingListBox1_DeleteRequested(object sender, Drawing drawing)
+        {
+            var result = MessageBox.Show(
+                $"Delete drawing '{drawing.Name}' and all its parts from every plate?",
+                "Delete Drawing",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+
+            if (result != DialogResult.Yes)
+                return;
+
+            foreach (var plate in Nest.Plates)
+            {
+                for (var i = plate.Parts.Count - 1; i >= 0; i--)
+                {
+                    if (plate.Parts[i].BaseDrawing == drawing)
+                        plate.Parts.RemoveAt(i);
+                }
+            }
+
+            Nest.Drawings.Remove(drawing);
+            UpdateDrawingList();
+            PlateView.Invalidate();
         }
 
         private void drawingListBox1_Click(object sender, EventArgs e)
