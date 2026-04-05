@@ -827,6 +827,7 @@ namespace OpenNest.Forms
         {
             if (activeForm == null) return;
             activeForm.Nest.Plates.RemoveEmptyPlates();
+            activeForm.EnsureSentinelPlate();
         }
 
         private void LoadFirstPlate_Click(object sender, EventArgs e)
@@ -963,6 +964,7 @@ namespace OpenNest.Forms
                 SetNestingLockout(false);
                 nestingCts.Dispose();
                 nestingCts = null;
+                activeForm.EnsureSentinelPlate();
             }
         }
 
@@ -1033,6 +1035,14 @@ namespace OpenNest.Forms
 
                 plate.Size = new Geometry.Size(result.ChosenSize.Width, result.ChosenSize.Length);
                 nestParts = result.Parts;
+
+                // Deduct placed quantities — the optimizer clones items internally
+                // so the originals are untouched after dry runs.
+                foreach (var item in items)
+                {
+                    var placed = nestParts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
+                    item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                }
             }
             else
             {

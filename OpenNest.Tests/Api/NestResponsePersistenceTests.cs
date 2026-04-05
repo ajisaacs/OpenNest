@@ -13,6 +13,9 @@ public class NestResponsePersistenceTests
     {
         var nest = new Nest("test-nest");
         var plate = new Plate(new Size(60, 120));
+        var drawing = new Drawing("test-part");
+        nest.Drawings.Add(drawing);
+        plate.Parts.Add(new Part(drawing));
         nest.Plates.Add(plate);
 
         var request = new NestRequest

@@ -175,9 +175,15 @@ namespace OpenNest.IO
         private List<PlateDto> BuildPlateDtos()
         {
             var list = new List<PlateDto>();
+            var id = 0;
             for (var i = 0; i < nest.Plates.Count; i++)
             {
                 var plate = nest.Plates[i];
+
+                if (plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0 && plate.CutOffs.Count == 0)
+                    continue;
+
+                id++;
                 var parts = new List<PartDto>();
                 foreach (var part in plate.Parts.Where(p => !p.BaseDrawing.IsCutOff))
                 {
@@ -208,7 +214,7 @@ namespace OpenNest.IO
 
                 list.Add(new PlateDto
                 {
-                    Id = i + 1,
+                    Id = id,
                     Size = new SizeDto { Width = plate.Size.Width, Length = plate.Size.Length },
                     Quadrant = plate.Quadrant,
                     Quantity = plate.Quantity,

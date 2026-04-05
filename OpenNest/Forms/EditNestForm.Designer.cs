@@ -36,6 +36,8 @@
             plateNumColumn = new System.Windows.Forms.ColumnHeader();
             sizeColumn = new System.Windows.Forms.ColumnHeader();
             qtyColumn = new System.Windows.Forms.ColumnHeader();
+            partsColumn = new System.Windows.Forms.ColumnHeader();
+            utilColumn = new System.Windows.Forms.ColumnHeader();
             toolStrip1 = new System.Windows.Forms.ToolStrip();
             tabPage2 = new System.Windows.Forms.TabPage();
             drawingListBox1 = new OpenNest.Controls.DrawingListBox();
@@ -100,7 +102,7 @@
             // platesListView
             // 
             platesListView.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            platesListView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] { plateNumColumn, sizeColumn, qtyColumn });
+            platesListView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] { plateNumColumn, sizeColumn, qtyColumn, partsColumn, utilColumn });
             platesListView.Dock = System.Windows.Forms.DockStyle.Fill;
             platesListView.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 0);
             platesListView.FullRowSelect = true;
@@ -126,8 +128,18 @@
             sizeColumn.Width = 80;
             // 
             // qtyColumn
-            // 
+            //
             qtyColumn.Text = "Qty";
+            //
+            // partsColumn
+            //
+            partsColumn.Text = "Parts";
+            partsColumn.Width = 45;
+            //
+            // utilColumn
+            //
+            utilColumn.Text = "Util";
+            utilColumn.Width = 45;
             // 
             // toolStrip1
             // 
@@ -263,6 +275,8 @@
         private System.Windows.Forms.TabPage tabPage2;
         private Controls.DrawingListBox drawingListBox1;
         private System.Windows.Forms.ColumnHeader plateNumColumn;
+        private System.Windows.Forms.ColumnHeader partsColumn;
+        private System.Windows.Forms.ColumnHeader utilColumn;
         private System.Windows.Forms.ToolStrip toolStrip2;
         private System.Windows.Forms.ToolStripButton toolStripButton2;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;

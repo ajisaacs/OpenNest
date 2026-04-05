@@ -27,6 +27,9 @@ namespace OpenNest.Forms
         public readonly PlateView PlateView;
 
         private readonly Timer updateDrawingListTimer;
+        private bool suppressPlateNavigation;
+        private bool updatingPlateList;
+        private bool sentinelUpdatePending;
 
         private Panel plateHeaderPanel;
         private Label plateInfoLabel;
@@ -67,7 +70,7 @@ namespace OpenNest.Forms
 
             platesListView.SelectedIndexChanged += (sender, e) =>
             {
-                if (platesListView.SelectedIndices.Count == 0)
+                if (updatingPlateList || platesListView.SelectedIndices.Count == 0)
                     return;
 
                 CurrentPlateIndex = platesListView.SelectedIndices[0];
@@ -217,6 +220,8 @@ namespace OpenNest.Forms
             if (Nest.Plates.Count == 0)
                 Nest.CreatePlate();
 
+            EnsureSentinelPlate();
+
             UpdatePlateList();
             UpdateDrawingList();
             UpdateRemovePlateButton();
@@ -299,6 +304,10 @@ namespace OpenNest.Forms
 
         public void UpdatePlateList()
         {
+            updatingPlateList = true;
+            var focused = ContainsFocus ? GetFocusedControl() : null;
+
+            platesListView.BeginUpdate();
             platesListView.Items.Clear();
 
             var items = new ListViewItem[Nest.Plates.Count];
@@ -311,6 +320,23 @@ namespace OpenNest.Forms
             }
 
             platesListView.Items.AddRange(items);
+
+            if (CurrentPlateIndex < platesListView.Items.Count)
+                platesListView.Items[CurrentPlateIndex].Selected = true;
+
+            platesListView.EndUpdate();
+            updatingPlateList = false;
+
+            if (focused != null && focused != platesListView)
+                focused.Focus();
+        }
+
+        private Control GetFocusedControl()
+        {
+            var ctrl = this;
+            while (ctrl is ContainerControl container && container.ActiveControl != null)
+                return container.ActiveControl;
+            return ctrl;
         }
 
         public void UpdateDrawingList()
@@ -943,6 +969,13 @@ namespace OpenNest.Forms
 
         private void Plates_PlateRemoved(object sender, ItemRemovedEventArgs<Plate> e)
         {
+            if (suppressPlateNavigation)
+            {
+                UpdatePlateList();
+                UpdateRemovePlateButton();
+                return;
+            }
+
             if (Nest.Plates.Count <= CurrentPlateIndex)
                 LoadLastPlate();
             else
@@ -958,13 +991,43 @@ namespace OpenNest.Forms
             tabControl1.SelectedIndex = 0;
             UpdatePlateList();
             UpdateRemovePlateButton();
-            LoadLastPlate();
-            PlateView.ZoomToFit();
+
+            if (!suppressPlateNavigation)
+            {
+                LoadLastPlate();
+                PlateView.ZoomToFit();
+            }
         }
 
         private void UpdateRemovePlateButton()
         {
-            btnRemovePlate.Enabled = Nest.Plates.Count > 1;
+            var plate = Nest.Plates.Count > 0 ? Nest.Plates[CurrentPlateIndex] : null;
+            btnRemovePlate.Enabled = Nest.Plates.Count > 1 && plate != null && plate.Parts.Count > 0;
+        }
+
+        /// <summary>
+        /// Ensures a single empty sentinel plate exists at the end of the nest.
+        /// </summary>
+        public void EnsureSentinelPlate()
+        {
+            suppressPlateNavigation = true;
+            try
+            {
+                if (Nest.Plates.Count == 0 || Nest.Plates[^1].Parts.Count > 0)
+                    Nest.CreatePlate();
+
+                // Trim excess trailing empty plates back to one
+                while (Nest.Plates.Count > 1
+                    && Nest.Plates[^1].Parts.Count == 0
+                    && Nest.Plates[^2].Parts.Count == 0)
+                {
+                    Nest.Plates.RemoveAt(Nest.Plates.Count - 1);
+                }
+            }
+            finally
+            {
+                suppressPlateNavigation = false;
+            }
         }
 
         #endregion
@@ -975,6 +1038,13 @@ namespace OpenNest.Forms
             item.Text = id.ToString();
             item.SubItems.Add(plate.Size.ToString());
             item.SubItems.Add(plate.Quantity.ToString());
+
+            var partCount = plate.Parts.Count(p => !p.BaseDrawing.IsCutOff);
+            item.SubItems.Add(partCount.ToString());
+
+            var util = plate.Utilization();
+            item.SubItems.Add(partCount > 0 ? $"{util:P0}" : "");
+
             return item;
         }
 
@@ -982,12 +1052,29 @@ namespace OpenNest.Forms
         {
             updateDrawingListTimer.Stop();
             updateDrawingListTimer.Start();
+            DeferSentinelUpdate();
         }
 
         private void PlateView_PartAdded(object sender, ItemAddedEventArgs<Part> e)
         {
             updateDrawingListTimer.Stop();
             updateDrawingListTimer.Start();
+            DeferSentinelUpdate();
+        }
+
+        private void DeferSentinelUpdate()
+        {
+            if (sentinelUpdatePending)
+                return;
+
+            sentinelUpdatePending = true;
+            BeginInvoke(new MethodInvoker(() =>
+            {
+                sentinelUpdatePending = false;
+                EnsureSentinelPlate();
+                UpdatePlateList();
+                UpdateRemovePlateButton();
+            }));
         }
 
         private void drawingListUpdateTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
