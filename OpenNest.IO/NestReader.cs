@@ -192,6 +192,18 @@ namespace OpenNest.IO
             nest.PlateDefaults.PartSpacing = pd.PartSpacing;
             nest.PlateDefaults.EdgeSpacing = new Spacing(pd.EdgeSpacing.Left, pd.EdgeSpacing.Bottom, pd.EdgeSpacing.Right, pd.EdgeSpacing.Top);
 
+            // Plate optimizer settings
+            nest.SalvageRate = dto.SalvageRate;
+            if (dto.PlateOptions != null)
+            {
+                nest.PlateOptions = dto.PlateOptions.Select(o => new PlateOption
+                {
+                    Width = o.Width,
+                    Length = o.Length,
+                    Cost = o.Cost,
+                }).ToList();
+            }
+
             // Drawings
             foreach (var d in drawingMap.OrderBy(k => k.Key))
                 nest.Drawings.Add(d.Value);

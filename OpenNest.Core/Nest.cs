@@ -1,6 +1,7 @@
 ﻿using OpenNest.Collections;
 using OpenNest.Geometry;
 using System;
+using System.Collections.Generic;
 
 namespace OpenNest
 {
@@ -50,6 +51,10 @@ namespace OpenNest
         public DateTime DateLastModified { get; set; }
 
         public PlateSettings PlateDefaults { get; set; }
+
+        public List<PlateOption> PlateOptions { get; set; } = new();
+
+        public double SalvageRate { get; set; } = 0.5;
 
         public Plate CreatePlate()
         {

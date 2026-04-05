@@ -88,7 +88,14 @@ namespace OpenNest.IO
                 },
                 PlateDefaults = BuildPlateDefaultsDto(),
                 Drawings = BuildDrawingDtos(),
-                Plates = BuildPlateDtos()
+                Plates = BuildPlateDtos(),
+                PlateOptions = nest.PlateOptions?.Select(o => new PlateOptionDto
+                {
+                    Width = o.Width,
+                    Length = o.Length,
+                    Cost = o.Cost,
+                }).ToList() ?? new(),
+                SalvageRate = nest.SalvageRate,
             };
         }
 

@@ -29,6 +29,8 @@ namespace OpenNest.IO
             public PlateDefaultsDto PlateDefaults { get; init; } = new();
             public List<DrawingDto> Drawings { get; init; } = new();
             public List<PlateDto> Plates { get; init; } = new();
+            public List<PlateOptionDto> PlateOptions { get; init; } = new();
+            public double SalvageRate { get; init; } = 0.5;
         }
 
         public record PlateDefaultsDto
@@ -151,6 +153,13 @@ namespace OpenNest.IO
             public double? Angle { get; init; }
             public double? Radius { get; init; }
             public string NoteText { get; init; } = "";
+        }
+
+        public record PlateOptionDto
+        {
+            public double Width { get; init; }
+            public double Length { get; init; }
+            public double Cost { get; init; }
         }
 
         public record BestFitSetDto
