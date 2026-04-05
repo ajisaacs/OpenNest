@@ -908,6 +908,10 @@ namespace OpenNest.Forms
             if (!items.Any(it => it.Quantity > 0))
                 return;
 
+            var optimizePlateSize = form.OptimizePlateSize;
+            var plateOptions = optimizePlateSize ? form.GetPlateOptions() : null;
+            var salvageRate = form.SalvageRate;
+
             nestingCts = new CancellationTokenSource();
             var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
             progressForm.PreviewPlate = CreatePreviewPlate(activeForm.PlateView.Plate);
@@ -928,7 +932,8 @@ namespace OpenNest.Forms
 
             try
             {
-                await RunAutoNestAsync(items, progressForm, progress, nestingCts.Token);
+                await RunAutoNestAsync(items, progressForm, progress, nestingCts.Token,
+                    plateOptions, salvageRate);
             }
             catch (Exception ex)
             {
@@ -950,7 +955,9 @@ namespace OpenNest.Forms
             List<NestItem> items,
             NestProgressForm progressForm,
             IProgress<NestProgress> progress,
-            CancellationToken token)
+            CancellationToken token,
+            List<PlateOption> plateOptions = null,
+            double salvageRate = 0.5)
         {
             const int maxPlates = 100;
 
@@ -964,7 +971,8 @@ namespace OpenNest.Forms
                 var plate = GetOrCreatePlate(progressForm);
 
                 var placed = await NestSinglePlateAsync(
-                    plate, plateIndex, remaining, progressForm, progress, token);
+                    plate, plateIndex, remaining, progressForm, progress, token,
+                    plateOptions, salvageRate);
 
                 if (!placed)
                     break;
@@ -993,13 +1001,32 @@ namespace OpenNest.Forms
             List<NestItem> items,
             NestProgressForm progressForm,
             IProgress<NestProgress> progress,
-            CancellationToken token)
+            CancellationToken token,
+            List<PlateOption> plateOptions = null,
+            double salvageRate = 0.5)
         {
-            var engine = NestEngineRegistry.Create(plate);
-            engine.PlateNumber = plateIndex;
+            List<Part> nestParts;
 
-            var nestParts = await Task.Run(() =>
-                engine.Nest(items, progress, token));
+            if (plateOptions != null && plateOptions.Count > 0)
+            {
+                var result = await Task.Run(() =>
+                    PlateOptimizer.Optimize(items, plateOptions, salvageRate, plate, progress, token));
+
+                if (result == null || result.Parts.Count == 0 ||
+                    (token.IsCancellationRequested && !progressForm.Accepted))
+                    return false;
+
+                plate.Size = new Geometry.Size(result.ChosenSize.Width, result.ChosenSize.Length);
+                nestParts = result.Parts;
+            }
+            else
+            {
+                var engine = NestEngineRegistry.Create(plate);
+                engine.PlateNumber = plateIndex;
+
+                nestParts = await Task.Run(() =>
+                    engine.Nest(items, progress, token));
+            }
 
             activeForm.PlateView.ClearPreviewParts();
 
