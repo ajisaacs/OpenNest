@@ -103,4 +103,47 @@ public class MultiPlateNesterTests
         var result = MultiPlateNester.Classify(bb, workArea);
         Assert.Equal(PartClass.Small, result);
     }
+
+    // --- Task 5: Scrap Zone Identification ---
+
+    [Fact]
+    public void IsScrapRemnant_BothDimensionsBelowThreshold_ReturnsTrue()
+    {
+        var remnant = new Box(0, 0, 10, 8);
+        Assert.True(MultiPlateNester.IsScrapRemnant(remnant, 12.0));
+    }
+
+    [Fact]
+    public void IsScrapRemnant_OneDimensionAboveThreshold_ReturnsFalse()
+    {
+        // 11 x 120 — narrow but long, should be preserved
+        var remnant = new Box(0, 0, 11, 120);
+        Assert.False(MultiPlateNester.IsScrapRemnant(remnant, 12.0));
+    }
+
+    [Fact]
+    public void IsScrapRemnant_BothDimensionsAboveThreshold_ReturnsFalse()
+    {
+        var remnant = new Box(0, 0, 20, 30);
+        Assert.False(MultiPlateNester.IsScrapRemnant(remnant, 12.0));
+    }
+
+    [Fact]
+    public void FindScrapZones_ReturnsOnlyScrapRemnants()
+    {
+        // 96x48 plate with a 70x40 part placed at origin
+        var plate = new Plate(96, 48) { PartSpacing = 0.25 };
+        var drawing = MakeDrawing("big", 70, 40);
+        var part = new Part(drawing);
+        plate.Parts.Add(part);
+
+        var scrap = MultiPlateNester.FindScrapZones(plate, 12.0);
+
+        // All returned zones should have both dims < 12
+        foreach (var zone in scrap)
+        {
+            Assert.True(zone.Width < 12.0 && zone.Length < 12.0,
+                $"Zone {zone.Width:F1}x{zone.Length:F1} is not scrap — at least one dimension >= 12");
+        }
+    }
 }

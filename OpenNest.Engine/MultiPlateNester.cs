@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 
 namespace OpenNest
@@ -55,6 +56,41 @@ namespace OpenNest
                 return PartClass.Medium;
 
             return PartClass.Small;
+        }
+
+        public static bool IsScrapRemnant(Box remnant, double minRemnantSize)
+        {
+            return remnant.Width < minRemnantSize && remnant.Length < minRemnantSize;
+        }
+
+        public static List<Box> FindScrapZones(Plate plate, double minRemnantSize)
+        {
+            var finder = RemnantFinder.FromPlate(plate);
+            var remnants = finder.FindRemnants();
+
+            var scrap = new List<Box>();
+            foreach (var remnant in remnants)
+            {
+                if (IsScrapRemnant(remnant, minRemnantSize))
+                    scrap.Add(remnant);
+            }
+
+            return scrap;
+        }
+
+        public static List<Box> FindViableRemnants(Plate plate, double minRemnantSize)
+        {
+            var finder = RemnantFinder.FromPlate(plate);
+            var remnants = finder.FindRemnants();
+
+            var viable = new List<Box>();
+            foreach (var remnant in remnants)
+            {
+                if (!IsScrapRemnant(remnant, minRemnantSize))
+                    viable.Add(remnant);
+            }
+
+            return viable;
         }
     }
 }
