@@ -125,6 +125,10 @@ namespace OpenNest.Controls
                 pt.Y += 18;
                 e.Graphics.DrawString(text3, Font, detailBrush, pt);
             }
+
+            using var separatorPen = new Pen(Color.LightGray);
+            var separatorY = e.Bounds.Bottom - 1;
+            e.Graphics.DrawLine(separatorPen, e.Bounds.X, separatorY, e.Bounds.Right, separatorY);
         }
 
         protected override void OnMouseMove(MouseEventArgs e)

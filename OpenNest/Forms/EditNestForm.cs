@@ -259,6 +259,11 @@ namespace OpenNest.Forms
 
         public void UpdateDrawingList()
         {
+            var topIndex = drawingListBox1.TopIndex;
+            var selected = drawingListBox1.SelectedItem;
+
+            drawingListBox1.BeginUpdate();
+
             drawingListBox1.Items.Clear();
 
             foreach (var dwg in Nest.Drawings.OrderBy(d => d.Name).ToList())
@@ -268,6 +273,14 @@ namespace OpenNest.Forms
 
                 drawingListBox1.Items.Add(dwg);
             }
+
+            if (selected != null && drawingListBox1.Items.Contains(selected))
+                drawingListBox1.SelectedItem = selected;
+
+            if (topIndex < drawingListBox1.Items.Count)
+                drawingListBox1.TopIndex = topIndex;
+
+            drawingListBox1.EndUpdate();
         }
 
         public void Save()
@@ -935,9 +948,20 @@ namespace OpenNest.Forms
             drawingListBox1.Invoke(new MethodInvoker(() =>
             {
                 if (hideNestedButton.Checked)
-                    UpdateDrawingList();
-                else
-                    drawingListBox1.Refresh();
+                {
+                    drawingListBox1.BeginUpdate();
+
+                    for (var i = drawingListBox1.Items.Count - 1; i >= 0; i--)
+                    {
+                        var dwg = (Drawing)drawingListBox1.Items[i];
+                        if (dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
+                            drawingListBox1.Items.RemoveAt(i);
+                    }
+
+                    drawingListBox1.EndUpdate();
+                }
+
+                drawingListBox1.Invalidate();
             }));
         }
 
