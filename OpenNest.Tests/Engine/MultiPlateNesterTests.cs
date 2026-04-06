@@ -146,4 +146,61 @@ public class MultiPlateNesterTests
                 $"Zone {zone.Width:F1}x{zone.Length:F1} is not scrap — at least one dimension >= 12");
         }
     }
+
+    // --- Task 6: Plate Creation Helper ---
+
+    [Fact]
+    public void CreatePlate_UsesTemplateWhenNoOptions()
+    {
+        var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
+        template.EdgeSpacing = new Spacing { Left = 1, Right = 1, Top = 1, Bottom = 1 };
+
+        var plate = MultiPlateNester.CreatePlate(template, null, null);
+
+        Assert.Equal(96, plate.Size.Width);
+        Assert.Equal(48, plate.Size.Length);
+        Assert.Equal(0.25, plate.PartSpacing);
+        Assert.Equal(1, plate.Quadrant);
+    }
+
+    [Fact]
+    public void CreatePlate_PicksSmallestFittingOption()
+    {
+        var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
+        template.EdgeSpacing = new Spacing { Left = 1, Right = 1, Top = 1, Bottom = 1 };
+
+        var options = new List<PlateOption>
+        {
+            new() { Width = 48, Length = 96, Cost = 100 },
+            new() { Width = 60, Length = 120, Cost = 200 },
+            new() { Width = 72, Length = 144, Cost = 300 },
+        };
+
+        // Part needs 50x50 work area — 48x96 (after edge spacing: 46x94) — 46 < 50, doesn't fit.
+        // 60x120 (58x118) does fit.
+        var minBounds = new Box(0, 0, 50, 50);
+
+        var plate = MultiPlateNester.CreatePlate(template, options, minBounds);
+
+        Assert.Equal(60, plate.Size.Width);
+        Assert.Equal(120, plate.Size.Length);
+    }
+
+    [Fact]
+    public void EvaluateUpgrade_PrefersCheaperOption()
+    {
+        var currentOption = new PlateOption { Width = 48, Length = 96, Cost = 100 };
+        var upgradeOption = new PlateOption { Width = 60, Length = 120, Cost = 160 };
+        var newPlateOption = new PlateOption { Width = 48, Length = 96, Cost = 100 };
+
+        // Upgrade cost = 160 - 100 = 60
+        // New plate cost with 50% utilization, 50% salvage:
+        // remnantFraction = 0.5, salvageCredit = 0.5 * 100 * 0.5 = 25
+        // netNewCost = 100 - 25 = 75
+        // Upgrade (60) < new plate (75), so upgrade wins
+        var decision = MultiPlateNester.EvaluateUpgradeVsNew(
+            currentOption, upgradeOption, newPlateOption, 0.5, 0.5);
+
+        Assert.True(decision.ShouldUpgrade);
+    }
 }
