@@ -140,7 +140,7 @@ public class MultiPlateNesterTests
     }
 
     [Fact]
-    public void FindScrapZones_ReturnsOnlyScrapRemnants()
+    public void FindRemnants_ScrapOnly_ReturnsOnlyScrapRemnants()
     {
         // 96x48 plate with a 70x40 part placed at origin
         var plate = new Plate(96, 48) { PartSpacing = 0.25 };
@@ -148,7 +148,7 @@ public class MultiPlateNesterTests
         var part = new Part(drawing);
         plate.Parts.Add(part);
 
-        var scrap = MultiPlateNester.FindScrapZones(plate, 12.0);
+        var scrap = MultiPlateNester.FindRemnants(plate, 12.0, scrapOnly: true);
 
         // All returned zones should have both dims < 12
         foreach (var zone in scrap)
