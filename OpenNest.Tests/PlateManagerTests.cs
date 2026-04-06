@@ -390,6 +390,8 @@ public class PlateManagerTests
         Assert.False(mgr.CanRemoveCurrent);
 
         nest.CreatePlate();
+        // Auto-navigated to plate2 (empty), go back to plate1 (has parts)
+        mgr.LoadFirst();
         Assert.True(mgr.CanRemoveCurrent);
     }
 }

@@ -199,6 +199,12 @@ namespace OpenNest
         private void OnPlateAdded(object sender, ItemAddedEventArgs<Plate> e)
         {
             PlateListChanged?.Invoke(this, EventArgs.Empty);
+
+            if (!suppressNavigation)
+            {
+                CurrentIndex = Count - 1;
+                FireCurrentPlateChanged();
+            }
         }
 
         private void OnPlateRemoved(object sender, ItemRemovedEventArgs<Plate> e)
