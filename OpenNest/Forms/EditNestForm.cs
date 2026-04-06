@@ -899,7 +899,6 @@ namespace OpenNest.Forms
 
         private void PlateManager_PlateListChanged(object sender, EventArgs e)
         {
-            tabControl1.SelectedIndex = 0;
             UpdatePlateList();
             UpdatePlateHeader();
             UpdateRemovePlateButton();
