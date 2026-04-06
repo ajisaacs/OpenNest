@@ -57,7 +57,7 @@ namespace OpenNest.IO
             return result;
         }
 
-        public static List<Geometry.Entity> ToOpenNest(this Spline spline, int precision)
+        public static List<Geometry.Entity> ToOpenNest(this Spline spline)
         {
             var layer = spline.Layer.ToOpenNest();
             var color = spline.ResolveColor();
@@ -67,7 +67,7 @@ namespace OpenNest.IO
             List<XYZ> curvePoints;
             try
             {
-                curvePoints = spline.PolygonalVertexes(precision > 0 ? precision : 200);
+                curvePoints = spline.PolygonalVertexes(200);
             }
             catch (Exception ex)
             {

@@ -228,7 +228,7 @@ public class EllipseConverterTests
             using (var writer = new ACadSharp.IO.DxfWriter(stream, doc, false))
                 writer.Write();
 
-            var importer = new OpenNest.IO.DxfImporter { SplinePrecision = 200 };
+            var importer = new OpenNest.IO.DxfImporter();
             var result = importer.Import(tempPath);
 
             var arcCount = result.Entities.Count(e => e is Arc);

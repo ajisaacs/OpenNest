@@ -118,19 +118,7 @@ namespace OpenNest.Properties {
                 this["NestNumber"] = value;
             }
         }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("200")]
-        public int ImportSplinePrecision {
-            get {
-                return ((int)(this["ImportSplinePrecision"]));
-            }
-            set {
-                this["ImportSplinePrecision"] = value;
-            }
-        }
-        
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("Inches")]

@@ -67,7 +67,6 @@ namespace OpenNest.Forms
             textBox1.Text = Settings.Default.NestTemplatePath;
             checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
             numericUpDown1.Value = (decimal)Settings.Default.AutoSizePlateFactor;
-            numericUpDown2.Value = (decimal)Settings.Default.ImportSplinePrecision;
 
             var disabledNames = ParseDisabledStrategies(Settings.Default.DisabledStrategies);
             foreach (DataGridViewRow row in strategyGrid.Rows)
@@ -79,7 +78,6 @@ namespace OpenNest.Forms
             Settings.Default.NestTemplatePath = textBox1.Text;
             Settings.Default.CreateNewNestOnOpen = checkBox1.Checked;
             Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
-            Settings.Default.ImportSplinePrecision = (int)numericUpDown2.Value;
 
             var disabledNames = new List<string>();
             foreach (DataGridViewRow row in strategyGrid.Rows)

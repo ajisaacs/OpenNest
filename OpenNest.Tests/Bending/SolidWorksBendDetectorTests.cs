@@ -35,7 +35,7 @@ public class SolidWorksBendDetectorTests
         var path = Path.Combine(AppContext.BaseDirectory, "Bending", "TestData", "4526 A14 PT11 Test.dxf");
         Assert.True(File.Exists(path), $"Test DXF not found: {path}");
 
-        var importer = new OpenNest.IO.DxfImporter { SplinePrecision = 200 };
+        var importer = new OpenNest.IO.DxfImporter();
         var result = importer.Import(path);
 
         // EllipseConverter now produces arcs directly during import,

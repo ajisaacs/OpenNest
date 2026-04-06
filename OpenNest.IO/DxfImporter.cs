@@ -10,8 +10,6 @@ namespace OpenNest.IO
 {
     public class DxfImporter
     {
-        public int SplinePrecision { get; set; }
-
         public DxfImporter()
         {
         }
@@ -45,7 +43,7 @@ namespace OpenNest.IO
                         break;
 
                     case ACadSharp.Entities.Spline spline:
-                        foreach (var e in spline.ToOpenNest(SplinePrecision))
+                        foreach (var e in spline.ToOpenNest())
                         {
                             if (e is Line l) lines.Add(l);
                             else if (e is Arc a) arcs.Add(a);
