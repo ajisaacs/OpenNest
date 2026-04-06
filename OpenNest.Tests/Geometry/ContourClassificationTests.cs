@@ -154,4 +154,18 @@ public class ContourClassificationTests
 
         Assert.NotEqual(originalDirection, newDirection);
     }
+
+    [Fact]
+    public void Reverse_changes_direction_label_for_circle()
+    {
+        var shape = MakeCircleShape(0, 0, 10);
+        var contours = ContourInfo.Classify(new List<Shape> { shape });
+        var contour = contours[0];
+
+        var originalDirection = contour.DirectionLabel;
+        contour.Reverse();
+        var newDirection = contour.DirectionLabel;
+
+        Assert.NotEqual(originalDirection, newDirection);
+    }
 }

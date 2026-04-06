@@ -137,7 +137,9 @@ namespace OpenNest.Geometry
         public List<Vector> ToPoints(int segments = 1000, bool circumscribe = false)
         {
             var points = new List<Vector>();
-            var stepAngle = Angle.TwoPI / segments;
+            var stepAngle = Rotation == RotationType.CW
+                ? -Angle.TwoPI / segments
+                : Angle.TwoPI / segments;
 
             var r = circumscribe && segments > 0
                 ? Radius / System.Math.Cos(stepAngle / 2.0)
