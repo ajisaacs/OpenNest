@@ -262,9 +262,9 @@ namespace OpenNest
                     if (classification == PartClass.Large)
                         continue; // Large parts don't go on existing plates — they create new ones.
 
-                    // Get all remnants and try to place in them.
+                    // Small parts only go into scrap zones; medium parts into viable remnants.
                     var remnants = classification == PartClass.Small
-                        ? FindAllRemnants(pr.Plate)
+                        ? FindScrapZones(pr.Plate, minRemnantSize)
                         : FindViableRemnants(pr.Plate, minRemnantSize);
 
                     foreach (var zone in remnants)
@@ -433,12 +433,6 @@ namespace OpenNest
             }
 
             return false;
-        }
-
-        private static List<Box> FindAllRemnants(Plate plate)
-        {
-            var finder = RemnantFinder.FromPlate(plate);
-            return finder.FindRemnants();
         }
 
         private static NestItem CloneItem(NestItem item)

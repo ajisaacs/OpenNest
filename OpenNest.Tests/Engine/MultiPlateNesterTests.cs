@@ -236,8 +236,11 @@ public class MultiPlateNesterTests
     }
 
     [Fact]
-    public void Nest_SmallPartsGoIntoScrapZones()
+    public void Nest_SmallPartsDontConsumeViableRemnants()
     {
+        // 96x48 plate with 80x40 big part leaves viable remnants (strips > 12" in one dim).
+        // Small parts should NOT consume those viable remnants — they should go to
+        // a separate plate instead, preserving the remnant for future use.
         var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
         template.EdgeSpacing = new Spacing();
 
@@ -258,10 +261,14 @@ public class MultiPlateNesterTests
             progress: null,
             token: CancellationToken.None);
 
-        // Small parts should be placed on the same plate as the big part
-        // (in scrap zones), not on a new plate.
-        Assert.Equal(1, result.Plates.Count);
-        Assert.True(result.Plates[0].Parts.Count > 1);
+        // Big part on plate 1, tiny parts on plate 2 (viable remnant preserved).
+        Assert.Equal(2, result.Plates.Count);
+
+        // First plate should have only the big part.
+        var bigPlate = result.Plates.First(p => p.Parts.Any(
+            part => part.BaseDrawing.Name == "big"));
+        var tinyOnBigPlate = bigPlate.Parts.Count(p => p.BaseDrawing.Name == "tiny");
+        Assert.Equal(0, tinyOnBigPlate);
     }
 
     [Fact]
