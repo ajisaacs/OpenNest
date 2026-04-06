@@ -56,11 +56,6 @@ namespace OpenNest
 
         protected FillPolicy BuildPolicy() => new FillPolicy(Comparer, PreferredDirection);
 
-        protected virtual BestFitResult SelectBestFitPair(List<BestFitResult> results)
-        {
-            return results.FirstOrDefault(r => r.Keep);
-        }
-
         // --- Virtual methods (side-effect-free, return parts) ---
 
         public virtual List<Part> Fill(NestItem item, Box workArea,
@@ -338,45 +333,56 @@ namespace OpenNest
 
                 var bestFits = BestFitCache.GetOrCompute(
                     item.Drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
-                var bestFit = SelectBestFitPair(bestFits);
-                if (bestFit == null) continue;
 
-                var parts = bestFit.BuildParts(item.Drawing);
-                var pairBbox = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
-                var pairW = pairBbox.Width;
-                var pairL = pairBbox.Length;
-                var minDim = System.Math.Min(pairW, pairL);
+                List<Part> bestPlacement = null;
+                Box bestTarget = null;
 
-                var remnants = finder.FindRemnants(minDim);
-                Box target = null;
-
-                foreach (var r in remnants)
+                foreach (var fit in bestFits)
                 {
-                    if (pairW <= r.Width + Tolerance.Epsilon &&
-                        pairL <= r.Length + Tolerance.Epsilon)
+                    if (!fit.Keep)
+                        continue;
+
+                    var parts = fit.BuildParts(item.Drawing);
+                    var pairBbox = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
+                    var pairW = pairBbox.Width;
+                    var pairL = pairBbox.Length;
+                    var minDim = System.Math.Min(pairW, pairL);
+
+                    var remnants = finder.FindRemnants(minDim);
+
+                    foreach (var r in remnants)
                     {
-                        target = r;
-                        break;
+                        if (pairW <= r.Width + Tolerance.Epsilon &&
+                            pairL <= r.Length + Tolerance.Epsilon)
+                        {
+                            var offset = r.Location - pairBbox.Location;
+                            foreach (var p in parts)
+                            {
+                                p.Offset(offset);
+                                p.UpdateBounds();
+                            }
+
+                            if (bestPlacement == null || IsBetterFill(parts, bestPlacement, r))
+                            {
+                                bestPlacement = parts;
+                                bestTarget = r;
+                            }
+                            break;
+                        }
                     }
                 }
 
-                if (target == null) continue;
+                if (bestPlacement == null) continue;
 
-                var offset = target.Location - pairBbox.Location;
-                foreach (var p in parts)
-                {
-                    p.Offset(offset);
-                    p.UpdateBounds();
-                }
-
-                result.AddRange(parts);
+                result.AddRange(bestPlacement);
                 item.Quantity = 0;
 
-                var envelope = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
+                var envelope = ((IEnumerable<IBoundable>)bestPlacement).GetBoundingBox();
                 finder.AddObstacle(envelope.Offset(Plate.PartSpacing));
 
                 Debug.WriteLine($"[Nest] Placed best-fit pair for {item.Drawing.Name} " +
-                    $"at ({target.X:F1},{target.Y:F1}), size {pairW:F1}x{pairL:F1}");
+                    $"at ({bestTarget.X:F1},{bestTarget.Y:F1}), " +
+                    $"size {envelope.Width:F1}x{envelope.Length:F1}");
             }
 
             return result;

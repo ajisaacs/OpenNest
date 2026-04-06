@@ -105,6 +105,95 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Computes the distance from a point along a direction to an arc.
+        /// Solves ray-circle intersection, then constrains hits to the arc's
+        /// angular span. Returns double.MaxValue if no hit.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public static double RayArcDistance(
+            double vx, double vy,
+            double cx, double cy, double r,
+            double startAngle, double endAngle, bool reversed,
+            double dirX, double dirY)
+        {
+            // Ray: P = (vx,vy) + t*(dirX,dirY)
+            // Circle: (x-cx)^2 + (y-cy)^2 = r^2
+            var ox = vx - cx;
+            var oy = vy - cy;
+
+            // a = dirX^2 + dirY^2 = 1 for unit direction, but handle general case
+            var a = dirX * dirX + dirY * dirY;
+            var b = 2.0 * (ox * dirX + oy * dirY);
+            var c = ox * ox + oy * oy - r * r;
+
+            var discriminant = b * b - 4.0 * a * c;
+            if (discriminant < 0)
+                return double.MaxValue;
+
+            var sqrtD = System.Math.Sqrt(discriminant);
+            var inv2a = 1.0 / (2.0 * a);
+            var t1 = (-b - sqrtD) * inv2a;
+            var t2 = (-b + sqrtD) * inv2a;
+
+            var best = double.MaxValue;
+
+            if (t1 > -Tolerance.Epsilon)
+            {
+                var hitAngle = Angle.NormalizeRad(System.Math.Atan2(
+                    vy + t1 * dirY - cy, vx + t1 * dirX - cx));
+                if (Angle.IsBetweenRad(hitAngle, startAngle, endAngle, reversed))
+                    best = t1 > Tolerance.Epsilon ? t1 : 0;
+            }
+
+            if (t2 > -Tolerance.Epsilon && t2 < best)
+            {
+                var hitAngle = Angle.NormalizeRad(System.Math.Atan2(
+                    vy + t2 * dirY - cy, vx + t2 * dirX - cx));
+                if (Angle.IsBetweenRad(hitAngle, startAngle, endAngle, reversed))
+                    best = t2 > Tolerance.Epsilon ? t2 : 0;
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// Computes the distance from a point along a direction to a full circle.
+        /// Returns double.MaxValue if no hit.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public static double RayCircleDistance(
+            double vx, double vy,
+            double cx, double cy, double r,
+            double dirX, double dirY)
+        {
+            var ox = vx - cx;
+            var oy = vy - cy;
+
+            var a = dirX * dirX + dirY * dirY;
+            var b = 2.0 * (ox * dirX + oy * dirY);
+            var c = ox * ox + oy * oy - r * r;
+
+            var discriminant = b * b - 4.0 * a * c;
+            if (discriminant < 0)
+                return double.MaxValue;
+
+            var sqrtD = System.Math.Sqrt(discriminant);
+            var t = (-b - sqrtD) / (2.0 * a);
+
+            if (t > Tolerance.Epsilon) return t;
+            if (t >= -Tolerance.Epsilon) return 0;
+
+            // First root is behind us, try the second
+            t = (-b + sqrtD) / (2.0 * a);
+            if (t > Tolerance.Epsilon) return t;
+            if (t >= -Tolerance.Epsilon) return 0;
+
+            return double.MaxValue;
+        }
+
+        /// <summary>
         /// Computes the minimum translation distance along a push direction before
         /// any edge of movingLines contacts any edge of stationaryLines.
         /// Returns double.MaxValue if no collision path exists.

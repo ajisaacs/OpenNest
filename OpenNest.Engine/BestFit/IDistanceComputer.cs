@@ -9,5 +9,10 @@ namespace OpenNest.Engine.BestFit
             List<Line> stationaryLines,
             List<Line> movingTemplateLines,
             SlideOffset[] offsets);
+
+        double[] ComputeDistances(
+            List<Entity> stationaryEntities,
+            List<Entity> movingEntities,
+            SlideOffset[] offsets);
     }
 }

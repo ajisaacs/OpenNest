@@ -1,4 +1,5 @@
 using OpenNest.Engine;
+using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using System;
@@ -44,6 +45,19 @@ namespace OpenNest
             if (candidates.Count == 0)
                 return null;
 
+            // Pre-compute best fits for all candidate plate sizes at once.
+            // This runs the expensive GPU evaluation once on the largest plate
+            // and filters the results for each smaller size.
+            var plateSizes = candidates
+                .Select(o => (Width: o.Length, Height: o.Width))
+                .ToList();
+
+            foreach (var item in items)
+            {
+                if (item.Quantity <= 0) continue;
+                BestFitCache.ComputeForSizes(item.Drawing, templatePlate.PartSpacing, plateSizes);
+            }
+
             PlateOptimizerResult best = null;
 
             foreach (var option in candidates)
@@ -58,9 +72,10 @@ namespace OpenNest
                 if (IsBetter(result, best))
                     best = result;
 
-                // Early exit: when salvage is zero, cheapest plate that fits everything wins.
-                // With salvage > 0, larger plates may have lower net cost, so keep searching.
-                if (salvageRate <= 0)
+                // Early exit: when all items fit, larger plates can only have
+                // worse utilization and higher cost. With salvage < 100%, the
+                // remnant credit never offsets the extra plate cost, so skip.
+                if (salvageRate < 1.0)
                 {
                     var allPlaced = items.All(i => i.Quantity <= 0 ||
                         result.Parts.Count(p => p.BaseDrawing.Name == i.Drawing.Name) >= i.Quantity);

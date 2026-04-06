@@ -39,7 +39,30 @@ namespace OpenNest
             return lines;
         }
 
-        public static List<Line> GetOffsetPartLines(Part part, double spacing, double chordTolerance = 0.001)
+        /// <summary>
+        /// Returns the perimeter entities (Line, Arc, Circle) with spacing offset applied,
+        /// without tessellation. Much faster than GetOffsetPartLines for parts with many arcs.
+        /// </summary>
+        public static List<Entity> GetOffsetPerimeterEntities(Part part, double spacing)
+        {
+            var geoEntities = ConvertProgram.ToGeometry(part.Program);
+            var profile = new ShapeProfile(
+                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+
+            var offsetShape = profile.Perimeter.OffsetOutward(spacing);
+            if (offsetShape == null)
+                return new List<Entity>();
+
+            // Offset the shape's entities to the part's location.
+            // OffsetOutward creates a new Shape, so mutating is safe.
+            foreach (var entity in offsetShape.Entities)
+                entity.Offset(part.Location);
+
+            return offsetShape.Entities;
+        }
+
+        public static List<Line> GetOffsetPartLines(Part part, double spacing, double chordTolerance = 0.001,
+            bool perimeterOnly = false)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
@@ -50,9 +73,12 @@ namespace OpenNest
             AddOffsetLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
                 chordTolerance, part.Location);
 
-            foreach (var cutout in profile.Cutouts)
-                AddOffsetLines(lines, cutout.OffsetInward(totalSpacing),
-                    chordTolerance, part.Location);
+            if (!perimeterOnly)
+            {
+                foreach (var cutout in profile.Cutouts)
+                    AddOffsetLines(lines, cutout.OffsetInward(totalSpacing),
+                        chordTolerance, part.Location);
+            }
 
             return lines;
         }

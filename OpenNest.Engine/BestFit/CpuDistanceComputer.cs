@@ -1,4 +1,5 @@
 using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,7 +18,6 @@ namespace OpenNest.Engine.BestFit
             var allMovingVerts = ExtractUniqueVertices(movingTemplateLines);
             var allStationaryVerts = ExtractUniqueVertices(stationaryLines);
 
-            // Pre-filter vertices per unique direction (typically 4 cardinal directions).
             var vertexCache = new Dictionary<(double, double), (Vector[] leading, Vector[] facing)>();
 
             foreach (var offset in offsets)
@@ -43,7 +43,6 @@ namespace OpenNest.Engine.BestFit
 
                 var minDist = double.MaxValue;
 
-                // Case 1: Leading moving vertices → stationary edges
                 for (var v = 0; v < leadingMoving.Length; v++)
                 {
                     var vx = leadingMoving[v].X + offset.Dx;
@@ -66,7 +65,6 @@ namespace OpenNest.Engine.BestFit
                     }
                 }
 
-                // Case 2: Facing stationary vertices → moving edges (opposite direction)
                 for (var v = 0; v < facingStationary.Length; v++)
                 {
                     var svx = facingStationary[v].X;
@@ -95,6 +93,178 @@ namespace OpenNest.Engine.BestFit
             return results;
         }
 
+        public double[] ComputeDistances(
+            List<Entity> stationaryEntities,
+            List<Entity> movingEntities,
+            SlideOffset[] offsets)
+        {
+            var count = offsets.Length;
+            var results = new double[count];
+
+            var allMovingVerts = ExtractVerticesFromEntities(movingEntities);
+            var allStationaryVerts = ExtractVerticesFromEntities(stationaryEntities);
+
+            var vertexCache = new Dictionary<(double, double), (Vector[] leading, Vector[] facing)>();
+
+            foreach (var offset in offsets)
+            {
+                var key = (offset.DirX, offset.DirY);
+                if (vertexCache.ContainsKey(key))
+                    continue;
+
+                var leading = FilterVerticesByProjection(allMovingVerts, offset.DirX, offset.DirY, keepHigh: true);
+                var facing = FilterVerticesByProjection(allStationaryVerts, offset.DirX, offset.DirY, keepHigh: false);
+                vertexCache[key] = (leading, facing);
+            }
+
+            System.Threading.Tasks.Parallel.For(0, count, i =>
+            {
+                var offset = offsets[i];
+                var dirX = offset.DirX;
+                var dirY = offset.DirY;
+                var oppX = -dirX;
+                var oppY = -dirY;
+
+                var (leadingMoving, facingStationary) = vertexCache[(dirX, dirY)];
+
+                var minDist = double.MaxValue;
+
+                // Case 1: Leading moving vertices → stationary entities
+                for (var v = 0; v < leadingMoving.Length; v++)
+                {
+                    var vx = leadingMoving[v].X + offset.Dx;
+                    var vy = leadingMoving[v].Y + offset.Dy;
+
+                    for (var j = 0; j < stationaryEntities.Count; j++)
+                    {
+                        var d = RayEntityDistance(vx, vy, stationaryEntities[j], 0, 0, dirX, dirY);
+
+                        if (d < minDist)
+                        {
+                            minDist = d;
+                            if (d <= 0) { results[i] = 0; return; }
+                        }
+                    }
+                }
+
+                // Case 2: Facing stationary vertices → moving entities (opposite direction)
+                for (var v = 0; v < facingStationary.Length; v++)
+                {
+                    var svx = facingStationary[v].X;
+                    var svy = facingStationary[v].Y;
+
+                    for (var j = 0; j < movingEntities.Count; j++)
+                    {
+                        var d = RayEntityDistance(svx, svy, movingEntities[j], offset.Dx, offset.Dy, oppX, oppY);
+
+                        if (d < minDist)
+                        {
+                            minDist = d;
+                            if (d <= 0) { results[i] = 0; return; }
+                        }
+                    }
+                }
+
+                results[i] = minDist;
+            });
+
+            return results;
+        }
+
+        private static double RayEntityDistance(
+            double vx, double vy, Entity entity,
+            double entityOffsetX, double entityOffsetY,
+            double dirX, double dirY)
+        {
+            if (entity is Line line)
+            {
+                return SpatialQuery.RayEdgeDistance(
+                    vx, vy,
+                    line.StartPoint.X + entityOffsetX, line.StartPoint.Y + entityOffsetY,
+                    line.EndPoint.X + entityOffsetX, line.EndPoint.Y + entityOffsetY,
+                    dirX, dirY);
+            }
+
+            if (entity is Arc arc)
+            {
+                return SpatialQuery.RayArcDistance(
+                    vx, vy,
+                    arc.Center.X + entityOffsetX, arc.Center.Y + entityOffsetY,
+                    arc.Radius,
+                    arc.StartAngle, arc.EndAngle, arc.IsReversed,
+                    dirX, dirY);
+            }
+
+            if (entity is Circle circle)
+            {
+                return SpatialQuery.RayCircleDistance(
+                    vx, vy,
+                    circle.Center.X + entityOffsetX, circle.Center.Y + entityOffsetY,
+                    circle.Radius,
+                    dirX, dirY);
+            }
+
+            return double.MaxValue;
+        }
+
+        private static Vector[] ExtractVerticesFromEntities(List<Entity> entities)
+        {
+            var vertices = new HashSet<Vector>();
+
+            for (var i = 0; i < entities.Count; i++)
+            {
+                var entity = entities[i];
+
+                if (entity is Line line)
+                {
+                    vertices.Add(line.StartPoint);
+                    vertices.Add(line.EndPoint);
+                }
+                else if (entity is Arc arc)
+                {
+                    vertices.Add(arc.StartPoint());
+                    vertices.Add(arc.EndPoint());
+                    AddArcExtremes(vertices, arc);
+                }
+                else if (entity is Circle circle)
+                {
+                    // Four cardinal points
+                    vertices.Add(new Vector(circle.Center.X + circle.Radius, circle.Center.Y));
+                    vertices.Add(new Vector(circle.Center.X - circle.Radius, circle.Center.Y));
+                    vertices.Add(new Vector(circle.Center.X, circle.Center.Y + circle.Radius));
+                    vertices.Add(new Vector(circle.Center.X, circle.Center.Y - circle.Radius));
+                }
+            }
+
+            return vertices.ToArray();
+        }
+
+        private static void AddArcExtremes(HashSet<Vector> points, Arc arc)
+        {
+            var a1 = arc.StartAngle;
+            var a2 = arc.EndAngle;
+            var reversed = arc.IsReversed;
+
+            if (reversed)
+                Generic.Swap(ref a1, ref a2);
+
+            // Right (0°)
+            if (Angle.IsBetweenRad(Angle.TwoPI, a1, a2))
+                points.Add(new Vector(arc.Center.X + arc.Radius, arc.Center.Y));
+
+            // Top (90°)
+            if (Angle.IsBetweenRad(Angle.HalfPI, a1, a2))
+                points.Add(new Vector(arc.Center.X, arc.Center.Y + arc.Radius));
+
+            // Left (180°)
+            if (Angle.IsBetweenRad(System.Math.PI, a1, a2))
+                points.Add(new Vector(arc.Center.X - arc.Radius, arc.Center.Y));
+
+            // Bottom (270°)
+            if (Angle.IsBetweenRad(System.Math.PI * 1.5, a1, a2))
+                points.Add(new Vector(arc.Center.X, arc.Center.Y - arc.Radius));
+        }
+
         private static Vector[] ExtractUniqueVertices(List<Line> lines)
         {
             var vertices = new HashSet<Vector>();
@@ -106,11 +276,6 @@ namespace OpenNest.Engine.BestFit
             return vertices.ToArray();
         }
 
-        /// <summary>
-        /// Filters vertices by their projection onto the push direction.
-        /// keepHigh=true returns the leading half (front face, closest to target).
-        /// keepHigh=false returns the facing half (side facing the approaching part).
-        /// </summary>
         private static Vector[] FilterVerticesByProjection(
             Vector[] vertices, double dirX, double dirY, bool keepHigh)
         {

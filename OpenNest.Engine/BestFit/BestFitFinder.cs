@@ -4,6 +4,7 @@ using OpenNest.Geometry;
 using OpenNest.Math;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -48,6 +49,8 @@ namespace OpenNest.Engine.BestFit
             });
 
             var allCandidates = candidateBags.SelectMany(c => c).ToList();
+
+            Debug.WriteLine($"[BestFitFinder] {strategies.Count} strategies, {allCandidates.Count} candidates");
 
             var results = _evaluator.EvaluateAll(allCandidates);
 

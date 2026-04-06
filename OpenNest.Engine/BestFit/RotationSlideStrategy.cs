@@ -36,8 +36,8 @@ namespace OpenNest.Engine.BestFit
             var part2Template = Part.CreateAtOrigin(drawing, Part2Rotation);
 
             var halfSpacing = spacing / 2;
-            var part1Lines = PartGeometry.GetOffsetPartLines(part1, halfSpacing);
-            var part2TemplateLines = PartGeometry.GetOffsetPartLines(part2Template, halfSpacing);
+            var part1Entities = PartGeometry.GetOffsetPerimeterEntities(part1, halfSpacing);
+            var part2Entities = PartGeometry.GetOffsetPerimeterEntities(part2Template, halfSpacing);
 
             var bbox1 = part1.BoundingBox;
             var bbox2 = part2Template.BoundingBox;
@@ -48,7 +48,7 @@ namespace OpenNest.Engine.BestFit
                 return candidates;
 
             var distances = _distanceComputer.ComputeDistances(
-                part1Lines, part2TemplateLines, offsets);
+                part1Entities, part2Entities, offsets);
 
             var testNumber = 0;
 
@@ -90,15 +90,18 @@ namespace OpenNest.Engine.BestFit
                 if (isHorizontalPush)
                 {
                     // Perpendicular sweep along Y → Width; push extent along X → Length
-                    perpMin = -(bbox2.Width + spacing);
-                    perpMax = bbox1.Width + bbox2.Width + spacing;
+                    // Trim to offsets where the parts overlap by at least 50%.
+                    var halfOverlap = bbox2.Width * 0.5;
+                    perpMin = -(halfOverlap - spacing);
+                    perpMax = bbox1.Width + halfOverlap + spacing;
                     pushStartOffset = bbox1.Length + bbox2.Length + spacing * 2;
                 }
                 else
                 {
                     // Perpendicular sweep along X → Length; push extent along Y → Width
-                    perpMin = -(bbox2.Length + spacing);
-                    perpMax = bbox1.Length + bbox2.Length + spacing;
+                    var halfOverlap = bbox2.Length * 0.5;
+                    perpMin = -(halfOverlap - spacing);
+                    perpMax = bbox1.Length + halfOverlap + spacing;
                     pushStartOffset = bbox1.Width + bbox2.Width + spacing * 2;
                 }
 

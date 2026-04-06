@@ -36,6 +36,16 @@ namespace OpenNest.Engine.BestFit
                 flatOffsets, count, directions);
         }
 
+        public double[] ComputeDistances(
+            List<Entity> stationaryEntities,
+            List<Entity> movingEntities,
+            SlideOffset[] offsets)
+        {
+            // GPU path doesn't support native entities yet — fall back to CPU.
+            var cpu = new CpuDistanceComputer();
+            return cpu.ComputeDistances(stationaryEntities, movingEntities, offsets);
+        }
+
         /// <summary>
         /// Maps a unit direction vector to a PushDirection int for the GPU interface.
         /// Left=0, Down=1, Right=2, Up=3.
