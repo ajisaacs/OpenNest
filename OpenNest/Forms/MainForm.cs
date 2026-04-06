@@ -120,6 +120,7 @@ namespace OpenNest.Forms
             {
                 NavigationEnableCheck();
                 UpdatePlateStatus();
+                mnuPlateRemove.Enabled = activeForm?.PlateManager.CanRemoveCurrent ?? false;
             };
             editForm.WindowState = windowState;
             editForm.Show();
