@@ -62,4 +62,45 @@ public class MultiPlateNesterTests
         Assert.Equal("short-wide", sorted[1].Drawing.Name);
         Assert.Equal("square", sorted[2].Drawing.Name);
     }
+
+    // --- Task 4: Part Classification ---
+
+    [Fact]
+    public void Classify_LargePart_WhenWidthExceedsHalfWorkArea()
+    {
+        var workArea = new Box(0, 0, 96, 48);
+        var bb = new Box(0, 0, 50, 20); // width 50 > half of 96 = 48
+        var result = MultiPlateNester.Classify(bb, workArea);
+        Assert.Equal(PartClass.Large, result);
+    }
+
+    [Fact]
+    public void Classify_LargePart_WhenLengthExceedsHalfWorkArea()
+    {
+        var workArea = new Box(0, 0, 96, 48);
+        var bb = new Box(0, 0, 20, 30); // length 30 > half of 48 = 24
+        var result = MultiPlateNester.Classify(bb, workArea);
+        Assert.Equal(PartClass.Large, result);
+    }
+
+    [Fact]
+    public void Classify_MediumPart_NotLargeButAreaAboveThreshold()
+    {
+        var workArea = new Box(0, 0, 96, 48);
+        // workArea = 4608, 1/9 = 512. bb = 40*15 = 600 > 512
+        // 40 < 48 (half of 96), 15 < 24 (half of 48) — not Large
+        var bb = new Box(0, 0, 40, 15);
+        var result = MultiPlateNester.Classify(bb, workArea);
+        Assert.Equal(PartClass.Medium, result);
+    }
+
+    [Fact]
+    public void Classify_SmallPart()
+    {
+        var workArea = new Box(0, 0, 96, 48);
+        // workArea = 4608, 1/9 = 512. bb = 10*10 = 100 < 512
+        var bb = new Box(0, 0, 10, 10);
+        var result = MultiPlateNester.Classify(bb, workArea);
+        Assert.Equal(PartClass.Small, result);
+    }
 }
