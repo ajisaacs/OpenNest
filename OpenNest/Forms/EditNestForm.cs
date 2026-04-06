@@ -955,6 +955,15 @@ namespace OpenNest.Forms
                             drawingListBox1.Items.RemoveAt(i);
                     }
 
+                    foreach (var dwg in Nest.Drawings.OrderBy(d => d.Name))
+                    {
+                        if (dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
+                            continue;
+
+                        if (!drawingListBox1.Items.Contains(dwg))
+                            drawingListBox1.Items.Add(dwg);
+                    }
+
                     drawingListBox1.EndUpdate();
                 }
 
