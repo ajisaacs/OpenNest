@@ -160,7 +160,7 @@ namespace OpenNest
 
             return new UpgradeDecision
             {
-                ShouldUpgrade = upgradeCost < netNewCost,
+                ShouldUpgrade = upgradeCost <= netNewCost,
                 UpgradeCost = upgradeCost,
                 NewPlateCost = netNewCost,
             };
@@ -291,6 +291,9 @@ namespace OpenNest
                 PackIntoExistingRemnants(leftovers);
                 CreateSharedPlates(leftovers);
             }
+
+            if (_plateOptions != null && _plateOptions.Count > 0 && !_token.IsCancellationRequested)
+                TryConsolidateTailPlates();
 
             foreach (var item in sorted.Where(i => i.Quantity > 0))
                 result.UnplacedItems.Add(item);
@@ -473,6 +476,12 @@ namespace OpenNest
                 for (var i = currentIdx + 1; i < sortedOptions.Count; i++)
                 {
                     var upgradeOption = sortedOptions[i];
+
+                    // Only consider options that are at least as large in both dimensions.
+                    if (upgradeOption.Width < currentOption.Width - Tolerance.Epsilon
+                        || upgradeOption.Length < currentOption.Length - Tolerance.Epsilon)
+                        continue;
+
                     var smallestNew = sortedOptions.FirstOrDefault(o =>
                     {
                         var ww = o.Width - _template.EdgeSpacing.Left - _template.EdgeSpacing.Right;
@@ -490,6 +499,9 @@ namespace OpenNest
 
                     if (decision.ShouldUpgrade)
                     {
+                        var oldSize = pr.Plate.Size;
+                        var oldChosenSize = pr.ChosenSize;
+
                         pr.Plate.Size = new Size(upgradeOption.Width, upgradeOption.Length);
                         pr.ChosenSize = upgradeOption;
 
@@ -497,12 +509,89 @@ namespace OpenNest
 
                         if (remainingArea.Count > 0 && FillAndPlace(pr, remainingArea[0], item) > 0)
                             return true;
+
+                        // Revert if nothing was placed.
+                        pr.Plate.Size = oldSize;
+                        pr.ChosenSize = oldChosenSize;
                     }
                     break;
                 }
             }
 
             return false;
+        }
+
+        private void TryConsolidateTailPlates()
+        {
+            var activePlates = _platePool.Where(p => p.Parts.Count > 0 && p.IsNew).ToList();
+            if (activePlates.Count < 2)
+                return;
+
+            var sortedOptions = _plateOptions.OrderBy(o => o.Cost).ToList();
+
+            // Try to absorb the smallest-utilization new plate into another plate via upgrade.
+            var donor = activePlates.OrderBy(p => p.Plate.Utilization()).First();
+            var donorParts = donor.Parts.ToList();
+
+            foreach (var target in activePlates)
+            {
+                if (target == donor || target.ChosenSize == null)
+                    continue;
+
+                var currentOption = target.ChosenSize;
+
+                // Try each larger option that doesn't shrink any dimension.
+                foreach (var upgradeOption in sortedOptions.Where(o =>
+                    o.Width >= currentOption.Width - Tolerance.Epsilon
+                    && o.Length >= currentOption.Length - Tolerance.Epsilon
+                    && (o.Width > currentOption.Width + Tolerance.Epsilon
+                        || o.Length > currentOption.Length + Tolerance.Epsilon)))
+                {
+                    var oldSize = target.Plate.Size;
+                    var oldChosenSize = target.ChosenSize;
+
+                    target.Plate.Size = new Size(upgradeOption.Width, upgradeOption.Length);
+                    target.ChosenSize = upgradeOption;
+
+                    var remnants = RemnantFinder.FromPlate(target.Plate).FindRemnants();
+                    if (remnants.Count == 0)
+                    {
+                        target.Plate.Size = oldSize;
+                        target.ChosenSize = oldChosenSize;
+                        continue;
+                    }
+
+                    // Try to pack all donor parts into the remnant space.
+                    var engine = NestEngineRegistry.Create(target.Plate);
+                    var tempItems = donorParts
+                        .GroupBy(p => p.BaseDrawing.Name)
+                        .Select(g => new NestItem
+                        {
+                            Drawing = g.First().BaseDrawing,
+                            Quantity = g.Count(),
+                        })
+                        .ToList();
+
+                    var placed = engine.PackArea(remnants[0], tempItems, _progress, _token);
+
+                    if (placed.Count >= donorParts.Count)
+                    {
+                        // All donor parts fit — absorb them.
+                        target.Plate.Parts.AddRange(placed);
+                        target.Parts.AddRange(placed);
+
+                        foreach (var p in donorParts)
+                            donor.Plate.Parts.Remove(p);
+                        donor.Parts.Clear();
+                        _platePool.Remove(donor);
+                        return;
+                    }
+
+                    // Didn't fit all parts — revert.
+                    target.Plate.Size = oldSize;
+                    target.ChosenSize = oldChosenSize;
+                }
+            }
         }
     }
 }
