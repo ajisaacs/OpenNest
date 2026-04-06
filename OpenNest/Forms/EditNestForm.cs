@@ -232,19 +232,6 @@ namespace OpenNest.Forms
 
         public DateTime LastSaveDate { get; private set; }
 
-        public int CurrentPlateIndex => PlateManager.CurrentIndex;
-
-        public int PlateCount => PlateManager.Count;
-
-        // Delegating methods kept for backward compatibility with MainForm (until Task 7)
-        public void LoadFirstPlate() => PlateManager.LoadFirst();
-        public void LoadLastPlate() => PlateManager.LoadLast();
-        public bool LoadNextPlate() => PlateManager.LoadNext();
-        public bool LoadPreviousPlate() => PlateManager.LoadPrevious();
-        public bool IsFirstPlate() => PlateManager.IsFirst;
-        public bool IsLastPlate() => PlateManager.IsLast;
-        public void EnsureSentinelPlate() => PlateManager.EnsureSentinel();
-
         public void UpdatePlateList()
         {
             updatingPlateList = true;

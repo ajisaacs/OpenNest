@@ -190,10 +190,10 @@ namespace OpenNest.Forms
             }
             else
             {
-                mnuNestPreviousPlate.Enabled = !activeForm.IsFirstPlate();
-                mnuNestNextPlate.Enabled = !activeForm.IsLastPlate();
-                mnuNestFirstPlate.Enabled = activeForm.PlateCount > 0 && !activeForm.IsFirstPlate();
-                mnuNestLastPlate.Enabled = activeForm.PlateCount > 0 && !activeForm.IsLastPlate();
+                mnuNestPreviousPlate.Enabled = !activeForm.PlateManager.IsFirst;
+                mnuNestNextPlate.Enabled = !activeForm.PlateManager.IsLast;
+                mnuNestFirstPlate.Enabled = activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsFirst;
+                mnuNestLastPlate.Enabled = activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsLast;
             }
         }
 
@@ -206,10 +206,10 @@ namespace OpenNest.Forms
             mnuPlate.Enabled = !locked;
 
             // Lock plate navigation
-            mnuNestPreviousPlate.Enabled = !locked && activeForm != null && !activeForm.IsFirstPlate();
-            mnuNestNextPlate.Enabled = !locked && activeForm != null && !activeForm.IsLastPlate();
-            mnuNestFirstPlate.Enabled = !locked && activeForm != null && activeForm.PlateCount > 0 && !activeForm.IsFirstPlate();
-            mnuNestLastPlate.Enabled = !locked && activeForm != null && activeForm.PlateCount > 0 && !activeForm.IsLastPlate();
+            mnuNestPreviousPlate.Enabled = !locked && activeForm != null && !activeForm.PlateManager.IsFirst;
+            mnuNestNextPlate.Enabled = !locked && activeForm != null && !activeForm.PlateManager.IsLast;
+            mnuNestFirstPlate.Enabled = !locked && activeForm != null && activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsFirst;
+            mnuNestLastPlate.Enabled = !locked && activeForm != null && activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsLast;
         }
 
         private void UpdateLocationStatus()
@@ -238,8 +238,8 @@ namespace OpenNest.Forms
 
             plateIndexStatusLabel.Text = string.Format(
                 "Plate: {0} of {1}",
-                activeForm.CurrentPlateIndex + 1,
-                activeForm.PlateCount);
+                activeForm.PlateManager.CurrentIndex + 1,
+                activeForm.PlateManager.Count);
 
             plateSizeStatusLabel.Text = string.Format(
                 "Size: {0}",
@@ -723,7 +723,7 @@ namespace OpenNest.Forms
                     foreach (var part in result.Parts)
                         plate.Parts.Add(part);
 
-                    activeForm.LoadLastPlate();
+                    activeForm.PlateManager.LoadLast();
                 }
 
                 activeForm.Nest.UpdateDrawingQuantities();
@@ -838,31 +838,30 @@ namespace OpenNest.Forms
         {
             if (activeForm == null) return;
             activeForm.Nest.Plates.RemoveEmptyPlates();
-            activeForm.EnsureSentinelPlate();
         }
 
         private void LoadFirstPlate_Click(object sender, EventArgs e)
         {
             if (activeForm == null) return;
-            activeForm.LoadFirstPlate();
+            activeForm.PlateManager.LoadFirst();
         }
 
         private void LoadLastPlate_Click(object sender, EventArgs e)
         {
             if (activeForm == null) return;
-            activeForm.LoadLastPlate();
+            activeForm.PlateManager.LoadLast();
         }
 
         private void LoadPreviousPlate_Click(object sender, EventArgs e)
         {
             if (activeForm == null) return;
-            activeForm.LoadPreviousPlate();
+            activeForm.PlateManager.LoadPrevious();
         }
 
         private void LoadNextPlate_Click(object sender, EventArgs e)
         {
             if (activeForm == null) return;
-            activeForm.LoadNextPlate();
+            activeForm.PlateManager.LoadNext();
         }
 
         private RemnantViewerForm remnantViewer;
@@ -975,7 +974,6 @@ namespace OpenNest.Forms
                 SetNestingLockout(false);
                 nestingCts.Dispose();
                 nestingCts = null;
-                activeForm.EnsureSentinelPlate();
             }
         }
 
@@ -1012,13 +1010,8 @@ namespace OpenNest.Forms
 
         private Plate GetOrCreatePlate(NestProgressForm progressForm)
         {
-            var currentPlate = activeForm.PlateView.Plate;
-
-            if (currentPlate.Parts.Count == 0)
-                return currentPlate;
-
-            var plate = activeForm.Nest.CreatePlate();
-            activeForm.LoadLastPlate();
+            var plate = activeForm.PlateManager.GetOrCreateEmpty();
+            activeForm.PlateManager.LoadLast();
             progressForm.PreviewPlate = CreatePreviewPlate(plate);
             return plate;
         }
