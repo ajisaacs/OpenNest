@@ -112,6 +112,7 @@ namespace OpenNest.Mcp.Tools
 
             var drawingName = name ?? Path.GetFileNameWithoutExtension(path);
             var drawing = new Drawing(drawingName, pgm);
+            drawing.Color = Drawing.GetNextColor();
             _session.Drawings.Add(drawing);
 
             var bbox = pgm.BoundingBox();
@@ -155,6 +156,7 @@ namespace OpenNest.Mcp.Tools
                     if (pgm == null)
                         return "Error: failed to parse G-code";
                     var gcodeDrawing = new Drawing(name, pgm);
+                    gcodeDrawing.Color = Drawing.GetNextColor();
                     _session.Drawings.Add(gcodeDrawing);
                     var gcodeBbox = pgm.BoundingBox();
                     return $"Created drawing '{name}': bbox={gcodeBbox.Width:F2} x {gcodeBbox.Length:F2}";
@@ -164,6 +166,7 @@ namespace OpenNest.Mcp.Tools
             }
 
             var drawing = shapeDef.GetDrawing();
+            drawing.Color = Drawing.GetNextColor();
             _session.Drawings.Add(drawing);
 
             var bbox = drawing.Program.BoundingBox();

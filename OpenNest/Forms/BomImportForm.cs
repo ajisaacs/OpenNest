@@ -420,6 +420,7 @@ namespace OpenNest.Forms
 
                         var drawingName = Path.GetFileNameWithoutExtension(part.DxfPath);
                         var drawing = new Drawing(drawingName);
+                        drawing.Color = Drawing.GetNextColor();
                         drawing.Source.Path = part.DxfPath;
                         drawing.Quantity.Required = part.Qty ?? 1;
                         drawing.Material = new Material(material);

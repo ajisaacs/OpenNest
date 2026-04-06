@@ -13,21 +13,7 @@ namespace OpenNest
         private Color edgeSpacingColor;
         private Color previewPartColor;
 
-        public static readonly Color[] PartColors = new Color[]
-        {
-            Color.FromArgb(205, 92, 92),    // Indian Red
-            Color.FromArgb(148, 103, 189),  // Medium Purple
-            Color.FromArgb(75, 180, 175),   // Teal
-            Color.FromArgb(210, 190, 75),   // Goldenrod
-            Color.FromArgb(190, 85, 175),   // Orchid
-            Color.FromArgb(185, 115, 85),   // Sienna
-            Color.FromArgb(120, 100, 190),  // Slate Blue
-            Color.FromArgb(200, 100, 140),  // Rose
-            Color.FromArgb(80, 175, 155),   // Sea Green
-            Color.FromArgb(195, 160, 85),   // Dark Khaki
-            Color.FromArgb(175, 95, 160),   // Plum
-            Color.FromArgb(215, 130, 130),  // Light Coral
-        };
+        public static Color[] PartColors => Drawing.PartColors;
 
         public static readonly ColorScheme Default = new ColorScheme
         {

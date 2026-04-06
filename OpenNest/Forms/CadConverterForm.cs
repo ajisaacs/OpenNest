@@ -19,7 +19,7 @@ namespace OpenNest.Forms
 {
     public partial class CadConverterForm : Form
     {
-        private static int colorIndex;
+
         private SimplifierViewerForm simplifierViewer;
         private bool staleProgram = true;
 
@@ -622,7 +622,7 @@ namespace OpenNest.Forms
                     continue;
 
                 var drawing = new Drawing(item.Name);
-                drawing.Color = GetNextColor();
+                drawing.Color = Drawing.GetNextColor();
                 drawing.Customer = item.Customer;
                 drawing.Source.Path = item.Path;
                 drawing.Quantity.Required = item.Quantity;
@@ -671,12 +671,7 @@ namespace OpenNest.Forms
         }
 
 
-        private static Color GetNextColor()
-        {
-            var color = ColorScheme.PartColors[colorIndex % ColorScheme.PartColors.Length];
-            colorIndex++;
-            return color;
-        }
+        private static Color GetNextColor() => Drawing.GetNextColor();
 
         private static bool IsDirectoryWritable(string path)
         {

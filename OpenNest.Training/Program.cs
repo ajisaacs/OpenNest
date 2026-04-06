@@ -79,21 +79,7 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
         Console.WriteLine($"Using template: {template}");
     }
 
-    var PartColors = new[]
-    {
-        Color.FromArgb(205, 92, 92),
-        Color.FromArgb(148, 103, 189),
-        Color.FromArgb(75, 180, 175),
-        Color.FromArgb(210, 190, 75),
-        Color.FromArgb(190, 85, 175),
-        Color.FromArgb(185, 115, 85),
-        Color.FromArgb(120, 100, 190),
-        Color.FromArgb(200, 100, 140),
-        Color.FromArgb(80, 175, 155),
-        Color.FromArgb(195, 160, 85),
-        Color.FromArgb(175, 95, 160),
-        Color.FromArgb(215, 130, 130),
-    };
+    var PartColors = Drawing.PartColors;
 
     var sheetSuite = new[]
     {
