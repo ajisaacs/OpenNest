@@ -158,8 +158,8 @@ namespace OpenNest
             if (!candidate.NetCost.IsEqualTo(current.NetCost))
                 return candidate.NetCost < current.NetCost;
 
-            // 3. Smaller plate area as tiebreak.
-            return candidate.ChosenSize.Area < current.ChosenSize.Area;
+            // 3. Higher utilization (tighter density) as tiebreak.
+            return candidate.Utilization > current.Utilization;
         }
     }
 }
