@@ -152,22 +152,14 @@ namespace OpenNest.Controls
             UpdateScrollBar();
         }
 
-        protected override bool IsInputKey(Keys keyData)
+        public void ProcessArrowKey(Keys keyData)
         {
-            if (keyData == Keys.Up || keyData == Keys.Down)
-                return true;
-            return base.IsInputKey(keyData);
-        }
-
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-            base.OnKeyDown(e);
             if (items.Count == 0) return;
 
             var newIndex = selectedIndex;
-            if (e.KeyCode == Keys.Down)
+            if (keyData == Keys.Down)
                 newIndex = System.Math.Min(selectedIndex + 1, items.Count - 1);
-            else if (e.KeyCode == Keys.Up)
+            else if (keyData == Keys.Up)
                 newIndex = System.Math.Max(selectedIndex - 1, 0);
             else
                 return;
@@ -179,7 +171,23 @@ namespace OpenNest.Controls
                 Invalidate();
                 SelectedIndexChanged?.Invoke(this, selectedIndex);
             }
-            e.Handled = true;
+        }
+
+        protected override bool IsInputKey(Keys keyData)
+        {
+            if (keyData == Keys.Up || keyData == Keys.Down)
+                return true;
+            return base.IsInputKey(keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down)
+            {
+                ProcessArrowKey(e.KeyCode);
+                e.Handled = true;
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)

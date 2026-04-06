@@ -23,6 +23,17 @@ namespace OpenNest.Forms
         private SimplifierViewerForm simplifierViewer;
         private bool staleProgram = true;
 
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if ((keyData == Keys.Up || keyData == Keys.Down) && !fileList.Focused)
+            {
+                fileList.ProcessArrowKey(keyData);
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         public CadConverterForm()
         {
             InitializeComponent();
