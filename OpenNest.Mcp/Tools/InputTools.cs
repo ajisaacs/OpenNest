@@ -96,13 +96,10 @@ namespace OpenNest.Mcp.Tools
             if (!File.Exists(path))
                 return $"Error: file not found: {path}";
 
-            var importer = new DxfImporter();
-
-            if (!importer.GetGeometry(path, out var geometry))
-                return "Error: failed to read DXF file";
+            var geometry = Dxf.GetGeometry(path);
 
             if (geometry.Count == 0)
-                return "Error: no geometry found in DXF file";
+                return "Error: failed to read DXF file or no geometry found";
 
             var normalized = ShapeProfile.NormalizeEntities(geometry);
             var pgm = ConvertGeometry.ToProgram(normalized);

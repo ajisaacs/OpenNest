@@ -32,8 +32,7 @@ public class BestFitOverlapTests
         if (!File.Exists(DxfPath))
             return null;
 
-        var importer = new DxfImporter();
-        importer.GetGeometry(DxfPath, out var geometry);
+        var geometry = Dxf.GetGeometry(DxfPath);
         var pgm = ConvertGeometry.ToProgram(geometry);
         return new Drawing("PT16", pgm);
     }

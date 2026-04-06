@@ -74,8 +74,7 @@ namespace OpenNest.Forms
         {
             try
             {
-                var importer = new DxfImporter();
-                var result = importer.Import(file);
+                var result = Dxf.Import(file);
 
                 if (result.Entities.Count == 0)
                     return;
@@ -383,8 +382,7 @@ namespace OpenNest.Forms
                 newItems.Add(splitPath);
 
                 // Re-import geometry but keep bends from the split drawing
-                var importer = new DxfImporter();
-                var result = importer.Import(splitPath);
+                var result = Dxf.Import(splitPath);
 
                 var splitItem = new FileListItem
                 {

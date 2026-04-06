@@ -70,8 +70,7 @@ public class NestRunnerTests
         var pgm = ConvertGeometry.ToProgram(shape);
         var path = Path.Combine(Path.GetTempPath(), $"test-{Guid.NewGuid()}.dxf");
 
-        var exporter = new DxfExporter();
-        exporter.ExportProgram(pgm, path);
+        Dxf.ExportProgram(pgm, path);
 
         return path;
     }

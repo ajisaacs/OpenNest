@@ -369,8 +369,7 @@ public class DrawingSplitterTests
             var writer = new OpenNest.IO.SplitDxfWriter();
             writer.Write(tempPath, results[0]);
 
-            var reimporter = new OpenNest.IO.DxfImporter();
-            var reimportResult = reimporter.Import(tempPath);
+            var reimportResult = OpenNest.IO.Dxf.Import(tempPath);
 
             var afterArcs = reimportResult.Entities.OfType<Arc>().Count();
             var afterCircles = reimportResult.Entities.OfType<Circle>().Count();

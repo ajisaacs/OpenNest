@@ -382,7 +382,6 @@ namespace OpenNest.Forms
             }
 
             var jobName = txtJobName.Text.Trim();
-            var importer = new DxfImporter();
             var nestsCreated = 0;
             var importErrors = new List<string>();
 
@@ -416,7 +415,7 @@ namespace OpenNest.Forms
 
                     try
                     {
-                        var result = importer.Import(part.DxfPath);
+                        var result = Dxf.Import(part.DxfPath);
 
                         var drawingName = Path.GetFileNameWithoutExtension(part.DxfPath);
                         var drawing = new Drawing(drawingName);

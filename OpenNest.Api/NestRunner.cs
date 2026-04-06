@@ -25,14 +25,13 @@ public static class NestRunner
 
         // 1. Import DXFs → Drawings
         var drawings = new List<Drawing>();
-        var importer = new DxfImporter();
-
         foreach (var part in request.Parts)
         {
             if (!File.Exists(part.DxfPath))
                 throw new FileNotFoundException($"DXF file not found: {part.DxfPath}", part.DxfPath);
 
-            if (!importer.GetGeometry(part.DxfPath, out var geometry) || geometry.Count == 0)
+            var geometry = Dxf.GetGeometry(part.DxfPath);
+            if (geometry.Count == 0)
                 throw new InvalidOperationException($"Failed to import DXF: {part.DxfPath}");
 
             var normalized = ShapeProfile.NormalizeEntities(geometry);

@@ -185,8 +185,7 @@ public class SplitDxfWriterEtchLayerTests
                 writer.Write(tempPath, splitDrawing);
 
                 // Re-import via DxfImporter (same path as CadConverterForm)
-                var importer = new DxfImporter();
-                var result = importer.Import(tempPath);
+                var result = Dxf.Import(tempPath);
 
                 // ETCH entities should be filtered during import (like BEND)
                 var etchEntities = result.Entities

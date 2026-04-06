@@ -23,8 +23,7 @@ public class StrategyOverlapTests
         if (!System.IO.File.Exists(DxfPath))
             return null;
 
-        var importer = new DxfImporter();
-        importer.GetGeometry(DxfPath, out var geometry);
+        var geometry = Dxf.GetGeometry(DxfPath);
         var pgm = ConvertGeometry.ToProgram(geometry);
         return new Drawing("PT15", pgm);
     }

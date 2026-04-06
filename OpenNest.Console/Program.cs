@@ -241,17 +241,11 @@ static class NestConsole
 
     static Drawing ImportDxf(string path)
     {
-        var importer = new DxfImporter();
-
-        if (!importer.GetGeometry(path, out var geometry))
-        {
-            Console.Error.WriteLine($"Error: failed to read DXF file: {path}");
-            return null;
-        }
+        var geometry = Dxf.GetGeometry(path);
 
         if (geometry.Count == 0)
         {
-            Console.Error.WriteLine($"Error: no geometry found in DXF file: {path}");
+            Console.Error.WriteLine($"Error: failed to read DXF file or no geometry found: {path}");
             return null;
         }
 

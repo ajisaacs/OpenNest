@@ -138,8 +138,7 @@ public class GeometrySimplifierTests
         if (!File.Exists(path))
             return; // skip if file not available
 
-        var importer = new DxfImporter();
-        var result = importer.Import(path);
+        var result = Dxf.Import(path);
         var shapes = ShapeBuilder.GetShapes(result.Entities);
 
         var simplifier = new GeometrySimplifier { Tolerance = 0.004 };

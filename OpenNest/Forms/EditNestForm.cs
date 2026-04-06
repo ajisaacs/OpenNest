@@ -362,9 +362,8 @@ namespace OpenNest.Forms
             {
                 if (dlg.FilterIndex == 1)
                 {
-                    var exporter = new DxfExporter();
-                    var success = exporter.ExportPlate(PlateView.Plate, dlg.FileName);
-                    return success;
+                    Dxf.ExportPlate(PlateView.Plate, dlg.FileName);
+                    return true;
                 }
                 else if (dlg.FilterIndex == 2)
                 {
@@ -540,8 +539,7 @@ namespace OpenNest.Forms
             var plate = PlateView.Plate;
             var name = string.Format("{0}-P{1}.dxf", Nest.Name, PlateManager.CurrentIndex + 1);
             var path = Path.Combine(Path.GetTempPath(), name);
-            var exporter = new DxfExporter();
-            exporter.ExportPlate(plate, path);
+            Dxf.ExportPlate(plate, path);
 
             Process.Start(path);
         }

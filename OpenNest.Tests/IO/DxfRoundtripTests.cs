@@ -11,17 +11,14 @@ public class DxfRoundtripTests
     private static List<Entity> ExportAndReimport(List<Entity> geometry)
     {
         var program = ConvertGeometry.ToProgram(geometry);
-        var exporter = new DxfExporter();
-        var importer = new DxfImporter();
-
         using var exportStream = new MemoryStream();
-        exporter.ExportProgram(program, exportStream);
+        Dxf.ExportProgram(program, exportStream);
         var bytes = exportStream.ToArray();
 
         var importStream = new MemoryStream(bytes);
-        var success = importer.GetGeometry(importStream, out var reimported);
+        var reimported = Dxf.GetGeometry(importStream);
 
-        Assert.True(success, "Failed to re-import exported DXF");
+        Assert.NotEmpty(reimported);
         return reimported;
     }
 

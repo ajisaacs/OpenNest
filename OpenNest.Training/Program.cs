@@ -104,7 +104,6 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
     if (backfilled > 0)
         Console.WriteLine($"Backfilled PerimeterToAreaRatio for {backfilled} existing parts");
 
-    var importer = new DxfImporter();
     var colorIndex = 0;
     var processed = 0;
     var skippedGeometry = 0;
@@ -129,7 +128,8 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                 continue;
             }
 
-            if (!importer.GetGeometry(file, out var entities))
+            var entities = Dxf.GetGeometry(file);
+            if (entities.Count == 0)
             {
                 Console.WriteLine(" - SKIP (no geometry)");
                 skippedGeometry++;
