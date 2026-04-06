@@ -259,10 +259,9 @@ namespace OpenNest
                     var workArea = pr.Plate.WorkArea();
                     var classification = Classify(partBounds, workArea);
 
-                    if (classification == PartClass.Large)
-                        continue; // Large parts don't go on existing plates — they create new ones.
-
-                    // Small parts only go into scrap zones; medium parts into viable remnants.
+                    // Small parts only go into scrap zones to preserve viable remnants.
+                    // Medium and Large parts go into viable remnants (large parts can
+                    // still fit in remnant space left by other large parts).
                     var remnants = classification == PartClass.Small
                         ? FindScrapZones(pr.Plate, minRemnantSize)
                         : FindViableRemnants(pr.Plate, minRemnantSize);
