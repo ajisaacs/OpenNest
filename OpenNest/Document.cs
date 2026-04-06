@@ -1,4 +1,4 @@
-﻿using OpenNest.IO;
+using OpenNest.IO;
 using System;
 using System.IO;
 
@@ -12,7 +12,9 @@ namespace OpenNest
 
         public string LastSavePath { get; private set; }
 
-        public Units Units { get; set; }
+        public string Name => Nest?.Name;
+
+        public bool HasSavePath => File.Exists(LastSavePath);
 
         public void SaveAs(string path)
         {

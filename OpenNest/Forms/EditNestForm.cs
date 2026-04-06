@@ -23,9 +23,11 @@ namespace OpenNest.Forms
     {
         public event EventHandler PlateChanged;
 
-        public readonly Nest Nest;
+        public readonly Document Document;
         public readonly PlateView PlateView;
         public readonly PlateManager PlateManager;
+
+        public Nest Nest => Document.Nest;
 
         private readonly Timer updateDrawingListTimer;
         private bool updatingPlateList;
@@ -209,7 +211,7 @@ namespace OpenNest.Forms
             };
             updateDrawingListTimer.Elapsed += drawingListUpdateTimer_Elapsed;
 
-            Nest = nest;
+            Document = new Document { Nest = nest };
 
             PlateManager = new PlateManager(nest);
             PlateManager.CurrentPlateChanged += PlateManager_CurrentPlateChanged;
@@ -228,9 +230,6 @@ namespace OpenNest.Forms
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
         }
 
-        public string LastSavePath { get; private set; }
-
-        public DateTime LastSaveDate { get; private set; }
 
         public void UpdatePlateList()
         {
@@ -284,8 +283,8 @@ namespace OpenNest.Forms
 
         public void Save()
         {
-            if (File.Exists(LastSavePath))
-                SaveAs(LastSavePath);
+            if (Document.HasSavePath)
+                SaveAs(Document.LastSavePath);
             else
                 SaveAs();
         }
@@ -307,14 +306,8 @@ namespace OpenNest.Forms
 
         public void SaveAs(string path)
         {
-            var name = Path.GetFileNameWithoutExtension(path);
-            Nest.Name = name;
-            Text = name;
-            LastSaveDate = DateTime.Now;
-            LastSavePath = path;
-
-            var writer = new NestWriter(Nest);
-            writer.Write(path);
+            Document.SaveAs(path);
+            Text = Document.Name;
         }
 
         public void SaveTemplate(string path)
