@@ -932,6 +932,10 @@ namespace OpenNest.Forms
             var optimizePlateSize = form.OptimizePlateSize;
             var plateOptions = optimizePlateSize ? form.GetPlateOptions() : null;
             var salvageRate = form.SalvageRate;
+            var partFirstMode = form.PartFirstMode;
+            var sortOrder = form.SortOrder;
+            var minRemnantSize = form.MinRemnantSize;
+            var allowPlateCreation = form.AllowPlateCreation;
 
             if (optimizePlateSize)
             {
@@ -960,7 +964,7 @@ namespace OpenNest.Forms
             try
             {
                 await RunAutoNestAsync(items, progressForm, progress, nestingCts.Token,
-                    plateOptions, salvageRate);
+                    plateOptions, salvageRate, partFirstMode, sortOrder, minRemnantSize, allowPlateCreation);
             }
             catch (Exception ex)
             {
@@ -984,8 +988,43 @@ namespace OpenNest.Forms
             IProgress<NestProgress> progress,
             CancellationToken token,
             List<PlateOption> plateOptions = null,
-            double salvageRate = 0.5)
+            double salvageRate = 0.5,
+            bool partFirstMode = false,
+            PartSortOrder sortOrder = PartSortOrder.BoundingBoxArea,
+            double minRemnantSize = 12.0,
+            bool allowPlateCreation = true)
         {
+            if (partFirstMode)
+            {
+                var existingPlates = new List<Plate>();
+                for (var i = 0; i < activeForm.Nest.Plates.Count; i++)
+                {
+                    var p = activeForm.Nest.Plates[i];
+                    if (p.Parts.Count > 0)
+                        existingPlates.Add(p);
+                }
+
+                var template = activeForm.PlateView.Plate;
+
+                var result = await Task.Run(() =>
+                    MultiPlateNester.Nest(items, template, plateOptions, salvageRate,
+                        sortOrder, minRemnantSize, allowPlateCreation, existingPlates, progress, token));
+
+                foreach (var pr in result.Plates)
+                {
+                    if (pr.IsNew)
+                    {
+                        var plate = GetOrCreatePlate(progressForm);
+                        plate.Size = pr.Plate.Size;
+                        plate.Parts.AddRange(pr.Parts);
+                    }
+                }
+
+                activeForm.Nest.UpdateDrawingQuantities();
+                progressForm.ShowCompleted();
+                return;
+            }
+
             const int maxPlates = 100;
 
             for (var plateIndex = 0; plateIndex < maxPlates; plateIndex++)
