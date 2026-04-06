@@ -1,7 +1,9 @@
+using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using OpenNest.IO.Bending;
 using OpenNest.IO.Bom;
 using System;
 using System.Collections.Generic;
@@ -470,12 +472,19 @@ namespace OpenNest.Forms
                     {
                         var result = Dxf.Import(part.DxfPath);
 
+                        var bends = new List<Bend>();
+                        if (result.Document != null)
+                            bends = BendDetectorRegistry.AutoDetect(result.Document);
+                        Bend.UpdateEtchEntities(result.Entities, bends);
+
                         var drawingName = Path.GetFileNameWithoutExtension(part.DxfPath);
                         var drawing = new Drawing(drawingName);
                         drawing.Color = Drawing.GetNextColor();
                         drawing.Source.Path = part.DxfPath;
                         drawing.Quantity.Required = part.Qty ?? 1;
                         drawing.Material = new Material(material);
+                        if (bends.Count > 0)
+                            drawing.Bends.AddRange(bends);
 
                         var normalized = ShapeProfile.NormalizeEntities(result.Entities);
                         var pgm = ConvertGeometry.ToProgram(normalized);
