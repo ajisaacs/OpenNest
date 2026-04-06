@@ -228,9 +228,96 @@ namespace OpenNest
                         plateOptions, salvageRate, minRemnantSize, progress, token) || placed;
                 }
 
-                if (item.Quantity > 0)
-                    result.UnplacedItems.Add(item);
+                // Don't add to unplaced yet — consolidation pass will handle leftovers.
             }
+
+            // Consolidation pass: pack remaining items together on shared plates
+            // using the engine's multi-item Nest() method instead of one-drawing-per-plate.
+            var leftovers = sorted.Where(i => i.Quantity > 0).ToList();
+
+            if (leftovers.Count > 0 && allowPlateCreation && !token.IsCancellationRequested)
+            {
+                // First try to pack leftovers into remaining space on existing plates.
+                foreach (var pr in platePool)
+                {
+                    if (token.IsCancellationRequested)
+                        break;
+
+                    var remaining = leftovers.Where(i => i.Quantity > 0).ToList();
+                    if (remaining.Count == 0)
+                        break;
+
+                    var finder = RemnantFinder.FromPlate(pr.Plate);
+                    var remnants = finder.FindRemnants();
+
+                    foreach (var remnant in remnants)
+                    {
+                        remaining = remaining.Where(i => i.Quantity > 0).ToList();
+                        if (remaining.Count == 0)
+                            break;
+
+                        var engine = NestEngineRegistry.Create(pr.Plate);
+                        var cloned = remaining.Select(CloneItem).ToList();
+                        var parts = engine.PackArea(remnant, cloned, progress, token);
+
+                        if (parts.Count > 0)
+                        {
+                            pr.Plate.Parts.AddRange(parts);
+                            pr.Parts.AddRange(parts);
+
+                            // Deduct placed quantities from originals.
+                            foreach (var item in remaining)
+                            {
+                                var placed = parts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
+                                item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                            }
+                        }
+                    }
+                }
+
+                // Then create new shared plates for anything still remaining.
+                leftovers = leftovers.Where(i => i.Quantity > 0).ToList();
+
+                while (leftovers.Count > 0 && !token.IsCancellationRequested)
+                {
+                    var plate = CreatePlate(template, plateOptions, null);
+                    var engine = NestEngineRegistry.Create(plate);
+                    var cloned = leftovers.Select(CloneItem).ToList();
+                    var parts = engine.Nest(cloned, progress, token);
+
+                    if (parts.Count == 0)
+                        break;
+
+                    plate.Parts.AddRange(parts);
+                    var pr = new PlateResult
+                    {
+                        Plate = plate,
+                        Parts = parts.ToList(),
+                        IsNew = true,
+                    };
+
+                    if (plateOptions != null)
+                    {
+                        pr.ChosenSize = plateOptions.FirstOrDefault(o =>
+                            o.Width.IsEqualTo(plate.Size.Width) && o.Length.IsEqualTo(plate.Size.Length));
+                    }
+
+                    platePool.Add(pr);
+
+                    // Deduct placed quantities from originals.
+                    foreach (var item in leftovers)
+                    {
+                        var placed = parts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
+                        item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                    }
+
+                    leftovers = leftovers.Where(i => i.Quantity > 0).ToList();
+                }
+            }
+
+            // Anything still remaining is truly unplaced.
+            foreach (var item in sorted.Where(i => i.Quantity > 0))
+                result.UnplacedItems.Add(item);
 
             result.Plates.AddRange(platePool.Where(p => p.Parts.Count > 0 || p.IsNew));
             return result;
