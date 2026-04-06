@@ -16,8 +16,9 @@ namespace OpenNest.Forms
     public partial class BomImportForm : Form
     {
         private List<BomPartRow> _parts;
-        private Dictionary<string, (double Width, double Length)> _plateSizes;
+        private Dictionary<string, GroupSettings> _groupSettings;
         private bool _suppressRegroup;
+        private Nest.PlateSettings _templateDefaults;
 
         public Form MdiParentForm { get; set; }
 
@@ -25,7 +26,38 @@ namespace OpenNest.Forms
         {
             InitializeComponent();
             _parts = new List<BomPartRow>();
-            _plateSizes = new Dictionary<string, (double, double)>();
+            _groupSettings = new Dictionary<string, GroupSettings>();
+            _templateDefaults = LoadTemplateDefaults();
+            ApplyTemplateDefaults();
+        }
+
+        private Nest.PlateSettings LoadTemplateDefaults()
+        {
+            var templatePath = Properties.Settings.Default.NestTemplatePath;
+            if (File.Exists(templatePath))
+            {
+                try
+                {
+                    var nest = new NestReader(templatePath).Read();
+                    return nest.PlateDefaults;
+                }
+                catch { }
+            }
+
+            // Fallback defaults matching CreateDefaultNest
+            return new Nest.PlateSettings
+            {
+                Size = new Geometry.Size(100, 100),
+                Quadrant = 1,
+                PartSpacing = 1,
+                EdgeSpacing = new Spacing(1, 1, 1, 1),
+            };
+        }
+
+        private void ApplyTemplateDefaults()
+        {
+            txtPlateWidth.Text = _templateDefaults.Size.Width.ToString("0.####");
+            txtPlateLength.Text = _templateDefaults.Size.Length.ToString("0.####");
         }
 
         #region File Browsing
@@ -154,7 +186,7 @@ namespace OpenNest.Forms
                 _parts.Add(row);
             }
 
-            _plateSizes.Clear();
+            _groupSettings.Clear();
         }
 
         #endregion
@@ -244,11 +276,11 @@ namespace OpenNest.Forms
 
         private void RebuildGroups()
         {
-            // Save existing plate sizes before rebuilding
-            SavePlateSizes();
+            // Save existing settings before rebuilding
+            SaveGroupSettings();
 
-            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var w) ? w : 60;
-            var defaultLength = double.TryParse(txtPlateLength.Text, out var l) ? l : 120;
+            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var w) ? w : _templateDefaults.Size.Width;
+            var defaultLength = double.TryParse(txtPlateLength.Text, out var l) ? l : _templateDefaults.Size.Length;
 
             var groups = _parts
                 .Where(p => p.IsEditable
@@ -270,6 +302,11 @@ namespace OpenNest.Forms
             table.Columns.Add("Total Qty", typeof(int));
             table.Columns.Add("Plate Width", typeof(double));
             table.Columns.Add("Plate Length", typeof(double));
+            table.Columns.Add("Part Spacing", typeof(double));
+            table.Columns.Add("Edge Left", typeof(double));
+            table.Columns.Add("Edge Bottom", typeof(double));
+            table.Columns.Add("Edge Right", typeof(double));
+            table.Columns.Add("Edge Top", typeof(double));
 
             foreach (var group in groups)
             {
@@ -277,23 +314,27 @@ namespace OpenNest.Forms
                 var thickness = group.Key.Thickness;
                 var key = GroupKey(material, thickness);
 
-                var plateWidth = _plateSizes.TryGetValue(key, out var size) ? size.Width : defaultWidth;
-                var plateLength = _plateSizes.TryGetValue(key, out _) ? size.Length : defaultLength;
+                var existing = _groupSettings.TryGetValue(key, out var gs);
 
                 table.Rows.Add(
                     material,
                     thickness,
                     group.Count(),
                     group.Sum(p => p.Qty ?? 0),
-                    plateWidth,
-                    plateLength
+                    existing ? gs.PlateWidth : defaultWidth,
+                    existing ? gs.PlateLength : defaultLength,
+                    existing ? gs.PartSpacing : _templateDefaults.PartSpacing,
+                    existing ? gs.EdgeLeft : _templateDefaults.EdgeSpacing.Left,
+                    existing ? gs.EdgeBottom : _templateDefaults.EdgeSpacing.Bottom,
+                    existing ? gs.EdgeRight : _templateDefaults.EdgeSpacing.Right,
+                    existing ? gs.EdgeTop : _templateDefaults.EdgeSpacing.Top
                 );
             }
 
             dgvGroups.DataSource = table;
 
             // Material, Thickness, Parts, Total Qty are read-only
-            if (dgvGroups.Columns.Count >= 6)
+            if (dgvGroups.Columns.Count > 0)
             {
                 dgvGroups.Columns["Material"].ReadOnly = true;
                 dgvGroups.Columns["Thickness"].ReadOnly = true;
@@ -304,22 +345,28 @@ namespace OpenNest.Forms
             btnCreateNests.Enabled = table.Rows.Count > 0;
         }
 
-        private void SavePlateSizes()
+        private void SaveGroupSettings()
         {
             if (dgvGroups.DataSource is not DataTable table)
                 return;
 
-            _plateSizes.Clear();
+            _groupSettings.Clear();
             foreach (DataRow row in table.Rows)
             {
                 var material = row["Material"]?.ToString() ?? "";
                 var thickness = row["Thickness"] is double t ? t : 0;
                 var key = GroupKey(material, thickness);
 
-                var width = row["Plate Width"] is double pw ? pw : 60;
-                var length = row["Plate Length"] is double pl ? pl : 120;
-
-                _plateSizes[key] = (width, length);
+                _groupSettings[key] = new GroupSettings
+                {
+                    PlateWidth = row["Plate Width"] is double pw ? pw : _templateDefaults.Size.Width,
+                    PlateLength = row["Plate Length"] is double pl ? pl : _templateDefaults.Size.Length,
+                    PartSpacing = row["Part Spacing"] is double ps ? ps : _templateDefaults.PartSpacing,
+                    EdgeLeft = row["Edge Left"] is double el ? el : _templateDefaults.EdgeSpacing.Left,
+                    EdgeBottom = row["Edge Bottom"] is double eb ? eb : _templateDefaults.EdgeSpacing.Bottom,
+                    EdgeRight = row["Edge Right"] is double er ? er : _templateDefaults.EdgeSpacing.Right,
+                    EdgeTop = row["Edge Top"] is double et ? et : _templateDefaults.EdgeSpacing.Top,
+                };
             }
         }
 
@@ -356,11 +403,11 @@ namespace OpenNest.Forms
             if (_parts == null || _parts.Count == 0)
                 return;
 
-            // Save latest plate size edits
-            SavePlateSizes();
+            // Save latest group edits
+            SaveGroupSettings();
 
-            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var dw) ? dw : 60;
-            var defaultLength = double.TryParse(txtPlateLength.Text, out var dl) ? dl : 120;
+            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var dw) ? dw : _templateDefaults.Size.Width;
+            var defaultLength = double.TryParse(txtPlateLength.Text, out var dl) ? dl : _templateDefaults.Size.Length;
 
             var groups = _parts
                 .Where(p => p.IsEditable
@@ -391,8 +438,14 @@ namespace OpenNest.Forms
                 var thickness = group.Key.Thickness;
                 var key = GroupKey(material, thickness);
 
-                var plateWidth = _plateSizes.TryGetValue(key, out var size) ? size.Width : defaultWidth;
-                var plateLength = _plateSizes.TryGetValue(key, out _) ? size.Length : defaultLength;
+                var hasSettings = _groupSettings.TryGetValue(key, out var gs);
+                var plateWidth = hasSettings ? gs.PlateWidth : defaultWidth;
+                var plateLength = hasSettings ? gs.PlateLength : defaultLength;
+                var partSpacing = hasSettings ? gs.PartSpacing : _templateDefaults.PartSpacing;
+                var edgeLeft = hasSettings ? gs.EdgeLeft : _templateDefaults.EdgeSpacing.Left;
+                var edgeBottom = hasSettings ? gs.EdgeBottom : _templateDefaults.EdgeSpacing.Bottom;
+                var edgeRight = hasSettings ? gs.EdgeRight : _templateDefaults.EdgeSpacing.Right;
+                var edgeTop = hasSettings ? gs.EdgeTop : _templateDefaults.EdgeSpacing.Top;
 
                 var nestName = $"{jobName} - {thickness:0.###} {material}";
                 var nest = new Nest(nestName);
@@ -401,9 +454,9 @@ namespace OpenNest.Forms
                 nest.PlateDefaults.Size = new Geometry.Size(plateWidth, plateLength);
                 nest.Thickness = thickness;
                 nest.Material = new Material(material);
-                nest.PlateDefaults.Quadrant = 1;
-                nest.PlateDefaults.PartSpacing = 1;
-                nest.PlateDefaults.EdgeSpacing = new Spacing(1, 1, 1, 1);
+                nest.PlateDefaults.Quadrant = _templateDefaults.Quadrant;
+                nest.PlateDefaults.PartSpacing = partSpacing;
+                nest.PlateDefaults.EdgeSpacing = new Spacing(edgeLeft, edgeBottom, edgeRight, edgeTop);
 
                 foreach (var part in group)
                 {
@@ -485,5 +538,16 @@ namespace OpenNest.Forms
         public string DxfPath { get; set; }
         public string Status { get; set; }
         public bool IsEditable { get; set; }
+    }
+
+    internal class GroupSettings
+    {
+        public double PlateWidth { get; set; }
+        public double PlateLength { get; set; }
+        public double PartSpacing { get; set; }
+        public double EdgeLeft { get; set; }
+        public double EdgeBottom { get; set; }
+        public double EdgeRight { get; set; }
+        public double EdgeTop { get; set; }
     }
 }

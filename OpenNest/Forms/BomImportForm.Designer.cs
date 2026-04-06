@@ -50,9 +50,9 @@ namespace OpenNest.Forms
             ((System.ComponentModel.ISupportInitialize)dgvGroups).BeginInit();
             pnlBottom.SuspendLayout();
             SuspendLayout();
-            // 
+            //
             // grpInput
-            // 
+            //
             grpInput.Controls.Add(tbl);
             grpInput.Dock = System.Windows.Forms.DockStyle.Top;
             grpInput.Location = new System.Drawing.Point(0, 0);
@@ -62,9 +62,9 @@ namespace OpenNest.Forms
             grpInput.TabIndex = 0;
             grpInput.TabStop = false;
             grpInput.Text = "Input";
-            // 
+            //
             // tbl
-            // 
+            //
             tbl.ColumnCount = 3;
             tbl.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             tbl.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
@@ -92,9 +92,9 @@ namespace OpenNest.Forms
             tbl.RowStyles.Add(new System.Windows.Forms.RowStyle());
             tbl.Size = new System.Drawing.Size(792, 172);
             tbl.TabIndex = 0;
-            // 
+            //
             // lblJobName
-            // 
+            //
             lblJobName.Anchor = System.Windows.Forms.AnchorStyles.Left;
             lblJobName.AutoSize = true;
             lblJobName.Location = new System.Drawing.Point(6, 13);
@@ -103,9 +103,9 @@ namespace OpenNest.Forms
             lblJobName.Size = new System.Drawing.Size(63, 15);
             lblJobName.TabIndex = 0;
             lblJobName.Text = "Job Name:";
-            // 
+            //
             // txtJobName
-            // 
+            //
             tbl.SetColumnSpan(txtJobName, 2);
             txtJobName.Dock = System.Windows.Forms.DockStyle.Fill;
             txtJobName.Location = new System.Drawing.Point(79, 9);
@@ -113,9 +113,9 @@ namespace OpenNest.Forms
             txtJobName.Name = "txtJobName";
             txtJobName.Size = new System.Drawing.Size(707, 23);
             txtJobName.TabIndex = 1;
-            // 
+            //
             // lblBomFile
-            // 
+            //
             lblBomFile.Anchor = System.Windows.Forms.AnchorStyles.Left;
             lblBomFile.AutoSize = true;
             lblBomFile.Location = new System.Drawing.Point(6, 45);
@@ -124,9 +124,9 @@ namespace OpenNest.Forms
             lblBomFile.Size = new System.Drawing.Size(58, 15);
             lblBomFile.TabIndex = 2;
             lblBomFile.Text = "BOM File:";
-            // 
+            //
             // txtBomFile
-            // 
+            //
             txtBomFile.Dock = System.Windows.Forms.DockStyle.Fill;
             txtBomFile.Location = new System.Drawing.Point(79, 41);
             txtBomFile.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
@@ -134,9 +134,9 @@ namespace OpenNest.Forms
             txtBomFile.ReadOnly = true;
             txtBomFile.Size = new System.Drawing.Size(669, 23);
             txtBomFile.TabIndex = 3;
-            // 
+            //
             // btnBrowseBom
-            // 
+            //
             btnBrowseBom.Location = new System.Drawing.Point(751, 40);
             btnBrowseBom.Margin = new System.Windows.Forms.Padding(0, 5, 3, 3);
             btnBrowseBom.Name = "btnBrowseBom";
@@ -144,9 +144,9 @@ namespace OpenNest.Forms
             btnBrowseBom.TabIndex = 4;
             btnBrowseBom.Text = "...";
             btnBrowseBom.Click += BrowseBom_Click;
-            // 
+            //
             // lblDxfFolder
-            // 
+            //
             lblDxfFolder.Anchor = System.Windows.Forms.AnchorStyles.Left;
             lblDxfFolder.AutoSize = true;
             lblDxfFolder.Location = new System.Drawing.Point(6, 78);
@@ -155,9 +155,9 @@ namespace OpenNest.Forms
             lblDxfFolder.Size = new System.Drawing.Size(67, 15);
             lblDxfFolder.TabIndex = 5;
             lblDxfFolder.Text = "DXF Folder:";
-            // 
+            //
             // txtDxfFolder
-            // 
+            //
             txtDxfFolder.Dock = System.Windows.Forms.DockStyle.Fill;
             txtDxfFolder.Location = new System.Drawing.Point(79, 74);
             txtDxfFolder.Margin = new System.Windows.Forms.Padding(3, 6, 3, 3);
@@ -165,9 +165,9 @@ namespace OpenNest.Forms
             txtDxfFolder.ReadOnly = true;
             txtDxfFolder.Size = new System.Drawing.Size(669, 23);
             txtDxfFolder.TabIndex = 6;
-            // 
+            //
             // btnBrowseDxf
-            // 
+            //
             btnBrowseDxf.Location = new System.Drawing.Point(751, 73);
             btnBrowseDxf.Margin = new System.Windows.Forms.Padding(0, 5, 3, 3);
             btnBrowseDxf.Name = "btnBrowseDxf";
@@ -175,9 +175,9 @@ namespace OpenNest.Forms
             btnBrowseDxf.TabIndex = 7;
             btnBrowseDxf.Text = "...";
             btnBrowseDxf.Click += BrowseDxf_Click;
-            // 
+            //
             // lblPlateSize
-            // 
+            //
             lblPlateSize.Anchor = System.Windows.Forms.AnchorStyles.Left;
             lblPlateSize.AutoSize = true;
             lblPlateSize.Location = new System.Drawing.Point(6, 112);
@@ -186,9 +186,9 @@ namespace OpenNest.Forms
             lblPlateSize.Size = new System.Drawing.Size(59, 15);
             lblPlateSize.TabIndex = 8;
             lblPlateSize.Text = "Plate Size:";
-            // 
+            //
             // platePanel
-            // 
+            //
             platePanel.AutoSize = true;
             platePanel.Controls.Add(txtPlateWidth);
             platePanel.Controls.Add(lblPlateX);
@@ -199,17 +199,17 @@ namespace OpenNest.Forms
             platePanel.Size = new System.Drawing.Size(156, 29);
             platePanel.TabIndex = 9;
             platePanel.WrapContents = false;
-            // 
+            //
             // txtPlateWidth
-            // 
+            //
             txtPlateWidth.Location = new System.Drawing.Point(3, 3);
             txtPlateWidth.Name = "txtPlateWidth";
             txtPlateWidth.Size = new System.Drawing.Size(60, 23);
             txtPlateWidth.TabIndex = 0;
             txtPlateWidth.Text = "60";
-            // 
+            //
             // lblPlateX
-            // 
+            //
             lblPlateX.Anchor = System.Windows.Forms.AnchorStyles.Left;
             lblPlateX.AutoSize = true;
             lblPlateX.Location = new System.Drawing.Point(69, 7);
@@ -217,17 +217,17 @@ namespace OpenNest.Forms
             lblPlateX.Size = new System.Drawing.Size(18, 15);
             lblPlateX.TabIndex = 1;
             lblPlateX.Text = " x ";
-            // 
+            //
             // txtPlateLength
-            // 
+            //
             txtPlateLength.Location = new System.Drawing.Point(93, 3);
             txtPlateLength.Name = "txtPlateLength";
             txtPlateLength.Size = new System.Drawing.Size(60, 23);
             txtPlateLength.TabIndex = 2;
             txtPlateLength.Text = "120";
-            // 
+            //
             // btnAnalyze
-            // 
+            //
             btnAnalyze.Anchor = System.Windows.Forms.AnchorStyles.Right;
             tbl.SetColumnSpan(btnAnalyze, 2);
             btnAnalyze.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
@@ -291,9 +291,9 @@ namespace OpenNest.Forms
             dgvGroups.RowHeadersVisible = false;
             dgvGroups.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             dgvGroups.TabIndex = 0;
-            // 
+            //
             // pnlBottom
-            // 
+            //
             pnlBottom.Controls.Add(lblSummary);
             pnlBottom.Controls.Add(btnCreateNests);
             pnlBottom.Controls.Add(btnClose);
@@ -303,9 +303,9 @@ namespace OpenNest.Forms
             pnlBottom.Padding = new System.Windows.Forms.Padding(10);
             pnlBottom.Size = new System.Drawing.Size(804, 50);
             pnlBottom.TabIndex = 2;
-            // 
+            //
             // lblSummary
-            // 
+            //
             lblSummary.AutoSize = true;
             lblSummary.Dock = System.Windows.Forms.DockStyle.Left;
             lblSummary.ForeColor = System.Drawing.Color.Gray;
@@ -314,9 +314,9 @@ namespace OpenNest.Forms
             lblSummary.Size = new System.Drawing.Size(0, 15);
             lblSummary.TabIndex = 0;
             lblSummary.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            // 
+            //
             // btnCreateNests
-            // 
+            //
             btnCreateNests.Dock = System.Windows.Forms.DockStyle.Right;
             btnCreateNests.Enabled = false;
             btnCreateNests.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
@@ -327,9 +327,9 @@ namespace OpenNest.Forms
             btnCreateNests.TabIndex = 1;
             btnCreateNests.Text = "Create Nests";
             btnCreateNests.Click += CreateNests_Click;
-            // 
+            //
             // btnClose
-            // 
+            //
             btnClose.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             btnClose.Dock = System.Windows.Forms.DockStyle.Right;
             btnClose.Location = new System.Drawing.Point(714, 10);
@@ -338,9 +338,9 @@ namespace OpenNest.Forms
             btnClose.TabIndex = 2;
             btnClose.Text = "Close";
             btnClose.Click += BtnClose_Click;
-            // 
+            //
             // BomImportForm
-            // 
+            //
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             CancelButton = btnClose;
