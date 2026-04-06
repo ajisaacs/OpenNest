@@ -1,6 +1,7 @@
 using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Xunit;
 
 namespace OpenNest.Tests.Engine;
@@ -202,5 +203,126 @@ public class MultiPlateNesterTests
             currentOption, upgradeOption, newPlateOption, 0.5, 0.5);
 
         Assert.True(decision.ShouldUpgrade);
+    }
+
+    // --- Task 7: Main Orchestration ---
+
+    [Fact]
+    public void Nest_LargePartsGetOwnPlates()
+    {
+        var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
+        template.EdgeSpacing = new Spacing();
+
+        var items = new List<NestItem>
+        {
+            MakeItem("big1", 80, 40, 1),
+            MakeItem("big2", 70, 35, 1),
+        };
+
+        var result = MultiPlateNester.Nest(
+            items, template,
+            plateOptions: null,
+            salvageRate: 0.5,
+            sortOrder: PartSortOrder.BoundingBoxArea,
+            minRemnantSize: 12.0,
+            allowPlateCreation: true,
+            existingPlates: null,
+            progress: null,
+            token: CancellationToken.None);
+
+        // Each large part should be on its own plate.
+        Assert.True(result.Plates.Count >= 2,
+            $"Expected at least 2 plates, got {result.Plates.Count}");
+    }
+
+    [Fact]
+    public void Nest_SmallPartsGoIntoScrapZones()
+    {
+        var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
+        template.EdgeSpacing = new Spacing();
+
+        var items = new List<NestItem>
+        {
+            MakeItem("big", 80, 40, 1),
+            MakeItem("tiny", 5, 5, 3),
+        };
+
+        var result = MultiPlateNester.Nest(
+            items, template,
+            plateOptions: null,
+            salvageRate: 0.5,
+            sortOrder: PartSortOrder.BoundingBoxArea,
+            minRemnantSize: 12.0,
+            allowPlateCreation: true,
+            existingPlates: null,
+            progress: null,
+            token: CancellationToken.None);
+
+        // Small parts should be placed on the same plate as the big part
+        // (in scrap zones), not on a new plate.
+        Assert.Equal(1, result.Plates.Count);
+        Assert.True(result.Plates[0].Parts.Count > 1);
+    }
+
+    [Fact]
+    public void Nest_RespectsAllowPlateCreation()
+    {
+        var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
+        template.EdgeSpacing = new Spacing();
+
+        var items = new List<NestItem>
+        {
+            MakeItem("big1", 80, 40, 1),
+            MakeItem("big2", 70, 35, 1),
+        };
+
+        var result = MultiPlateNester.Nest(
+            items, template,
+            plateOptions: null,
+            salvageRate: 0.5,
+            sortOrder: PartSortOrder.BoundingBoxArea,
+            minRemnantSize: 12.0,
+            allowPlateCreation: false,
+            existingPlates: null,
+            progress: null,
+            token: CancellationToken.None);
+
+        // No existing plates and no plate creation — nothing can be placed.
+        Assert.Empty(result.Plates);
+        Assert.Equal(2, result.UnplacedItems.Count);
+    }
+
+    [Fact]
+    public void Nest_UsesExistingPlates()
+    {
+        var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
+        template.EdgeSpacing = new Spacing();
+
+        var existingPlate = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
+        existingPlate.EdgeSpacing = new Spacing();
+
+        // Use a part small enough to be classified as Medium on a 96x48 plate.
+        // Plate WorkArea: Width=96, Length=48. Half: 48, 24.
+        // Part 24x22: Length=24 (not > 24), Width=22 (not > 48) — not Large.
+        // Area = 528 > 4608/9 = 512 — Medium.
+        var items = new List<NestItem>
+        {
+            MakeItem("medium", 24, 22, 1),
+        };
+
+        var result = MultiPlateNester.Nest(
+            items, template,
+            plateOptions: null,
+            salvageRate: 0.5,
+            sortOrder: PartSortOrder.BoundingBoxArea,
+            minRemnantSize: 12.0,
+            allowPlateCreation: true,
+            existingPlates: new List<Plate> { existingPlate },
+            progress: null,
+            token: CancellationToken.None);
+
+        // Part should be placed on the existing plate, not a new one.
+        Assert.Single(result.Plates);
+        Assert.False(result.Plates[0].IsNew);
     }
 }
