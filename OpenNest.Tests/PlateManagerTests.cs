@@ -1,4 +1,5 @@
 using OpenNest.CNC;
+using OpenNest.Collections;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests;
@@ -373,7 +374,10 @@ public class PlateManagerTests
 
         mgr.RemoveCurrent();
 
-        Assert.Equal(1, nest.Plates.Count);
+        // plate1 + sentinel (created by reactive sentinel enforcement)
+        Assert.Equal(2, nest.Plates.Count);
+        Assert.Same(plate1, nest.Plates[0]);
+        Assert.Equal(0, nest.Plates[^1].Parts.Count);
         Assert.Equal(0, mgr.CurrentIndex);
     }
 
@@ -393,5 +397,44 @@ public class PlateManagerTests
         // Auto-navigated to plate2 (empty), go back to plate1 (has parts)
         mgr.LoadFirst();
         Assert.True(mgr.CanRemoveCurrent);
+    }
+
+    [Fact]
+    public void RemoveEmptyPlates_SentinelIsRestored()
+    {
+        var nest = CreateNest();
+        var plate = nest.CreatePlate();
+        plate.Parts.Add(MakePart());
+        using var mgr = new PlateManager(nest);
+        mgr.EnsureSentinel();
+        Assert.Equal(2, nest.Plates.Count);
+
+        // RemoveEmptyPlates removes the sentinel
+        nest.Plates.RemoveEmptyPlates();
+
+        // Sentinel should be restored reactively by OnPlateRemoved
+        Assert.Equal(2, nest.Plates.Count);
+        Assert.Equal(0, nest.Plates[^1].Parts.Count);
+    }
+
+    [Fact]
+    public void PlateRemoval_RefreshesTailSubscriptions()
+    {
+        var nest = CreateNest();
+        var plate1 = nest.CreatePlate();
+        plate1.Parts.Add(MakePart());
+        var plate2 = nest.CreatePlate();
+        plate2.Parts.Add(MakePart());
+        using var mgr = new PlateManager(nest);
+        mgr.EnsureSentinel();
+        // plates: [plate1(parts), plate2(parts), sentinel(empty)]
+
+        // Remove plate2 — tail subscriptions should refresh
+        nest.Plates.Remove(plate2);
+        // plates: [plate1(parts), sentinel(empty)]
+
+        // Verify reactive subscriptions still work on the new tail
+        nest.Plates[^1].Parts.Add(MakePart());
+        Assert.Equal(0, nest.Plates[^1].Parts.Count);
     }
 }

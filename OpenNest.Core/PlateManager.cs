@@ -198,6 +198,9 @@ namespace OpenNest
 
         private void OnPlateAdded(object sender, ItemAddedEventArgs<Plate> e)
         {
+            if (!suppressNavigation && !batching)
+                EnsureSentinel();
+
             PlateListChanged?.Invoke(this, EventArgs.Empty);
 
             if (!suppressNavigation)
@@ -211,6 +214,9 @@ namespace OpenNest
         {
             if (CurrentIndex >= Count && Count > 0)
                 CurrentIndex = Count - 1;
+
+            if (!suppressNavigation && !batching)
+                EnsureSentinel();
 
             PlateListChanged?.Invoke(this, EventArgs.Empty);
 
