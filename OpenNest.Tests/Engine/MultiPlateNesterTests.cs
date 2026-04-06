@@ -1,13 +1,23 @@
 using OpenNest.Geometry;
+using OpenNest.IO;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace OpenNest.Tests.Engine;
 
 public class MultiPlateNesterTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public MultiPlateNesterTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
     private static Drawing MakeDrawing(string name, double width, double length)
     {
         var program = new OpenNest.CNC.Program();
@@ -236,18 +246,19 @@ public class MultiPlateNesterTests
     }
 
     [Fact]
-    public void Nest_SmallPartsDontConsumeViableRemnants()
+    public void Nest_SmallPartsConsolidateOntoSharedPlates()
     {
-        // 96x48 plate with 80x40 big part leaves viable remnants (strips > 12" in one dim).
-        // Small parts should NOT consume those viable remnants — they should go to
-        // a separate plate instead, preserving the remnant for future use.
+        // Small parts should be packed together on shared plates rather than
+        // each drawing getting its own plate. The consolidation pass fills
+        // small parts into remaining space on existing plates.
         var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
         template.EdgeSpacing = new Spacing();
 
         var items = new List<NestItem>
         {
             MakeItem("big", 80, 40, 1),
-            MakeItem("tiny", 5, 5, 3),
+            MakeItem("tinyA", 5, 5, 3),
+            MakeItem("tinyB", 4, 4, 3),
         };
 
         var result = MultiPlateNester.Nest(
@@ -261,14 +272,11 @@ public class MultiPlateNesterTests
             progress: null,
             token: CancellationToken.None);
 
-        // Big part on plate 1, tiny parts on plate 2 (viable remnant preserved).
-        Assert.Equal(2, result.Plates.Count);
-
-        // First plate should have only the big part.
-        var bigPlate = result.Plates.First(p => p.Parts.Any(
-            part => part.BaseDrawing.Name == "big"));
-        var tinyOnBigPlate = bigPlate.Parts.Count(p => p.BaseDrawing.Name == "tiny");
-        Assert.Equal(0, tinyOnBigPlate);
+        // Both small drawing types should share space — not each on their own plate.
+        // With consolidation, they pack into remaining space alongside the big part.
+        Assert.True(result.Plates.Count <= 2,
+            $"Expected at most 2 plates (small parts consolidated), got {result.Plates.Count}");
+        Assert.Equal(0, result.UnplacedItems.Count);
     }
 
     [Fact]
@@ -331,5 +339,84 @@ public class MultiPlateNesterTests
         // Part should be placed on the existing plate, not a new one.
         Assert.Single(result.Plates);
         Assert.False(result.Plates[0].IsNew);
+    }
+
+    [Fact]
+    public void Nest_RealNestFile_PartFirst()
+    {
+        var nestPath = @"C:\Users\aisaacs\Desktop\4526 A14 - 0.188 AISI 304.nest";
+        if (!File.Exists(nestPath))
+        {
+            _output.WriteLine("SKIP: nest file not found");
+            return;
+        }
+
+        var nest = new NestReader(nestPath).Read();
+        var template = nest.PlateDefaults.CreateNew();
+
+        _output.WriteLine($"Plate: {template.Size.Width}x{template.Size.Length}, " +
+            $"spacing={template.PartSpacing}, edge=({template.EdgeSpacing.Left},{template.EdgeSpacing.Bottom},{template.EdgeSpacing.Right},{template.EdgeSpacing.Top})");
+
+        var wa = template.WorkArea();
+        _output.WriteLine($"Work area: {wa.Width:F1}x{wa.Length:F1}");
+        _output.WriteLine($"Classification thresholds: Large if dim > {wa.Width / 2:F1} or {wa.Length / 2:F1}, " +
+            $"Medium if area > {wa.Width * wa.Length / 9:F0}");
+        _output.WriteLine("---");
+
+        var items = new List<NestItem>();
+        foreach (var d in nest.Drawings)
+        {
+            var qty = d.Quantity.Required > 0 ? d.Quantity.Required : d.Quantity.Remaining;
+            if (qty <= 0) qty = 1;
+
+            var bb = d.Program.BoundingBox();
+            var classification = MultiPlateNester.Classify(bb, wa);
+
+            _output.WriteLine($"  {d.Name,-25} {bb.Width:F1}x{bb.Length:F1} (area={bb.Width * bb.Length:F0})  qty={qty}  class={classification}");
+
+            items.Add(new NestItem
+            {
+                Drawing = d,
+                Quantity = qty,
+                StepAngle = d.Constraints.StepAngle,
+                RotationStart = d.Constraints.StartAngle,
+                RotationEnd = d.Constraints.EndAngle,
+            });
+        }
+
+        _output.WriteLine("---");
+        _output.WriteLine($"Total: {items.Count} drawings, {items.Sum(i => i.Quantity)} parts");
+        _output.WriteLine("");
+
+        var result = MultiPlateNester.Nest(
+            items, template,
+            plateOptions: null,
+            salvageRate: 0.5,
+            sortOrder: PartSortOrder.BoundingBoxArea,
+            minRemnantSize: 12.0,
+            allowPlateCreation: true,
+            existingPlates: null,
+            progress: null,
+            token: CancellationToken.None);
+
+        _output.WriteLine($"=== RESULTS: {result.Plates.Count} plates ===");
+
+        for (var i = 0; i < result.Plates.Count; i++)
+        {
+            var pr = result.Plates[i];
+            var groups = pr.Parts.GroupBy(p => p.BaseDrawing.Name)
+                .Select(g => $"{g.Key} x{g.Count()}")
+                .ToList();
+            _output.WriteLine($"  Plate {i + 1} ({pr.Plate.Size.Width}x{pr.Plate.Size.Length}): " +
+                $"{pr.Parts.Count} parts, util={pr.Plate.Utilization():P1}  [{string.Join(", ", groups)}]");
+        }
+
+        if (result.UnplacedItems.Count > 0)
+        {
+            _output.WriteLine($"  Unplaced: {string.Join(", ", result.UnplacedItems.Select(i => $"{i.Drawing.Name} x{i.Quantity}"))}");
+        }
+
+        _output.WriteLine($"\nTotal parts placed: {result.Plates.Sum(p => p.Parts.Count)}");
+        _output.WriteLine($"Total plates used: {result.Plates.Count}");
     }
 }

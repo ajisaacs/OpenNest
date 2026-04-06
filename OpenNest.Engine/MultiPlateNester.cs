@@ -214,15 +214,20 @@ namespace OpenNest
                 placed = TryPlaceOnExistingPlates(item, bb, platePool, template,
                     minRemnantSize, progress, token);
 
-                // If items remain, try creating new plates.
-                if (item.Quantity > 0 && allowPlateCreation)
+                // Classify against template to decide if this item warrants its own plate.
+                // Small parts are deferred to the consolidation pass where they get packed
+                // together on shared plates instead of each getting their own.
+                var templateClass = Classify(bb, template.WorkArea());
+
+                if (item.Quantity > 0 && allowPlateCreation && templateClass != PartClass.Small)
                 {
                     placed = PlaceOnNewPlates(item, bb, platePool, template,
                         plateOptions, minRemnantSize, progress, token) || placed;
                 }
 
                 // If items remain, try upgrade-vs-new-plate.
-                if (item.Quantity > 0 && allowPlateCreation && plateOptions != null && plateOptions.Count > 0)
+                if (item.Quantity > 0 && allowPlateCreation && templateClass != PartClass.Small
+                    && plateOptions != null && plateOptions.Count > 0)
                 {
                     placed = TryUpgradeOrNewPlate(item, bb, platePool, template,
                         plateOptions, salvageRate, minRemnantSize, progress, token) || placed;
@@ -276,23 +281,54 @@ namespace OpenNest
                 }
 
                 // Then create new shared plates for anything still remaining.
+                // Fill each drawing onto shared plates one at a time, packing
+                // multiple drawings onto the same plate before creating a new one.
                 leftovers = leftovers.Where(i => i.Quantity > 0).ToList();
 
                 while (leftovers.Count > 0 && !token.IsCancellationRequested)
                 {
                     var plate = CreatePlate(template, plateOptions, null);
-                    var engine = NestEngineRegistry.Create(plate);
-                    var cloned = leftovers.Select(CloneItem).ToList();
-                    var parts = engine.Nest(cloned, progress, token);
+                    var allParts = new List<Part>();
+                    var anyPlacedOnPlate = false;
 
-                    if (parts.Count == 0)
+                    // Fill each leftover drawing onto this plate.
+                    foreach (var item in leftovers)
+                    {
+                        if (item.Quantity <= 0 || token.IsCancellationRequested)
+                            continue;
+
+                        // Find remaining space on the plate.
+                        var finder = RemnantFinder.FromPlate(plate);
+                        var remnants = allParts.Count == 0
+                            ? new List<Box> { plate.WorkArea() }
+                            : finder.FindRemnants();
+
+                        foreach (var remnant in remnants)
+                        {
+                            if (item.Quantity <= 0)
+                                break;
+
+                            var engine = NestEngineRegistry.Create(plate);
+                            var clonedItem = CloneItem(item);
+                            var parts = engine.Fill(clonedItem, remnant, progress, token);
+
+                            if (parts.Count > 0)
+                            {
+                                plate.Parts.AddRange(parts);
+                                allParts.AddRange(parts);
+                                item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
+                                anyPlacedOnPlate = true;
+                            }
+                        }
+                    }
+
+                    if (!anyPlacedOnPlate)
                         break;
 
-                    plate.Parts.AddRange(parts);
                     var pr = new PlateResult
                     {
                         Plate = plate,
-                        Parts = parts.ToList(),
+                        Parts = allParts,
                         IsNew = true,
                     };
 
@@ -303,14 +339,6 @@ namespace OpenNest
                     }
 
                     platePool.Add(pr);
-
-                    // Deduct placed quantities from originals.
-                    foreach (var item in leftovers)
-                    {
-                        var placed = parts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
-                        item.Quantity = System.Math.Max(0, item.Quantity - placed);
-                    }
-
                     leftovers = leftovers.Where(i => i.Quantity > 0).ToList();
                 }
             }
