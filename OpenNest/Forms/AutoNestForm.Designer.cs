@@ -17,13 +17,20 @@ namespace OpenNest.Forms
 
         private void InitializeComponent()
         {
-            this.engineLabel = new System.Windows.Forms.Label();
-            this.engineComboBox = new System.Windows.Forms.ComboBox();
-            this.partsGroup = new System.Windows.Forms.GroupBox();
+            this.tabControl = new System.Windows.Forms.TabControl();
+            this.partsTab = new System.Windows.Forms.TabPage();
+            this.platesTab = new System.Windows.Forms.TabPage();
             this.partsGrid = new System.Windows.Forms.DataGridView();
             this.summaryLabel = new System.Windows.Forms.Label();
-            this.optionsGroup = new System.Windows.Forms.GroupBox();
+            this.engineLabel = new System.Windows.Forms.Label();
+            this.engineComboBox = new System.Windows.Forms.ComboBox();
             this.createNewPlatesAsNeededBox = new System.Windows.Forms.CheckBox();
+            this.partFirstGroup = new System.Windows.Forms.GroupBox();
+            this.partFirstCheckBox = new System.Windows.Forms.CheckBox();
+            this.sortOrderLabel = new System.Windows.Forms.Label();
+            this.sortOrderComboBox = new System.Windows.Forms.ComboBox();
+            this.minRemnantLabel = new System.Windows.Forms.Label();
+            this.minRemnantBox = new System.Windows.Forms.TextBox();
             this.plateOptimizerGroup = new System.Windows.Forms.GroupBox();
             this.optimizePlateSizeBox = new System.Windows.Forms.CheckBox();
             this.plateGrid = new System.Windows.Forms.DataGridView();
@@ -33,42 +40,53 @@ namespace OpenNest.Forms
             this.buttonPanel = new System.Windows.Forms.Panel();
             this.acceptButton = new System.Windows.Forms.Button();
             this.cancelButton = new System.Windows.Forms.Button();
+            this.tabControl.SuspendLayout();
+            this.partsTab.SuspendLayout();
+            this.platesTab.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.partsGrid)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.plateGrid)).BeginInit();
-            this.partsGroup.SuspendLayout();
-            this.optionsGroup.SuspendLayout();
+            this.partFirstGroup.SuspendLayout();
             this.plateOptimizerGroup.SuspendLayout();
             this.buttonPanel.SuspendLayout();
             this.SuspendLayout();
             //
-            // engineLabel
+            // tabControl
             //
-            this.engineLabel.AutoSize = true;
-            this.engineLabel.Location = new System.Drawing.Point(12, 15);
-            this.engineLabel.Name = "engineLabel";
-            this.engineLabel.Size = new System.Drawing.Size(82, 16);
-            this.engineLabel.TabIndex = 0;
-            this.engineLabel.Text = "Nest Engine:";
+            this.tabControl.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
+            this.tabControl.Controls.Add(this.partsTab);
+            this.tabControl.Controls.Add(this.platesTab);
+            this.tabControl.Location = new System.Drawing.Point(12, 12);
+            this.tabControl.Name = "tabControl";
+            this.tabControl.SelectedIndex = 0;
+            this.tabControl.Size = new System.Drawing.Size(556, 490);
+            this.tabControl.TabIndex = 0;
             //
-            // engineComboBox
+            // partsTab
             //
-            this.engineComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.engineComboBox.Location = new System.Drawing.Point(100, 12);
-            this.engineComboBox.Name = "engineComboBox";
-            this.engineComboBox.Size = new System.Drawing.Size(200, 24);
-            this.engineComboBox.TabIndex = 1;
+            this.partsTab.Controls.Add(this.partsGrid);
+            this.partsTab.Controls.Add(this.summaryLabel);
+            this.partsTab.Location = new System.Drawing.Point(4, 25);
+            this.partsTab.Name = "partsTab";
+            this.partsTab.Padding = new System.Windows.Forms.Padding(6);
+            this.partsTab.Size = new System.Drawing.Size(548, 461);
+            this.partsTab.TabIndex = 0;
+            this.partsTab.Text = "Parts";
+            this.partsTab.UseVisualStyleBackColor = true;
             //
-            // partsGroup
+            // platesTab
             //
-            this.partsGroup.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
-            this.partsGroup.Controls.Add(this.partsGrid);
-            this.partsGroup.Controls.Add(this.summaryLabel);
-            this.partsGroup.Location = new System.Drawing.Point(12, 42);
-            this.partsGroup.Name = "partsGroup";
-            this.partsGroup.Size = new System.Drawing.Size(556, 210);
-            this.partsGroup.TabIndex = 2;
-            this.partsGroup.TabStop = false;
-            this.partsGroup.Text = "Parts";
+            this.platesTab.Controls.Add(this.engineLabel);
+            this.platesTab.Controls.Add(this.engineComboBox);
+            this.platesTab.Controls.Add(this.createNewPlatesAsNeededBox);
+            this.platesTab.Controls.Add(this.partFirstGroup);
+            this.platesTab.Controls.Add(this.plateOptimizerGroup);
+            this.platesTab.Location = new System.Drawing.Point(4, 25);
+            this.platesTab.Name = "platesTab";
+            this.platesTab.Padding = new System.Windows.Forms.Padding(6);
+            this.platesTab.Size = new System.Drawing.Size(548, 461);
+            this.platesTab.TabIndex = 1;
+            this.platesTab.Text = "Plates";
+            this.platesTab.UseVisualStyleBackColor = true;
             //
             // partsGrid
             //
@@ -78,42 +96,107 @@ namespace OpenNest.Forms
             this.partsGrid.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
             this.partsGrid.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.partsGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.partsGrid.Location = new System.Drawing.Point(10, 22);
+            this.partsGrid.Location = new System.Drawing.Point(10, 10);
             this.partsGrid.Name = "partsGrid";
             this.partsGrid.RowHeadersVisible = false;
             this.partsGrid.AutoGenerateColumns = false;
-            this.partsGrid.Size = new System.Drawing.Size(536, 160);
+            this.partsGrid.Size = new System.Drawing.Size(528, 420);
             this.partsGrid.TabIndex = 0;
             //
             // summaryLabel
             //
             this.summaryLabel.AutoSize = true;
             this.summaryLabel.ForeColor = System.Drawing.SystemColors.GrayText;
-            this.summaryLabel.Location = new System.Drawing.Point(10, 188);
+            this.summaryLabel.Location = new System.Drawing.Point(10, 436);
             this.summaryLabel.Name = "summaryLabel";
             this.summaryLabel.Size = new System.Drawing.Size(0, 16);
             this.summaryLabel.TabIndex = 1;
             //
-            // optionsGroup
+            // engineLabel
             //
-            this.optionsGroup.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
-            this.optionsGroup.Controls.Add(this.createNewPlatesAsNeededBox);
-            this.optionsGroup.Location = new System.Drawing.Point(12, 258);
-            this.optionsGroup.Name = "optionsGroup";
-            this.optionsGroup.Size = new System.Drawing.Size(556, 48);
-            this.optionsGroup.TabIndex = 3;
-            this.optionsGroup.TabStop = false;
-            this.optionsGroup.Text = "Options";
+            this.engineLabel.AutoSize = true;
+            this.engineLabel.Location = new System.Drawing.Point(10, 15);
+            this.engineLabel.Name = "engineLabel";
+            this.engineLabel.Size = new System.Drawing.Size(82, 16);
+            this.engineLabel.TabIndex = 0;
+            this.engineLabel.Text = "Nest Engine:";
+            //
+            // engineComboBox
+            //
+            this.engineComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.engineComboBox.Location = new System.Drawing.Point(98, 12);
+            this.engineComboBox.Name = "engineComboBox";
+            this.engineComboBox.Size = new System.Drawing.Size(200, 24);
+            this.engineComboBox.TabIndex = 1;
             //
             // createNewPlatesAsNeededBox
             //
             this.createNewPlatesAsNeededBox.AutoSize = true;
-            this.createNewPlatesAsNeededBox.Location = new System.Drawing.Point(10, 22);
+            this.createNewPlatesAsNeededBox.Location = new System.Drawing.Point(10, 44);
             this.createNewPlatesAsNeededBox.Name = "createNewPlatesAsNeededBox";
             this.createNewPlatesAsNeededBox.Size = new System.Drawing.Size(202, 20);
-            this.createNewPlatesAsNeededBox.TabIndex = 0;
+            this.createNewPlatesAsNeededBox.TabIndex = 2;
             this.createNewPlatesAsNeededBox.Text = "Create new plates as needed";
             this.createNewPlatesAsNeededBox.UseVisualStyleBackColor = true;
+            //
+            // partFirstGroup
+            //
+            this.partFirstGroup.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
+            this.partFirstGroup.Controls.Add(this.partFirstCheckBox);
+            this.partFirstGroup.Controls.Add(this.sortOrderLabel);
+            this.partFirstGroup.Controls.Add(this.sortOrderComboBox);
+            this.partFirstGroup.Controls.Add(this.minRemnantLabel);
+            this.partFirstGroup.Controls.Add(this.minRemnantBox);
+            this.partFirstGroup.Location = new System.Drawing.Point(10, 72);
+            this.partFirstGroup.Name = "partFirstGroup";
+            this.partFirstGroup.Size = new System.Drawing.Size(528, 80);
+            this.partFirstGroup.TabIndex = 3;
+            this.partFirstGroup.TabStop = false;
+            this.partFirstGroup.Text = "      Part-First Mode";
+            //
+            // partFirstCheckBox
+            //
+            this.partFirstCheckBox.AutoSize = true;
+            this.partFirstCheckBox.Location = new System.Drawing.Point(10, 0);
+            this.partFirstCheckBox.Name = "partFirstCheckBox";
+            this.partFirstCheckBox.Size = new System.Drawing.Size(15, 14);
+            this.partFirstCheckBox.TabIndex = 0;
+            this.partFirstCheckBox.UseVisualStyleBackColor = true;
+            this.partFirstCheckBox.CheckedChanged += new System.EventHandler(this.partFirstCheckBox_CheckedChanged);
+            //
+            // sortOrderLabel
+            //
+            this.sortOrderLabel.AutoSize = true;
+            this.sortOrderLabel.Location = new System.Drawing.Point(10, 26);
+            this.sortOrderLabel.Name = "sortOrderLabel";
+            this.sortOrderLabel.Size = new System.Drawing.Size(75, 16);
+            this.sortOrderLabel.TabIndex = 1;
+            this.sortOrderLabel.Text = "Sort Order:";
+            //
+            // sortOrderComboBox
+            //
+            this.sortOrderComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.sortOrderComboBox.Location = new System.Drawing.Point(100, 23);
+            this.sortOrderComboBox.Name = "sortOrderComboBox";
+            this.sortOrderComboBox.Size = new System.Drawing.Size(180, 24);
+            this.sortOrderComboBox.TabIndex = 2;
+            //
+            // minRemnantLabel
+            //
+            this.minRemnantLabel.AutoSize = true;
+            this.minRemnantLabel.Location = new System.Drawing.Point(10, 54);
+            this.minRemnantLabel.Name = "minRemnantLabel";
+            this.minRemnantLabel.Size = new System.Drawing.Size(117, 16);
+            this.minRemnantLabel.TabIndex = 3;
+            this.minRemnantLabel.Text = "Min Remnant Size:";
+            //
+            // minRemnantBox
+            //
+            this.minRemnantBox.Location = new System.Drawing.Point(133, 51);
+            this.minRemnantBox.Name = "minRemnantBox";
+            this.minRemnantBox.Size = new System.Drawing.Size(60, 22);
+            this.minRemnantBox.TabIndex = 4;
+            this.minRemnantBox.Text = "12";
             //
             // plateOptimizerGroup
             //
@@ -123,9 +206,9 @@ namespace OpenNest.Forms
             this.plateOptimizerGroup.Controls.Add(this.salvageRateLabel);
             this.plateOptimizerGroup.Controls.Add(this.salvageRateBox);
             this.plateOptimizerGroup.Controls.Add(this.salvageRatePercentLabel);
-            this.plateOptimizerGroup.Location = new System.Drawing.Point(12, 312);
+            this.plateOptimizerGroup.Location = new System.Drawing.Point(10, 158);
             this.plateOptimizerGroup.Name = "plateOptimizerGroup";
-            this.plateOptimizerGroup.Size = new System.Drawing.Size(556, 188);
+            this.plateOptimizerGroup.Size = new System.Drawing.Size(528, 188);
             this.plateOptimizerGroup.TabIndex = 4;
             this.plateOptimizerGroup.TabStop = false;
             this.plateOptimizerGroup.Text = "      Plate Optimizer";
@@ -150,7 +233,7 @@ namespace OpenNest.Forms
             this.plateGrid.Name = "plateGrid";
             this.plateGrid.RowHeadersVisible = false;
             this.plateGrid.AutoGenerateColumns = false;
-            this.plateGrid.Size = new System.Drawing.Size(536, 130);
+            this.plateGrid.Size = new System.Drawing.Size(508, 130);
             this.plateGrid.TabIndex = 1;
             //
             // salvageRateLabel
@@ -187,7 +270,7 @@ namespace OpenNest.Forms
             this.buttonPanel.Location = new System.Drawing.Point(0, 506);
             this.buttonPanel.Name = "buttonPanel";
             this.buttonPanel.Size = new System.Drawing.Size(580, 50);
-            this.buttonPanel.TabIndex = 5;
+            this.buttonPanel.TabIndex = 1;
             //
             // acceptButton
             //
@@ -217,11 +300,7 @@ namespace OpenNest.Forms
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
             this.ClientSize = new System.Drawing.Size(580, 556);
-            this.Controls.Add(this.engineLabel);
-            this.Controls.Add(this.engineComboBox);
-            this.Controls.Add(this.partsGroup);
-            this.Controls.Add(this.optionsGroup);
-            this.Controls.Add(this.plateOptimizerGroup);
+            this.Controls.Add(this.tabControl);
             this.Controls.Add(this.buttonPanel);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
@@ -232,28 +311,37 @@ namespace OpenNest.Forms
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "AutoNest";
+            this.tabControl.ResumeLayout(false);
+            this.partsTab.ResumeLayout(false);
+            this.partsTab.PerformLayout();
+            this.platesTab.ResumeLayout(false);
+            this.platesTab.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.partsGrid)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.plateGrid)).EndInit();
-            this.partsGroup.ResumeLayout(false);
-            this.partsGroup.PerformLayout();
-            this.optionsGroup.ResumeLayout(false);
-            this.optionsGroup.PerformLayout();
+            this.partFirstGroup.ResumeLayout(false);
+            this.partFirstGroup.PerformLayout();
             this.plateOptimizerGroup.ResumeLayout(false);
             this.plateOptimizerGroup.PerformLayout();
             this.buttonPanel.ResumeLayout(false);
             this.ResumeLayout(false);
-            this.PerformLayout();
         }
 
         #endregion
 
-        private System.Windows.Forms.Label engineLabel;
-        private System.Windows.Forms.ComboBox engineComboBox;
-        private System.Windows.Forms.GroupBox partsGroup;
+        private System.Windows.Forms.TabControl tabControl;
+        private System.Windows.Forms.TabPage partsTab;
+        private System.Windows.Forms.TabPage platesTab;
         private System.Windows.Forms.DataGridView partsGrid;
         private System.Windows.Forms.Label summaryLabel;
-        private System.Windows.Forms.GroupBox optionsGroup;
+        private System.Windows.Forms.Label engineLabel;
+        private System.Windows.Forms.ComboBox engineComboBox;
         private System.Windows.Forms.CheckBox createNewPlatesAsNeededBox;
+        private System.Windows.Forms.GroupBox partFirstGroup;
+        private System.Windows.Forms.CheckBox partFirstCheckBox;
+        private System.Windows.Forms.Label sortOrderLabel;
+        private System.Windows.Forms.ComboBox sortOrderComboBox;
+        private System.Windows.Forms.Label minRemnantLabel;
+        private System.Windows.Forms.TextBox minRemnantBox;
         private System.Windows.Forms.GroupBox plateOptimizerGroup;
         private System.Windows.Forms.CheckBox optimizePlateSizeBox;
         private System.Windows.Forms.DataGridView plateGrid;
