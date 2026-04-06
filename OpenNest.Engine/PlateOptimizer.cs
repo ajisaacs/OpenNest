@@ -23,7 +23,8 @@ namespace OpenNest
             if (items == null || items.Count == 0 || plateOptions == null || plateOptions.Count == 0)
                 return null;
 
-            // Find the minimum dimension needed to fit the largest part.
+            // Find the minimum dimension needed to fit the largest part,
+            // skipping items that are too large for every plate option.
             var minPartWidth = 0.0;
             var minPartLength = 0.0;
             foreach (var item in items)
@@ -32,6 +33,14 @@ namespace OpenNest
                 var bb = item.Drawing.Program.BoundingBox();
                 var shortSide = System.Math.Min(bb.Width, bb.Length);
                 var longSide = System.Math.Max(bb.Width, bb.Length);
+
+                if (!plateOptions.Any(o => FitsPart(o, shortSide, longSide, templatePlate.EdgeSpacing)))
+                {
+                    Debug.WriteLine($"[PlateOptimizer] Skipping oversized item '{item.Drawing.Name}' " +
+                        $"({shortSide:F1}x{longSide:F1}) — does not fit any plate option");
+                    continue;
+                }
+
                 if (shortSide > minPartWidth) minPartWidth = shortSide;
                 if (longSide > minPartLength) minPartLength = longSide;
             }
