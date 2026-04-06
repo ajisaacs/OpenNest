@@ -386,11 +386,26 @@ public class MultiPlateNesterTests
 
         _output.WriteLine("---");
         _output.WriteLine($"Total: {items.Count} drawings, {items.Sum(i => i.Quantity)} parts");
+
+        var plateOptions = new List<PlateOption>
+        {
+            new() { Width = 48, Length = 96, Cost = 0 },
+            new() { Width = 48, Length = 120, Cost = 0 },
+            new() { Width = 48, Length = 144, Cost = 0 },
+            new() { Width = 60, Length = 96, Cost = 0 },
+            new() { Width = 60, Length = 120, Cost = 0 },
+            new() { Width = 60, Length = 144, Cost = 0 },
+            new() { Width = 72, Length = 96, Cost = 0 },
+            new() { Width = 72, Length = 120, Cost = 0 },
+            new() { Width = 72, Length = 144, Cost = 0 },
+        };
+
+        _output.WriteLine($"Plate options: {string.Join(", ", plateOptions.Select(o => $"{o.Width}x{o.Length}"))}");
         _output.WriteLine("");
 
         var result = MultiPlateNester.Nest(
             items, template,
-            plateOptions: null,
+            plateOptions: plateOptions,
             salvageRate: 0.5,
             sortOrder: PartSortOrder.BoundingBoxArea,
             minRemnantSize: 12.0,

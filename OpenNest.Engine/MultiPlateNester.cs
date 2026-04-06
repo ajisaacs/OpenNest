@@ -248,18 +248,24 @@ namespace OpenNest
                     if (token.IsCancellationRequested)
                         break;
 
-                    var remaining = leftovers.Where(i => i.Quantity > 0).ToList();
-                    if (remaining.Count == 0)
-                        break;
-
-                    var finder = RemnantFinder.FromPlate(pr.Plate);
-                    var remnants = finder.FindRemnants();
-
-                    foreach (var remnant in remnants)
+                    // Repeatedly find the largest remnant and pack into it.
+                    // Recalculate after each fill to avoid overlapping stale remnants.
+                    var anyPlacedOnThis = true;
+                    while (anyPlacedOnThis && !token.IsCancellationRequested)
                     {
-                        remaining = remaining.Where(i => i.Quantity > 0).ToList();
+                        anyPlacedOnThis = false;
+
+                        var remaining = leftovers.Where(i => i.Quantity > 0).ToList();
                         if (remaining.Count == 0)
                             break;
+
+                        var finder = RemnantFinder.FromPlate(pr.Plate);
+                        var remnants = finder.FindRemnants();
+                        if (remnants.Count == 0)
+                            break;
+
+                        // Try the largest remnant.
+                        var remnant = remnants[0];
 
                         var engine = NestEngineRegistry.Create(pr.Plate);
                         var cloned = remaining.Select(CloneItem).ToList();
@@ -269,8 +275,8 @@ namespace OpenNest
                         {
                             pr.Plate.Parts.AddRange(parts);
                             pr.Parts.AddRange(parts);
+                            anyPlacedOnThis = true;
 
-                            // Deduct placed quantities from originals.
                             foreach (var item in remaining)
                             {
                                 var placed = parts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
@@ -292,33 +298,33 @@ namespace OpenNest
                     var anyPlacedOnPlate = false;
 
                     // Fill each leftover drawing onto this plate.
+                    // Recalculate remnants after each fill to avoid overlaps.
                     foreach (var item in leftovers)
                     {
                         if (item.Quantity <= 0 || token.IsCancellationRequested)
                             continue;
 
-                        // Find remaining space on the plate.
-                        var finder = RemnantFinder.FromPlate(plate);
+                        // Find remaining space on the plate (recalculated each item).
                         var remnants = allParts.Count == 0
                             ? new List<Box> { plate.WorkArea() }
-                            : finder.FindRemnants();
+                            : RemnantFinder.FromPlate(plate).FindRemnants();
 
-                        foreach (var remnant in remnants)
+                        if (remnants.Count == 0)
+                            break;
+
+                        // Use only the largest remnant to avoid stale overlap issues.
+                        var remnant = remnants[0];
+
+                        var engine = NestEngineRegistry.Create(plate);
+                        var clonedItem = CloneItem(item);
+                        var parts = engine.Fill(clonedItem, remnant, progress, token);
+
+                        if (parts.Count > 0)
                         {
-                            if (item.Quantity <= 0)
-                                break;
-
-                            var engine = NestEngineRegistry.Create(plate);
-                            var clonedItem = CloneItem(item);
-                            var parts = engine.Fill(clonedItem, remnant, progress, token);
-
-                            if (parts.Count > 0)
-                            {
-                                plate.Parts.AddRange(parts);
-                                allParts.AddRange(parts);
-                                item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
-                                anyPlacedOnPlate = true;
-                            }
+                            plate.Parts.AddRange(parts);
+                            allParts.AddRange(parts);
+                            item.Quantity = System.Math.Max(0, item.Quantity - parts.Count);
+                            anyPlacedOnPlate = true;
                         }
                     }
 
