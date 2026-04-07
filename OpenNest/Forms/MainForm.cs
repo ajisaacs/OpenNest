@@ -1006,9 +1006,18 @@ namespace OpenNest.Forms
 
                 var template = activeForm.PlateView.Plate;
 
+                var nestOptions = new MultiPlateNestOptions
+                {
+                    Template = template,
+                    PlateOptions = plateOptions,
+                    SalvageRate = salvageRate,
+                    SortOrder = sortOrder,
+                    MinRemnantSize = minRemnantSize,
+                    AllowPlateCreation = allowPlateCreation,
+                };
+
                 var result = await Task.Run(() =>
-                    MultiPlateNester.Nest(items, template, plateOptions, salvageRate,
-                        sortOrder, minRemnantSize, allowPlateCreation, existingPlates, progress, token));
+                    MultiPlateNester.Nest(items, nestOptions, existingPlates, progress, token));
 
                 foreach (var pr in result.Plates)
                 {

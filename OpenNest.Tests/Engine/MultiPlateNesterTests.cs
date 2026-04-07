@@ -229,16 +229,9 @@ public class MultiPlateNesterTests
             MakeItem("big2", 70, 35, 1),
         };
 
-        var result = MultiPlateNester.Nest(
-            items, template,
-            plateOptions: null,
-            salvageRate: 0.5,
-            sortOrder: PartSortOrder.BoundingBoxArea,
-            minRemnantSize: 12.0,
-            allowPlateCreation: true,
-            existingPlates: null,
-            progress: null,
-            token: CancellationToken.None);
+        var options = new MultiPlateNestOptions { Template = template };
+
+        var result = MultiPlateNester.Nest(items, options);
 
         // Each large part should be on its own plate.
         Assert.True(result.Plates.Count >= 2,
@@ -261,16 +254,9 @@ public class MultiPlateNesterTests
             MakeItem("tinyB", 4, 4, 3),
         };
 
-        var result = MultiPlateNester.Nest(
-            items, template,
-            plateOptions: null,
-            salvageRate: 0.5,
-            sortOrder: PartSortOrder.BoundingBoxArea,
-            minRemnantSize: 12.0,
-            allowPlateCreation: true,
-            existingPlates: null,
-            progress: null,
-            token: CancellationToken.None);
+        var options = new MultiPlateNestOptions { Template = template };
+
+        var result = MultiPlateNester.Nest(items, options);
 
         // Both small drawing types should share space — not each on their own plate.
         // With consolidation, they pack into remaining space alongside the big part.
@@ -291,16 +277,13 @@ public class MultiPlateNesterTests
             MakeItem("big2", 70, 35, 1),
         };
 
-        var result = MultiPlateNester.Nest(
-            items, template,
-            plateOptions: null,
-            salvageRate: 0.5,
-            sortOrder: PartSortOrder.BoundingBoxArea,
-            minRemnantSize: 12.0,
-            allowPlateCreation: false,
-            existingPlates: null,
-            progress: null,
-            token: CancellationToken.None);
+        var options = new MultiPlateNestOptions
+        {
+            Template = template,
+            AllowPlateCreation = false,
+        };
+
+        var result = MultiPlateNester.Nest(items, options);
 
         // No existing plates and no plate creation — nothing can be placed.
         Assert.Empty(result.Plates);
@@ -325,16 +308,10 @@ public class MultiPlateNesterTests
             MakeItem("medium", 24, 22, 1),
         };
 
-        var result = MultiPlateNester.Nest(
-            items, template,
-            plateOptions: null,
-            salvageRate: 0.5,
-            sortOrder: PartSortOrder.BoundingBoxArea,
-            minRemnantSize: 12.0,
-            allowPlateCreation: true,
-            existingPlates: new List<Plate> { existingPlate },
-            progress: null,
-            token: CancellationToken.None);
+        var options = new MultiPlateNestOptions { Template = template };
+
+        var result = MultiPlateNester.Nest(items, options,
+            existingPlates: new List<Plate> { existingPlate });
 
         // Part should be placed on the existing plate, not a new one.
         Assert.Single(result.Plates);
@@ -403,16 +380,13 @@ public class MultiPlateNesterTests
         _output.WriteLine($"Plate options: {string.Join(", ", plateOptions.Select(o => $"{o.Width}x{o.Length}"))}");
         _output.WriteLine("");
 
-        var result = MultiPlateNester.Nest(
-            items, template,
-            plateOptions: plateOptions,
-            salvageRate: 0.5,
-            sortOrder: PartSortOrder.BoundingBoxArea,
-            minRemnantSize: 12.0,
-            allowPlateCreation: true,
-            existingPlates: null,
-            progress: null,
-            token: CancellationToken.None);
+        var options = new MultiPlateNestOptions
+        {
+            Template = template,
+            PlateOptions = plateOptions,
+        };
+
+        var result = MultiPlateNester.Nest(items, options);
 
         _output.WriteLine($"=== RESULTS: {result.Plates.Count} plates ===");
 
