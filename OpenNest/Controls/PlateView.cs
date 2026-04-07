@@ -364,8 +364,10 @@ namespace OpenNest.Controls
                 }
 
                 if (hitPart != hoveredPart)
-                {
                     hoveredPart = hitPart;
+
+                if (hoveredPart != null)
+                {
                     hoverPoint = e.Location;
                     Invalidate();
                 }
