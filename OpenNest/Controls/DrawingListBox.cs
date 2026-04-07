@@ -8,16 +8,14 @@ namespace OpenNest.Controls
 
     public class DrawingListBox : ListBox
     {
+        private const int WM_ERASEBKGND = 0x0014;
+
         private readonly Size imageSize;
         private readonly Font nameFont;
         private Point lastClickLocation;
 
         public DrawingListBox()
         {
-            SetStyle(
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer, true);
-
             DrawMode = DrawMode.OwnerDrawFixed;
             ItemHeight = 85;
 
@@ -148,6 +146,16 @@ namespace OpenNest.Controls
         {
             base.OnMouseDown(e);
             lastClickLocation = e.Location;
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_ERASEBKGND)
+            {
+                m.Result = (IntPtr)1;
+                return;
+            }
+            base.WndProc(ref m);
         }
     }
 
