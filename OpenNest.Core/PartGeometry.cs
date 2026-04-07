@@ -61,6 +61,91 @@ namespace OpenNest
             return offsetShape.Entities;
         }
 
+        /// <summary>
+        /// Returns all entities (perimeter + cutouts) with spacing offset applied,
+        /// without tessellation. Perimeter is offset outward, cutouts inward.
+        /// </summary>
+        public static List<Entity> GetOffsetPartEntities(Part part, double spacing)
+        {
+            var geoEntities = ConvertProgram.ToGeometry(part.Program);
+            var profile = new ShapeProfile(
+                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+            var entities = new List<Entity>();
+
+            var perimeter = profile.Perimeter.OffsetOutward(spacing);
+            if (perimeter != null)
+            {
+                foreach (var entity in perimeter.Entities)
+                    entity.Offset(part.Location);
+                entities.AddRange(perimeter.Entities);
+            }
+
+            foreach (var cutout in profile.Cutouts)
+            {
+                var inset = cutout.OffsetInward(spacing);
+                if (inset == null) continue;
+                foreach (var entity in inset.Entities)
+                    entity.Offset(part.Location);
+                entities.AddRange(inset.Entities);
+            }
+
+            return entities;
+        }
+
+        /// <summary>
+        /// Returns perimeter entities at the part's world location, without tessellation
+        /// or spacing offset.
+        /// </summary>
+        public static List<Entity> GetPerimeterEntities(Part part)
+        {
+            var geoEntities = ConvertProgram.ToGeometry(part.Program);
+            var profile = new ShapeProfile(
+                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+
+            return CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
+        }
+
+        /// <summary>
+        /// Returns all entities (perimeter + cutouts) at the part's world location,
+        /// without tessellation or spacing offset.
+        /// </summary>
+        public static List<Entity> GetPartEntities(Part part)
+        {
+            var geoEntities = ConvertProgram.ToGeometry(part.Program);
+            var profile = new ShapeProfile(
+                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+            var entities = CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
+
+            foreach (var cutout in profile.Cutouts)
+                entities.AddRange(CopyEntitiesAtLocation(cutout.Entities, part.Location));
+
+            return entities;
+        }
+
+        private static List<Entity> CopyEntitiesAtLocation(List<Entity> source, Vector location)
+        {
+            var result = new List<Entity>(source.Count);
+
+            for (var i = 0; i < source.Count; i++)
+            {
+                var entity = source[i];
+                Entity copy;
+
+                if (entity is Line line)
+                    copy = new Line(line.StartPoint + location, line.EndPoint + location);
+                else if (entity is Arc arc)
+                    copy = new Arc(arc.Center + location, arc.Radius, arc.StartAngle, arc.EndAngle, arc.IsReversed);
+                else if (entity is Circle circle)
+                    copy = new Circle(circle.Center + location, circle.Radius);
+                else
+                    continue;
+
+                result.Add(copy);
+            }
+
+            return result;
+        }
+
         public static List<Line> GetOffsetPartLines(Part part, double spacing, double chordTolerance = 0.001,
             bool perimeterOnly = false)
         {

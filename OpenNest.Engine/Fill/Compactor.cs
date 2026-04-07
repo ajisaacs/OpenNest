@@ -11,8 +11,6 @@ namespace OpenNest.Engine.Fill
     /// </summary>
     public static class Compactor
     {
-        private const double ChordTolerance = 0.001;
-
         public static double Push(List<Part> movingParts, Plate plate, PushDirection direction)
         {
             var obstacleParts = plate.Parts
@@ -44,7 +42,7 @@ namespace OpenNest.Engine.Fill
             var opposite = -direction;
 
             var obstacleBoxes = new Box[obstacleParts.Count];
-            var obstacleLines = new List<Line>[obstacleParts.Count];
+            var obstacleEntities = new List<Entity>[obstacleParts.Count];
 
             for (var i = 0; i < obstacleParts.Count; i++)
                 obstacleBoxes[i] = obstacleParts[i].BoundingBox;
@@ -61,7 +59,19 @@ namespace OpenNest.Engine.Fill
                     distance = edgeDist;
 
                 var movingBox = moving.BoundingBox;
-                List<Line> movingLines = null;
+                List<Entity> movingEntities = null;
+
+                // Check if any obstacle is inside the moving part — only then
+                // do we need cutout entities on the moving part.
+                var needCutouts = false;
+                for (var i = 0; i < obstacleBoxes.Length; i++)
+                {
+                    if (movingBox.Contains(obstacleBoxes[i]))
+                    {
+                        needCutouts = true;
+                        break;
+                    }
+                }
 
                 for (var i = 0; i < obstacleBoxes.Length; i++)
                 {
@@ -76,15 +86,19 @@ namespace OpenNest.Engine.Fill
                     if (!SpatialQuery.PerpendicularOverlap(movingBox, obstacleBoxes[i], direction))
                         continue;
 
-                    movingLines ??= halfSpacing > 0
-                        ? PartGeometry.GetOffsetPartLines(moving, halfSpacing, direction, ChordTolerance)
-                        : PartGeometry.GetPartLines(moving, direction, ChordTolerance);
+                    movingEntities ??= halfSpacing > 0
+                        ? (needCutouts
+                            ? PartGeometry.GetOffsetPartEntities(moving, halfSpacing)
+                            : PartGeometry.GetOffsetPerimeterEntities(moving, halfSpacing))
+                        : (needCutouts
+                            ? PartGeometry.GetPartEntities(moving)
+                            : PartGeometry.GetPerimeterEntities(moving));
 
-                    obstacleLines[i] ??= halfSpacing > 0
-                        ? PartGeometry.GetOffsetPartLines(obstacleParts[i], halfSpacing, opposite, ChordTolerance)
-                        : PartGeometry.GetPartLines(obstacleParts[i], opposite, ChordTolerance);
+                    obstacleEntities[i] ??= halfSpacing > 0
+                        ? PartGeometry.GetOffsetPerimeterEntities(obstacleParts[i], halfSpacing)
+                        : PartGeometry.GetPerimeterEntities(obstacleParts[i]);
 
-                    var d = SpatialQuery.DirectionalDistance(movingLines, obstacleLines[i], direction);
+                    var d = SpatialQuery.DirectionalDistance(movingEntities, obstacleEntities[i], direction);
                     if (d < distance)
                         distance = d;
                 }
@@ -157,7 +171,7 @@ namespace OpenNest.Engine.Fill
                         continue;
 
                     var gap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], direction);
-                    var d = gap - partSpacing - 2 * ChordTolerance;
+                    var d = gap - partSpacing - 0.002;
                     if (d < 0) d = 0;
                     if (d < distance)
                         distance = d;

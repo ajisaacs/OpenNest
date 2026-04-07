@@ -596,6 +596,138 @@ namespace OpenNest.Geometry
             return minDist;
         }
 
+        /// <summary>
+        /// Computes the minimum translation distance along an arbitrary unit direction
+        /// before any vertex/edge of movingEntities contacts any vertex/edge of
+        /// stationaryEntities. Works with native Line, Arc, and Circle entities
+        /// without tessellation.
+        /// </summary>
+        public static double DirectionalDistance(
+            List<Entity> movingEntities, List<Entity> stationaryEntities, Vector direction)
+        {
+            var minDist = double.MaxValue;
+            var dirX = direction.X;
+            var dirY = direction.Y;
+
+            var movingVertices = ExtractEntityVertices(movingEntities);
+
+            for (var v = 0; v < movingVertices.Length; v++)
+            {
+                var vx = movingVertices[v].X;
+                var vy = movingVertices[v].Y;
+
+                for (var j = 0; j < stationaryEntities.Count; j++)
+                {
+                    var d = RayEntityDistance(vx, vy, stationaryEntities[j], dirX, dirY);
+                    if (d < minDist)
+                    {
+                        minDist = d;
+                        if (d <= 0) return 0;
+                    }
+                }
+            }
+
+            var oppX = -dirX;
+            var oppY = -dirY;
+
+            var stationaryVertices = ExtractEntityVertices(stationaryEntities);
+
+            for (var v = 0; v < stationaryVertices.Length; v++)
+            {
+                var vx = stationaryVertices[v].X;
+                var vy = stationaryVertices[v].Y;
+
+                for (var j = 0; j < movingEntities.Count; j++)
+                {
+                    var d = RayEntityDistance(vx, vy, movingEntities[j], oppX, oppY);
+                    if (d < minDist)
+                    {
+                        minDist = d;
+                        if (d <= 0) return 0;
+                    }
+                }
+            }
+
+            return minDist;
+        }
+
+        private static double RayEntityDistance(
+            double vx, double vy, Entity entity, double dirX, double dirY)
+        {
+            if (entity is Line line)
+            {
+                return RayEdgeDistance(vx, vy,
+                    line.pt1.X, line.pt1.Y, line.pt2.X, line.pt2.Y,
+                    dirX, dirY);
+            }
+
+            if (entity is Arc arc)
+            {
+                return RayArcDistance(vx, vy,
+                    arc.Center.X, arc.Center.Y, arc.Radius,
+                    arc.StartAngle, arc.EndAngle, arc.IsReversed,
+                    dirX, dirY);
+            }
+
+            if (entity is Circle circle)
+            {
+                return RayCircleDistance(vx, vy,
+                    circle.Center.X, circle.Center.Y, circle.Radius,
+                    dirX, dirY);
+            }
+
+            return double.MaxValue;
+        }
+
+        private static Vector[] ExtractEntityVertices(List<Entity> entities)
+        {
+            var vertices = new HashSet<Vector>();
+
+            for (var i = 0; i < entities.Count; i++)
+            {
+                var entity = entities[i];
+
+                if (entity is Line line)
+                {
+                    vertices.Add(line.pt1);
+                    vertices.Add(line.pt2);
+                }
+                else if (entity is Arc arc)
+                {
+                    vertices.Add(arc.StartPoint());
+                    vertices.Add(arc.EndPoint());
+                    AddArcExtremeVertices(vertices, arc);
+                }
+                else if (entity is Circle circle)
+                {
+                    vertices.Add(new Vector(circle.Center.X + circle.Radius, circle.Center.Y));
+                    vertices.Add(new Vector(circle.Center.X - circle.Radius, circle.Center.Y));
+                    vertices.Add(new Vector(circle.Center.X, circle.Center.Y + circle.Radius));
+                    vertices.Add(new Vector(circle.Center.X, circle.Center.Y - circle.Radius));
+                }
+            }
+
+            return vertices.ToArray();
+        }
+
+        private static void AddArcExtremeVertices(HashSet<Vector> points, Arc arc)
+        {
+            var a1 = arc.StartAngle;
+            var a2 = arc.EndAngle;
+
+            if (arc.IsReversed)
+                Generic.Swap(ref a1, ref a2);
+
+            if (Angle.IsBetweenRad(Angle.TwoPI, a1, a2))
+                points.Add(new Vector(arc.Center.X + arc.Radius, arc.Center.Y));
+            if (Angle.IsBetweenRad(Angle.HalfPI, a1, a2))
+                points.Add(new Vector(arc.Center.X, arc.Center.Y + arc.Radius));
+            if (Angle.IsBetweenRad(System.Math.PI, a1, a2))
+                points.Add(new Vector(arc.Center.X - arc.Radius, arc.Center.Y));
+            if (Angle.IsBetweenRad(System.Math.PI * 1.5, a1, a2))
+                points.Add(new Vector(arc.Center.X, arc.Center.Y - arc.Radius));
+        }
+
         private static double BoxProjectionMin(Box box, double dx, double dy)
         {
             var x = dx >= 0 ? box.Left : box.Right;
