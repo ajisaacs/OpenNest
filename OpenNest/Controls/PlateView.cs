@@ -179,18 +179,6 @@ namespace OpenNest.Controls
             }
         }
 
-        // Temporary — removed in Task 5
-        public CutOff SelectedCutOff
-        {
-            get => selection.SelectedCutOffs.Count > 0 ? selection.SelectedCutOffs[0] : null;
-            set
-            {
-                selection.SelectedCutOffs.Clear();
-                if (value != null)
-                    selection.SelectedCutOffs.Add(value);
-                Invalidate();
-            }
-        }
 
         public double RotateIncrementAngle { get; set; }
 

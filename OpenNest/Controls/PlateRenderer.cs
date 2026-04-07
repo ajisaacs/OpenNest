@@ -168,7 +168,7 @@ namespace OpenNest.Controls
                 if (program == null || program.Codes.Count == 0)
                     continue;
 
-                var activePen = cutoff == view.SelectedCutOff ? selectedPen : pen;
+                var activePen = view.Selection.SelectedCutOffs.Contains(cutoff) ? selectedPen : pen;
 
                 for (var i = 0; i < program.Codes.Count - 1; i += 2)
                 {

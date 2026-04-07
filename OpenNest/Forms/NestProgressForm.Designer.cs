@@ -427,7 +427,7 @@ namespace OpenNest.Forms
             plate1.Quantity = 0;
             previewPlateView.Plate = plate1;
             previewPlateView.RotateIncrementAngle = 10D;
-            previewPlateView.SelectedCutOff = null;
+
             previewPlateView.ShowBendLines = false;
             previewPlateView.Size = new System.Drawing.Size(356, 341);
             previewPlateView.Status = "Select";
