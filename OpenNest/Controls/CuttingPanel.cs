@@ -11,7 +11,7 @@ namespace OpenNest.Controls
             { "None", "Line", "Arc", "Line + Arc", "Clean Hole", "Line + Line" };
 
         private static readonly string[] LeadOutTypes =
-            { "None", "Line", "Arc", "Microtab" };
+            { "None", "Line", "Arc" };
 
         private readonly TabControl tabControl;
         private readonly ComboBox cboExternalLeadIn, cboExternalLeadOut;
@@ -424,9 +424,6 @@ namespace OpenNest.Controls
                 case 2:
                     AddNumericField(panel, "Radius:", 0.25, ref y, "Radius");
                     break;
-                case 3:
-                    AddNumericField(panel, "Gap Size:", 0.06, ref y, "GapSize");
-                    break;
             }
         }
 
@@ -513,10 +510,6 @@ namespace OpenNest.Controls
                     combo.SelectedIndex = 2;
                     SetParam(panel, "Radius", arc.Radius);
                     break;
-                case MicrotabLeadOut microtab:
-                    combo.SelectedIndex = 3;
-                    SetParam(panel, "GapSize", microtab.GapSize);
-                    break;
                 default:
                     combo.SelectedIndex = 0;
                     break;
@@ -571,10 +564,6 @@ namespace OpenNest.Controls
                 2 => new ArcLeadOut
                 {
                     Radius = GetParam(panel, "Radius", 0.25)
-                },
-                3 => new MicrotabLeadOut
-                {
-                    GapSize = GetParam(panel, "GapSize", 0.06)
                 },
                 _ => new NoLeadOut()
             };

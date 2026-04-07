@@ -85,7 +85,6 @@ namespace OpenNest.Forms
             {
                 LineLeadOut line => new LeadOutDto { Type = "Line", Length = line.Length, ApproachAngle = line.ApproachAngle },
                 ArcLeadOut arc => new LeadOutDto { Type = "Arc", Radius = arc.Radius },
-                MicrotabLeadOut mt => new LeadOutDto { Type = "Microtab", GapSize = mt.GapSize },
                 _ => new LeadOutDto { Type = "None" }
             };
         }
@@ -97,7 +96,6 @@ namespace OpenNest.Forms
             {
                 "Line" => new LineLeadOut { Length = dto.Length, ApproachAngle = dto.ApproachAngle },
                 "Arc" => new ArcLeadOut { Radius = dto.Radius },
-                "Microtab" => new MicrotabLeadOut { GapSize = dto.GapSize },
                 _ => new NoLeadOut()
             };
         }
