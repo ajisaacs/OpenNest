@@ -32,9 +32,8 @@ namespace OpenNest.Controls
         private CutOffSettings cutOffSettings = new CutOffSettings();
         private SelectionManager selection;
         private CutOffHandler cutOffHandler;
+        private PreviewManager previewManager;
         protected List<LayoutPart> parts;
-        private List<LayoutPart> stationaryParts = new List<LayoutPart>();
-        private List<LayoutPart> activeParts = new List<LayoutPart>();
         private Point middleMouseDownPoint;
         private Box activeWorkArea;
         private List<Box> debugRemnants;
@@ -70,6 +69,7 @@ namespace OpenNest.Controls
         internal SelectionManager Selection => selection;
         internal CutOffHandler CutOffs => cutOffHandler;
         internal ActionManager Actions => actionManager;
+        internal PreviewManager Previews => previewManager;
 
         public event EventHandler<ItemAddedEventArgs<Part>> PartAdded;
         public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
@@ -94,6 +94,7 @@ namespace OpenNest.Controls
             parts = new List<LayoutPart>();
             selection = new SelectionManager(this);
             cutOffHandler = new CutOffHandler(this);
+            previewManager = new PreviewManager(this);
 
             redrawTimer = new Timer()
             {
@@ -158,14 +159,9 @@ namespace OpenNest.Controls
 
         internal List<LayoutPart> LayoutParts => parts;
 
-        internal IReadOnlyList<LayoutPart> PreviewParts =>
-            activeParts.Count > 0 ? activeParts : stationaryParts;
-
-        internal Brush PreviewBrush =>
-            activeParts.Count > 0 ? ColorScheme.ActivePreviewPartBrush : ColorScheme.PreviewPartBrush;
-
-        internal Pen PreviewPen =>
-            activeParts.Count > 0 ? ColorScheme.ActivePreviewPartPen : ColorScheme.PreviewPartPen;
+        internal IReadOnlyList<LayoutPart> PreviewParts => previewManager.PreviewParts;
+        internal Brush PreviewBrush => previewManager.PreviewBrush;
+        internal Pen PreviewPen => previewManager.PreviewPen;
 
         internal RectangleF GetViewBounds() =>
             new RectangleF(-origin.X, -origin.Y, Width, Height);
@@ -213,8 +209,7 @@ namespace OpenNest.Controls
                 plate.PartAdded -= plate_PartAdded;
                 plate.PartRemoved -= plate_PartRemoved;
                 parts.Clear();
-                stationaryParts.Clear();
-                activeParts.Clear();
+                previewManager.Clear();
                 selection.Clear();
             }
 
@@ -537,8 +532,7 @@ namespace OpenNest.Controls
         public override void Refresh()
         {
             parts.ForEach(p => p.Update(this));
-            stationaryParts.ForEach(p => p.Update(this));
-            activeParts.ForEach(p => p.Update(this));
+            previewManager.Update();
             Invalidate();
         }
 
@@ -566,51 +560,10 @@ namespace OpenNest.Controls
             Plate.Parts.Add(part);
         }
 
-        public void SetStationaryParts(List<Part> parts)
-        {
-            stationaryParts.Clear();
-            activeParts.Clear();
-
-            if (parts != null)
-            {
-                foreach (var part in parts)
-                    stationaryParts.Add(LayoutPart.Create(part, this));
-            }
-
-            Invalidate();
-        }
-
-        public void SetActiveParts(List<Part> parts)
-        {
-            activeParts.Clear();
-
-            if (parts != null)
-            {
-                foreach (var part in parts)
-                    activeParts.Add(LayoutPart.Create(part, this));
-            }
-
-            Invalidate();
-        }
-
-        public void ClearPreviewParts()
-        {
-            stationaryParts.Clear();
-            activeParts.Clear();
-            Invalidate();
-        }
-
-        public void AcceptPreviewParts(List<Part> parts)
-        {
-            if (parts != null)
-            {
-                foreach (var part in parts)
-                    Plate.Parts.Add(part);
-            }
-
-            stationaryParts.Clear();
-            activeParts.Clear();
-        }
+        public void SetStationaryParts(List<Part> parts) => previewManager.SetStationaryParts(parts);
+        public void SetActiveParts(List<Part> parts) => previewManager.SetActiveParts(parts);
+        public void ClearPreviewParts() => previewManager.ClearPreviewParts();
+        public void AcceptPreviewParts(List<Part> parts) => previewManager.AcceptPreviewParts(parts);
 
         public async void FillWithProgress(List<Part> groupParts, Box workArea)
         {
@@ -751,8 +704,7 @@ namespace OpenNest.Controls
         {
             base.UpdateMatrix();
             parts.ForEach(p => p.Update(this));
-            stationaryParts.ForEach(p => p.Update(this));
-            activeParts.ForEach(p => p.Update(this));
+            previewManager.Update();
         }
     }
 }
