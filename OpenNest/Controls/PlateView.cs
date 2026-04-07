@@ -28,8 +28,7 @@ namespace OpenNest.Controls
 
         private string status;
         private Plate plate;
-        private Action currentAction;
-        private Action previousAction;
+        private ActionManager actionManager;
         private CutOffSettings cutOffSettings = new CutOffSettings();
         private SelectionManager selection;
         private CutOffHandler cutOffHandler;
@@ -70,6 +69,7 @@ namespace OpenNest.Controls
 
         internal SelectionManager Selection => selection;
         internal CutOffHandler CutOffs => cutOffHandler;
+        internal ActionManager Actions => actionManager;
 
         public event EventHandler<ItemAddedEventArgs<Part>> PartAdded;
         public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
@@ -124,7 +124,8 @@ namespace OpenNest.Controls
             DrawOffset = false;
             FillParts = true;
             renderer = new PlateRenderer(this);
-            SetAction(typeof(ActionSelect));
+            actionManager = new ActionManager(this);
+            actionManager.SetAction(typeof(ActionSelect));
 
             UpdateMatrix();
         }
@@ -224,10 +225,7 @@ namespace OpenNest.Controls
             foreach (var part in plate.Parts)
                 parts.Add(LayoutPart.Create(part, this));
 
-            if (currentAction == null || !currentAction.SurvivesPlateChange)
-                SetAction(typeof(ActionSelect));
-            else
-                currentAction.OnPlateChanged();
+            actionManager.OnPlateChanged();
         }
 
         public string Status
@@ -272,7 +270,7 @@ namespace OpenNest.Controls
             if (e.Button == MouseButtons.Middle)
                 middleMouseDownPoint = e.Location;
 
-            if (e.Button == MouseButtons.Left && currentAction is ActionSelect)
+            if (e.Button == MouseButtons.Left && actionManager.CurrentAction is ActionSelect)
             {
                 var hitCutOff = cutOffHandler.TryStartDrag(CurrentPoint, 5.0 / ViewScale);
                 if (hitCutOff != null)
@@ -374,7 +372,7 @@ namespace OpenNest.Controls
                 return;
             }
 
-            if (e.Button == MouseButtons.None && currentAction is ActionSelect)
+            if (e.Button == MouseButtons.None && actionManager.CurrentAction is ActionSelect)
             {
                 var graphPt = PointControlToGraph(e.Location);
                 LayoutPart hitPart = null;
@@ -432,15 +430,7 @@ namespace OpenNest.Controls
             }
         }
 
-        public void ProcessEscapeKey()
-        {
-            if (currentAction.IsBusy())
-                currentAction.CancelAction();
-            else if (currentAction is ActionSelect && previousAction != null)
-                RestorePreviousAction();
-            else
-                SetAction(typeof(ActionSelect));
-        }
+        public void ProcessEscapeKey() => actionManager.ProcessEscapeKey();
 
         protected override bool ProcessDialogKey(Keys keyData)
         {
@@ -541,14 +531,7 @@ namespace OpenNest.Controls
         protected override void OnHandleDestroyed(EventArgs e)
         {
             base.OnHandleDestroyed(e);
-
-            if (currentAction != null)
-            {
-                currentAction.CancelAction();
-                currentAction.DisconnectEvents();
-                currentAction = null;
-            }
-
+            actionManager.Cleanup();
         }
 
         public override void Refresh()
@@ -566,72 +549,8 @@ namespace OpenNest.Controls
         public LayoutPart GetPartAtPoint(Vector pt) => selection.GetPartAtPoint(pt);
         public IList<LayoutPart> GetPartsFromWindow(RectangleF rect, SelectionType selectionType) => selection.GetPartsFromWindow(rect, selectionType);
 
-        public void SetAction(Type type)
-        {
-            var action = Activator.CreateInstance(type, this) as Action;
-
-            if (action == null)
-                return;
-
-            if (currentAction != null)
-            {
-                if (type == typeof(ActionSelect) && !(currentAction is ActionSelect))
-                    previousAction = currentAction;
-                else
-                    previousAction = null;
-
-                currentAction.CancelAction();
-                currentAction.DisconnectEvents();
-                currentAction = null;
-            }
-
-            currentAction = action;
-
-            Status = GetDisplayName(type);
-        }
-
-        public void SetAction(Type type, params object[] args)
-        {
-            if (currentAction != null)
-            {
-                previousAction = null;
-                currentAction.CancelAction();
-                currentAction.DisconnectEvents();
-                currentAction = null;
-            }
-
-            Array.Resize(ref args, args.Length + 1);
-
-            // shift all elements to the right
-            for (int i = args.Length - 2; i >= 0; i--)
-                args[i + 1] = args[i];
-
-            // set the first argument to this.
-            args[0] = this;
-
-            var action = Activator.CreateInstance(type, args) as Action;
-
-            if (action == null)
-                return;
-
-            currentAction = action;
-
-            Status = GetDisplayName(type);
-        }
-
-        private void RestorePreviousAction()
-        {
-            var action = previousAction;
-            previousAction = null;
-
-            currentAction.CancelAction();
-            currentAction.DisconnectEvents();
-
-            action.ConnectEvents();
-            currentAction = action;
-
-            Status = GetDisplayName(action.GetType());
-        }
+        public void SetAction(Type type) => actionManager.SetAction(type);
+        public void SetAction(Type type, params object[] args) => actionManager.SetAction(type, args);
 
         public void AlignSelected(AlignType alignType) => selection.AlignSelected(alignType);
         public void AlignSelected(AlignType alignType, LayoutPart fixedPart) => selection.AlignSelected(alignType, fixedPart);
@@ -825,21 +744,6 @@ namespace OpenNest.Controls
         }
 
         public void PushSelected(PushDirection direction) => selection.PushSelected(direction);
-
-        private string GetDisplayName(Type type)
-        {
-            var attributes = type.GetCustomAttributes(true);
-
-            foreach (var attr in attributes)
-            {
-                var displayNameAttr = attr as DisplayNameAttribute;
-
-                if (displayNameAttr != null)
-                    return displayNameAttr.DisplayName;
-            }
-
-            return type.Name;
-        }
 
         public void RotateSelectedParts(double angle) => selection.RotateSelectedParts(angle);
 
