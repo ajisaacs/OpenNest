@@ -202,7 +202,7 @@ namespace OpenNest.Controls
             foreach (var part in plate.Parts)
                 parts.Add(LayoutPart.Create(part, this));
 
-            actionManager.OnPlateChanged();
+            actionManager?.OnPlateChanged();
         }
 
         public string Status
