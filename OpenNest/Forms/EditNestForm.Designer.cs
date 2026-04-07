@@ -175,7 +175,7 @@
             // toolStripLabel2
             // 
             toolStripLabel2.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            toolStripLabel2.Image = Properties.Resources.delete;
+            toolStripLabel2.Image = (System.Drawing.Image)resources.GetObject("toolStripLabel2.Image");
             toolStripLabel2.Name = "toolStripLabel2";
             toolStripLabel2.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
             toolStripLabel2.Size = new System.Drawing.Size(34, 24);

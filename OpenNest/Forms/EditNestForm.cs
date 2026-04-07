@@ -892,6 +892,7 @@ namespace OpenNest.Forms
             PlateView.Plate = PlateManager.CurrentPlate;
             PlateView.ZoomToFit();
             UpdatePlateHeader();
+            UpdateRemovePlateButton();
             PlateChanged?.Invoke(this, EventArgs.Empty);
         }
 
