@@ -152,6 +152,20 @@ namespace OpenNest.Controls
         {
             if (m.Msg == WM_ERASEBKGND)
             {
+                var itemBottom = 0;
+
+                if (Items.Count > 0)
+                {
+                    var lastVisible = System.Math.Min(TopIndex + (ClientSize.Height / ItemHeight), Items.Count - 1);
+                    itemBottom = GetItemRectangle(lastVisible).Bottom;
+                }
+
+                if (itemBottom < ClientSize.Height)
+                {
+                    using var g = Graphics.FromHdc(m.WParam);
+                    g.FillRectangle(Brushes.White, 0, itemBottom, ClientSize.Width, ClientSize.Height - itemBottom);
+                }
+
                 m.Result = (IntPtr)1;
                 return;
             }
