@@ -1,9 +1,7 @@
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Drawing;
 using System.Linq;
 

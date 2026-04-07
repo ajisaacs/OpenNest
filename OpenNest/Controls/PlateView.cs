@@ -1,5 +1,4 @@
 ﻿using OpenNest.Actions;
-using OpenNest.CNC;
 using OpenNest.Collections;
 using OpenNest.Engine.Fill;
 using OpenNest.Forms;
@@ -8,7 +7,6 @@ using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -16,14 +14,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Action = OpenNest.Actions.Action;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Controls
 {
     public class PlateView : DrawControl
     {
-        private readonly Font programIdFont;
         private readonly Timer redrawTimer;
 
         private string status;
@@ -89,7 +85,6 @@ namespace OpenNest.Controls
         public PlateView(ColorScheme colorScheme)
         {
             Plate = new Plate(60, 120);
-            programIdFont = new Font(DefaultFont, FontStyle.Bold | FontStyle.Underline);
             origin = new PointF();
             parts = new List<LayoutPart>();
             selection = new SelectionManager(this);
@@ -178,7 +173,6 @@ namespace OpenNest.Controls
                 Invalidate();
             }
         }
-
 
         public double RotateIncrementAngle { get; set; }
 
