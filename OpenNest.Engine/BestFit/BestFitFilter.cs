@@ -17,7 +17,8 @@ namespace OpenNest.Engine.BestFit
                 if (!result.Keep)
                     continue;
 
-                if (result.ShortestSide > System.Math.Min(MaxPlateWidth, MaxPlateHeight))
+                if (result.ShortestSide > System.Math.Min(MaxPlateWidth, MaxPlateHeight) ||
+                    result.LongestSide > System.Math.Max(MaxPlateWidth, MaxPlateHeight))
                 {
                     result.Keep = false;
                     result.Reason = "Exceeds plate dimensions";
