@@ -102,7 +102,7 @@ namespace OpenNest.Controls
             redrawTimer.Elapsed += redrawTimer_Elapsed;
 
             hoverTimer = new Timer() { AutoReset = false, Interval = 1000 };
-            hoverTimer.Elapsed += (s, _) => { showTooltip = true; Invalidate(); };
+            hoverTimer.Elapsed += hoverTimer_Elapsed;
 
             SetStyle(
                 ControlStyles.AllPaintingInWmPaint |
@@ -356,36 +356,15 @@ namespace OpenNest.Controls
 
             if (e.Button == MouseButtons.None && actionManager.CurrentAction is ActionSelect)
             {
-                var graphPt = PointControlToGraph(e.Location);
-                LayoutPart hitPart = null;
-                for (var i = parts.Count - 1; i >= 0; --i)
-                {
-                    if (parts[i].Path.GetBounds().Contains(graphPt) &&
-                        parts[i].Path.IsVisible(graphPt))
-                    {
-                        hitPart = parts[i];
-                        break;
-                    }
-                }
-
-                if (hitPart != hoveredPart)
-                    hoveredPart = hitPart;
+                hoverPoint = e.Location;
+                showTooltip = false;
+                hoverTimer.Stop();
+                hoverTimer.Start();
 
                 if (hoveredPart != null)
-                {
-                    hoverPoint = e.Location;
-                    showTooltip = false;
-                    hoverTimer.Stop();
-                    hoverTimer.Start();
                     Invalidate();
-                }
-                else
-                {
-                    hoverTimer.Stop();
-                    showTooltip = false;
-                }
             }
-            else if (hoveredPart != null)
+            else if (hoveredPart != null || showTooltip)
             {
                 hoveredPart = null;
                 hoverTimer.Stop();
@@ -642,6 +621,27 @@ namespace OpenNest.Controls
         private void redrawTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             Invalidate();
+        }
+
+        private void hoverTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            var graphPt = PointControlToGraph(hoverPoint);
+            LayoutPart hitPart = null;
+            for (var i = parts.Count - 1; i >= 0; --i)
+            {
+                if (parts[i].Path.GetBounds().Contains(graphPt) &&
+                    parts[i].Path.IsVisible(graphPt))
+                {
+                    hitPart = parts[i];
+                    break;
+                }
+            }
+
+            hoveredPart = hitPart;
+            showTooltip = hitPart != null;
+
+            if (showTooltip)
+                Invalidate();
         }
 
         private void plate_PartAdded(object sender, ItemAddedEventArgs<Part> e)
