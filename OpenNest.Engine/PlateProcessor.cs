@@ -14,7 +14,7 @@ namespace OpenNest.Engine
         public ContourCuttingStrategy CuttingStrategy { get; set; }
         public IRapidPlanner RapidPlanner { get; set; }
 
-        public PlateResult Process(Plate plate)
+        public PlateProcessingResult Process(Plate plate)
         {
             var sequenced = Sequencer.Sequence(plate.Parts.ToList(), plate);
             var results = new List<ProcessedPart>(sequenced.Count);
@@ -66,7 +66,7 @@ namespace OpenNest.Engine
                 currentPoint = ToPlateSpace(lastCutLocal, part);
             }
 
-            return new PlateResult { Parts = results };
+            return new PlateProcessingResult { Parts = results };
         }
 
         private static Vector ToPartLocal(Vector platePoint, Part part)

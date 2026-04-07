@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace OpenNest.Engine
 {
-    public class PlateResult
+    public class PlateProcessingResult
     {
         public List<ProcessedPart> Parts { get; init; }
     }
