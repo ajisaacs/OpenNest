@@ -31,7 +31,7 @@ namespace OpenNest.Controls
         private Action currentAction;
         private Action previousAction;
         private CutOffSettings cutOffSettings = new CutOffSettings();
-        private CutOff selectedCutOff;
+        private SelectionManager selection;
         private bool draggingCutOff;
         private Dictionary<Part, Geometry.Entity> dragPerimeterCache;
         protected List<LayoutPart> parts;
@@ -41,6 +41,8 @@ namespace OpenNest.Controls
         private Box activeWorkArea;
         private List<Box> debugRemnants;
         private PlateRenderer renderer;
+        private LayoutPart hoveredPart;
+        private Point hoverPoint;
 
         public Box ActiveWorkArea
         {
@@ -64,13 +66,20 @@ namespace OpenNest.Controls
 
         public List<int> DebugRemnantPriorities { get; set; }
 
-        public List<LayoutPart> SelectedParts;
-        public ReadOnlyCollection<LayoutPart> Parts;
+        public List<LayoutPart> SelectedParts => selection.SelectedParts;
+        public ReadOnlyCollection<LayoutPart> Parts => new ReadOnlyCollection<LayoutPart>(parts);
+
+        internal SelectionManager Selection => selection;
 
         public event EventHandler<ItemAddedEventArgs<Part>> PartAdded;
         public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
         public event EventHandler StatusChanged;
-        public event EventHandler SelectionChanged;
+
+        public event EventHandler SelectionChanged
+        {
+            add => selection.SelectionChanged += value;
+            remove => selection.SelectionChanged -= value;
+        }
 
         public PlateView()
             : this(ColorScheme.Default)
@@ -83,8 +92,7 @@ namespace OpenNest.Controls
             programIdFont = new Font(DefaultFont, FontStyle.Bold | FontStyle.Underline);
             origin = new PointF();
             parts = new List<LayoutPart>();
-            Parts = new ReadOnlyCollection<LayoutPart>(parts);
-            SelectedParts = new List<LayoutPart>();
+            selection = new SelectionManager(this);
 
             redrawTimer = new Timer()
             {
@@ -173,12 +181,15 @@ namespace OpenNest.Controls
             }
         }
 
+        // Temporary — removed in Task 5
         public CutOff SelectedCutOff
         {
-            get => selectedCutOff;
+            get => selection.SelectedCutOffs.Count > 0 ? selection.SelectedCutOffs[0] : null;
             set
             {
-                selectedCutOff = value;
+                selection.SelectedCutOffs.Clear();
+                if (value != null)
+                    selection.SelectedCutOffs.Add(value);
                 Invalidate();
             }
         }
@@ -202,7 +213,7 @@ namespace OpenNest.Controls
                 parts.Clear();
                 stationaryParts.Clear();
                 activeParts.Clear();
-                SelectedParts.Clear();
+                selection.Clear();
             }
 
             plate = p;
@@ -288,12 +299,12 @@ namespace OpenNest.Controls
 
                 if (dx * dx + dy * dy < 25)
                 {
-                    RotateSelectedParts(Angle.ToRadians(90));
+                    selection.RotateSelectedParts(Angle.ToRadians(90));
                     Invalidate();
                 }
             }
 
-            if (draggingCutOff && selectedCutOff != null)
+            if (draggingCutOff && SelectedCutOff != null)
             {
                 draggingCutOff = false;
                 dragPerimeterCache = null;
@@ -319,7 +330,7 @@ namespace OpenNest.Controls
 
                 var angle = Angle.ToRadians((e.Delta > 0 ? -increment : increment) * multiplier);
 
-                RotateSelectedParts(angle);
+                selection.RotateSelectedParts(angle);
             }
             else
             {
@@ -358,16 +369,42 @@ namespace OpenNest.Controls
 
             lastPoint = e.Location;
 
-            if (draggingCutOff && selectedCutOff != null)
+            if (draggingCutOff && SelectedCutOff != null)
             {
-                if (selectedCutOff.Axis == CutOffAxis.Vertical)
-                    selectedCutOff.Position = new Vector(CurrentPoint.X, selectedCutOff.Position.Y);
+                if (SelectedCutOff.Axis == CutOffAxis.Vertical)
+                    SelectedCutOff.Position = new Vector(CurrentPoint.X, SelectedCutOff.Position.Y);
                 else
-                    selectedCutOff.Position = new Vector(selectedCutOff.Position.X, CurrentPoint.Y);
+                    SelectedCutOff.Position = new Vector(SelectedCutOff.Position.X, CurrentPoint.Y);
 
-                selectedCutOff.Regenerate(Plate, cutOffSettings, dragPerimeterCache);
+                SelectedCutOff.Regenerate(Plate, cutOffSettings, dragPerimeterCache);
                 Invalidate();
                 return;
+            }
+
+            if (e.Button == MouseButtons.None && currentAction is ActionSelect)
+            {
+                var graphPt = PointControlToGraph(e.Location);
+                LayoutPart hitPart = null;
+                for (var i = parts.Count - 1; i >= 0; --i)
+                {
+                    if (parts[i].Path.IsVisible(graphPt))
+                    {
+                        hitPart = parts[i];
+                        break;
+                    }
+                }
+
+                if (hitPart != hoveredPart)
+                {
+                    hoveredPart = hitPart;
+                    hoverPoint = e.Location;
+                    Invalidate();
+                }
+            }
+            else if (hoveredPart != null)
+            {
+                hoveredPart = null;
+                Invalidate();
             }
 
             base.OnMouseMove(e);
@@ -386,17 +423,7 @@ namespace OpenNest.Controls
             switch (e.KeyCode)
             {
                 case Keys.Delete:
-                    if (selectedCutOff != null)
-                    {
-                        Plate.CutOffs.Remove(selectedCutOff);
-                        selectedCutOff = null;
-                        Plate.RegenerateCutOffs(cutOffSettings);
-                        Invalidate();
-                    }
-                    else
-                    {
-                        RemoveSelectedParts();
-                    }
+                    selection.DeleteSelected();
                     break;
 
                 case Keys.F:
@@ -440,22 +467,22 @@ namespace OpenNest.Controls
 
                 case Keys.X:
                 case Keys.Shift | Keys.Left:
-                    PushSelected(PushDirection.Left);
+                    selection.PushSelected(PushDirection.Left);
                     break;
 
                 case Keys.Shift | Keys.X:
                 case Keys.Shift | Keys.Right:
-                    PushSelected(PushDirection.Right);
+                    selection.PushSelected(PushDirection.Right);
                     break;
 
                 case Keys.Shift | Keys.Y:
                 case Keys.Shift | Keys.Up:
-                    PushSelected(PushDirection.Up);
+                    selection.PushSelected(PushDirection.Up);
                     break;
 
                 case Keys.Y:
                 case Keys.Shift | Keys.Down:
-                    PushSelected(PushDirection.Down);
+                    selection.PushSelected(PushDirection.Down);
                     break;
 
                 case Keys.Right:
@@ -496,6 +523,26 @@ namespace OpenNest.Controls
             renderer.DrawDebugRemnants(e.Graphics);
 
             base.OnPaint(e);
+
+            if (hoveredPart != null)
+            {
+                e.Graphics.ResetTransform();
+                var text = hoveredPart.BasePart.BaseDrawing.Name;
+                var size = e.Graphics.MeasureString(text, Font);
+                var x = hoverPoint.X + 16f;
+                var y = hoverPoint.Y - size.Height - 6f;
+
+                if (x + size.Width + 8 > ClientSize.Width)
+                    x = hoverPoint.X - size.Width - 8;
+                if (y < 0)
+                    y = hoverPoint.Y + 20;
+
+                var rect = new RectangleF(x, y, size.Width + 6, size.Height + 4);
+                using (var bgBrush = new SolidBrush(Color.FromArgb(230, Color.White)))
+                    e.Graphics.FillRectangle(bgBrush, rect);
+                e.Graphics.DrawRectangle(Pens.DimGray, rect.X, rect.Y, rect.Width, rect.Height);
+                e.Graphics.DrawString(text, Font, Brushes.Black, x + 3, y + 2);
+            }
         }
 
         protected override void OnHandleDestroyed(EventArgs e)
@@ -508,6 +555,7 @@ namespace OpenNest.Controls
                 currentAction.DisconnectEvents();
                 currentAction = null;
             }
+
         }
 
         public override void Refresh()
@@ -544,62 +592,10 @@ namespace OpenNest.Controls
             return null;
         }
 
-        public LayoutPart GetPartAtControlPoint(Point pt)
-        {
-            var pt2 = PointControlToGraph(pt);
-            return GetPartAtGraphPoint(pt2);
-        }
-
-        public LayoutPart GetPartAtGraphPoint(PointF pt)
-        {
-            for (int i = parts.Count - 1; i >= 0; --i)
-            {
-                if (parts[i].Path.IsVisible(pt))
-                    return parts[i];
-            }
-
-            return null;
-        }
-
-        public LayoutPart GetPartAtPoint(Vector pt)
-        {
-            var pt2 = PointWorldToGraph(pt);
-            return GetPartAtGraphPoint(pt2);
-        }
-
-        public IList<LayoutPart> GetPartsFromWindow(RectangleF rect, SelectionType selectionType)
-        {
-            var list = new List<LayoutPart>();
-
-            if (selectionType == SelectionType.Intersect)
-            {
-                for (int i = 0; i < parts.Count; ++i)
-                {
-                    var part = parts[i];
-                    var path = part.Path;
-                    var region = new Region(path);
-
-                    if (region.IsVisible(rect))
-                        list.Add(part);
-
-                    region.Dispose();
-                }
-            }
-            else
-            {
-                for (int i = 0; i < parts.Count; ++i)
-                {
-                    var part = parts[i];
-                    var path = part.Path;
-                    var bounds = path.GetBounds();
-
-                    if (rect.Contains(bounds))
-                        list.Add(part);
-                }
-            }
-
-            return list;
-        }
+        public LayoutPart GetPartAtControlPoint(Point pt) => selection.GetPartAtControlPoint(pt);
+        public LayoutPart GetPartAtGraphPoint(PointF pt) => selection.GetPartAtGraphPoint(pt);
+        public LayoutPart GetPartAtPoint(Vector pt) => selection.GetPartAtPoint(pt);
+        public IList<LayoutPart> GetPartsFromWindow(RectangleF rect, SelectionType selectionType) => selection.GetPartsFromWindow(rect, selectionType);
 
         public void SetAction(Type type)
         {
@@ -668,57 +664,8 @@ namespace OpenNest.Controls
             Status = GetDisplayName(action.GetType());
         }
 
-        public void AlignSelected(AlignType alignType)
-        {
-            if (SelectedParts.Count == 0)
-                return;
-
-            AlignSelected(alignType, SelectedParts[0]);
-        }
-
-        public void AlignSelected(AlignType alignType, LayoutPart fixedPart)
-        {
-            switch (alignType)
-            {
-                case AlignType.Bottom:
-                    Align.Bottom(fixedPart.BasePart, SelectedParts.Select(p => p.BasePart).ToList());
-                    break;
-
-                case AlignType.Horizontally:
-                    Align.Horizontally(fixedPart.BasePart, SelectedParts.Select(p => p.BasePart).ToList());
-                    break;
-
-                case AlignType.Left:
-                    Align.Left(fixedPart.BasePart, SelectedParts.Select(p => p.BasePart).ToList());
-                    break;
-
-                case AlignType.Right:
-                    Align.Right(fixedPart.BasePart, SelectedParts.Select(p => p.BasePart).ToList());
-                    break;
-
-                case AlignType.Top:
-                    Align.Top(fixedPart.BasePart, SelectedParts.Select(p => p.BasePart).ToList());
-                    break;
-
-                case AlignType.Vertically:
-                    Align.Vertically(fixedPart.BasePart, SelectedParts.Select(p => p.BasePart).ToList());
-                    break;
-
-                case AlignType.EvenlySpaceHorizontally:
-                    Align.EvenlyDistributeHorizontally(SelectedParts.Select(p => p.BasePart).ToList());
-                    break;
-
-                case AlignType.EvenlySpaceVertically:
-                    Align.EvenlyDistributeVertically(SelectedParts.Select(p => p.BasePart).ToList());
-                    break;
-
-                default:
-                    return;
-            }
-
-            SelectedParts.ForEach(p => p.IsDirty = true);
-            Invalidate();
-        }
+        public void AlignSelected(AlignType alignType) => selection.AlignSelected(alignType);
+        public void AlignSelected(AlignType alignType, LayoutPart fixedPart) => selection.AlignSelected(alignType, fixedPart);
 
         public void AddPartFromDrawing(Drawing dwg, Vector location)
         {
@@ -848,14 +795,7 @@ namespace OpenNest.Controls
             }
         }
 
-        public void RemoveSelectedParts()
-        {
-            foreach (var part in SelectedParts)
-                Plate.Parts.Remove(part.BasePart);
-
-            DeselectAll();
-            Invalidate();
-        }
+        public void RemoveSelectedParts() => selection.RemoveSelectedParts();
 
 
         private void redrawTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
@@ -880,24 +820,9 @@ namespace OpenNest.Controls
             parts.RemoveAll(p => p.BasePart == e.Item);
         }
 
-        public void DeselectAll()
-        {
-            SelectedParts.ForEach(p => p.IsSelected = false);
-            SelectedParts.Clear();
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        public void SelectAll()
-        {
-            parts.ForEach(p => p.IsSelected = true);
-            SelectedParts.AddRange(parts);
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        public void NotifySelectionChanged()
-        {
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
-        }
+        public void DeselectAll() => selection.DeselectAll();
+        public void SelectAll() => selection.SelectAll();
+        public void NotifySelectionChanged() => selection.NotifySelectionChanged();
 
         public override void ZoomToPoint(Vector pt, float zoomFactor, bool redraw = true)
         {
@@ -930,13 +855,7 @@ namespace OpenNest.Controls
             ZoomToArea(plate.BoundingBox(false), redraw);
         }
 
-        public void PushSelected(PushDirection direction)
-        {
-            var movingParts = SelectedParts.Select(p => p.BasePart).ToList();
-            Compactor.Push(movingParts, Plate, direction);
-            SelectedParts.ForEach(p => p.IsDirty = true);
-            Invalidate();
-        }
+        public void PushSelected(PushDirection direction) => selection.PushSelected(direction);
 
         private string GetDisplayName(Type type)
         {
@@ -953,27 +872,7 @@ namespace OpenNest.Controls
             return type.Name;
         }
 
-        public void RotateSelectedParts(double angle)
-        {
-            var parts = SelectedParts.Select(p => p.BasePart).ToList();
-            var bounds = parts.GetBoundingBox();
-            var center = bounds.Center;
-            var anchor = bounds.Location;
-
-            for (var i = 0; i < SelectedParts.Count; ++i)
-            {
-                var part = SelectedParts[i];
-                part.BasePart.Rotate(angle, center);
-            }
-
-            var diff = anchor - parts.GetBoundingBox().Location;
-
-            for (var i = 0; i < SelectedParts.Count; ++i)
-                SelectedParts[i].Offset(diff);
-
-            if (Plate.CutOffs.Count > 0)
-                Plate.RegenerateCutOffs(cutOffSettings);
-        }
+        public void RotateSelectedParts(double angle) => selection.RotateSelectedParts(angle);
 
         protected override void UpdateMatrix()
         {
