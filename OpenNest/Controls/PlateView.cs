@@ -32,8 +32,7 @@ namespace OpenNest.Controls
         private Action previousAction;
         private CutOffSettings cutOffSettings = new CutOffSettings();
         private SelectionManager selection;
-        private bool draggingCutOff;
-        private Dictionary<Part, Geometry.Entity> dragPerimeterCache;
+        private CutOffHandler cutOffHandler;
         protected List<LayoutPart> parts;
         private List<LayoutPart> stationaryParts = new List<LayoutPart>();
         private List<LayoutPart> activeParts = new List<LayoutPart>();
@@ -70,6 +69,7 @@ namespace OpenNest.Controls
         public ReadOnlyCollection<LayoutPart> Parts => new ReadOnlyCollection<LayoutPart>(parts);
 
         internal SelectionManager Selection => selection;
+        internal CutOffHandler CutOffs => cutOffHandler;
 
         public event EventHandler<ItemAddedEventArgs<Part>> PartAdded;
         public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
@@ -93,6 +93,7 @@ namespace OpenNest.Controls
             origin = new PointF();
             parts = new List<LayoutPart>();
             selection = new SelectionManager(this);
+            cutOffHandler = new CutOffHandler(this);
 
             redrawTimer = new Timer()
             {
@@ -273,17 +274,18 @@ namespace OpenNest.Controls
 
             if (e.Button == MouseButtons.Left && currentAction is ActionSelect)
             {
-                var hitCutOff = GetCutOffAtPoint(CurrentPoint, 5.0 / ViewScale);
+                var hitCutOff = cutOffHandler.TryStartDrag(CurrentPoint, 5.0 / ViewScale);
                 if (hitCutOff != null)
                 {
-                    SelectedCutOff = hitCutOff;
-                    draggingCutOff = true;
-                    dragPerimeterCache = Plate.BuildPerimeterCache(Plate);
+                    selection.DeselectParts();
+                    selection.SelectedCutOffs.Clear();
+                    selection.SelectedCutOffs.Add(hitCutOff);
+                    Invalidate();
                     return;
                 }
                 else
                 {
-                    SelectedCutOff = null;
+                    selection.DeselectCutOffs();
                 }
             }
 
@@ -304,12 +306,9 @@ namespace OpenNest.Controls
                 }
             }
 
-            if (draggingCutOff && SelectedCutOff != null)
+            if (cutOffHandler.IsDragging && selection.SelectedCutOffs.Count > 0)
             {
-                draggingCutOff = false;
-                dragPerimeterCache = null;
-                Plate.RegenerateCutOffs(cutOffSettings);
-                Invalidate();
+                cutOffHandler.EndDrag();
                 return;
             }
 
@@ -369,15 +368,9 @@ namespace OpenNest.Controls
 
             lastPoint = e.Location;
 
-            if (draggingCutOff && SelectedCutOff != null)
+            if (cutOffHandler.IsDragging && selection.SelectedCutOffs.Count > 0)
             {
-                if (SelectedCutOff.Axis == CutOffAxis.Vertical)
-                    SelectedCutOff.Position = new Vector(CurrentPoint.X, SelectedCutOff.Position.Y);
-                else
-                    SelectedCutOff.Position = new Vector(SelectedCutOff.Position.X, CurrentPoint.Y);
-
-                SelectedCutOff.Regenerate(Plate, cutOffSettings, dragPerimeterCache);
-                Invalidate();
+                cutOffHandler.UpdateDrag(CurrentPoint, selection.SelectedCutOffs[0]);
                 return;
             }
 
@@ -566,31 +559,7 @@ namespace OpenNest.Controls
             Invalidate();
         }
 
-        public CutOff GetCutOffAtPoint(Vector point, double tolerance)
-        {
-            if (Plate?.CutOffs == null)
-                return null;
-
-            foreach (var cutoff in Plate.CutOffs)
-            {
-                var program = cutoff.Drawing?.Program;
-                if (program == null)
-                    continue;
-
-                for (var i = 0; i < program.Codes.Count - 1; i += 2)
-                {
-                    if (program.Codes[i] is RapidMove rapid &&
-                        program.Codes[i + 1] is LinearMove linear)
-                    {
-                        var line = new Geometry.Line(rapid.EndPoint, linear.EndPoint);
-                        if (line.ClosestPointTo(point).DistanceTo(point) <= tolerance)
-                            return cutoff;
-                    }
-                }
-            }
-
-            return null;
-        }
+        public CutOff GetCutOffAtPoint(Vector point, double tolerance) => cutOffHandler.GetCutOffAtPoint(point, tolerance);
 
         public LayoutPart GetPartAtControlPoint(Point pt) => selection.GetPartAtControlPoint(pt);
         public LayoutPart GetPartAtGraphPoint(PointF pt) => selection.GetPartAtGraphPoint(pt);
