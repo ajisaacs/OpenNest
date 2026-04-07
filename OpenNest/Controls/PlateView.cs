@@ -36,6 +36,8 @@ namespace OpenNest.Controls
         private PlateRenderer renderer;
         private LayoutPart hoveredPart;
         private Point hoverPoint;
+        private bool showTooltip;
+        private Timer hoverTimer;
 
         public Box ActiveWorkArea
         {
@@ -98,6 +100,9 @@ namespace OpenNest.Controls
                 Interval = 50
             };
             redrawTimer.Elapsed += redrawTimer_Elapsed;
+
+            hoverTimer = new Timer() { AutoReset = false, Interval = 1000 };
+            hoverTimer.Elapsed += (s, _) => { showTooltip = true; Invalidate(); };
 
             SetStyle(
                 ControlStyles.AllPaintingInWmPaint |
@@ -369,12 +374,22 @@ namespace OpenNest.Controls
                 if (hoveredPart != null)
                 {
                     hoverPoint = e.Location;
+                    showTooltip = false;
+                    hoverTimer.Stop();
+                    hoverTimer.Start();
                     Invalidate();
+                }
+                else
+                {
+                    hoverTimer.Stop();
+                    showTooltip = false;
                 }
             }
             else if (hoveredPart != null)
             {
                 hoveredPart = null;
+                hoverTimer.Stop();
+                showTooltip = false;
                 Invalidate();
             }
 
@@ -487,7 +502,7 @@ namespace OpenNest.Controls
 
             base.OnPaint(e);
 
-            if (hoveredPart != null)
+            if (hoveredPart != null && showTooltip)
             {
                 e.Graphics.ResetTransform();
                 var text = hoveredPart.BasePart.BaseDrawing.Name;
