@@ -648,6 +648,75 @@ namespace OpenNest.Geometry
                 }
             }
 
+            // Phase 3: Curve-to-curve direct distance.
+            // The vertex-to-entity approach misses the closest contact between two
+            // curved entities (circles/arcs) because only a few cardinal vertices are
+            // sampled. The true closest contact along the push direction is found by
+            // treating it as a ray from one center to an expanded circle at the other
+            // center (radius = r1 + r2).
+            for (var i = 0; i < movingEntities.Count; i++)
+            {
+                var me = movingEntities[i];
+                double mcx, mcy, mr;
+
+                if (me is Circle mc)
+                {
+                    mcx = mc.Center.X; mcy = mc.Center.Y; mr = mc.Radius;
+                }
+                else if (me is Arc ma)
+                {
+                    mcx = ma.Center.X; mcy = ma.Center.Y; mr = ma.Radius;
+                }
+                else continue;
+
+                for (var j = 0; j < stationaryEntities.Count; j++)
+                {
+                    var se = stationaryEntities[j];
+                    double scx, scy, sr;
+
+                    if (se is Circle sc)
+                    {
+                        scx = sc.Center.X; scy = sc.Center.Y; sr = sc.Radius;
+                    }
+                    else if (se is Arc sa)
+                    {
+                        scx = sa.Center.X; scy = sa.Center.Y; sr = sa.Radius;
+                    }
+                    else continue;
+
+                    var d = RayCircleDistance(mcx, mcy, scx, scy, mr + sr, dirX, dirY);
+
+                    if (d >= minDist || d == double.MaxValue)
+                        continue;
+
+                    // For arcs, verify the contact point falls within both arcs' angular ranges.
+                    if (me is Arc || se is Arc)
+                    {
+                        var mx = mcx + d * dirX;
+                        var my = mcy + d * dirY;
+                        var toCx = scx - mx;
+                        var toCy = scy - my;
+
+                        if (me is Arc mArc)
+                        {
+                            var angle = Angle.NormalizeRad(System.Math.Atan2(toCy, toCx));
+                            if (!Angle.IsBetweenRad(angle, mArc.StartAngle, mArc.EndAngle, mArc.IsReversed))
+                                continue;
+                        }
+
+                        if (se is Arc sArc)
+                        {
+                            var angle = Angle.NormalizeRad(System.Math.Atan2(-toCy, -toCx));
+                            if (!Angle.IsBetweenRad(angle, sArc.StartAngle, sArc.EndAngle, sArc.IsReversed))
+                                continue;
+                        }
+                    }
+
+                    minDist = d;
+                    if (d <= 0) return 0;
+                }
+            }
+
             return minDist;
         }
 
