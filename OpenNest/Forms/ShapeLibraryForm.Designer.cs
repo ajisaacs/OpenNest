@@ -118,7 +118,7 @@ namespace OpenNest.Forms
             fieldsTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             fieldsTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
             fieldsTable.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            fieldsTable.Size = new System.Drawing.Size(584, 97);
+            fieldsTable.Size = new System.Drawing.Size(584, 99);
             fieldsTable.TabIndex = 0;
             // 
             // nameLabel
@@ -135,10 +135,10 @@ namespace OpenNest.Forms
             // nameTextBox
             // 
             nameTextBox.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
-            nameTextBox.Location = new System.Drawing.Point(102, 4);
-            nameTextBox.Margin = new System.Windows.Forms.Padding(0, 4, 4, 4);
+            nameTextBox.Location = new System.Drawing.Point(106, 4);
+            nameTextBox.Margin = new System.Windows.Forms.Padding(4);
             nameTextBox.Name = "nameTextBox";
-            nameTextBox.Size = new System.Drawing.Size(478, 25);
+            nameTextBox.Size = new System.Drawing.Size(474, 25);
             nameTextBox.TabIndex = 1;
             // 
             // qtyLabel
@@ -154,8 +154,8 @@ namespace OpenNest.Forms
             // 
             // quantityUpDown
             // 
-            quantityUpDown.Location = new System.Drawing.Point(102, 37);
-            quantityUpDown.Margin = new System.Windows.Forms.Padding(0, 4, 4, 4);
+            quantityUpDown.Location = new System.Drawing.Point(106, 37);
+            quantityUpDown.Margin = new System.Windows.Forms.Padding(4);
             quantityUpDown.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
             quantityUpDown.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             quantityUpDown.Name = "quantityUpDown";
@@ -168,7 +168,7 @@ namespace OpenNest.Forms
             // 
             configLabel.Anchor = System.Windows.Forms.AnchorStyles.Left;
             configLabel.AutoSize = true;
-            configLabel.Location = new System.Drawing.Point(4, 73);
+            configLabel.Location = new System.Drawing.Point(4, 74);
             configLabel.Margin = new System.Windows.Forms.Padding(4, 4, 8, 4);
             configLabel.Name = "configLabel";
             configLabel.Size = new System.Drawing.Size(90, 17);
@@ -180,10 +180,10 @@ namespace OpenNest.Forms
             // 
             configComboBox.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             configComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            configComboBox.Location = new System.Drawing.Point(102, 70);
-            configComboBox.Margin = new System.Windows.Forms.Padding(0, 4, 4, 4);
+            configComboBox.Location = new System.Drawing.Point(106, 70);
+            configComboBox.Margin = new System.Windows.Forms.Padding(4);
             configComboBox.Name = "configComboBox";
-            configComboBox.Size = new System.Drawing.Size(478, 25);
+            configComboBox.Size = new System.Drawing.Size(474, 25);
             configComboBox.TabIndex = 3;
             configComboBox.Visible = false;
             // 
@@ -192,9 +192,9 @@ namespace OpenNest.Forms
             contentPanel.Controls.Add(previewBox);
             contentPanel.Controls.Add(parametersPanel);
             contentPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            contentPanel.Location = new System.Drawing.Point(9, 108);
+            contentPanel.Location = new System.Drawing.Point(9, 110);
             contentPanel.Name = "contentPanel";
-            contentPanel.Size = new System.Drawing.Size(578, 365);
+            contentPanel.Size = new System.Drawing.Size(578, 363);
             contentPanel.TabIndex = 1;
             // 
             // previewBox
@@ -242,7 +242,7 @@ namespace OpenNest.Forms
             previewBox.Plate = plate1;
             previewBox.RotateIncrementAngle = 10D;
             previewBox.ShowBendLines = false;
-            previewBox.Size = new System.Drawing.Size(318, 365);
+            previewBox.Size = new System.Drawing.Size(318, 363);
             previewBox.Status = "Select";
             previewBox.TabIndex = 4;
             previewBox.TabStop = false;
@@ -254,7 +254,7 @@ namespace OpenNest.Forms
             parametersPanel.Location = new System.Drawing.Point(318, 0);
             parametersPanel.Name = "parametersPanel";
             parametersPanel.Padding = new System.Windows.Forms.Padding(8, 0, 0, 0);
-            parametersPanel.Size = new System.Drawing.Size(260, 365);
+            parametersPanel.Size = new System.Drawing.Size(260, 363);
             parametersPanel.TabIndex = 5;
             // 
             // buttonPanel
