@@ -7,6 +7,11 @@ namespace OpenNest.Shapes
     {
         public double Diameter { get; set; }
 
+        public override void SetPreviewDefaults()
+        {
+            Diameter = 8;
+        }
+
         public override Drawing GetDrawing()
         {
             var entities = new List<Entity>

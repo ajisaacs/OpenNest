@@ -10,6 +10,14 @@ namespace OpenNest.Shapes
         public double LegWidth { get; set; }
         public double LegHeight { get; set; }
 
+        public override void SetPreviewDefaults()
+        {
+            Width = 8;
+            Height = 10;
+            LegWidth = 3;
+            LegHeight = 3;
+        }
+
         public override Drawing GetDrawing()
         {
             var lw = LegWidth > 0 ? LegWidth : Width / 2.0;

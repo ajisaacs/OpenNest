@@ -11,6 +11,15 @@ namespace OpenNest.Shapes
         public double HolePatternDiameter { get; set; }
         public int HoleCount { get; set; }
 
+        public override void SetPreviewDefaults()
+        {
+            NominalPipeSize = 2;
+            OD = 7.5;
+            HoleDiameter = 0.875;
+            HolePatternDiameter = 5.5;
+            HoleCount = 8;
+        }
+
         public override Drawing GetDrawing()
         {
             var entities = new List<Entity>();

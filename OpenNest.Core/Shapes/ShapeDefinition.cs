@@ -26,6 +26,8 @@ namespace OpenNest.Shapes
 
         public abstract Drawing GetDrawing();
 
+        public virtual void SetPreviewDefaults() { }
+
         public static List<T> LoadFromJson<T>(string path) where T : ShapeDefinition
         {
             var json = File.ReadAllText(path);

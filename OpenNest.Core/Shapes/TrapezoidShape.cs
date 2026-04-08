@@ -9,6 +9,13 @@ namespace OpenNest.Shapes
         public double BottomWidth { get; set; }
         public double Height { get; set; }
 
+        public override void SetPreviewDefaults()
+        {
+            TopWidth = 6;
+            BottomWidth = 10;
+            Height = 6;
+        }
+
         public override Drawing GetDrawing()
         {
             var offset = (BottomWidth - TopWidth) / 2.0;

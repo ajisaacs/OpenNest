@@ -10,6 +10,14 @@ namespace OpenNest.Shapes
         public double StemWidth { get; set; }
         public double BarHeight { get; set; }
 
+        public override void SetPreviewDefaults()
+        {
+            Width = 10;
+            Height = 8;
+            StemWidth = 3;
+            BarHeight = 3;
+        }
+
         public override Drawing GetDrawing()
         {
             var sw = StemWidth > 0 ? StemWidth : Width / 3.0;

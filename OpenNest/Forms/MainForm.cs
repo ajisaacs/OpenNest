@@ -829,6 +829,20 @@ namespace OpenNest.Forms
             activeForm.Import();
         }
 
+        private void ShapeLibrary_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null) return;
+
+            var form = new ShapeLibraryForm();
+            form.ShowDialog();
+
+            var drawings = form.GetDrawings();
+            if (drawings.Count == 0) return;
+
+            drawings.ForEach(d => activeForm.Nest.Drawings.Add(d));
+            activeForm.UpdateDrawingList();
+        }
+
         private void EditNest_Click(object sender, EventArgs e)
         {
             if (activeForm == null) return;

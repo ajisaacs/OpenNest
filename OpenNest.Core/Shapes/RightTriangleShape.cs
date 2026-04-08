@@ -8,6 +8,12 @@ namespace OpenNest.Shapes
         public double Width { get; set; }
         public double Height { get; set; }
 
+        public override void SetPreviewDefaults()
+        {
+            Width = 8;
+            Height = 6;
+        }
+
         public override Drawing GetDrawing()
         {
             var entities = new List<Entity>

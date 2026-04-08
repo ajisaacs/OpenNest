@@ -7,6 +7,11 @@ namespace OpenNest.Shapes
     {
         public double Width { get; set; }
 
+        public override void SetPreviewDefaults()
+        {
+            Width = 8;
+        }
+
         public override Drawing GetDrawing()
         {
             var center = Width / 2.0;

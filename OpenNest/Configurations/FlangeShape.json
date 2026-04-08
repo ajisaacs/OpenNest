@@ -1,0 +1,1090 @@
+[
+  {
+    "Name": "0.25in-150#",
+    "NominalPipeSize": 0.25,
+    "OD": 3.375,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.25in-300#",
+    "NominalPipeSize": 0.25,
+    "OD": 3.375,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.25in-400#",
+    "NominalPipeSize": 0.25,
+    "OD": 3.375,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.25in-600#",
+    "NominalPipeSize": 0.25,
+    "OD": 3.375,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.5in-150#",
+    "NominalPipeSize": 0.5,
+    "OD": 3.5,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.38,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.5in-300#",
+    "NominalPipeSize": 0.5,
+    "OD": 3.75,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.63,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.5in-400#",
+    "NominalPipeSize": 0.5,
+    "OD": 3.75,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.63,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.5in-600#",
+    "NominalPipeSize": 0.5,
+    "OD": 3.75,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.63,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.5in-900#",
+    "NominalPipeSize": 0.5,
+    "OD": 4.75,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 3.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.5in-1500#",
+    "NominalPipeSize": 0.5,
+    "OD": 4.75,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 3.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.5in-2500#",
+    "NominalPipeSize": 0.5,
+    "OD": 5.25,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 3.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.75in-150#",
+    "NominalPipeSize": 0.75,
+    "OD": 3.875,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 2.75,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.75in-300#",
+    "NominalPipeSize": 0.75,
+    "OD": 4.625,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.75in-400#",
+    "NominalPipeSize": 0.75,
+    "OD": 4.625,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.75in-600#",
+    "NominalPipeSize": 0.75,
+    "OD": 4.625,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.75in-900#",
+    "NominalPipeSize": 0.75,
+    "OD": 5.125,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 3.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.75in-1500#",
+    "NominalPipeSize": 0.75,
+    "OD": 5.125,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 3.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "0.75in-2500#",
+    "NominalPipeSize": 0.75,
+    "OD": 5.5,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 3.75,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1in-150#",
+    "NominalPipeSize": 1.0,
+    "OD": 4.25,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 3.13,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1in-300#",
+    "NominalPipeSize": 1.0,
+    "OD": 4.875,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1in-400#",
+    "NominalPipeSize": 1.0,
+    "OD": 4.875,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1in-600#",
+    "NominalPipeSize": 1.0,
+    "OD": 4.875,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1in-900#",
+    "NominalPipeSize": 1.0,
+    "OD": 5.875,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 4.0,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1in-1500#",
+    "NominalPipeSize": 1.0,
+    "OD": 5.875,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 4.0,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1in-2500#",
+    "NominalPipeSize": 1.0,
+    "OD": 6.25,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 4.25,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.25in-150#",
+    "NominalPipeSize": 1.25,
+    "OD": 4.625,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 3.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.25in-300#",
+    "NominalPipeSize": 1.25,
+    "OD": 5.25,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.88,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.25in-400#",
+    "NominalPipeSize": 1.25,
+    "OD": 5.25,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.88,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.25in-600#",
+    "NominalPipeSize": 1.25,
+    "OD": 5.25,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 3.88,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.25in-900#",
+    "NominalPipeSize": 1.25,
+    "OD": 6.25,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 4.38,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.25in-1500#",
+    "NominalPipeSize": 1.25,
+    "OD": 6.25,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 4.38,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.25in-2500#",
+    "NominalPipeSize": 1.25,
+    "OD": 7.25,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 5.13,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.5in-150#",
+    "NominalPipeSize": 1.5,
+    "OD": 5.0,
+    "HoleDiameter": 0.62,
+    "HolePatternDiameter": 3.88,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.5in-300#",
+    "NominalPipeSize": 1.5,
+    "OD": 6.125,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 4.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.5in-400#",
+    "NominalPipeSize": 1.5,
+    "OD": 6.125,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 4.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.5in-600#",
+    "NominalPipeSize": 1.5,
+    "OD": 6.125,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 4.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.5in-900#",
+    "NominalPipeSize": 1.5,
+    "OD": 7.0,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 4.88,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.5in-1500#",
+    "NominalPipeSize": 1.5,
+    "OD": 7.0,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 4.88,
+    "HoleCount": 4
+  },
+  {
+    "Name": "1.5in-2500#",
+    "NominalPipeSize": 1.5,
+    "OD": 8.0,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 5.75,
+    "HoleCount": 4
+  },
+  {
+    "Name": "2in-150#",
+    "NominalPipeSize": 2.0,
+    "OD": 6.0,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 4.75,
+    "HoleCount": 4
+  },
+  {
+    "Name": "2in-300#",
+    "NominalPipeSize": 2.0,
+    "OD": 6.5,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 5.0,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2in-400#",
+    "NominalPipeSize": 2.0,
+    "OD": 6.5,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 5.0,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2in-600#",
+    "NominalPipeSize": 2.0,
+    "OD": 6.5,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 5.0,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2in-900#",
+    "NominalPipeSize": 2.0,
+    "OD": 8.5,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 6.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2in-1500#",
+    "NominalPipeSize": 2.0,
+    "OD": 8.5,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 6.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2in-2500#",
+    "NominalPipeSize": 2.0,
+    "OD": 9.25,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 6.75,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2.5in-150#",
+    "NominalPipeSize": 2.5,
+    "OD": 7.0,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 5.5,
+    "HoleCount": 4
+  },
+  {
+    "Name": "2.5in-300#",
+    "NominalPipeSize": 2.5,
+    "OD": 7.5,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 5.88,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2.5in-400#",
+    "NominalPipeSize": 2.5,
+    "OD": 7.5,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 5.88,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2.5in-600#",
+    "NominalPipeSize": 2.5,
+    "OD": 7.5,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 5.88,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2.5in-900#",
+    "NominalPipeSize": 2.5,
+    "OD": 9.625,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 7.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2.5in-1500#",
+    "NominalPipeSize": 2.5,
+    "OD": 9.625,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 7.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "2.5in-2500#",
+    "NominalPipeSize": 2.5,
+    "OD": 10.5,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 7.75,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3in-150#",
+    "NominalPipeSize": 3.0,
+    "OD": 7.5,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 6.0,
+    "HoleCount": 4
+  },
+  {
+    "Name": "3in-300#",
+    "NominalPipeSize": 3.0,
+    "OD": 8.25,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 6.63,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3in-400#",
+    "NominalPipeSize": 3.0,
+    "OD": 8.25,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 6.63,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3in-600#",
+    "NominalPipeSize": 3.0,
+    "OD": 8.25,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 6.63,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3in-900#",
+    "NominalPipeSize": 3.0,
+    "OD": 9.5,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 7.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3in-1500#",
+    "NominalPipeSize": 3.0,
+    "OD": 10.5,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 8.0,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3in-2500#",
+    "NominalPipeSize": 3.0,
+    "OD": 12.0,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 9.0,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3.5in-150#",
+    "NominalPipeSize": 3.5,
+    "OD": 8.5,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 7.0,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3.5in-300#",
+    "NominalPipeSize": 3.5,
+    "OD": 9.0,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 7.25,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3.5in-400#",
+    "NominalPipeSize": 3.5,
+    "OD": 9.0,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 7.25,
+    "HoleCount": 8
+  },
+  {
+    "Name": "3.5in-600#",
+    "NominalPipeSize": 3.5,
+    "OD": 9.0,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 7.25,
+    "HoleCount": 8
+  },
+  {
+    "Name": "4in-150#",
+    "NominalPipeSize": 4.0,
+    "OD": 9.0,
+    "HoleDiameter": 0.75,
+    "HolePatternDiameter": 7.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "4in-300#",
+    "NominalPipeSize": 4.0,
+    "OD": 10.0,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 7.88,
+    "HoleCount": 8
+  },
+  {
+    "Name": "4in-400#",
+    "NominalPipeSize": 4.0,
+    "OD": 10.0,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 7.88,
+    "HoleCount": 8
+  },
+  {
+    "Name": "4in-600#",
+    "NominalPipeSize": 4.0,
+    "OD": 10.75,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 8.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "4in-900#",
+    "NominalPipeSize": 4.0,
+    "OD": 11.5,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 9.25,
+    "HoleCount": 8
+  },
+  {
+    "Name": "4in-1500#",
+    "NominalPipeSize": 4.0,
+    "OD": 12.25,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 9.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "4in-2500#",
+    "NominalPipeSize": 4.0,
+    "OD": 14.0,
+    "HoleDiameter": 1.62,
+    "HolePatternDiameter": 10.75,
+    "HoleCount": 8
+  },
+  {
+    "Name": "5in-150#",
+    "NominalPipeSize": 5.0,
+    "OD": 10.0,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 8.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "5in-300#",
+    "NominalPipeSize": 5.0,
+    "OD": 11.0,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 9.25,
+    "HoleCount": 8
+  },
+  {
+    "Name": "5in-400#",
+    "NominalPipeSize": 5.0,
+    "OD": 11.0,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 9.25,
+    "HoleCount": 8
+  },
+  {
+    "Name": "5in-600#",
+    "NominalPipeSize": 5.0,
+    "OD": 13.0,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 10.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "5in-900#",
+    "NominalPipeSize": 5.0,
+    "OD": 13.75,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 11.0,
+    "HoleCount": 8
+  },
+  {
+    "Name": "5in-1500#",
+    "NominalPipeSize": 5.0,
+    "OD": 14.75,
+    "HoleDiameter": 1.62,
+    "HolePatternDiameter": 11.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "5in-2500#",
+    "NominalPipeSize": 5.0,
+    "OD": 16.5,
+    "HoleDiameter": 1.88,
+    "HolePatternDiameter": 12.75,
+    "HoleCount": 8
+  },
+  {
+    "Name": "6in-150#",
+    "NominalPipeSize": 6.0,
+    "OD": 11.0,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 9.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "6in-300#",
+    "NominalPipeSize": 6.0,
+    "OD": 12.5,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 10.63,
+    "HoleCount": 12
+  },
+  {
+    "Name": "6in-400#",
+    "NominalPipeSize": 6.0,
+    "OD": 12.5,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 10.63,
+    "HoleCount": 12
+  },
+  {
+    "Name": "6in-600#",
+    "NominalPipeSize": 6.0,
+    "OD": 14.0,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 11.5,
+    "HoleCount": 12
+  },
+  {
+    "Name": "6in-900#",
+    "NominalPipeSize": 6.0,
+    "OD": 15.0,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 12.5,
+    "HoleCount": 12
+  },
+  {
+    "Name": "6in-1500#",
+    "NominalPipeSize": 6.0,
+    "OD": 15.5,
+    "HoleDiameter": 1.5,
+    "HolePatternDiameter": 12.5,
+    "HoleCount": 12
+  },
+  {
+    "Name": "6in-2500#",
+    "NominalPipeSize": 6.0,
+    "OD": 19.0,
+    "HoleDiameter": 2.12,
+    "HolePatternDiameter": 14.5,
+    "HoleCount": 8
+  },
+  {
+    "Name": "8in-150#",
+    "NominalPipeSize": 8.0,
+    "OD": 13.5,
+    "HoleDiameter": 0.88,
+    "HolePatternDiameter": 11.75,
+    "HoleCount": 8
+  },
+  {
+    "Name": "8in-300#",
+    "NominalPipeSize": 8.0,
+    "OD": 15.0,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 13.0,
+    "HoleCount": 12
+  },
+  {
+    "Name": "8in-400#",
+    "NominalPipeSize": 8.0,
+    "OD": 15.0,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 13.0,
+    "HoleCount": 12
+  },
+  {
+    "Name": "8in-600#",
+    "NominalPipeSize": 8.0,
+    "OD": 16.5,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 13.75,
+    "HoleCount": 12
+  },
+  {
+    "Name": "8in-900#",
+    "NominalPipeSize": 8.0,
+    "OD": 18.5,
+    "HoleDiameter": 1.5,
+    "HolePatternDiameter": 15.5,
+    "HoleCount": 12
+  },
+  {
+    "Name": "8in-1500#",
+    "NominalPipeSize": 8.0,
+    "OD": 19.0,
+    "HoleDiameter": 1.75,
+    "HolePatternDiameter": 15.5,
+    "HoleCount": 12
+  },
+  {
+    "Name": "8in-2500#",
+    "NominalPipeSize": 8.0,
+    "OD": 21.75,
+    "HoleDiameter": 2.12,
+    "HolePatternDiameter": 17.25,
+    "HoleCount": 12
+  },
+  {
+    "Name": "10in-150#",
+    "NominalPipeSize": 10.0,
+    "OD": 16.0,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 14.25,
+    "HoleCount": 12
+  },
+  {
+    "Name": "10in-300#",
+    "NominalPipeSize": 10.0,
+    "OD": 17.5,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 15.25,
+    "HoleCount": 16
+  },
+  {
+    "Name": "10in-400#",
+    "NominalPipeSize": 10.0,
+    "OD": 17.5,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 15.25,
+    "HoleCount": 16
+  },
+  {
+    "Name": "10in-600#",
+    "NominalPipeSize": 10.0,
+    "OD": 20.0,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 17.0,
+    "HoleCount": 16
+  },
+  {
+    "Name": "10in-900#",
+    "NominalPipeSize": 10.0,
+    "OD": 21.5,
+    "HoleDiameter": 1.5,
+    "HolePatternDiameter": 18.5,
+    "HoleCount": 16
+  },
+  {
+    "Name": "10in-1500#",
+    "NominalPipeSize": 10.0,
+    "OD": 23.0,
+    "HoleDiameter": 2.0,
+    "HolePatternDiameter": 19.0,
+    "HoleCount": 12
+  },
+  {
+    "Name": "10in-2500#",
+    "NominalPipeSize": 10.0,
+    "OD": 26.5,
+    "HoleDiameter": 2.62,
+    "HolePatternDiameter": 21.25,
+    "HoleCount": 12
+  },
+  {
+    "Name": "12in-150#",
+    "NominalPipeSize": 12.0,
+    "OD": 19.0,
+    "HoleDiameter": 1.0,
+    "HolePatternDiameter": 17.0,
+    "HoleCount": 12
+  },
+  {
+    "Name": "12in-300#",
+    "NominalPipeSize": 12.0,
+    "OD": 20.5,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 17.75,
+    "HoleCount": 16
+  },
+  {
+    "Name": "12in-400#",
+    "NominalPipeSize": 12.0,
+    "OD": 20.5,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 17.75,
+    "HoleCount": 16
+  },
+  {
+    "Name": "12in-600#",
+    "NominalPipeSize": 12.0,
+    "OD": 22.0,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 19.25,
+    "HoleCount": 20
+  },
+  {
+    "Name": "12in-900#",
+    "NominalPipeSize": 12.0,
+    "OD": 24.0,
+    "HoleDiameter": 1.5,
+    "HolePatternDiameter": 21.0,
+    "HoleCount": 20
+  },
+  {
+    "Name": "12in-1500#",
+    "NominalPipeSize": 12.0,
+    "OD": 26.5,
+    "HoleDiameter": 2.12,
+    "HolePatternDiameter": 22.5,
+    "HoleCount": 16
+  },
+  {
+    "Name": "12in-2500#",
+    "NominalPipeSize": 12.0,
+    "OD": 30.0,
+    "HoleDiameter": 2.88,
+    "HolePatternDiameter": 24.375,
+    "HoleCount": 12
+  },
+  {
+    "Name": "14in-150#",
+    "NominalPipeSize": 14.0,
+    "OD": 21.0,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 18.75,
+    "HoleCount": 12
+  },
+  {
+    "Name": "14in-300#",
+    "NominalPipeSize": 14.0,
+    "OD": 23.0,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 20.25,
+    "HoleCount": 20
+  },
+  {
+    "Name": "14in-400#",
+    "NominalPipeSize": 14.0,
+    "OD": 23.0,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 20.25,
+    "HoleCount": 20
+  },
+  {
+    "Name": "14in-600#",
+    "NominalPipeSize": 14.0,
+    "OD": 23.75,
+    "HoleDiameter": 1.5,
+    "HolePatternDiameter": 20.75,
+    "HoleCount": 20
+  },
+  {
+    "Name": "14in-900#",
+    "NominalPipeSize": 14.0,
+    "OD": 25.25,
+    "HoleDiameter": 1.62,
+    "HolePatternDiameter": 22.0,
+    "HoleCount": 20
+  },
+  {
+    "Name": "14in-1500#",
+    "NominalPipeSize": 14.0,
+    "OD": 29.5,
+    "HoleDiameter": 2.38,
+    "HolePatternDiameter": 25.0,
+    "HoleCount": 16
+  },
+  {
+    "Name": "16in-150#",
+    "NominalPipeSize": 16.0,
+    "OD": 23.5,
+    "HoleDiameter": 1.12,
+    "HolePatternDiameter": 21.25,
+    "HoleCount": 16
+  },
+  {
+    "Name": "16in-300#",
+    "NominalPipeSize": 16.0,
+    "OD": 25.5,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 22.5,
+    "HoleCount": 20
+  },
+  {
+    "Name": "16in-400#",
+    "NominalPipeSize": 16.0,
+    "OD": 25.5,
+    "HoleDiameter": 1.5,
+    "HolePatternDiameter": 22.5,
+    "HoleCount": 20
+  },
+  {
+    "Name": "16in-600#",
+    "NominalPipeSize": 16.0,
+    "OD": 27.0,
+    "HoleDiameter": 1.62,
+    "HolePatternDiameter": 23.75,
+    "HoleCount": 20
+  },
+  {
+    "Name": "16in-900#",
+    "NominalPipeSize": 16.0,
+    "OD": 27.75,
+    "HoleDiameter": 1.75,
+    "HolePatternDiameter": 24.5,
+    "HoleCount": 20
+  },
+  {
+    "Name": "16in-1500#",
+    "NominalPipeSize": 16.0,
+    "OD": 32.5,
+    "HoleDiameter": 2.62,
+    "HolePatternDiameter": 27.75,
+    "HoleCount": 16
+  },
+  {
+    "Name": "18in-150#",
+    "NominalPipeSize": 18.0,
+    "OD": 25.0,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 22.75,
+    "HoleCount": 16
+  },
+  {
+    "Name": "18in-300#",
+    "NominalPipeSize": 18.0,
+    "OD": 28.0,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 24.75,
+    "HoleCount": 24
+  },
+  {
+    "Name": "18in-400#",
+    "NominalPipeSize": 18.0,
+    "OD": 28.0,
+    "HoleDiameter": 1.5,
+    "HolePatternDiameter": 24.75,
+    "HoleCount": 24
+  },
+  {
+    "Name": "18in-600#",
+    "NominalPipeSize": 18.0,
+    "OD": 29.25,
+    "HoleDiameter": 1.75,
+    "HolePatternDiameter": 25.75,
+    "HoleCount": 20
+  },
+  {
+    "Name": "18in-900#",
+    "NominalPipeSize": 18.0,
+    "OD": 31.0,
+    "HoleDiameter": 2.0,
+    "HolePatternDiameter": 27.0,
+    "HoleCount": 20
+  },
+  {
+    "Name": "18in-1500#",
+    "NominalPipeSize": 18.0,
+    "OD": 36.0,
+    "HoleDiameter": 2.88,
+    "HolePatternDiameter": 30.5,
+    "HoleCount": 16
+  },
+  {
+    "Name": "20in-150#",
+    "NominalPipeSize": 20.0,
+    "OD": 27.5,
+    "HoleDiameter": 1.25,
+    "HolePatternDiameter": 25.0,
+    "HoleCount": 20
+  },
+  {
+    "Name": "20in-300#",
+    "NominalPipeSize": 20.0,
+    "OD": 30.5,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 27.0,
+    "HoleCount": 24
+  },
+  {
+    "Name": "20in-400#",
+    "NominalPipeSize": 20.0,
+    "OD": 30.5,
+    "HoleDiameter": 1.62,
+    "HolePatternDiameter": 27.0,
+    "HoleCount": 24
+  },
+  {
+    "Name": "20in-600#",
+    "NominalPipeSize": 20.0,
+    "OD": 32.0,
+    "HoleDiameter": 1.75,
+    "HolePatternDiameter": 28.5,
+    "HoleCount": 24
+  },
+  {
+    "Name": "20in-900#",
+    "NominalPipeSize": 20.0,
+    "OD": 33.75,
+    "HoleDiameter": 2.12,
+    "HolePatternDiameter": 29.5,
+    "HoleCount": 20
+  },
+  {
+    "Name": "20in-1500#",
+    "NominalPipeSize": 20.0,
+    "OD": 38.75,
+    "HoleDiameter": 3.12,
+    "HolePatternDiameter": 32.75,
+    "HoleCount": 16
+  },
+  {
+    "Name": "24in-150#",
+    "NominalPipeSize": 24.0,
+    "OD": 32.0,
+    "HoleDiameter": 1.38,
+    "HolePatternDiameter": 29.5,
+    "HoleCount": 20
+  },
+  {
+    "Name": "24in-300#",
+    "NominalPipeSize": 24.0,
+    "OD": 36.0,
+    "HoleDiameter": 1.62,
+    "HolePatternDiameter": 32.0,
+    "HoleCount": 24
+  },
+  {
+    "Name": "24in-400#",
+    "NominalPipeSize": 24.0,
+    "OD": 36.0,
+    "HoleDiameter": 1.88,
+    "HolePatternDiameter": 32.0,
+    "HoleCount": 24
+  },
+  {
+    "Name": "24in-600#",
+    "NominalPipeSize": 24.0,
+    "OD": 37.0,
+    "HoleDiameter": 2.0,
+    "HolePatternDiameter": 33.0,
+    "HoleCount": 24
+  },
+  {
+    "Name": "24in-900#",
+    "NominalPipeSize": 24.0,
+    "OD": 41.0,
+    "HoleDiameter": 2.62,
+    "HolePatternDiameter": 35.5,
+    "HoleCount": 20
+  },
+  {
+    "Name": "24in-1500#",
+    "NominalPipeSize": 24.0,
+    "OD": 46.0,
+    "HoleDiameter": 3.62,
+    "HolePatternDiameter": 39.0,
+    "HoleCount": 16
+  }
+]

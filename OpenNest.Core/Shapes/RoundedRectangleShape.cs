@@ -10,6 +10,13 @@ namespace OpenNest.Shapes
         public double Width { get; set; }
         public double Radius { get; set; }
 
+        public override void SetPreviewDefaults()
+        {
+            Length = 12;
+            Width = 6;
+            Radius = 1;
+        }
+
         public override Drawing GetDrawing()
         {
             var r = Radius;
