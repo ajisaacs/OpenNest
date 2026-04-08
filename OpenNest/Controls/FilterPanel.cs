@@ -170,10 +170,11 @@ namespace OpenNest.Controls
             layersList.Items.Clear();
             var layers = entities
                 .Where(e => e.Layer != null)
-                .Select(e => e.Layer.Name)
-                .Distinct();
+                .Select(e => e.Layer)
+                .GroupBy(l => l.Name)
+                .Select(g => g.First());
             foreach (var layer in layers)
-                layersList.Items.Add(layer, true); // checked = visible
+                layersList.Items.Add(layer.Name, layer.IsVisible);
 
             layersPanel.HeaderText = $"Layers ({layersList.Items.Count})";
 
@@ -191,10 +192,10 @@ namespace OpenNest.Controls
             // Line Types
             lineTypesList.Items.Clear();
             var lineTypes = entities
-                .Select(e => e.LineTypeName ?? "Continuous")
-                .Distinct();
+                .GroupBy(e => e.LineTypeName ?? "Continuous")
+                .Select(g => new { Name = g.Key, Visible = g.Any(e => e.IsVisible) });
             foreach (var lt in lineTypes)
-                lineTypesList.Items.Add(lt, true); // checked = visible
+                lineTypesList.Items.Add(lt.Name, lt.Visible);
 
             lineTypesPanel.HeaderText = $"Line Types ({lineTypesList.Items.Count})";
 

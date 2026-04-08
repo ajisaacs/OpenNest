@@ -309,7 +309,12 @@ namespace OpenNest.CNC.CuttingStrategy
             if (shape.Entities.Count == 1 && shape.Entities[0] is Circle circle)
                 return circle.Rotation;
 
-            return shape.ToPolygon().RotationDirection();
+            var polygon = shape.ToPolygon();
+
+            if (polygon.Vertices.Count < 3)
+                return RotationType.CCW;
+
+            return polygon.RotationDirection();
         }
 
         private LeadIn ClampLeadInForCircle(LeadIn leadIn, Circle circle, Vector contourPoint, double normalAngle)
