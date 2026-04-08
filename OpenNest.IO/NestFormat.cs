@@ -162,6 +162,35 @@ namespace OpenNest.IO
             public double Cost { get; init; }
         }
 
+        public record EntitySetDto
+        {
+            public List<EntityDto> Entities { get; init; } = new();
+            public List<string> Suppressed { get; init; } = new();
+        }
+
+        public record EntityDto
+        {
+            public string Id { get; init; } = "";
+            public string Type { get; init; } = "";
+            public string Layer { get; init; } = "";
+            public string LineType { get; init; } = "";
+
+            // Line
+            public double X1 { get; init; }
+            public double Y1 { get; init; }
+            public double X2 { get; init; }
+            public double Y2 { get; init; }
+
+            // Arc / Circle
+            public double CX { get; init; }
+            public double CY { get; init; }
+            public double R { get; init; }
+            public double StartAngle { get; init; }
+            public double EndAngle { get; init; }
+            public bool Reversed { get; init; }
+            public string Rotation { get; init; } = "";
+        }
+
         public record BestFitSetDto
         {
             public double PlateWidth { get; init; }

@@ -610,17 +610,31 @@ namespace OpenNest.Forms
         {
             foreach (var drawing in drawings)
             {
-                var entities = ConvertProgram.ToGeometry(drawing.Program);
+                List<Entity> entities;
 
-                // Re-apply source offset so entities appear in their natural position
-                if (drawing.Source?.Offset != null && drawing.Source.Offset != Vector.Zero)
+                if (drawing.SourceEntities != null)
                 {
-                    foreach (var entity in entities)
-                        entity.Offset(drawing.Source.Offset);
-                }
+                    // Use stored entities with stable GUIDs; apply suppression state
+                    entities = new List<Entity>(drawing.SourceEntities);
 
-                // Remove rapid traversals — they aren't part of the cut geometry
-                entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
+                    foreach (var entity in entities)
+                        entity.IsVisible = !drawing.SuppressedEntityIds.Contains(entity.Id);
+                }
+                else
+                {
+                    // Fallback: derive entities from Program (older drawings without source entities)
+                    entities = ConvertProgram.ToGeometry(drawing.Program);
+
+                    // Re-apply source offset so entities appear in their natural position
+                    if (drawing.Source?.Offset != null && drawing.Source.Offset != Vector.Zero)
+                    {
+                        foreach (var entity in entities)
+                            entity.Offset(drawing.Source.Offset);
+                    }
+
+                    // Remove rapid traversals — they aren't part of the cut geometry
+                    entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
+                }
 
                 var bounds = entities.GetBoundingBox();
 
@@ -682,6 +696,22 @@ namespace OpenNest.Forms
                     drawing.Program = programEditor.Program;
                 else
                     drawing.Program = pgm;
+
+                // Store all entities with stable GUIDs; track suppressed by ID
+                var bendSources = new HashSet<Entity>(
+                    (item.Bends ?? new List<Bend>())
+                        .Where(b => b.SourceEntity != null)
+                        .Select(b => b.SourceEntity));
+
+                drawing.SourceEntities = item.Entities
+                    .Where(e => !bendSources.Contains(e))
+                    .ToList();
+
+                drawing.SuppressedEntityIds = new HashSet<Guid>(
+                    drawing.SourceEntities
+                        .Where(e => !(e.Layer.IsVisible && e.IsVisible))
+                        .Select(e => e.Id));
+
                 drawings.Add(drawing);
 
                 Thread.Sleep(20);

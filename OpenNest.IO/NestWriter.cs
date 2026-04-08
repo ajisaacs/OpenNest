@@ -41,6 +41,7 @@ namespace OpenNest.IO
 
             WriteNestJson(zipArchive);
             WritePrograms(zipArchive);
+            WriteEntities(zipArchive);
             WriteBestFits(zipArchive);
 
             return true;
@@ -309,6 +310,24 @@ namespace OpenNest.IO
                 var entry = zipArchive.CreateEntry(name);
                 using var entryStream = entry.Open();
                 stream.CopyTo(entryStream);
+            }
+        }
+
+        private void WriteEntities(ZipArchive zipArchive)
+        {
+            foreach (var kvp in drawingDict.OrderBy(k => k.Key))
+            {
+                var drawing = kvp.Value;
+                if (drawing.SourceEntities == null || drawing.SourceEntities.Count == 0)
+                    continue;
+
+                var dto = EntitySerializer.ToDto(drawing.SourceEntities, drawing.SuppressedEntityIds);
+                var json = JsonSerializer.Serialize(dto, JsonOptions);
+
+                var entry = zipArchive.CreateEntry($"entities/entities-{kvp.Key}");
+                using var stream = entry.Open();
+                using var writer = new StreamWriter(stream, Encoding.UTF8);
+                writer.Write(json);
             }
         }
 

@@ -883,6 +883,8 @@ namespace OpenNest.Forms
                 if (newByName.TryGetValue(existing.Name, out var updated))
                 {
                     existing.Program = updated.Program;
+                    existing.SourceEntities = updated.SourceEntities;
+                    existing.SuppressedEntityIds = updated.SuppressedEntityIds;
                     existing.Source = updated.Source;
                     existing.Customer = updated.Customer;
                     existing.Quantity.Required = updated.Quantity.Required;

@@ -2,6 +2,7 @@
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -89,6 +90,18 @@ namespace OpenNest
         public SourceInfo Source { get; set; }
 
         public List<Bend> Bends { get; set; } = new List<Bend>();
+
+        /// <summary>
+        /// Complete set of source entities with stable GUIDs.
+        /// Null when the drawing was created from G-code or an older nest file.
+        /// </summary>
+        public List<Entity> SourceEntities { get; set; }
+
+        /// <summary>
+        /// IDs of entities in <see cref="SourceEntities"/> that are suppressed (hidden).
+        /// Suppressed entities are excluded from the active Program but preserved for re-enabling.
+        /// </summary>
+        public HashSet<Guid> SuppressedEntityIds { get; set; } = new HashSet<Guid>();
 
         public double Area { get; protected set; }
 

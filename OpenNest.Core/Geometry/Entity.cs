@@ -1,4 +1,5 @@
 ﻿using OpenNest.Math;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -10,9 +11,15 @@ namespace OpenNest.Geometry
 
         protected Entity()
         {
+            Id = Guid.NewGuid();
             Layer = OpenNest.Geometry.Layer.Default;
             boundingBox = new Box();
         }
+
+        /// <summary>
+        /// Unique identifier for this entity, stable across edit sessions.
+        /// </summary>
+        public Guid Id { get; set; }
 
         /// <summary>
         /// Entity color (resolved from DXF ByLayer/ByBlock to actual color).

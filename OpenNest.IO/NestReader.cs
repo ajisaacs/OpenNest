@@ -36,7 +36,8 @@ namespace OpenNest.IO
             var dto = JsonSerializer.Deserialize<NestDto>(nestJson, JsonOptions);
 
             var programs = ReadPrograms(dto.Drawings.Count);
-            var drawingMap = BuildDrawings(dto, programs);
+            var entitySets = ReadEntitySets(dto.Drawings.Count);
+            var drawingMap = BuildDrawings(dto, programs, entitySets);
             ReadBestFits(drawingMap);
             var nest = BuildNest(dto, drawingMap);
 
@@ -74,7 +75,25 @@ namespace OpenNest.IO
             return programs;
         }
 
-        private Dictionary<int, Drawing> BuildDrawings(NestDto dto, Dictionary<int, Program> programs)
+        private Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> ReadEntitySets(int count)
+        {
+            var result = new Dictionary<int, (List<Entity>, HashSet<Guid>)>();
+            for (var i = 1; i <= count; i++)
+            {
+                var entry = zipArchive.GetEntry($"entities/entities-{i}");
+                if (entry == null) continue;
+
+                using var entryStream = entry.Open();
+                using var reader = new StreamReader(entryStream);
+                var json = reader.ReadToEnd();
+                var dto = JsonSerializer.Deserialize<EntitySetDto>(json, JsonOptions);
+                result[i] = EntitySerializer.FromDto(dto);
+            }
+            return result;
+        }
+
+        private Dictionary<int, Drawing> BuildDrawings(NestDto dto, Dictionary<int, Program> programs,
+            Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> entitySets)
         {
             var map = new Dictionary<int, Drawing>();
             foreach (var d in dto.Drawings)
@@ -111,6 +130,12 @@ namespace OpenNest.IO
 
                 if (programs.TryGetValue(d.Id, out var pgm))
                     drawing.Program = pgm;
+
+                if (entitySets.TryGetValue(d.Id, out var entitySet))
+                {
+                    drawing.SourceEntities = entitySet.entities;
+                    drawing.SuppressedEntityIds = entitySet.suppressed;
+                }
 
                 map[d.Id] = drawing;
             }
