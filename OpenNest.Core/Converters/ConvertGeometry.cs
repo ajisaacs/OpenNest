@@ -97,7 +97,7 @@ namespace OpenNest.Converters
             if (startpt != lastpt)
                 pgm.MoveTo(startpt);
 
-            pgm.ArcTo(startpt, circle.Center, RotationType.CCW);
+            pgm.ArcTo(startpt, circle.Center, circle.Rotation);
 
             lastpt = startpt;
             return lastpt;

@@ -605,7 +605,7 @@ namespace OpenNest.Geometry
                         copy.Entities.Add(new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed) { Layer = a.Layer });
                         break;
                     case Circle c:
-                        copy.Entities.Add(new Circle(c.Center, c.Radius) { Layer = c.Layer });
+                        copy.Entities.Add(new Circle(c.Center, c.Radius) { Layer = c.Layer, Rotation = RotationType.CW });
                         break;
                 }
             }
@@ -640,7 +640,7 @@ namespace OpenNest.Geometry
                         copy.Entities.Add(new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed) { Layer = a.Layer });
                         break;
                     case Circle c:
-                        copy.Entities.Add(new Circle(c.Center, c.Radius) { Layer = c.Layer });
+                        copy.Entities.Add(new Circle(c.Center, c.Radius) { Layer = c.Layer, Rotation = RotationType.CCW });
                         break;
                 }
             }

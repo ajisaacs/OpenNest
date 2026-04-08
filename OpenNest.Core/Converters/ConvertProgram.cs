@@ -106,7 +106,7 @@ namespace OpenNest.Converters
             var layer = ConvertLayer(arcMove.Layer);
 
             if (startAngle.IsEqualTo(endAngle))
-                geometry.Add(new Circle(center, radius) { Layer = layer, Color = layer.Color });
+                geometry.Add(new Circle(center, radius) { Layer = layer, Color = layer.Color, Rotation = arcMove.Rotation });
             else
                 geometry.Add(new Arc(center, radius, startAngle, endAngle, arcMove.Rotation == RotationType.CW) { Layer = layer, Color = layer.Color });
 
