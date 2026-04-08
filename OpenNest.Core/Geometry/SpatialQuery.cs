@@ -511,6 +511,17 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Computes the minimum translation distance along a push direction
+        /// before any vertex/edge of movingEntities contacts any vertex/edge of
+        /// stationaryEntities. Delegates to the Vector-based overload.
+        /// </summary>
+        public static double DirectionalDistance(
+            List<Entity> movingEntities, List<Entity> stationaryEntities, PushDirection direction)
+        {
+            return DirectionalDistance(movingEntities, stationaryEntities, DirectionToOffset(direction, 1.0));
+        }
+
+        /// <summary>
         /// Computes the minimum translation distance along an arbitrary unit direction
         /// before any vertex/edge of movingEntities contacts any vertex/edge of
         /// stationaryEntities. Works with native Line, Arc, and Circle entities
@@ -566,43 +577,10 @@ namespace OpenNest.Geometry
             // Phases 1-2 sample arc endpoints and cardinal extremes, but the actual
             // closest point on a small corner arc to a straight edge may lie between
             // those samples. Use ClosestPointTo to find it and fire a ray from there.
-            for (var i = 0; i < movingEntities.Count; i++)
-            {
-                if (movingEntities[i] is Arc mArc)
-                {
-                    for (var j = 0; j < stationaryEntities.Count; j++)
-                    {
-                        if (stationaryEntities[j] is Line sLine)
-                        {
-                            var linePt = sLine.ClosestPointTo(mArc.Center);
-                            var arcPt = mArc.ClosestPointTo(linePt);
-                            var d = RayEdgeDistance(arcPt.X, arcPt.Y,
-                                sLine.pt1.X, sLine.pt1.Y, sLine.pt2.X, sLine.pt2.Y,
-                                dirX, dirY);
-                            if (d < minDist) { minDist = d; if (d <= 0) return 0; }
-                        }
-                    }
-                }
-            }
-
-            for (var i = 0; i < stationaryEntities.Count; i++)
-            {
-                if (stationaryEntities[i] is Arc sArc2)
-                {
-                    for (var j = 0; j < movingEntities.Count; j++)
-                    {
-                        if (movingEntities[j] is Line mLine)
-                        {
-                            var linePt = mLine.ClosestPointTo(sArc2.Center);
-                            var arcPt = sArc2.ClosestPointTo(linePt);
-                            var d = RayEdgeDistance(arcPt.X, arcPt.Y,
-                                mLine.pt1.X, mLine.pt1.Y, mLine.pt2.X, mLine.pt2.Y,
-                                oppX, oppY);
-                            if (d < minDist) { minDist = d; if (d <= 0) return 0; }
-                        }
-                    }
-                }
-            }
+            minDist = ArcToLineClosestDistance(movingEntities, stationaryEntities, dirX, dirY, minDist);
+            if (minDist <= 0) return 0;
+            minDist = ArcToLineClosestDistance(stationaryEntities, movingEntities, oppX, oppY, minDist);
+            if (minDist <= 0) return 0;
 
             // Phase 4: Curve-to-curve direct distance.
             // The vertex-to-entity approach misses the closest contact between two
@@ -624,7 +602,7 @@ namespace OpenNest.Geometry
 
                     var d = RayCircleDistance(mcx, mcy, scx, scy, mr + sr, dirX, dirY);
 
-                    if (d >= minDist || d == double.MaxValue)
+                    if (d >= minDist)
                         continue;
 
                     // For arcs, verify the contact point falls within both arcs' angular ranges.
@@ -655,6 +633,31 @@ namespace OpenNest.Geometry
                 }
             }
 
+            return minDist;
+        }
+
+        private static double ArcToLineClosestDistance(
+            List<Entity> arcEntities, List<Entity> lineEntities,
+            double dirX, double dirY, double minDist)
+        {
+            for (var i = 0; i < arcEntities.Count; i++)
+            {
+                if (arcEntities[i] is Arc arc)
+                {
+                    for (var j = 0; j < lineEntities.Count; j++)
+                    {
+                        if (lineEntities[j] is Line line)
+                        {
+                            var linePt = line.ClosestPointTo(arc.Center);
+                            var arcPt = arc.ClosestPointTo(linePt);
+                            var d = RayEdgeDistance(arcPt.X, arcPt.Y,
+                                line.pt1.X, line.pt1.Y, line.pt2.X, line.pt2.Y,
+                                dirX, dirY);
+                            if (d < minDist) { minDist = d; if (d <= 0) return 0; }
+                        }
+                    }
+                }
+            }
             return minDist;
         }
 
@@ -737,13 +740,7 @@ namespace OpenNest.Geometry
 
         private static HashSet<Vector> CollectVertices(List<Line> lines, Vector offset)
         {
-            var vertices = new HashSet<Vector>();
-            for (var i = 0; i < lines.Count; i++)
-            {
-                vertices.Add(lines[i].pt1 + offset);
-                vertices.Add(lines[i].pt2 + offset);
-            }
-            return vertices;
+            return CollectVertices(ToEdgeArray(lines), offset);
         }
 
         private static HashSet<Vector> CollectVertices((Vector start, Vector end)[] edges, Vector offset)
