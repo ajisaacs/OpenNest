@@ -104,6 +104,9 @@ namespace OpenNest.Engine.BestFit
             var allMovingVerts = ExtractVerticesFromEntities(movingEntities);
             var allStationaryVerts = ExtractVerticesFromEntities(stationaryEntities);
 
+            var movingCurves = ExtractCurveParams(movingEntities);
+            var stationaryCurves = ExtractCurveParams(stationaryEntities);
+
             var vertexCache = new Dictionary<(double, double), (Vector[] leading, Vector[] facing)>();
 
             foreach (var offset in offsets)
@@ -165,10 +168,82 @@ namespace OpenNest.Engine.BestFit
                     }
                 }
 
+                // Phase 3: Curve-to-curve direct distance.
+                // Vertex sampling misses the true contact between two curved entities
+                // when the approach angle doesn't align with a sampled vertex.
+                for (var m = 0; m < movingCurves.Length; m++)
+                {
+                    var mc = movingCurves[m];
+                    var mcx = mc.Cx + offset.Dx;
+                    var mcy = mc.Cy + offset.Dy;
+
+                    for (var s = 0; s < stationaryCurves.Length; s++)
+                    {
+                        var sc = stationaryCurves[s];
+                        var d = SpatialQuery.RayCircleDistance(
+                            mcx, mcy, sc.Cx, sc.Cy, mc.Radius + sc.Radius, dirX, dirY);
+
+                        if (d >= minDist || d == double.MaxValue)
+                            continue;
+
+                        if (mc.Entity is Arc || sc.Entity is Arc)
+                        {
+                            var mx = mcx + d * dirX;
+                            var my = mcy + d * dirY;
+                            var toCx = sc.Cx - mx;
+                            var toCy = sc.Cy - my;
+
+                            if (mc.Entity is Arc mArc)
+                            {
+                                var angle = Angle.NormalizeRad(System.Math.Atan2(toCy, toCx));
+                                if (!Angle.IsBetweenRad(angle, mArc.StartAngle, mArc.EndAngle, mArc.IsReversed))
+                                    continue;
+                            }
+
+                            if (sc.Entity is Arc sArc)
+                            {
+                                var angle = Angle.NormalizeRad(System.Math.Atan2(-toCy, -toCx));
+                                if (!Angle.IsBetweenRad(angle, sArc.StartAngle, sArc.EndAngle, sArc.IsReversed))
+                                    continue;
+                            }
+                        }
+
+                        minDist = d;
+                        if (d <= 0) { results[i] = 0; return; }
+                    }
+                }
+
                 results[i] = minDist;
             });
 
             return results;
+        }
+
+        private readonly struct CurveParams
+        {
+            public readonly Entity Entity;
+            public readonly double Cx, Cy, Radius;
+
+            public CurveParams(Entity entity, double cx, double cy, double radius)
+            {
+                Entity = entity;
+                Cx = cx;
+                Cy = cy;
+                Radius = radius;
+            }
+        }
+
+        private static CurveParams[] ExtractCurveParams(List<Entity> entities)
+        {
+            var curves = new List<CurveParams>();
+            for (var i = 0; i < entities.Count; i++)
+            {
+                if (entities[i] is Circle circle)
+                    curves.Add(new CurveParams(circle, circle.Center.X, circle.Center.Y, circle.Radius));
+                else if (entities[i] is Arc arc)
+                    curves.Add(new CurveParams(arc, arc.Center.X, arc.Center.Y, arc.Radius));
+            }
+            return curves.ToArray();
         }
 
         private static double RayEntityDistance(

@@ -119,10 +119,11 @@ namespace OpenNest.Engine.Fill
             var maxCopyDistance = FindMaxPairDistance(
                 patternA.Parts, boundaries, offset, pushDir, opposite, startOffset);
 
-            if (maxCopyDistance < Tolerance.Epsilon)
-                return bboxDim + PartSpacing;
-
-            return maxCopyDistance;
+            // The copy distance must be at least bboxDim + PartSpacing to prevent
+            // bounding box overlap. Cross-pair slides can underestimate when the
+            // circumscribed polygon boundary overshoots the true arc, creating
+            // spurious contacts between diagonal parts in adjacent copies.
+            return System.Math.Max(maxCopyDistance, bboxDim + PartSpacing);
         }
 
         /// <summary>
