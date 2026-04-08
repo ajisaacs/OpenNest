@@ -562,7 +562,49 @@ namespace OpenNest.Geometry
                 }
             }
 
-            // Phase 3: Curve-to-curve direct distance.
+            // Phase 3: Arc-to-line closest-point check.
+            // Phases 1-2 sample arc endpoints and cardinal extremes, but the actual
+            // closest point on a small corner arc to a straight edge may lie between
+            // those samples. Use ClosestPointTo to find it and fire a ray from there.
+            for (var i = 0; i < movingEntities.Count; i++)
+            {
+                if (movingEntities[i] is Arc mArc)
+                {
+                    for (var j = 0; j < stationaryEntities.Count; j++)
+                    {
+                        if (stationaryEntities[j] is Line sLine)
+                        {
+                            var linePt = sLine.ClosestPointTo(mArc.Center);
+                            var arcPt = mArc.ClosestPointTo(linePt);
+                            var d = RayEdgeDistance(arcPt.X, arcPt.Y,
+                                sLine.pt1.X, sLine.pt1.Y, sLine.pt2.X, sLine.pt2.Y,
+                                dirX, dirY);
+                            if (d < minDist) { minDist = d; if (d <= 0) return 0; }
+                        }
+                    }
+                }
+            }
+
+            for (var i = 0; i < stationaryEntities.Count; i++)
+            {
+                if (stationaryEntities[i] is Arc sArc2)
+                {
+                    for (var j = 0; j < movingEntities.Count; j++)
+                    {
+                        if (movingEntities[j] is Line mLine)
+                        {
+                            var linePt = mLine.ClosestPointTo(sArc2.Center);
+                            var arcPt = sArc2.ClosestPointTo(linePt);
+                            var d = RayEdgeDistance(arcPt.X, arcPt.Y,
+                                mLine.pt1.X, mLine.pt1.Y, mLine.pt2.X, mLine.pt2.Y,
+                                oppX, oppY);
+                            if (d < minDist) { minDist = d; if (d <= 0) return 0; }
+                        }
+                    }
+                }
+            }
+
+            // Phase 4: Curve-to-curve direct distance.
             // The vertex-to-entity approach misses the closest contact between two
             // curved entities (circles/arcs) because only a few cardinal vertices are
             // sampled. The true closest contact along the push direction is found by
