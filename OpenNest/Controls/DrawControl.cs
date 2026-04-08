@@ -29,7 +29,7 @@ namespace OpenNest.Controls
         {
             ViewScale = 1.0f;
             ViewScaleMin = 0.3f;
-            ViewScaleMax = 3000;
+            ViewScaleMax = 10000;
             origin = new PointF(100, 100);
         }
 

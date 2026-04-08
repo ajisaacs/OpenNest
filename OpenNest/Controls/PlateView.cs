@@ -627,14 +627,22 @@ namespace OpenNest.Controls
         {
             var graphPt = PointControlToGraph(hoverPoint);
             LayoutPart hitPart = null;
-            for (var i = parts.Count - 1; i >= 0; --i)
+            try
             {
-                if (parts[i].Path.GetBounds().Contains(graphPt) &&
-                    parts[i].Path.IsVisible(graphPt))
+                for (var i = parts.Count - 1; i >= 0; --i)
                 {
-                    hitPart = parts[i];
-                    break;
+                    if (parts[i].Path.GetBounds().Contains(graphPt) &&
+                        parts[i].Path.IsVisible(graphPt))
+                    {
+                        hitPart = parts[i];
+                        break;
+                    }
                 }
+            }
+            catch (InvalidOperationException)
+            {
+                // GraphicsPath in use by paint thread — skip this hover tick
+                return;
             }
 
             hoveredPart = hitPart;
