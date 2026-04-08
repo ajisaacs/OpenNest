@@ -604,6 +604,44 @@ namespace OpenNest.Forms
 
         #endregion
 
+        #region Load Existing Drawings
+
+        public void LoadDrawings(IEnumerable<Drawing> drawings)
+        {
+            foreach (var drawing in drawings)
+            {
+                var entities = ConvertProgram.ToGeometry(drawing.Program);
+
+                // Re-apply source offset so entities appear in their natural position
+                if (drawing.Source?.Offset != null && drawing.Source.Offset != Vector.Zero)
+                {
+                    foreach (var entity in entities)
+                        entity.Offset(drawing.Source.Offset);
+                }
+
+                // Remove rapid traversals — they aren't part of the cut geometry
+                entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
+
+                var bounds = entities.GetBoundingBox();
+
+                var item = new FileListItem
+                {
+                    Name = drawing.Name,
+                    Entities = entities,
+                    Path = drawing.Source?.Path,
+                    Quantity = drawing.Quantity.Required,
+                    Customer = drawing.Customer ?? string.Empty,
+                    Bends = drawing.Bends?.ToList() ?? new List<Bend>(),
+                    Bounds = bounds,
+                    EntityCount = entities.Count
+                };
+
+                fileList.AddItem(item);
+            }
+        }
+
+        #endregion
+
         #region Output
 
         public List<Drawing> GetDrawings()

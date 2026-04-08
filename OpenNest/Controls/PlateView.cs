@@ -225,7 +225,6 @@ namespace OpenNest.Controls
         protected override void OnMouseEnter(EventArgs e)
         {
             base.OnMouseEnter(e);
-            if (!Focused) Focus();
         }
 
         protected override void OnDragEnter(DragEventArgs drgevent)
@@ -249,6 +248,8 @@ namespace OpenNest.Controls
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
+            if (!Focused) Focus();
+
             if (e.Button == MouseButtons.Middle)
                 middleMouseDownPoint = e.Location;
 

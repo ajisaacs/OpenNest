@@ -154,7 +154,10 @@ namespace OpenNest.Controls
                 Font = new Font("Segoe UI", 9f)
             };
             list.ItemCheck += (s, e) =>
-                BeginInvoke((Action)(() => FilterChanged?.Invoke(this, EventArgs.Empty)));
+            {
+                if (IsHandleCreated)
+                    BeginInvoke((Action)(() => FilterChanged?.Invoke(this, EventArgs.Empty)));
+            };
             return list;
         }
 

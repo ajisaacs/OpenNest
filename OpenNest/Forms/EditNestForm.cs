@@ -52,6 +52,7 @@ namespace OpenNest.Forms
         private EditNestForm()
         {
             PlateView = new PlateView();
+            PlateView.MouseEnter += PlateView_MouseEnter;
             PlateView.Enter += PlateView_Enter;
             PlateView.PartAdded += PlateView_PartAdded;
             PlateView.PartRemoved += PlateView_PartRemoved;
@@ -862,6 +863,24 @@ namespace OpenNest.Forms
             Import();
         }
 
+        private void EditDrawingsInConverter_Click(object sender, EventArgs e)
+        {
+            if (Nest.Drawings.Count == 0)
+                return;
+
+            var converter = new CadConverterForm();
+            converter.LoadDrawings(Nest.Drawings);
+
+            if (converter.ShowDialog() != DialogResult.OK)
+                return;
+
+            var drawings = converter.GetDrawings();
+
+            // Replace all drawings — clear existing and add new ones
+            Nest.Drawings.Clear();
+            drawings.ForEach(d => Nest.Drawings.Add(d));
+        }
+
         private void CleanUnusedDrawings_Click(object sender, EventArgs e)
         {
             var result = MessageBox.Show(
@@ -1024,6 +1043,12 @@ namespace OpenNest.Forms
         private void drawingListBox1_Click(object sender, EventArgs e)
         {
             addPart = true;
+        }
+
+        private void PlateView_MouseEnter(object sender, EventArgs e)
+        {
+            if (!PlateView.Focused)
+                PlateView.Focus();
         }
 
         private void PlateView_Enter(object sender, EventArgs e)
