@@ -719,19 +719,17 @@ namespace OpenNest.Forms
 
             var plate = PlateView.Plate;
 
-            if (plate.CuttingParameters == null)
-            {
-                var json = Properties.Settings.Default.CuttingParametersJson;
-                if (!string.IsNullOrEmpty(json))
-                {
-                    try { plate.CuttingParameters = CuttingParametersSerializer.Deserialize(json); }
-                    catch { plate.CuttingParameters = new CuttingParameters(); }
-                }
-                else
-                {
-                    plate.CuttingParameters = new CuttingParameters();
-                }
-            }
+            var parameters = LoadOrDefaultParameters(plate.CuttingParameters);
+
+            using var dlg = new CuttingParametersDialog();
+            dlg.LoadParameters(parameters);
+
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return;
+
+            parameters = dlg.GetParameters();
+            plate.CuttingParameters = parameters;
+            SaveCuttingParameters(parameters);
 
             var assigner = new LeadInAssigner
             {
@@ -782,17 +780,16 @@ namespace OpenNest.Forms
             if (Nest == null)
                 return;
 
-            CuttingParameters parameters;
-            var json = Properties.Settings.Default.CuttingParametersJson;
-            if (!string.IsNullOrEmpty(json))
-            {
-                try { parameters = CuttingParametersSerializer.Deserialize(json); }
-                catch { parameters = new CuttingParameters(); }
-            }
-            else
-            {
-                parameters = new CuttingParameters();
-            }
+            var parameters = LoadOrDefaultParameters(PlateView?.Plate?.CuttingParameters);
+
+            using var dlg = new CuttingParametersDialog();
+            dlg.LoadParameters(parameters);
+
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return;
+
+            parameters = dlg.GetParameters();
+            SaveCuttingParameters(parameters);
 
             var assigner = new LeadInAssigner
             {
@@ -840,22 +837,32 @@ namespace OpenNest.Forms
 
             var plate = PlateView.Plate;
 
-            // If no cutting parameters exist, initialize from saved settings or defaults
             if (plate.CuttingParameters == null)
-            {
-                var json = Properties.Settings.Default.CuttingParametersJson;
-                if (!string.IsNullOrEmpty(json))
-                {
-                    try { plate.CuttingParameters = CuttingParametersSerializer.Deserialize(json); }
-                    catch { plate.CuttingParameters = new CuttingParameters(); }
-                }
-                else
-                {
-                    plate.CuttingParameters = new CuttingParameters();
-                }
-            }
+                plate.CuttingParameters = LoadOrDefaultParameters(null);
 
             PlateView.SetAction(typeof(Actions.ActionLeadIn));
+        }
+
+        private static CuttingParameters LoadOrDefaultParameters(CuttingParameters existing)
+        {
+            if (existing != null)
+                return existing;
+
+            var json = Properties.Settings.Default.CuttingParametersJson;
+            if (!string.IsNullOrEmpty(json))
+            {
+                try { return CuttingParametersSerializer.Deserialize(json); }
+                catch { /* fall through */ }
+            }
+
+            return new CuttingParameters();
+        }
+
+        private static void SaveCuttingParameters(CuttingParameters parameters)
+        {
+            var json = CuttingParametersSerializer.Serialize(parameters);
+            Properties.Settings.Default.CuttingParametersJson = json;
+            Properties.Settings.Default.Save();
         }
 
         private void ImportDrawings_Click(object sender, EventArgs e)
