@@ -105,6 +105,39 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Solves ray-circle intersection, returning the two parametric t values.
+        /// Returns false if no real intersection exists.
+        /// </summary>
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static bool SolveRayCircle(
+            double vx, double vy,
+            double cx, double cy, double r,
+            double dirX, double dirY,
+            out double t1, out double t2)
+        {
+            var ox = vx - cx;
+            var oy = vy - cy;
+
+            var a = dirX * dirX + dirY * dirY;
+            var b = 2.0 * (ox * dirX + oy * dirY);
+            var c = ox * ox + oy * oy - r * r;
+
+            var discriminant = b * b - 4.0 * a * c;
+            if (discriminant < 0)
+            {
+                t1 = t2 = double.MaxValue;
+                return false;
+            }
+
+            var sqrtD = System.Math.Sqrt(discriminant);
+            var inv2a = 1.0 / (2.0 * a);
+            t1 = (-b - sqrtD) * inv2a;
+            t2 = (-b + sqrtD) * inv2a;
+            return true;
+        }
+
+        /// <summary>
         /// Computes the distance from a point along a direction to an arc.
         /// Solves ray-circle intersection, then constrains hits to the arc's
         /// angular span. Returns double.MaxValue if no hit.
@@ -117,24 +150,8 @@ namespace OpenNest.Geometry
             double startAngle, double endAngle, bool reversed,
             double dirX, double dirY)
         {
-            // Ray: P = (vx,vy) + t*(dirX,dirY)
-            // Circle: (x-cx)^2 + (y-cy)^2 = r^2
-            var ox = vx - cx;
-            var oy = vy - cy;
-
-            // a = dirX^2 + dirY^2 = 1 for unit direction, but handle general case
-            var a = dirX * dirX + dirY * dirY;
-            var b = 2.0 * (ox * dirX + oy * dirY);
-            var c = ox * ox + oy * oy - r * r;
-
-            var discriminant = b * b - 4.0 * a * c;
-            if (discriminant < 0)
+            if (!SolveRayCircle(vx, vy, cx, cy, r, dirX, dirY, out var t1, out var t2))
                 return double.MaxValue;
-
-            var sqrtD = System.Math.Sqrt(discriminant);
-            var inv2a = 1.0 / (2.0 * a);
-            var t1 = (-b - sqrtD) * inv2a;
-            var t2 = (-b + sqrtD) * inv2a;
 
             var best = double.MaxValue;
 
@@ -168,27 +185,13 @@ namespace OpenNest.Geometry
             double cx, double cy, double r,
             double dirX, double dirY)
         {
-            var ox = vx - cx;
-            var oy = vy - cy;
-
-            var a = dirX * dirX + dirY * dirY;
-            var b = 2.0 * (ox * dirX + oy * dirY);
-            var c = ox * ox + oy * oy - r * r;
-
-            var discriminant = b * b - 4.0 * a * c;
-            if (discriminant < 0)
+            if (!SolveRayCircle(vx, vy, cx, cy, r, dirX, dirY, out var t1, out var t2))
                 return double.MaxValue;
 
-            var sqrtD = System.Math.Sqrt(discriminant);
-            var t = (-b - sqrtD) / (2.0 * a);
-
-            if (t > Tolerance.Epsilon) return t;
-            if (t >= -Tolerance.Epsilon) return 0;
-
-            // First root is behind us, try the second
-            t = (-b + sqrtD) / (2.0 * a);
-            if (t > Tolerance.Epsilon) return t;
-            if (t >= -Tolerance.Epsilon) return 0;
+            if (t1 > Tolerance.Epsilon) return t1;
+            if (t1 >= -Tolerance.Epsilon) return 0;
+            if (t2 > Tolerance.Epsilon) return t2;
+            if (t2 >= -Tolerance.Epsilon) return 0;
 
             return double.MaxValue;
         }
@@ -200,57 +203,7 @@ namespace OpenNest.Geometry
         /// </summary>
         public static double DirectionalDistance(List<Line> movingLines, List<Line> stationaryLines, PushDirection direction)
         {
-            var minDist = double.MaxValue;
-
-            // Case 1: Each moving vertex -> each stationary edge
-            var movingVertices = new HashSet<Vector>();
-            for (int i = 0; i < movingLines.Count; i++)
-            {
-                movingVertices.Add(movingLines[i].pt1);
-                movingVertices.Add(movingLines[i].pt2);
-            }
-
-            var stationaryEdges = new (Vector start, Vector end)[stationaryLines.Count];
-            for (int i = 0; i < stationaryLines.Count; i++)
-                stationaryEdges[i] = (stationaryLines[i].pt1, stationaryLines[i].pt2);
-
-            // Sort edges for pruning if not already sorted (usually they aren't here)
-            if (direction == PushDirection.Left || direction == PushDirection.Right)
-                stationaryEdges = stationaryEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
-            else
-                stationaryEdges = stationaryEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
-
-            foreach (var mv in movingVertices)
-            {
-                var d = OneWayDistance(mv, stationaryEdges, Vector.Zero, direction);
-                if (d < minDist) minDist = d;
-            }
-
-            // Case 2: Each stationary vertex -> each moving edge (opposite direction)
-            var opposite = OppositeDirection(direction);
-            var stationaryVertices = new HashSet<Vector>();
-            for (int i = 0; i < stationaryLines.Count; i++)
-            {
-                stationaryVertices.Add(stationaryLines[i].pt1);
-                stationaryVertices.Add(stationaryLines[i].pt2);
-            }
-
-            var movingEdges = new (Vector start, Vector end)[movingLines.Count];
-            for (int i = 0; i < movingLines.Count; i++)
-                movingEdges[i] = (movingLines[i].pt1, movingLines[i].pt2);
-
-            if (opposite == PushDirection.Left || opposite == PushDirection.Right)
-                movingEdges = movingEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
-            else
-                movingEdges = movingEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
-
-            foreach (var sv in stationaryVertices)
-            {
-                var d = OneWayDistance(sv, movingEdges, Vector.Zero, opposite);
-                if (d < minDist) minDist = d;
-            }
-
-            return minDist;
+            return DirectionalDistance(movingLines, 0, 0, stationaryLines, direction);
         }
 
         /// <summary>
@@ -265,21 +218,10 @@ namespace OpenNest.Geometry
             var movingOffset = new Vector(movingDx, movingDy);
 
             // Case 1: Each moving vertex -> each stationary edge
-            var movingVertices = new HashSet<Vector>();
-            for (int i = 0; i < movingLines.Count; i++)
-            {
-                movingVertices.Add(movingLines[i].pt1 + movingOffset);
-                movingVertices.Add(movingLines[i].pt2 + movingOffset);
-            }
+            var movingVertices = CollectVertices(movingLines, movingOffset);
 
-            var stationaryEdges = new (Vector start, Vector end)[stationaryLines.Count];
-            for (int i = 0; i < stationaryLines.Count; i++)
-                stationaryEdges[i] = (stationaryLines[i].pt1, stationaryLines[i].pt2);
-
-            if (direction == PushDirection.Left || direction == PushDirection.Right)
-                stationaryEdges = stationaryEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
-            else
-                stationaryEdges = stationaryEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
+            var stationaryEdges = ToEdgeArray(stationaryLines);
+            SortEdgesForPruning(stationaryEdges, direction);
 
             foreach (var mv in movingVertices)
             {
@@ -289,21 +231,10 @@ namespace OpenNest.Geometry
 
             // Case 2: Each stationary vertex -> each moving edge (opposite direction)
             var opposite = OppositeDirection(direction);
-            var stationaryVertices = new HashSet<Vector>();
-            for (int i = 0; i < stationaryLines.Count; i++)
-            {
-                stationaryVertices.Add(stationaryLines[i].pt1);
-                stationaryVertices.Add(stationaryLines[i].pt2);
-            }
+            var stationaryVertices = CollectVertices(stationaryLines, Vector.Zero);
 
-            var movingEdges = new (Vector start, Vector end)[movingLines.Count];
-            for (int i = 0; i < movingLines.Count; i++)
-                movingEdges[i] = (movingLines[i].pt1, movingLines[i].pt2);
-
-            if (opposite == PushDirection.Left || opposite == PushDirection.Right)
-                movingEdges = movingEdges.OrderBy(e => System.Math.Min(e.start.Y, e.end.Y)).ToArray();
-            else
-                movingEdges = movingEdges.OrderBy(e => System.Math.Min(e.start.X, e.end.X)).ToArray();
+            var movingEdges = ToEdgeArray(movingLines);
+            SortEdgesForPruning(movingEdges, opposite);
 
             foreach (var sv in stationaryVertices)
             {
@@ -342,15 +273,11 @@ namespace OpenNest.Geometry
         {
             var minDist = double.MaxValue;
 
-            // Extract unique vertices from moving edges.
-            var movingVertices = new HashSet<Vector>();
-            for (var i = 0; i < movingEdges.Length; i++)
-            {
-                movingVertices.Add(movingEdges[i].start + movingOffset);
-                movingVertices.Add(movingEdges[i].end + movingOffset);
-            }
+            SortEdgesForPruning(stationaryEdges, direction);
 
             // Case 1: Each moving vertex -> each stationary edge
+            var movingVertices = CollectVertices(movingEdges, movingOffset);
+
             foreach (var mv in movingVertices)
             {
                 var d = OneWayDistance(mv, stationaryEdges, stationaryOffset, direction);
@@ -359,12 +286,9 @@ namespace OpenNest.Geometry
 
             // Case 2: Each stationary vertex -> each moving edge (opposite direction)
             var opposite = OppositeDirection(direction);
-            var stationaryVertices = new HashSet<Vector>();
-            for (var i = 0; i < stationaryEdges.Length; i++)
-            {
-                stationaryVertices.Add(stationaryEdges[i].start + stationaryOffset);
-                stationaryVertices.Add(stationaryEdges[i].end + stationaryOffset);
-            }
+            SortEdgesForPruning(movingEdges, opposite);
+
+            var stationaryVertices = CollectVertices(stationaryEdges, stationaryOffset);
 
             foreach (var sv in stationaryVertices)
             {
@@ -556,12 +480,7 @@ namespace OpenNest.Geometry
             var dirX = direction.X;
             var dirY = direction.Y;
 
-            var movingVertices = new HashSet<Vector>();
-            for (var i = 0; i < movingLines.Count; i++)
-            {
-                movingVertices.Add(movingLines[i].pt1);
-                movingVertices.Add(movingLines[i].pt2);
-            }
+            var movingVertices = CollectVertices(movingLines, Vector.Zero);
 
             foreach (var mv in movingVertices)
             {
@@ -576,12 +495,7 @@ namespace OpenNest.Geometry
             var oppX = -dirX;
             var oppY = -dirY;
 
-            var stationaryVertices = new HashSet<Vector>();
-            for (var i = 0; i < stationaryLines.Count; i++)
-            {
-                stationaryVertices.Add(stationaryLines[i].pt1);
-                stationaryVertices.Add(stationaryLines[i].pt2);
-            }
+            var stationaryVertices = CollectVertices(stationaryLines, Vector.Zero);
 
             foreach (var sv in stationaryVertices)
             {
@@ -657,32 +571,14 @@ namespace OpenNest.Geometry
             for (var i = 0; i < movingEntities.Count; i++)
             {
                 var me = movingEntities[i];
-                double mcx, mcy, mr;
-
-                if (me is Circle mc)
-                {
-                    mcx = mc.Center.X; mcy = mc.Center.Y; mr = mc.Radius;
-                }
-                else if (me is Arc ma)
-                {
-                    mcx = ma.Center.X; mcy = ma.Center.Y; mr = ma.Radius;
-                }
-                else continue;
+                if (!TryGetCurveParams(me, out var mcx, out var mcy, out var mr))
+                    continue;
 
                 for (var j = 0; j < stationaryEntities.Count; j++)
                 {
                     var se = stationaryEntities[j];
-                    double scx, scy, sr;
-
-                    if (se is Circle sc)
-                    {
-                        scx = sc.Center.X; scy = sc.Center.Y; sr = sc.Radius;
-                    }
-                    else if (se is Arc sa)
-                    {
-                        scx = sa.Center.X; scy = sa.Center.Y; sr = sa.Radius;
-                    }
-                    else continue;
+                    if (!TryGetCurveParams(se, out var scx, out var scy, out var sr))
+                        continue;
 
                     var d = RayCircleDistance(mcx, mcy, scx, scy, mr + sr, dirX, dirY);
 
@@ -795,6 +691,62 @@ namespace OpenNest.Geometry
                 points.Add(new Vector(arc.Center.X - arc.Radius, arc.Center.Y));
             if (Angle.IsBetweenRad(System.Math.PI * 1.5, a1, a2))
                 points.Add(new Vector(arc.Center.X, arc.Center.Y - arc.Radius));
+        }
+
+        private static HashSet<Vector> CollectVertices(List<Line> lines, Vector offset)
+        {
+            var vertices = new HashSet<Vector>();
+            for (var i = 0; i < lines.Count; i++)
+            {
+                vertices.Add(lines[i].pt1 + offset);
+                vertices.Add(lines[i].pt2 + offset);
+            }
+            return vertices;
+        }
+
+        private static HashSet<Vector> CollectVertices((Vector start, Vector end)[] edges, Vector offset)
+        {
+            var vertices = new HashSet<Vector>();
+            for (var i = 0; i < edges.Length; i++)
+            {
+                vertices.Add(edges[i].start + offset);
+                vertices.Add(edges[i].end + offset);
+            }
+            return vertices;
+        }
+
+        private static (Vector start, Vector end)[] ToEdgeArray(List<Line> lines)
+        {
+            var edges = new (Vector start, Vector end)[lines.Count];
+            for (var i = 0; i < lines.Count; i++)
+                edges[i] = (lines[i].pt1, lines[i].pt2);
+            return edges;
+        }
+
+        private static void SortEdgesForPruning((Vector start, Vector end)[] edges, PushDirection direction)
+        {
+            if (direction == PushDirection.Left || direction == PushDirection.Right)
+                System.Array.Sort(edges, (a, b) =>
+                    System.Math.Min(a.start.Y, a.end.Y).CompareTo(System.Math.Min(b.start.Y, b.end.Y)));
+            else
+                System.Array.Sort(edges, (a, b) =>
+                    System.Math.Min(a.start.X, a.end.X).CompareTo(System.Math.Min(b.start.X, b.end.X)));
+        }
+
+        private static bool TryGetCurveParams(Entity entity, out double cx, out double cy, out double r)
+        {
+            if (entity is Circle circle)
+            {
+                cx = circle.Center.X; cy = circle.Center.Y; r = circle.Radius;
+                return true;
+            }
+            if (entity is Arc arc)
+            {
+                cx = arc.Center.X; cy = arc.Center.Y; r = arc.Radius;
+                return true;
+            }
+            cx = cy = r = 0;
+            return false;
         }
 
         private static double BoxProjectionMin(Box box, double dx, double dy)
