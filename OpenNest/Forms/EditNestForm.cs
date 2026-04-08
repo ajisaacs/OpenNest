@@ -874,11 +874,40 @@ namespace OpenNest.Forms
             if (converter.ShowDialog() != DialogResult.OK)
                 return;
 
-            var drawings = converter.GetDrawings();
+            var newDrawings = converter.GetDrawings();
+            var newByName = newDrawings.ToDictionary(d => d.Name);
 
-            // Replace all drawings — clear existing and add new ones
-            Nest.Drawings.Clear();
-            drawings.ForEach(d => Nest.Drawings.Add(d));
+            // Update existing drawings in-place so parts keep their BaseDrawing references
+            foreach (var existing in Nest.Drawings.ToList())
+            {
+                if (newByName.TryGetValue(existing.Name, out var updated))
+                {
+                    existing.Program = updated.Program;
+                    existing.Source = updated.Source;
+                    existing.Customer = updated.Customer;
+                    existing.Quantity.Required = updated.Quantity.Required;
+                    existing.Bends.Clear();
+                    existing.Bends.AddRange(updated.Bends);
+                    newByName.Remove(existing.Name);
+                }
+                else
+                {
+                    Nest.Drawings.Remove(existing);
+                }
+            }
+
+            // Add any new drawings that weren't in the original set
+            foreach (var d in newByName.Values)
+                Nest.Drawings.Add(d);
+
+            // Refresh all parts to use the updated programs
+            foreach (var plate in Nest.Plates)
+                foreach (var part in plate.Parts)
+                    if (!part.BaseDrawing.IsCutOff)
+                        part.Update();
+
+            UpdateDrawingList();
+            PlateView.Invalidate();
         }
 
         private void CleanUnusedDrawings_Click(object sender, EventArgs e)

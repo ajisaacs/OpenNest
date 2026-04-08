@@ -190,7 +190,14 @@ namespace OpenNest
         {
             var rotation = Rotation;
             Program = BaseDrawing.Program.Clone() as Program;
-            Program.Rotate(Program.Rotation - rotation);
+
+            if (!Math.Tolerance.IsEqualTo(rotation, 0))
+                Program.Rotate(rotation);
+
+            HasManualLeadIns = false;
+            LeadInsLocked = false;
+            CuttingParameters = null;
+            UpdateBounds();
         }
 
         /// <summary>
