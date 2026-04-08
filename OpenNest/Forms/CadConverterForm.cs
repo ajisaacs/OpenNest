@@ -169,6 +169,7 @@ namespace OpenNest.Forms
             if (item.Entities.Any(e => e.Layer != null))
                 item.Entities.ForEach(e => e.Layer.IsVisible = true);
             ReHidePromotedEntities(item.Bends);
+            ReHideSuppressedEntities(item);
 
             filterPanel.LoadItem(item.Entities, item.Bends);
 
@@ -245,6 +246,7 @@ namespace OpenNest.Forms
 
             filterPanel.ApplyFilters(item.Entities);
             ReHidePromotedEntities(item.Bends);
+            SyncSuppressedState(item);
             entityView1.Invalidate();
             staleProgram = true;
         }
@@ -646,6 +648,9 @@ namespace OpenNest.Forms
                     Quantity = drawing.Quantity.Required,
                     Customer = drawing.Customer ?? string.Empty,
                     Bends = drawing.Bends?.ToList() ?? new List<Bend>(),
+                    SuppressedEntityIds = drawing.SuppressedEntityIds.Count > 0
+                        ? new HashSet<Guid>(drawing.SuppressedEntityIds)
+                        : null,
                     Bounds = bounds,
                     EntityCount = entities.Count
                 };
@@ -732,6 +737,47 @@ namespace OpenNest.Forms
                 if (bend.SourceEntity != null)
                     bend.SourceEntity.IsVisible = false;
             }
+        }
+
+        private static void ReHideSuppressedEntities(FileListItem item)
+        {
+            if (item.SuppressedEntityIds == null || item.SuppressedEntityIds.Count == 0)
+                return;
+
+            foreach (var entity in item.Entities)
+            {
+                if (item.SuppressedEntityIds.Contains(entity.Id))
+                    entity.IsVisible = false;
+            }
+
+            // If all entities on a layer are suppressed, uncheck the layer too
+            var layerGroups = item.Entities
+                .Where(e => e.Layer != null)
+                .GroupBy(e => e.Layer);
+
+            foreach (var group in layerGroups)
+            {
+                if (group.All(e => !e.IsVisible))
+                    group.Key.IsVisible = false;
+            }
+        }
+
+        private static void SyncSuppressedState(FileListItem item)
+        {
+            var bendSources = new HashSet<Entity>(
+                (item.Bends ?? new List<Bend>())
+                    .Where(b => b.SourceEntity != null)
+                    .Select(b => b.SourceEntity));
+
+            var suppressed = item.Entities
+                .Where(e => !(e.Layer.IsVisible && e.IsVisible))
+                .Where(e => !bendSources.Contains(e))
+                .Select(e => e.Id);
+
+            item.SuppressedEntityIds = new HashSet<Guid>(suppressed);
+
+            if (item.SuppressedEntityIds.Count == 0)
+                item.SuppressedEntityIds = null;
         }
 
 
