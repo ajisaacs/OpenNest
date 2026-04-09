@@ -255,7 +255,23 @@ namespace OpenNest.CNC.CuttingStrategy
             var leadOut = SelectLeadOut(contourType);
 
             if (contourType == ContourType.ArcCircle && entity is Circle circle)
+            {
+                if (Parameters.RoundLeadInAngles && Parameters.LeadInAngleIncrement > 0)
+                {
+                    var increment = Angle.ToRadians(Parameters.LeadInAngleIncrement);
+                    normal = System.Math.Round(normal / increment) * increment;
+                    normal = Angle.NormalizeRad(normal);
+
+                    // Recompute contour start point on the circle at the rounded angle.
+                    // For ArcCircle, normal points inward (toward center), so outward = normal - PI.
+                    var outwardAngle = normal - System.Math.PI;
+                    point = new Vector(
+                        circle.Center.X + circle.Radius * System.Math.Cos(outwardAngle),
+                        circle.Center.Y + circle.Radius * System.Math.Sin(outwardAngle));
+                }
+
                 leadIn = ClampLeadInForCircle(leadIn, circle, point, normal);
+            }
 
             program.Codes.AddRange(leadIn.Generate(point, normal, winding));
 

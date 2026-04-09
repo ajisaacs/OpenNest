@@ -28,6 +28,9 @@ namespace OpenNest.Controls
         private readonly NumericUpDown nudAutoTabMax;
         private readonly NumericUpDown nudPierceClearance;
 
+        private readonly CheckBox chkRoundLeadInAngles;
+        private readonly NumericUpDown nudLeadInAngleIncrement;
+
         private readonly Button btnAutoAssign;
 
         private bool suppressEvents;
@@ -162,7 +165,7 @@ namespace OpenNest.Controls
             {
                 HeaderText = "Pierce",
                 Dock = DockStyle.Top,
-                ExpandedHeight = 60,
+                ExpandedHeight = 90,
                 IsExpanded = true
             };
 
@@ -175,6 +178,34 @@ namespace OpenNest.Controls
 
             nudPierceClearance = CreateNumeric(130, 3, 0.0625, 0.0625);
             piercePanel.ContentPanel.Controls.Add(nudPierceClearance);
+
+            chkRoundLeadInAngles = new CheckBox
+            {
+                Text = "Round Lead-In Angles",
+                Location = new Point(12, 32),
+                AutoSize = true
+            };
+            chkRoundLeadInAngles.CheckedChanged += (s, e) =>
+            {
+                nudLeadInAngleIncrement.Enabled = chkRoundLeadInAngles.Checked;
+                OnParametersChanged();
+            };
+            piercePanel.ContentPanel.Controls.Add(chkRoundLeadInAngles);
+
+            piercePanel.ContentPanel.Controls.Add(new Label
+            {
+                Text = "Increment:",
+                Location = new Point(175, 34),
+                AutoSize = true
+            });
+
+            nudLeadInAngleIncrement = CreateNumeric(245, 31, 5, 1);
+            nudLeadInAngleIncrement.DecimalPlaces = 0;
+            nudLeadInAngleIncrement.Minimum = 1;
+            nudLeadInAngleIncrement.Maximum = 90;
+            nudLeadInAngleIncrement.Enabled = false;
+            nudLeadInAngleIncrement.ValueChanged += (s, e) => OnParametersChanged();
+            piercePanel.ContentPanel.Controls.Add(nudLeadInAngleIncrement);
 
             // Auto-Assign button — wrapped in a panel for Dock.Top with padding
             btnAutoAssign = new Button
@@ -218,6 +249,8 @@ namespace OpenNest.Controls
                 TabsEnabled = chkTabsEnabled.Checked,
                 TabConfig = new NormalTab { Size = (double)nudTabWidth.Value },
                 PierceClearance = (double)nudPierceClearance.Value,
+                RoundLeadInAngles = chkRoundLeadInAngles.Checked,
+                LeadInAngleIncrement = (double)nudLeadInAngleIncrement.Value,
                 AutoTabMinSize = (double)nudAutoTabMin.Value,
                 AutoTabMaxSize = (double)nudAutoTabMax.Value
             };
@@ -238,6 +271,9 @@ namespace OpenNest.Controls
             if (p.TabConfig != null)
                 nudTabWidth.Value = (decimal)p.TabConfig.Size;
             nudPierceClearance.Value = (decimal)p.PierceClearance;
+            chkRoundLeadInAngles.Checked = p.RoundLeadInAngles;
+            nudLeadInAngleIncrement.Value = (decimal)p.LeadInAngleIncrement;
+            nudLeadInAngleIncrement.Enabled = p.RoundLeadInAngles;
             nudAutoTabMin.Value = (decimal)p.AutoTabMinSize;
             nudAutoTabMax.Value = (decimal)p.AutoTabMaxSize;
 

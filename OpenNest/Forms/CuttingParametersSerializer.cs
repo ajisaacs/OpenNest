@@ -24,6 +24,8 @@ namespace OpenNest.Forms
                 TabsEnabled = p.TabsEnabled,
                 TabWidth = p.TabConfig?.Size ?? 0.25,
                 PierceClearance = p.PierceClearance,
+                RoundLeadInAngles = p.RoundLeadInAngles,
+                LeadInAngleIncrement = p.LeadInAngleIncrement,
                 AutoTabMinSize = p.AutoTabMinSize,
                 AutoTabMaxSize = p.AutoTabMaxSize
             };
@@ -47,6 +49,8 @@ namespace OpenNest.Forms
                 TabsEnabled = dto.TabsEnabled,
                 TabConfig = new NormalTab { Size = dto.TabWidth },
                 PierceClearance = dto.PierceClearance,
+                RoundLeadInAngles = dto.RoundLeadInAngles,
+                LeadInAngleIncrement = dto.LeadInAngleIncrement > 0 ? dto.LeadInAngleIncrement : 5.0,
                 AutoTabMinSize = dto.AutoTabMinSize,
                 AutoTabMaxSize = dto.AutoTabMaxSize
             };
@@ -111,6 +115,8 @@ namespace OpenNest.Forms
             public bool TabsEnabled { get; set; }
             public double TabWidth { get; set; }
             public double PierceClearance { get; set; }
+            public bool RoundLeadInAngles { get; set; }
+            public double LeadInAngleIncrement { get; set; }
             public double AutoTabMinSize { get; set; }
             public double AutoTabMaxSize { get; set; }
         }
