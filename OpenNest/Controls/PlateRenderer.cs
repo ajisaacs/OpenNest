@@ -433,7 +433,15 @@ namespace OpenNest.Controls
                     if (program != null)
                     {
                         var savedPos = pos;
-                        pos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
+                        var holePos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
+
+                        // Draw rapid from current position to hole center
+                        if (!(skipFirstRapid && !firstRapidSkipped))
+                            DrawLine(g, pos, holePos, view.ColorScheme.RapidPen);
+                        else
+                            firstRapidSkipped = true;
+
+                        pos = holePos;
                         DrawRapids(g, program, ref pos);
                         pos = savedPos;
                     }
