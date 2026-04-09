@@ -1,5 +1,6 @@
 using OpenNest.Geometry;
 using OpenNest.Math;
+using System;
 using System.Collections.Generic;
 
 namespace OpenNest.CNC.CuttingStrategy
@@ -245,6 +246,13 @@ namespace OpenNest.CNC.CuttingStrategy
             return perimeter.ClosestPointTo(lastCutout, out entity);
         }
 
+        private static int ComputeSubProgramKey(double radius, double normalAngle)
+        {
+            var r = System.Math.Round(radius, 6);
+            var a = System.Math.Round(normalAngle, 6);
+            return HashCode.Combine(r, a);
+        }
+
         private void EmitContour(Program program, Shape shape, Vector point, Entity entity, ContourType? forceType = null)
         {
             var contourType = forceType ?? DetectContourType(shape);
@@ -262,8 +270,6 @@ namespace OpenNest.CNC.CuttingStrategy
                     normal = System.Math.Round(normal / increment) * increment;
                     normal = Angle.NormalizeRad(normal);
 
-                    // Recompute contour start point on the circle at the rounded angle.
-                    // For ArcCircle, normal points inward (toward center), so outward = normal - PI.
                     var outwardAngle = normal - System.Math.PI;
                     point = new Vector(
                         circle.Center.X + circle.Radius * System.Math.Cos(outwardAngle),
@@ -271,16 +277,48 @@ namespace OpenNest.CNC.CuttingStrategy
                 }
 
                 leadIn = ClampLeadInForCircle(leadIn, circle, point, normal);
+
+                // Build hole sub-program relative to (0,0)
+                var holeCenter = circle.Center;
+                var relativePoint = new Vector(point.X - holeCenter.X, point.Y - holeCenter.Y);
+                var relativeCircle = new Circle(new Vector(0, 0), circle.Radius) { Rotation = circle.Rotation };
+                var relativeShape = new Shape();
+                relativeShape.Entities.Add(relativeCircle);
+
+                var subPgm = new Program(Mode.Absolute);
+                subPgm.Codes.AddRange(leadIn.Generate(relativePoint, normal, winding));
+                var reindexed = relativeShape.ReindexAt(relativePoint, relativeCircle);
+
+                if (Parameters.TabsEnabled && Parameters.TabConfig != null)
+                    reindexed = TrimShapeForTab(reindexed, relativePoint, Parameters.TabConfig.Size);
+
+                subPgm.Codes.AddRange(ConvertShapeToMoves(reindexed, relativePoint));
+                subPgm.Codes.AddRange(leadOut.Generate(relativePoint, normal, winding));
+                subPgm.Mode = Mode.Incremental;
+
+                // Deduplicate: check if an identical sub-program already exists
+                var key = ComputeSubProgramKey(circle.Radius, normal);
+                if (!program.SubPrograms.ContainsKey(key))
+                    program.SubPrograms[key] = subPgm;
+
+                program.Codes.Add(new SubProgramCall
+                {
+                    Id = key,
+                    Program = program.SubPrograms[key],
+                    Offset = holeCenter
+                });
+
+                return;
             }
 
             program.Codes.AddRange(leadIn.Generate(point, normal, winding));
 
-            var reindexed = shape.ReindexAt(point, entity);
+            var reindexedShape = shape.ReindexAt(point, entity);
 
             if (Parameters.TabsEnabled && Parameters.TabConfig != null)
-                reindexed = TrimShapeForTab(reindexed, point, Parameters.TabConfig.Size);
+                reindexedShape = TrimShapeForTab(reindexedShape, point, Parameters.TabConfig.Size);
 
-            program.Codes.AddRange(ConvertShapeToMoves(reindexed, point));
+            program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
             program.Codes.AddRange(leadOut.Generate(point, normal, winding));
         }
 
