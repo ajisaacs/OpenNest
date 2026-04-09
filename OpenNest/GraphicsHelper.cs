@@ -147,7 +147,10 @@ namespace OpenNest
                         {
                             cutPath.StartFigure();
                             leadPath.StartFigure();
+                            var savedPos = curpos;
+                            curpos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
                             AddProgramSplit(cutPath, leadPath, subpgm.Program, mode, ref curpos);
+                            curpos = savedPos;
                         }
                         mode = tmpmode;
                         break;
@@ -305,7 +308,10 @@ namespace OpenNest
 
                             if (subpgm.Program != null)
                             {
+                                var savedPos = curpos;
+                                curpos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
                                 AddProgram(path, subpgm.Program, mode, ref curpos);
+                                curpos = savedPos;
                             }
 
                             mode = tmpmode;

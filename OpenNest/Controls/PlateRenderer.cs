@@ -404,6 +404,9 @@ namespace OpenNest.Controls
         {
             for (var i = 0; i < pgm.Length; i++)
             {
+                if (pgm[i] is SubProgramCall call && call.Program != null)
+                    return GetFirstPiercePoint(call.Program, partLocation + call.Offset);
+
                 if (pgm[i] is Motion motion)
                 {
                     if (pgm.Mode == Mode.Incremental)
@@ -428,7 +431,12 @@ namespace OpenNest.Controls
                     var program = subpgm.Program;
 
                     if (program != null)
+                    {
+                        var savedPos = pos;
+                        pos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
                         DrawRapids(g, program, ref pos);
+                        pos = savedPos;
+                    }
                 }
                 else
                 {
@@ -489,7 +497,12 @@ namespace OpenNest.Controls
                 {
                     var subpgm = (SubProgramCall)code;
                     if (subpgm.Program != null)
+                    {
+                        var savedPos = pos;
+                        pos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
                         DrawProgramPiercePoints(g, subpgm.Program, ref pos, brush, pen);
+                        pos = savedPos;
+                    }
                 }
                 else
                 {

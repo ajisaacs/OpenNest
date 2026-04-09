@@ -1,5 +1,6 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using System.Linq;
 
@@ -157,6 +158,127 @@ public class HoleSubProgramTests
 
         // But different offsets
         Assert.NotEqual(calls[0].Offset.X, calls[1].Offset.X);
+    }
+
+    [Fact]
+    public void Apply_HoleCenters_PreservedInGeometry()
+    {
+        // Square perimeter 10x10 with two circle holes at known positions
+        var holeCenter1 = new Vector(3, 3);
+        var holeCenter2 = new Vector(7, 5);
+        var holeRadius = 0.5;
+
+        var pgm = new Program(Mode.Absolute);
+        // Perimeter
+        pgm.Codes.Add(new RapidMove(0, 0));
+        pgm.Codes.Add(new LinearMove(10, 0));
+        pgm.Codes.Add(new LinearMove(10, 10));
+        pgm.Codes.Add(new LinearMove(0, 10));
+        pgm.Codes.Add(new LinearMove(0, 0));
+        // Hole 1 at (3, 3)
+        pgm.Codes.Add(new RapidMove(holeCenter1.X + holeRadius, holeCenter1.Y));
+        pgm.Codes.Add(new ArcMove(
+            new Vector(holeCenter1.X + holeRadius, holeCenter1.Y),
+            holeCenter1, RotationType.CW));
+        // Hole 2 at (7, 5)
+        pgm.Codes.Add(new RapidMove(holeCenter2.X + holeRadius, holeCenter2.Y));
+        pgm.Codes.Add(new ArcMove(
+            new Vector(holeCenter2.X + holeRadius, holeCenter2.Y),
+            holeCenter2, RotationType.CW));
+
+        var strategy = new ContourCuttingStrategy
+        {
+            Parameters = new CuttingParameters
+            {
+                ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
+                ArcCircleLeadOut = new NoLeadOut()
+            }
+        };
+
+        var result = strategy.Apply(pgm, new Vector(10, 10));
+
+        // Convert to geometry — this is what PlateView renders
+        var geometry = ConvertProgram.ToGeometry(result.Program);
+        var circles = geometry.OfType<Circle>().ToList();
+
+        Assert.Equal(2, circles.Count);
+
+        // Circle centers must match the original hole positions
+        var center1 = circles[0].Center;
+        var center2 = circles[1].Center;
+
+        Assert.Equal(holeCenter1.X, center1.X, 2);
+        Assert.Equal(holeCenter1.Y, center1.Y, 2);
+        Assert.Equal(holeCenter2.X, center2.X, 2);
+        Assert.Equal(holeCenter2.Y, center2.Y, 2);
+    }
+
+    [Fact]
+    public void Part_ApplyLeadIns_HolesAndPerimeter_CorrectPositions()
+    {
+        // Build a drawing with a square and two holes
+        var holeCenter1 = new Vector(3, 3);
+        var holeCenter2 = new Vector(7, 5);
+        var holeRadius = 0.5;
+
+        var pgm = new Program(Mode.Absolute);
+        pgm.Codes.Add(new RapidMove(0, 0));
+        pgm.Codes.Add(new LinearMove(10, 0));
+        pgm.Codes.Add(new LinearMove(10, 10));
+        pgm.Codes.Add(new LinearMove(0, 10));
+        pgm.Codes.Add(new LinearMove(0, 0));
+        pgm.Codes.Add(new RapidMove(holeCenter1.X + holeRadius, holeCenter1.Y));
+        pgm.Codes.Add(new ArcMove(
+            new Vector(holeCenter1.X + holeRadius, holeCenter1.Y),
+            holeCenter1, RotationType.CW));
+        pgm.Codes.Add(new RapidMove(holeCenter2.X + holeRadius, holeCenter2.Y));
+        pgm.Codes.Add(new ArcMove(
+            new Vector(holeCenter2.X + holeRadius, holeCenter2.Y),
+            holeCenter2, RotationType.CW));
+
+        var drawing = new Drawing("TestPart") { Program = pgm };
+        var part = new Part(drawing);
+
+        var parameters = new CuttingParameters
+        {
+            RoundLeadInAngles = true,
+            LeadInAngleIncrement = 5.0,
+            ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
+            ArcCircleLeadOut = new NoLeadOut(),
+            ExternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
+            ExternalLeadOut = new NoLeadOut()
+        };
+
+        part.ApplyLeadIns(parameters, new Vector(10, 10));
+
+        // Convert to geometry — this is what PlateView renders
+        var geometry = ConvertProgram.ToGeometry(part.Program);
+        var circles = geometry.OfType<Circle>().ToList();
+        var lines = geometry.OfType<Line>().Where(l => l.Layer != SpecialLayers.Rapid).ToList();
+
+        // Hole circles must be at correct positions
+        Assert.Equal(2, circles.Count);
+        Assert.Equal(holeCenter1.X, circles[0].Center.X, 2);
+        Assert.Equal(holeCenter1.Y, circles[0].Center.Y, 2);
+        Assert.Equal(holeCenter2.X, circles[1].Center.X, 2);
+        Assert.Equal(holeCenter2.Y, circles[1].Center.Y, 2);
+        Assert.Equal(holeRadius, circles[0].Radius, 2);
+        Assert.Equal(holeRadius, circles[1].Radius, 2);
+
+        // Perimeter lines must stay within the original 10x10 bounding box.
+        // This catches the mode conversion bug where perimeter gets shifted
+        // by the last hole's position.
+        foreach (var line in lines)
+        {
+            Assert.True(line.StartPoint.X >= -1 && line.StartPoint.X <= 11,
+                $"Perimeter line start X={line.StartPoint.X} is outside the 10x10 part bounds");
+            Assert.True(line.StartPoint.Y >= -1 && line.StartPoint.Y <= 11,
+                $"Perimeter line start Y={line.StartPoint.Y} is outside the 10x10 part bounds");
+            Assert.True(line.EndPoint.X >= -1 && line.EndPoint.X <= 11,
+                $"Perimeter line end X={line.EndPoint.X} is outside the 10x10 part bounds");
+            Assert.True(line.EndPoint.Y >= -1 && line.EndPoint.Y <= 11,
+                $"Perimeter line end Y={line.EndPoint.Y} is outside the 10x10 part bounds");
+        }
     }
 
     [Fact]

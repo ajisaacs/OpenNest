@@ -43,13 +43,20 @@ namespace OpenNest.Converters
                     case CodeType.SubProgramCall:
                         var subpgm = (SubProgramCall)code;
                         var savedMode = mode;
+                        var savedPos = curpos;
 
-                        // Apply offset: sub-program executes at the call's offset position
-                        if (subpgm.Offset.X != 0 || subpgm.Offset.Y != 0)
-                            curpos = subpgm.Offset;
+                        // Position the sub-program at savedPos + Offset.
+                        // savedPos is the base position ((0,0) here, Part.Location in rendering).
+                        // Offset is the hole center in drawing-local coordinates.
+                        curpos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
 
                         AddProgram(subpgm.Program, ref mode, ref curpos, ref geometry);
                         mode = savedMode;
+
+                        // Restore curpos: ConvertMode.ToIncremental skips SubProgramCalls
+                        // when computing deltas, so subsequent incremental codes expect
+                        // curpos to be where it was before the call.
+                        curpos = savedPos;
                         break;
                 }
             }

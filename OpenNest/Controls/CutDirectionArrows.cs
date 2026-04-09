@@ -18,7 +18,12 @@ namespace OpenNest.Controls
                 {
                     var subpgm = (SubProgramCall)code;
                     if (subpgm.Program != null)
+                    {
+                        var savedPos = pos;
+                        pos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
                         DrawProgram(g, view, subpgm.Program, ref pos, pen, spacing, arrowSize);
+                        pos = savedPos;
+                    }
                     continue;
                 }
 
