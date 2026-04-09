@@ -621,29 +621,29 @@ namespace OpenNest.Controls
 
         private void redrawTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            Invalidate();
+            if (IsDisposed || !IsHandleCreated) return;
+            BeginInvoke(new System.Action(Invalidate));
         }
 
         private void hoverTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
+            if (IsDisposed || !IsHandleCreated) return;
+            BeginInvoke(new System.Action(HoverCheck));
+        }
+
+        private void HoverCheck()
+        {
             var graphPt = PointControlToGraph(hoverPoint);
             LayoutPart hitPart = null;
-            try
+
+            for (var i = parts.Count - 1; i >= 0; --i)
             {
-                for (var i = parts.Count - 1; i >= 0; --i)
+                if (parts[i].Path.GetBounds().Contains(graphPt) &&
+                    parts[i].Path.IsVisible(graphPt))
                 {
-                    if (parts[i].Path.GetBounds().Contains(graphPt) &&
-                        parts[i].Path.IsVisible(graphPt))
-                    {
-                        hitPart = parts[i];
-                        break;
-                    }
+                    hitPart = parts[i];
+                    break;
                 }
-            }
-            catch (InvalidOperationException)
-            {
-                // GraphicsPath in use by paint thread — skip this hover tick
-                return;
             }
 
             hoveredPart = hitPart;
