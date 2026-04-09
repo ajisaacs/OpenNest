@@ -15,11 +15,18 @@ namespace OpenNest.Engine.BestFit
 
         public List<BestFitResult> EvaluateAll(List<PairCandidate> candidates)
         {
+            if (candidates.Count == 0)
+                return new List<BestFitResult>();
+
+            // Build a perimeter-only drawing once — all candidates share the same drawing.
+            // This avoids cloning the full program (with all cutouts) for every candidate.
+            var perimeterDrawing = CreatePerimeterDrawing(candidates[0].Drawing);
+
             var resultBag = new ConcurrentBag<BestFitResult>();
 
             Parallel.ForEach(candidates, c =>
             {
-                resultBag.Add(Evaluate(c));
+                resultBag.Add(Evaluate(c, perimeterDrawing));
             });
 
             return resultBag.ToList();
@@ -27,18 +34,24 @@ namespace OpenNest.Engine.BestFit
 
         public BestFitResult Evaluate(PairCandidate candidate)
         {
-            var drawing = candidate.Drawing;
+            var perimeterDrawing = CreatePerimeterDrawing(candidate.Drawing);
+            return Evaluate(candidate, perimeterDrawing);
+        }
 
-            var part1 = Part.CreateAtOrigin(drawing);
+        private BestFitResult Evaluate(PairCandidate candidate, Drawing perimeterDrawing)
+        {
+            var part1 = Part.CreateAtOrigin(perimeterDrawing);
 
-            var part2 = Part.CreateAtOrigin(drawing, candidate.Part2Rotation);
+            var part2 = Part.CreateAtOrigin(perimeterDrawing, candidate.Part2Rotation);
             part2.Location = candidate.Part2Offset;
             part2.UpdateBounds();
 
-            // Check overlap via shape intersection
-            var overlaps = CheckOverlap(part1, part2);
+            // Overlap check — perimeter vs perimeter
+            var shape1 = GetPerimeterShape(part1);
+            var shape2 = GetPerimeterShape(part2);
+            var overlaps = shape1 != null && shape2 != null && shape1.Intersects(shape2, out _);
 
-            // Collect all polygon vertices for convex hull / optimal rotation
+            // Convex hull vertices from perimeter polygons only
             var allPoints = GetPartVertices(part1);
             allPoints.AddRange(GetPartVertices(part2));
 
@@ -66,7 +79,7 @@ namespace OpenNest.Engine.BestFit
                 hullAngles = new List<double> { 0 };
             }
 
-            var trueArea = drawing.Area * 2;
+            var trueArea = candidate.Drawing.Area * 2;
 
             // Normalize to landscape (width >= height) for consistent display.
             if (bestHeight > bestWidth)
@@ -91,38 +104,29 @@ namespace OpenNest.Engine.BestFit
             };
         }
 
-        private bool CheckOverlap(Part part1, Part part2)
+        private static Drawing CreatePerimeterDrawing(Drawing source)
         {
-            var shapes1 = GetPartShapes(part1);
-            var shapes2 = GetPartShapes(part2);
-
-            for (var i = 0; i < shapes1.Count; i++)
-            {
-                for (var j = 0; j < shapes2.Count; j++)
-                {
-                    List<Vector> pts;
-
-                    if (shapes1[i].Intersects(shapes2[j], out pts))
-                        return true;
-                }
-            }
-
-            return false;
+            var entities = ConvertProgram.ToGeometry(source.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var profile = new ShapeProfile(entities);
+            var program = ConvertGeometry.ToProgram(profile.Perimeter);
+            return new Drawing(source.Name, program);
         }
 
-        private List<Shape> GetPartShapes(Part part)
+        private static Shape GetPerimeterShape(Part part)
         {
             var entities = ConvertProgram.ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid);
+                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
             var shapes = ShapeBuilder.GetShapes(entities);
-            shapes.ForEach(s => s.Offset(part.Location));
-            return shapes;
+            if (shapes.Count == 0) return null;
+            shapes[0].Offset(part.Location);
+            return shapes[0];
         }
 
-        private List<Vector> GetPartVertices(Part part)
+        private static List<Vector> GetPartVertices(Part part)
         {
             var entities = ConvertProgram.ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid);
+                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
             var shapes = ShapeBuilder.GetShapes(entities);
             var points = new List<Vector>();
 
@@ -130,9 +134,7 @@ namespace OpenNest.Engine.BestFit
             {
                 var polygon = shape.ToPolygonWithTolerance(ChordTolerance);
                 polygon.Offset(part.Location);
-
-                foreach (var vertex in polygon.Vertices)
-                    points.Add(vertex);
+                points.AddRange(polygon.Vertices);
             }
 
             return points;
