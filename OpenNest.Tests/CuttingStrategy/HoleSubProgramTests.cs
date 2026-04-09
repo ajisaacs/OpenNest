@@ -40,4 +40,40 @@ public class HoleSubProgramTests
         Assert.Contains("X1.5", str);
         Assert.Contains("Y2.5", str);
     }
+
+    [Fact]
+    public void Program_SubPrograms_EmptyByDefault()
+    {
+        var pgm = new Program();
+        Assert.NotNull(pgm.SubPrograms);
+        Assert.Empty(pgm.SubPrograms);
+    }
+
+    [Fact]
+    public void Program_SubPrograms_StoresAndRetrieves()
+    {
+        var pgm = new Program();
+        var sub = new Program(Mode.Incremental);
+        sub.Codes.Add(new LinearMove(0.1, 0.2));
+
+        pgm.SubPrograms[1] = sub;
+
+        Assert.Single(pgm.SubPrograms);
+        Assert.Same(sub, pgm.SubPrograms[1]);
+    }
+
+    [Fact]
+    public void Program_Clone_DeepCopiesSubPrograms()
+    {
+        var pgm = new Program();
+        var sub = new Program(Mode.Incremental);
+        sub.Codes.Add(new LinearMove(0.1, 0.2));
+        pgm.SubPrograms[1] = sub;
+
+        var clone = (Program)pgm.Clone();
+
+        Assert.Single(clone.SubPrograms);
+        Assert.NotSame(sub, clone.SubPrograms[1]);
+        Assert.Equal(Mode.Incremental, clone.SubPrograms[1].Mode);
+    }
 }

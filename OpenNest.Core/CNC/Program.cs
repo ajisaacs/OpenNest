@@ -12,6 +12,8 @@ namespace OpenNest.CNC
 
         public Dictionary<string, VariableDefinition> Variables { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        public Dictionary<int, Program> SubPrograms { get; } = new();
+
         private Mode mode;
 
         public Program(Mode mode = Mode.Absolute)
@@ -459,6 +461,9 @@ namespace OpenNest.CNC
 
             foreach (var kvp in Variables)
                 pgm.Variables[kvp.Key] = kvp.Value;
+
+            foreach (var kvp in SubPrograms)
+                pgm.SubPrograms[kvp.Key] = (Program)kvp.Value.Clone();
 
             return pgm;
         }
