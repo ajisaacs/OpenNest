@@ -89,6 +89,17 @@ namespace OpenNest.CNC
                 {
                     var subpgm = (SubProgramCall)code;
 
+                    if (subpgm.Offset.X != 0 || subpgm.Offset.Y != 0)
+                    {
+                        var cos = System.Math.Cos(angle);
+                        var sin = System.Math.Sin(angle);
+                        var dx = subpgm.Offset.X - origin.X;
+                        var dy = subpgm.Offset.Y - origin.Y;
+                        subpgm.Offset = new Geometry.Vector(
+                            origin.X + dx * cos - dy * sin,
+                            origin.Y + dx * sin + dy * cos);
+                    }
+
                     if (subpgm.Program != null)
                         subpgm.Program.Rotate(angle, origin);
                 }
@@ -422,7 +433,10 @@ namespace OpenNest.CNC
                     case CodeType.SubProgramCall:
                         {
                             var subpgm = (SubProgramCall)code;
-                            var box = subpgm.Program.BoundingBox(ref pos);
+                            var subPos = subpgm.Offset.X != 0 || subpgm.Offset.Y != 0
+                                ? new Vector(subpgm.Offset.X, subpgm.Offset.Y)
+                                : pos;
+                            var box = subpgm.Program.BoundingBox(ref subPos);
 
                             if (box.Left < minX)
                                 minX = box.Left;

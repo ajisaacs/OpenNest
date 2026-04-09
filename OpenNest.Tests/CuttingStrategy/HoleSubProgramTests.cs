@@ -158,4 +158,40 @@ public class HoleSubProgramTests
         // But different offsets
         Assert.NotEqual(calls[0].Offset.X, calls[1].Offset.X);
     }
+
+    [Fact]
+    public void Program_BoundingBox_IncludesSubProgramOffset()
+    {
+        var sub = new Program(Mode.Incremental);
+        sub.Codes.Add(new LinearMove(1, 0));
+
+        var main = new Program(Mode.Absolute);
+        main.SubPrograms[1] = sub;
+        main.Codes.Add(new SubProgramCall { Id = 1, Program = sub, Offset = new Vector(10, 20) });
+
+        var box = main.BoundingBox();
+
+        // Sub-program line goes from (10,20) to (11,20)
+        Assert.True(box.Right >= 11);
+        Assert.True(box.Top >= 20);
+    }
+
+    [Fact]
+    public void Program_Rotate_RotatesSubProgramCallOffsets()
+    {
+        var sub = new Program(Mode.Incremental);
+        sub.Codes.Add(new LinearMove(1, 0));
+
+        var main = new Program(Mode.Absolute);
+        main.SubPrograms[1] = sub;
+        main.Codes.Add(new SubProgramCall { Id = 1, Program = sub, Offset = new Vector(10, 0) });
+
+        // Rotate 90 degrees CCW around origin
+        main.Rotate(System.Math.PI / 2);
+
+        var call = main.Codes.OfType<SubProgramCall>().First();
+        // (10, 0) rotated 90 CCW = (0, 10)
+        Assert.Equal(0, call.Offset.X, 1);
+        Assert.Equal(10, call.Offset.Y, 1);
+    }
 }
