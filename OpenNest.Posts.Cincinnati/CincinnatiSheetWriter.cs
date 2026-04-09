@@ -17,13 +17,16 @@ public sealed class CincinnatiSheetWriter
     private readonly ProgramVariableManager _vars;
     private readonly CoordinateFormatter _fmt;
     private readonly CincinnatiFeatureWriter _featureWriter;
+    private readonly Dictionary<int, int> _holeSubprograms;
 
-    public CincinnatiSheetWriter(CincinnatiPostConfig config, ProgramVariableManager vars)
+    public CincinnatiSheetWriter(CincinnatiPostConfig config, ProgramVariableManager vars,
+        Dictionary<int, int> holeSubprograms = null)
     {
         _config = config;
         _vars = vars;
         _fmt = new CoordinateFormatter(config.PostedAccuracy);
         _featureWriter = new CincinnatiFeatureWriter(config);
+        _holeSubprograms = holeSubprograms;
     }
 
     /// <summary>
@@ -132,11 +135,21 @@ public sealed class CincinnatiSheetWriter
                 for (var f = 0; f < features.Count; f++)
                 {
                     var (codes, isEtch) = features[f];
+                    var isLastFeature = isLastPart && f == features.Count - 1;
+
+                    // SubProgramCall features are emitted as M98 hole calls
+                    if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
+                    {
+                        WriteHoleSubprogramCall(w, holeCall, featureIndex, isLastFeature);
+                        featureIndex++;
+                        lastPartName = partName;
+                        continue;
+                    }
+
                     var featureNumber = featureIndex == 0
                         ? _config.FeatureLineNumberStart
                         : 1000 + featureIndex + 1;
 
-                    var isLastFeature = isLastPart && f == features.Count - 1;
                     var cutDistance = FeatureUtils.ComputeCutDistance(codes);
 
                     var ctx = new FeatureContext
@@ -204,6 +217,25 @@ public sealed class CincinnatiSheetWriter
             w.WriteLine("M47");
     }
 
+    private void WriteHoleSubprogramCall(TextWriter w, SubProgramCall call, int featureIndex, bool isLastFeature)
+    {
+        var postSubNum = _holeSubprograms != null && _holeSubprograms.TryGetValue(call.Id, out var num)
+            ? num : call.Id;
+
+        var featureNumber = featureIndex == 0
+            ? _config.FeatureLineNumberStart
+            : 1000 + featureIndex + 1;
+
+        var sb = new StringBuilder();
+        if (_config.UseLineNumbers)
+            sb.Append($"N{featureNumber} ");
+        sb.Append($"M98 P{postSubNum} X{_fmt.FormatCoord(call.Offset.X)} Y{_fmt.FormatCoord(call.Offset.Y)}");
+        w.WriteLine(sb.ToString());
+
+        if (!isLastFeature)
+            w.WriteLine("M47");
+    }
+
     private void WritePartsInline(TextWriter w, List<Part> allParts,
         string cutLibrary, string etchLibrary, double sheetDiagonal,
         double plateWidth, double plateLength,
@@ -227,6 +259,14 @@ public sealed class CincinnatiSheetWriter
             var isFirstFeatureOfPart = partName != lastPartName;
             var isSafetyHeadraise = partName != lastPartName && lastPartName != "";
             var isLastFeature = i == features.Count - 1;
+
+            // SubProgramCall features are emitted as M98 hole calls
+            if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
+            {
+                WriteHoleSubprogramCall(w, holeCall, i, isLastFeature);
+                lastPartName = partName;
+                continue;
+            }
 
             var featureNumber = i == 0
                 ? _config.FeatureLineNumberStart

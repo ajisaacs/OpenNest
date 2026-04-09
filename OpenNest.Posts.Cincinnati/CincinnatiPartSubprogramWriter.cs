@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 
@@ -135,5 +136,62 @@ public sealed class CincinnatiPartSubprogramWriter
         }
 
         return (mapping, entries);
+    }
+
+    /// <summary>
+    /// Scans all parts across all plates and builds a nest-level registry of unique
+    /// hole sub-programs. Deduplicates by comparing sub-program code content.
+    /// </summary>
+    internal static (Dictionary<int, int> modelToPostMapping, List<(int subNum, Program program)> entries)
+        BuildHoleRegistry(IEnumerable<Plate> plates, int startNumber)
+    {
+        var mapping = new Dictionary<int, int>();
+        var entries = new List<(int, Program)>();
+        var contentIndex = new Dictionary<string, int>();
+        var nextSubNum = startNumber;
+
+        foreach (var plate in plates)
+        {
+            foreach (var part in plate.Parts)
+            {
+                if (part.BaseDrawing.IsCutOff) continue;
+                foreach (var code in part.Program.Codes)
+                {
+                    if (code is not SubProgramCall call) continue;
+                    if (mapping.ContainsKey(call.Id)) continue;
+
+                    var canonical = ProgramToCanonical(call.Program);
+                    if (contentIndex.TryGetValue(canonical, out var existingNum))
+                    {
+                        mapping[call.Id] = existingNum;
+                    }
+                    else
+                    {
+                        var subNum = nextSubNum++;
+                        mapping[call.Id] = subNum;
+                        contentIndex[canonical] = subNum;
+                        entries.Add((subNum, call.Program));
+                    }
+                }
+            }
+        }
+
+        return (mapping, entries);
+    }
+
+    private static string ProgramToCanonical(Program pgm)
+    {
+        var sb = new StringBuilder();
+        sb.Append(pgm.Mode == Mode.Absolute ? "A" : "I");
+        foreach (var code in pgm.Codes)
+        {
+            if (code is LinearMove lm)
+                sb.Append($"L{lm.EndPoint.X:F6},{lm.EndPoint.Y:F6},{(int)lm.Layer}");
+            else if (code is ArcMove am)
+                sb.Append($"A{am.EndPoint.X:F6},{am.EndPoint.Y:F6},{am.CenterPoint.X:F6},{am.CenterPoint.Y:F6},{(int)am.Rotation},{(int)am.Layer}");
+            else if (code is RapidMove rm)
+                sb.Append($"R{rm.EndPoint.X:F6},{rm.EndPoint.Y:F6}");
+        }
+        return sb.ToString();
     }
 }

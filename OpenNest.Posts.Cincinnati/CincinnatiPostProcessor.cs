@@ -89,9 +89,15 @@ namespace OpenNest.Posts.Cincinnati
             if (Config.UsePartSubprograms)
                 (partSubprograms, subprogramEntries) = CincinnatiPartSubprogramWriter.BuildRegistry(plates, Config.PartSubprogramStart);
 
+            // 5b. Build hole sub-program registry (SubProgramCalls across all parts)
+            var holeStartNumber = Config.PartSubprogramStart
+                + (subprogramEntries?.Count ?? 0);
+            var (holeMapping, holeEntries) = CincinnatiPartSubprogramWriter.BuildHoleRegistry(plates, holeStartNumber);
+
             // 6. Create writers
             var preamble = new CincinnatiPreambleWriter(Config);
-            var sheetWriter = new CincinnatiSheetWriter(Config, vars);
+            var sheetWriter = new CincinnatiSheetWriter(Config, vars,
+                holeMapping.Count > 0 ? holeMapping : null);
 
             // 7. Build material description from nest
             var material = nest.Material;
@@ -131,6 +137,23 @@ namespace OpenNest.Posts.Cincinnati
                 foreach (var (subNum, name, pgm) in subprogramEntries)
                 {
                     partSubWriter.Write(writer, pgm, name, subNum,
+                        initialCutLibrary, etchLibrary, sheetDiagonal);
+                }
+            }
+
+            // Hole sub-programs (SubProgramCall definitions)
+            if (holeEntries.Count > 0)
+            {
+                var holeSubWriter = new CincinnatiPartSubprogramWriter(Config);
+                var sheetDiagonal = firstPlate != null
+                    ? System.Math.Sqrt(firstPlate.Size.Width * firstPlate.Size.Width
+                        + firstPlate.Size.Length * firstPlate.Size.Length)
+                    : 100.0;
+
+                foreach (var (subNum, pgm) in holeEntries)
+                {
+                    CincinnatiPartSubprogramWriter.EnsureLeadingRapid(pgm);
+                    holeSubWriter.Write(writer, pgm, "HOLE", subNum,
                         initialCutLibrary, etchLibrary, sheetDiagonal);
                 }
             }

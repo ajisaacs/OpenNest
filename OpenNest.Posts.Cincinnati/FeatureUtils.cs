@@ -21,7 +21,16 @@ public static class FeatureUtils
 
         foreach (var code in codes)
         {
-            if (code is RapidMove)
+            if (code is SubProgramCall)
+            {
+                // Flush any pending feature
+                if (current != null)
+                    features.Add(current);
+                // SubProgramCall is its own feature
+                features.Add(new List<ICode> { code });
+                current = null;
+            }
+            else if (code is RapidMove)
             {
                 if (current != null)
                     features.Add(current);
