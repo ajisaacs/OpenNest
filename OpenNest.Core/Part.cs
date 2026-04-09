@@ -63,9 +63,14 @@ namespace OpenNest
 
         public void ApplyLeadIns(CNC.CuttingStrategy.CuttingParameters parameters, Vector approachPoint)
         {
+            ApplyLeadIns(parameters, approachPoint, Geometry.Vector.Invalid);
+        }
+
+        public void ApplyLeadIns(CNC.CuttingStrategy.CuttingParameters parameters, Vector approachPoint, Vector nextPartStart)
+        {
             preLeadInRotation = Rotation;
             var strategy = new CNC.CuttingStrategy.ContourCuttingStrategy { Parameters = parameters };
-            var result = strategy.Apply(Program, approachPoint);
+            var result = strategy.Apply(Program, approachPoint, nextPartStart);
             Program = result.Program;
             CuttingParameters = parameters;
             HasManualLeadIns = true;

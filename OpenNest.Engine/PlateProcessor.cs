@@ -17,15 +17,38 @@ namespace OpenNest.Engine
         public PlateProcessingResult Process(Plate plate)
         {
             var sequenced = Sequencer.Sequence(plate.Parts.ToList(), plate);
+            var exitPoint = PlateHelper.GetExitPoint(plate);
+
+            // Pass 1: process each part to collect pierce points
+            var piercePoints = new Vector[sequenced.Count];
+            var currentPoint = exitPoint;
+
+            for (var i = 0; i < sequenced.Count; i++)
+            {
+                var part = sequenced[i].Part;
+
+                if (!part.HasManualLeadIns && CuttingStrategy != null)
+                {
+                    var localApproach = ToPartLocal(currentPoint, part);
+                    var result = CuttingStrategy.Apply(part.Program, localApproach);
+                    piercePoints[i] = ToPlateSpace(GetProgramStartPoint(result.Program), part);
+                    currentPoint = ToPlateSpace(result.LastCutPoint, part);
+                }
+                else
+                {
+                    piercePoints[i] = ToPlateSpace(GetProgramStartPoint(part.Program), part);
+                    currentPoint = ToPlateSpace(GetProgramEndPoint(part.Program), part);
+                }
+            }
+
+            // Pass 2: re-process with next part's start point for perimeter lead-in refinement
             var results = new List<ProcessedPart>(sequenced.Count);
             var cutAreas = new List<Shape>();
-            var currentPoint = PlateHelper.GetExitPoint(plate);
+            currentPoint = exitPoint;
 
-            foreach (var sp in sequenced)
+            for (var i = 0; i < sequenced.Count; i++)
             {
-                var part = sp.Part;
-
-                // Compute approach point in part-local space
+                var part = sequenced[i].Part;
                 var localApproach = ToPartLocal(currentPoint, part);
 
                 Program processedProgram;
@@ -33,7 +56,18 @@ namespace OpenNest.Engine
 
                 if (!part.HasManualLeadIns && CuttingStrategy != null)
                 {
-                    var cuttingResult = CuttingStrategy.Apply(part.Program, localApproach);
+                    CuttingResult cuttingResult;
+
+                    if (i + 1 < sequenced.Count)
+                    {
+                        var nextStart = ToPartLocal(piercePoints[i + 1], part);
+                        cuttingResult = CuttingStrategy.Apply(part.Program, localApproach, nextStart);
+                    }
+                    else
+                    {
+                        cuttingResult = CuttingStrategy.Apply(part.Program, localApproach);
+                    }
+
                     processedProgram = cuttingResult.Program;
                     lastCutLocal = cuttingResult.LastCutPoint;
                 }
@@ -43,11 +77,9 @@ namespace OpenNest.Engine
                     lastCutLocal = GetProgramEndPoint(part.Program);
                 }
 
-                // Pierce point: program start point in plate space
                 var pierceLocal = GetProgramStartPoint(processedProgram);
                 var piercePoint = ToPlateSpace(pierceLocal, part);
 
-                // Plan rapid from currentPoint to pierce point
                 var rapidPath = RapidPlanner.Plan(currentPoint, piercePoint, cutAreas);
 
                 results.Add(new ProcessedPart
@@ -57,12 +89,10 @@ namespace OpenNest.Engine
                     RapidPath = rapidPath
                 });
 
-                // Update cut areas with part perimeter
                 var perimeter = GetPartPerimeter(part);
                 if (perimeter != null)
                     cutAreas.Add(perimeter);
 
-                // Update current point to last cut point in plate space
                 currentPoint = ToPlateSpace(lastCutLocal, part);
             }
 

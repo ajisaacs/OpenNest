@@ -12,6 +12,11 @@ namespace OpenNest.CNC.CuttingStrategy
 
         public CuttingResult Apply(Program partProgram, Vector approachPoint)
         {
+            return Apply(partProgram, approachPoint, Vector.Invalid);
+        }
+
+        public CuttingResult Apply(Program partProgram, Vector approachPoint, Vector nextPartStart)
+        {
             var entities = partProgram.ToGeometry();
             entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
 
@@ -20,14 +25,43 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var profile = new ShapeProfile(entities);
 
-            // Forward pass: sequence cutouts nearest-neighbor from perimeter
-            var perimeterPoint = profile.Perimeter.ClosestPointTo(approachPoint, out _);
-            var orderedCutouts = SequenceCutouts(profile.Cutouts, perimeterPoint);
+            // Start from the bounding box corner opposite the origin (max X, max Y)
+            var bbox = entities.GetBoundingBox();
+            var startCorner = new Vector(bbox.Right, bbox.Top);
+
+            // Initial pass: sequence cutouts from bbox corner
+            var seedPoint = startCorner;
+            var orderedCutouts = SequenceCutouts(profile.Cutouts, seedPoint);
             orderedCutouts.Reverse();
 
-            // Backward pass: walk from perimeter back through cutting order
-            // so each lead-in faces the next cutout to be cut, not the previous
-            var cutoutEntries = ResolveLeadInPoints(orderedCutouts, perimeterPoint);
+            var perimeterSeed = profile.Perimeter.ClosestPointTo(seedPoint, out _);
+            var cutoutEntries = ResolveLeadInPoints(orderedCutouts, perimeterSeed);
+
+            Vector perimeterPt;
+            Entity perimeterEntity;
+
+            if (!double.IsNaN(nextPartStart.X) && cutoutEntries.Count > 0)
+            {
+                // Iterate: each pass refines the perimeter lead-in which changes
+                // the internal sequence which changes the last cutout position
+                for (var iter = 0; iter < 3; iter++)
+                {
+                    var lastCutoutPt = cutoutEntries[cutoutEntries.Count - 1].Point;
+                    perimeterSeed = FindPerimeterIntersection(profile.Perimeter, lastCutoutPt, nextPartStart, out _);
+
+                    orderedCutouts = SequenceCutouts(profile.Cutouts, perimeterSeed);
+                    orderedCutouts.Reverse();
+                    cutoutEntries = ResolveLeadInPoints(orderedCutouts, perimeterSeed);
+                }
+
+                var finalLastCutout = cutoutEntries[cutoutEntries.Count - 1].Point;
+                perimeterPt = FindPerimeterIntersection(profile.Perimeter, finalLastCutout, nextPartStart, out perimeterEntity);
+            }
+            else
+            {
+                var perimeterRef = cutoutEntries.Count > 0 ? cutoutEntries[0].Point : approachPoint;
+                perimeterPt = profile.Perimeter.ClosestPointTo(perimeterRef, out perimeterEntity);
+            }
 
             var result = new Program(Mode.Absolute);
 
@@ -36,9 +70,6 @@ namespace OpenNest.CNC.CuttingStrategy
             foreach (var entry in cutoutEntries)
                 EmitContour(result, entry.Shape, entry.Point, entry.Entity);
 
-            // Perimeter last
-            var lastRefPoint = cutoutEntries.Count > 0 ? cutoutEntries[cutoutEntries.Count - 1].Point : approachPoint;
-            var perimeterPt = profile.Perimeter.ClosestPointTo(lastRefPoint, out var perimeterEntity);
             EmitContour(result, profile.Perimeter, perimeterPt, perimeterEntity, ContourType.External);
 
             result.Mode = Mode.Incremental;
@@ -185,6 +216,33 @@ namespace OpenNest.CNC.CuttingStrategy
             }
 
             return new List<ContourEntry>(entries);
+        }
+
+        private static Vector FindPerimeterIntersection(Shape perimeter, Vector lastCutout, Vector nextPartStart, out Entity entity)
+        {
+            var ray = new Line(lastCutout, nextPartStart);
+
+            if (perimeter.Intersects(ray, out var pts) && pts.Count > 0)
+            {
+                // Pick the intersection closest to the last cutout
+                var best = pts[0];
+                var bestDist = best.DistanceTo(lastCutout);
+
+                for (var i = 1; i < pts.Count; i++)
+                {
+                    var dist = pts[i].DistanceTo(lastCutout);
+                    if (dist < bestDist)
+                    {
+                        best = pts[i];
+                        bestDist = dist;
+                    }
+                }
+
+                return perimeter.ClosestPointTo(best, out entity);
+            }
+
+            // Fallback: closest point on perimeter to the last cutout
+            return perimeter.ClosestPointTo(lastCutout, out entity);
         }
 
         private void EmitContour(Program program, Shape shape, Vector point, Entity entity, ContourType? forceType = null)
