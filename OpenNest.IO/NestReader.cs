@@ -71,8 +71,66 @@ namespace OpenNest.IO
 
                 var reader = new ProgramReader(memStream);
                 programs[i] = reader.Read();
+
+                // Read sub-programs if present
+                var subsEntry = zipArchive.GetEntry($"programs/program-{i}-subs");
+                if (subsEntry != null)
+                {
+                    using var subsStream = subsEntry.Open();
+                    ReadSubPrograms(programs[i], subsStream);
+                }
             }
             return programs;
+        }
+
+        private static void ReadSubPrograms(Program parent, Stream stream)
+        {
+            using var reader = new StreamReader(stream);
+            var currentId = -1;
+            var lines = new List<string>();
+
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                var trimmed = line.Trim();
+
+                if (trimmed.StartsWith(":") && int.TryParse(trimmed.Substring(1), out var id))
+                {
+                    // Flush previous sub-program
+                    if (currentId >= 0 && lines.Count > 0)
+                        parent.SubPrograms[currentId] = ParseSubProgram(lines);
+
+                    currentId = id;
+                    lines.Clear();
+                }
+                else if (trimmed == "M99")
+                {
+                    if (currentId >= 0 && lines.Count > 0)
+                        parent.SubPrograms[currentId] = ParseSubProgram(lines);
+
+                    currentId = -1;
+                    lines.Clear();
+                }
+                else
+                {
+                    lines.Add(trimmed);
+                }
+            }
+
+            // Wire up SubProgramCall.Program references
+            foreach (var code in parent.Codes)
+            {
+                if (code is SubProgramCall call && parent.SubPrograms.TryGetValue(call.Id, out var sub))
+                    call.Program = sub;
+            }
+        }
+
+        private static Program ParseSubProgram(List<string> lines)
+        {
+            var text = string.Join("\n", lines);
+            var memStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(text));
+            var reader = new ProgramReader(memStream);
+            return reader.Read();
         }
 
         private Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> ReadEntitySets(int count)

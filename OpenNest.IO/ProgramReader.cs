@@ -374,6 +374,8 @@ namespace OpenNest.IO
         {
             var p = 0;
             var r = 0.0;
+            var x = 0.0;
+            var y = 0.0;
 
             while (section == CodeSection.SubProgram)
             {
@@ -395,13 +397,26 @@ namespace OpenNest.IO
                         r = double.Parse(code.Value);
                         break;
 
+                    case 'X':
+                        x = double.Parse(code.Value);
+                        break;
+
+                    case 'Y':
+                        y = double.Parse(code.Value);
+                        break;
+
                     default:
                         section = CodeSection.Unknown;
                         break;
                 }
             }
 
-            program.Codes.Add(new SubProgramCall() { Id = p, Rotation = r });
+            program.Codes.Add(new SubProgramCall
+            {
+                Id = p,
+                Rotation = r,
+                Offset = new Geometry.Vector(x, y)
+            });
         }
 
         private Code GetNextCode()

@@ -308,8 +308,32 @@ namespace OpenNest.IO
                 WriteDrawing(stream, kvp.Value);
 
                 var entry = zipArchive.CreateEntry(name);
-                using var entryStream = entry.Open();
-                stream.CopyTo(entryStream);
+                using (var entryStream = entry.Open())
+                {
+                    stream.CopyTo(entryStream);
+                }
+
+                // Write sub-programs if present
+                if (kvp.Value.Program.SubPrograms.Count > 0)
+                    WriteSubPrograms(zipArchive, kvp.Key, kvp.Value.Program.SubPrograms);
+            }
+        }
+
+        private void WriteSubPrograms(ZipArchive zipArchive, int drawingId, Dictionary<int, Program> subPrograms)
+        {
+            var entry = zipArchive.CreateEntry($"programs/program-{drawingId}-subs");
+            using var entryStream = entry.Open();
+            using var writer = new StreamWriter(entryStream, Encoding.UTF8);
+
+            foreach (var kvp in subPrograms.OrderBy(k => k.Key))
+            {
+                writer.WriteLine($":{kvp.Key}");
+                writer.WriteLine(kvp.Value.Mode == Mode.Absolute ? "G90" : "G91");
+
+                foreach (var code in kvp.Value.Codes)
+                    writer.WriteLine(GetCodeString(code));
+
+                writer.WriteLine("M99");
             }
         }
 
@@ -448,7 +472,9 @@ namespace OpenNest.IO
                 case CodeType.SubProgramCall:
                     {
                         var subProgramCall = (SubProgramCall)code;
-                        break;
+                        var x = System.Math.Round(subProgramCall.Offset.X, OutputPrecision).ToString(CoordinateFormat);
+                        var y = System.Math.Round(subProgramCall.Offset.Y, OutputPrecision).ToString(CoordinateFormat);
+                        return $"G65P{subProgramCall.Id}X{x}Y{y}";
                     }
             }
 
