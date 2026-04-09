@@ -1,4 +1,5 @@
-﻿using OpenNest.Math;
+﻿using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.CNC
 {
@@ -34,6 +35,12 @@ namespace OpenNest.CNC
                 UpdateProgramRotation();
             }
         }
+
+        /// <summary>
+        /// Gets or sets the offset (position) at which the sub-program is executed.
+        /// For hole sub-programs, this is the hole center.
+        /// </summary>
+        public Vector Offset { get; set; }
 
         /// <summary>
         /// Gets or sets the rotation of the program in degrees.
@@ -78,11 +85,13 @@ namespace OpenNest.CNC
         /// <returns></returns>
         public ICode Clone()
         {
-            return new SubProgramCall(program, Rotation);
+            return new SubProgramCall(program, Rotation) { Id = Id, Offset = Offset };
         }
 
         public override string ToString()
         {
+            if (Offset.X != 0 || Offset.Y != 0)
+                return string.Format("G65 P{0} X{1} Y{2}", Id, Offset.X, Offset.Y);
             return string.Format("G65 P{0} R{1}", Id, Rotation);
         }
     }
