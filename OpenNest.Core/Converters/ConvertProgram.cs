@@ -41,12 +41,15 @@ namespace OpenNest.Converters
                         break;
 
                     case CodeType.SubProgramCall:
-                        var tmpmode = mode;
                         var subpgm = (SubProgramCall)code;
-                        var geoProgram = new Shape();
-                        AddProgram(subpgm.Program, ref mode, ref curpos, ref geoProgram.Entities);
-                        geometry.Add(geoProgram);
-                        mode = tmpmode;
+                        var savedMode = mode;
+
+                        // Apply offset: sub-program executes at the call's offset position
+                        if (subpgm.Offset.X != 0 || subpgm.Offset.Y != 0)
+                            curpos = subpgm.Offset;
+
+                        AddProgram(subpgm.Program, ref mode, ref curpos, ref geometry);
+                        mode = savedMode;
                         break;
                 }
             }
