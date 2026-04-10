@@ -1,5 +1,4 @@
 using OpenNest;
-using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using System;
@@ -241,25 +240,15 @@ static class NestConsole
 
     static Drawing ImportDxf(string path)
     {
-        var geometry = Dxf.GetGeometry(path);
-
-        if (geometry.Count == 0)
+        try
         {
-            Console.Error.WriteLine($"Error: failed to read DXF file or no geometry found: {path}");
+            return CadImporter.ImportDrawing(path);
+        }
+        catch (System.Exception ex)
+        {
+            Console.Error.WriteLine($"Error: failed to import DXF '{path}': {ex.Message}");
             return null;
         }
-
-        var normalized = ShapeProfile.NormalizeEntities(geometry);
-        var pgm = ConvertGeometry.ToProgram(normalized);
-
-        if (pgm == null)
-        {
-            Console.Error.WriteLine($"Error: failed to convert geometry: {path}");
-            return null;
-        }
-
-        var name = Path.GetFileNameWithoutExtension(path);
-        return new Drawing(name, pgm);
     }
 
     static void ApplyTemplate(Plate plate, Options options)
