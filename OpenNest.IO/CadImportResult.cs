@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using ACadSharp;
 using OpenNest.Bending;
 using OpenNest.Geometry;
 
@@ -29,12 +28,6 @@ namespace OpenNest.IO
         /// if callers mutate <see cref="Entities"/>; recompute if needed.
         /// </summary>
         public Box Bounds { get; set; }
-
-        /// <summary>
-        /// Underlying CAD document for callers that need to run additional
-        /// analysis (e.g., MText extraction). May be null for stream imports.
-        /// </summary>
-        public CadDocument Document { get; set; }
 
         /// <summary>
         /// Absolute path to the source file.

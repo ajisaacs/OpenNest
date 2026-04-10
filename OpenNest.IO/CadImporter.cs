@@ -42,7 +42,6 @@ namespace OpenNest.IO
                 Entities = dxf.Entities,
                 Bends = bends,
                 Bounds = dxf.Entities.GetBoundingBox(),
-                Document = dxf.Document,
                 SourcePath = path,
                 Name = options.Name ?? Path.GetFileNameWithoutExtension(path),
             };

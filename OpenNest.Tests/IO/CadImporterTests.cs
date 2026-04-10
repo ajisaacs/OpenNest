@@ -40,6 +40,18 @@ namespace OpenNest.Tests.IO
         }
 
         [Fact]
+        public void Import_WhenNamedDetectorDoesNotExist_ReturnsEmptyBends()
+        {
+            // Exercises the named-detector branch: when BendDetectorName doesn't
+            // match any registered detector, bends should be an empty list
+            // (not a crash, and no fall-through to auto-detect).
+            var result = CadImporter.Import(TestDxf,
+                new CadImportOptions { BendDetectorName = "__nonexistent__" });
+
+            Assert.Empty(result.Bends);
+        }
+
+        [Fact]
         public void BuildDrawing_ProducesDrawingWithProgramAndMetadata()
         {
             var result = CadImporter.Import(TestDxf);

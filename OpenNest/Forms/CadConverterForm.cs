@@ -5,7 +5,6 @@ using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.IO.Bending;
-using OpenNest.Properties;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -356,7 +355,6 @@ namespace OpenNest.Forms
                 : Path.GetTempPath();
 
             var index = fileList.SelectedIndex;
-            var newItems = new List<string>();
 
             var splitWriter = new SplitDxfWriter();
             var splitItems = new List<FileListItem>();
@@ -369,7 +367,6 @@ namespace OpenNest.Forms
                 var splitPath = GetUniquePath(Path.Combine(writableDir, splitName));
 
                 splitWriter.Write(splitPath, splitDrawing);
-                newItems.Add(splitPath);
 
                 // Re-import geometry but keep bends from the split drawing
                 var result = Dxf.Import(splitPath);
@@ -749,9 +746,6 @@ namespace OpenNest.Forms
             if (item.SuppressedEntityIds.Count == 0)
                 item.SuppressedEntityIds = null;
         }
-
-
-        private static Color GetNextColor() => Drawing.GetNextColor();
 
         private static bool IsDirectoryWritable(string path)
         {
