@@ -98,6 +98,9 @@ namespace OpenNest
         private static void AddProgramSplit(GraphicsPath cutPath, GraphicsPath leadPath,
             Program pgm, Mode mode, ref Vector curpos)
         {
+            // Capture the frame origin at entry. Sub-program Offsets are relative
+            // to this fixed origin, not to the current tool position.
+            var frameOrigin = curpos;
             mode = pgm.Mode;
 
             for (var i = 0; i < pgm.Length; ++i)
@@ -147,10 +150,8 @@ namespace OpenNest
                         {
                             cutPath.StartFigure();
                             leadPath.StartFigure();
-                            var savedPos = curpos;
-                            curpos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
+                            curpos = new Vector(frameOrigin.X + subpgm.Offset.X, frameOrigin.Y + subpgm.Offset.Y);
                             AddProgramSplit(cutPath, leadPath, subpgm.Program, mode, ref curpos);
-                            curpos = savedPos;
                         }
                         mode = tmpmode;
                         break;
@@ -240,6 +241,9 @@ namespace OpenNest
 
         private static void AddProgram(GraphicsPath path, Program pgm, Mode mode, ref Vector curpos)
         {
+            // Capture the frame origin at entry. Sub-program Offsets are relative
+            // to this fixed origin, not to the current tool position.
+            var frameOrigin = curpos;
             mode = pgm.Mode;
             GraphicsPath currentFigure = null;
 
@@ -308,10 +312,8 @@ namespace OpenNest
 
                             if (subpgm.Program != null)
                             {
-                                var savedPos = curpos;
-                                curpos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
+                                curpos = new Vector(frameOrigin.X + subpgm.Offset.X, frameOrigin.Y + subpgm.Offset.Y);
                                 AddProgram(path, subpgm.Program, mode, ref curpos);
-                                curpos = savedPos;
                             }
 
                             mode = tmpmode;

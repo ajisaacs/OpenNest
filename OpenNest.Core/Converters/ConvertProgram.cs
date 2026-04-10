@@ -20,6 +20,9 @@ namespace OpenNest.Converters
 
         private static void AddProgram(Program program, ref Mode mode, ref Vector curpos, ref List<Entity> geometry)
         {
+            // Capture the frame origin at entry. Sub-program Offsets are relative
+            // to this fixed origin, not to the current tool position.
+            var frameOrigin = curpos;
             mode = program.Mode;
 
             for (int i = 0; i < program.Length; ++i)
@@ -43,20 +46,13 @@ namespace OpenNest.Converters
                     case CodeType.SubProgramCall:
                         var subpgm = (SubProgramCall)code;
                         var savedMode = mode;
-                        var savedPos = curpos;
 
-                        // Position the sub-program at savedPos + Offset.
-                        // savedPos is the base position ((0,0) here, Part.Location in rendering).
-                        // Offset is the hole center in drawing-local coordinates.
-                        curpos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
+                        // The sub-program's frame origin in this program's frame is
+                        // frameOrigin + Offset — independent of current tool position.
+                        curpos = new Vector(frameOrigin.X + subpgm.Offset.X, frameOrigin.Y + subpgm.Offset.Y);
 
                         AddProgram(subpgm.Program, ref mode, ref curpos, ref geometry);
                         mode = savedMode;
-
-                        // Restore curpos: ConvertMode.ToIncremental skips SubProgramCalls
-                        // when computing deltas, so subsequent incremental codes expect
-                        // curpos to be where it was before the call.
-                        curpos = savedPos;
                         break;
                 }
             }

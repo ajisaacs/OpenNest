@@ -10,6 +10,12 @@ namespace OpenNest.Controls
         public static void DrawProgram(Graphics g, DrawControl view, Program pgm, ref Vector pos,
             Pen pen, double spacing, float arrowSize)
         {
+            DrawProgram(g, view, pgm, pos, ref pos, pen, spacing, arrowSize);
+        }
+
+        private static void DrawProgram(Graphics g, DrawControl view, Program pgm, Vector basePos, ref Vector pos,
+            Pen pen, double spacing, float arrowSize)
+        {
             for (var i = 0; i < pgm.Length; ++i)
             {
                 var code = pgm[i];
@@ -19,10 +25,9 @@ namespace OpenNest.Controls
                     var subpgm = (SubProgramCall)code;
                     if (subpgm.Program != null)
                     {
-                        var savedPos = pos;
-                        pos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
-                        DrawProgram(g, view, subpgm.Program, ref pos, pen, spacing, arrowSize);
-                        pos = savedPos;
+                        var holeBase = basePos + subpgm.Offset;
+                        pos = holeBase;
+                        DrawProgram(g, view, subpgm.Program, holeBase, ref pos, pen, spacing, arrowSize);
                     }
                     continue;
                 }
@@ -31,7 +36,7 @@ namespace OpenNest.Controls
 
                 var endpt = pgm.Mode == Mode.Incremental
                     ? motion.EndPoint + pos
-                    : motion.EndPoint;
+                    : motion.EndPoint + basePos;
 
                 if (code.Type == CodeType.LinearMove)
                 {
@@ -46,7 +51,7 @@ namespace OpenNest.Controls
                     {
                         var center = pgm.Mode == Mode.Incremental
                             ? arc.CenterPoint + pos
-                            : arc.CenterPoint;
+                            : arc.CenterPoint + basePos;
                         DrawArcArrows(g, view, pos, endpt, center, arc.Rotation, pen, spacing, arrowSize);
                     }
                 }

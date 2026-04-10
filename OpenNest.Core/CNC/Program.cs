@@ -288,6 +288,10 @@ namespace OpenNest.CNC
 
         private Box BoundingBox(ref Vector pos)
         {
+            // Capture the frame origin at entry. Sub-program Offsets and
+            // absolute-mode endpoints are relative to this fixed origin.
+            var frameOrigin = pos;
+
             double minX = 0.0;
             double minY = 0.0;
             double maxX = 0.0;
@@ -303,7 +307,7 @@ namespace OpenNest.CNC
                         {
                             var line = (LinearMove)code;
                             var pt = Mode == Mode.Absolute ?
-                                line.EndPoint :
+                                frameOrigin + line.EndPoint :
                                 line.EndPoint + pos;
 
                             if (pt.X > maxX)
@@ -325,7 +329,7 @@ namespace OpenNest.CNC
                         {
                             var line = (RapidMove)code;
                             var pt = Mode == Mode.Absolute
-                                ? line.EndPoint
+                                ? frameOrigin + line.EndPoint
                                 : line.EndPoint + pos;
 
                             if (pt.X > maxX)
@@ -358,8 +362,8 @@ namespace OpenNest.CNC
                             }
                             else
                             {
-                                endpt = arc.EndPoint;
-                                centerpt = arc.CenterPoint;
+                                endpt = frameOrigin + arc.EndPoint;
+                                centerpt = frameOrigin + arc.CenterPoint;
                             }
 
                             double minX1;
@@ -433,10 +437,13 @@ namespace OpenNest.CNC
                     case CodeType.SubProgramCall:
                         {
                             var subpgm = (SubProgramCall)code;
-                            var subPos = subpgm.Offset.X != 0 || subpgm.Offset.Y != 0
-                                ? new Vector(subpgm.Offset.X, subpgm.Offset.Y)
-                                : pos;
-                            var box = subpgm.Program.BoundingBox(ref subPos);
+                            if (subpgm.Program == null)
+                                break;
+
+                            // Sub-program frame origin in this program's frame
+                            // is frameOrigin + Offset, regardless of current pos.
+                            pos = frameOrigin + subpgm.Offset;
+                            var box = subpgm.Program.BoundingBox(ref pos);
 
                             if (box.Left < minX)
                                 minX = box.Left;

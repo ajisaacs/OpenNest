@@ -395,8 +395,8 @@ namespace OpenNest.Controls
                 var piercePoint = GetFirstPiercePoint(pgm, part.Location);
                 DrawLine(g, pos, piercePoint, view.ColorScheme.RapidPen);
 
-                pos = part.Location;
-                DrawRapids(g, pgm, ref pos, skipFirstRapid: true);
+                pos = piercePoint;
+                DrawRapids(g, pgm, part.Location, ref pos, skipFirstRapid: true);
             }
         }
 
@@ -409,15 +409,13 @@ namespace OpenNest.Controls
 
                 if (pgm[i] is Motion motion)
                 {
-                    if (pgm.Mode == Mode.Incremental)
-                        return motion.EndPoint + partLocation;
-                    return motion.EndPoint;
+                    return motion.EndPoint + partLocation;
                 }
             }
             return partLocation;
         }
 
-        private void DrawRapids(Graphics g, Program pgm, ref Vector pos, bool skipFirstRapid = false)
+        private void DrawRapids(Graphics g, Program pgm, Vector basePos, ref Vector pos, bool skipFirstRapid = false)
         {
             var firstRapidSkipped = false;
 
@@ -425,60 +423,39 @@ namespace OpenNest.Controls
             {
                 var code = pgm[i];
 
-                if (code.Type == CodeType.SubProgramCall)
+                if (code is SubProgramCall { Program: { } program } call)
                 {
-                    var subpgm = (SubProgramCall)code;
-                    var program = subpgm.Program;
+                    var holeBase = basePos + call.Offset;
 
-                    if (program != null)
-                    {
-                        var holePos = new Vector(pos.X + subpgm.Offset.X, pos.Y + subpgm.Offset.Y);
+                    if (ShouldDrawRapid(skipFirstRapid, ref firstRapidSkipped))
+                        DrawLine(g, pos, holeBase, view.ColorScheme.RapidPen);
 
-                        // Draw rapid from current position to hole center
-                        if (!(skipFirstRapid && !firstRapidSkipped))
-                            DrawLine(g, pos, holePos, view.ColorScheme.RapidPen);
-                        else
-                            firstRapidSkipped = true;
-
-                        pos = holePos;
-                        DrawRapids(g, program, ref pos);
-                        // Don't restore pos — let it advance so the next hole's
-                        // rapid starts from where this one ended.
-                    }
+                    var subPos = holeBase;
+                    DrawRapids(g, program, holeBase, ref subPos);
+                    pos = subPos;
                 }
-                else
+                else if (code is Motion motion)
                 {
-                    var motion = code as Motion;
+                    var endpt = pgm.Mode == Mode.Incremental
+                        ? motion.EndPoint + pos
+                        : motion.EndPoint;
 
-                    if (motion != null)
-                    {
-                        if (pgm.Mode == Mode.Incremental)
-                        {
-                            var endpt = motion.EndPoint + pos;
+                    if (code.Type == CodeType.RapidMove && ShouldDrawRapid(skipFirstRapid, ref firstRapidSkipped))
+                        DrawLine(g, pos, endpt, view.ColorScheme.RapidPen);
 
-                            if (code.Type == CodeType.RapidMove)
-                            {
-                                if (skipFirstRapid && !firstRapidSkipped)
-                                    firstRapidSkipped = true;
-                                else
-                                    DrawLine(g, pos, endpt, view.ColorScheme.RapidPen);
-                            }
-                            pos = endpt;
-                        }
-                        else
-                        {
-                            if (code.Type == CodeType.RapidMove)
-                            {
-                                if (skipFirstRapid && !firstRapidSkipped)
-                                    firstRapidSkipped = true;
-                                else
-                                    DrawLine(g, pos, motion.EndPoint, view.ColorScheme.RapidPen);
-                            }
-                            pos = motion.EndPoint;
-                        }
-                    }
+                    pos = endpt;
                 }
             }
+        }
+
+        private static bool ShouldDrawRapid(bool skipFirstRapid, ref bool firstRapidSkipped)
+        {
+            if (skipFirstRapid && !firstRapidSkipped)
+            {
+                firstRapidSkipped = true;
+                return false;
+            }
+            return true;
         }
 
         private void DrawAllPiercePoints(Graphics g)
@@ -491,11 +468,11 @@ namespace OpenNest.Controls
                 var part = view.Plate.Parts[i];
                 var pgm = part.Program;
                 var pos = part.Location;
-                DrawProgramPiercePoints(g, pgm, ref pos, brush, pen);
+                DrawProgramPiercePoints(g, pgm, part.Location, ref pos, brush, pen);
             }
         }
 
-        private void DrawProgramPiercePoints(Graphics g, Program pgm, ref Vector pos, Brush brush, Pen pen)
+        private void DrawProgramPiercePoints(Graphics g, Program pgm, Vector basePos, ref Vector pos, Brush brush, Pen pen)
         {
             for (var i = 0; i < pgm.Length; ++i)
             {
@@ -506,10 +483,9 @@ namespace OpenNest.Controls
                     var subpgm = (SubProgramCall)code;
                     if (subpgm.Program != null)
                     {
-                        var savedPos = pos;
-                        pos = new Vector(savedPos.X + subpgm.Offset.X, savedPos.Y + subpgm.Offset.Y);
-                        DrawProgramPiercePoints(g, subpgm.Program, ref pos, brush, pen);
-                        pos = savedPos;
+                        var holeBase = basePos + subpgm.Offset;
+                        pos = holeBase;
+                        DrawProgramPiercePoints(g, subpgm.Program, holeBase, ref pos, brush, pen);
                     }
                 }
                 else
@@ -519,7 +495,7 @@ namespace OpenNest.Controls
 
                     var endpt = pgm.Mode == Mode.Incremental
                         ? motion.EndPoint + pos
-                        : motion.EndPoint;
+                        : motion.EndPoint + basePos;
 
                     if (code.Type == CodeType.RapidMove)
                     {
