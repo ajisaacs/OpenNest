@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 
 namespace OpenNest.Shapes
 {
@@ -7,7 +6,7 @@ namespace OpenNest.Shapes
     {
         public readonly record struct Entry(string Label, double OuterDiameter);
 
-        public static IReadOnlyList<Entry> All { get; } = new List<Entry>
+        public static IReadOnlyList<Entry> All { get; } = new[]
         {
             new Entry("1/8",    0.405),
             new Entry("1/4",    0.540),
@@ -61,9 +60,19 @@ namespace OpenNest.Shapes
             return false;
         }
 
+        /// <summary>
+        /// Returns all pipe sizes whose outer diameter is less than or equal to <paramref name="maxOD"/>.
+        /// The bound is inclusive.
+        /// </summary>
         public static IEnumerable<Entry> GetFittingSizes(double maxOD)
         {
-            return All.Where(e => e.OuterDiameter <= maxOD);
+            foreach (var entry in All)
+            {
+                if (entry.OuterDiameter <= maxOD)
+                {
+                    yield return entry;
+                }
+            }
         }
     }
 }

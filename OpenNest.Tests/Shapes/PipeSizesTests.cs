@@ -47,6 +47,16 @@ public class PipeSizesTests
     }
 
     [Fact]
+    public void GetFittingSizes_ExactBoundary_IsInclusive()
+    {
+        // NPS 3 has OD 3.500; passing maxOD = 3.500 should include it.
+        var results = PipeSizes.GetFittingSizes(3.500).ToList();
+
+        Assert.Contains(results, e => e.Label == "3");
+        Assert.DoesNotContain(results, e => e.Label == "3 1/2");
+    }
+
+    [Fact]
     public void GetFittingSizes_MaxSmallerThanSmallest_ReturnsEmpty()
     {
         Assert.Empty(PipeSizes.GetFittingSizes(0.1));
