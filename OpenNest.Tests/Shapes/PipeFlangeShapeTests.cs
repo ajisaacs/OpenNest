@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using OpenNest.Shapes;
 
 namespace OpenNest.Tests.Shapes;
@@ -132,5 +134,83 @@ public class PipeFlangeShapeTests
 
         var expectedArea = System.Math.PI * 24;
         Assert.Equal(expectedArea, drawing.Area, 0.5);
+    }
+
+    [Fact]
+    public void LoadFromJson_ProducesCorrectDrawing()
+    {
+        var json = """
+        [
+          {
+            "Name": "2in-150#",
+            "PipeSize": "2",
+            "PipeClearance": 0.0625,
+            "OD": 6.0,
+            "HoleDiameter": 0.75,
+            "HolePatternDiameter": 4.75,
+            "HoleCount": 4
+          },
+          {
+            "Name": "2in-300#",
+            "PipeSize": "2",
+            "PipeClearance": 0.0625,
+            "OD": 6.5,
+            "HoleDiameter": 0.75,
+            "HolePatternDiameter": 5.0,
+            "HoleCount": 8
+          }
+        ]
+        """;
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, json);
+
+            var flanges = ShapeDefinition.LoadFromJson<PipeFlangeShape>(tempFile);
+
+            Assert.Equal(2, flanges.Count);
+
+            var first = flanges[0];
+            Assert.Equal("2in-150#", first.Name);
+            Assert.Equal("2", first.PipeSize);
+            Assert.Equal(0.0625, first.PipeClearance, 0.0001);
+            var drawing = first.GetDrawing();
+            var bbox = drawing.Program.BoundingBox();
+            Assert.Equal(6, bbox.Width, 0.01);
+
+            var second = flanges[1];
+            Assert.Equal("2in-300#", second.Name);
+            Assert.Equal(8, second.HoleCount);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void LoadFromJson_RealShippedConfig_LoadsAllEntries()
+    {
+        // Resolve the repo-relative config path from the test binary location.
+        var dir = AppDomain.CurrentDomain.BaseDirectory;
+        while (dir != null && !File.Exists(Path.Combine(dir, "OpenNest.sln")))
+            dir = Path.GetDirectoryName(dir);
+
+        Assert.NotNull(dir);
+
+        var configPath = Path.Combine(dir, "OpenNest", "Configurations", "PipeFlangeShape.json");
+        Assert.True(File.Exists(configPath), $"Config missing at {configPath}");
+
+        var flanges = ShapeDefinition.LoadFromJson<PipeFlangeShape>(configPath);
+
+        Assert.NotEmpty(flanges);
+        foreach (var f in flanges)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(f.PipeSize));
+            Assert.True(PipeSizes.TryGetOD(f.PipeSize, out _),
+                $"Unknown PipeSize '{f.PipeSize}' in entry '{f.Name}'");
+            Assert.Equal(0.0625, f.PipeClearance, 0.0001);
+        }
     }
 }
