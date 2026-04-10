@@ -226,11 +226,22 @@ public sealed class CincinnatiSheetWriter
             ? _config.FeatureLineNumberStart
             : 1000 + featureIndex + 1;
 
+        // Shift the local origin to the hole center via G52 (manual §1.52).
+        // G52 does not move the nozzle, so the sub-program's first rapid
+        // (the lead-in to the pierce point) takes the tool straight from the
+        // previous feature's end to pierce. The hole sub-program is authored
+        // in hole-local coordinates and resolves to `hole + local` under the
+        // shift. See docs/cincinnati-post-output.md for the full bracket.
         var sb = new StringBuilder();
         if (_config.UseLineNumbers)
             sb.Append($"N{featureNumber} ");
-        sb.Append($"M98 P{postSubNum} X{_fmt.FormatCoord(call.Offset.X)} Y{_fmt.FormatCoord(call.Offset.Y)}");
+        sb.Append($"G52 X{_fmt.FormatCoord(call.Offset.X)} Y{_fmt.FormatCoord(call.Offset.Y)}");
         w.WriteLine(sb.ToString());
+
+        w.WriteLine($"M98 P{postSubNum}");
+
+        // Cancel the local shift (manual §1.52).
+        w.WriteLine("G52 X0 Y0");
 
         if (!isLastFeature)
             w.WriteLine("M47");
