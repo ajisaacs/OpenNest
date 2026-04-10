@@ -108,5 +108,19 @@ namespace OpenNest.Tests.IO
 
             Assert.Same(edited, drawing.Program);
         }
+
+        [Fact]
+        public void ImportDrawing_ComposesImportAndBuild()
+        {
+            var drawing = CadImporter.ImportDrawing(TestDxf,
+                new CadImportOptions { Quantity = 3, Customer = "ACME" });
+
+            Assert.NotNull(drawing);
+            Assert.Equal("4526 A14 PT11", drawing.Name);
+            Assert.Equal(3, drawing.Quantity.Required);
+            Assert.Equal("ACME", drawing.Customer);
+            Assert.NotNull(drawing.Program);
+            Assert.NotNull(drawing.SourceEntities);
+        }
     }
 }

@@ -49,6 +49,23 @@ namespace OpenNest.IO
         }
 
         /// <summary>
+        /// Convenience for headless callers: Import a file and build a Drawing
+        /// in a single call, using all loaded entities and detected bends.
+        /// </summary>
+        public static Drawing ImportDrawing(string path, CadImportOptions options = null)
+        {
+            options ??= CadImportOptions.Default;
+            var result = Import(path, options);
+            return BuildDrawing(
+                result,
+                result.Entities,
+                result.Bends,
+                options.Quantity,
+                options.Customer,
+                editedProgram: null);
+        }
+
+        /// <summary>
         /// Build a fully-populated <see cref="Drawing"/> from an import result plus
         /// the caller's current entity and bend state. UI callers pass the currently
         /// visible subset; headless callers pass the full lists.
