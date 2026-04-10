@@ -425,13 +425,21 @@ namespace OpenNest.Controls
 
                 if (code is SubProgramCall { Program: { } program } call)
                 {
+                    // A SubProgramCall is a coordinate-frame shift, not a physical
+                    // rapid to the hole center. The Cincinnati post emits it as a
+                    // G52 bracket, so the physical rapid is the sub-program's first
+                    // motion, which goes straight from here to the lead-in pierce.
+                    // Look ahead for that pierce point and draw the direct rapid,
+                    // then recurse with skipFirstRapid so the sub doesn't also draw
+                    // its first rapid on top. See docs/cincinnati-post-output.md.
                     var holeBase = basePos + call.Offset;
+                    var firstPierce = GetFirstPiercePoint(program, holeBase);
 
                     if (ShouldDrawRapid(skipFirstRapid, ref firstRapidSkipped))
-                        DrawLine(g, pos, holeBase, view.ColorScheme.RapidPen);
+                        DrawLine(g, pos, firstPierce, view.ColorScheme.RapidPen);
 
                     var subPos = holeBase;
-                    DrawRapids(g, program, holeBase, ref subPos);
+                    DrawRapids(g, program, holeBase, ref subPos, skipFirstRapid: true);
                     pos = subPos;
                 }
                 else if (code is Motion motion)
