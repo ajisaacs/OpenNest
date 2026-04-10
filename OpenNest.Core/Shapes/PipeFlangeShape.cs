@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace OpenNest.Shapes
 {
-    public class FlangeShape : ShapeDefinition
+    public class PipeFlangeShape : ShapeDefinition
     {
         public double NominalPipeSize { get; set; }
         public double OD { get; set; }
@@ -24,10 +24,8 @@ namespace OpenNest.Shapes
         {
             var entities = new List<Entity>();
 
-            // Outer circle
             entities.Add(new Circle(0, 0, OD / 2.0));
 
-            // Bolt holes evenly spaced on the bolt circle
             var boltCircleRadius = HolePatternDiameter / 2.0;
             var holeRadius = HoleDiameter / 2.0;
             var angleStep = 2.0 * System.Math.PI / HoleCount;
