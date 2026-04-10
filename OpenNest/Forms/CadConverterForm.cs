@@ -657,53 +657,35 @@ namespace OpenNest.Forms
 
             foreach (var item in fileList.Items)
             {
-                var entities = item.Entities.Where(e => e.Layer.IsVisible && e.IsVisible).ToList();
-
-                if (entities.Count == 0)
-                    continue;
-
-                var drawing = new Drawing(item.Name);
-                drawing.Color = Drawing.GetNextColor();
-                drawing.Customer = item.Customer;
-                drawing.Source.Path = item.Path;
-                drawing.Quantity.Required = item.Quantity;
-
-                // Copy bends
-                if (item.Bends != null)
-                    drawing.Bends.AddRange(item.Bends);
-
-                var normalized = ShapeProfile.NormalizeEntities(entities);
-                var pgm = ConvertGeometry.ToProgram(normalized);
-                var firstCode = pgm[0];
-
-                if (firstCode.Type == CodeType.RapidMove)
-                {
-                    var rapid = (RapidMove)firstCode;
-                    drawing.Source.Offset = rapid.EndPoint;
-                    pgm.Offset(-rapid.EndPoint);
-                    // Keep the rapid (now at origin) — it marks the contour
-                    // start and is needed by the post for correct pierce placement.
-                }
-
-                if (item == CurrentItem && programEditor.IsDirty && programEditor.Program != null)
-                    drawing.Program = programEditor.Program;
-                else
-                    drawing.Program = pgm;
-
-                // Store all entities with stable GUIDs; track suppressed by ID
-                var bendSources = new HashSet<Entity>(
-                    (item.Bends ?? new List<Bend>())
-                        .Where(b => b.SourceEntity != null)
-                        .Select(b => b.SourceEntity));
-
-                drawing.SourceEntities = item.Entities
-                    .Where(e => !bendSources.Contains(e))
+                var visible = item.Entities
+                    .Where(e => e.Layer.IsVisible && e.IsVisible)
                     .ToList();
 
-                drawing.SuppressedEntityIds = new HashSet<Guid>(
-                    drawing.SourceEntities
-                        .Where(e => !(e.Layer.IsVisible && e.IsVisible))
-                        .Select(e => e.Id));
+                if (visible.Count == 0)
+                    continue;
+
+                // Rebuild a CadImportResult from the FileListItem's current state so
+                // BuildDrawing sees the user's edits (filters, suppressions, new bends).
+                var result = new CadImportResult
+                {
+                    Entities = item.Entities,
+                    Bends = item.Bends ?? new List<Bend>(),
+                    Bounds = item.Bounds,
+                    SourcePath = item.Path,
+                    Name = item.Name,
+                };
+
+                var editedProgram = (item == CurrentItem && programEditor.IsDirty && programEditor.Program != null)
+                    ? programEditor.Program
+                    : null;
+
+                var drawing = CadImporter.BuildDrawing(
+                    result,
+                    visible,
+                    result.Bends,
+                    item.Quantity,
+                    item.Customer,
+                    editedProgram);
 
                 drawings.Add(drawing);
 
