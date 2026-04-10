@@ -363,9 +363,8 @@ namespace OpenNest.Forms
                     continue;
                 }
 
-                if (binding.Property.PropertyType == typeof(string))
+                if (binding.Control is ComboBox combo)
                 {
-                    var combo = (ComboBox)binding.Control;
                     binding.Property.SetValue(shape, combo.SelectedItem?.ToString());
                     continue;
                 }
