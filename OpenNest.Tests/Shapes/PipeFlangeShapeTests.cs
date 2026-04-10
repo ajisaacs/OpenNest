@@ -114,8 +114,10 @@ public class PipeFlangeShapeTests
         Assert.Equal(expectedArea, drawing.Area, 0.5);
     }
 
-    [Fact]
-    public void GetDrawing_NullOrEmptyPipeSize_OmitsCenterBore()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void GetDrawing_NullOrEmptyPipeSize_OmitsCenterBore(string pipeSize)
     {
         var shape = new PipeFlangeShape
         {
@@ -123,7 +125,7 @@ public class PipeFlangeShapeTests
             HoleDiameter = 1,
             HolePatternDiameter = 7,
             HoleCount = 4,
-            PipeSize = null,
+            PipeSize = pipeSize,
             PipeClearance = 0.125
         };
         var drawing = shape.GetDrawing();
