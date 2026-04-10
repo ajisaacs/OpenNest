@@ -180,27 +180,43 @@ namespace OpenNest.Forms
 
                 y += 18;
 
-                var tb = new TextBox
+                Control editor;
+                if (prop.PropertyType == typeof(bool))
                 {
-                    Location = new Point(parametersPanel.Padding.Left, y),
-                    Width = panelWidth,
-                    Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-                };
+                    var cb = new CheckBox
+                    {
+                        Location = new Point(parametersPanel.Padding.Left, y),
+                        AutoSize = true,
+                        Checked = sourceValues != null && (bool)prop.GetValue(sourceValues)
+                    };
+                    cb.CheckedChanged += (s, ev) => UpdatePreview();
+                    editor = cb;
+                }
+                else
+                {
+                    var tb = new TextBox
+                    {
+                        Location = new Point(parametersPanel.Padding.Left, y),
+                        Width = panelWidth,
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                    };
 
-                if (sourceValues != null)
-                {
-                    if (prop.PropertyType == typeof(int))
-                        tb.Text = ((int)prop.GetValue(sourceValues)).ToString();
-                    else
-                        tb.Text = ((double)prop.GetValue(sourceValues)).ToString("G");
+                    if (sourceValues != null)
+                    {
+                        if (prop.PropertyType == typeof(int))
+                            tb.Text = ((int)prop.GetValue(sourceValues)).ToString();
+                        else
+                            tb.Text = ((double)prop.GetValue(sourceValues)).ToString("G");
+                    }
+
+                    tb.TextChanged += (s, ev) => UpdatePreview();
+                    editor = tb;
                 }
 
-                tb.TextChanged += (s, ev) => UpdatePreview();
-
-                parameterBindings.Add(new ParameterBinding { Property = prop, Control = tb });
+                parameterBindings.Add(new ParameterBinding { Property = prop, Control = editor });
 
                 parametersPanel.Controls.Add(label);
-                parametersPanel.Controls.Add(tb);
+                parametersPanel.Controls.Add(editor);
 
                 y += 30;
             }
@@ -241,6 +257,13 @@ namespace OpenNest.Forms
 
             foreach (var binding in parameterBindings)
             {
+                if (binding.Property.PropertyType == typeof(bool))
+                {
+                    var cb = (CheckBox)binding.Control;
+                    binding.Property.SetValue(shape, cb.Checked);
+                    continue;
+                }
+
                 var tb = (TextBox)binding.Control;
 
                 if (binding.Property.PropertyType == typeof(int))
