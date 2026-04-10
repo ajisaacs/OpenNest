@@ -74,36 +74,24 @@ namespace OpenNest.Forms
         {
             try
             {
-                var result = Dxf.Import(file);
+                var options = new CadImportOptions
+                {
+                    BendDetectorName = detectorIndex == 0 ? null : detectorName,
+                };
 
+                var result = CadImporter.Import(file, options);
                 if (result.Entities.Count == 0)
                     return;
 
-                // Compute bounds
-                var bounds = result.Entities.GetBoundingBox();
-
-                // Detect bends (detectorIndex/Name captured on UI thread)
-                var bends = new List<Bend>();
-                if (result.Document != null)
-                {
-                    bends = detectorIndex == 0
-                        ? BendDetectorRegistry.AutoDetect(result.Document)
-                        : BendDetectorRegistry.GetByName(detectorName)
-                            ?.DetectBends(result.Document)
-                          ?? new List<Bend>();
-                }
-
-                Bend.UpdateEtchEntities(result.Entities, bends);
-
                 var item = new FileListItem
                 {
-                    Name = Path.GetFileNameWithoutExtension(file),
+                    Name = result.Name,
                     Entities = result.Entities,
-                    Path = file,
+                    Path = result.SourcePath,
                     Quantity = 1,
                     Customer = string.Empty,
-                    Bends = bends,
-                    Bounds = bounds,
+                    Bends = result.Bends,
+                    Bounds = result.Bounds,
                     EntityCount = result.Entities.Count
                 };
 
