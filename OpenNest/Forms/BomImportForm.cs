@@ -1,9 +1,5 @@
-using OpenNest.Bending;
-using OpenNest.CNC;
-using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
-using OpenNest.IO.Bending;
 using OpenNest.IO.Bom;
 using System;
 using System.Collections.Generic;
@@ -470,33 +466,9 @@ namespace OpenNest.Forms
 
                     try
                     {
-                        var result = Dxf.Import(part.DxfPath);
-
-                        var bends = new List<Bend>();
-                        if (result.Document != null)
-                            bends = BendDetectorRegistry.AutoDetect(result.Document);
-                        Bend.UpdateEtchEntities(result.Entities, bends);
-
-                        var drawingName = Path.GetFileNameWithoutExtension(part.DxfPath);
-                        var drawing = new Drawing(drawingName);
-                        drawing.Color = Drawing.GetNextColor();
-                        drawing.Source.Path = part.DxfPath;
-                        drawing.Quantity.Required = part.Qty ?? 1;
+                        var drawing = CadImporter.ImportDrawing(part.DxfPath,
+                            new CadImportOptions { Quantity = part.Qty ?? 1 });
                         drawing.Material = new Material(material);
-                        if (bends.Count > 0)
-                            drawing.Bends.AddRange(bends);
-
-                        var normalized = ShapeProfile.NormalizeEntities(result.Entities);
-                        var pgm = ConvertGeometry.ToProgram(normalized);
-
-                        if (pgm.Codes.Count > 0 && pgm[0].Type == CodeType.RapidMove)
-                        {
-                            var rapid = (RapidMove)pgm[0];
-                            drawing.Source.Offset = rapid.EndPoint;
-                            pgm.Offset(-rapid.EndPoint);
-                        }
-
-                        drawing.Program = pgm;
                         nest.Drawings.Add(drawing);
                     }
                     catch (Exception ex)
