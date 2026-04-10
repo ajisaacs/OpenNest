@@ -1,4 +1,5 @@
-﻿using OpenNest.Geometry;
+﻿using System.Text;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
 namespace OpenNest.CNC
@@ -90,9 +91,13 @@ namespace OpenNest.CNC
 
         public override string ToString()
         {
+            var sb = new StringBuilder();
+            sb.Append($"G65 P{Id}");
             if (Offset.X != 0 || Offset.Y != 0)
-                return string.Format("G65 P{0} X{1} Y{2}", Id, Offset.X, Offset.Y);
-            return string.Format("G65 P{0} R{1}", Id, Rotation);
+                sb.Append($" X{Offset.X} Y{Offset.Y}");
+            if (Rotation != 0)
+                sb.Append($" R{Rotation}");
+            return sb.ToString();
         }
     }
 }

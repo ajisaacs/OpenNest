@@ -45,6 +45,25 @@ public class HoleSubProgramTests
     }
 
     [Fact]
+    public void SubProgramCall_ToString_IncludesOffsetAndRotation()
+    {
+        var call = new SubProgramCall { Id = 1000, Offset = new Vector(1.5, 2.5), Rotation = 30 };
+        var str = call.ToString();
+        Assert.Contains("P1000", str);
+        Assert.Contains("X1.5", str);
+        Assert.Contains("Y2.5", str);
+        Assert.Contains("R30", str);
+    }
+
+    [Fact]
+    public void SubProgramCall_ToString_OmitsZeroFields()
+    {
+        var call = new SubProgramCall { Id = 1000 };
+        var str = call.ToString();
+        Assert.Equal("G65 P1000", str);
+    }
+
+    [Fact]
     public void Program_SubPrograms_EmptyByDefault()
     {
         var pgm = new Program();
