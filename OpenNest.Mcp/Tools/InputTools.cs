@@ -1,6 +1,4 @@
 using ModelContextProtocol.Server;
-using OpenNest.Converters;
-using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Shapes;
 using System.ComponentModel;
@@ -96,24 +94,18 @@ namespace OpenNest.Mcp.Tools
             if (!File.Exists(path))
                 return $"Error: file not found: {path}";
 
-            var geometry = Dxf.GetGeometry(path);
+            try
+            {
+                var drawing = CadImporter.ImportDrawing(path, new CadImportOptions { Name = name });
+                _session.Drawings.Add(drawing);
 
-            if (geometry.Count == 0)
-                return "Error: failed to read DXF file or no geometry found";
-
-            var normalized = ShapeProfile.NormalizeEntities(geometry);
-            var pgm = ConvertGeometry.ToProgram(normalized);
-
-            if (pgm == null)
-                return "Error: failed to convert geometry to program";
-
-            var drawingName = name ?? Path.GetFileNameWithoutExtension(path);
-            var drawing = new Drawing(drawingName, pgm);
-            drawing.Color = Drawing.GetNextColor();
-            _session.Drawings.Add(drawing);
-
-            var bbox = pgm.BoundingBox();
-            return $"Imported drawing '{drawingName}': bbox={bbox.Width:F2} x {bbox.Length:F2}";
+                var bbox = drawing.Program.BoundingBox();
+                return $"Imported drawing '{drawing.Name}': bbox={bbox.Width:F2} x {bbox.Length:F2}";
+            }
+            catch (System.Exception ex)
+            {
+                return $"Error: failed to import '{path}': {ex.Message}";
+            }
         }
 
         [McpServerTool(Name = "create_drawing")]
