@@ -5,8 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using OpenNest.Converters;
-using OpenNest.Geometry;
 using OpenNest.IO;
 
 namespace OpenNest.Api;
@@ -30,15 +28,21 @@ public static class NestRunner
             if (!File.Exists(part.DxfPath))
                 throw new FileNotFoundException($"DXF file not found: {part.DxfPath}", part.DxfPath);
 
-            var geometry = Dxf.GetGeometry(part.DxfPath);
-            if (geometry.Count == 0)
+            Drawing drawing;
+            try
+            {
+                drawing = CadImporter.ImportDrawing(part.DxfPath,
+                    new CadImportOptions { Quantity = part.Quantity });
+            }
+            catch (System.Exception ex)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to import DXF: {part.DxfPath}", ex);
+            }
+
+            if (drawing.Program == null || drawing.Program.Codes.Count == 0)
                 throw new InvalidOperationException($"Failed to import DXF: {part.DxfPath}");
 
-            var normalized = ShapeProfile.NormalizeEntities(geometry);
-            var pgm = ConvertGeometry.ToProgram(normalized);
-            var name = Path.GetFileNameWithoutExtension(part.DxfPath);
-            var drawing = new Drawing(name);
-            drawing.Program = pgm;
             drawings.Add(drawing);
         }
 
