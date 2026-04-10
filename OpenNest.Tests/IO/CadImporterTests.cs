@@ -38,5 +38,75 @@ namespace OpenNest.Tests.IO
 
             Assert.Equal("custom", result.Name);
         }
+
+        [Fact]
+        public void BuildDrawing_ProducesDrawingWithProgramAndMetadata()
+        {
+            var result = CadImporter.Import(TestDxf);
+
+            var drawing = CadImporter.BuildDrawing(
+                result,
+                result.Entities,
+                result.Bends,
+                quantity: 5,
+                customer: "ACME",
+                editedProgram: null);
+
+            Assert.NotNull(drawing);
+            Assert.Equal("4526 A14 PT11", drawing.Name);
+            Assert.Equal("ACME", drawing.Customer);
+            Assert.Equal(5, drawing.Quantity.Required);
+            Assert.Equal(TestDxf, drawing.Source.Path);
+            Assert.NotNull(drawing.Program);
+            Assert.NotEmpty(drawing.Program.Codes);
+            Assert.NotNull(drawing.SourceEntities);
+            Assert.NotEmpty(drawing.SourceEntities);
+        }
+
+        [Fact]
+        public void BuildDrawing_ExtractsFirstRapidAsSourceOffset()
+        {
+            var result = CadImporter.Import(TestDxf);
+
+            var drawing = CadImporter.BuildDrawing(result, result.Entities, result.Bends,
+                quantity: 1, customer: null, editedProgram: null);
+
+            Assert.NotNull(drawing.Source.Offset);
+            // After offset extraction, the program's first rapid must start at origin.
+            var firstRapid = (OpenNest.CNC.RapidMove)drawing.Program.Codes[0];
+            Assert.Equal(0, firstRapid.EndPoint.X, 6);
+            Assert.Equal(0, firstRapid.EndPoint.Y, 6);
+        }
+
+        [Fact]
+        public void BuildDrawing_WhenEntityHidden_TracksSuppressedId()
+        {
+            var result = CadImporter.Import(TestDxf);
+            // Suppress the first non-bend-source entity
+            var bendSources = result.Bends
+                .Where(b => b.SourceEntity != null)
+                .Select(b => b.SourceEntity)
+                .ToHashSet();
+            var hidden = result.Entities.First(e => !bendSources.Contains(e));
+            hidden.IsVisible = false;
+
+            var drawing = CadImporter.BuildDrawing(result, result.Entities, result.Bends,
+                quantity: 1, customer: null, editedProgram: null);
+
+            Assert.Contains(hidden.Id, drawing.SuppressedEntityIds);
+        }
+
+        [Fact]
+        public void BuildDrawing_WhenEditedProgramProvided_UsesEditedProgram()
+        {
+            var result = CadImporter.Import(TestDxf);
+            var edited = new OpenNest.CNC.Program();
+            edited.MoveTo(new OpenNest.Geometry.Vector(0, 0));
+
+            var drawing = CadImporter.BuildDrawing(result, result.Entities, result.Bends,
+                quantity: 1, customer: null, editedProgram: edited);
+
+            Assert.Same(edited, drawing.Program);
+        }
     }
 }
