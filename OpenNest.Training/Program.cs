@@ -1,8 +1,8 @@
 using OpenNest;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.ML;
-using OpenNest.Geometry;
 using OpenNest.Gpu;
+using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Training;
 using System;
@@ -128,17 +128,26 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                 continue;
             }
 
-            var entities = Dxf.GetGeometry(file);
-            if (entities.Count == 0)
+            Drawing drawing;
+            try
+            {
+                drawing = CadImporter.ImportDrawing(file,
+                    new CadImportOptions { DetectBends = false, Name = Path.GetFileName(file) });
+            }
+            catch (System.Exception ex)
+            {
+                Console.WriteLine($" - SKIP ({ex.Message})");
+                skippedGeometry++;
+                continue;
+            }
+
+            if (drawing.Program == null || drawing.Program.Codes.Count == 0)
             {
                 Console.WriteLine(" - SKIP (no geometry)");
                 skippedGeometry++;
                 continue;
             }
 
-            var drawing = new Drawing(Path.GetFileName(file));
-            var normalized = ShapeProfile.NormalizeEntities(entities);
-            drawing.Program = OpenNest.Converters.ConvertGeometry.ToProgram(normalized);
             drawing.UpdateArea();
             drawing.Color = PartColors[colorIndex % PartColors.Length];
             colorIndex++;
