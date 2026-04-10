@@ -192,6 +192,29 @@ namespace OpenNest.Forms
                     cb.CheckedChanged += (s, ev) => UpdatePreview();
                     editor = cb;
                 }
+                else if (prop.PropertyType == typeof(string) && prop.Name == "PipeSize")
+                {
+                    var combo = new ComboBox
+                    {
+                        Location = new Point(parametersPanel.Padding.Left, y),
+                        Width = panelWidth,
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                        DropDownStyle = ComboBoxStyle.DropDownList
+                    };
+
+                    // Initial population: every entry; the filter runs on first UpdatePreview.
+                    foreach (var entry in PipeSizes.All)
+                        combo.Items.Add(entry.Label);
+
+                    var initial = sourceValues != null ? (string)prop.GetValue(sourceValues) : null;
+                    if (!string.IsNullOrEmpty(initial) && combo.Items.Contains(initial))
+                        combo.SelectedItem = initial;
+                    else if (combo.Items.Count > 0)
+                        combo.SelectedIndex = 0;
+
+                    combo.SelectedIndexChanged += (s, ev) => UpdatePreview();
+                    editor = combo;
+                }
                 else
                 {
                     var tb = new TextBox
@@ -228,6 +251,8 @@ namespace OpenNest.Forms
         {
             if (suppressPreview || selectedEntry == null) return;
 
+            UpdatePipeSizeFilter();
+
             try
             {
                 var shape = CreateShapeFromInputs();
@@ -239,14 +264,88 @@ namespace OpenNest.Forms
                 if (drawing?.Program != null)
                 {
                     var bb = drawing.Program.BoundingBox();
-                    previewBox.SetInfo(
-                        nameTextBox.Text,
-                        string.Format("{0:F3} x {1:F3}", bb.Size.Length, bb.Size.Width));
+                    var info = string.Format("{0:F3} x {1:F3}", bb.Size.Length, bb.Size.Width);
+
+                    if (shape is PipeFlangeShape flange
+                        && !flange.Blind
+                        && !string.IsNullOrEmpty(flange.PipeSize)
+                        && !PipeSizes.TryGetOD(flange.PipeSize, out _))
+                    {
+                        info += "  — Invalid pipe size, no bore cut";
+                    }
+
+                    previewBox.SetInfo(nameTextBox.Text, info);
                 }
             }
             catch
             {
                 previewBox.ShowDrawing(null);
+            }
+        }
+
+        private void UpdatePipeSizeFilter()
+        {
+            // Find the PipeSize combo and the numeric inputs it depends on.
+            ComboBox pipeCombo = null;
+            double holePattern = 0, holeDia = 0, clearance = 0;
+            bool blind = false;
+
+            foreach (var binding in parameterBindings)
+            {
+                var name = binding.Property.Name;
+                if (name == "PipeSize" && binding.Control is ComboBox cb)
+                    pipeCombo = cb;
+                else if (name == "HolePatternDiameter" && binding.Control is TextBox tb1)
+                    double.TryParse(tb1.Text, out holePattern);
+                else if (name == "HoleDiameter" && binding.Control is TextBox tb2)
+                    double.TryParse(tb2.Text, out holeDia);
+                else if (name == "PipeClearance" && binding.Control is TextBox tb3)
+                    double.TryParse(tb3.Text, out clearance);
+                else if (name == "Blind" && binding.Control is CheckBox chk)
+                    blind = chk.Checked;
+            }
+
+            if (pipeCombo == null)
+                return;
+
+            // Disable when blind, but keep visible with the selection preserved.
+            pipeCombo.Enabled = !blind;
+
+            // Compute filter: pipeOD + clearance < HolePatternDiameter - HoleDiameter.
+            var maxPipeOD = holePattern - holeDia - clearance;
+            var fittingLabels = PipeSizes.GetFittingSizes(maxPipeOD).Select(e => e.Label).ToList();
+
+            // Sequence-equal on existing items — no-op if unchanged (avoids flicker).
+            var currentLabels = pipeCombo.Items.Cast<string>().ToList();
+            if (currentLabels.SequenceEqual(fittingLabels))
+                return;
+
+            var previousSelection = pipeCombo.SelectedItem as string;
+
+            pipeCombo.BeginUpdate();
+            try
+            {
+                pipeCombo.Items.Clear();
+                foreach (var label in fittingLabels)
+                    pipeCombo.Items.Add(label);
+
+                if (fittingLabels.Count == 0)
+                {
+                    // No pipe fits — leave unselected.
+                }
+                else if (previousSelection != null && fittingLabels.Contains(previousSelection))
+                {
+                    pipeCombo.SelectedItem = previousSelection;
+                }
+                else
+                {
+                    // Select the largest (last, since PipeSizes.All is sorted ascending).
+                    pipeCombo.SelectedIndex = fittingLabels.Count - 1;
+                }
+            }
+            finally
+            {
+                pipeCombo.EndUpdate();
             }
         }
 
@@ -261,6 +360,13 @@ namespace OpenNest.Forms
                 {
                     var cb = (CheckBox)binding.Control;
                     binding.Property.SetValue(shape, cb.Checked);
+                    continue;
+                }
+
+                if (binding.Property.PropertyType == typeof(string))
+                {
+                    var combo = (ComboBox)binding.Control;
+                    binding.Property.SetValue(shape, combo.SelectedItem?.ToString());
                     continue;
                 }
 
