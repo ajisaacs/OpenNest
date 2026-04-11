@@ -7,6 +7,7 @@ using OpenNest.Engine.Sequencing;
 using OpenNest.IO;
 using OpenNest.Math;
 using OpenNest.Properties;
+using OpenNest.Shapes;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -453,7 +454,11 @@ namespace OpenNest.Forms
 
         public void ResizePlateToFitParts()
         {
-            PlateView.Plate.AutoSize(Settings.Default.AutoSizePlateFactor);
+            var options = new PlateSizeOptions
+            {
+                SnapIncrement = Settings.Default.AutoSizePlateFactor,
+            };
+            PlateView.Plate.SnapToStandardSize(options);
             PlateView.ZoomToPlate();
             PlateView.Refresh();
             UpdatePlateList();

@@ -1,6 +1,7 @@
 ﻿using OpenNest.Collections;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using OpenNest.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -546,6 +547,65 @@ namespace OpenNest
             Size = new Size(
                 Rounding.RoundUpToNearest(yExtent, roundingFactor),
                 Rounding.RoundUpToNearest(xExtent, roundingFactor));
+        }
+
+        /// <summary>
+        /// Sizes the plate using the <see cref="PlateSizes"/> catalog: small
+        /// layouts snap to an increment, larger ones round up to the next
+        /// standard mill sheet. The plate's long-axis orientation (X vs Y)
+        /// is preserved. Does nothing if the plate has no parts.
+        /// </summary>
+        public PlateSizeResult SnapToStandardSize(PlateSizeOptions options = null)
+        {
+            if (Parts.Count == 0)
+                return default;
+
+            var bounds = Parts.GetBoundingBox();
+
+            // Quadrant-aware extents relative to the plate origin, matching AutoSize.
+            double xExtent;
+            double yExtent;
+
+            switch (Quadrant)
+            {
+                case 1:
+                    xExtent = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
+                    yExtent = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    break;
+
+                case 2:
+                    xExtent = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
+                    yExtent = System.Math.Abs(bounds.Top) + EdgeSpacing.Top;
+                    break;
+
+                case 3:
+                    xExtent = System.Math.Abs(bounds.Left) + EdgeSpacing.Left;
+                    yExtent = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    break;
+
+                case 4:
+                    xExtent = System.Math.Abs(bounds.Right) + EdgeSpacing.Right;
+                    yExtent = System.Math.Abs(bounds.Bottom) + EdgeSpacing.Bottom;
+                    break;
+
+                default:
+                    return default;
+            }
+
+            // PlateSizes.Recommend takes (short, long); canonicalize then map
+            // the result back so the plate's long axis stays aligned with the
+            // parts' long axis.
+            var shortDim = System.Math.Min(xExtent, yExtent);
+            var longDim = System.Math.Max(xExtent, yExtent);
+            var result = PlateSizes.Recommend(shortDim, longDim, options);
+
+            // Plate convention: Length = X axis, Width = Y axis.
+            if (xExtent >= yExtent)
+                Size = new Size(result.Width, result.Length);   // X is the long axis
+            else
+                Size = new Size(result.Length, result.Width);   // Y is the long axis
+
+            return result;
         }
 
         /// <summary>
