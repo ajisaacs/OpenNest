@@ -75,7 +75,8 @@ namespace OpenNest.Geometry
         /// </summary>
         public static List<Entity> NormalizeEntities(IEnumerable<Entity> entities)
         {
-            var profile = new ShapeProfile(entities.ToList());
+            var cloned = entities.CloneAll();
+            var profile = new ShapeProfile(cloned);
             return profile.ToNormalizedEntities();
         }
 

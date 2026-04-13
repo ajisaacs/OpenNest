@@ -252,6 +252,23 @@ namespace OpenNest.Geometry
         public abstract bool Intersects(Shape shape, out List<Vector> pts);
 
         /// <summary>
+        /// Creates a deep copy of the entity with a new Id.
+        /// </summary>
+        public abstract Entity Clone();
+
+        /// <summary>
+        /// Copies common Entity properties from this instance to the target.
+        /// </summary>
+        protected void CopyBaseTo(Entity target)
+        {
+            target.Color = Color;
+            target.Layer = Layer;
+            target.LineTypeName = LineTypeName;
+            target.IsVisible = IsVisible;
+            target.Tag = Tag;
+        }
+
+        /// <summary>
         /// Type of entity.
         /// </summary>
         public abstract EntityType Type { get; }
@@ -259,6 +276,14 @@ namespace OpenNest.Geometry
 
     public static class EntityExtensions
     {
+        public static List<Entity> CloneAll(this IEnumerable<Entity> entities)
+        {
+            var result = new List<Entity>();
+            foreach (var e in entities)
+                result.Add(e.Clone());
+            return result;
+        }
+
         public static List<Vector> CollectPoints(this IEnumerable<Entity> entities)
         {
             var points = new List<Vector>();

@@ -267,6 +267,13 @@ namespace OpenNest.Geometry
             get { return Diameter * System.Math.PI * SweepAngle() / Angle.TwoPI; }
         }
 
+        public override Entity Clone()
+        {
+            var copy = new Arc(center, radius, startAngle, endAngle, reversed);
+            CopyBaseTo(copy);
+            return copy;
+        }
+
         /// <summary>
         /// Reverses the rotation direction.
         /// </summary>
