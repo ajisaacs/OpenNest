@@ -2,7 +2,10 @@
 
 A Windows desktop application for CNC nesting — imports DXF drawings, arranges parts on material plates, and exports layouts as DXF or G-code for cutting.
 
-![OpenNest - parts nested on a 36x36 plate](screenshots/screenshot-nest-1.png)
+<p>
+  <a href="screenshots/screenshot-nest-1.png"><img src="screenshots/screenshot-nest-1.png" width="420" alt="OpenNest - parts nested on a 36x36 plate"></a>
+  <a href="screenshots/screenshot-nest-2.png"><img src="screenshots/screenshot-nest-2.png" width="420" alt="OpenNest - 44 parts nested on a 60x120 plate"></a>
+</p>
 
 OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and arranges the parts to make efficient use of material. The result can be exported as DXF files or post-processed into G-code that your CNC cutting machine understands.
 
@@ -46,8 +49,6 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 | **User-Defined Variables** | Named G-code variables (`$name`) emitted as machine variables (`#200+`) at post time |
 | **Post-Processors** | Plugin-based G-code generation; Cincinnati CL-707/800/900/940/CLX included |
 
-![OpenNest - 44 parts nested on a 60x120 plate](screenshots/screenshot-nest-2.png)
-
 ## Prerequisites
 
 - **Windows 10 or later**
@@ -79,6 +80,15 @@ Or open `OpenNest.sln` in Visual Studio and run the `OpenNest` project.
 4. **Fill the plate** — The nesting engine arranges parts automatically using the active fill strategy
 5. **Add cut-offs** — Optionally add horizontal/vertical cut-off lines to trim unused plate material
 6. **Export** — Save as a `.nest` file, export to DXF, or post-process to G-code
+
+### CAD Converter
+
+The CAD Converter turns DXF/DWG files into nest-ready drawings. Toggle layers, colors, and linetypes to exclude construction geometry; review detected bend lines; and preview the generated cut program with contour ordering before accepting the drawing into the nest.
+
+<p>
+  <a href="screenshots/screenshot-cad-converter-1.png"><img src="screenshots/screenshot-cad-converter-1.png" width="420" alt="CAD Converter — layer, color, and linetype filtering"></a>
+  <a href="screenshots/screenshot-cad-converter-2.png"><img src="screenshots/screenshot-cad-converter-2.png" width="420" alt="CAD Converter — contour list and G-code preview"></a>
+</p>
 
 ## Command-Line Interface
 
