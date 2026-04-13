@@ -69,9 +69,17 @@ namespace OpenNest.CNC.CuttingStrategy
             EmitScribeContours(result, scribeEntities);
 
             foreach (var entry in cutoutEntries)
-                EmitContour(result, entry.Shape, entry.Point, entry.Entity);
+            {
+                if (!entry.Shape.IsClosed())
+                    EmitRawContour(result, entry.Shape);
+                else
+                    EmitContour(result, entry.Shape, entry.Point, entry.Entity);
+            }
 
-            EmitContour(result, profile.Perimeter, perimeterPt, perimeterEntity, ContourType.External);
+            if (!profile.Perimeter.IsClosed())
+                EmitRawContour(result, profile.Perimeter);
+            else
+                EmitContour(result, profile.Perimeter, perimeterPt, perimeterEntity, ContourType.External);
 
             result.Mode = Mode.Incremental;
 
@@ -99,10 +107,14 @@ namespace OpenNest.CNC.CuttingStrategy
             // Find the target shape that contains the clicked entity
             var (targetShape, matchedEntity) = FindTargetShape(profile, point, entity);
 
-            // Emit cutouts — only the target gets lead-in/out
+            // Emit cutouts — only the target gets lead-in/out (skip open contours)
             foreach (var cutout in profile.Cutouts)
             {
-                if (cutout == targetShape)
+                if (!cutout.IsClosed())
+                {
+                    EmitRawContour(result, cutout);
+                }
+                else if (cutout == targetShape)
                 {
                     var ct = DetectContourType(cutout);
                     EmitContour(result, cutout, point, matchedEntity, ct);
@@ -114,7 +126,11 @@ namespace OpenNest.CNC.CuttingStrategy
             }
 
             // Emit perimeter
-            if (profile.Perimeter == targetShape)
+            if (!profile.Perimeter.IsClosed())
+            {
+                EmitRawContour(result, profile.Perimeter);
+            }
+            else if (profile.Perimeter == targetShape)
             {
                 EmitContour(result, profile.Perimeter, point, matchedEntity, ContourType.External);
             }
