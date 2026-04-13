@@ -133,7 +133,7 @@ namespace OpenNest.IO.Bending
         {
             return document.Entities
                 .OfType<ACadSharp.Entities.Line>()
-                .Where(l => l.Layer?.Name == "BEND"
+                .Where(l => (l.Layer?.Name == "BEND" || l.Layer?.Name == "0")
                     && (l.LineType?.Name?.Contains("CENTER") == true
                         || l.LineType?.Name == "CENTERX2"))
                 .ToList();
