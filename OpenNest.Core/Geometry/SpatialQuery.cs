@@ -306,49 +306,38 @@ namespace OpenNest.Geometry
             var minDist = double.MaxValue;
             var vx = vertex.X;
             var vy = vertex.Y;
+            var horizontal = IsHorizontalDirection(direction);
 
-            // Pruning: edges are sorted by their perpendicular min-coordinate in PartBoundary.
-            if (direction == PushDirection.Left || direction == PushDirection.Right)
+            // Pruning: edges are sorted by their perpendicular min-coordinate.
+            // For horizontal push, prune by Y range; for vertical push, prune by X range.
+            for (var i = 0; i < edges.Length; i++)
             {
-                for (var i = 0; i < edges.Length; i++)
+                var e1 = edges[i].start + edgeOffset;
+                var e2 = edges[i].end + edgeOffset;
+
+                double perpValue, edgeMin, edgeMax;
+                if (horizontal)
                 {
-                    var e1 = edges[i].start + edgeOffset;
-                    var e2 = edges[i].end + edgeOffset;
-
-                    var minY = e1.Y < e2.Y ? e1.Y : e2.Y;
-                    var maxY = e1.Y > e2.Y ? e1.Y : e2.Y;
-
-                    // Since edges are sorted by minY, if vy < minY, then vy < all subsequent minY.
-                    if (vy < minY - Tolerance.Epsilon)
-                        break;
-
-                    if (vy > maxY + Tolerance.Epsilon)
-                        continue;
-
-                    var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
-                    if (d < minDist) minDist = d;
+                    perpValue = vy;
+                    edgeMin = e1.Y < e2.Y ? e1.Y : e2.Y;
+                    edgeMax = e1.Y > e2.Y ? e1.Y : e2.Y;
                 }
-            }
-            else // Up/Down
-            {
-                for (var i = 0; i < edges.Length; i++)
+                else
                 {
-                    var e1 = edges[i].start + edgeOffset;
-                    var e2 = edges[i].end + edgeOffset;
-
-                    var minX = e1.X < e2.X ? e1.X : e2.X;
-                    var maxX = e1.X > e2.X ? e1.X : e2.X;
-
-                    // Since edges are sorted by minX, if vx < minX, then vx < all subsequent minX.
-                    if (vx < minX - Tolerance.Epsilon)
-                        break;
-
-                    if (vx > maxX + Tolerance.Epsilon)
-                        continue;
-
-                    var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
-                    if (d < minDist) minDist = d;
+                    perpValue = vx;
+                    edgeMin = e1.X < e2.X ? e1.X : e2.X;
+                    edgeMax = e1.X > e2.X ? e1.X : e2.X;
                 }
+
+                // Since edges are sorted by edgeMin, if perpValue < edgeMin, all subsequent edges are also past.
+                if (perpValue < edgeMin - Tolerance.Epsilon)
+                    break;
+
+                if (perpValue > edgeMax + Tolerance.Epsilon)
+                    continue;
+
+                var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
+                if (d < minDist) minDist = d;
             }
 
             return minDist;
