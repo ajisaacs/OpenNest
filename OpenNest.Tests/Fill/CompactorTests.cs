@@ -8,6 +8,76 @@ namespace OpenNest.Tests.Fill
 {
     public class CompactorTests
     {
+        [Fact]
+        public void DirectionalDistance_ArcVsInclinedLine_DoesNotOverPush()
+        {
+            // Arc (top semicircle) pushed upward toward a 45° inclined line.
+            // The critical angle on the arc gives a shorter distance than any
+            // sampled vertex (endpoints + cardinal extremes).
+            var arc = new Arc(5, 0, 2, 0, System.Math.PI);
+            var line = new Line(new Vector(3, 4), new Vector(7, 6));
+
+            var moving = new List<Entity> { arc };
+            var stationary = new List<Entity> { line };
+            var direction = new Vector(0, 1); // push up
+
+            var dist = SpatialQuery.DirectionalDistance(moving, stationary, direction);
+
+            // Move the arc up by the computed distance, then verify no overlap.
+            // The topmost reachable point on the arc at the critical angle θ ≈ 2.034
+            // (between π/2 and π) should just touch the line.
+            Assert.True(dist < double.MaxValue, "Should find a finite distance");
+            Assert.True(dist > 0, "Should be a positive distance");
+
+            // Verify: after moving, the closest point on the arc should be within
+            // tolerance of the line, not past it.
+            var theta = System.Math.Atan2(
+                line.pt2.X - line.pt1.X, -(line.pt2.Y - line.pt1.Y));
+            theta = OpenNest.Math.Angle.NormalizeRad(theta + System.Math.PI);
+            var qx = arc.Center.X + arc.Radius * System.Math.Cos(theta);
+            var qy = arc.Center.Y + arc.Radius * System.Math.Sin(theta) + dist;
+
+            // The moved point should be on or just touching the line, not past it.
+            // Line equation: (y - 4) / (x - 3) = (6 - 4) / (7 - 3) = 0.5
+            // y = 0.5x + 2.5
+            var lineYAtQx = 0.5 * qx + 2.5;
+            Assert.True(qy <= lineYAtQx + 0.001,
+                $"Arc point ({qx:F4}, {qy:F4}) should not be past line (line Y={lineYAtQx:F4} at X={qx:F4}). " +
+                $"dist={dist:F6}, overshot by {qy - lineYAtQx:F6}");
+        }
+
+        [Fact]
+        public void DirectionalDistance_ArcVsInclinedLine_BetterThanVertexSampling()
+        {
+            // Same geometry — verify the analytical Phase 3 finds a shorter
+            // distance than the Phase 1/2 vertex sampling alone would.
+            var arc = new Arc(5, 0, 2, 0, System.Math.PI);
+            var line = new Line(new Vector(3, 4), new Vector(7, 6));
+
+            // Phase 1/2 vertex-only distance: sample arc endpoints + cardinal extreme.
+            var vertices = new[]
+            {
+                new Vector(7, 0),  // arc endpoint θ=0
+                new Vector(3, 0),  // arc endpoint θ=π
+                new Vector(5, 2),  // cardinal extreme θ=π/2
+            };
+
+            var vertexMin = double.MaxValue;
+            foreach (var v in vertices)
+            {
+                var d = SpatialQuery.RayEdgeDistance(v.X, v.Y,
+                    line.pt1.X, line.pt1.Y, line.pt2.X, line.pt2.Y, 0, 1);
+                if (d < vertexMin) vertexMin = d;
+            }
+
+            // Full directional distance (includes Phase 3 arc-to-line).
+            var moving = new List<Entity> { arc };
+            var stationary = new List<Entity> { line };
+            var fullDist = SpatialQuery.DirectionalDistance(moving, stationary, new Vector(0, 1));
+
+            Assert.True(fullDist < vertexMin,
+                $"Full distance ({fullDist:F6}) should be less than vertex-only ({vertexMin:F6})");
+        }
         private static Drawing MakeRectDrawing(double w, double h)
         {
             var pgm = new OpenNest.CNC.Program();
