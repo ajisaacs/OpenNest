@@ -41,6 +41,7 @@ namespace OpenNest.Forms
             filterPanel.FilterChanged += OnFilterChanged;
             filterPanel.BendLineSelected += OnBendLineSelected;
             filterPanel.BendLineRemoved += OnBendLineRemoved;
+            filterPanel.BendLineEdited += OnBendLineEdited;
             filterPanel.AddBendLineClicked += OnAddBendLineClicked;
             entityView1.LinePicked += OnLinePicked;
             entityView1.PickCancelled += OnPickCancelled;
@@ -288,6 +289,29 @@ namespace OpenNest.Forms
             entityView1.Entities.AddRange(item.Entities);
             entityView1.Bends = item.Bends;
             entityView1.SelectedBendIndex = -1;
+            filterPanel.LoadItem(item.Entities, item.Bends);
+            entityView1.Invalidate();
+        }
+
+        private void OnBendLineEdited(object sender, int index)
+        {
+            var item = CurrentItem;
+            if (item == null || index < 0 || index >= item.Bends.Count) return;
+
+            var bend = item.Bends[index];
+            using var dialog = new BendLineDialog();
+            dialog.LoadBend(bend);
+
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+            bend.Direction = dialog.Direction;
+            bend.Angle = dialog.BendAngle;
+            bend.Radius = dialog.BendRadius;
+
+            Bend.UpdateEtchEntities(item.Entities, item.Bends);
+            entityView1.Entities.Clear();
+            entityView1.Entities.AddRange(item.Entities);
+            entityView1.Bends = item.Bends;
             filterPanel.LoadItem(item.Entities, item.Bends);
             entityView1.Invalidate();
         }

@@ -27,6 +27,7 @@ namespace OpenNest.Controls
         public event EventHandler FilterChanged;
         public event EventHandler<int> BendLineSelected;
         public event EventHandler<int> BendLineRemoved;
+        public event EventHandler<int> BendLineEdited;
         public event EventHandler AddBendLineClicked;
 
         public FilterPanel()
@@ -51,6 +52,18 @@ namespace OpenNest.Controls
             bendLinesList.SelectedIndexChanged += (s, e) =>
                 BendLineSelected?.Invoke(this, bendLinesList.SelectedIndex);
 
+            var bendEditLink = new LinkLabel
+            {
+                Text = "Edit",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 8f)
+            };
+            bendEditLink.LinkClicked += (s, e) =>
+            {
+                if (bendLinesList.SelectedIndex >= 0)
+                    BendLineEdited?.Invoke(this, bendLinesList.SelectedIndex);
+            };
+
             var bendDeleteLink = new LinkLabel
             {
                 Text = "Remove",
@@ -61,6 +74,12 @@ namespace OpenNest.Controls
             {
                 if (bendLinesList.SelectedIndex >= 0)
                     BendLineRemoved?.Invoke(this, bendLinesList.SelectedIndex);
+            };
+
+            bendLinesList.DoubleClick += (s, e) =>
+            {
+                if (bendLinesList.SelectedIndex >= 0)
+                    BendLineEdited?.Invoke(this, bendLinesList.SelectedIndex);
             };
 
             bendAddLink = new LinkLabel
@@ -80,6 +99,7 @@ namespace OpenNest.Controls
                 WrapContents = false
             };
             bendLinksPanel.Controls.Add(bendAddLink);
+            bendLinksPanel.Controls.Add(bendEditLink);
             bendLinksPanel.Controls.Add(bendDeleteLink);
 
             bendLinesPanel.ContentPanel.Controls.Add(bendLinesList);

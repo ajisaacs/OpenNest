@@ -99,5 +99,17 @@ namespace OpenNest.Forms
         public double BendAngle => (double)numAngle.Value;
 
         public double? BendRadius => chkRadius.Checked ? (double)numRadius.Value : null;
+
+        public void LoadBend(Bend bend)
+        {
+            cboDirection.SelectedIndex = bend.Direction == BendDirection.Up ? 1 : 0;
+            if (bend.Angle.HasValue)
+                numAngle.Value = (decimal)bend.Angle.Value;
+            if (bend.Radius.HasValue)
+            {
+                chkRadius.Checked = true;
+                numRadius.Value = (decimal)bend.Radius.Value;
+            }
+        }
     }
 }
