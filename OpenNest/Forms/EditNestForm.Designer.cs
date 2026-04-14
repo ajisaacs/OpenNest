@@ -81,8 +81,8 @@
             // 
             // tabControl1
             // 
-            tabControl1.Controls.Add(tabPage1);
             tabControl1.Controls.Add(tabPage2);
+            tabControl1.Controls.Add(tabPage1);
             tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
             tabControl1.ItemSize = new System.Drawing.Size(100, 22);
             tabControl1.Location = new System.Drawing.Point(0, 0);
