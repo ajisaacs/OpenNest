@@ -351,6 +351,9 @@ namespace OpenNest.Forms
                         postProcessorMenuItem.Tag = postProcessor;
                         postProcessorMenuItem.Click += PostProcessor_Click;
                         mnuNestPost.DropDownItems.Add(postProcessorMenuItem);
+
+                        if (postProcessor is IMaterialProvidingPostProcessor materialProvider)
+                            PostProcessorMaterials.AddFrom(materialProvider);
                     }
                 }
             }
@@ -1156,6 +1159,9 @@ namespace OpenNest.Forms
 
             if (postProcessor == null)
                 return;
+
+            if (postProcessor is IPostProcessorNestAware nestAware)
+                nestAware.PrepareForNest(activeForm.Nest);
 
             if (postProcessor is IConfigurablePostProcessor configurable)
             {

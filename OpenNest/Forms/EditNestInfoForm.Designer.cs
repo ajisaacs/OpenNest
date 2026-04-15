@@ -63,7 +63,7 @@
             this.textBox2 = new System.Windows.Forms.TextBox();
             this.label5 = new System.Windows.Forms.Label();
             this.labelMaterial = new System.Windows.Forms.Label();
-            this.materialBox = new System.Windows.Forms.TextBox();
+            this.materialBox = new System.Windows.Forms.ComboBox();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.tabPage3 = new System.Windows.Forms.TabPage();
             this.notesBox = new System.Windows.Forms.TextBox();
@@ -516,9 +516,10 @@
             // materialBox
             //
             this.materialBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.materialBox.FormattingEnabled = true;
             this.materialBox.Location = new System.Drawing.Point(135, 159);
             this.materialBox.Name = "materialBox";
-            this.materialBox.Size = new System.Drawing.Size(224, 22);
+            this.materialBox.Size = new System.Drawing.Size(224, 24);
             this.materialBox.TabIndex = 11;
             //
             // label3
@@ -729,6 +730,6 @@
         private System.Windows.Forms.RadioButton radioButton2;
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Label labelMaterial;
-        private System.Windows.Forms.TextBox materialBox;
+        private System.Windows.Forms.ComboBox materialBox;
     }
 }

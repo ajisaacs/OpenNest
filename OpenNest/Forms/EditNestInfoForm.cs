@@ -15,6 +15,9 @@ namespace OpenNest.Forms
         {
             InitializeComponent();
 
+            foreach (var name in PostProcessorMaterials.Names)
+                materialBox.Items.Add(name);
+
             timer = new Timer
             {
                 SynchronizingObject = this,

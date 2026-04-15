@@ -9,7 +9,7 @@ using OpenNest.CNC;
 
 namespace OpenNest.Posts.Cincinnati
 {
-    public sealed class CincinnatiPostProcessor : IConfigurablePostProcessor
+    public sealed class CincinnatiPostProcessor : IConfigurablePostProcessor, IMaterialProvidingPostProcessor
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -24,6 +24,16 @@ namespace OpenNest.Posts.Cincinnati
         public CincinnatiPostConfig Config { get; }
 
         object IConfigurablePostProcessor.Config => Config;
+
+        public IEnumerable<string> GetMaterialNames()
+        {
+            if (Config?.MaterialLibraries == null)
+                return System.Array.Empty<string>();
+
+            return Config.MaterialLibraries
+                .Select(e => e.Material)
+                .Where(s => !string.IsNullOrWhiteSpace(s));
+        }
 
         public CincinnatiPostProcessor()
         {
