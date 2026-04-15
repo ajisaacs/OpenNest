@@ -10,15 +10,20 @@ public sealed class MaterialLibraryResolver
 
     private readonly List<MaterialLibraryEntry> _materialLibraries;
     private readonly List<EtchLibraryEntry> _etchLibraries;
+    private readonly string _selectedLibrary;
 
     public MaterialLibraryResolver(CincinnatiPostConfig config)
     {
         _materialLibraries = config.MaterialLibraries ?? new List<MaterialLibraryEntry>();
         _etchLibraries = config.EtchLibraries ?? new List<EtchLibraryEntry>();
+        _selectedLibrary = config.SelectedLibrary ?? "";
     }
 
     public string ResolveCutLibrary(string materialName, double thickness, string gas)
     {
+        if (!string.IsNullOrEmpty(_selectedLibrary))
+            return EnsureLibExtension(_selectedLibrary);
+
         var entry = _materialLibraries.FirstOrDefault(e =>
             string.Equals(e.Material, materialName, StringComparison.OrdinalIgnoreCase) &&
             System.Math.Abs(e.Thickness - thickness) <= ThicknessTolerance &&

@@ -9,7 +9,7 @@ using OpenNest.CNC;
 
 namespace OpenNest.Posts.Cincinnati
 {
-    public sealed class CincinnatiPostProcessor : IConfigurablePostProcessor, IMaterialProvidingPostProcessor
+    public sealed class CincinnatiPostProcessor : IConfigurablePostProcessor, IPostProcessorNestAware, IMaterialProvidingPostProcessor
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -33,6 +33,13 @@ namespace OpenNest.Posts.Cincinnati
             return Config.MaterialLibraries
                 .Select(e => e.Material)
                 .Where(s => !string.IsNullOrWhiteSpace(s));
+        }
+
+        public void PrepareForNest(Nest nest)
+        {
+            var materialName = nest?.Material?.Name ?? "";
+            var thickness = nest?.Thickness ?? 0.0;
+            Config.SelectedLibrary = Config.FindBestLibrary(materialName, thickness);
         }
 
         public CincinnatiPostProcessor()
@@ -138,7 +145,8 @@ namespace OpenNest.Posts.Cincinnati
             // Part sub-programs (if enabled)
             if (subprogramEntries != null)
             {
-                var partSubWriter = new CincinnatiPartSubprogramWriter(Config);
+                var partSubWriter = new CincinnatiPartSubprogramWriter(Config,
+                    holeMapping.Count > 0 ? holeMapping : null);
                 var sheetDiagonal = firstPlate != null
                     ? System.Math.Sqrt(firstPlate.Size.Width * firstPlate.Size.Width
                         + firstPlate.Size.Length * firstPlate.Size.Length)

@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 
 namespace OpenNest.Posts.Cincinnati
 {
@@ -277,6 +279,24 @@ namespace OpenNest.Posts.Cincinnati
         [DisplayName("Etch Libraries")]
         [Description("Gas-to-library mapping for etch operations.")]
         public List<EtchLibraryEntry> EtchLibraries { get; set; } = new();
+
+        [Category("B. Libraries")]
+        [DisplayName("Selected Library")]
+        [Description("Overrides Material/Thickness/Gas auto-resolution. Pick an existing entry from Material Libraries, or leave blank to auto-resolve.")]
+        [TypeConverter(typeof(MaterialLibraryNameConverter))]
+        public string SelectedLibrary { get; set; } = "";
+
+        public string FindBestLibrary(string materialName, double thickness)
+        {
+            if (MaterialLibraries == null || string.IsNullOrEmpty(materialName))
+                return "";
+
+            return MaterialLibraries
+                .Where(e => string.Equals(e.Material, materialName, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e => System.Math.Abs(e.Thickness - thickness))
+                .Select(e => e.Library)
+                .FirstOrDefault() ?? "";
+        }
     }
 
     public class MaterialLibraryEntry

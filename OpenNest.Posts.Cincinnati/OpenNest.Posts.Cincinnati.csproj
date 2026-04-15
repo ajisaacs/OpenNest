@@ -6,11 +6,19 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="OpenNest.Posts.Cincinnati.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   <Target Name="CopyToPostsDir" AfterTargets="Build">
     <PropertyGroup>
       <PostsDir>..\OpenNest\bin\$(Configuration)\$(TargetFramework)\Posts\</PostsDir>
+      <ConfigJson>$(MSBuildProjectDirectory)\OpenNest.Posts.Cincinnati.json</ConfigJson>
+      <DeployedConfigJson>$(PostsDir)OpenNest.Posts.Cincinnati.json</DeployedConfigJson>
     </PropertyGroup>
     <MakeDir Directories="$(PostsDir)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Copy SourceFiles="$(ConfigJson)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" ContinueOnError="true" Condition="!Exists('$(DeployedConfigJson)')" />
   </Target>
 </Project>
