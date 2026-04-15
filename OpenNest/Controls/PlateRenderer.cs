@@ -385,85 +385,20 @@ namespace OpenNest.Controls
 
         private void DrawRapids(Graphics g)
         {
+            var pen = view.ColorScheme.RapidPen;
             var pos = new Vector(0, 0);
 
             for (var i = 0; i < view.Plate.Parts.Count; ++i)
             {
                 var part = view.Plate.Parts[i];
-                var pgm = part.Program;
+                var segments = RapidEnumerator.Enumerate(part.Program, part.Location, pos);
 
-                var piercePoint = GetFirstPiercePoint(pgm, part.Location);
-                DrawLine(g, pos, piercePoint, view.ColorScheme.RapidPen);
-
-                pos = piercePoint;
-                DrawRapids(g, pgm, part.Location, ref pos, skipFirstRapid: true);
-            }
-        }
-
-        private static Vector GetFirstPiercePoint(Program pgm, Vector partLocation)
-        {
-            for (var i = 0; i < pgm.Length; i++)
-            {
-                if (pgm[i] is SubProgramCall call && call.Program != null)
-                    return GetFirstPiercePoint(call.Program, partLocation + call.Offset);
-
-                if (pgm[i] is Motion motion)
+                foreach (var seg in segments)
                 {
-                    return motion.EndPoint + partLocation;
+                    DrawLine(g, seg.From, seg.To, pen);
+                    pos = seg.To;
                 }
             }
-            return partLocation;
-        }
-
-        private void DrawRapids(Graphics g, Program pgm, Vector basePos, ref Vector pos, bool skipFirstRapid = false)
-        {
-            var firstRapidSkipped = false;
-
-            for (var i = 0; i < pgm.Length; ++i)
-            {
-                var code = pgm[i];
-
-                if (code is SubProgramCall { Program: { } program } call)
-                {
-                    // A SubProgramCall is a coordinate-frame shift, not a physical
-                    // rapid to the hole center. The Cincinnati post emits it as a
-                    // G52 bracket, so the physical rapid is the sub-program's first
-                    // motion, which goes straight from here to the lead-in pierce.
-                    // Look ahead for that pierce point and draw the direct rapid,
-                    // then recurse with skipFirstRapid so the sub doesn't also draw
-                    // its first rapid on top. See docs/cincinnati-post-output.md.
-                    var holeBase = basePos + call.Offset;
-                    var firstPierce = GetFirstPiercePoint(program, holeBase);
-
-                    if (ShouldDrawRapid(skipFirstRapid, ref firstRapidSkipped))
-                        DrawLine(g, pos, firstPierce, view.ColorScheme.RapidPen);
-
-                    var subPos = holeBase;
-                    DrawRapids(g, program, holeBase, ref subPos, skipFirstRapid: true);
-                    pos = subPos;
-                }
-                else if (code is Motion motion)
-                {
-                    var endpt = pgm.Mode == Mode.Incremental
-                        ? motion.EndPoint + pos
-                        : motion.EndPoint;
-
-                    if (code.Type == CodeType.RapidMove && ShouldDrawRapid(skipFirstRapid, ref firstRapidSkipped))
-                        DrawLine(g, pos, endpt, view.ColorScheme.RapidPen);
-
-                    pos = endpt;
-                }
-            }
-        }
-
-        private static bool ShouldDrawRapid(bool skipFirstRapid, ref bool firstRapidSkipped)
-        {
-            if (skipFirstRapid && !firstRapidSkipped)
-            {
-                firstRapidSkipped = true;
-                return false;
-            }
-            return true;
         }
 
         private void DrawAllPiercePoints(Graphics g)
