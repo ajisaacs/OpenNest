@@ -15,7 +15,7 @@ namespace OpenNest.Engine.Strategies
         public int PlateNumber { get; init; }
         public CancellationToken Token { get; init; }
         public IProgress<NestProgress> Progress { get; init; }
-        public FillPolicy Policy { get; init; }
+        public FillPolicy Policy { get; init; } = new FillPolicy(new DefaultFillComparer());
         public int MaxQuantity { get; init; }
         public PartType PartType { get; set; }
 
