@@ -209,15 +209,8 @@ namespace OpenNest.Controls
 
         private static Entity CloneEntity(Entity entity, Color color)
         {
-            Entity clone = entity switch
-            {
-                Line line => new Line(line.StartPoint, line.EndPoint) { Layer = line.Layer, IsVisible = line.IsVisible },
-                Arc arc => new Arc(arc.Center, arc.Radius, arc.StartAngle, arc.EndAngle, arc.IsReversed) { Layer = arc.Layer, IsVisible = arc.IsVisible },
-                Circle circle => new Circle(circle.Center, circle.Radius) { Layer = circle.Layer, IsVisible = circle.IsVisible },
-                _ => null,
-            };
-            if (clone != null)
-                clone.Color = color;
+            var clone = entity.Clone();
+            clone.Color = color;
             return clone;
         }
 

@@ -257,6 +257,13 @@ namespace OpenNest.Geometry
             }
         }
 
+        public override Entity Clone()
+        {
+            var copy = new Line(pt1, pt2);
+            CopyBaseTo(copy);
+            return copy;
+        }
+
         /// <summary>
         /// Reversed the line.
         /// </summary>

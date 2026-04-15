@@ -306,49 +306,38 @@ namespace OpenNest.Geometry
             var minDist = double.MaxValue;
             var vx = vertex.X;
             var vy = vertex.Y;
+            var horizontal = IsHorizontalDirection(direction);
 
-            // Pruning: edges are sorted by their perpendicular min-coordinate in PartBoundary.
-            if (direction == PushDirection.Left || direction == PushDirection.Right)
+            // Pruning: edges are sorted by their perpendicular min-coordinate.
+            // For horizontal push, prune by Y range; for vertical push, prune by X range.
+            for (var i = 0; i < edges.Length; i++)
             {
-                for (var i = 0; i < edges.Length; i++)
+                var e1 = edges[i].start + edgeOffset;
+                var e2 = edges[i].end + edgeOffset;
+
+                double perpValue, edgeMin, edgeMax;
+                if (horizontal)
                 {
-                    var e1 = edges[i].start + edgeOffset;
-                    var e2 = edges[i].end + edgeOffset;
-
-                    var minY = e1.Y < e2.Y ? e1.Y : e2.Y;
-                    var maxY = e1.Y > e2.Y ? e1.Y : e2.Y;
-
-                    // Since edges are sorted by minY, if vy < minY, then vy < all subsequent minY.
-                    if (vy < minY - Tolerance.Epsilon)
-                        break;
-
-                    if (vy > maxY + Tolerance.Epsilon)
-                        continue;
-
-                    var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
-                    if (d < minDist) minDist = d;
+                    perpValue = vy;
+                    edgeMin = e1.Y < e2.Y ? e1.Y : e2.Y;
+                    edgeMax = e1.Y > e2.Y ? e1.Y : e2.Y;
                 }
-            }
-            else // Up/Down
-            {
-                for (var i = 0; i < edges.Length; i++)
+                else
                 {
-                    var e1 = edges[i].start + edgeOffset;
-                    var e2 = edges[i].end + edgeOffset;
-
-                    var minX = e1.X < e2.X ? e1.X : e2.X;
-                    var maxX = e1.X > e2.X ? e1.X : e2.X;
-
-                    // Since edges are sorted by minX, if vx < minX, then vx < all subsequent minX.
-                    if (vx < minX - Tolerance.Epsilon)
-                        break;
-
-                    if (vx > maxX + Tolerance.Epsilon)
-                        continue;
-
-                    var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
-                    if (d < minDist) minDist = d;
+                    perpValue = vx;
+                    edgeMin = e1.X < e2.X ? e1.X : e2.X;
+                    edgeMax = e1.X > e2.X ? e1.X : e2.X;
                 }
+
+                // Since edges are sorted by edgeMin, if perpValue < edgeMin, all subsequent edges are also past.
+                if (perpValue < edgeMin - Tolerance.Epsilon)
+                    break;
+
+                if (perpValue > edgeMax + Tolerance.Epsilon)
+                    continue;
+
+                var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
+                if (d < minDist) minDist = d;
             }
 
             return minDist;
@@ -642,19 +631,46 @@ namespace OpenNest.Geometry
         {
             for (var i = 0; i < arcEntities.Count; i++)
             {
-                if (arcEntities[i] is Arc arc)
+                if (arcEntities[i] is not Arc arc)
+                    continue;
+
+                var cx = arc.Center.X;
+                var cy = arc.Center.Y;
+                var r = arc.Radius;
+
+                for (var j = 0; j < lineEntities.Count; j++)
                 {
-                    for (var j = 0; j < lineEntities.Count; j++)
+                    if (lineEntities[j] is not Line line)
+                        continue;
+
+                    var p1x = line.pt1.X;
+                    var p1y = line.pt1.Y;
+                    var ex = line.pt2.X - p1x;
+                    var ey = line.pt2.Y - p1y;
+
+                    var det = ex * dirY - ey * dirX;
+                    if (System.Math.Abs(det) < Tolerance.Epsilon)
+                        continue;
+
+                    // The directional distance from an arc point at angle θ to the
+                    // line is t(θ) = [A + r·(ey·cosθ − ex·sinθ)] / det.
+                    // dt/dθ = 0 at θ = atan2(−ex, ey) and θ + π.
+                    var theta1 = Angle.NormalizeRad(System.Math.Atan2(-ex, ey));
+                    var theta2 = Angle.NormalizeRad(theta1 + System.Math.PI);
+
+                    for (var k = 0; k < 2; k++)
                     {
-                        if (lineEntities[j] is Line line)
-                        {
-                            var linePt = line.ClosestPointTo(arc.Center);
-                            var arcPt = arc.ClosestPointTo(linePt);
-                            var d = RayEdgeDistance(arcPt.X, arcPt.Y,
-                                line.pt1.X, line.pt1.Y, line.pt2.X, line.pt2.Y,
-                                dirX, dirY);
-                            if (d < minDist) { minDist = d; if (d <= 0) return 0; }
-                        }
+                        var theta = k == 0 ? theta1 : theta2;
+
+                        if (!Angle.IsBetweenRad(theta, arc.StartAngle, arc.EndAngle, arc.IsReversed))
+                            continue;
+
+                        var qx = cx + r * System.Math.Cos(theta);
+                        var qy = cy + r * System.Math.Sin(theta);
+
+                        var d = RayEdgeDistance(qx, qy, p1x, p1y, line.pt2.X, line.pt2.Y,
+                            dirX, dirY);
+                        if (d < minDist) { minDist = d; if (d <= 0) return 0; }
                     }
                 }
             }

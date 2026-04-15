@@ -126,20 +126,10 @@ namespace OpenNest
         {
             var result = new List<Entity>(source.Count);
 
-            for (var i = 0; i < source.Count; i++)
+            foreach (var entity in source)
             {
-                var entity = source[i];
-                Entity copy;
-
-                if (entity is Line line)
-                    copy = new Line(line.StartPoint + location, line.EndPoint + location);
-                else if (entity is Arc arc)
-                    copy = new Arc(arc.Center + location, arc.Radius, arc.StartAngle, arc.EndAngle, arc.IsReversed);
-                else if (entity is Circle circle)
-                    copy = new Circle(circle.Center + location, circle.Radius);
-                else
-                    continue;
-
+                var copy = entity.Clone();
+                copy.Offset(location);
                 result.Add(copy);
             }
 

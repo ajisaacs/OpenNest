@@ -165,6 +165,13 @@ namespace OpenNest.Geometry
             get { return Circumference(); }
         }
 
+        public override Entity Clone()
+        {
+            var copy = new Circle(center, radius) { Rotation = Rotation };
+            CopyBaseTo(copy);
+            return copy;
+        }
+
         /// <summary>
         /// Reverses the rotation direction.
         /// </summary>

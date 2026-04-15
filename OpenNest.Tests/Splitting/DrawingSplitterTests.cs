@@ -384,6 +384,161 @@ public class DrawingSplitterTests
         }
     }
 
+    [Fact]
+    public void Split_RectangleWithSpanningSlot_ProducesDisconnectedStrips()
+    {
+        // 255x55 outer rectangle with a 235x35 interior slot centered at (10,10)-(245,45).
+        // 4 vertical splits at x = 55, 110, 165, 220.
+        //
+        // Expected: regions R2/R3/R4 are entirely "over" the slot horizontally, so the
+        // surviving material in each is two physically disjoint strips (upper + lower).
+        // R1 and R5 each have a solid edge that connects the top and bottom strips, so
+        // they remain single (notched) pieces.
+        //
+        // Total output drawings: 1 (R1) + 2 (R2) + 2 (R3) + 2 (R4) + 1 (R5) = 8.
+        var outerEntities = new List<Entity>
+        {
+            new Line(new Vector(0, 0), new Vector(255, 0)),
+            new Line(new Vector(255, 0), new Vector(255, 55)),
+            new Line(new Vector(255, 55), new Vector(0, 55)),
+            new Line(new Vector(0, 55), new Vector(0, 0))
+        };
+        var slotEntities = new List<Entity>
+        {
+            new Line(new Vector(10, 10), new Vector(245, 10)),
+            new Line(new Vector(245, 10), new Vector(245, 45)),
+            new Line(new Vector(245, 45), new Vector(10, 45)),
+            new Line(new Vector(10, 45), new Vector(10, 10))
+        };
+        var allEntities = new List<Entity>();
+        allEntities.AddRange(outerEntities);
+        allEntities.AddRange(slotEntities);
+
+        var drawing = new Drawing("SLOT", ConvertGeometry.ToProgram(allEntities));
+        var originalArea = drawing.Area;
+
+        var splitLines = new List<SplitLine>
+        {
+            new SplitLine(55.0, CutOffAxis.Vertical),
+            new SplitLine(110.0, CutOffAxis.Vertical),
+            new SplitLine(165.0, CutOffAxis.Vertical),
+            new SplitLine(220.0, CutOffAxis.Vertical)
+        };
+
+        var results = DrawingSplitter.Split(drawing, splitLines, new SplitParameters { Type = SplitType.Straight });
+
+        // R1 (0..55)   → 1 notched piece,  height 55
+        // R2 (55..110) → upper strip + lower strip, each height 10
+        // R3 (110..165)→ upper strip + lower strip, each height 10
+        // R4 (165..220)→ upper strip + lower strip, each height 10
+        // R5 (220..255)→ 1 notched piece,  height 55
+        Assert.Equal(8, results.Count);
+
+        // Area preservation: sum of all output areas equals (outer − slot).
+        var totalArea = results.Sum(d => d.Area);
+        Assert.Equal(originalArea, totalArea, 1);
+
+        // Box.Length = X-extent, Box.Width = Y-extent.
+        // Exactly 6 strips (Y-extent ~10mm) from the three middle regions, and
+        // exactly 2 notched pieces (Y-extent 55mm) from R1 and R5.
+        var strips = results
+            .Where(d => System.Math.Abs(d.Program.BoundingBox().Width - 10.0) < 0.5)
+            .ToList();
+        var notched = results
+            .Where(d => System.Math.Abs(d.Program.BoundingBox().Width - 55.0) < 0.5)
+            .ToList();
+
+        Assert.Equal(6, strips.Count);
+        Assert.Equal(2, notched.Count);
+
+        // Each piece should form a closed perimeter (no dangling edges, no gaps).
+        foreach (var piece in results)
+        {
+            var entities = ConvertProgram.ToGeometry(piece.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+
+            Assert.True(entities.Count >= 3, $"{piece.Name} must have at least 3 edges");
+
+            for (var i = 0; i < entities.Count; i++)
+            {
+                var end = GetEndPoint(entities[i]);
+                var nextStart = GetStartPoint(entities[(i + 1) % entities.Count]);
+                var gap = end.DistanceTo(nextStart);
+                Assert.True(gap < 0.01,
+                    $"{piece.Name} gap of {gap:F4} between edge {i} end and edge {(i + 1) % entities.Count} start");
+            }
+        }
+    }
+
+    [Fact]
+    public void Split_DxfFile_WithSpanningSlot_HasNoCutLinesThroughCutout()
+    {
+        // Real DXF regression: 255x55 plate with a centered slot cutout, split into
+        // five columns. Exercises the same path as the synthetic
+        // Split_RectangleWithSpanningSlot_ProducesDisconnectedStrips test but through
+        // the full DXF import pipeline.
+        var path = Path.Combine(AppContext.BaseDirectory, "Splitting", "TestData", "split_test.dxf");
+        Assert.True(File.Exists(path), $"Test DXF not found: {path}");
+
+        var imported = OpenNest.IO.Dxf.Import(path);
+        var profile = new OpenNest.Geometry.ShapeProfile(imported.Entities);
+
+        // Normalize to origin so the split line positions are predictable.
+        var bb = profile.Perimeter.BoundingBox;
+        var offsetX = -bb.X;
+        var offsetY = -bb.Y;
+        foreach (var e in profile.Perimeter.Entities) e.Offset(offsetX, offsetY);
+        foreach (var cutout in profile.Cutouts)
+            foreach (var e in cutout.Entities) e.Offset(offsetX, offsetY);
+
+        var allEntities = new List<Entity>();
+        allEntities.AddRange(profile.Perimeter.Entities);
+        foreach (var cutout in profile.Cutouts) allEntities.AddRange(cutout.Entities);
+
+        var drawing = new Drawing("SPLITTEST", ConvertGeometry.ToProgram(allEntities));
+        var originalArea = drawing.Area;
+
+        // Part is ~255x55 with an interior slot. Split into 5 columns (55mm each).
+        var splitLines = new List<SplitLine>
+        {
+            new SplitLine(55.0, CutOffAxis.Vertical),
+            new SplitLine(110.0, CutOffAxis.Vertical),
+            new SplitLine(165.0, CutOffAxis.Vertical),
+            new SplitLine(220.0, CutOffAxis.Vertical)
+        };
+
+        var results = DrawingSplitter.Split(drawing, splitLines, new SplitParameters { Type = SplitType.Straight });
+
+        // Area must be preserved within tolerance (floating-point coords in the DXF).
+        var totalArea = results.Sum(d => d.Area);
+        Assert.Equal(originalArea, totalArea, 0);
+
+        // At least one region must yield more than one physical strip — that's the
+        // whole point of the fix: a cutout that spans a region disconnects it.
+        Assert.True(results.Count > splitLines.Count + 1,
+            $"Expected more than {splitLines.Count + 1} pieces (some regions split into strips), got {results.Count}");
+
+        // Every output drawing must resolve into fully-closed shapes (outer loop
+        // and any hole loops), with no dangling geometry. A piece that contains
+        // a cutout will have its entities span more than one connected loop.
+        foreach (var piece in results)
+        {
+            var entities = ConvertProgram.ToGeometry(piece.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+
+            Assert.True(entities.Count >= 3, $"{piece.Name} has only {entities.Count} entities");
+
+            var shapes = OpenNest.Geometry.ShapeBuilder.GetShapes(entities);
+            Assert.NotEmpty(shapes);
+
+            foreach (var shape in shapes)
+            {
+                Assert.True(shape.IsClosed(),
+                    $"{piece.Name} contains an open chain of {shape.Entities.Count} entities");
+            }
+        }
+    }
+
     private static Vector GetStartPoint(Entity entity)
     {
         return entity switch

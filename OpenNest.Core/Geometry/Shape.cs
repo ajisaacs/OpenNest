@@ -349,6 +349,15 @@ namespace OpenNest.Geometry
             return polygon;
         }
 
+        public override Entity Clone()
+        {
+            var copy = new Shape();
+            foreach (var e in Entities)
+                copy.Entities.Add(e.Clone());
+            CopyBaseTo(copy);
+            return copy;
+        }
+
         /// <summary>
         /// Reverses the rotation direction of the shape.
         /// </summary>

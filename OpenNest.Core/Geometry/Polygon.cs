@@ -168,6 +168,13 @@ namespace OpenNest.Geometry
             get { return Perimeter(); }
         }
 
+        public override Entity Clone()
+        {
+            var copy = new Polygon { Vertices = new List<Vector>(Vertices) };
+            CopyBaseTo(copy);
+            return copy;
+        }
+
         /// <summary>
         /// Reverses the rotation direction of the polygon.
         /// </summary>

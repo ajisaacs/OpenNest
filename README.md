@@ -2,32 +2,52 @@
 
 A Windows desktop application for CNC nesting — imports DXF drawings, arranges parts on material plates, and exports layouts as DXF or G-code for cutting.
 
-![OpenNest - parts nested on a 36x36 plate](screenshots/screenshot-nest-1.png)
+<p>
+  <a href="screenshots/screenshot-nest-1.png"><img src="screenshots/screenshot-nest-1.png" width="420" alt="OpenNest - parts nested on a 36x36 plate"></a>
+  <a href="screenshots/screenshot-nest-2.png"><img src="screenshots/screenshot-nest-2.png" width="420" alt="OpenNest - 44 parts nested on a 60x120 plate"></a>
+</p>
 
 OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and arranges the parts to make efficient use of material. The result can be exported as DXF files or post-processed into G-code that your CNC cutting machine understands.
 
 ## Features
 
-- **DXF/DWG Import & Export** — Load part drawings from DXF or DWG files and export completed nest layouts as DXF
-- **Multiple Fill Strategies** — Grid-based linear fill, interlocking pair fill, rectangle bin packing, extents-based tiling, and more via a pluggable strategy system
-- **Best-Fit Pair Nesting** — NFP-based (No Fit Polygon) pair evaluation finds tight-fitting interlocking orientations between parts
-- **GPU Acceleration** — Optional ILGPU-based bitmap overlap detection for faster best-fit evaluation
-- **Part Rotation** — Automatically tries different rotation angles to find better fits, with optional ML-based angle prediction (ONNX)
-- **Gravity Compaction** — After placing parts, pushes them together using polygon-based directional distance to close gaps between irregular shapes
-- **Multi-Plate Support** — Work with multiple plates of different sizes and materials in a single nest
-- **Sheet Cut-Offs** — Automatically cut the plate to size after nesting, with geometry-aware clearance that avoids placed parts
-- **Drawing Splitting** — Split oversized parts into pieces that fit your plate, with straight cuts, weld-gap tabs, or interlocking spike-groove joints
-- **BOM Import** — Read bills of materials from Excel spreadsheets to batch-import part lists with quantities
-- **Bend Line Detection** — Import bend lines from DXF files with pluggable detectors (SolidWorks flat pattern support built in)
-- **Lead-In/Lead-Out & Tabs** — Configurable approach paths, exit paths, and holding tabs for CNC cutting, with snap-to-endpoint/midpoint placement
-- **Contour & Program Editing** — Inline G-code editor with contour reordering, direction arrows, and cut direction reversal
-- **G-code Output** — Post-process nested layouts to G-code via plugin post-processors
-- **User-Defined Variables** — Define named variables in G-code (`diameter = 0.3`) referenced with `$name` syntax; Cincinnati post emits numbered machine variables (`#200`) so operators can adjust values at the control
-- **Built-in Shapes** — 12 parametric shapes (circles, rectangles, L-shapes, T-shapes, flanges, etc.) for quick testing or simple parts
-- **Interactive Editing** — Zoom, pan, select, clone, push, and manually arrange parts on the plate view
-- **Pluggable Engine Architecture** — Swap between built-in nesting engines or load custom engines from plugin DLLs
+### Import & Export
 
-![OpenNest - 44 parts nested on a 60x120 plate](screenshots/screenshot-nest-2.png)
+| Feature | Description |
+|---------|-------------|
+| **DXF/DWG Import** | Load part drawings from AutoCAD DXF or DWG files via ACadSharp |
+| **DXF Export** | Export completed nest layouts back to DXF for downstream tools |
+| **BOM Import** | Batch-import part lists with quantities from Excel spreadsheets |
+| **Bend Line Detection** | Import bend lines from DXF via pluggable detectors (SolidWorks flat pattern built in) |
+| **Built-in Shapes** | 12 parametric shapes (circles, rectangles, L/T/flange, etc.) for quick parts |
+
+### Nesting
+
+| Feature | Description |
+|---------|-------------|
+| **Pluggable Engines** | Default multi-phase, Vertical Remnant, Horizontal Remnant, plus custom plugin DLLs |
+| **Fill Strategies** | Linear grid, interlocking pairs, rectangle best-fit, and extents-based tiling |
+| **Best-Fit Pair Nesting** | NFP-based pair evaluation finds tight interlocking orientations between parts |
+| **Gravity Compaction** | Polygon-based directional push to close gaps after filling |
+| **Part Rotation** | Automatic angle sweep to find better fits across allowed orientations |
+| **Multi-Plate Support** | Manage multiple plates of different sizes and materials in one nest |
+
+### Plate Operations
+
+| Feature | Description |
+|---------|-------------|
+| **Sheet Cut-Offs** | Auto-generated trim cuts with geometry-aware clearance around placed parts |
+| **Drawing Splitting** | Split oversized parts with straight cuts, weld-gap tabs, or spike-groove joints |
+| **Interactive Editing** | Zoom, pan, select, clone, rotate, push, and manually arrange parts |
+
+### CNC Output
+
+| Feature | Description |
+|---------|-------------|
+| **Lead-Ins, Lead-Outs & Tabs** | Configurable approach/exit paths and holding tabs with snap placement |
+| **Contour & Program Editing** | Inline G-code editor with contour reordering and cut-direction reversal |
+| **User-Defined Variables** | Named G-code variables (`$name`) emitted as machine variables (`#200+`) at post time |
+| **Post-Processors** | Plugin-based G-code generation; Cincinnati CL-707/800/900/940/CLX included |
 
 ## Prerequisites
 
@@ -60,6 +80,15 @@ Or open `OpenNest.sln` in Visual Studio and run the `OpenNest` project.
 4. **Fill the plate** — The nesting engine arranges parts automatically using the active fill strategy
 5. **Add cut-offs** — Optionally add horizontal/vertical cut-off lines to trim unused plate material
 6. **Export** — Save as a `.nest` file, export to DXF, or post-process to G-code
+
+### CAD Converter
+
+The CAD Converter turns DXF/DWG files into nest-ready drawings. Toggle layers, colors, and linetypes to exclude construction geometry; review detected bend lines; and preview the generated cut program with contour ordering before accepting the drawing into the nest.
+
+<p>
+  <a href="screenshots/screenshot-cad-converter-1.png"><img src="screenshots/screenshot-cad-converter-1.png" width="420" alt="CAD Converter — layer, color, and linetype filtering"></a>
+  <a href="screenshots/screenshot-cad-converter-2.png"><img src="screenshots/screenshot-cad-converter-2.png" width="420" alt="CAD Converter — contour list and G-code preview"></a>
+</p>
 
 ## Command-Line Interface
 
@@ -172,6 +201,8 @@ Oversized parts that don't fit on a single plate can be split into smaller piece
 
 The split system supports fit-to-plate (auto-calculates split lines) and split-by-count modes, with an interactive UI for adjusting split positions and feature parameters.
 
+**Cutout-aware clipping.** Split lines are trimmed against interior cutouts so cut paths never travel through a hole. Lines are Liang-Barsky clipped at region boundaries and arcs/circles are iteratively split at their intersections with the region box, so a cutout that straddles a split correctly contributes material to both sides. When a cutout fully spans the region between two splits, the material breaks into physically disconnected strips — the splitter detects the connected components via endpoint connectivity, nests any remaining holes inside their outer loops by bounding-box and point-in-polygon containment, and emits one drawing per strip.
+
 ## Post-Processors
 
 Post-processors convert nested layouts into machine-specific G-code. They are loaded as plugin DLLs from the `Posts/` directory at runtime.
@@ -212,16 +243,11 @@ Custom post-processors implement the `IPostProcessor` interface and are auto-dis
 
 Nest files (`.nest`) are ZIP archives containing:
 
-- `nest.json` — JSON metadata: nest info, plate defaults, drawings (with bend data), and plates (with parts and cut-offs)
-- `programs/program-N` — G-code text for each drawing's cut program (may include variable definitions and `$name` references)
-- `bestfits/bestfit-N` — Cached best-fit pair evaluation results (optional)
-
-## Roadmap
-
-- **NFP-based auto-nesting** — Simulated annealing optimizer and NFP placement exist in the engine but aren't exposed as a selectable engine yet
-- **Geometry simplifier** — Replace consecutive small line segments with fitted arcs to reduce program size and improve nesting performance
-- **Shape library UI** — 12 built-in parametric shapes exist in code; needs a browsable library UI for quick access
-- **Additional post-processors** — Plugin interface is in place; more machine-specific post-processors planned
+- `nest.json` — JSON metadata: nest info (name, customer, units, material, thickness, assist gas, salvage rate), plate defaults, plate options (alternative sizes with cost), drawings (with bend lines, material, source path, rotation constraints), and plates (size, quadrant, grain angle, parts with manual lead-in flags, cut-offs)
+- `programs/program-N` — G-code text for drawing N's cut program (may include variable definitions and `$name` references)
+- `programs/program-N-subs` — Sub-program definitions for drawing N (M98/G65-callable blocks for repeated features like holes)
+- `entities/entities-N` — Original source entities for drawing N (preserved from DXF import with per-entity suppression state for round-trip editing)
+- `bestfits/bestfit-N` — Cached best-fit pair evaluation results for drawing N, keyed by plate size and spacing (optional)
 
 ## Status
 
