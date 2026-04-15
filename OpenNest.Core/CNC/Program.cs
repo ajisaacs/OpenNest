@@ -128,6 +128,12 @@ namespace OpenNest.CNC
             {
                 var code = Codes[i];
 
+                if (code is SubProgramCall subpgm)
+                {
+                    subpgm.Offset = new Geometry.Vector(
+                        subpgm.Offset.X + x, subpgm.Offset.Y + y);
+                }
+
                 if (code is Motion == false)
                     continue;
 
@@ -149,6 +155,12 @@ namespace OpenNest.CNC
             for (int i = 0; i < Codes.Count; ++i)
             {
                 var code = Codes[i];
+
+                if (code is SubProgramCall subpgm)
+                {
+                    subpgm.Offset = new Geometry.Vector(
+                        subpgm.Offset.X + voffset.X, subpgm.Offset.Y + voffset.Y);
+                }
 
                 if (code is Motion == false)
                     continue;
