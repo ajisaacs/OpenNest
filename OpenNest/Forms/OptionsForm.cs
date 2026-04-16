@@ -68,6 +68,13 @@ namespace OpenNest.Forms
             checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
             numericUpDown1.Value = (decimal)Settings.Default.AutoSizePlateFactor;
 
+            colorSchemeCombo.Items.Clear();
+            foreach (var scheme in ColorSchemeRegistry.AllSchemes)
+                colorSchemeCombo.Items.Add(scheme.Name);
+            var active = Settings.Default.ActiveColorScheme;
+            var idx = colorSchemeCombo.Items.IndexOf(active);
+            colorSchemeCombo.SelectedIndex = idx >= 0 ? idx : 0;
+
             var disabledNames = ParseDisabledStrategies(Settings.Default.DisabledStrategies);
             foreach (DataGridViewRow row in strategyGrid.Rows)
                 row.Cells["Enabled"].Value = !disabledNames.Contains((string)row.Cells["Name"].Value);
@@ -78,6 +85,7 @@ namespace OpenNest.Forms
             Settings.Default.NestTemplatePath = textBox1.Text;
             Settings.Default.CreateNewNestOnOpen = checkBox1.Checked;
             Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
+            Settings.Default.ActiveColorScheme = colorSchemeCombo.SelectedItem as string ?? "Classic";
 
             var disabledNames = new List<string>();
             foreach (DataGridViewRow row in strategyGrid.Rows)
@@ -89,6 +97,10 @@ namespace OpenNest.Forms
 
             Settings.Default.Save();
             ApplyDisabledStrategies();
+            ColorSchemeRegistry.ApplyActiveFromSettings();
+
+            foreach (Form f in Application.OpenForms)
+                f.Invalidate(invalidateChildren: true);
         }
 
         /// <summary>

@@ -42,6 +42,8 @@
             this.bottomPanel1 = new OpenNest.Controls.BottomPanel();
             this.strategyGrid = new System.Windows.Forms.DataGridView();
             this.strategyGroupBox = new System.Windows.Forms.GroupBox();
+            this.colorSchemeLabel = new System.Windows.Forms.Label();
+            this.colorSchemeCombo = new System.Windows.Forms.ComboBox();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
             this.bottomPanel1.SuspendLayout();
@@ -86,7 +88,7 @@
             this.toolTip1.SetToolTip(this.numericUpDown1, "The amount to round the plate size up.");
             //
             // tableLayoutPanel1
-            // 
+            //
             this.tableLayoutPanel1.ColumnCount = 4;
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
@@ -95,15 +97,18 @@
             this.tableLayoutPanel1.Controls.Add(this.label1, 0, 1);
             this.tableLayoutPanel1.Controls.Add(this.textBox1, 1, 0);
             this.tableLayoutPanel1.Controls.Add(this.label3, 0, 0);
-            this.tableLayoutPanel1.Controls.Add(this.checkBox1, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.colorSchemeLabel, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.colorSchemeCombo, 1, 2);
+            this.tableLayoutPanel1.Controls.Add(this.checkBox1, 0, 3);
             this.tableLayoutPanel1.Controls.Add(this.numericUpDown1, 1, 1);
             this.tableLayoutPanel1.Controls.Add(this.button1, 3, 0);
             this.tableLayoutPanel1.Location = new System.Drawing.Point(12, 12);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 3;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.33F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.33F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 33.34F));
+            this.tableLayoutPanel1.RowCount = 4;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 25F));
             this.tableLayoutPanel1.Size = new System.Drawing.Size(684, 160);
             this.tableLayoutPanel1.TabIndex = 0;
             // 
@@ -198,6 +203,25 @@
             this.strategyGroupBox.TabStop = false;
             this.strategyGroupBox.Text = "Fill Strategies";
             //
+            // colorSchemeLabel
+            //
+            this.colorSchemeLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.colorSchemeLabel.AutoSize = true;
+            this.colorSchemeLabel.Location = new System.Drawing.Point(3, 92);
+            this.colorSchemeLabel.Name = "colorSchemeLabel";
+            this.colorSchemeLabel.Size = new System.Drawing.Size(145, 16);
+            this.colorSchemeLabel.TabIndex = 10;
+            this.colorSchemeLabel.Text = "Color scheme:";
+            //
+            // colorSchemeCombo
+            //
+            this.colorSchemeCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.colorSchemeCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.colorSchemeCombo.Location = new System.Drawing.Point(154, 89);
+            this.colorSchemeCombo.Name = "colorSchemeCombo";
+            this.colorSchemeCombo.Size = new System.Drawing.Size(130, 24);
+            this.colorSchemeCombo.TabIndex = 11;
+            //
             // OptionsForm
             //
             this.AcceptButton = this.saveButton;
@@ -239,5 +263,7 @@
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.DataGridView strategyGrid;
         private System.Windows.Forms.GroupBox strategyGroupBox;
+        private System.Windows.Forms.Label colorSchemeLabel;
+        private System.Windows.Forms.ComboBox colorSchemeCombo;
     }
 }
