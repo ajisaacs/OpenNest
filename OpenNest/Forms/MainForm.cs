@@ -71,6 +71,7 @@ namespace OpenNest.Forms
             NestEngineRegistry.LoadPlugins(enginesDir);
 
             OptionsForm.ApplyDisabledStrategies();
+            ColorSchemeRegistry.ApplyActiveFromSettings();
 
             foreach (var engine in NestEngineRegistry.AvailableEngines)
                 engineComboBox.Items.Add(engine.Name);
