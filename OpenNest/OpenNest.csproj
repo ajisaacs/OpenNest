@@ -16,6 +16,11 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <None Update="Schemes\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\OpenNest.Api\OpenNest.Api.csproj" />
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
     <ProjectReference Include="..\OpenNest.Data\OpenNest.Data.csproj" />
