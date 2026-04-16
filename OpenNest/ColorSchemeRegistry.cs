@@ -1,9 +1,11 @@
+using OpenNest.Forms;
 using OpenNest.Properties;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Windows.Forms;
 
 namespace OpenNest
 {
@@ -62,6 +64,26 @@ namespace OpenNest
             d.PartColors = scheme.PartColors;
 
             Drawing.PartColors = scheme.PartColors;
+
+            RecolorOpenNests(scheme.PartColors);
+        }
+
+        private static void RecolorOpenNests(Color[] palette)
+        {
+            foreach (Form f in Application.OpenForms)
+            {
+                if (f is not EditNestForm enf)
+                    continue;
+
+                var i = 0;
+                foreach (var drawing in enf.Nest.Drawings)
+                {
+                    if (drawing.IsCutOff)
+                        continue;
+                    drawing.Color = palette[i % palette.Length];
+                    i++;
+                }
+            }
         }
 
         private static IEnumerable<ColorScheme> LoadDiskSchemes()
@@ -163,12 +185,18 @@ namespace OpenNest
             PreviewPartColor = Color.FromArgb(255, 170, 60),
             PartColors = new[]
             {
-                Color.FromArgb(220, 110, 110), Color.FromArgb(170, 130, 215),
-                Color.FromArgb(90, 200, 195),  Color.FromArgb(230, 210, 100),
-                Color.FromArgb(215, 110, 200), Color.FromArgb(210, 140, 110),
-                Color.FromArgb(140, 125, 215), Color.FromArgb(225, 125, 165),
-                Color.FromArgb(100, 200, 180), Color.FromArgb(220, 185, 110),
-                Color.FromArgb(200, 120, 185), Color.FromArgb(240, 155, 155),
+                Color.FromArgb(255, 85, 85),   // Neon Red
+                Color.FromArgb(80, 220, 255),  // Electric Cyan
+                Color.FromArgb(255, 200, 50),  // Amber
+                Color.FromArgb(130, 255, 130), // Lime Green
+                Color.FromArgb(255, 130, 220), // Hot Pink
+                Color.FromArgb(255, 165, 70),  // Tangerine
+                Color.FromArgb(100, 180, 255), // Sky Blue
+                Color.FromArgb(200, 160, 255), // Lavender
+                Color.FromArgb(50, 230, 180),  // Mint
+                Color.FromArgb(255, 255, 100), // Lemon
+                Color.FromArgb(255, 120, 120), // Salmon
+                Color.FromArgb(140, 230, 255), // Ice Blue
             }
         };
     }
