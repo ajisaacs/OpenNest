@@ -464,6 +464,9 @@ namespace OpenNest.Controls
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (BackColor != ColorScheme.BackgroundColor)
+                BackColor = ColorScheme.BackgroundColor;
+
             e.Graphics.SmoothingMode = SmoothingMode.HighSpeed;
 
             if (DrawOrigin)

@@ -17,8 +17,18 @@ namespace OpenNest
                 ["Dark"] = BuildDark()
             };
 
-        public static IEnumerable<ColorScheme> AllSchemes =>
-            builtIns.Values.Concat(LoadDiskSchemes());
+        private static List<ColorScheme> diskCache;
+
+        public static IEnumerable<ColorScheme> AllSchemes
+        {
+            get
+            {
+                diskCache ??= LoadDiskSchemes().ToList();
+                return builtIns.Values.Concat(diskCache);
+            }
+        }
+
+        public static void Refresh() => diskCache = null;
 
         public static ColorScheme Get(string name)
         {

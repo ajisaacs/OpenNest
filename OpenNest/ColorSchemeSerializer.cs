@@ -59,6 +59,8 @@ namespace OpenNest
             if (string.IsNullOrWhiteSpace(hex))
                 return Color.Black;
             var h = hex.TrimStart('#');
+            if (h.Length < 6)
+                return Color.Black;
             var r = byte.Parse(h.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
             var g = byte.Parse(h.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
             var b = byte.Parse(h.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
