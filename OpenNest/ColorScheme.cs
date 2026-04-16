@@ -13,10 +13,13 @@ namespace OpenNest
         private Color edgeSpacingColor;
         private Color previewPartColor;
 
-        public static Color[] PartColors => Drawing.PartColors;
+        public string Name { get; set; } = "Unnamed";
+
+        public Color[] PartColors { get; set; } = Drawing.PartColors;
 
         public static readonly ColorScheme Default = new ColorScheme
         {
+            Name = "Classic",
             BackgroundColor = Color.DarkGray,
             LayoutOutlineColor = Color.Gray,
             LayoutFillColor = Color.WhiteSmoke,
