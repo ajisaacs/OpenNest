@@ -305,9 +305,6 @@ namespace OpenNest.CNC.CuttingStrategy
                 subPgm.Codes.AddRange(leadIn.Generate(relativePoint, normal, winding));
                 var reindexed = relativeShape.ReindexAt(relativePoint, relativeCircle);
 
-                if (Parameters.TabsEnabled && Parameters.TabConfig != null)
-                    reindexed = TrimShapeForTab(reindexed, relativePoint, Parameters.TabConfig.Size);
-
                 subPgm.Codes.AddRange(ConvertShapeToMoves(reindexed, relativePoint));
                 subPgm.Codes.AddRange(leadOut.Generate(relativePoint, normal, winding));
                 subPgm.Mode = Mode.Incremental;
@@ -331,7 +328,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var reindexedShape = shape.ReindexAt(point, entity);
 
-            if (Parameters.TabsEnabled && Parameters.TabConfig != null)
+            if (Parameters.TabsEnabled && Parameters.TabConfig != null && contourType == ContourType.External)
                 reindexedShape = TrimShapeForTab(reindexedShape, point, Parameters.TabConfig.Size);
 
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
