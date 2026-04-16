@@ -226,5 +226,17 @@ namespace OpenNest.Properties {
                 this["CuttingParametersJson"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Classic")]
+        public string ActiveColorScheme {
+            get {
+                return ((string)(this["ActiveColorScheme"]));
+            }
+            set {
+                this["ActiveColorScheme"] = value;
+            }
+        }
     }
 }

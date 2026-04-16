@@ -53,5 +53,8 @@
     <Setting Name="CuttingParametersJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="ActiveColorScheme" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Classic</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
