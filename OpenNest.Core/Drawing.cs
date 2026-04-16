@@ -16,7 +16,7 @@ namespace OpenNest
         private static int nextColorIndex;
         private Program program;
 
-        public static readonly Color[] PartColors = new Color[]
+        public static Color[] PartColors = new Color[]
         {
             Color.FromArgb(205, 92, 92),    // Indian Red
             Color.FromArgb(148, 103, 189),  // Medium Purple
