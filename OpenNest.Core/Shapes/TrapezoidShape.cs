@@ -9,6 +9,8 @@ namespace OpenNest.Shapes
         public double BottomWidth { get; set; }
         public double Height { get; set; }
 
+        public override string GenerateName() => $"Trapezoid {Dim(TopWidth)}x{Dim(BottomWidth)}x{Dim(Height)}";
+
         public override void SetPreviewDefaults()
         {
             TopWidth = 6;

@@ -837,7 +837,7 @@ namespace OpenNest.Forms
         {
             if (activeForm == null) return;
 
-            var form = new ShapeLibraryForm();
+            var form = new ShapeLibraryForm(activeForm.Nest.Drawings.Select(d => d.Name));
             form.ShowDialog();
 
             var drawings = form.GetDrawings();

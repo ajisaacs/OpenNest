@@ -8,6 +8,8 @@ namespace OpenNest.Shapes
         public double Base { get; set; }
         public double Height { get; set; }
 
+        public override string GenerateName() => $"Isosceles Triangle {Dim(Base)}x{Dim(Height)}";
+
         public override void SetPreviewDefaults()
         {
             Base = 8;

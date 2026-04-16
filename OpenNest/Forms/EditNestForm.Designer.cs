@@ -47,11 +47,9 @@
             drawingListBox1 = new OpenNest.Controls.DrawingListBox();
             toolStrip2 = new System.Windows.Forms.ToolStrip();
             toolStripButton2 = new System.Windows.Forms.ToolStripButton();
-            toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
+            shapeLibraryButton = new System.Windows.Forms.ToolStripButton();
             editDrawingsButton = new System.Windows.Forms.ToolStripButton();
-            toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             toolStripButton3 = new System.Windows.Forms.ToolStripButton();
-            toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
             hideNestedButton = new System.Windows.Forms.ToolStripButton();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
             splitContainer.Panel1.SuspendLayout();
@@ -219,7 +217,7 @@
             // 
             toolStrip2.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
             toolStrip2.ImageScalingSize = new System.Drawing.Size(20, 20);
-            toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripButton2, toolStripSeparator4, editDrawingsButton, toolStripSeparator1, toolStripButton3, toolStripSeparator2, hideNestedButton });
+            toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripButton2, shapeLibraryButton, editDrawingsButton, toolStripButton3, hideNestedButton });
             toolStrip2.Location = new System.Drawing.Point(4, 3);
             toolStrip2.Name = "toolStrip2";
             toolStrip2.Size = new System.Drawing.Size(265, 27);
@@ -237,14 +235,19 @@
             toolStripButton2.Size = new System.Drawing.Size(34, 24);
             toolStripButton2.Text = "Import Drawings";
             toolStripButton2.Click += ImportDrawings_Click;
-            // 
-            // toolStripSeparator4
-            // 
-            toolStripSeparator4.Name = "toolStripSeparator4";
-            toolStripSeparator4.Size = new System.Drawing.Size(6, 27);
-            // 
+            //
+            // shapeLibraryButton
+            //
+            shapeLibraryButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+            shapeLibraryButton.Image = Properties.Resources.shapes;
+            shapeLibraryButton.Name = "shapeLibraryButton";
+            shapeLibraryButton.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
+            shapeLibraryButton.Size = new System.Drawing.Size(34, 24);
+            shapeLibraryButton.Text = "Shape Library";
+            shapeLibraryButton.Click += ShapeLibrary_Click;
+            //
             // editDrawingsButton
-            // 
+            //
             editDrawingsButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
             editDrawingsButton.Image = (System.Drawing.Image)resources.GetObject("editDrawingsButton.Image");
             editDrawingsButton.Name = "editDrawingsButton";
@@ -252,14 +255,9 @@
             editDrawingsButton.Size = new System.Drawing.Size(34, 24);
             editDrawingsButton.Text = "Edit Drawings in Converter";
             editDrawingsButton.Click += EditDrawingsInConverter_Click;
-            // 
-            // toolStripSeparator1
-            // 
-            toolStripSeparator1.Name = "toolStripSeparator1";
-            toolStripSeparator1.Size = new System.Drawing.Size(6, 27);
-            // 
+            //
             // toolStripButton3
-            // 
+            //
             toolStripButton3.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
             toolStripButton3.Image = (System.Drawing.Image)resources.GetObject("toolStripButton3.Image");
             toolStripButton3.Name = "toolStripButton3";
@@ -268,12 +266,7 @@
             toolStripButton3.Size = new System.Drawing.Size(34, 24);
             toolStripButton3.Text = "Cleanup unused Drawings";
             toolStripButton3.Click += CleanUnusedDrawings_Click;
-            // 
-            // toolStripSeparator2
-            // 
-            toolStripSeparator2.Name = "toolStripSeparator2";
-            toolStripSeparator2.Size = new System.Drawing.Size(6, 27);
-            // 
+            //
             // hideNestedButton
             // 
             hideNestedButton.CheckOnClick = true;
@@ -329,11 +322,9 @@
         private System.Windows.Forms.ColumnHeader utilColumn;
         private System.Windows.Forms.ToolStrip toolStrip2;
         private System.Windows.Forms.ToolStripButton toolStripButton2;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
+        private System.Windows.Forms.ToolStripButton shapeLibraryButton;
         private System.Windows.Forms.ToolStripButton editDrawingsButton;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripButton toolStripButton3;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.ToolStripButton hideNestedButton;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
         private System.Windows.Forms.ToolStripButton toolStripLabel1;

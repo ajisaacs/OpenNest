@@ -8,6 +8,8 @@ namespace OpenNest.Shapes
         public double OuterDiameter { get; set; }
         public double InnerDiameter { get; set; }
 
+        public override string GenerateName() => $"Ring {Dim(OuterDiameter)}x{Dim(InnerDiameter)}";
+
         public override void SetPreviewDefaults()
         {
             OuterDiameter = 10;

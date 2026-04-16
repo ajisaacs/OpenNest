@@ -8,6 +8,8 @@ namespace OpenNest.Shapes
         public double Length { get; set; }
         public double Width { get; set; }
 
+        public override string GenerateName() => $"Rectangle {Dim(Length)}x{Dim(Width)}";
+
         public override void SetPreviewDefaults()
         {
             Length = 12;

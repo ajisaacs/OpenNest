@@ -7,6 +7,8 @@ namespace OpenNest.Shapes
     {
         public double Diameter { get; set; }
 
+        public override string GenerateName() => $"Circle {Dim(Diameter)} Dia";
+
         public override void SetPreviewDefaults()
         {
             Diameter = 8;

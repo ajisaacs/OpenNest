@@ -26,6 +26,14 @@ namespace OpenNest.Shapes
 
         public abstract Drawing GetDrawing();
 
+        public virtual string GenerateName()
+        {
+            var typeName = GetType().Name;
+            return typeName.EndsWith("Shape")
+                ? typeName.Substring(0, typeName.Length - 5)
+                : typeName;
+        }
+
         public virtual void SetPreviewDefaults() { }
 
         public static List<T> LoadFromJson<T>(string path) where T : ShapeDefinition
@@ -33,6 +41,8 @@ namespace OpenNest.Shapes
             var json = File.ReadAllText(path);
             return JsonSerializer.Deserialize<List<T>>(json, JsonOptions);
         }
+
+        protected static string Dim(double value) => value.ToString("0.###");
 
         protected Drawing CreateDrawing(List<Entity> entities)
         {

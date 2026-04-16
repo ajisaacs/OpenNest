@@ -10,6 +10,8 @@ namespace OpenNest.Shapes
         public double LegWidth { get; set; }
         public double LegHeight { get; set; }
 
+        public override string GenerateName() => $"L {Dim(Width)}x{Dim(Height)}";
+
         public override void SetPreviewDefaults()
         {
             Width = 8;

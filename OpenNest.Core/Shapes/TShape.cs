@@ -10,6 +10,8 @@ namespace OpenNest.Shapes
         public double StemWidth { get; set; }
         public double BarHeight { get; set; }
 
+        public override string GenerateName() => $"T {Dim(Width)}x{Dim(Height)}";
+
         public override void SetPreviewDefaults()
         {
             Width = 10;

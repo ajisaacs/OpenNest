@@ -21,12 +21,17 @@ namespace OpenNest.Forms
         private readonly List<Drawing> addedDrawings = new List<Drawing>();
         private readonly List<ShapeEntry> shapeEntries = new List<ShapeEntry>();
         private readonly List<ParameterBinding> parameterBindings = new List<ParameterBinding>();
+        private readonly HashSet<string> existingNames;
 
         private ShapeEntry selectedEntry;
         private bool suppressPreview;
 
-        public ShapeLibraryForm()
+        public ShapeLibraryForm(IEnumerable<string> existingDrawingNames = null)
         {
+            existingNames = existingDrawingNames != null
+                ? new HashSet<string>(existingDrawingNames, StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             InitializeComponent();
             DiscoverShapes();
             PopulateShapeList();
@@ -259,6 +264,7 @@ namespace OpenNest.Forms
                 if (shape == null) return;
 
                 var drawing = shape.GetDrawing();
+                nameTextBox.Text = shape.GenerateName();
                 previewBox.ShowDrawing(drawing);
 
                 if (drawing?.Program != null)
@@ -405,10 +411,12 @@ namespace OpenNest.Forms
                 if (shape == null) return;
 
                 var drawing = shape.GetDrawing();
+                drawing.Name = GetUniqueName(drawing.Name);
                 drawing.Color = Drawing.GetNextColor();
                 drawing.Quantity.Required = (int)quantityUpDown.Value;
 
                 addedDrawings.Add(drawing);
+                existingNames.Add(drawing.Name);
                 DialogResult = DialogResult.OK;
 
                 addButton.Text = $"Added ({addedDrawings.Count})";
@@ -420,6 +428,19 @@ namespace OpenNest.Forms
                     "Error",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
+            }
+        }
+
+        private string GetUniqueName(string baseName)
+        {
+            if (!existingNames.Contains(baseName))
+                return baseName;
+
+            for (var i = 2; ; i++)
+            {
+                var candidate = $"{baseName} ({i})";
+                if (!existingNames.Contains(candidate))
+                    return candidate;
             }
         }
 

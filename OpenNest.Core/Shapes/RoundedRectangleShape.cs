@@ -10,6 +10,8 @@ namespace OpenNest.Shapes
         public double Width { get; set; }
         public double Radius { get; set; }
 
+        public override string GenerateName() => $"Rounded Rectangle {Dim(Length)}x{Dim(Width)} R{Dim(Radius)}";
+
         public override void SetPreviewDefaults()
         {
             Length = 12;

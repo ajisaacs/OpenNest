@@ -8,6 +8,8 @@ namespace OpenNest.Shapes
         public int Sides { get; set; }
         public double Width { get; set; }
 
+        public override string GenerateName() => $"{Sides}-Sided Polygon {Dim(Width)}";
+
         public override void SetPreviewDefaults()
         {
             Sides = 8;

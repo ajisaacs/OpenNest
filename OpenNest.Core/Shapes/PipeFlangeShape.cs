@@ -13,6 +13,14 @@ namespace OpenNest.Shapes
         public double PipeClearance { get; set; }
         public bool Blind { get; set; }
 
+        public override string GenerateName()
+        {
+            var name = $"Pipe Flange {Dim(OD)} OD";
+            if (!string.IsNullOrEmpty(PipeSize))
+                name += $" {PipeSize} Pipe";
+            return name;
+        }
+
         public override void SetPreviewDefaults()
         {
             OD = 7.5;
