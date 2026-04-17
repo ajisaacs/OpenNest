@@ -1,18 +1,10 @@
 using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Generic;
-using System.IO;
 
 namespace OpenNest.Engine.BestFit
 {
     public class NfpSlideStrategy : IBestFitStrategy
     {
-        private static readonly string LogPath = Path.Combine(
-            System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),
-            "nfp-slide-debug.log");
-
-        private static readonly object LogLock = new object();
-
         private readonly double _part2Rotation;
         private readonly Polygon _stationaryPerimeter;
         private readonly Polygon _stationaryHull;
@@ -46,12 +38,6 @@ namespace OpenNest.Engine.BestFit
 
             var hull = ConvexHull.Compute(result.Polygon.Vertices);
 
-            Log($"=== Create: drawing={drawing.Name}, rotation={Angle.ToDegrees(part2Rotation):F1}deg ===");
-            Log($"  Perimeter: {result.Polygon.Vertices.Count} verts, bounds={FormatBounds(result.Polygon)}");
-            Log($"  Hull: {hull.Vertices.Count} verts, bounds={FormatBounds(hull)}");
-            Log($"  Correction: ({result.Correction.X:F4}, {result.Correction.Y:F4})");
-            Log($"  ProgramBBox: {drawing.Program.BoundingBox()}");
-
             return new NfpSlideStrategy(part2Rotation, type, description,
                 result.Polygon, hull, result.Correction);
         }
@@ -63,39 +49,16 @@ namespace OpenNest.Engine.BestFit
             if (stepSize <= 0)
                 return candidates;
 
-            Log($"--- GenerateCandidates: drawing={drawing.Name}, part2Rot={Angle.ToDegrees(_part2Rotation):F1}deg, spacing={spacing}, stepSize={stepSize} ---");
-
-            // Orbiting polygon: same shape rotated to Part2's angle.
             var orbitingPerimeter = PolygonHelper.RotatePolygon(_stationaryPerimeter, _part2Rotation, reNormalize: true);
             var orbitingPoly = ConvexHull.Compute(orbitingPerimeter.Vertices);
-
-            Log($"  Stationary hull: {_stationaryHull.Vertices.Count} verts, bounds={FormatBounds(_stationaryHull)}");
-            Log($"  Orbiting perimeter (rotated): {orbitingPerimeter.Vertices.Count} verts, bounds={FormatBounds(orbitingPerimeter)}");
-            Log($"  Orbiting hull: {orbitingPoly.Vertices.Count} verts, bounds={FormatBounds(orbitingPoly)}");
 
             var nfp = NoFitPolygon.ComputeConvex(_stationaryHull, orbitingPoly);
 
             if (nfp == null || nfp.Vertices.Count < 3)
-            {
-                Log($"  NFP failed or degenerate (verts={nfp?.Vertices.Count ?? 0})");
                 return candidates;
-            }
 
             var verts = nfp.Vertices;
             var vertCount = nfp.IsClosed() ? verts.Count - 1 : verts.Count;
-
-            Log($"  NFP: {verts.Count} verts (closed={nfp.IsClosed()}, walking {vertCount}), bounds={FormatBounds(nfp)}");
-            Log($"  Correction: ({_correction.X:F4}, {_correction.Y:F4})");
-
-            // Log NFP vertices
-            for (var v = 0; v < vertCount; v++)
-                Log($"    NFP vert[{v}]: ({verts[v].X:F4}, {verts[v].Y:F4}) -> corrected: ({verts[v].X - _correction.X:F4}, {verts[v].Y - _correction.Y:F4})");
-
-            // Compare with what RotationSlideStrategy would produce
-            var part1 = Part.CreateAtOrigin(drawing);
-            var part2 = Part.CreateAtOrigin(drawing, _part2Rotation);
-            Log($"  Part1 (rot=0): loc=({part1.Location.X:F4}, {part1.Location.Y:F4}), bbox={part1.BoundingBox}");
-            Log($"  Part2 (rot={Angle.ToDegrees(_part2Rotation):F1}): loc=({part2.Location.X:F4}, {part2.Location.Y:F4}), bbox={part2.BoundingBox}");
 
             var testNumber = 0;
 
@@ -125,20 +88,6 @@ namespace OpenNest.Engine.BestFit
                 }
             }
 
-            // Log overlap check for vertex candidates (first few)
-            var checkCount = System.Math.Min(vertCount, 8);
-            for (var c = 0; c < checkCount; c++)
-            {
-                var cand = candidates[c];
-                var p2 = Part.CreateAtOrigin(drawing, cand.Part2Rotation);
-                p2.Location = cand.Part2Offset;
-                var overlaps = part1.Intersects(p2, out _);
-                Log($"  Candidate[{c}]: offset=({cand.Part2Offset.X:F4}, {cand.Part2Offset.Y:F4}), overlaps={overlaps}");
-            }
-
-            Log($"  Total candidates: {candidates.Count}");
-            Log("");
-
             return candidates;
         }
 
@@ -159,21 +108,6 @@ namespace OpenNest.Engine.BestFit
                 TestNumber = testNumber,
                 Spacing = spacing
             };
-        }
-
-        private static string FormatBounds(Polygon polygon)
-        {
-            polygon.UpdateBounds();
-            var bb = polygon.BoundingBox;
-            return $"[({bb.Left:F4}, {bb.Bottom:F4})-({bb.Right:F4}, {bb.Top:F4}), {bb.Width:F2}x{bb.Length:F2}]";
-        }
-
-        private static void Log(string message)
-        {
-            lock (LogLock)
-            {
-                File.AppendAllText(LogPath, message + "\n");
-            }
         }
     }
 }

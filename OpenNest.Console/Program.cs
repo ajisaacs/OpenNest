@@ -41,7 +41,6 @@ static class NestConsole
             }
         }
 
-        using var log = SetUpLog(options);
         var nest = LoadOrCreateNest(options);
 
         if (nest == null)
@@ -67,10 +66,6 @@ static class NestConsole
         var (success, elapsed) = Fill(nest, plate, drawing, options);
 
         var overlapCount = CheckOverlaps(plate, options);
-
-        // Flush and close the log before printing results.
-        Trace.Flush();
-        log?.Dispose();
 
         PrintResults(success, plate, elapsed);
         Save(nest, options);
@@ -112,9 +107,6 @@ static class NestConsole
                 case "--no-save":
                     o.NoSave = true;
                     break;
-                case "--no-log":
-                    o.NoLog = true;
-                    break;
                 case "--keep-parts":
                     o.KeepParts = true;
                     break;
@@ -151,21 +143,6 @@ static class NestConsole
         }
 
         return o;
-    }
-
-    static StreamWriter SetUpLog(Options options)
-    {
-        if (options.NoLog)
-            return null;
-
-        var baseDir = Path.GetDirectoryName(options.InputFiles[0]);
-        var logDir = Path.Combine(baseDir, "test-harness-logs");
-        Directory.CreateDirectory(logDir);
-        var logFile = Path.Combine(logDir, $"debug-{DateTime.Now:yyyyMMdd-HHmmss}.log");
-        var writer = new StreamWriter(logFile) { AutoFlush = true };
-        Trace.Listeners.Add(new TextWriterTraceListener(writer));
-        Console.WriteLine($"Debug log: {logFile}");
-        return writer;
     }
 
     static Nest LoadOrCreateNest(Options options)
@@ -503,7 +480,6 @@ static class NestConsole
         Console.Error.WriteLine("  --keep-parts           Don't clear existing parts before filling");
         Console.Error.WriteLine("  --check-overlaps       Run overlap detection after fill (exit code 1 if found)");
         Console.Error.WriteLine("  --no-save              Skip saving output file");
-        Console.Error.WriteLine("  --no-log               Skip writing debug log file");
         Console.Error.WriteLine("  --post <name>          Run a post processor after nesting");
         Console.Error.WriteLine("  --post-output <path>   Output file for post processor (default: <input>.cnc)");
         Console.Error.WriteLine("  --posts-dir <path>     Directory containing post processor DLLs (default: Posts/)");
@@ -522,7 +498,6 @@ static class NestConsole
         public Size? PlateSize;
         public bool CheckOverlaps;
         public bool NoSave;
-        public bool NoLog;
         public bool KeepParts;
         public bool AutoNest;
         public string TemplateFile;
