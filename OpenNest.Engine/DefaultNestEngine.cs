@@ -47,14 +47,29 @@ namespace OpenNest
             PhaseResults.Clear();
             AngleResults.Clear();
 
-            // Fast path: for very small quantities, skip the full strategy pipeline.
-            if (item.Quantity > 0 && item.Quantity <= 2)
+            // Replace the item's Drawing with a canonical copy for the duration of this fill.
+            // All internal methods see canonical geometry; this wrapper un-canonicalizes the final result.
+            var sourceAngle = item.Drawing?.Source?.Angle ?? 0.0;
+            var originalDrawing = item.Drawing;
+            var canonicalItem = new NestItem
             {
-                var fast = TryFillSmallQuantity(item, workArea);
-                if (fast != null && fast.Count >= item.Quantity)
+                Drawing = CanonicalFrame.AsCanonicalCopy(item.Drawing),
+                Quantity = item.Quantity,
+                Priority = item.Priority,
+                RotationStart = item.RotationStart,
+                RotationEnd = item.RotationEnd,
+                StepAngle = item.StepAngle,
+            };
+
+            // Fast path for qty 1-2.
+            if (canonicalItem.Quantity > 0 && canonicalItem.Quantity <= 2)
+            {
+                var fast = TryFillSmallQuantity(canonicalItem, workArea);
+                if (fast != null && fast.Count >= canonicalItem.Quantity)
                 {
-                    Debug.WriteLine($"[Fill] Fast path: placed {fast.Count} parts for qty={item.Quantity}");
+                    Debug.WriteLine($"[Fill] Fast path: placed {fast.Count} parts for qty={canonicalItem.Quantity}");
                     WinnerPhase = NestPhase.Pairs;
+                    fast = RebindAndUnCanonicalize(fast, originalDrawing, sourceAngle);
                     ReportProgress(progress, new ProgressReport
                     {
                         Phase = WinnerPhase,
@@ -68,32 +83,30 @@ namespace OpenNest
                 }
             }
 
-            // For low quantities, shrink the work area in both dimensions to avoid
-            // running expensive strategies against the full plate.
             var effectiveWorkArea = workArea;
-            if (item.Quantity > 0)
+            if (canonicalItem.Quantity > 0)
             {
-                effectiveWorkArea = ShrinkWorkArea(item, workArea, Plate.PartSpacing);
-
+                effectiveWorkArea = ShrinkWorkArea(canonicalItem, workArea, Plate.PartSpacing);
                 if (effectiveWorkArea != workArea)
-                    Debug.WriteLine($"[Fill] Low-qty shrink: {item.Quantity} requested, " +
+                    Debug.WriteLine($"[Fill] Low-qty shrink: {canonicalItem.Quantity} requested, " +
                         $"from {workArea.Width:F1}x{workArea.Length:F1} " +
                         $"to {effectiveWorkArea.Width:F1}x{effectiveWorkArea.Length:F1}");
             }
 
-            var best = RunFillPipeline(item, effectiveWorkArea, progress, token);
+            var best = RunFillPipeline(canonicalItem, effectiveWorkArea, progress, token);
 
-            // Fallback: if the reduced area didn't yield enough, retry with full area.
-            if (item.Quantity > 0 && best.Count < item.Quantity && effectiveWorkArea != workArea)
+            if (canonicalItem.Quantity > 0 && best.Count < canonicalItem.Quantity && effectiveWorkArea != workArea)
             {
-                Debug.WriteLine($"[Fill] Low-qty fallback: got {best.Count}, need {item.Quantity}, retrying full area");
+                Debug.WriteLine($"[Fill] Low-qty fallback: got {best.Count}, need {canonicalItem.Quantity}, retrying full area");
                 PhaseResults.Clear();
                 AngleResults.Clear();
-                best = RunFillPipeline(item, workArea, progress, token);
+                best = RunFillPipeline(canonicalItem, workArea, progress, token);
             }
 
-            if (item.Quantity > 0 && best.Count > item.Quantity)
-                best = ShrinkFiller.TrimToCount(best, item.Quantity, TrimAxis);
+            if (canonicalItem.Quantity > 0 && best.Count > canonicalItem.Quantity)
+                best = ShrinkFiller.TrimToCount(best, canonicalItem.Quantity, TrimAxis);
+
+            best = RebindAndUnCanonicalize(best, originalDrawing, sourceAngle);
 
             ReportProgress(progress, new ProgressReport
             {
@@ -106,6 +119,31 @@ namespace OpenNest
             });
 
             return best;
+        }
+
+        /// <summary>
+        /// Single exit point for canonical -> source frame conversion. Rebinds every Part to the
+        /// original Drawing (so consumers see the user's drawing identity, not the transient canonical copy)
+        /// and composes sourceAngle onto each Part's rotation via CanonicalFrame.FromCanonical.
+        /// </summary>
+        private static List<Part> RebindAndUnCanonicalize(List<Part> parts, Drawing original, double sourceAngle)
+        {
+            if (parts == null || parts.Count == 0)
+                return parts;
+
+            for (var i = 0; i < parts.Count; i++)
+            {
+                var p = parts[i];
+                // Rebind to `original` while preserving world pose. CreateAtOrigin rotates
+                // at the origin (keeping bbox at world (0,0)) then we offset to match p's bbox.
+                var rebound = Part.CreateAtOrigin(original, p.Rotation);
+                var delta = p.BoundingBox.Location - rebound.BoundingBox.Location;
+                rebound.Offset(delta);
+                rebound.UpdateBounds();
+                parts[i] = rebound;
+            }
+
+            return CanonicalFrame.FromCanonical(parts, sourceAngle);
         }
 
         /// <summary>
