@@ -97,3 +97,60 @@ public class CanonicalAngleTests
         Assert.Equal(0.0, CanonicalAngle.Compute(d), precision: 6);
     }
 }
+
+public class DrawingCanonicalAngleWiringTests
+{
+    private static OpenNest.CNC.Program RotatedRectProgram(double w, double h, double theta)
+    {
+        var pgm = new OpenNest.CNC.Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        if (!OpenNest.Math.Tolerance.IsEqualTo(theta, 0))
+            pgm.Rotate(theta, pgm.BoundingBox().Center);
+        return pgm;
+    }
+
+    [Fact]
+    public void Constructor_ComputesAngleOnProgramAssignment()
+    {
+        var pgm = RotatedRectProgram(100, 50, 0.5);
+        var d = new Drawing("r", pgm);
+        Assert.InRange(d.Source.Angle, -0.52, -0.48);
+    }
+
+    [Fact]
+    public void SetProgram_RecomputesAngle()
+    {
+        var d = new Drawing("r", RotatedRectProgram(100, 50, 0.0));
+        Assert.Equal(0.0, d.Source.Angle, precision: 6);
+
+        d.Program = RotatedRectProgram(100, 50, 0.5);
+        Assert.InRange(d.Source.Angle, -0.52, -0.48);
+    }
+
+    [Fact]
+    public void IsCutOff_SkipsAngleComputation()
+    {
+        var d = new Drawing("cut", RotatedRectProgram(100, 50, 0.5)) { IsCutOff = true };
+        // Re-assign after flag is set so the setter observes IsCutOff.
+        d.Program = RotatedRectProgram(100, 50, 0.5);
+        Assert.Equal(0.0, d.Source.Angle, precision: 6);
+    }
+
+    [Fact]
+    public void RecomputeCanonicalAngle_UpdatesAfterMutation()
+    {
+        var d = new Drawing("r", RotatedRectProgram(100, 50, 0.0));
+        Assert.Equal(0.0, d.Source.Angle, precision: 6);
+
+        // Mutate in-place (doesn't trigger setter).
+        d.Program.Rotate(0.5, d.Program.BoundingBox().Center);
+        Assert.Equal(0.0, d.Source.Angle, precision: 6); // still stale
+
+        d.RecomputeCanonicalAngle();
+        Assert.InRange(d.Source.Angle, -0.52, -0.48);
+    }
+}

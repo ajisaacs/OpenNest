@@ -54,9 +54,9 @@ namespace OpenNest
             Id = Interlocked.Increment(ref nextId);
             Name = name;
             Material = new Material();
-            Program = pgm;
             Constraints = new NestConstraints();
             Source = new SourceInfo();
+            Program = pgm;
         }
 
         public int Id { get; }
@@ -78,7 +78,27 @@ namespace OpenNest
             {
                 program = value;
                 UpdateArea();
+                RecomputeCanonicalAngle();
             }
+        }
+
+        /// <summary>
+        /// Recomputes and stores the canonical angle from the current Program.
+        /// Callers that mutate Program in place (rather than reassigning it) must invoke this explicitly.
+        /// Cut-off drawings are left with Angle=0.
+        /// </summary>
+        public void RecomputeCanonicalAngle()
+        {
+            if (Source == null)
+                Source = new SourceInfo();
+
+            if (program == null || IsCutOff)
+            {
+                Source.Angle = 0.0;
+                return;
+            }
+
+            Source.Angle = CanonicalAngle.Compute(this);
         }
 
         public Color Color { get; set; }
