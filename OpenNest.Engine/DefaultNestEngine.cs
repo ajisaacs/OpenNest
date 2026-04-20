@@ -139,6 +139,10 @@ namespace OpenNest
             var bestFits = BestFitCache.GetOrCompute(
                 drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
 
+            // Build pair candidates with a canonical drawing so their geometry matches
+            // the coordinate frame of the cached fit results.
+            var canonicalDrawing = CanonicalFrame.AsCanonicalCopy(drawing);
+
             List<Part> bestPlacement = null;
 
             foreach (var fit in bestFits)
@@ -152,7 +156,7 @@ namespace OpenNest
                 if (fit.LongestSide > System.Math.Max(workArea.Width, workArea.Length) + Tolerance.Epsilon)
                     continue;
 
-                var landscape = fit.BuildParts(drawing);
+                var landscape = fit.BuildParts(canonicalDrawing);
                 var portrait = RotatePair90(landscape);
 
                 var lFits = TryOffsetToWorkArea(landscape, workArea);
@@ -174,6 +178,8 @@ namespace OpenNest
                     bestPlacement = candidate;
             }
 
+            // Parts are returned in canonical frame, bound to the canonical drawing.
+            // The outer Fill wrapper (Task 7) rebinds to `drawing` and composes sourceAngle onto rotation.
             return bestPlacement;
         }
 

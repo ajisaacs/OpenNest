@@ -24,6 +24,9 @@ namespace OpenNest.Engine.BestFit
             if (_cache.TryGetValue(key, out var cached))
                 return cached;
 
+            // Operate on the canonical frame so cached pair positions are orientation-invariant.
+            var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
+
             IPairEvaluator evaluator = null;
             ISlideComputer slideComputer = null;
 
@@ -31,7 +34,7 @@ namespace OpenNest.Engine.BestFit
             {
                 if (CreateEvaluator != null)
                 {
-                    try { evaluator = CreateEvaluator(drawing, spacing); }
+                    try { evaluator = CreateEvaluator(canonical, spacing); }
                     catch { /* fall back to default evaluator */ }
                 }
 
@@ -42,7 +45,7 @@ namespace OpenNest.Engine.BestFit
                 }
 
                 var finder = new BestFitFinder(plateWidth, plateHeight, evaluator, slideComputer);
-                var results = finder.FindBestFits(drawing, spacing, StepSize);
+                var results = finder.FindBestFits(canonical, spacing, StepSize);
 
                 _cache.TryAdd(key, results);
                 return results;
@@ -86,9 +89,12 @@ namespace OpenNest.Engine.BestFit
 
             try
             {
+                // Operate on the canonical frame so cached pair positions are orientation-invariant.
+                var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
+
                 if (CreateEvaluator != null)
                 {
-                    try { evaluator = CreateEvaluator(drawing, spacing); }
+                    try { evaluator = CreateEvaluator(canonical, spacing); }
                     catch { /* fall back to default evaluator */ }
                 }
 
@@ -100,7 +106,7 @@ namespace OpenNest.Engine.BestFit
 
                 // Compute candidates and evaluate once with the largest plate.
                 var finder = new BestFitFinder(maxWidth, maxHeight, evaluator, slideComputer);
-                var baseResults = finder.FindBestFits(drawing, spacing, StepSize);
+                var baseResults = finder.FindBestFits(canonical, spacing, StepSize);
 
                 // Cache a filtered copy for each plate size.
                 foreach (var size in needed)
