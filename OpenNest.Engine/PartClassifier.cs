@@ -64,8 +64,8 @@ namespace OpenNest.Engine
             var mbrArea = mbr.Area;
             var mbrPerimeter = 2 * (mbr.Width + mbr.Height);
 
-            // Store primary angle (negated to align MBR with axes, same as RotationAnalysis).
-            result.PrimaryAngle = -mbr.Angle;
+            // Share the single angle formula with CanonicalAngle (no duplicate MBR compute).
+            result.PrimaryAngle = CanonicalAngle.FromMbr(mbr);
 
             // Drawing perimeter for circularity and perimeter ratio.
             var drawingPerimeter = polygon.Perimeter();
