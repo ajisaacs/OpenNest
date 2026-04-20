@@ -27,7 +27,10 @@ namespace OpenNest.Engine.ML
     {
         public static PartFeatures Extract(Drawing drawing)
         {
-            var entities = OpenNest.Converters.ConvertProgram.ToGeometry(drawing.Program)
+            // Normalize to canonical frame so features are invariant to import orientation.
+            var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
+
+            var entities = OpenNest.Converters.ConvertProgram.ToGeometry(canonical.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid)
                 .ToList();
 
@@ -45,18 +48,18 @@ namespace OpenNest.Engine.ML
 
             var features = new PartFeatures
             {
-                Area = drawing.Area,
-                Convexity = drawing.Area / (hullArea > 0 ? hullArea : 1.0),
+                Area = canonical.Area,
+                Convexity = canonical.Area / (hullArea > 0 ? hullArea : 1.0),
                 AspectRatio = bb.Length / (bb.Width > 0 ? bb.Width : 1.0),
-                BoundingBoxFill = drawing.Area / (bb.Area() > 0 ? bb.Area() : 1.0),
+                BoundingBoxFill = canonical.Area / (bb.Area() > 0 ? bb.Area() : 1.0),
                 VertexCount = polygon.Vertices.Count,
                 Bitmask = GenerateBitmask(polygon, 32)
             };
 
             // Circularity = 4 * PI * Area / Perimeter^2
             var perimeterLen = polygon.Perimeter();
-            features.Circularity = (4 * System.Math.PI * drawing.Area) / (perimeterLen * perimeterLen);
-            features.PerimeterToAreaRatio = drawing.Area > 0 ? perimeterLen / drawing.Area : 0;
+            features.Circularity = (4 * System.Math.PI * canonical.Area) / (perimeterLen * perimeterLen);
+            features.PerimeterToAreaRatio = canonical.Area > 0 ? perimeterLen / canonical.Area : 0;
 
             return features;
         }
