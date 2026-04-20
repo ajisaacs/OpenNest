@@ -186,10 +186,11 @@ namespace OpenNest
 
         /// <summary>
         /// Rotation (radians) that maps the source program geometry to its canonical
-        /// (MBR-axis-aligned) frame. A value of 0 means the drawing is already canonical.
-        /// Task 3 will wire <see cref="Drawing.Program"/> setter to populate this via
-        /// <see cref="CanonicalAngle.Compute"/>; for now it is assigned manually by
-        /// engine helpers (see <c>OpenNest.Engine.CanonicalFrame</c>).
+        /// (MBR-axis-aligned) frame. Populated automatically by the <see cref="Drawing.Program"/>
+        /// setter via <see cref="CanonicalAngle.Compute"/>. A value of 0 means the drawing is
+        /// already canonical or <see cref="Drawing.IsCutOff"/> is true. Callers that mutate
+        /// <see cref="Drawing.Program"/> in place must invoke
+        /// <see cref="Drawing.RecomputeCanonicalAngle"/> to refresh.
         /// </summary>
         public double Angle { get; set; }
     }
