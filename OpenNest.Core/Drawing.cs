@@ -163,5 +163,14 @@ namespace OpenNest
         /// Offset distances to the original location.
         /// </summary>
         public Vector Offset { get; set; }
+
+        /// <summary>
+        /// Rotation (radians) that maps the source program geometry to its canonical
+        /// (MBR-axis-aligned) frame. A value of 0 means the drawing is already canonical.
+        /// Task 3 will wire <see cref="Drawing.Program"/> setter to populate this via
+        /// <see cref="CanonicalAngle.Compute"/>; for now it is assigned manually by
+        /// engine helpers (see <c>OpenNest.Engine.CanonicalFrame</c>).
+        /// </summary>
+        public double Angle { get; set; }
     }
 }
