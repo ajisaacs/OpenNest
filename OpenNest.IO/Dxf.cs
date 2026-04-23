@@ -65,6 +65,36 @@ namespace OpenNest.IO
             }
         }
 
+        public static List<Entity> GetGeometry(string path, Func<string, bool> layerFilter)
+        {
+            try
+            {
+                using var reader = new DxfReader(path);
+                var doc = reader.Read();
+                return ConvertEntities(doc, layerFilter);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                return new List<Entity>();
+            }
+        }
+
+        public static List<Entity> GetGeometry(Stream stream, Func<string, bool> layerFilter)
+        {
+            try
+            {
+                using var reader = new DxfReader(stream);
+                var doc = reader.Read();
+                return ConvertEntities(doc, layerFilter);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                return new List<Entity>();
+            }
+        }
+
         #endregion
 
         #region Export
@@ -128,15 +158,16 @@ namespace OpenNest.IO
             }
         }
 
-        private static List<Entity> ConvertEntities(CadDocument doc)
+        private static List<Entity> ConvertEntities(CadDocument doc, Func<string, bool> layerFilter = null)
         {
             var entities = new List<Entity>();
             var lines = new List<Line>();
             var arcs = new List<Arc>();
+            var filter = layerFilter ?? IsNonCutLayer;
 
             foreach (var entity in doc.Entities)
             {
-                if (IsNonCutLayer(entity.Layer?.Name))
+                if (filter(entity.Layer?.Name))
                     continue;
 
                 switch (entity)
