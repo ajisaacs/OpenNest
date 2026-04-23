@@ -1,4 +1,4 @@
-using OpenNest.IO.Bom;
+using OpenNest.Math;
 using System;
 using System.Drawing;
 using System.Text;

@@ -3,7 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace OpenNest.IO.Bom
+namespace OpenNest.Math
 {
     public static class Fraction
     {
