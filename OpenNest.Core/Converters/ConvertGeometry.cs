@@ -1,5 +1,6 @@
 ﻿using OpenNest.CNC;
 using OpenNest.Geometry;
+using OpenNest.Math;
 using System.Collections.Generic;
 
 namespace OpenNest.Converters
@@ -86,7 +87,16 @@ namespace OpenNest.Converters
 
             lastpt = endpt;
 
-            pgm.ArcTo(endpt, arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW);
+            var sweep = System.Math.Abs(arc.SweepAngle());
+            if (sweep < Tolerance.Epsilon || sweep.IsEqualTo(Angle.TwoPI))
+            {
+                pgm.LineTo(endpt);
+            }
+            else
+            {
+                pgm.ArcTo(endpt, arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW);
+            }
+
             return lastpt;
         }
 

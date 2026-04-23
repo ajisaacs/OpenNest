@@ -173,7 +173,11 @@ namespace OpenNest.Geometry
 
             if (maxDev <= tolerance)
             {
-                results.Add(CreateArc(arcCenter, radius, center, semiMajor, semiMinor, rotation, t0, t1));
+                var arc = CreateArc(arcCenter, radius, center, semiMajor, semiMinor, rotation, t0, t1);
+                if (arc.SweepAngle() < Tolerance.Epsilon)
+                    results.Add(new Line(p0, p1));
+                else
+                    results.Add(arc);
             }
             else
             {
