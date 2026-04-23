@@ -181,12 +181,21 @@ namespace OpenNest.IO
         {
             var center = new Vector(ellipse.Center.X, ellipse.Center.Y);
             var majorAxis = new Vector(ellipse.MajorAxisEndPoint.X, ellipse.MajorAxisEndPoint.Y);
-            var semiMajor = System.Math.Sqrt(majorAxis.X * majorAxis.X + majorAxis.Y * majorAxis.Y);
-            var semiMinor = semiMajor * ellipse.RadiusRatio;
-            var rotation = System.Math.Atan2(majorAxis.Y, majorAxis.X);
 
             var startParam = ellipse.StartParameter;
             var endParam = ellipse.EndParameter;
+
+            if (ellipse.Normal.Z < 0)
+            {
+                var newStart = OpenNest.Math.Angle.TwoPI - endParam;
+                var newEnd = OpenNest.Math.Angle.TwoPI - startParam;
+                startParam = newStart;
+                endParam = newEnd;
+            }
+
+            var semiMajor = System.Math.Sqrt(majorAxis.X * majorAxis.X + majorAxis.Y * majorAxis.Y);
+            var semiMinor = semiMajor * ellipse.RadiusRatio;
+            var rotation = System.Math.Atan2(majorAxis.Y, majorAxis.X);
 
             var layer = ellipse.Layer.ToOpenNest();
             var color = ellipse.ResolveColor();

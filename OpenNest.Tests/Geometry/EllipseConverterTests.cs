@@ -1,4 +1,5 @@
 using OpenNest.Geometry;
+using OpenNest.IO;
 using OpenNest.Math;
 using Xunit;
 using System.Linq;
@@ -242,6 +243,81 @@ public class EllipseConverterTests
             if (System.IO.File.Exists(tempPath))
                 System.IO.File.Delete(tempPath);
         }
+    }
+
+    [Fact]
+    public void ToOpenNest_FlippedNormalZ_ProducesCorrectArcs()
+    {
+        var normal = new ACadSharp.Entities.Ellipse
+        {
+            Center = new CSMath.XYZ(-0.275, -0.245, 0),
+            MajorAxisEndPoint = new CSMath.XYZ(0.0001, 1.245, 0),
+            RadiusRatio = 0.28,
+            StartParameter = 0.017,
+            EndParameter = 1.571,
+            Normal = new CSMath.XYZ(0, 0, 1)
+        };
+
+        var flipped = new ACadSharp.Entities.Ellipse
+        {
+            Center = new CSMath.XYZ(0.275, -0.245, 0),
+            MajorAxisEndPoint = new CSMath.XYZ(-0.0001, 1.245, 0),
+            RadiusRatio = 0.28,
+            StartParameter = 0.017,
+            EndParameter = 1.571,
+            Normal = new CSMath.XYZ(0, 0, -1)
+        };
+
+        var normalArcs = normal.ToOpenNest();
+        var flippedArcs = flipped.ToOpenNest();
+
+        Assert.True(normalArcs.Count > 0);
+        Assert.True(flippedArcs.Count > 0);
+        Assert.True(normalArcs.All(e => e is Arc));
+        Assert.True(flippedArcs.All(e => e is Arc));
+
+        var normalFirst = (Arc)normalArcs.First();
+        var flippedFirst = (Arc)flippedArcs.First();
+        var normalStart = GetArcStart(normalFirst);
+        var flippedStart = GetArcStart(flippedFirst);
+
+        Assert.True(normalStart.X < 0, $"Normal ellipse start X should be negative, got {normalStart.X}");
+        Assert.True(flippedStart.X > 0, $"Flipped ellipse should bulge right, got {flippedStart.X}");
+
+        var normalBbox = GetBoundingBox(normalArcs.Cast<Arc>());
+        var flippedBbox = GetBoundingBox(flippedArcs.Cast<Arc>());
+        Assert.True(flippedBbox.minX > 0, $"Flipped ellipse should stay on positive X side, minX={flippedBbox.minX}");
+        Assert.True(normalBbox.maxX < 0, $"Normal ellipse should stay on negative X side, maxX={normalBbox.maxX}");
+    }
+
+    private static (double minX, double maxX) GetBoundingBox(IEnumerable<Arc> arcs)
+    {
+        var minX = double.MaxValue;
+        var maxX = double.MinValue;
+        foreach (var arc in arcs)
+        {
+            var s = GetArcStart(arc);
+            var e = GetArcEnd(arc);
+            minX = System.Math.Min(minX, System.Math.Min(s.X, e.X));
+            maxX = System.Math.Max(maxX, System.Math.Max(s.X, e.X));
+        }
+        return (minX, maxX);
+    }
+
+    private static Vector GetArcStart(Arc arc)
+    {
+        var angle = arc.IsReversed ? arc.EndAngle : arc.StartAngle;
+        return new Vector(
+            arc.Center.X + arc.Radius * System.Math.Cos(angle),
+            arc.Center.Y + arc.Radius * System.Math.Sin(angle));
+    }
+
+    private static Vector GetArcEnd(Arc arc)
+    {
+        var angle = arc.IsReversed ? arc.StartAngle : arc.EndAngle;
+        return new Vector(
+            arc.Center.X + arc.Radius * System.Math.Cos(angle),
+            arc.Center.Y + arc.Radius * System.Math.Sin(angle));
     }
 
     private static double MaxDeviationFromEllipse(Arc arc, Vector ellipseCenter,
