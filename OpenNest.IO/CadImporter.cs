@@ -5,6 +5,7 @@ using OpenNest.Bending;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO.Bending;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {
@@ -24,6 +25,8 @@ namespace OpenNest.IO
             options ??= CadImportOptions.Default;
 
             var dxf = Dxf.Import(path);
+
+            RemoveDuplicateArcs(dxf.Entities);
 
             var bends = new List<Bend>();
             if (options.DetectBends && dxf.Document != null)
@@ -135,6 +138,34 @@ namespace OpenNest.IO
                     .Select(e => e.Id));
 
             return drawing;
+        }
+
+        internal static void RemoveDuplicateArcs(List<Entity> entities)
+        {
+            var circles = entities.OfType<Circle>().ToList();
+            var arcs = entities.OfType<Arc>().ToList();
+            var arcsToRemove = new List<Arc>();
+
+            foreach (var arc in arcs)
+            {
+                foreach (var circle in circles)
+                {
+                    if (arc.Layer?.Name != circle.Layer?.Name)
+                        continue;
+
+                    if (!arc.Center.DistanceTo(circle.Center).IsEqualTo(0))
+                        continue;
+
+                    if (!arc.Radius.IsEqualTo(circle.Radius))
+                        continue;
+
+                    arcsToRemove.Add(arc);
+                    break;
+                }
+            }
+
+            foreach (var arc in arcsToRemove)
+                entities.Remove(arc);
         }
     }
 }
