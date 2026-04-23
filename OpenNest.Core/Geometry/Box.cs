@@ -1,8 +1,9 @@
-﻿using OpenNest.Math;
+﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
-    public class Box
+    public class Box : IComparable<Box>
     {
         public static readonly Box Empty = new Box();
 
@@ -214,5 +215,19 @@ namespace OpenNest.Geometry
         {
             return string.Format("[Box: X={0}, Y={1}, Width={2}, Length={3}]", X, Y, Width, Length);
         }
+
+        public int CompareTo(Box other)
+        {
+            var cmp = Width.CompareTo(other.Width);
+            return cmp != 0 ? cmp : Length.CompareTo(other.Length);
+        }
+
+        public static bool operator >(Box a, Box b) => a.CompareTo(b) > 0;
+
+        public static bool operator <(Box a, Box b) => a.CompareTo(b) < 0;
+
+        public static bool operator >=(Box a, Box b) => a.CompareTo(b) >= 0;
+
+        public static bool operator <=(Box a, Box b) => a.CompareTo(b) <= 0;
     }
 }
