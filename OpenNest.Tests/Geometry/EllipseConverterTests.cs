@@ -2,13 +2,17 @@ using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Math;
 using Xunit;
+using Xunit.Abstractions;
 using System.Linq;
 
 namespace OpenNest.Tests.Geometry;
 
 public class EllipseConverterTests
 {
+    private readonly ITestOutputHelper _output;
     private const double Tol = 1e-10;
+
+    public EllipseConverterTests(ITestOutputHelper output) => _output = output;
 
     [Fact]
     public void EvaluatePoint_AtZero_ReturnsMajorAxisEnd()
@@ -242,6 +246,26 @@ public class EllipseConverterTests
         {
             if (System.IO.File.Exists(tempPath))
                 System.IO.File.Delete(tempPath);
+        }
+    }
+
+    [Fact]
+    public void DxfImport_ArcBoundingBoxes_Diagnostic()
+    {
+        var path = @"C:\Users\aisaacs\Desktop\11ga tab.dxf";
+        if (!System.IO.File.Exists(path)) return;
+
+        var result = Dxf.Import(path);
+        var all = (System.Collections.Generic.IEnumerable<IBoundable>)result.Entities;
+        var bbox = all.GetBoundingBox();
+        _output.WriteLine($"Overall: X={bbox.X:F4} Y={bbox.Y:F4} W={bbox.Length:F4} H={bbox.Width:F4}");
+
+        for (var i = 0; i < result.Entities.Count; i++)
+        {
+            var e = result.Entities[i];
+            var b = e.BoundingBox;
+            var flag = (b.Length > 1 || b.Width > 1) ? " ***" : "";
+            _output.WriteLine($"{i + 1,3}. {e.GetType().Name,-8} X={b.X:F4} Y={b.Y:F4} W={b.Length:F4} H={b.Width:F4}{flag}");
         }
     }
 

@@ -404,26 +404,29 @@ namespace OpenNest.Geometry
                 maxY = startpt.Y;
             }
 
-            var angle1 = StartAngle;
-            var angle2 = EndAngle;
+            var sweep = SweepAngle();
+            if (sweep > Tolerance.Epsilon)
+            {
+                var angle1 = StartAngle;
+                var angle2 = EndAngle;
 
-            // switch the angle to counter clockwise.
-            if (IsReversed)
-                Generic.Swap(ref angle1, ref angle2);
+                if (IsReversed)
+                    Generic.Swap(ref angle1, ref angle2);
 
-            if (Angle.IsBetweenRad(Angle.HalfPI, angle1, angle2))
-                maxY = Center.Y + Radius;
+                if (Angle.IsBetweenRad(Angle.HalfPI, angle1, angle2))
+                    maxY = Center.Y + Radius;
 
-            if (Angle.IsBetweenRad(System.Math.PI, angle1, angle2))
-                minX = Center.X - Radius;
+                if (Angle.IsBetweenRad(System.Math.PI, angle1, angle2))
+                    minX = Center.X - Radius;
 
-            const double oneHalfPI = System.Math.PI * 1.5;
+                const double oneHalfPI = System.Math.PI * 1.5;
 
-            if (Angle.IsBetweenRad(oneHalfPI, angle1, angle2))
-                minY = Center.Y - Radius;
+                if (Angle.IsBetweenRad(oneHalfPI, angle1, angle2))
+                    minY = Center.Y - Radius;
 
-            if (Angle.IsBetweenRad(Angle.TwoPI, angle1, angle2))
-                maxX = Center.X + Radius;
+                if (Angle.IsBetweenRad(Angle.TwoPI, angle1, angle2))
+                    maxX = Center.X + Radius;
+            }
 
             boundingBox.X = minX;
             boundingBox.Y = minY;
