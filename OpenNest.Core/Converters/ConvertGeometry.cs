@@ -82,7 +82,7 @@ namespace OpenNest.Converters
             var startpt = arc.StartPoint();
             var endpt = arc.EndPoint();
 
-            if (startpt != lastpt)
+            if (startpt.DistanceTo(lastpt) > Tolerance.ChainTolerance)
                 pgm.MoveTo(startpt);
 
             lastpt = endpt;
@@ -104,7 +104,7 @@ namespace OpenNest.Converters
         {
             var startpt = new Vector(circle.Center.X + circle.Radius, circle.Center.Y);
 
-            if (startpt != lastpt)
+            if (startpt.DistanceTo(lastpt) > Tolerance.ChainTolerance)
                 pgm.MoveTo(startpt);
 
             pgm.ArcTo(startpt, circle.Center, circle.Rotation);
@@ -115,7 +115,7 @@ namespace OpenNest.Converters
 
         private static Vector AddLine(Program pgm, Vector lastpt, Line line)
         {
-            if (line.StartPoint != lastpt)
+            if (line.StartPoint.DistanceTo(lastpt) > Tolerance.ChainTolerance)
                 pgm.MoveTo(line.StartPoint);
 
             var move = new LinearMove(line.EndPoint);

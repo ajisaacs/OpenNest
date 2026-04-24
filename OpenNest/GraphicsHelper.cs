@@ -138,9 +138,20 @@ namespace OpenNest
                         break;
 
                     case CodeType.RapidMove:
-                        cutPath.StartFigure();
-                        leadPath.StartFigure();
-                        AddLine(cutPath, (RapidMove)code, mode, ref curpos);
+                        {
+                            var rapid = (RapidMove)code;
+                            var endpt = rapid.EndPoint;
+                            if (mode == Mode.Incremental)
+                                endpt += curpos;
+                            var dx = endpt.X - curpos.X;
+                            var dy = endpt.Y - curpos.Y;
+                            if (dx * dx + dy * dy > 0.001 * 0.001)
+                            {
+                                cutPath.StartFigure();
+                                leadPath.StartFigure();
+                            }
+                            curpos = endpt;
+                        }
                         break;
 
                     case CodeType.SubProgramCall:
@@ -300,8 +311,17 @@ namespace OpenNest
                         break;
 
                     case CodeType.RapidMove:
-                        Flush();
-                        AddLine(path, (RapidMove)code, mode, ref curpos);
+                        {
+                            var rapid = (RapidMove)code;
+                            var endpt = rapid.EndPoint;
+                            if (mode == Mode.Incremental)
+                                endpt += curpos;
+                            var dx = endpt.X - curpos.X;
+                            var dy = endpt.Y - curpos.Y;
+                            if (dx * dx + dy * dy > 0.001 * 0.001)
+                                Flush();
+                            curpos = endpt;
+                        }
                         break;
 
                     case CodeType.SubProgramCall:
