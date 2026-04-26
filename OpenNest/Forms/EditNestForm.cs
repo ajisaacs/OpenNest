@@ -346,7 +346,6 @@ namespace OpenNest.Forms
             drawings.ForEach(d => Nest.Drawings.Add(d));
 
             UpdateDrawingList();
-            tabControl1.SelectedIndex = 1;
         }
 
         public bool Export()
