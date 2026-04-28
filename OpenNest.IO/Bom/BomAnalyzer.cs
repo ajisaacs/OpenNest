@@ -42,6 +42,11 @@ namespace OpenNest.IO.Bom
                     var nameWithoutExt = Path.GetFileNameWithoutExtension(file);
                     dxfFiles[nameWithoutExt] = file;
                 }
+                foreach (var file in Directory.GetFiles(dxfFolder, "*.dwg"))
+                {
+                    var nameWithoutExt = Path.GetFileNameWithoutExtension(file);
+                    dxfFiles.TryAdd(nameWithoutExt, file);
+                }
             }
 
             // Partition items into: skipped, unmatched, or matched (grouped)
@@ -57,8 +62,8 @@ namespace OpenNest.IO.Bom
 
                 var lookupName = item.FileName;
 
-                // Strip .dxf extension if the BOM includes it
-                if (lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase))
+                if (lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
+                    || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase))
                     lookupName = Path.GetFileNameWithoutExtension(lookupName);
 
                 if (!folderExists)

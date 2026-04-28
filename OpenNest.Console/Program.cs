@@ -151,7 +151,8 @@ static class NestConsole
             f.EndsWith(NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase)
             || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
         var dxfFiles = options.InputFiles.Where(f =>
-            f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)).ToList();
+            f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase) ||
+            f.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)).ToList();
 
         // If we have a nest file, load it and optionally add DXFs.
         if (nestFile != null)
@@ -187,7 +188,7 @@ static class NestConsole
         // DXF-only mode: create a fresh nest.
         if (dxfFiles.Count == 0)
         {
-            Console.Error.WriteLine("Error: no nest (.nest) or DXF (.dxf) files specified");
+            Console.Error.WriteLine("Error: no nest (.nest) or CAD (.dxf/.dwg) files specified");
             return null;
         }
 
@@ -461,7 +462,7 @@ static class NestConsole
         Console.Error.WriteLine("Usage: OpenNest.Console <input-files...> [options]");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Arguments:");
-        Console.Error.WriteLine("  input-files            One or more .nest nest files or .dxf drawing files");
+        Console.Error.WriteLine("  input-files            One or more .nest nest files or .dxf/.dwg drawing files");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Modes:");
         Console.Error.WriteLine("  <nest.nest>             Load nest and fill (existing behavior)");

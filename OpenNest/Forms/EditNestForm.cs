@@ -329,7 +329,7 @@ namespace OpenNest.Forms
         {
             var dlg = new OpenFileDialog();
             dlg.Multiselect = true;
-            dlg.Filter = "DXF Files (*.dxf) | *.dxf";
+            dlg.Filter = "CAD Files (*.dxf;*.dwg)|*.dxf;*.dwg|DXF Files (*.dxf)|*.dxf|DWG Files (*.dwg)|*.dwg";
 
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;

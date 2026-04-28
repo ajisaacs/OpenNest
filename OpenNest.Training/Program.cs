@@ -89,8 +89,10 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
         new Size(48, 24), new Size(120, 10)
     };
 
-    var dxfFiles = Directory.GetFiles(dir, "*.dxf", SearchOption.AllDirectories);
-    Console.WriteLine($"Found {dxfFiles.Length} DXF files");
+    var dxfFiles = Directory.GetFiles(dir, "*.dxf", SearchOption.AllDirectories)
+        .Concat(Directory.GetFiles(dir, "*.dwg", SearchOption.AllDirectories))
+        .ToArray();
+    Console.WriteLine($"Found {dxfFiles.Length} CAD files");
     var resolvedDb = dbPath.EndsWith(".db", StringComparison.OrdinalIgnoreCase) ? dbPath : dbPath + ".db";
     Console.WriteLine($"Database: {Path.GetFullPath(resolvedDb)}");
     Console.WriteLine($"Sheet sizes: {sheetSuite.Length} configurations");

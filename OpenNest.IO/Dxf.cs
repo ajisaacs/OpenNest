@@ -27,8 +27,7 @@ namespace OpenNest.IO
         /// </summary>
         public static DxfImportResult Import(string path)
         {
-            using var reader = new DxfReader(path);
-            var doc = reader.Read();
+            var doc = ReadDocument(path);
 
             return new DxfImportResult
             {
@@ -41,8 +40,7 @@ namespace OpenNest.IO
         {
             try
             {
-                using var reader = new DxfReader(path);
-                var doc = reader.Read();
+                var doc = ReadDocument(path);
                 return ConvertEntities(doc);
             }
             catch (Exception ex)
@@ -112,6 +110,23 @@ namespace OpenNest.IO
         #endregion
 
         #region Private
+
+        private static bool IsDwg(string path) =>
+            Path.GetExtension(path).Equals(".dwg", StringComparison.OrdinalIgnoreCase);
+
+        private static CadDocument ReadDocument(string path)
+        {
+            if (IsDwg(path))
+            {
+                using var reader = new DwgReader(path);
+                return reader.Read();
+            }
+            else
+            {
+                using var reader = new DxfReader(path);
+                return reader.Read();
+            }
+        }
 
         private static List<Entity> ConvertEntities(CadDocument doc)
         {

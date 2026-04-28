@@ -473,7 +473,8 @@ namespace OpenNest.Forms
             {
                 var files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 var dxfFiles = files.Where(f =>
-                    f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)).ToArray();
+                    f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase) ||
+                    f.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)).ToArray();
                 if (dxfFiles.Length > 0)
                     AddFiles(dxfFiles);
             }

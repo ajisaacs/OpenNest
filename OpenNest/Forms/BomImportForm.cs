@@ -165,7 +165,8 @@ namespace OpenNest.Forms
                 else
                 {
                     var lookupName = item.FileName;
-                    if (lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase))
+                    if (lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
+                        || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase))
                         lookupName = Path.GetFileNameWithoutExtension(lookupName);
 
                     if (matchedPaths.TryGetValue(lookupName, out var dxfPath))
