@@ -16,15 +16,11 @@ namespace OpenNest.Actions
         private CutOffSettings settings;
         private CutOffAxis lockedAxis = CutOffAxis.Vertical;
         private Dictionary<Part, Entity> perimeterCache;
-        private readonly Timer debounceTimer;
-        private bool regeneratePending;
 
         public ActionCutOff(PlateView plateView)
             : base(plateView)
         {
             settings = plateView.CutOffSettings;
-            debounceTimer = new Timer { Interval = 16 };
-            debounceTimer.Tick += OnDebounce;
             ConnectEvents();
         }
 
@@ -40,8 +36,6 @@ namespace OpenNest.Actions
 
         public override void DisconnectEvents()
         {
-            debounceTimer.Stop();
-            debounceTimer.Dispose();
             plateView.MouseMove -= OnMouseMove;
             plateView.MouseDown -= OnMouseDown;
             plateView.KeyDown -= OnKeyDown;
@@ -58,18 +52,6 @@ namespace OpenNest.Actions
 
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
-            regeneratePending = true;
-            debounceTimer.Start();
-        }
-
-        private void OnDebounce(object sender, System.EventArgs e)
-        {
-            debounceTimer.Stop();
-
-            if (!regeneratePending)
-                return;
-
-            regeneratePending = false;
             var pt = plateView.CurrentPoint;
             previewCutOff = new CutOff(pt, lockedAxis);
             previewCutOff.Regenerate(plateView.Plate, settings, perimeterCache);
