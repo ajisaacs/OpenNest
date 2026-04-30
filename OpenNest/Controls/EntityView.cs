@@ -29,12 +29,14 @@ namespace OpenNest.Controls
         public List<Entity> SimplifierToleranceRight { get; set; }
         public List<Entity> OriginalEntities { get; set; }
         public bool ShowEntityLabels { get; set; }
+        public List<CadText> Texts { get; set; } = new List<CadText>();
 
         private readonly Pen gridPen = new Pen(Color.FromArgb(70, 70, 70));
         private readonly Dictionary<int, Pen> penCache = new Dictionary<int, Pen>();
         private readonly Font labelFont = new Font("Segoe UI", 7f);
         private readonly SolidBrush labelBrush = new SolidBrush(Color.FromArgb(220, 255, 255, 200));
         private readonly SolidBrush labelBackBrush = new SolidBrush(Color.FromArgb(33, 40, 48));
+        private readonly SolidBrush textBrush = new SolidBrush(Color.FromArgb(180, 200, 200, 200));
 
         public event EventHandler<Line> LinePicked;
         public event EventHandler PickCancelled;
@@ -115,6 +117,8 @@ namespace OpenNest.Controls
                 var pen = GetEntityPen(entity.Color);
                 DrawEntity(e.Graphics, entity, pen);
             }
+
+            DrawTexts(e.Graphics);
 
             if (ShowEntityLabels)
                 DrawEntityLabels(e.Graphics);
@@ -408,6 +412,7 @@ namespace OpenNest.Controls
                 labelFont.Dispose();
                 labelBrush.Dispose();
                 labelBackBrush.Dispose();
+                textBrush.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -472,6 +477,34 @@ namespace OpenNest.Controls
                 center.Y - radius,
                 diameter,
                 diameter);
+        }
+
+        private void DrawTexts(Graphics g)
+        {
+            if (Texts == null || Texts.Count == 0)
+                return;
+
+            using var sf = new StringFormat();
+
+            foreach (var text in Texts)
+            {
+                var pos = PointWorldToGraph(text.Position);
+                var fontSize = LengthWorldToGui(text.Height);
+                if (fontSize < 2f) continue;
+
+                var state = g.Save();
+                g.TranslateTransform(pos.X, pos.Y);
+
+                if (text.Rotation != 0)
+                    g.RotateTransform((float)OpenNest.Math.Angle.ToDegrees(text.Rotation));
+
+                sf.Alignment = text.HAlign;
+                sf.LineAlignment = text.VAlign;
+
+                using var font = new Font("Segoe UI", fontSize, GraphicsUnit.Pixel);
+                g.DrawString(text.Value, font, textBrush, 0, 0, sf);
+                g.Restore(state);
+            }
         }
 
         private void DrawPoint(Graphics g, Vector pt, Pen pen)

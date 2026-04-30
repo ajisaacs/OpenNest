@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ACadSharp;
 using OpenNest.Bending;
 using OpenNest.Geometry;
 
@@ -38,5 +39,11 @@ namespace OpenNest.IO
         /// Default drawing name (filename without extension, unless overridden).
         /// </summary>
         public string Name { get; set; }
+
+        /// <summary>
+        /// The raw CAD document from the source file. Available for callers
+        /// that need access to non-geometry entities (e.g., text annotations).
+        /// </summary>
+        public CadDocument Document { get; set; }
     }
 }

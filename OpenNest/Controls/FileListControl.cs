@@ -22,6 +22,7 @@ namespace OpenNest.Controls
         public HashSet<Guid> SuppressedEntityIds { get; set; }
         public Box Bounds { get; set; }
         public int EntityCount { get; set; }
+        public List<CadText> Texts { get; set; } = new();
     }
 
     public class FileListControl : Control

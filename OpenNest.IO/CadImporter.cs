@@ -47,6 +47,7 @@ namespace OpenNest.IO
                 Bounds = dxf.Entities.GetBoundingBox(),
                 SourcePath = path,
                 Name = options.Name ?? Path.GetFileNameWithoutExtension(path),
+                Document = dxf.Document,
             };
         }
 

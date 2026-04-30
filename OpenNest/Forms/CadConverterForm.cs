@@ -92,7 +92,8 @@ namespace OpenNest.Forms
                     Customer = string.Empty,
                     Bends = result.Bends,
                     Bounds = result.Bounds,
-                    EntityCount = result.Entities.Count
+                    EntityCount = result.Entities.Count,
+                    Texts = ExtractTexts(result.Document),
                 };
 
                 if (InvokeRequired)
@@ -152,6 +153,7 @@ namespace OpenNest.Forms
             entityView1.Entities.Clear();
             entityView1.Entities.AddRange(item.Entities);
             entityView1.Bends = item.Bends ?? new List<Bend>();
+            entityView1.Texts = item.Texts ?? new List<CadText>();
 
             item.Entities.ForEach(e => e.IsVisible = true);
             if (item.Entities.Any(e => e.Layer != null))
@@ -803,6 +805,102 @@ namespace OpenNest.Forms
         }
 
         #endregion
+
+        private static List<CadText> ExtractTexts(ACadSharp.CadDocument doc)
+        {
+            var texts = new List<CadText>();
+            if (doc == null) return texts;
+
+            foreach (var entity in doc.Entities)
+            {
+                switch (entity)
+                {
+                    case ACadSharp.Entities.MText mtext:
+                        var (mh, mv) = MapAttachmentPoint(mtext.AttachmentPoint);
+                        texts.Add(new CadText
+                        {
+                            Position = new Vector(mtext.InsertPoint.X, mtext.InsertPoint.Y),
+                            Value = ReplaceControlCodes(StripMTextFormatting(mtext.Value)),
+                            Height = mtext.Height,
+                            Rotation = mtext.Rotation,
+                            LayerName = mtext.Layer?.Name,
+                            HAlign = mh,
+                            VAlign = mv,
+                        });
+                        break;
+
+                    case ACadSharp.Entities.TextEntity text:
+                        var useAlignment = text.HorizontalAlignment != 0
+                            || text.VerticalAlignment != 0;
+                        var pt = useAlignment ? text.AlignmentPoint : text.InsertPoint;
+                        var ha = text.HorizontalAlignment switch
+                        {
+                            ACadSharp.Entities.TextHorizontalAlignment.Center => System.Drawing.StringAlignment.Center,
+                            ACadSharp.Entities.TextHorizontalAlignment.Right => System.Drawing.StringAlignment.Far,
+                            _ => System.Drawing.StringAlignment.Near,
+                        };
+                        texts.Add(new CadText
+                        {
+                            Position = new Vector(pt.X, pt.Y),
+                            Value = ReplaceControlCodes(text.Value),
+                            Height = text.Height,
+                            Rotation = text.Rotation,
+                            LayerName = text.Layer?.Name,
+                            HAlign = ha,
+                        });
+                        break;
+                }
+            }
+
+            return texts;
+        }
+
+        private static (System.Drawing.StringAlignment h, System.Drawing.StringAlignment v) MapAttachmentPoint(
+            ACadSharp.Entities.AttachmentPointType apt)
+        {
+            var h = apt switch
+            {
+                ACadSharp.Entities.AttachmentPointType.TopCenter
+                    or ACadSharp.Entities.AttachmentPointType.MiddleCenter
+                    or ACadSharp.Entities.AttachmentPointType.BottomCenter => System.Drawing.StringAlignment.Center,
+                ACadSharp.Entities.AttachmentPointType.TopRight
+                    or ACadSharp.Entities.AttachmentPointType.MiddleRight
+                    or ACadSharp.Entities.AttachmentPointType.BottomRight => System.Drawing.StringAlignment.Far,
+                _ => System.Drawing.StringAlignment.Near,
+            };
+            var v = apt switch
+            {
+                ACadSharp.Entities.AttachmentPointType.MiddleLeft
+                    or ACadSharp.Entities.AttachmentPointType.MiddleCenter
+                    or ACadSharp.Entities.AttachmentPointType.MiddleRight => System.Drawing.StringAlignment.Center,
+                ACadSharp.Entities.AttachmentPointType.BottomLeft
+                    or ACadSharp.Entities.AttachmentPointType.BottomCenter
+                    or ACadSharp.Entities.AttachmentPointType.BottomRight => System.Drawing.StringAlignment.Far,
+                _ => System.Drawing.StringAlignment.Near,
+            };
+            return (h, v);
+        }
+
+        private static string StripMTextFormatting(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            var result = System.Text.RegularExpressions.Regex.Replace(text, @"\\[A-Za-z][^;]*;", "");
+            result = result.Replace("{", "").Replace("}", "");
+            return result.Trim();
+        }
+
+        private static string ReplaceControlCodes(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            return text
+                .Replace("%%p", "±")
+                .Replace("%%P", "±")
+                .Replace("%%d", "°")
+                .Replace("%%D", "°")
+                .Replace("%%c", "⌀")
+                .Replace("%%C", "⌀")
+                .Replace("%%%", "%");
+        }
 
         private void filterPanel_Paint(object sender, PaintEventArgs e)
         {
