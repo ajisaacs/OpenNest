@@ -27,6 +27,7 @@ namespace OpenNest.IO
             var dxf = Dxf.Import(path);
 
             RemoveDuplicateArcs(dxf.Entities);
+            RemoveZeroSweepArcs(dxf.Entities);
 
             var bends = new List<Bend>();
             if (options.DetectBends && dxf.Document != null)
@@ -139,6 +140,12 @@ namespace OpenNest.IO
                     .Select(e => e.Id));
 
             return drawing;
+        }
+
+        internal static void RemoveZeroSweepArcs(List<Entity> entities)
+        {
+            entities.RemoveAll(e =>
+                e is Arc arc && arc.StartAngle.IsEqualTo(arc.EndAngle, Tolerance.ChainTolerance));
         }
 
         internal static void RemoveDuplicateArcs(List<Entity> entities)
