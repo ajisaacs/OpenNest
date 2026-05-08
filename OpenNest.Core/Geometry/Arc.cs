@@ -93,6 +93,9 @@ namespace OpenNest.Geometry
             }
         }
 
+        public bool IsFullCircle() =>
+            SweepAngle() >= Angle.TwoPI - Tolerance.Epsilon;
+
         /// <summary>
         /// Angle in radians between start and end angles.
         /// </summary>

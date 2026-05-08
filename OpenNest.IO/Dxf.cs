@@ -163,6 +163,7 @@ namespace OpenNest.IO
             var entities = new List<Entity>();
             var lines = new List<Line>();
             var arcs = new List<Arc>();
+            var circles = new List<Circle>();
             var filter = layerFilter ?? IsNonCutLayer;
 
             foreach (var entity in doc.Entities)
@@ -181,7 +182,7 @@ namespace OpenNest.IO
                         break;
 
                     case ACadSharp.Entities.Circle circle:
-                        entities.Add(circle.ToOpenNest());
+                        circles.Add(circle.ToOpenNest());
                         break;
 
                     case ACadSharp.Entities.Spline spline:
@@ -212,7 +213,10 @@ namespace OpenNest.IO
 
             GeometryOptimizer.Optimize(lines);
             GeometryOptimizer.Optimize(arcs);
+            GeometryOptimizer.Deduplicate(circles);
+            GeometryOptimizer.Deduplicate(circles, arcs);
 
+            entities.AddRange(circles);
             entities.AddRange(lines);
             entities.AddRange(arcs);
 

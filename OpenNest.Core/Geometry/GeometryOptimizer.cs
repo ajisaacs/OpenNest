@@ -17,6 +17,38 @@ namespace OpenNest.Geometry
                 (list, item, i) => list.GetCollinearLines(item, i),
                 (Line a, Line b, out Line joined) => TryJoinLines(a, b, out joined));
 
+        public static void Deduplicate(IList<Circle> circles)
+        {
+            for (var i = circles.Count - 1; i >= 1; i--)
+            {
+                for (var j = i - 1; j >= 0; j--)
+                {
+                    if (circles[i].Center.DistanceTo(circles[j].Center) <= Tolerance.Epsilon
+                        && circles[i].Radius.IsEqualTo(circles[j].Radius))
+                    {
+                        circles.RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        public static void Deduplicate(IList<Circle> circles, IList<Arc> arcs)
+        {
+            for (var i = circles.Count - 1; i >= 0; i--)
+            {
+                for (var j = arcs.Count - 1; j >= 0; j--)
+                {
+                    if (arcs[j].Center.DistanceTo(circles[i].Center) <= Tolerance.Epsilon
+                        && arcs[j].Radius.IsEqualTo(circles[i].Radius)
+                        && arcs[j].IsFullCircle())
+                    {
+                        arcs.RemoveAt(j);
+                    }
+                }
+            }
+        }
+
         private delegate bool TryJoin<T>(T a, T b, out T joined);
 
         private static void MergePass<T>(IList<T> items,
