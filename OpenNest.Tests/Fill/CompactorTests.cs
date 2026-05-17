@@ -97,6 +97,33 @@ namespace OpenNest.Tests.Fill
             return part;
         }
 
+        private static Drawing MakeTriangleDrawing(params Vector[] points)
+        {
+            var pgm = new OpenNest.CNC.Program();
+            pgm.Codes.Add(new OpenNest.CNC.RapidMove(points[0]));
+
+            for (var i = 1; i < points.Length; i++)
+                pgm.Codes.Add(new OpenNest.CNC.LinearMove(points[i]));
+
+            pgm.Codes.Add(new OpenNest.CNC.LinearMove(points[0]));
+            return new Drawing("triangle", pgm);
+        }
+
+        private static Part MakeTrianglePart(params Vector[] points)
+        {
+            var part = new Part(MakeTriangleDrawing(points));
+            part.UpdateBounds();
+            return part;
+        }
+
+        private static Part MakeTrianglePart(double x, double y, params Vector[] points)
+        {
+            var part = MakeTrianglePart(points);
+            part.Location = new Vector(x, y);
+            part.UpdateBounds();
+            return part;
+        }
+
         [Fact]
         public void Push_Left_MovesPartTowardEdge()
         {
@@ -169,6 +196,86 @@ namespace OpenNest.Tests.Fill
 
             // Spacing should cause the part to stop at a different position than without spacing.
             Assert.NotEqual(distNoSpacing, distWithSpacing);
+        }
+
+        [Fact]
+        public void Push_Up_AllowsSharedDiagonalEdgeToSeparate()
+        {
+            var workArea = new Box(0, 0, 20, 20);
+            var obstacle = MakeTrianglePart(
+                new Vector(0, 0),
+                new Vector(10, 0),
+                new Vector(0, 10));
+            var movingPart = MakeTrianglePart(
+                new Vector(0, 10),
+                new Vector(10, 0),
+                new Vector(10, 10));
+
+            var distance = Compactor.Push(
+                new List<Part> { movingPart },
+                new List<Part> { obstacle },
+                workArea,
+                0,
+                PushDirection.Up);
+
+            Assert.True(distance > 0);
+            Assert.True(movingPart.BoundingBox.Top > 19.9);
+            Assert.False(movingPart.Intersects(obstacle, out _));
+        }
+
+        [Fact]
+        public void Push_Up_MovesAfterRightTriangleIsPushedLeftIntoSharedEdge()
+        {
+            var workArea = new Box(0, 0, 24, 24);
+            var leftTriangle = MakeTrianglePart(
+                2, 2,
+                new Vector(0, 0),
+                new Vector(8, 0),
+                new Vector(4, 10));
+            var rightTriangle = MakeTrianglePart(
+                14, 4,
+                new Vector(0, 10),
+                new Vector(8, 10),
+                new Vector(4, 0));
+
+            var moving = new List<Part> { rightTriangle };
+            var obstacles = new List<Part> { leftTriangle };
+
+            var leftDistance = Compactor.Push(moving, obstacles, workArea, 0, PushDirection.Left);
+            var yBeforePushUp = rightTriangle.Location.Y;
+            var bottomBeforePushUp = rightTriangle.BoundingBox.Bottom;
+
+            var upDistance = Compactor.Push(moving, obstacles, workArea, 0, PushDirection.Up);
+
+            Assert.True(leftDistance > 0);
+            Assert.True(upDistance > 0);
+            Assert.True(rightTriangle.Location.Y > yBeforePushUp);
+            Assert.True(rightTriangle.BoundingBox.Bottom > bottomBeforePushUp);
+            Assert.False(rightTriangle.Intersects(leftTriangle, out _));
+        }
+
+        [Fact]
+        public void Push_Left_BlocksWhenSharedDiagonalEdgeWouldOverlap()
+        {
+            var workArea = new Box(0, 0, 20, 20);
+            var obstacle = MakeTrianglePart(
+                new Vector(0, 0),
+                new Vector(10, 0),
+                new Vector(0, 10));
+            var movingPart = MakeTrianglePart(
+                new Vector(0, 10),
+                new Vector(10, 0),
+                new Vector(10, 10));
+
+            var distance = Compactor.Push(
+                new List<Part> { movingPart },
+                new List<Part> { obstacle },
+                workArea,
+                0,
+                PushDirection.Left);
+
+            Assert.Equal(0, distance);
+            Assert.Equal(0, movingPart.BoundingBox.Left);
         }
 
         [Fact]

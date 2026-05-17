@@ -1,6 +1,7 @@
 using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Fill
 {
@@ -14,7 +15,7 @@ namespace OpenNest.Engine.Fill
         public static double Push(List<Part> movingParts, Plate plate, PushDirection direction)
         {
             var obstacleParts = plate.Parts
-                .Where(p => !movingParts.Contains(p))
+                .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
             return Push(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, direction);
@@ -26,7 +27,7 @@ namespace OpenNest.Engine.Fill
         public static double Push(List<Part> movingParts, Plate plate, double angle)
         {
             var obstacleParts = plate.Parts
-                .Where(p => !movingParts.Contains(p))
+                .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
             var direction = new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
@@ -99,6 +100,13 @@ namespace OpenNest.Engine.Fill
                         : PartGeometry.GetPerimeterEntities(obstacleParts[i]);
 
                     var d = SpatialQuery.DirectionalDistance(movingEntities, obstacleEntities[i], direction);
+                    if (d <= Tolerance.Epsilon
+                        && partSpacing <= Tolerance.Epsilon
+                        && CanNudgeWithoutOverlap(moving, obstacleParts[i], direction))
+                    {
+                        continue;
+                    }
+
                     if (d < distance)
                         distance = d;
                 }
@@ -113,6 +121,31 @@ namespace OpenNest.Engine.Fill
             }
 
             return 0;
+        }
+
+        private static bool IntersectsAny(Part candidate, List<Part> parts)
+        {
+            for (var i = 0; i < parts.Count; i++)
+            {
+                if (candidate.Intersects(parts[i], out _))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool CanNudgeWithoutOverlap(Part moving, Part obstacle, Vector direction)
+        {
+            var nudge = direction * (Tolerance.Epsilon * 10);
+
+            moving.Offset(nudge);
+            try
+            {
+                return !moving.Intersects(obstacle, out _);
+            }
+            finally
+            {
+                moving.Offset(-nudge);
+            }
         }
 
         public static double Push(List<Part> movingParts, List<Part> obstacleParts,
@@ -130,7 +163,7 @@ namespace OpenNest.Engine.Fill
         public static double PushBoundingBox(List<Part> movingParts, Plate plate, PushDirection direction)
         {
             var obstacleParts = plate.Parts
-                .Where(p => !movingParts.Contains(p))
+                .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
             return PushBoundingBox(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, direction);
