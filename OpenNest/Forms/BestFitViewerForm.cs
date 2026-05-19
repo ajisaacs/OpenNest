@@ -45,6 +45,7 @@ namespace OpenNest.Forms
 
         public BestFitResult SelectedResult { get; private set; }
         public Drawing SelectedDrawing => activeDrawing;
+        public List<Part> SelectedParts { get; private set; }
 
         public BestFitViewerForm(DrawingCollection drawings, Plate plate, Units units = Units.Inches)
         {
@@ -318,11 +319,11 @@ namespace OpenNest.Forms
             var cell = new BestFitCell(colorScheme);
             cell.PartColor = partColor;
             cell.Dock = DockStyle.Fill;
+
+            var parts = result.BuildCanonicalParts();
             cell.Plate.Size = new Geometry.Size(
                 result.BoundingHeight,
                 result.BoundingWidth);
-
-            var parts = result.BuildParts(drawing);
 
             foreach (var part in parts)
                 cell.Plate.Parts.Add(part);
@@ -332,6 +333,7 @@ namespace OpenNest.Forms
             cell.DoubleClick += (sender, e) =>
             {
                 SelectedResult = result;
+                SelectedParts = result.BuildSourceParts(drawing);
                 DialogResult = DialogResult.OK;
                 Close();
             };

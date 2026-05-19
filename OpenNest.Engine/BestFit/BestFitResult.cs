@@ -1,6 +1,9 @@
+using OpenNest.Engine;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -53,6 +56,68 @@ namespace OpenNest.Engine.BestFit
             part2.Offset(offset);
 
             return new List<Part> { part1, part2 };
+        }
+
+        public List<Part> BuildCanonicalParts()
+        {
+            return NormalizeToCutOrigin(BuildParts(Candidate.Drawing));
+        }
+
+        public List<Part> BuildSourceParts(Drawing drawing)
+        {
+            var parts = BuildCanonicalParts();
+            var sourceAngle = drawing?.Source?.Angle ?? 0.0;
+
+            for (var i = 0; i < parts.Count; i++)
+            {
+                var p = parts[i];
+                var rebound = Part.CreateAtOrigin(drawing, p.Rotation);
+                var delta = p.BoundingBox.Location - rebound.BoundingBox.Location;
+                rebound.Offset(delta);
+                rebound.UpdateBounds();
+                parts[i] = rebound;
+            }
+
+            return NormalizeToCutOrigin(CanonicalFrame.FromCanonical(parts, sourceAngle));
+        }
+
+        public Box GetCutBounds(List<Part> parts)
+        {
+            return GetCutBoundingBox(parts);
+        }
+
+        private static List<Part> NormalizeToCutOrigin(List<Part> parts)
+        {
+            if (parts == null || parts.Count == 0)
+                return parts;
+
+            var bounds = GetCutBoundingBox(parts);
+            var offset = new Vector(-bounds.Left, -bounds.Bottom);
+
+            foreach (var part in parts)
+                part.Offset(offset);
+
+            return parts;
+        }
+
+        private static Box GetCutBoundingBox(List<Part> parts)
+        {
+            var entities = new List<IBoundable>();
+
+            foreach (var part in parts)
+            {
+                var partEntities = ConvertProgram.ToGeometry(part.Program)
+                    .Where(e => e.Layer != SpecialLayers.Rapid)
+                    .ToList();
+
+                foreach (var entity in partEntities)
+                {
+                    entity.Offset(part.Location);
+                    entities.Add(entity);
+                }
+            }
+
+            return entities.GetBoundingBox();
         }
     }
 
