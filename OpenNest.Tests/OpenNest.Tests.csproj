@@ -27,6 +27,7 @@
     <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
     <ProjectReference Include="..\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" />
+    <ProjectReference Include="..\OpenNest.Posts.GravographIS\OpenNest.Posts.GravographIS.csproj" />
     <ProjectReference Include="..\OpenNest\OpenNest.csproj" />
   </ItemGroup>
 

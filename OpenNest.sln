@@ -30,6 +30,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PostProcessors", "PostProce
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.Cincinnati", "OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj", "{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.GravographIS", "OpenNest.Posts.GravographIS\OpenNest.Posts.GravographIS.csproj", "{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Data", "OpenNest.Data\OpenNest.Data.csproj", "{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}"
 EndProject
 Global
@@ -186,12 +188,25 @@ Global
 		{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}.Release|x64.Build.0 = Release|Any CPU
 		{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}.Release|x86.ActiveCfg = Release|Any CPU
 		{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}.Release|x86.Build.0 = Release|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Debug|x64.Build.0 = Debug|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Debug|x86.Build.0 = Debug|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|x64.ActiveCfg = Release|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|x64.Build.0 = Release|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|x86.ActiveCfg = Release|Any CPU
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532} = {4052CFAC-1F12-48BE-872D-F503C3B65D7E}
+		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40} = {4052CFAC-1F12-48BE-872D-F503C3B65D7E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {86FE17B3-F764-40AE-BCAA-F26B470CA05C}

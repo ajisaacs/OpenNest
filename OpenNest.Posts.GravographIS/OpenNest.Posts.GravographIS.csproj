@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>OpenNest.Posts.GravographIS</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenNest.Tests" />
+  </ItemGroup>
+  <Target Name="CopyToPostsDir" AfterTargets="Build">
+    <PropertyGroup>
+      <PostsDir>..\OpenNest\bin\$(Configuration)\$(TargetFramework)\Posts\</PostsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(PostsDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
+  </Target>
+</Project>
