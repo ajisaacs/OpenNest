@@ -839,6 +839,13 @@ namespace OpenNest.Forms
                             ACadSharp.Entities.TextHorizontalAlignment.Right => System.Drawing.StringAlignment.Far,
                             _ => System.Drawing.StringAlignment.Near,
                         };
+                        var va = text.VerticalAlignment switch
+                        {
+                            ACadSharp.Entities.TextVerticalAlignmentType.Middle => System.Drawing.StringAlignment.Center,
+                            ACadSharp.Entities.TextVerticalAlignmentType.Top => System.Drawing.StringAlignment.Near,
+                            ACadSharp.Entities.TextVerticalAlignmentType.Bottom => System.Drawing.StringAlignment.Far,
+                            _ => System.Drawing.StringAlignment.Far,
+                        };
                         texts.Add(new CadText
                         {
                             Position = new Vector(pt.X, pt.Y),
@@ -847,6 +854,7 @@ namespace OpenNest.Forms
                             Rotation = text.Rotation,
                             LayerName = text.Layer?.Name,
                             HAlign = ha,
+                            VAlign = va,
                         });
                         break;
                 }
