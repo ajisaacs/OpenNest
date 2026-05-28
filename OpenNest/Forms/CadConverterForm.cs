@@ -45,6 +45,7 @@ namespace OpenNest.Forms
             filterPanel.AddBendLineClicked += OnAddBendLineClicked;
             entityView1.LinePicked += OnLinePicked;
             entityView1.PickCancelled += OnPickCancelled;
+            entityView1.TextConvertRequested += OnTextConvertRequested;
             btnSplit.Click += OnSplitClicked;
             numQuantity.ValueChanged += OnQuantityChanged;
             txtCustomer.TextChanged += OnCustomerChanged;
@@ -461,6 +462,115 @@ namespace OpenNest.Forms
         {
             entityView1.IsPickingBendLine = false;
             filterPanel.SetPickMode(false);
+        }
+
+        private void OnTextConvertRequested(object sender, Controls.CadText text)
+        {
+            var item = CurrentItem;
+            if (item == null) return;
+
+            var font = LoadChrFont();
+            if (font == null) return;
+
+            var layer = new Geometry.Layer("ENGRAVE")
+            {
+                Color = System.Drawing.Color.Cyan,
+                IsVisible = true,
+            };
+
+            var entities = font.RenderText(text.Value, text.Height, Geometry.Vector.Zero, layer);
+            if (entities.Count > 0)
+            {
+                var box = entities.GetBoundingBox();
+                var shiftX = text.HAlign switch
+                {
+                    System.Drawing.StringAlignment.Center => text.Position.X - (box.Left + box.Right) / 2,
+                    System.Drawing.StringAlignment.Far => text.Position.X - box.Right,
+                    _ => text.Position.X - box.Left,
+                };
+                var shiftY = text.VAlign switch
+                {
+                    System.Drawing.StringAlignment.Center => text.Position.Y - (box.Top + box.Bottom) / 2,
+                    System.Drawing.StringAlignment.Near => text.Position.Y - box.Top,
+                    _ => text.Position.Y - box.Bottom,
+                };
+                var shift = new Geometry.Vector(shiftX, shiftY);
+                foreach (var e in entities)
+                    e.Offset(shift);
+            }
+            if (entities.Count == 0)
+            {
+                MessageBox.Show($"No geometry produced for \"{text.Value}\".", "Convert Text",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            item.Entities.AddRange(entities);
+            item.Texts.Remove(text);
+            item.EntityCount = item.Entities.Count;
+            item.Bounds = item.Entities.GetBoundingBox();
+
+            entityView1.Entities.Clear();
+            entityView1.Entities.AddRange(item.Entities);
+            entityView1.Texts = item.Texts;
+            filterPanel.LoadItem(item.Entities, item.Bends);
+            entityView1.Invalidate();
+            staleProgram = true;
+            lblEntityCount.Text = $"{item.EntityCount} entities";
+        }
+
+        private ChrFont cachedChrFont;
+        private string cachedChrFontPath;
+
+        private ChrFont LoadChrFont()
+        {
+            if (cachedChrFont != null)
+                return cachedChrFont;
+
+            // Look for .CHR files next to the app, then prompt
+            var appDir = System.IO.Path.GetDirectoryName(Application.ExecutablePath);
+            var candidates = Directory.GetFiles(appDir, "*.CHR", SearchOption.TopDirectoryOnly);
+
+            string fontPath;
+            if (candidates.Length == 1)
+            {
+                fontPath = candidates[0];
+            }
+            else if (candidates.Length > 1)
+            {
+                fontPath = PromptForChrFile(appDir);
+            }
+            else
+            {
+                fontPath = PromptForChrFile(null);
+            }
+
+            if (fontPath == null)
+                return null;
+
+            try
+            {
+                cachedChrFont = ChrFont.Read(fontPath);
+                cachedChrFontPath = fontPath;
+                return cachedChrFont;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading font: {ex.Message}", "Font Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return null;
+            }
+        }
+
+        private static string PromptForChrFile(string initialDir)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Title = "Select Engraving Font (.CHR)",
+                Filter = "Gravograph Font (*.CHR)|*.CHR",
+                InitialDirectory = initialDir ?? "",
+            };
+            return dlg.ShowDialog() == DialogResult.OK ? dlg.FileName : null;
         }
 
         private void OnDragEnter(object sender, DragEventArgs e)

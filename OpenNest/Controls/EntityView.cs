@@ -40,6 +40,7 @@ namespace OpenNest.Controls
 
         public event EventHandler<Line> LinePicked;
         public event EventHandler PickCancelled;
+        public event EventHandler<CadText> TextConvertRequested;
 
         private bool isPickingBendLine;
         public bool IsPickingBendLine
@@ -75,6 +76,13 @@ namespace OpenNest.Controls
                 var line = HitTestLine(e.Location);
                 if (line != null)
                     LinePicked?.Invoke(this, line);
+            }
+
+            if (e.Button == MouseButtons.Right)
+            {
+                var text = HitTestText(e.Location);
+                if (text != null)
+                    ShowTextContextMenu(text, e.Location);
             }
         }
 
@@ -326,6 +334,41 @@ namespace OpenNest.Controls
             }
 
             return bestLine;
+        }
+
+        private CadText HitTestText(Point controlPoint)
+        {
+            if (Texts == null || Texts.Count == 0)
+                return null;
+
+            var worldPoint = PointControlToWorld(controlPoint);
+            var tolerance = LengthGuiToWorld(8);
+
+            foreach (var text in Texts)
+            {
+                if (string.IsNullOrEmpty(text.Value))
+                    continue;
+
+                var estimatedWidth = text.Height * text.Value.Length * 0.6;
+                var minX = text.Position.X - tolerance;
+                var maxX = text.Position.X + estimatedWidth + tolerance;
+                var minY = text.Position.Y - tolerance;
+                var maxY = text.Position.Y + text.Height + tolerance;
+
+                if (worldPoint.X >= minX && worldPoint.X <= maxX &&
+                    worldPoint.Y >= minY && worldPoint.Y <= maxY)
+                    return text;
+            }
+
+            return null;
+        }
+
+        private void ShowTextContextMenu(CadText text, Point location)
+        {
+            var menu = new ContextMenuStrip();
+            var item = menu.Items.Add($"Convert \"{text.Value}\" to Geometry");
+            item.Click += (s, e) => TextConvertRequested?.Invoke(this, text);
+            menu.Show(this, location);
         }
 
         private void DrawEntityLabels(Graphics g)

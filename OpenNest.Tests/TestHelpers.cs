@@ -1,7 +1,36 @@
+using System.Text.Json;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests;
+
+internal static class TestConfig
+{
+    private static readonly Lazy<Dictionary<string, string>> Config = new(() =>
+    {
+        var dir = AppContext.BaseDirectory;
+        for (var i = 0; i < 6; i++)
+        {
+            var path = Path.Combine(dir, "test-config.json");
+            if (File.Exists(path))
+            {
+                var json = File.ReadAllText(path);
+                return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
+            }
+            dir = Path.GetDirectoryName(dir)!;
+        }
+        return new();
+    });
+
+    public static string? Get(string key) =>
+        Config.Value.TryGetValue(key, out var val) ? val : null;
+
+    public static string? GetExistingPath(string key)
+    {
+        var path = Get(key);
+        return path != null && File.Exists(path) ? path : null;
+    }
+}
 
 internal static class TestHelpers
 {

@@ -213,3 +213,6 @@ docs/superpowers/
 
 # Launch settings
 **/Properties/launchSettings.json
+
+# Local test config (contains user-specific paths to proprietary test assets)
+OpenNest.Tests/test-config.json
