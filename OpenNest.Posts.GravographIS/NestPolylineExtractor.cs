@@ -1,15 +1,35 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 
 namespace OpenNest.Posts.GravographIS
 {
     /// <summary>
+    /// A polyline together with the <see cref="LayerType"/> of the moves that
+    /// produced it. The Gravograph post groups by layer to emit separate engrave
+    /// and cut passes (with a tool-change pause between them).
+    /// </summary>
+    public sealed class LayeredPolyline
+    {
+        public LayeredPolyline(List<Vector> points, LayerType layer)
+        {
+            Points = points;
+            Layer = layer;
+        }
+
+        public List<Vector> Points { get; }
+
+        public LayerType Layer { get; }
+    }
+
+    /// <summary>
     /// Lifts polylines out of an OpenNest <see cref="Nest"/> for the Gravograph
     /// backend. Walks each <see cref="Part"/>'s <see cref="Program"/>, breaks
-    /// polylines at rapid moves, and tessellates arcs to a chord-deviation
-    /// tolerance (the wire format takes line segments only).
+    /// polylines at rapid moves and at <see cref="LayerType"/> changes, and
+    /// tessellates arcs to a chord-deviation tolerance (the wire format takes
+    /// line segments only).
     /// </summary>
     public sealed class NestPolylineExtractor
     {
@@ -17,13 +37,31 @@ namespace OpenNest.Posts.GravographIS
 
         /// <summary>
         /// Extracts polylines from every non-cutoff part in every plate of the nest,
-        /// returning them in plate coordinates (inches).
+        /// returning them in plate coordinates (inches). Layer information is dropped;
+        /// use <see cref="ExtractLayered(Nest)"/> to keep it.
         /// </summary>
         public List<List<Vector>> Extract(Nest nest)
         {
+            return ExtractLayered(nest).Select(p => p.Points).ToList();
+        }
+
+        /// <summary>
+        /// Extracts polylines for a single part without layer information.
+        /// </summary>
+        public List<List<Vector>> ExtractPart(Part part)
+        {
+            return ExtractPartLayered(part).Select(p => p.Points).ToList();
+        }
+
+        /// <summary>
+        /// Extracts layer-tagged polylines from every non-cutoff part in every plate,
+        /// in plate coordinates (inches). Each polyline is layer-uniform.
+        /// </summary>
+        public List<LayeredPolyline> ExtractLayered(Nest nest)
+        {
             if (nest == null) throw new ArgumentNullException(nameof(nest));
 
-            var result = new List<List<Vector>>();
+            var result = new List<LayeredPolyline>();
 
             foreach (var plate in nest.Plates)
             {
@@ -40,17 +78,17 @@ namespace OpenNest.Posts.GravographIS
         }
 
         /// <summary>
-        /// Extracts polylines for a single part. Public so callers driving the
-        /// writer directly (e.g. from a console one-off) can use it.
+        /// Extracts layer-tagged polylines for a single part. Public so callers
+        /// driving the writer directly (e.g. from a console one-off) can use it.
         /// </summary>
-        public List<List<Vector>> ExtractPart(Part part)
+        public List<LayeredPolyline> ExtractPartLayered(Part part)
         {
-            var list = new List<List<Vector>>();
+            var list = new List<LayeredPolyline>();
             ExtractPart(part, list);
             return list;
         }
 
-        private void ExtractPart(Part part, List<List<Vector>> sink)
+        private void ExtractPart(Part part, List<LayeredPolyline> sink)
         {
             var program = part.Program;
             if (program == null) return;
@@ -67,6 +105,7 @@ namespace OpenNest.Posts.GravographIS
             var offset = part.Location;
             var pos = new Vector(0, 0);
             List<Vector> current = null;
+            var currentLayer = LayerType.Cut;
 
             foreach (var code in program.Codes)
             {
@@ -77,17 +116,14 @@ namespace OpenNest.Posts.GravographIS
                 {
                     case RapidMove rapid:
                     {
-                        FlushCurrent(sink, ref current);
+                        FlushCurrent(sink, ref current, currentLayer);
                         pos = rapid.EndPoint;
                         break;
                     }
 
                     case LinearMove linear:
                     {
-                        if (current == null)
-                        {
-                            current = new List<Vector> { pos + offset };
-                        }
+                        StartOrSplit(sink, ref current, ref currentLayer, linear.Layer, pos + offset);
                         var end = linear.EndPoint;
                         current.Add(end + offset);
                         pos = end;
@@ -96,10 +132,7 @@ namespace OpenNest.Posts.GravographIS
 
                     case ArcMove arc:
                     {
-                        if (current == null)
-                        {
-                            current = new List<Vector> { pos + offset };
-                        }
+                        StartOrSplit(sink, ref current, ref currentLayer, arc.Layer, pos + offset);
                         TessellateArc(pos, arc, offset, ArcChordToleranceInches, current);
                         pos = arc.EndPoint;
                         break;
@@ -107,13 +140,33 @@ namespace OpenNest.Posts.GravographIS
                 }
             }
 
-            FlushCurrent(sink, ref current);
+            FlushCurrent(sink, ref current, currentLayer);
         }
 
-        private static void FlushCurrent(List<List<Vector>> sink, ref List<Vector> current)
+        // Ensures `current` is an open polyline whose layer matches `moveLayer`,
+        // seeded at `seed` (the current pen position). When the layer changes
+        // mid-chain the previous polyline is flushed and a new one begins at the
+        // shared seam vertex so engrave and cut passes stay geometrically continuous.
+        private static void StartOrSplit(List<LayeredPolyline> sink, ref List<Vector> current,
+            ref LayerType currentLayer, LayerType moveLayer, Vector seed)
+        {
+            if (current == null)
+            {
+                current = new List<Vector> { seed };
+                currentLayer = moveLayer;
+            }
+            else if (moveLayer != currentLayer)
+            {
+                FlushCurrent(sink, ref current, currentLayer);
+                current = new List<Vector> { seed };
+                currentLayer = moveLayer;
+            }
+        }
+
+        private static void FlushCurrent(List<LayeredPolyline> sink, ref List<Vector> current, LayerType layer)
         {
             if (current != null && current.Count >= 2)
-                sink.Add(current);
+                sink.Add(new LayeredPolyline(current, layer));
             current = null;
         }
 

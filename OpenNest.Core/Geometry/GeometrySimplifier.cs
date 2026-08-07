@@ -374,11 +374,8 @@ public class GeometrySimplifier
         var points = CollectPoints(entities, start, k);
         if (points.Count < 3) return null;
 
-        var startTangent = chainedTangent.IsValid()
-            ? chainedTangent
-            : new Vector(points[1].X - points[0].X, points[1].Y - points[0].Y);
-
-        var endTangent = GetExitDirection(entities[k]);
+        var startTangent = EstimateStartTangent(entities, start, points, chainedTangent);
+        var endTangent = EstimateEndTangent(entities, k, points);
         var (center, radius, dev) = TryFit(points, startTangent, endTangent);
         if (!center.IsValid()) return null;
 
@@ -386,8 +383,10 @@ public class GeometrySimplifier
         while (k + 1 <= runEnd)
         {
             var extPoints = CollectPoints(entities, start, k + 1);
-            var extEndTangent = GetExitDirection(entities[k + 1]);
-            var (nc, nr, nd) = extPoints.Count >= 3 ? TryFit(extPoints, startTangent, extEndTangent) : (Vector.Invalid, 0, 0d);
+            if (extPoints.Count < 3) break;
+
+            var extEndTangent = EstimateEndTangent(entities, k + 1, extPoints);
+            var (nc, nr, nd) = TryFit(extPoints, startTangent, extEndTangent);
             if (!nc.IsValid()) break;
 
             k++;
@@ -407,36 +406,171 @@ public class GeometrySimplifier
         return new ArcFitResult(center, radius, dev, points, k);
     }
 
-    private (Vector center, double radius, double deviation) TryFit(List<Vector> points, Vector startTangent, Vector endTangent)
+    private (Vector center, double radius, double deviation) TryFit(
+        List<Vector> points, TangentEstimate start, TangentEstimate end)
     {
-        // Try dual-tangent fit first (matches direction at both endpoints)
-        if (endTangent.IsValid())
+        foreach (var (center, radius, dev) in FitAttempts(points, start, end))
         {
-            var (dc, dr, dd) = ArcFit.FitWithDualTangent(points, startTangent, endTangent);
-            if (dc.IsValid() && dd <= Tolerance)
+            if (!center.IsValid() || dev > Tolerance)
+                continue;
+
+            // Check that the arc doesn't bulge away from the original line segments
+            var isReversed = SumSignedAngles(center, points) < 0;
+            var arcDev = MaxArcToSegmentDeviation(points, center, radius, isReversed);
+            if (arcDev > Tolerance)
+                continue;
+
+            return (center, radius, System.Math.Max(dev, arcDev));
+        }
+
+        return (Vector.Invalid, 0, 0);
+    }
+
+    /// <summary>
+    /// Yields fit attempts in preference order. A trusted tangent (chained from the
+    /// previous arc, an adjacent original arc, or a long straight edge) is enforced
+    /// exactly on its side; otherwise the tangency error is balanced between both
+    /// endpoints. The unconstrained mirror-axis fit is the last resort. Every attempt
+    /// passes exactly through both endpoints, so no gaps are introduced.
+    /// </summary>
+    private IEnumerable<(Vector center, double radius, double deviation)> FitAttempts(
+        List<Vector> points, TangentEstimate start, TangentEstimate end)
+    {
+        if (start.Trusted && !end.Trusted)
+        {
+            yield return ArcFit.FitWithStartTangent(points, start.Direction);
+            yield return ArcFit.FitThroughEndpointsWithTangents(points, start.Direction, end.Direction);
+            yield return FitWithEndTangent(points, end.Direction);
+        }
+        else if (end.Trusted && !start.Trusted)
+        {
+            yield return FitWithEndTangent(points, end.Direction);
+            yield return ArcFit.FitThroughEndpointsWithTangents(points, start.Direction, end.Direction);
+            yield return ArcFit.FitWithStartTangent(points, start.Direction);
+        }
+        else
+        {
+            yield return ArcFit.FitThroughEndpointsWithTangents(points, start.Direction, end.Direction);
+            yield return ArcFit.FitWithStartTangent(points, start.Direction);
+            yield return FitWithEndTangent(points, end.Direction);
+        }
+
+        yield return FitMirrorAxis(points);
+    }
+
+    /// <summary>
+    /// Fits an arc through both endpoints with an exact tangent at the last point,
+    /// by running the start-tangent fit on the reversed point sequence.
+    /// </summary>
+    private static (Vector center, double radius, double deviation) FitWithEndTangent(
+        List<Vector> points, Vector endTangent)
+    {
+        var reversed = new List<Vector>(points);
+        reversed.Reverse();
+        return ArcFit.FitWithStartTangent(reversed, new Vector(-endTangent.X, -endTangent.Y));
+    }
+
+    /// <summary>
+    /// An estimated tangent direction at a fit endpoint. Trusted estimates come from
+    /// exact geometry (a chained arc, an adjacent original arc, or a long straight
+    /// edge) and are enforced exactly; untrusted ones are derived from the polyline
+    /// vertices and only guide the fit.
+    /// </summary>
+    private readonly record struct TangentEstimate(Vector Direction, bool Trusted);
+
+    /// <summary>Segment-length ratio above which a neighboring line counts as a true
+    /// straight edge (rather than another chord of the tessellated curve).</summary>
+    private const double NeighborEdgeFactor = 3.0;
+
+    private static TangentEstimate EstimateStartTangent(
+        List<Entity> entities, int start, List<Vector> points, Vector chainedTangent)
+    {
+        if (chainedTangent.IsValid())
+            return new TangentEstimate(chainedTangent, true);
+
+        if (entities[start] is Arc startArc)
+            return new TangentEstimate(GetEntryDirection(startArc), true);
+
+        var firstChordLen = points[0].DistanceTo(points[1]);
+        if (start > 0)
+        {
+            var prev = entities[start - 1];
+            var prevEnd = prev switch { Line l => l.EndPoint, Arc a => a.EndPoint(), _ => Vector.Invalid };
+            if (prevEnd.IsValid() && prevEnd.DistanceTo(points[0]) < 1e-6)
             {
-                var isRev = SumSignedAngles(dc, points) < 0;
-                var aDev = MaxArcToSegmentDeviation(points, dc, dr, isRev);
-                if (aDev <= Tolerance)
-                    return (dc, dr, System.Math.Max(dd, aDev));
+                if (prev is Arc)
+                    return new TangentEstimate(GetExitDirection(prev), true);
+                if (prev is Line prevLine && prevLine.StartPoint.DistanceTo(prevLine.EndPoint) >= NeighborEdgeFactor * firstChordLen)
+                    return new TangentEstimate(GetExitDirection(prevLine), true);
             }
         }
 
-        // Fall back to start-tangent-only, then mirror axis
-        var (center, radius, dev) = ArcFit.FitWithStartTangent(points, startTangent);
-        if (!center.IsValid() || dev > Tolerance)
-            (center, radius, dev) = FitMirrorAxis(points);
-        if (!center.IsValid() || dev > Tolerance)
-            return (Vector.Invalid, 0, 0);
-
-        // Check that the arc doesn't bulge away from the original line segments
-        var isReversed = SumSignedAngles(center, points) < 0;
-        var arcDev = MaxArcToSegmentDeviation(points, center, radius, isReversed);
-        if (arcDev > Tolerance)
-            return (Vector.Invalid, 0, 0);
-
-        return (center, radius, System.Math.Max(dev, arcDev));
+        var chord = new Vector(points[1].X - points[0].X, points[1].Y - points[0].Y);
+        if (points.Count >= 3)
+            return new TangentEstimate(EstimateVertexTangent(points[0], points[1], points[2], chord), false);
+        return new TangentEstimate(chord, false);
     }
+
+    private static TangentEstimate EstimateEndTangent(List<Entity> entities, int k, List<Vector> points)
+    {
+        if (entities[k] is Arc endArc)
+            return new TangentEstimate(GetExitDirection(endArc), true);
+
+        var lastChordLen = points[^1].DistanceTo(points[^2]);
+        if (k + 1 < entities.Count)
+        {
+            var next = entities[k + 1];
+            var nextStart = next switch { Line l => l.StartPoint, Arc a => a.StartPoint(), _ => Vector.Invalid };
+            if (nextStart.IsValid() && nextStart.DistanceTo(points[^1]) < 1e-6)
+            {
+                if (next is Arc nextArc)
+                    return new TangentEstimate(GetEntryDirection(nextArc), true);
+                if (next is Line nextLine && nextLine.StartPoint.DistanceTo(nextLine.EndPoint) >= NeighborEdgeFactor * lastChordLen)
+                    return new TangentEstimate(GetExitDirection(nextLine), true);
+            }
+        }
+
+        var chord = new Vector(points[^1].X - points[^2].X, points[^1].Y - points[^2].Y);
+        if (points.Count >= 3)
+            return new TangentEstimate(EstimateVertexTangent(points[^1], points[^2], points[^3], chord), false);
+        return new TangentEstimate(chord, false);
+    }
+
+    /// <summary>
+    /// Estimates the curve tangent at a polyline vertex from the circle through it and
+    /// its two nearest neighbors. A raw chord direction is off from the true tangent by
+    /// half the chord's subtended angle; the circumcircle estimate removes that bias.
+    /// Falls back to the travel direction when the three points are collinear.
+    /// </summary>
+    private static Vector EstimateVertexTangent(Vector at, Vector b, Vector c, Vector travel)
+    {
+        var d = 2 * (at.X * (b.Y - c.Y) + b.X * (c.Y - at.Y) + c.X * (at.Y - b.Y));
+        if (System.Math.Abs(d) < 1e-14)
+            return travel;
+
+        var sqA = at.X * at.X + at.Y * at.Y;
+        var sqB = b.X * b.X + b.Y * b.Y;
+        var sqC = c.X * c.X + c.Y * c.Y;
+        var cx = (sqA * (b.Y - c.Y) + sqB * (c.Y - at.Y) + sqC * (at.Y - b.Y)) / d;
+        var cy = (sqA * (c.X - b.X) + sqB * (at.X - c.X) + sqC * (b.X - at.X)) / d;
+
+        var tangent = new Vector(-(at.Y - cy), at.X - cx);
+        if (tangent.X * travel.X + tangent.Y * travel.Y < 0)
+            tangent = new Vector(-tangent.X, -tangent.Y);
+        return tangent;
+    }
+
+    /// <summary>
+    /// Returns the entry direction (tangent at start point) of an entity.
+    /// </summary>
+    private static Vector GetEntryDirection(Entity entity) => entity switch
+    {
+        Line line => new Vector(line.EndPoint.X - line.StartPoint.X, line.EndPoint.Y - line.StartPoint.Y),
+        Arc arc => arc.IsReversed
+            ? new Vector(System.Math.Sin(arc.StartAngle), -System.Math.Cos(arc.StartAngle))
+            : new Vector(-System.Math.Sin(arc.StartAngle), System.Math.Cos(arc.StartAngle)),
+        _ => Vector.Invalid,
+    };
 
     /// <summary>
     /// Computes the tangent direction at the last point of a fitted arc,

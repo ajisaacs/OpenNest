@@ -178,6 +178,101 @@ public class GravographISWriterTests
         Assert.Equal(-GravographISWriter.StepsPerInch, dy);
     }
 
+    [Fact]
+    public void Passes_PauseBeforeCut_EmitsPauseSequenceBetweenGroups()
+    {
+        var engrave = new List<IReadOnlyList<Vector>> { new[] { new Vector(0, 0), new Vector(1, 0) } };
+        var cut = new List<IReadOnlyList<Vector>> { new[] { new Vector(0, 0), new Vector(0, -1) } };
+        var passes = new List<GravographPass>
+        {
+            new GravographPass { Polylines = engrave, FeedMmPerSec = 10, DepthInches = 0.25 },
+            new GravographPass { Polylines = cut, FeedMmPerSec = 3, DepthInches = 0.25, PauseBefore = true, PauseMessage = "Hi" },
+        };
+
+        using var ms = new MemoryStream();
+        new GravographISWriter(new GravographISWriterOptions
+        {
+            EnvelopeGuardEnabled = false,
+            ReturnToOriginAtEnd = false,
+        }).Write(passes, ms);
+        var bytes = ms.ToArray();
+
+        var mcOff = IndexOf(bytes, 0, (byte)'M', (byte)'C', 0x00, 0x00);
+        var ouFb = IndexOf(bytes, mcOff, (byte)'O', (byte)'U', 0xFF, 0xFB);
+        var ouFa = IndexOf(bytes, ouFb, (byte)'O', (byte)'U', 0xFF, 0xFA);
+        var lbBegin = IndexOf(bytes, ouFa, (byte)'L', (byte)'B', 0x00, 0x00);
+        var lbMsg = IndexOf(bytes, lbBegin, (byte)'L', (byte)'B', (byte)'H', (byte)'i');
+        var nr = IndexOf(bytes, lbMsg, (byte)'N', (byte)'R', 0x00, 0x01);
+        var lbEnd = IndexOf(bytes, nr, (byte)'L', (byte)'B', 0x00, 0x01);
+        var mcOn = IndexOf(bytes, lbEnd, (byte)'M', (byte)'C', 0x00, 0x01);
+
+        Assert.True(mcOff >= 0, "motor-off (MC 0000) not found");
+        Assert.True(mcOff < ouFb && ouFb < ouFa && ouFa < lbBegin && lbBegin < lbMsg
+            && lbMsg < nr && nr < lbEnd && lbEnd < mcOn,
+            "pause commands out of order");
+
+        // Resume sets the cut feed inline (VS 0x0003) after the motor restarts.
+        var vsCut = IndexOf(bytes, mcOn, (byte)'V', (byte)'S', 0x00, 0x03);
+        Assert.True(vsCut > mcOn, "cut feed not set after resume");
+    }
+
+    [Fact]
+    public void Passes_PauseOddMessage_SpacePadsLastPacket()
+    {
+        var passes = new List<GravographPass>
+        {
+            new GravographPass { Polylines = new List<IReadOnlyList<Vector>> { new[] { new Vector(0, 0), new Vector(1, 0) } }, FeedMmPerSec = 10 },
+            new GravographPass { Polylines = new List<IReadOnlyList<Vector>> { new[] { new Vector(0, 0), new Vector(0, -1) } }, FeedMmPerSec = 3, PauseBefore = true, PauseMessage = "abc" },
+        };
+
+        using var ms = new MemoryStream();
+        new GravographISWriter(new GravographISWriterOptions { EnvelopeGuardEnabled = false, ReturnToOriginAtEnd = false }).Write(passes, ms);
+        var bytes = ms.ToArray();
+
+        var lbAb = IndexOf(bytes, 0, (byte)'L', (byte)'B', (byte)'a', (byte)'b');
+        var lbCPad = IndexOf(bytes, lbAb, (byte)'L', (byte)'B', (byte)'c', 0x20);
+        Assert.True(lbAb >= 0, "first message packet 'ab' not found");
+        Assert.True(lbCPad > lbAb, "odd packet not space-padded to 'c '");
+    }
+
+    [Fact]
+    public void Passes_DifferentFeeds_NoPause_EmitsInlineFeedChangeNoMessage()
+    {
+        var passes = new List<GravographPass>
+        {
+            new GravographPass { Polylines = new List<IReadOnlyList<Vector>> { new[] { new Vector(0, 0), new Vector(1, 0) } }, FeedMmPerSec = 10 },
+            new GravographPass { Polylines = new List<IReadOnlyList<Vector>> { new[] { new Vector(0, 0), new Vector(0, -1) } }, FeedMmPerSec = 3, PauseBefore = false },
+        };
+
+        using var ms = new MemoryStream();
+        new GravographISWriter(new GravographISWriterOptions { EnvelopeGuardEnabled = false, ReturnToOriginAtEnd = false }).Write(passes, ms);
+        var bytes = ms.ToArray();
+
+        Assert.True(IndexOf(bytes, 0, (byte)'V', (byte)'S', 0x00, 0x03) >= 0, "inline cut feed change missing");
+        Assert.True(IndexOfCmd(bytes, (byte)'L', (byte)'B') < 0, "no LB message expected without a pause");
+    }
+
+    private static int IndexOf(byte[] bytes, int from, byte c0, byte c1, byte hi, byte lo)
+    {
+        for (var i = System.Math.Max(0, from); i <= bytes.Length - 6; i++)
+        {
+            if (bytes[i] == 0xFF && bytes[i + 1] == 0xFD && bytes[i + 2] == c0 &&
+                bytes[i + 3] == c1 && bytes[i + 4] == hi && bytes[i + 5] == lo)
+                return i;
+        }
+        return -1;
+    }
+
+    private static int IndexOfCmd(byte[] bytes, byte c0, byte c1)
+    {
+        for (var i = 0; i <= bytes.Length - 4; i++)
+        {
+            if (bytes[i] == 0xFF && bytes[i + 1] == 0xFD && bytes[i + 2] == c0 && bytes[i + 3] == c1)
+                return i;
+        }
+        return -1;
+    }
+
     private static void AssertOperand(byte[] bytes, byte c0, byte c1, byte hi, byte lo)
     {
         for (var i = 0; i < bytes.Length - 5; i++)

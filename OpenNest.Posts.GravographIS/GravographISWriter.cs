@@ -1,10 +1,30 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using OpenNest.Geometry;
 
 namespace OpenNest.Posts.GravographIS
 {
+    /// <summary>
+    /// One tool pass: a run of polylines cut at a single feed/depth, optionally
+    /// preceded by an operator pause (to swap or adjust the tool). The Gravograph
+    /// post builds one pass for engrave and one for cut.
+    /// </summary>
+    public sealed class GravographPass
+    {
+        public IEnumerable<IReadOnlyList<Vector>> Polylines { get; set; }
+
+        public int FeedMmPerSec { get; set; }
+
+        public double DepthInches { get; set; }
+
+        /// <summary>When true, park to origin and prompt the operator before this pass.</summary>
+        public bool PauseBefore { get; set; }
+
+        public string PauseMessage { get; set; } = "";
+    }
+
     /// <summary>
     /// Encodes polylines (in inches) into the Gravograph IS8000 native "binary HPGL"
     /// wire format. The byte stream is byte-exact against captures from GravoStyle'98.
@@ -84,12 +104,40 @@ namespace OpenNest.Posts.GravographIS
         public void Write(IEnumerable<IReadOnlyList<Vector>> polylines, Stream output)
         {
             if (polylines == null) throw new ArgumentNullException(nameof(polylines));
+
+            // A single pass at the configured feed/depth — byte-identical to the
+            // original single-group output (no transitions, no pause).
+            Write(new[]
+            {
+                new GravographPass
+                {
+                    Polylines = polylines,
+                    FeedMmPerSec = Options.FeedMmPerSec,
+                    DepthInches = Options.DepthInches,
+                    PauseBefore = false,
+                    PauseMessage = "",
+                },
+            }, output);
+        }
+
+        /// <summary>
+        /// Writes the full byte stream for an ordered list of tool passes. The preamble
+        /// carries the first pass's feed/depth; each later pass emits an inline feed
+        /// (and depth, if changed) and, when <see cref="GravographPass.PauseBefore"/> is
+        /// set, parks to the operator origin and emits an operator pause before cutting.
+        /// </summary>
+        public void Write(IReadOnlyList<GravographPass> passes, Stream output)
+        {
+            if (passes == null) throw new ArgumentNullException(nameof(passes));
             if (output == null) throw new ArgumentNullException(nameof(output));
 
+            var firstFeed = passes.Count > 0 ? passes[0].FeedMmPerSec : Options.FeedMmPerSec;
+            var firstDepth = passes.Count > 0 ? passes[0].DepthInches : Options.DepthInches;
+
             var preamble = (byte[])PreambleTemplate.Clone();
-            PatchOperand(preamble, (byte)'V', (byte)'S', (short)Options.FeedMmPerSec);
-            PatchOperand(preamble, (byte)'V', (byte)'Z', (short)Options.FeedMmPerSec);
-            PatchOperand(preamble, (byte)'D', (byte)'Z', DepthInStepsAsInt16());
+            PatchOperand(preamble, (byte)'V', (byte)'S', (short)firstFeed);
+            PatchOperand(preamble, (byte)'V', (byte)'Z', (short)firstFeed);
+            PatchOperand(preamble, (byte)'D', (byte)'Z', DepthInStepsAsInt16(firstDepth));
             output.Write(preamble, 0, preamble.Length);
 
             // Cumulative head position from the operator-set upper-left origin, in
@@ -105,45 +153,51 @@ namespace OpenNest.Posts.GravographIS
 
             var firstPolyline = true;
             var polyIndex = 0;
+            var currentFeed = firstFeed;
+            var currentDepth = firstDepth;
 
-            foreach (var poly in polylines)
+            for (var p = 0; p < passes.Count; p++)
             {
-                polyIndex++;
-                if (poly == null || poly.Count < 2)
-                    continue;
+                var pass = passes[p];
 
-                var (startX, startY) = ToWire(poly[0]);
-                WriteTravel(output,
-                    firstPolyline ? (byte)'D' : (byte)'P',
-                    firstPolyline ? (byte)'R' : (byte)'U',
-                    checked(startX - headX), checked(startY - headY),
-                    ref headX, ref headY, envelopeXSteps, envelopeYSteps, polyIndex);
-
-                // PD command + single records-follow flag, then one record per segment.
-                output.WriteByte(0xFF);
-                output.WriteByte(0xFD);
-                output.WriteByte((byte)'P');
-                output.WriteByte((byte)'D');
-                output.WriteByte(0x00);
-                output.WriteByte(0x00);
-
-                var prevX = startX;
-                var prevY = startY;
-                for (int i = 1; i < poly.Count; i++)
+                if (p > 0)
                 {
-                    var (cx, cy) = ToWire(poly[i]);
-                    var dx = checked(cx - prevX);
-                    var dy = checked(cy - prevY);
-                    EnsureEnvelope(headX + dx, headY + dy, envelopeXSteps, envelopeYSteps,
-                        polyIndex, segment: i, isTravel: false);
-                    WriteRecord(output, dx, dy);
-                    prevX = cx;
-                    prevY = cy;
-                    headX += dx;
-                    headY += dy;
+                    if (pass.PauseBefore)
+                    {
+                        // Park: lift Z, then rapid (pen-up) back to the operator origin so
+                        // the head is clear of the work while the tool is swapped.
+                        WriteLiftOnly(output);
+                        WriteTravel(output, (byte)'P', (byte)'U',
+                            checked(-headX), checked(-headY),
+                            ref headX, ref headY, envelopeXSteps, envelopeYSteps, polyIndex);
+                        WritePauseCore(output, pass.PauseMessage);
+                    }
+
+                    if (pass.FeedMmPerSec != currentFeed)
+                    {
+                        WriteCommand(output, (byte)'V', (byte)'S', (short)pass.FeedMmPerSec);
+                        WriteCommand(output, (byte)'V', (byte)'Z', (short)pass.FeedMmPerSec);
+                        currentFeed = pass.FeedMmPerSec;
+                    }
+
+                    if (pass.DepthInches != currentDepth)
+                    {
+                        WriteCommand(output, (byte)'D', (byte)'Z', DepthInStepsAsInt16(pass.DepthInches));
+                        currentDepth = pass.DepthInches;
+                    }
                 }
 
-                firstPolyline = false;
+                if (pass.Polylines == null) continue;
+
+                foreach (var poly in pass.Polylines)
+                {
+                    polyIndex++;
+                    if (poly == null || poly.Count < 2)
+                        continue;
+
+                    WritePolyline(output, poly, ref firstPolyline, ref headX, ref headY,
+                        envelopeXSteps, envelopeYSteps, polyIndex);
+                }
             }
 
             WriteLiftOnly(output);
@@ -154,6 +208,89 @@ namespace OpenNest.Posts.GravographIS
                     ref headX, ref headY, envelopeXSteps, envelopeYSteps, polyIndex);
             }
             output.Write(EndJobBytes, 0, EndJobBytes.Length);
+        }
+
+        private void WritePolyline(Stream output, IReadOnlyList<Vector> poly,
+            ref bool firstPolyline, ref int headX, ref int headY,
+            int envelopeXSteps, int envelopeYSteps, int polyIndex)
+        {
+            var (startX, startY) = ToWire(poly[0]);
+            WriteTravel(output,
+                firstPolyline ? (byte)'D' : (byte)'P',
+                firstPolyline ? (byte)'R' : (byte)'U',
+                checked(startX - headX), checked(startY - headY),
+                ref headX, ref headY, envelopeXSteps, envelopeYSteps, polyIndex);
+
+            // PD command + single records-follow flag, then one record per segment.
+            output.WriteByte(0xFF);
+            output.WriteByte(0xFD);
+            output.WriteByte((byte)'P');
+            output.WriteByte((byte)'D');
+            output.WriteByte(0x00);
+            output.WriteByte(0x00);
+
+            var prevX = startX;
+            var prevY = startY;
+            for (int i = 1; i < poly.Count; i++)
+            {
+                var (cx, cy) = ToWire(poly[i]);
+                var dx = checked(cx - prevX);
+                var dy = checked(cy - prevY);
+                EnsureEnvelope(headX + dx, headY + dy, envelopeXSteps, envelopeYSteps,
+                    polyIndex, segment: i, isTravel: false);
+                WriteRecord(output, dx, dy);
+                prevX = cx;
+                prevY = cy;
+                headX += dx;
+                headY += dy;
+            }
+
+            firstPolyline = false;
+        }
+
+        // The operator pause, minus the leading lift/park which the caller emits.
+        // Stops the spindle (MC off), turns off aux, writes the console message, then
+        // restarts the spindle (MC on) so the job resumes when the operator presses start.
+        private static void WritePauseCore(Stream s, string message)
+        {
+            WriteCommandRaw(s, (byte)'M', (byte)'C', 0x00, 0x00); // motor off
+            WriteCommandRaw(s, (byte)'O', (byte)'U', 0xFF, 0xFB); // aux off
+            WriteCommandRaw(s, (byte)'O', (byte)'U', 0xFF, 0xFA); // aux off
+            WriteCommandRaw(s, (byte)'L', (byte)'B', 0x00, 0x00); // begin message
+            WriteMessagePackets(s, message);
+            WriteCommandRaw(s, (byte)'N', (byte)'R', 0x00, 0x01); // line terminator
+            WriteCommandRaw(s, (byte)'L', (byte)'B', 0x00, 0x01); // end message
+            WriteCommandRaw(s, (byte)'M', (byte)'C', 0x00, 0x01); // motor on
+        }
+
+        // Console label packets carry two ASCII chars each; an odd-length message is
+        // space-padded to a whole number of packets so widths stay 2 bytes.
+        private static void WriteMessagePackets(Stream s, string message)
+        {
+            if (string.IsNullOrEmpty(message)) return;
+
+            var chars = Encoding.ASCII.GetBytes(message);
+            for (var i = 0; i < chars.Length; i += 2)
+            {
+                var c0 = chars[i];
+                var c1 = (i + 1 < chars.Length) ? chars[i + 1] : (byte)0x20;
+                WriteCommandRaw(s, (byte)'L', (byte)'B', c0, c1);
+            }
+        }
+
+        private static void WriteCommand(Stream s, byte c0, byte c1, short value)
+        {
+            WriteCommandRaw(s, c0, c1, (byte)((value >> 8) & 0xFF), (byte)(value & 0xFF));
+        }
+
+        private static void WriteCommandRaw(Stream s, byte c0, byte c1, byte hi, byte lo)
+        {
+            s.WriteByte(0xFF);
+            s.WriteByte(0xFD);
+            s.WriteByte(c0);
+            s.WriteByte(c1);
+            s.WriteByte(hi);
+            s.WriteByte(lo);
         }
 
         private const double StepsPerMm = 80.0;
@@ -181,11 +318,11 @@ namespace OpenNest.Posts.GravographIS
                 $"work envelope from upper-left origin. Refusing to emit the record.");
         }
 
-        private short DepthInStepsAsInt16()
+        private static short DepthInStepsAsInt16(double depthInches)
         {
-            var steps = (long)System.Math.Round(Options.DepthInches * StepsPerInch, MidpointRounding.AwayFromZero);
+            var steps = (long)System.Math.Round(depthInches * StepsPerInch, MidpointRounding.AwayFromZero);
             if (steps < short.MinValue || steps > short.MaxValue)
-                throw new ArgumentOutOfRangeException(nameof(Options.DepthInches), $"Depth {Options.DepthInches} in. → {steps} steps overflows int16.");
+                throw new ArgumentOutOfRangeException(nameof(depthInches), $"Depth {depthInches} in. → {steps} steps overflows int16.");
             return (short)steps;
         }
 

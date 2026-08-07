@@ -132,6 +132,111 @@ public class GeometrySimplifierTests
     }
 
     [Fact]
+    public void Analyze_FilletBetweenTangentLines_ArcIsTangentToLines()
+    {
+        // A 90-degree fillet (r=0.3, center origin, 270deg..360deg CCW) between two
+        // long tangent lines, approximated by 8 chords whose interior vertices bulge
+        // radially outward within tolerance (simulates real DXF tessellation noise).
+        var r = 0.3;
+        var deltas = new[] { 0.0, 0.002, 0.003, 0.0035, 0.0035, 0.0035, 0.003, 0.002, 0.0 };
+        var pts = new List<Vector>();
+        for (var i = 0; i <= 8; i++)
+        {
+            var ang = OpenNest.Math.Angle.ToRadians(270 + 11.25 * i);
+            var radius = r + deltas[i];
+            pts.Add(new Vector(radius * System.Math.Cos(ang), radius * System.Math.Sin(ang)));
+        }
+
+        var shape = new Shape();
+        shape.Entities.Add(new Line(new Vector(-2, -r), pts[0]));
+        for (var i = 0; i < pts.Count - 1; i++)
+            shape.Entities.Add(new Line(pts[i], pts[i + 1]));
+        shape.Entities.Add(new Line(pts[^1], new Vector(r, 2)));
+
+        var simplifier = new GeometrySimplifier { Tolerance = 0.004 };
+        var candidates = simplifier.Analyze(shape);
+
+        Assert.Single(candidates);
+        var arc = candidates[0].FittedArc;
+
+        // Arc must pass exactly through the run's boundary vertices (no gaps)
+        Assert.True(arc.StartPoint().DistanceTo(pts[0]) < 1e-6);
+        Assert.True(arc.EndPoint().DistanceTo(pts[^1]) < 1e-6);
+
+        // Arc must be tangent to the adjacent straight edges at its endpoints
+        var startDelta = AngleBetweenDeg(ArcTangentAt(arc, arc.StartPoint()), new Vector(1, 0));
+        var endDelta = AngleBetweenDeg(ArcTangentAt(arc, arc.EndPoint()), new Vector(0, 1));
+        Assert.True(startDelta < 0.3, $"Arc start not tangent to incoming line: off by {startDelta:F3} deg");
+        Assert.True(endDelta < 0.3, $"Arc end not tangent to outgoing line: off by {endDelta:F3} deg");
+    }
+
+    [Fact]
+    public void Analyze_CompoundCurve_AdjacentArcsAreTangentAtJunction()
+    {
+        // Two tangent-continuous arcs of different radii (r=0.2 sweeping 60deg, then
+        // r=0.6 sweeping 40deg), tessellated into chords with slight radial noise.
+        // The fitted arcs must stay tangent-continuous at their junction.
+        var c1 = new Vector(0, 0);
+        var r1 = 0.2;
+        var deltas1 = new[] { 0.0, 0.001, 0.0005, -0.0005, -0.001, -0.0005, 0.0 };
+        var pts = new List<Vector>();
+        for (var i = 0; i <= 6; i++)
+        {
+            var ang = OpenNest.Math.Angle.ToRadians(10 * i);
+            var radius = r1 + deltas1[i];
+            pts.Add(new Vector(c1.X + radius * System.Math.Cos(ang), c1.Y + radius * System.Math.Sin(ang)));
+        }
+
+        // Second arc center along the junction radius so tangents match at the junction
+        var junctionAngle = OpenNest.Math.Angle.ToRadians(60);
+        var u = new Vector(System.Math.Cos(junctionAngle), System.Math.Sin(junctionAngle));
+        var r2 = 0.6;
+        var c2 = new Vector(c1.X + u.X * (r1 - r2), c1.Y + u.Y * (r1 - r2));
+        var deltas2 = new[] { 0.0, 0.001, -0.001, 0.0005, -0.0005, 0.0 };
+        for (var i = 1; i <= 5; i++)
+        {
+            var ang = OpenNest.Math.Angle.ToRadians(60 + 8 * i);
+            var radius = r2 + deltas2[i];
+            pts.Add(new Vector(c2.X + radius * System.Math.Cos(ang), c2.Y + radius * System.Math.Sin(ang)));
+        }
+
+        var shape = new Shape();
+        for (var i = 0; i < pts.Count - 1; i++)
+            shape.Entities.Add(new Line(pts[i], pts[i + 1]));
+
+        var simplifier = new GeometrySimplifier { Tolerance = 0.004 };
+        var candidates = simplifier.Analyze(shape);
+
+        Assert.Equal(2, candidates.Count);
+        var arcA = candidates[0].FittedArc;
+        var arcB = candidates[1].FittedArc;
+
+        // Arcs must share the junction vertex exactly
+        Assert.True(arcA.EndPoint().DistanceTo(arcB.StartPoint()) < 1e-6);
+
+        // Tangent continuity across the junction
+        var junctionDelta = AngleBetweenDeg(ArcTangentAt(arcA, arcA.EndPoint()), ArcTangentAt(arcB, arcB.StartPoint()));
+        Assert.True(junctionDelta < 0.3, $"Tangent break of {junctionDelta:F3} deg at arc-arc junction");
+    }
+
+    private static Vector ArcTangentAt(Arc arc, Vector pt)
+    {
+        var ang = System.Math.Atan2(pt.Y - arc.Center.Y, pt.X - arc.Center.X);
+        return arc.IsReversed
+            ? new Vector(System.Math.Sin(ang), -System.Math.Cos(ang))
+            : new Vector(-System.Math.Sin(ang), System.Math.Cos(ang));
+    }
+
+    private static double AngleBetweenDeg(Vector v1, Vector v2)
+    {
+        var l1 = System.Math.Sqrt(v1.X * v1.X + v1.Y * v1.Y);
+        var l2 = System.Math.Sqrt(v2.X * v2.X + v2.Y * v2.Y);
+        var dot = (v1.X * v2.X + v1.Y * v2.Y) / (l1 * l2);
+        dot = System.Math.Max(-1, System.Math.Min(1, dot));
+        return System.Math.Acos(dot) * 180.0 / System.Math.PI;
+    }
+
+    [Fact]
     public void Apply_DynaPanDxf_NoGapsAfterSimplification()
     {
         var path = @"C:\Users\aisaacs\Desktop\Sullys Q29 DXFs\SULLYS-031 Dyna Pan.dxf";
