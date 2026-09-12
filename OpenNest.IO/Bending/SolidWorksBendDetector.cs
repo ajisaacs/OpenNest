@@ -56,6 +56,7 @@ namespace OpenNest.IO.Bending
                     var noteText = StripMTextFormatting(note.Value);
                     bend.Direction = GetBendDirection(noteText);
                     bend.NoteText = noteText;
+                    bend.SourceNoteHandle = note.Handle;
                     ParseBendNote(noteText, bend);
                 }
 
@@ -94,6 +95,7 @@ namespace OpenNest.IO.Bending
                     bend.Angle = other.Angle;
                     bend.Radius = other.Radius;
                     bend.NoteText = other.NoteText;
+                    bend.SourceNoteHandle = other.SourceNoteHandle;
                     break;
                 }
             }

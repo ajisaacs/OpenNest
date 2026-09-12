@@ -26,6 +26,10 @@ namespace OpenNest.Bending
         [System.Text.Json.Serialization.JsonIgnore]
         public Entity SourceEntity { get; set; }
 
+        // Import-only identity of the original CAD annotation (not nest metadata).
+        [System.Text.Json.Serialization.JsonIgnore]
+        public ulong? SourceNoteHandle { get; set; }
+
         public double Length => StartPoint.DistanceTo(EndPoint);
 
         public double AngleRadians => Angle.HasValue

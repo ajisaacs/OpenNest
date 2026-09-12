@@ -91,6 +91,9 @@ public class SolidWorksBendDetectorTests
         Assert.All(bends, b =>
         {
             Assert.NotNull(b.NoteText);
+            Assert.NotNull(b.SourceNoteHandle);
+            Assert.Contains(doc.Entities, e => e.Handle == b.SourceNoteHandle
+                && e is ACadSharp.Entities.MText);
             Assert.Equal(BendDirection.Up, b.Direction);
             Assert.Equal(90.0, b.Angle);
             Assert.Equal(0.125, b.Radius);

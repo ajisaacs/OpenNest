@@ -929,6 +929,7 @@ namespace OpenNest.Forms
                         var (mh, mv) = MapAttachmentPoint(mtext.AttachmentPoint);
                         texts.Add(new CadText
                         {
+                            SourceHandle = mtext.Handle,
                             Position = new Vector(mtext.InsertPoint.X, mtext.InsertPoint.Y),
                             Value = ReplaceControlCodes(StripMTextFormatting(mtext.Value)),
                             Height = mtext.Height,
@@ -958,6 +959,7 @@ namespace OpenNest.Forms
                         };
                         texts.Add(new CadText
                         {
+                            SourceHandle = text.Handle,
                             Position = new Vector(pt.X, pt.Y),
                             Value = ReplaceControlCodes(text.Value),
                             Height = text.Height,

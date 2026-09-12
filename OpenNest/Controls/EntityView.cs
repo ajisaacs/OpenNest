@@ -346,7 +346,7 @@ namespace OpenNest.Controls
 
             foreach (var text in Texts)
             {
-                if (string.IsNullOrEmpty(text.Value))
+                if (string.IsNullOrEmpty(text.Value) || text.IsReplacedByBendNote(Bends))
                     continue;
 
                 var estimatedWidth = text.Height * text.Value.Length * 0.6;
@@ -531,6 +531,9 @@ namespace OpenNest.Controls
 
             foreach (var text in Texts)
             {
+                // The bend overlay already renders this source annotation.
+                if (text.IsReplacedByBendNote(Bends)) continue;
+
                 var pos = PointWorldToGraph(text.Position);
                 var fontSize = LengthWorldToGui(text.Height);
                 if (fontSize < 2f) continue;

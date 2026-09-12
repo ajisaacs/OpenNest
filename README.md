@@ -83,7 +83,7 @@ Or open `OpenNest.sln` in Visual Studio and run the `OpenNest` project.
 
 ### CAD Converter
 
-The CAD Converter turns DXF/DWG files into nest-ready drawings. Toggle layers, colors, and linetypes to exclude construction geometry; review detected bend lines; and preview the generated cut program with contour ordering before accepting the drawing into the nest.
+The CAD Converter turns DXF/DWG files into nest-ready drawings. Detected bend notes replace their original CAD annotations in the preview, avoiding duplicate labels without hiding unrelated text. Toggle layers, colors, and linetypes to exclude construction geometry; review detected bend lines; and preview the generated cut program with contour ordering before accepting the drawing into the nest.
 
 <p>
   <a href="screenshots/screenshot-cad-converter-1.png"><img src="screenshots/screenshot-cad-converter-1.png" width="420" alt="CAD Converter — layer, color, and linetype filtering"></a>
