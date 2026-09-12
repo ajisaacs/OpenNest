@@ -43,12 +43,16 @@ namespace OpenNest.Engine.Fill
             var opposite = -direction;
 
             var obstacleBoxes = new Box[obstacleParts.Count];
+            var obstacleSpacingBoxes = new Box[obstacleParts.Count];
             var obstacleEntities = new List<Entity>[obstacleParts.Count];
+            var halfSpacing = System.Math.Max(0, partSpacing) / 2;
 
             for (var i = 0; i < obstacleParts.Count; i++)
+            {
                 obstacleBoxes[i] = obstacleParts[i].BoundingBox;
+                obstacleSpacingBoxes[i] = SpacingBounds(obstacleBoxes[i], halfSpacing);
+            }
 
-            var halfSpacing = partSpacing / 2;
             var distance = double.MaxValue;
 
             foreach (var moving in movingParts)
@@ -74,17 +78,21 @@ namespace OpenNest.Engine.Fill
                     }
                 }
 
+                // Broad-phase bounds must enclose the spacing-offset contours.
+                // Raw bounds can miss near passes and overestimate the safe travel.
+                var movingSpacingBox = SpacingBounds(movingBox, halfSpacing);
                 for (var i = 0; i < obstacleBoxes.Length; i++)
                 {
-                    var reverseGap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], opposite);
+                    var obstacleSpacingBox = obstacleSpacingBoxes[i];
+                    var reverseGap = SpatialQuery.DirectionalGap(movingSpacingBox, obstacleSpacingBox, opposite);
                     if (reverseGap > 0)
                         continue;
 
-                    var gap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], direction);
+                    var gap = SpatialQuery.DirectionalGap(movingSpacingBox, obstacleSpacingBox, direction);
                     if (gap >= distance)
                         continue;
 
-                    if (!SpatialQuery.PerpendicularOverlap(movingBox, obstacleBoxes[i], direction))
+                    if (!SpatialQuery.PerpendicularOverlap(movingSpacingBox, obstacleSpacingBox, direction))
                         continue;
 
                     movingEntities ??= halfSpacing > 0
@@ -121,6 +129,12 @@ namespace OpenNest.Engine.Fill
             }
 
             return 0;
+        }
+
+        private static Box SpacingBounds(Box box, double spacing)
+        {
+            return new Box(box.Left - spacing, box.Bottom - spacing,
+                box.Length + 2 * spacing, box.Width + 2 * spacing);
         }
 
         private static bool IntersectsAny(Part candidate, List<Part> parts)

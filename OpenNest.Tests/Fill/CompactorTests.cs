@@ -198,6 +198,81 @@ namespace OpenNest.Tests.Fill
             Assert.NotEqual(distNoSpacing, distWithSpacing);
         }
 
+        [Theory]
+        [InlineData(15)]
+        [InlineData(30)]
+        [InlineData(45)]
+        [InlineData(60)]
+        [InlineData(90)]
+        public void Push_RotatedParts_PreservesSpacingOnRepeatedPushes(double degrees)
+        {
+            var angle = OpenNest.Math.Angle.ToRadians(degrees);
+            var obstacle = Part.CreateAtOrigin(MakeRectDrawing(10, 10), angle);
+            obstacle.Offset(20, 20);
+            var moving = Part.CreateAtOrigin(MakeRectDrawing(10, 10), angle);
+            moving.Offset(60, 20);
+            var parts = new List<Part> { moving };
+            var obstacles = new List<Part> { obstacle };
+            var workArea = new Box(0, 0, 100, 100);
+            var spacing = 2.0;
+
+            var distance = Compactor.Push(parts, obstacles, workArea, spacing, PushDirection.Left);
+            Assert.True(distance > 0);
+            AssertClearance(moving, obstacle, spacing);
+
+            for (var i = 0; i < 3; i++)
+            {
+                Compactor.Push(parts, obstacles, workArea, spacing, PushDirection.Left);
+                AssertClearance(moving, obstacle, spacing);
+            }
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(15)]
+        [InlineData(45)]
+        [InlineData(75)]
+        public void Push_WithSpacing_StopsBeforeNearMissOutsideRawBounds(double degrees)
+        {
+            var obstacle = MakeRectPart(20, 20, 10, 10);
+            var moving = Part.CreateAtOrigin(MakeRectDrawing(10, 10), OpenNest.Math.Angle.ToRadians(degrees));
+            moving.Offset(60, 31);
+
+            Compactor.Push(new List<Part> { moving }, new List<Part> { obstacle },
+                new Box(0, 0, 100, 100), 2, PushDirection.Left);
+
+            // Must stop at the first clearance boundary, not pass the obstacle
+            // and finish in a clear position on the far side.
+            Assert.True(moving.BoundingBox.Left > obstacle.BoundingBox.Left);
+            AssertClearance(moving, obstacle, 2);
+        }
+
+        [Fact]
+        public void Push_WithSpacing_ObstacleClearanceWinsOverCloserPlateEdge()
+        {
+            var obstacle = MakeRectPart(20, 20, 10, 10);
+            var moving = MakeRectPart(60, 20, 10, 10);
+
+            Compactor.Push(new List<Part> { moving }, new List<Part> { obstacle },
+                new Box(31, 0, 100, 100), 2, PushDirection.Left);
+
+            AssertClearance(moving, obstacle, 2);
+            Assert.Equal(32, moving.BoundingBox.Left, 7);
+        }
+
+        private static void AssertClearance(Part moving, Part obstacle, double spacing)
+        {
+            var clearance = double.MaxValue;
+            foreach (var a in PartGeometry.GetPartLines(moving))
+            foreach (var b in PartGeometry.GetPartLines(obstacle))
+            {
+                Assert.False(Intersect.Intersects(a, b, out _));
+                clearance = System.Math.Min(clearance, a.StartPoint.DistanceTo(b.ClosestPointTo(a.StartPoint)));
+                clearance = System.Math.Min(clearance, b.StartPoint.DistanceTo(a.ClosestPointTo(b.StartPoint)));
+            }
+            Assert.True(clearance >= spacing - 1e-7, $"Clearance {clearance:R} is less than spacing {spacing:R}");
+        }
+
         [Fact]
         public void Push_Up_AllowsSharedDiagonalEdgeToSeparate()
         {

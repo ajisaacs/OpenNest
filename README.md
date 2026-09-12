@@ -28,7 +28,7 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 | **Pluggable Engines** | Default multi-phase, Vertical Remnant, Horizontal Remnant, plus custom plugin DLLs |
 | **Fill Strategies** | Linear grid, interlocking pairs, rectangle best-fit, and extents-based tiling |
 | **Best-Fit Pair Nesting** | NFP-based pair evaluation finds tight interlocking orientations between parts |
-| **Gravity Compaction** | Polygon-based directional push to close gaps after filling |
+| **Gravity Compaction** | Geometry-based directional push that preserves part spacing, including rotated parts and near passes between outlines |
 | **Part Rotation** | Automatic angle sweep to find better fits across allowed orientations |
 | **Multi-Plate Support** | Manage multiple plates of different sizes and materials in one nest |
 
