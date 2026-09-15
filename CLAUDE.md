@@ -18,7 +18,7 @@ NuGet dependencies: `ACadSharp` 3.1.32 (DXF/DWG import/export, in OpenNest.IO), 
 
 ## Architecture
 
-Eight projects form a layered architecture:
+Nine projects form a layered architecture:
 
 ### OpenNest.Core (class library)
 Domain model, geometry, and CNC primitives organized into namespaces:
@@ -68,6 +68,15 @@ GPU-accelerated pair evaluation for best-fit nesting. `GpuPairEvaluator` impleme
 
 ### OpenNest.Training (console app, depends on Core + Engine)
 Training data collection for ML angle prediction. `TrainingDatabase` stores per-angle nesting results in SQLite via EF Core for offline model training.
+
+### OpenNest.Benchmark (console app, depends on Core + Engine + IO)
+Compares registered `NestEngineBase` implementations against each other on real `.nest` files. Fully generic — it never hardcodes drawing geometry, just reads whatever drawings/quantities/plate settings each input file already has.
+
+- `JobLoader` builds `BenchmarkJob`s from a `.nest` file or a folder of them via `NestReader`, using every drawing with `Quantity.Required > 0`. `--sheet-sizes` can sweep a fixed list of plate sizes instead of each file's own.
+- `BenchmarkRunner` gives each (job, engine) pair a fresh `Plate`/`NestItem` list (`BenchmarkJob.CreatePlate()`/`CreateItems()`) so engines can't see each other's mutated state, then calls the engine's `Nest()` and times it.
+- `NestValidator` checks the returned layout: every part inside `Plate.WorkArea()`, every pair at least `Plate.PartSpacing` apart (checked geometrically via each part's own world-space polygon, inflated by the spacing — works on arbitrary concave/holed shapes, not just bounding boxes), and no drawing over its requested quantity. An invalid or throwing run scores zero for that job.
+- Scoring matches `Plate.Utilization()` (placed drawing area / full sheet area, `Plate.Area()`). If an engine placed every requested part, ties are broken by the smaller used-bounding-box (`Report`'s ranking rule) — a more compact layout leaves a bigger usable remnant.
+- `--engines Name1,Name2` filters to specific registered engines (default: all); `--csv <path>` writes a flat per-job CSV alongside the console report.
 
 ### OpenNest.Mcp (console app, depends on Core + Engine + IO)
 MCP server for Claude Code integration. Exposes nesting operations as MCP tools over stdio transport. Published to `~/.claude/mcp/OpenNest.Mcp/`.
