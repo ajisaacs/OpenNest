@@ -31,9 +31,32 @@ namespace OpenNest.Benchmark
 
             ValidateQuantities(parts, job, result);
             ValidateBounds(parts, plate, result);
+            ValidateAreaBudget(parts, plate, result);
             ValidateSpacing(parts, plate.PartSpacing, result);
 
             return result;
+        }
+
+        /// <summary>
+        /// Hard mathematical backstop: non-overlapping parts confined to the work
+        /// area can never have a combined area greater than the work area itself.
+        /// This catches overlap that the polygon-based ValidateSpacing check can
+        /// miss - Collision.HasOverlap (and Part.Intersects, which uses the same
+        /// algorithm) has been observed to return false negatives on real,
+        /// complex production geometry, so this check does not depend on it.
+        /// </summary>
+        private static void ValidateAreaBudget(List<Part> parts, Plate plate, ValidationResult result)
+        {
+            var workArea = plate.WorkArea();
+            var budget = workArea.Width * workArea.Length;
+            var placedArea = parts.Sum(p => p.BaseDrawing.Area);
+
+            if (placedArea > budget + Tolerance.Epsilon)
+            {
+                result.Violations.Add(
+                    $"Combined placed area ({placedArea:F2}) exceeds the work area ({budget:F2}) - " +
+                    "parts must overlap even though the polygon overlap check did not flag a pair");
+            }
         }
 
         private static void ValidateQuantities(List<Part> parts, BenchmarkJob job, ValidationResult result)
@@ -132,7 +155,10 @@ namespace OpenNest.Benchmark
             if (inflateBy > Tolerance.Epsilon)
                 perimeter = perimeter.OffsetOutward(inflateBy) ?? perimeter;
 
-            var polygon = perimeter.ToPolygon();
+            // Adaptive tolerance instead of Shape.ToPolygon()'s default (up to 1000
+            // segments per arc) - arc-heavy real parts otherwise produce thousands
+            // of vertices, which is needlessly slow for a spacing check.
+            var polygon = perimeter.ToPolygonWithTolerance(0.01, circumscribe: true);
 
             if (polygon == null)
                 return null;
