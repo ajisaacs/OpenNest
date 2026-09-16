@@ -9,9 +9,10 @@ namespace OpenNest.Benchmark
 {
     /// <summary>
     /// Console + CSV reporting for benchmark results. Ranking rule per job:
-    /// valid beats invalid; higher utilization wins; if utilization ties and both
-    /// engines fully placed every requested part, the smaller used-bounding-box
-    /// (more compact remnant) wins. Ties beyond that are a shared win.
+    /// valid beats invalid; higher aggregate utilization wins; if utilization
+    /// ties and both engines fully placed every requested part, fewer plates
+    /// used wins (the multi-plate analogue of "smaller remnant" - both are
+    /// proxies for wasting less material). Ties beyond that are a shared win.
     /// </summary>
     public static class Report
     {
@@ -27,7 +28,7 @@ namespace OpenNest.Benchmark
                 var ranked = jobGroup.OrderBy(r => r, Comparer<JobResult>.Create(Compare)).ToList();
                 var best = ranked.Count > 0 ? ranked[0] : null;
 
-                Console.WriteLine($"{"Engine",-16} {"Result",-9} {"Parts",-10} {"Util%",-8} {"Remnant",-12} {"Time(ms)",-9} Notes");
+                Console.WriteLine($"{"Engine",-16} {"Result",-9} {"Parts",-10} {"Util%",-8} {"Plates",-18} {"Time(ms)",-9} Notes");
 
                 foreach (var r in ranked)
                 {
@@ -36,10 +37,10 @@ namespace OpenNest.Benchmark
                     var status = r.Crashed ? "CRASH" : r.Valid ? "ok" : "INVALID";
                     var partsCol = $"{r.PartsPlaced}/{r.PartsRequested}";
                     var utilCol = r.Valid ? $"{r.Utilization * 100:F1}" : "-";
-                    var remnantCol = r.Valid ? $"{r.UsedBoundingBoxArea:F0}" : "-";
+                    var platesCol = r.PlatesUsed > 0 ? $"{r.PlatesUsed} ({SizeSummary(r.SizeBreakdown)})" : "-";
                     var notes = r.Crashed ? r.Error : string.Join("; ", r.Violations.Take(2));
 
-                    Console.WriteLine($"{marker}{r.EngineName,-15} {status,-9} {partsCol,-10} {utilCol,-8} {remnantCol,-12} {r.ElapsedMs,-9} {notes}");
+                    Console.WriteLine($"{marker}{r.EngineName,-15} {status,-9} {partsCol,-10} {utilCol,-8} {platesCol,-18} {r.ElapsedMs,-9} {notes}");
                 }
             }
         }
@@ -57,7 +58,9 @@ namespace OpenNest.Benchmark
                     Jobs = g.Count(),
                     Valid = g.Count(r => r.Valid),
                     Crashed = g.Count(r => r.Crashed),
+                    FullyPlaced = g.Count(r => r.FullyPlaced),
                     TotalUtilization = g.Sum(r => r.Utilization),
+                    TotalPlates = g.Sum(r => r.PlatesUsed),
                     TotalTimeMs = g.Sum(r => r.ElapsedMs),
                 })
                 .OrderByDescending(e => e.TotalUtilization)
@@ -65,33 +68,41 @@ namespace OpenNest.Benchmark
 
             var wins = CountWins(results);
 
-            Console.WriteLine($"{"Engine",-16} {"Jobs",-6} {"Valid",-7} {"Crashed",-8} {"Wins",-6} {"AvgUtil%",-10} {"TotalTime(ms)",-14}");
+            Console.WriteLine($"{"Engine",-16} {"Jobs",-6} {"Valid",-7} {"Complete",-9} {"Wins",-6} {"AvgUtil%",-10} {"Plates",-8} {"TotalTime(ms)",-14}");
 
             foreach (var e in byEngine)
             {
                 var avgUtil = e.Jobs > 0 ? e.TotalUtilization / e.Jobs * 100 : 0;
                 var winCount = wins.TryGetValue(e.Engine, out var w) ? w : 0;
-                Console.WriteLine($"{e.Engine,-16} {e.Jobs,-6} {e.Valid,-7} {e.Crashed,-8} {winCount,-6} {avgUtil,-10:F1} {e.TotalTimeMs,-14}");
+                Console.WriteLine($"{e.Engine,-16} {e.Jobs,-6} {e.Valid,-7} {e.FullyPlaced,-9} {winCount,-6} {avgUtil,-10:F1} {e.TotalPlates,-8} {e.TotalTimeMs,-14}");
             }
         }
 
         public static void WriteCsv(string path, List<JobResult> results)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Job,Engine,Valid,Crashed,PartsPlaced,PartsRequested,Utilization,UsedBoundingBoxArea,ElapsedMs,Notes");
+            sb.AppendLine("Job,Engine,Valid,Crashed,FullyPlaced,PartsPlaced,PartsRequested,Utilization,PlatesUsed,SizeBreakdown,ElapsedMs,Notes");
 
             foreach (var r in results)
             {
                 var notes = r.Crashed ? r.Error : string.Join(" | ", r.Violations);
                 sb.AppendLine(string.Join(",",
-                    Csv(r.JobName), Csv(r.EngineName), r.Valid, r.Crashed,
+                    Csv(r.JobName), Csv(r.EngineName), r.Valid, r.Crashed, r.FullyPlaced,
                     r.PartsPlaced, r.PartsRequested,
                     r.Utilization.ToString("F4", CultureInfo.InvariantCulture),
-                    r.UsedBoundingBoxArea.ToString("F2", CultureInfo.InvariantCulture),
+                    r.PlatesUsed, Csv(SizeSummary(r.SizeBreakdown)),
                     r.ElapsedMs, Csv(notes)));
             }
 
             File.WriteAllText(path, sb.ToString());
+        }
+
+        private static string SizeSummary(Dictionary<string, int> breakdown)
+        {
+            if (breakdown == null || breakdown.Count == 0)
+                return "-";
+
+            return string.Join("; ", breakdown.Select(kv => $"{kv.Key}×{kv.Value}"));
         }
 
         private static string Csv(string value)
@@ -124,7 +135,7 @@ namespace OpenNest.Benchmark
         }
 
         /// <summary>Lower sorts first (better). Valid beats invalid, then higher
-        /// utilization, then (if both fully placed) smaller used-bounding-box.</summary>
+        /// aggregate utilization, then (if both fully placed) fewer plates used.</summary>
         private static int Compare(JobResult a, JobResult b)
         {
             if (a.Valid != b.Valid)
@@ -138,13 +149,8 @@ namespace OpenNest.Benchmark
             if (System.Math.Abs(utilDiff) > Epsilon)
                 return utilDiff > 0 ? 1 : -1;
 
-            if (a.FullyPlaced && b.FullyPlaced)
-            {
-                var bboxDiff = a.UsedBoundingBoxArea - b.UsedBoundingBoxArea;
-
-                if (System.Math.Abs(bboxDiff) > Epsilon)
-                    return bboxDiff > 0 ? 1 : -1;
-            }
+            if (a.FullyPlaced && b.FullyPlaced && a.PlatesUsed != b.PlatesUsed)
+                return a.PlatesUsed > b.PlatesUsed ? 1 : -1;
 
             return 0;
         }

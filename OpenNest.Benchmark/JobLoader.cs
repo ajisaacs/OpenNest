@@ -8,11 +8,12 @@ using System.Linq;
 namespace OpenNest.Benchmark
 {
     /// <summary>
-    /// Builds BenchmarkJobs from .nest files on disk. Fully generic: works on any
-    /// valid .nest file, using whatever drawings/quantities/plate settings it contains.
-    /// Optionally sweeps a fixed list of sheet sizes instead of the sizes embedded
-    /// in the file, so the same drawing set can be benchmarked across a standard
-    /// sheet-size lineup.
+    /// Builds BenchmarkJobs from .nest files on disk. Fully generic: works on
+    /// any valid .nest file, using whatever drawings/quantities/plate settings
+    /// it contains. One job per file, carrying the full pool of candidate
+    /// sheet sizes the engine may use across the whole nest - by default the
+    /// distinct sizes already present in that file, or a fixed override list
+    /// (e.g. a standard sheet-size lineup) applied to every file.
     /// </summary>
     public static class JobLoader
     {
@@ -46,22 +47,18 @@ namespace OpenNest.Benchmark
 
                 var template = ResolvePlateTemplate(nest);
                 var sizes = sheetSizeOverrides != null && sheetSizeOverrides.Count > 0
-                    ? sheetSizeOverrides
+                    ? sheetSizeOverrides.ToList()
                     : ResolveSheetSizes(nest);
 
-                foreach (var size in sizes)
+                jobs.Add(new BenchmarkJob
                 {
-                    jobs.Add(new BenchmarkJob
-                    {
-                        SourceFile = file,
-                        SheetSizeLabel = size.ToString(1),
-                        PlateSize = size,
-                        EdgeSpacing = template.EdgeSpacing,
-                        PartSpacing = partSpacingOverride ?? template.PartSpacing,
-                        Quadrant = template.Quadrant,
-                        Requests = requests,
-                    });
-                }
+                    SourceFile = file,
+                    CandidateSizes = sizes,
+                    EdgeSpacing = template.EdgeSpacing,
+                    PartSpacing = partSpacingOverride ?? template.PartSpacing,
+                    Quadrant = template.Quadrant,
+                    Requests = requests,
+                });
             }
 
             return jobs;

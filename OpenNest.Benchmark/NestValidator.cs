@@ -13,50 +13,39 @@ namespace OpenNest.Benchmark
     }
 
     /// <summary>
-    /// Validates a placed layout against the benchmark rules: every part must lie
-    /// within the plate's work area, every pair of parts must be at least
-    /// PartSpacing apart, and no drawing may have more parts placed than requested.
-    /// Geometry checks work on arbitrary (concave, holed) polygons by reusing the
-    /// same world-space extraction Part.Intersects uses internally, so no engine
-    /// gets an advantage or penalty from shape complexity.
+    /// Validates a (possibly multi-plate) placed layout against the benchmark
+    /// rules: on every plate, every part must lie within that plate's work
+    /// area and every pair of parts must be at least PartSpacing apart; across
+    /// all plates combined, no drawing may have more parts placed than
+    /// requested (the quantity limit is a property of the whole order, not of
+    /// any one plate). Geometry checks work on arbitrary (concave, holed)
+    /// polygons by reusing the same world-space extraction Part.Intersects
+    /// uses internally, so no engine gets an advantage or penalty from shape
+    /// complexity.
     /// </summary>
     public static class NestValidator
     {
-        public static ValidationResult Validate(List<Part> parts, Plate plate, BenchmarkJob job)
+        public static ValidationResult Validate(List<(Plate Plate, List<Part> Parts)> plateRuns, BenchmarkJob job)
         {
             var result = new ValidationResult();
+            var allParts = plateRuns.SelectMany(pr => pr.Parts).ToList();
 
-            if (parts == null || parts.Count == 0)
+            if (allParts.Count == 0)
                 return result;
 
-            ValidateQuantities(parts, job, result);
-            ValidateBounds(parts, plate, result);
-            ValidateAreaBudget(parts, plate, result);
-            ValidateSpacing(parts, plate.PartSpacing, result);
+            ValidateQuantities(allParts, job, result);
+
+            foreach (var (plate, parts) in plateRuns)
+            {
+                if (parts.Count == 0)
+                    continue;
+
+                ValidateBounds(parts, plate, result);
+                ValidateAreaBudget(parts, plate, result);
+                ValidateSpacing(parts, plate.PartSpacing, result);
+            }
 
             return result;
-        }
-
-        /// <summary>
-        /// Hard mathematical backstop: non-overlapping parts confined to the work
-        /// area can never have a combined area greater than the work area itself.
-        /// This catches overlap that the polygon-based ValidateSpacing check can
-        /// miss - Collision.HasOverlap (and Part.Intersects, which uses the same
-        /// algorithm) has been observed to return false negatives on real,
-        /// complex production geometry, so this check does not depend on it.
-        /// </summary>
-        private static void ValidateAreaBudget(List<Part> parts, Plate plate, ValidationResult result)
-        {
-            var workArea = plate.WorkArea();
-            var budget = workArea.Width * workArea.Length;
-            var placedArea = parts.Sum(p => p.BaseDrawing.Area);
-
-            if (placedArea > budget + Tolerance.Epsilon)
-            {
-                result.Violations.Add(
-                    $"Combined placed area ({placedArea:F2}) exceeds the work area ({budget:F2}) - " +
-                    "parts must overlap even though the polygon overlap check did not flag a pair");
-            }
         }
 
         private static void ValidateQuantities(List<Part> parts, BenchmarkJob job, ValidationResult result)
@@ -77,7 +66,7 @@ namespace OpenNest.Benchmark
                 if (placed > max)
                 {
                     var name = parts.First(p => p.BaseDrawing.Id == drawingId).BaseDrawing.Name;
-                    result.Violations.Add($"'{name}': placed {placed} but only {max} were requested");
+                    result.Violations.Add($"'{name}': placed {placed} across all plates but only {max} were requested");
                 }
             }
         }
@@ -98,8 +87,32 @@ namespace OpenNest.Benchmark
                 if (outLeft || outBottom || outRight || outTop)
                 {
                     result.Violations.Add(
-                        $"'{part.BaseDrawing.Name}' at ({part.Location.X:F2},{part.Location.Y:F2}) falls outside the work area");
+                        $"'{part.BaseDrawing.Name}' at ({part.Location.X:F2},{part.Location.Y:F2}) falls outside the work area " +
+                        $"of a {plate.Size} plate");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Hard mathematical backstop: non-overlapping parts confined to the
+        /// work area can never have a combined area greater than the work
+        /// area itself. This catches overlap that the polygon-based
+        /// ValidateSpacing check can miss - Collision.HasOverlap (and
+        /// Part.Intersects, which uses the same algorithm) has been observed
+        /// to return false negatives on real, complex production geometry, so
+        /// this check does not depend on it.
+        /// </summary>
+        private static void ValidateAreaBudget(List<Part> parts, Plate plate, ValidationResult result)
+        {
+            var workArea = plate.WorkArea();
+            var budget = workArea.Width * workArea.Length;
+            var placedArea = parts.Sum(p => p.BaseDrawing.Area);
+
+            if (placedArea > budget + Tolerance.Epsilon)
+            {
+                result.Violations.Add(
+                    $"Combined placed area ({placedArea:F2}) on a {plate.Size} plate exceeds its work area ({budget:F2}) - " +
+                    "parts must overlap even though the polygon overlap check did not flag a pair");
             }
         }
 
