@@ -64,6 +64,18 @@ cd OpenNest
 dotnet build OpenNest.sln
 ```
 
+### Cross-platform engine contract tests
+
+```bash
+dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj
+```
+
+`OpenNest.Engine.Tests` targets `net8.0` and runs on Linux, macOS, and Windows without the desktop project or local DXF fixtures. The existing `OpenNest.Tests` suite still requires Windows.
+
+The new whole-job contracts in `OpenNest.Engine/Jobs` (`namespace OpenNest`) use owned immutable geometry/settings, explicit part IDs and positive demand, finite or unlimited stock (`null` means unlimited; zero means unavailable), and result ID/pose values rather than mutable desktop models. Rotation is in radians about the geometry origin, followed by translation into the plate quadrant frame. Strategy factories belong to each runner, not the global registry.
+
+**Current scope:** `NestJobRunner.Solve` completes empty jobs without consuming stock and honors initial cancellation by throwing. Nonempty jobs explicitly throw `NotSupportedException`; allocation, legacy adapters, placement validation, and production strategy resolution are not implemented yet. Geometry snapshots currently preserve flat CNC rapid/line/arc programs, including hole contours, without approximation; other instructions are explicitly rejected. Existing desktop, API, CLI, and MCP nesting paths are unchanged.
+
 ### Run
 
 ```bash
@@ -142,7 +154,8 @@ dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- project.zip ext
 OpenNest.sln
 ├── OpenNest/                   # WinForms desktop application (UI)
 ├── OpenNest.Core/              # Domain model, geometry, and CNC primitives
-├── OpenNest.Engine/            # Nesting algorithms (fill, pack, compact, best-fit)
+├── OpenNest.Engine/            # Nesting algorithms and whole-job contracts
+├── OpenNest.Engine.Tests/      # Cross-platform whole-job contract tests (net8.0)
 ├── OpenNest.IO/                # File I/O — DXF import/export, nest file format
 ├── OpenNest.Console/           # Command-line interface for batch nesting
 ├── OpenNest.Api/               # Programmatic nesting API (NestRunner pipeline)
