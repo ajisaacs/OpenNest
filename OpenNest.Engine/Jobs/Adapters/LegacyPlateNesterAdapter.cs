@@ -18,10 +18,10 @@ public sealed class LegacyPlateNesterAdapter : IPlateNester
         this.engineFactory = engineFactory;
     }
 
-    /// <summary>Minimal built-in selection; never reads or changes NestEngineRegistry.</summary>
-    public static IPlateNester Create(string strategy) => strategy == "Default"
-        ? new LegacyPlateNesterAdapter(plate => new DefaultNestEngine(plate))
-        : throw new NotSupportedException($"Unknown placement strategy: {strategy}.");
+    /// <summary>Convenience overload delegating to <see cref="PlateNesterFactory"/> so strategy
+    /// resolution has a single source of truth; rejects unknown keys. Never reads or changes the
+    /// process-global NestEngineRegistry.</summary>
+    public static IPlateNester Create(string strategy) => PlateNesterFactory.Create(strategy);
 
     public PlateCandidate Place(PlatePlacementRequest request, IProgress<NestJobProgress> progress = null,
         CancellationToken token = default)
