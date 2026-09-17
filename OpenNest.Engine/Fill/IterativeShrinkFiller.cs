@@ -1,6 +1,7 @@
 using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -130,17 +131,13 @@ namespace OpenNest.Engine.Fill
 
             var placed = filler.FillItems(workItems, shrinkWrapper, token);
 
-            // Build leftovers: compare placed count to original quantities.
-            // RemnantFiller.FillItems does NOT mutate NestItem.Quantity.
+            // Build leftovers: compare placed count to original quantities by drawing
+            // reference. RemnantFiller.FillItems does NOT mutate NestItem.Quantity.
             var leftovers = new List<NestItem>();
             foreach (var item in items)
             {
-                var placedCount = 0;
-                foreach (var p in placed)
-                {
-                    if (p.BaseDrawing.Name == item.Drawing.Name)
-                        placedCount++;
-                }
+                var placedCount = placed.Count(p =>
+                    ReferenceEquals(p.BaseDrawing, item.Drawing));
 
                 if (item.Quantity <= 0)
                     continue; // unlimited items are always "satisfied" — no leftover

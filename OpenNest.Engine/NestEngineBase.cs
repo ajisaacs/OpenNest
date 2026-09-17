@@ -113,11 +113,11 @@ namespace OpenNest
                 {
                     allParts.AddRange(fillParts);
 
-                    // Deduct placed quantities
+                    // Deduct placed quantities by drawing reference, not name.
                     foreach (var item in fillItems)
                     {
                         var placed = fillParts.Count(p =>
-                            p.BaseDrawing.Name == item.Drawing.Name);
+                            ReferenceEquals(p.BaseDrawing, item.Drawing));
                         item.Quantity = System.Math.Max(0, item.Quantity - placed);
                     }
 
@@ -147,10 +147,11 @@ namespace OpenNest
                 {
                     allParts.AddRange(packParts);
 
+                    // Deduct placed quantities by drawing reference, not name.
                     foreach (var item in regularPackItems)
                     {
                         var placed = packParts.Count(p =>
-                            p.BaseDrawing.Name == item.Drawing.Name);
+                            ReferenceEquals(p.BaseDrawing, item.Drawing));
                         item.Quantity = System.Math.Max(0, item.Quantity - placed);
                     }
                 }

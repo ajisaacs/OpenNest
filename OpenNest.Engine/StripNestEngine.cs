@@ -128,13 +128,14 @@ namespace OpenNest
                 }
             }
 
-            // Deduct placed quantities from original items.
+            // Deduct placed quantities from original items by drawing reference.
             foreach (var item in items)
             {
                 if (item.Quantity <= 0)
                     continue;
 
-                var placed = allParts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
+                var placed = allParts.Count(p =>
+                    ReferenceEquals(p.BaseDrawing, item.Drawing));
                 item.Quantity = System.Math.Max(0, item.Quantity - placed);
             }
 
