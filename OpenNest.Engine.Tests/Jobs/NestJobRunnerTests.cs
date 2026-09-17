@@ -41,12 +41,15 @@ public class NestJobRunnerTests
     }
 
     [Fact]
-    public void NonemptyJobIsExplicitlyUnsupportedInContractSlice()
+    public void EmptyStockReturnsIncomplete()
     {
         var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle()), 1);
         var job = new NestJob(new[] { part }, Array.Empty<NestPlateStock>());
         var runner = new NestJobRunner(_ => new FakePlateNester());
-        Assert.Throws<NotSupportedException>(() => runner.Solve(job));
+        var result = runner.Solve(job);
+        Assert.Equal(NestJobStatus.Incomplete, result.Status);
+        Assert.Equal(NestJobStopReason.StockExhausted, result.StopReason);
+        Assert.Equal(1, Assert.Single(result.Fulfillment).Unplaced);
     }
 
     [Fact]

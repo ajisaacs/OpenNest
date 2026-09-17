@@ -74,7 +74,21 @@ dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj
 
 The new whole-job contracts in `OpenNest.Engine/Jobs` (`namespace OpenNest`) use owned immutable geometry/settings, explicit part IDs and positive demand, finite or unlimited stock (`null` means unlimited; zero means unavailable), and result ID/pose values rather than mutable desktop models. Rotation is in radians about the geometry origin, followed by translation into the plate quadrant frame. Strategy factories belong to each runner, not the global registry.
 
-**Current scope:** `NestJobRunner.Solve` completes empty jobs without consuming stock and honors initial cancellation by throwing. Nonempty jobs explicitly throw `NotSupportedException`; allocation, legacy adapters, placement validation, and production strategy resolution are not implemented yet. Geometry snapshots currently preserve flat CNC rapid/line/arc programs, including hole contours, without approximation; other instructions are explicitly rejected. Existing desktop, API, CLI, and MCP nesting paths are unchanged.
+**Current scope (minimum runnable slice, not release-ready):** `NestJobRunner.Solve` allocates one stock entry across multiple physical sheets, respecting finite inventory (`null` is unlimited), positive remaining demand, and `MaxPlates`. Empty parts complete without consuming stock; empty/unavailable stock returns `Incomplete/StockExhausted`. A zero-placement candidate stops with `NoPlacementFound` and consumes no sheet. Nonempty jobs with multiple stock entries explicitly throw `NotSupportedException`; mixed-stock selection and optional optimizations are not implemented.
+
+`DrawingJobMapper` snapshots caller drawings/items under explicit requirement IDs. `LegacyPlateNesterAdapter` creates fresh private legacy drawings, items, and plates for each trial and maps returned drawings **by reference**, never by name. Mutable legacy quantities never drive the fulfillment ledger. The minimal built-in factory accepts only `Default`; injected factories must explicitly reject unknown keys or return null. `NestResultMaterializer` returns a detached domain nest and `DrawingsByPartId` identity map. Each output plate represents one physical sheet (`Quantity = 1`), and each placement is attached exactly once so domain quantity events do not double count.
+
+```csharp
+var job = new NestJob(
+    new[] { DrawingJobMapper.FromDrawing("requirement-1", drawing, quantity: 3) },
+    new[] { DrawingJobMapper.FromPlate("stock-1", plateTemplate, quantity: 3) });
+var result = new NestJobRunner(LegacyPlateNesterAdapter.Create).Solve(job);
+var domainResult = NestResultMaterializer.Materialize(job, result);
+// result contains fulfillment/unplaced counts and physical stock usage;
+// domainResult.Nest and domainResult.DrawingsByPartId are detached from caller objects.
+```
+
+**Unfinished safety boundary:** basic validation rejects invalid dimensions/settings, nonfinite geometry, unknown candidate IDs, nonfinite poses, and overproduction. Cancellation throws initially and immediately after the engine returns; no partial result is returned. Full contour validity, plate containment, allowed-rotation enforcement, inter-part overlap/clearance validation, and broader cancellation coverage remain task 5 work. A committed candidate is therefore **not yet certified safe for cutting**, even if the legacy engine reports success. Geometry snapshots preserve flat CNC rapid/line/arc programs, including origin and hole contours, without approximation; other instructions are explicitly rejected. Existing desktop, API, CLI, and MCP nesting paths are unchanged.
 
 ### Run
 
