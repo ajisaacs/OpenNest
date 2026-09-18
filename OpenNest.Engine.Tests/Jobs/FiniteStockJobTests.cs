@@ -105,11 +105,12 @@ public class FiniteStockJobTests
     }
 
     [Fact]
-    public void MixedStockIsNotSilentlyIgnored()
+    public void MixedStockCanBeEvaluated()
     {
         var job = Job();
         var mixed = new NestJob(job.Parts, job.Plates.Concat(new[] { new NestPlateStock("other", new Size(10, 20), 2) }));
-        Assert.Throws<NotSupportedException>(() => new NestJobRunner(_ => new Nester(One)).Solve(mixed));
+        var result = new NestJobRunner(_ => new Nester(One)).Solve(mixed);
+        Assert.Equal(NestJobStatus.Complete, result.Status);
     }
 
     [Theory]

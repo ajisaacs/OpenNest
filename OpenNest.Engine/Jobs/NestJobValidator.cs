@@ -26,9 +26,6 @@ public static class NestJobValidator
                 !double.IsFinite(m.CenterX) || !double.IsFinite(m.CenterY)))
                 throw new ArgumentException($"Geometry must contain finite motions: {part.Id}.", nameof(job));
         }
-        // Empty jobs do not select or consume stock (including multiple unused stock entries).
-        if (job.Parts.Count != 0 && job.Plates.Count > 1)
-            throw new NotSupportedException("This slice supports one stock entry only; mixed-stock selection is not implemented.");
     }
 
     internal static void ValidateCandidate(PlateCandidate candidate, IReadOnlyDictionary<string, int> remaining)
