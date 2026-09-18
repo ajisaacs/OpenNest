@@ -16,7 +16,7 @@ public class FiniteStockJobTests
     }
 
     internal static PlateCandidate One(PlatePlacementRequest request) => new(new[]
-        { new NestJobPlacement(request.Parts[0].Id, 99, 1, 2, 0) });
+        { new NestJobPlacement(request.Parts[0].Id, 99, 0, 0, 0) });
 
     [Theory]
     [InlineData(3, 3, 0, NestJobStatus.Complete, NestJobStopReason.Completed)]
@@ -108,7 +108,7 @@ public class FiniteStockJobTests
     public void MixedStockCanBeEvaluated()
     {
         var job = Job();
-        var mixed = new NestJob(job.Parts, job.Plates.Concat(new[] { new NestPlateStock("other", new Size(10, 20), 2) }));
+        var mixed = new NestJob(job.Parts, job.Plates.Concat(new[] { new NestPlateStock("other", new Size(20, 10), 2) }));
         var result = new NestJobRunner(_ => new Nester(One)).Solve(mixed);
         Assert.Equal(NestJobStatus.Complete, result.Status);
     }

@@ -25,23 +25,21 @@ public static class NestJobValidator
                 !double.IsFinite(m.X) || !double.IsFinite(m.Y) ||
                 !double.IsFinite(m.CenterX) || !double.IsFinite(m.CenterY)))
                 throw new ArgumentException($"Geometry must contain finite motions: {part.Id}.", nameof(job));
+            try
+            {
+                NestJobPlacementValidator.ValidateGeometry(part.Geometry);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new ArgumentException($"Geometry must contain usable closed edges: {part.Id}.", nameof(job), exception);
+            }
         }
     }
 
-    internal static void ValidateCandidate(PlateCandidate candidate, IReadOnlyDictionary<string, int> remaining)
+    internal static void ValidateCandidate(PlateCandidate candidate, NestPlateStock stock,
+        IReadOnlyDictionary<string, int> remaining, IReadOnlyDictionary<string, NestJobPart> parts)
     {
-        if (candidate == null) throw new InvalidOperationException("The plate nester returned a null candidate.");
-        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (var placement in candidate.Placements)
-        {
-            if (placement.PartId == null || !remaining.TryGetValue(placement.PartId, out var available))
-                throw new InvalidOperationException("Candidate references an unknown requirement ID.");
-            if (!double.IsFinite(placement.X) || !double.IsFinite(placement.Y) || !double.IsFinite(placement.Rotation))
-                throw new InvalidOperationException("Candidate poses must be finite.");
-            counts.TryGetValue(placement.PartId, out var count);
-            if (count >= available) throw new InvalidOperationException("Candidate overproduces a requirement.");
-            counts[placement.PartId] = count + 1;
-        }
+        NestJobPlacementValidator.ValidateCandidate(candidate, stock, remaining, parts);
     }
 
     private static bool Positive(double value) => double.IsFinite(value) && value > 0;

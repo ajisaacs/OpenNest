@@ -66,7 +66,7 @@ public class NestJobStockSelectionTests
         var area = Solve(new[] { Part("p", 1) }, new[] { Stock("large", 20, 20, 1), Stock("small", 10, 10, 1) },
             request => Candidate(request, "p"));
         var envelope = Solve(new[] { Part("p", 2) }, new[] { Stock("a", 10, 10, 1), Stock("b", 10, 10, 1) },
-            request => request.Stock.Id == "a" ? CandidatePair("p", 0, 10) : CandidatePair("p", 0, 1));
+            request => request.Stock.Id == "a" ? CandidatePair("p", 4, 5) : CandidatePair("p", 4, 0));
         var inputOrder = Solve(new[] { Part("p", 1) }, new[] { Stock("first", 10, 10, 1), Stock("second", 10, 10, 1) },
             request => Candidate(request, "p"));
 
@@ -93,7 +93,7 @@ public class NestJobStockSelectionTests
         new NestJobRunner(_ => new Nester(place)).Solve(new NestJob(parts, stock, options));
 
     private static NestJobPart Part(string id, int quantity, int priority = 0) =>
-        new(id, PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle()), quantity, priority);
+        new(id, PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 5)), quantity, priority);
 
     private static NestPlateStock Stock(string id, double width, double length, int? quantity) =>
         new(id, new Size(width, length), quantity);
@@ -103,10 +103,10 @@ public class NestJobStockSelectionTests
         return new PlateCandidate(new[] { new NestJobPlacement(id, 0, firstX, 0, 0) });
     }
 
-    private static PlateCandidate CandidatePair(string id, double first, double second) => new(new[]
+    private static PlateCandidate CandidatePair(string id, double secondX, double secondY) => new(new[]
     {
-        new NestJobPlacement(id, 0, first, first, 0),
-        new NestJobPlacement(id, 1, second, second, 0)
+        new NestJobPlacement(id, 0, 0, 0, 0),
+        new NestJobPlacement(id, 1, secondX, secondY, 0)
     });
 
     private static PlateCandidate Empty() => new(Array.Empty<NestJobPlacement>());

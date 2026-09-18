@@ -58,7 +58,11 @@ public class JobAdapterTests
         {
             Assert.NotSame(items[0].Drawing, items[1].Drawing);
             foreach (var item in items) item.Drawing.Name = "identical";
-            return items.Select(i => new Part(i.Drawing)).ToList();
+            return new List<Part>
+            {
+                new Part(items[0].Drawing, new Vector(0, 0)),
+                new Part(items[1].Drawing, new Vector(10, 0))
+            };
         }));
         var result = new NestJobRunner(_ => adapter).Solve(job);
         Assert.Equal(new[] { "a", "b" }, result.Plates[0].Placements.Select(p => p.PartId));

@@ -46,7 +46,8 @@ public sealed class LegacyPlateNesterAdapter : IPlateNester
             });
         }
         var engine = engineFactory(plate) ?? throw new InvalidOperationException("Legacy engine factory returned null.");
-        var parts = engine.Nest(items, null, token);
+        var legacyProgress = progress == null ? null : new LegacyProgress(progress, request.Stock.Id);
+        var parts = engine.Nest(items, legacyProgress, token);
         token.ThrowIfCancellationRequested();
         if (parts == null) throw new InvalidOperationException("Legacy engine returned null placements.");
         var placements = new List<NestJobPlacement>();
@@ -57,5 +58,14 @@ public sealed class LegacyPlateNesterAdapter : IPlateNester
             placements.Add(new NestJobPlacement(id, 0, part.Location.X, part.Location.Y, part.Rotation));
         }
         return new PlateCandidate(placements);
+    }
+
+    private sealed class LegacyProgress(IProgress<NestJobProgress> progress, string stockId) : IProgress<NestProgress>
+    {
+        public void Report(NestProgress value)
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            progress.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stockId, -1, 0, 0, value));
+        }
     }
 }

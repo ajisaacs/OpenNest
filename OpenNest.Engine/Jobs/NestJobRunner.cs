@@ -29,6 +29,7 @@ public sealed class NestJobRunner : INestingEngine
         var plates = new List<NestJobPlateResult>();
         var remaining = job.Parts.ToDictionary(part => part.Id, part => part.Quantity, StringComparer.Ordinal);
         var placed = job.Parts.ToDictionary(part => part.Id, _ => 0, StringComparer.Ordinal);
+        var parts = job.Parts.ToDictionary(part => part.Id, StringComparer.Ordinal);
         var used = job.Plates.ToDictionary(stock => stock.Id, _ => 0, StringComparer.Ordinal);
         var comparer = new NestJobCandidateComparer(job.Parts);
         var nester = job.Parts.Count == 0 ? null : plateNesterFactory(job.Options.PlacementStrategy) ??
@@ -55,9 +56,11 @@ public sealed class NestJobRunner : INestingEngine
                 progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id,
                     plates.Count, plates.Count, placed.Values.Sum()));
                 token.ThrowIfCancellationRequested();
-                var candidate = nester.Place(request, token: token);
+                var candidateProgress = progress == null ? null : new CandidateProgress(progress, stock.Id,
+                    plates.Count, plates.Count, placed.Values.Sum());
+                var candidate = nester.Place(request, candidateProgress, token);
                 token.ThrowIfCancellationRequested();
-                NestJobValidator.ValidateCandidate(candidate, remaining);
+                NestJobValidator.ValidateCandidate(candidate, stock, remaining, parts);
                 var trial = new CandidateTrial(candidate, stock, index);
                 if (winner == null || comparer.Compare(trial.Candidate, trial.Stock, trial.StockIndex,
                     winner.Candidate, winner.Stock, winner.StockIndex) > 0)
@@ -95,4 +98,15 @@ public sealed class NestJobRunner : INestingEngine
     }
 
     private sealed record CandidateTrial(PlateCandidate Candidate, NestPlateStock Stock, int StockIndex);
+
+    private sealed class CandidateProgress(IProgress<NestJobProgress> progress, string stockId, int plateIndex,
+        int committedPlates, int committedParts) : IProgress<NestJobProgress>
+    {
+        public void Report(NestJobProgress value)
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            progress.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stockId, plateIndex,
+                committedPlates, committedParts, value.LegacyProgress));
+        }
+    }
 }

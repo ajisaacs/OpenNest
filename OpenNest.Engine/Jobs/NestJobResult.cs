@@ -5,11 +5,6 @@ namespace OpenNest;
 
 public enum NestJobStatus { Complete, Incomplete }
 public enum NestJobStopReason { Completed, StockExhausted, NoPlacementFound, PlateLimitReached }
-public enum NestJobStage { EvaluatingCandidate, PlateCommitted }
-
-/// <summary>Committed counts only; candidate evaluation does not imply committed production.</summary>
-public sealed record NestJobProgress(NestJobStage Stage, string StockId, int PlateIndex,
-    int CommittedPlates, int CommittedParts);
 
 /// <summary>
 /// Rotate about the snapshot origin, then translate by X/Y into the selected plate quadrant frame.
