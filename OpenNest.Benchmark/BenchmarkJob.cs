@@ -48,13 +48,13 @@ namespace OpenNest.Benchmark
         /// engine owns its own multi-plate/size strategy; this harness no
         /// longer picks plate sizes on the engine's behalf.
         /// </summary>
-        public NestJob BuildNestJob(int maxPlates)
+        public NestJob BuildNestJob(int maxPlates, double salvageRate = 0, double minimumSalvageDimension = 0)
         {
             var parts = Requests.Select(r =>
                 DrawingJobMapper.FromDrawing(r.Drawing.Id.ToString(), r.Drawing, r.Quantity));
             var stock = CandidateSizes.Select(size =>
                 new NestPlateStock(size.ToString(1), size, null, PartSpacing, EdgeSpacing, Quadrant));
-            return new NestJob(parts, stock, new NestJobOptions("Default", maxPlates));
+            return new NestJob(parts, stock, new NestJobOptions("Default", maxPlates, salvageRate, minimumSalvageDimension));
         }
     }
 }

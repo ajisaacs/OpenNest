@@ -23,7 +23,8 @@ namespace OpenNest.Benchmark
         /// <summary>Wall-clock budget for one engine solving one job.</summary>
         private static readonly TimeSpan SolveTimeout = TimeSpan.FromMinutes(5);
 
-        public static List<JobResult> Run(List<BenchmarkJob> jobs, IReadOnlyList<NestingEngineInfo> engines)
+        public static List<JobResult> Run(List<BenchmarkJob> jobs, IReadOnlyList<NestingEngineInfo> engines,
+            double salvageRate = 0, double minimumSalvageDimension = 0, string outputDirectory = null)
         {
             var results = new List<JobResult>(jobs.Count * engines.Count);
 
@@ -31,21 +32,22 @@ namespace OpenNest.Benchmark
             {
                 foreach (var engineInfo in engines)
                 {
-                    results.Add(RunOne(job, engineInfo));
+                    results.Add(RunOne(job, engineInfo, salvageRate, minimumSalvageDimension, outputDirectory));
                 }
             }
 
             return results;
         }
 
-        private static JobResult RunOne(BenchmarkJob job, NestingEngineInfo engineInfo)
+        private static JobResult RunOne(BenchmarkJob job, NestingEngineInfo engineInfo,
+            double salvageRate, double minimumSalvageDimension, string outputDirectory)
         {
             var requested = job.TotalRequestedQuantity;
             var sw = Stopwatch.StartNew();
 
             try
             {
-                var nestJob = job.BuildNestJob(MaxPlates);
+                var nestJob = job.BuildNestJob(MaxPlates, salvageRate, minimumSalvageDimension);
                 var engine = engineInfo.Factory();
                 using var cts = new CancellationTokenSource(SolveTimeout);
                 var jobResult = engine.Solve(nestJob, null, cts.Token);
@@ -70,6 +72,35 @@ namespace OpenNest.Benchmark
                     .OrderByDescending(g => g.Count())
                     .ToDictionary(g => g.Key, g => g.Count());
 
+                if (validation.Valid && outputDirectory != null)
+                {
+                    System.IO.Directory.CreateDirectory(outputDirectory);
+                    // Keep names and job metadata for a useful inspectable output; never modify source.
+                    var source = new OpenNest.IO.NestReader(job.SourceFile).Read();
+                    materialized.Nest.Name = source.Name;
+                    materialized.Nest.Units = source.Units;
+                    materialized.Nest.Material = source.Material;
+                    materialized.Nest.Thickness = source.Thickness;
+                    materialized.Nest.SalvageRate = salvageRate;
+                    foreach (var request in job.Requests)
+                        materialized.DrawingsByPartId[request.Drawing.Id.ToString()].Name = request.Drawing.Name;
+                    var path = System.IO.Path.Combine(outputDirectory, $"{job.Name}-{engineInfo.Name}.nest");
+                    if (System.IO.Path.GetFullPath(path) == System.IO.Path.GetFullPath(job.SourceFile))
+                        throw new InvalidOperationException("Output must not overwrite the source nest.");
+                    new OpenNest.IO.NestWriter(materialized.Nest).Write(path);
+                    var report = new
+                    {
+                        Source = job.SourceFile, Engine = engineInfo.Name, jobResult.Status, jobResult.StopReason,
+                        Requested = requested, Placed = totalPlaced, SheetArea = plateArea, PlacedArea = placedArea,
+                        SalvageRate = salvageRate, MinimumSalvageDimension = minimumSalvageDimension,
+                        EstimatedNetArea = jobResult.Plates.Sum(p => StockLadderNestingEngine.EstimateNetArea(nestJob, p)),
+                        Fulfillment = jobResult.Fulfillment, StockUsage = jobResult.StockUsage,
+                        Plates = jobResult.Plates, validation.Violations
+                    };
+                    System.IO.File.WriteAllText(System.IO.Path.ChangeExtension(path, ".json"),
+                        System.Text.Json.JsonSerializer.Serialize(report,
+                            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                }
                 sw.Stop();
 
                 return new JobResult

@@ -218,6 +218,71 @@ OpenNest.sln
 | **OpenNest.Benchmark** | Runs every registered whole-job nesting engine (`INestingEngine`) against a set of `.nest` files and scores them by material utilization, so competing engines — each owning its own multi-plate strategy — can be compared head-to-head. |
 | **OpenNest.Tests** | 89 test files covering core geometry, fill strategies, splitting, bending, BOM import, post-processing, and the API. |
 
+### StockLadder whole-job baseline
+
+Select `new StockLadderNestingEngine().Solve(job)` or the whole-job registry's
+`StockLadder` engine (benchmark: `--engines StockLadder`). This does not switch the
+legacy desktop single-plate engine. Supply every allowed `NestPlateStock` explicitly;
+no stock sizes are invented. Stock quantity `null` means unlimited, `0` unavailable,
+and a positive quantity is finite inventory. The benchmark's `--sheet-sizes` pool
+uses unlimited quantities; use the job API for finite stock.
+
+```csharp
+var job = new NestJob(parts, callerStocks,
+    new NestJobOptions(maxPlates: 100, salvageRate: 0,
+        minimumSalvageDimension: 0));
+var result = new StockLadderNestingEngine().Solve(job, token: cancellationToken);
+```
+
+Construction orders by priority, then validated stock-fit scarcity, then part area,
+pins an anchor before fillers, and ranks candidate sheets by estimated net sheet
+area per placed part area. Repacking tries single-sheet replacements and adjacent
+pairs into one sheet, accepting only strictly lower estimated net area with exactly
+the same demand. Failed trials leave placements and finite stock accounting intact.
+
+Salvage is an **area estimate**, not price or certified recoverable material.
+`salvageRate` defaults to `0` (allowed range 0–1); `minimumSalvageDimension` defaults
+to `0`, which also disables credit. With both enabled, only the largest qualifying
+full-span edge rectangle outside placed bounding boxes plus part spacing is credited,
+within the usable work area; both dimensions must meet the minimum in job units.
+Holes/scraps are not credited. No cut-off toolpath, kerf, handling, or future-demand
+valuation is modeled. Benchmark ranking still uses gross material utilization.
+
+This is a tested deterministic heuristic baseline, **not an optimal or production-
+certified solver**. Conservative rectangular free-region hints and linear fills can
+miss concave interlocks and feasible layouts. Automatic rotation tries cardinal
+angles plus 5-degree increments below 180 degrees; fixed/range policies are honored.
+Repacking is bounded local search, not a global stock/demand search or fixed-point
+optimality proof. `NoPlacementFound` is not proof of impossibility. Cancellation is
+cooperative (the benchmark requests it after five minutes), not process isolation.
+Geometry acceptance remains strict, including open marks leaving closed material.
+
+Benchmark export example (use a separate output directory):
+
+```bash
+dotnet run --project OpenNest.Benchmark -- input.nest \
+  --engines StockLadder --sheet-sizes 48x96,48x120,48x144,60x96,60x120,60x144,72x96,72x120,72x144 \
+  --salvage-rate 0 --min-salvage-dimension 0 \
+  --output ./stockladder-output --csv ./stockladder.csv
+```
+
+`--output` writes validated layouts as `.nest` plus JSON containing status, stop
+reason, fulfillment, stock usage, poses, and gross/estimated net area. Valid but
+incomplete layouts may be exported: inspect status and fulfillment. Thrown/invalid
+runs do not export layouts. The console can exit zero despite a reported `CRASH`;
+inspect the report, not just the process exit code. Export does not certify cutting
+readiness and must not overwrite the source.
+
+**Known real-input blocker (no successful real-file result):**
+`/srv/shared/P260805-10_dxf/P260805-10.nest` requests 219 pieces from 69 drawings.
+With the nine caller-supplied sizes above, strict validation rejects drawing ID `57`,
+`4980 A01 PT75`: its open mark from `(-5.21875, -1.807287)` to
+`(-4.21875, -1.807287)` starts `0.0001` outside the perimeter's vertical edge at
+`x = -5.21865`. Error: `Geometry must contain usable closed edges: 57. Open geometry
+leaves the closed material region. (Parameter 'job')`. No snapping, clipping, or
+source geometry changes were made. Source SHA-256:
+`9e839fd51072587ec4f3173dc2f39ef1ea8ae460971889c2a3b91fa54b61091d`.
+
 ## Nesting Engines
 
 OpenNest uses a pluggable engine architecture. The active engine can be selected at runtime.
