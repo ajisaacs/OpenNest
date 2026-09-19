@@ -50,23 +50,28 @@ namespace OpenNest.Benchmark
 
         private static void ValidateQuantities(List<Part> parts, BenchmarkJob job, ValidationResult result)
         {
-            var allowed = job.Requests.ToDictionary(r => r.Drawing.Id, r => r.Quantity);
+            // Materialized parts reference freshly reconstructed Drawing objects (NestResultMaterializer
+            // rebuilds them via DrawingJobMapper.CreateDrawing, which sets the materialized Drawing's Name
+            // to the originating NestJobPart id - a fresh, unrelated Drawing.Id gets auto-generated instead).
+            // BuildNestJob sets each NestJobPart's id to the original Drawing.Id.ToString(), so that string -
+            // materialized as BaseDrawing.Name - is the stable identity across the materialization boundary.
+            var allowed = job.Requests.ToDictionary(r => r.Drawing.Id.ToString(), r => (r.Quantity, r.Drawing.Name));
             var placedCounts = parts
-                .GroupBy(p => p.BaseDrawing.Id)
+                .GroupBy(p => p.BaseDrawing.Name)
                 .ToDictionary(g => g.Key, g => g.Count());
 
-            foreach (var (drawingId, placed) in placedCounts)
+            foreach (var (partId, placed) in placedCounts)
             {
-                if (!allowed.TryGetValue(drawingId, out var max))
+                if (!allowed.TryGetValue(partId, out var requirement))
                 {
-                    result.Violations.Add($"Placed drawing id={drawingId} which was not requested for this job");
+                    result.Violations.Add($"Placed drawing id={partId} which was not requested for this job");
                     continue;
                 }
 
-                if (placed > max)
+                if (placed > requirement.Quantity)
                 {
-                    var name = parts.First(p => p.BaseDrawing.Id == drawingId).BaseDrawing.Name;
-                    result.Violations.Add($"'{name}': placed {placed} across all plates but only {max} were requested");
+                    result.Violations.Add(
+                        $"'{requirement.Name}': placed {placed} across all plates but only {requirement.Quantity} were requested");
                 }
             }
         }
