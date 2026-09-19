@@ -41,50 +41,20 @@ namespace OpenNest.Benchmark
         public int TotalRequestedQuantity => Requests.Sum(r => r.Quantity);
 
         /// <summary>
-        /// A blank plate carrying only the job's spacing/quadrant template.
-        /// MultiPlateNester.CreatePlate copies these settings onto whichever
-        /// size it ultimately picks; its Size is only the fallback used when
-        /// nothing in the candidate pool fits, so it's set to the largest
-        /// candidate rather than an arbitrary one.
+        /// Builds the whole-job request this job represents: one NestJobPart per
+        /// requested drawing, and one NestPlateStock per candidate sheet size
+        /// (unlimited quantity - the engine under test decides how many of each
+        /// size it actually uses, and how demand splits across plates). The
+        /// engine owns its own multi-plate/size strategy; this harness no
+        /// longer picks plate sizes on the engine's behalf.
         /// </summary>
-        public Plate CreateTemplatePlate()
+        public NestJob BuildNestJob(int maxPlates)
         {
-            var fallbackSize = CandidateSizes
-                .OrderByDescending(s => s.Width * s.Length)
-                .FirstOrDefault();
-
-            return new Plate(fallbackSize)
-            {
-                EdgeSpacing = EdgeSpacing,
-                PartSpacing = PartSpacing,
-                Quadrant = Quadrant,
-            };
-        }
-
-        /// <summary>
-        /// The candidate sizes as PlateOptions for MultiPlateNester.CreatePlate.
-        /// Cost is area-proportional since no real per-size material pricing is
-        /// available here - this only affects which size is preferred when more
-        /// than one candidate fits, favoring the smaller/cheaper sheet.
-        /// </summary>
-        public List<PlateOption> BuildPlateOptions()
-        {
-            return CandidateSizes
-                .Select(s => new PlateOption { Width = s.Width, Length = s.Length, Cost = s.Width * s.Length })
-                .ToList();
-        }
-
-        public List<NestItem> CreateItems()
-        {
-            return Requests.Select(r => new NestItem
-            {
-                Drawing = r.Drawing,
-                Quantity = r.Quantity,
-                Priority = r.Priority,
-                StepAngle = r.StepAngle,
-                RotationStart = r.RotationStart,
-                RotationEnd = r.RotationEnd,
-            }).ToList();
+            var parts = Requests.Select(r =>
+                DrawingJobMapper.FromDrawing(r.Drawing.Id.ToString(), r.Drawing, r.Quantity));
+            var stock = CandidateSizes.Select(size =>
+                new NestPlateStock(size.ToString(1), size, null, PartSpacing, EdgeSpacing, Quadrant));
+            return new NestJob(parts, stock, new NestJobOptions("Default", maxPlates));
         }
     }
 }
