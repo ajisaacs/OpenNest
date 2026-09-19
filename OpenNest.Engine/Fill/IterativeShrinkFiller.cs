@@ -219,8 +219,10 @@ namespace OpenNest.Engine.Fill
             if (strips.Count <= 1)
                 return;
 
-            var gap = stripMin(strips[1]) - stripMax(strips[0]);
-
+            // Use the required clearance as the inter-strip gap, not a gap sampled from one
+            // original pair: actual placement gaps vary for irregular/mixed-size geometry, and
+            // replaying a larger sampled gap across every reordered pair can push the trailing
+            // strip past the original (already plate-fitted) footprint.
             strips.Sort((a, b) => sortMetric(a).CompareTo(sortMetric(b)));
 
             var pos = primaryEdge(parts[0].BoundingBox);
@@ -236,7 +238,7 @@ namespace OpenNest.Engine.Fill
                         part.Offset(offset);
                 }
 
-                pos = stripMax(s) + gap;
+                pos = stripMax(s) + spacing;
             }
 
             parts.Clear();
