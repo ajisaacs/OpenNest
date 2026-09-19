@@ -58,20 +58,20 @@ namespace OpenNest.Engine.Fill
             return allParts;
         }
 
-        private static Dictionary<string, int> BuildLocalQuantities(List<NestItem> items)
+        private static Dictionary<Drawing, int> BuildLocalQuantities(List<NestItem> items)
         {
-            var localQty = new Dictionary<string, int>(items.Count);
+            var localQty = new Dictionary<Drawing, int>(items.Count, ReferenceEqualityComparer.Instance);
             foreach (var item in items)
-                localQty[item.Drawing.Name] = item.Quantity;
+                localQty[item.Drawing] = item.Quantity;
             return localQty;
         }
 
-        private static double FindMinItemDimension(List<NestItem> items, Dictionary<string, int> localQty)
+        private static double FindMinItemDimension(List<NestItem> items, Dictionary<Drawing, int> localQty)
         {
             var minDim = double.MaxValue;
             foreach (var item in items)
             {
-                if (localQty[item.Drawing.Name] <= 0)
+                if (localQty[item.Drawing] <= 0)
                     continue;
                 var bb = item.Drawing.Program.BoundingBox();
                 var dim = System.Math.Min(bb.Width, bb.Length);
@@ -84,7 +84,7 @@ namespace OpenNest.Engine.Fill
         private bool TryFillOneItem(
             List<NestItem> items,
             List<Box> freeBoxes,
-            Dictionary<string, int> localQty,
+            Dictionary<Drawing, int> localQty,
             Func<NestItem, Box, List<Part>> fillFunc,
             List<Part> allParts,
             CancellationToken token)
@@ -94,7 +94,7 @@ namespace OpenNest.Engine.Fill
                 if (token.IsCancellationRequested)
                     return false;
 
-                var qty = localQty[item.Drawing.Name];
+                var qty = localQty[item.Drawing];
                 if (qty <= 0)
                     continue;
 
@@ -110,7 +110,7 @@ namespace OpenNest.Engine.Fill
                     RemoveTopmostPart(placed);
 
                 allParts.AddRange(placed);
-                localQty[item.Drawing.Name] = System.Math.Max(0, qty - placed.Count);
+                localQty[item.Drawing] = System.Math.Max(0, qty - placed.Count);
 
                 // Add the envelope of all placed parts as a single obstacle
                 // rather than individual bounding boxes, preventing the

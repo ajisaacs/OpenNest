@@ -35,6 +35,7 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Data", "OpenNest.Data\OpenNest.Data.csproj", "{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Benchmark", "OpenNest.Benchmark\OpenNest.Benchmark.csproj", "{ACD8F725-829A-48A8-AA59-61DD90DE06CA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Engine.Tests", "OpenNest.Engine.Tests\OpenNest.Engine.Tests.csproj", "{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -214,6 +215,18 @@ Global
 		{ACD8F725-829A-48A8-AA59-61DD90DE06CA}.Release|x64.Build.0 = Release|Any CPU
 		{ACD8F725-829A-48A8-AA59-61DD90DE06CA}.Release|x86.ActiveCfg = Release|Any CPU
 		{ACD8F725-829A-48A8-AA59-61DD90DE06CA}.Release|x86.Build.0 = Release|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Debug|x64.Build.0 = Debug|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Debug|x86.Build.0 = Debug|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Release|x64.ActiveCfg = Release|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Release|x64.Build.0 = Release|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Release|x86.ActiveCfg = Release|Any CPU
+		{F2EF39E0-1A95-4C32-B50B-3D71EC72F692}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

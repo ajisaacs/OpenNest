@@ -64,6 +64,36 @@ cd OpenNest
 dotnet build OpenNest.sln
 ```
 
+### Cross-platform engine contract tests
+
+```bash
+dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj
+```
+
+`OpenNest.Engine.Tests` targets `net8.0` and runs on Linux, macOS, and Windows without the desktop project or local DXF fixtures. The existing `OpenNest.Tests` suite still requires Windows.
+
+The new whole-job contracts in `OpenNest.Engine/Jobs` (`namespace OpenNest`) use owned immutable geometry/settings, explicit part IDs and positive demand, finite or unlimited stock (`null` means unlimited; zero means unavailable), and result ID/pose values rather than mutable desktop models. Callers own their inputs: the job copies everything at entry and the result leaks no mutable `Drawing`, `Plate`, or `NestItem`. One job is one material/thickness/unit system — no cross-material pooling. Rotation is in radians about the geometry origin, followed by translation into the plate quadrant frame. Strategy factories belong to each runner, not the global registry. In the public API, the legacy `SheetSize` request field is the unlimited-stock fallback only when `Plates` is null; an explicit empty `Plates` list means no available stock.
+
+`NestJobRunner.Solve` allocates a job across physical sheets from the full stock inventory: every available stock entry is trialled independently each iteration, and only the winning candidate consumes a sheet or reduces demand. Selection is a documented deterministic greedy policy — lexicographic placed-count vector by ascending part priority, then lower consumed sheet area, then smaller placement envelope, then original stock input order (see `NestJobCandidateComparer`). It is a tie policy, not a guarantee of global-minimum material or plate count. Finite stock is never exceeded; `MaxPlates` caps sheet count; empty parts complete without consuming stock; empty or fully exhausted stock returns `Incomplete/StockExhausted`; a zero-placement candidate stops with `NoPlacementFound` and consumes no sheet.
+
+`DrawingJobMapper` snapshots caller drawings/items under explicit requirement IDs. `LegacyPlateNesterAdapter` creates fresh private legacy drawings, items, and plates for each trial and maps returned drawings **by reference**, never by name. Mutable legacy quantities never drive the fulfillment ledger. `PlateNesterFactory` resolves the built-in strategy names (`Default`, `Strip`, `Vertical Remnant`, `Horizontal Remnant`) to instance-scoped placement strategies; it neither reads nor changes the process-global `NestEngineRegistry`, and unknown keys reject. Quantity deduction in the engine paths the runner reaches (base-class fill/pack, strip deduction, remnant-fill ledger, shrink-leftover counting) is keyed by drawing reference, not display name, so same-name drawings and repeated requirements stay independent. `NestResultMaterializer` returns a detached domain nest and `DrawingsByPartId` identity map. Each output plate represents one physical sheet (`Quantity = 1`), and each placement is attached exactly once so domain quantity events do not double count.
+
+```csharp
+var job = new NestJob(
+    new[] { DrawingJobMapper.FromDrawing("requirement-1", drawing, quantity: 3) },
+    new[] { DrawingJobMapper.FromPlate("stock-1", plateTemplate, quantity: 3) });
+var result = new NestJobRunner(LegacyPlateNesterAdapter.Create).Solve(job);
+var domainResult = NestResultMaterializer.Materialize(job, result);
+// result contains fulfillment/unplaced counts and physical stock usage;
+// domainResult.Nest and domainResult.DrawingsByPartId are detached from caller objects.
+```
+
+**Safety gate:** before the runner commits any candidate, `NestJobPlacementValidator` re-checks it against the immutable job geometry: closed usable contours, finite poses, the requirement's rotation policy (automatic / fixed / bounded sweep with step), containment inside the per-quadrant usable work area, hole-aware material overlap, and required part spacing (touching is allowed at zero spacing, rejected at positive spacing). Malformed engine output fails explicitly without consuming stock or demand. Cancellation throws `OperationCanceledException` before each trial and immediately after each engine return; no half-committed state is returned. An `Incomplete` result means the heuristic stopped, not that the geometry is impossible — the stop reason says why. Geometry snapshots preserve flat CNC rapid/line/arc programs, including origin and hole contours, without approximation; other instructions are explicitly rejected.
+
+**Placement strategies:** `Default` and `Strip` are migrated built-ins (`OpenNest.Engine/Jobs/Placement/DefaultPlateNester.cs`, `StripPlateNester.cs`) that reuse the engine geometry while keeping demand read-only; the remnant strategies still run through `LegacyPlateNesterAdapter` during rollout. A runnable end-to-end example — multiple requirements, mixed finite/unlimited stock, full plate/leftover enumeration — lives in `OpenNest.Engine.Tests/Jobs/NestJobExampleTests.cs`.
+
+**Legacy caller boundaries (not yet migrated):** the desktop UI (`MainForm.RunAutoNestAsync` / `NestSinglePlateAsync`), the CLI (`OpenNest.Console`), and MCP (`NestingTools`) still call the old single-plate `engine.Nest(...)` entry points unchanged. UI adoption needs a separate adapter preserving populated-plate editing, preview routing, and Accept-versus-Cancel semantics. The public API (`OpenNest.Api`, `NestRunner.RunAsync`) already delegates to one `NestJobRunner.Solve` call and reports status, stop reason, part fulfillment, stock usage, and plate-to-stock mapping; `.nestquote` archives carry a schema version and round-trip incomplete jobs.
+
 ### Run
 
 ```bash
@@ -157,7 +187,8 @@ An engine's layout is rejected (scoring zero for that job) if any part falls out
 OpenNest.sln
 ├── OpenNest/                   # WinForms desktop application (UI)
 ├── OpenNest.Core/              # Domain model, geometry, and CNC primitives
-├── OpenNest.Engine/            # Nesting algorithms (fill, pack, compact, best-fit)
+├── OpenNest.Engine/            # Nesting algorithms and whole-job contracts
+├── OpenNest.Engine.Tests/      # Cross-platform whole-job contract tests (net8.0)
 ├── OpenNest.IO/                # File I/O — DXF import/export, nest file format
 ├── OpenNest.Console/           # Command-line interface for batch nesting
 ├── OpenNest.Api/               # Programmatic nesting API (NestRunner pipeline)
