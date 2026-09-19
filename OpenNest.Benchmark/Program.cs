@@ -137,7 +137,7 @@ static class BenchmarkConsole
                 Console.Error.WriteLine($"Warning: could not parse sheet size '{token}', skipping");
         }
 
-        return sizes;
+        return sizes.Distinct().ToList();
     }
 
     private static void PrintUsage()

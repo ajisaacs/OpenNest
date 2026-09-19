@@ -21,7 +21,7 @@ namespace OpenNest.Benchmark
         private const int MaxPlates = 40;
 
         /// <summary>Wall-clock budget for one engine solving one job.</summary>
-        private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan SolveTimeout = TimeSpan.FromMinutes(5);
 
         public static List<JobResult> Run(List<BenchmarkJob> jobs, IReadOnlyList<NestingEngineInfo> engines)
         {
@@ -40,14 +40,14 @@ namespace OpenNest.Benchmark
 
         private static JobResult RunOne(BenchmarkJob job, NestingEngineInfo engineInfo)
         {
-            var nestJob = job.BuildNestJob(MaxPlates);
             var requested = job.TotalRequestedQuantity;
             var sw = Stopwatch.StartNew();
 
             try
             {
+                var nestJob = job.BuildNestJob(MaxPlates);
                 var engine = engineInfo.Factory();
-                using var cts = new CancellationTokenSource(Timeout);
+                using var cts = new CancellationTokenSource(SolveTimeout);
                 var jobResult = engine.Solve(nestJob, null, cts.Token);
 
                 var materialized = NestResultMaterializer.Materialize(nestJob, jobResult);
@@ -55,7 +55,12 @@ namespace OpenNest.Benchmark
                     .Select(plate => (Plate: plate, Parts: plate.Parts.ToList()))
                     .ToList();
 
-                var validation = NestValidator.Validate(plateRuns, job);
+                var requirements = job.Requests.ToDictionary<DrawingRequest, Drawing, (string Name, int Quantity)>(
+                    r => materialized.DrawingsByPartId[r.Drawing.Id.ToString()],
+                    r => (r.Drawing.Name, r.Quantity),
+                    ReferenceEqualityComparer.Instance);
+
+                var validation = NestValidator.Validate(plateRuns, requirements);
                 var totalPlaced = plateRuns.Sum(pr => pr.Parts.Count);
                 var placedArea = validation.Valid ? plateRuns.Sum(pr => pr.Parts.Sum(p => p.BaseDrawing.Area)) : 0;
                 var plateArea = plateRuns.Sum(pr => pr.Plate.Area());
@@ -92,7 +97,7 @@ namespace OpenNest.Benchmark
                     Valid = false,
                     PartsRequested = requested,
                     ElapsedMs = sw.ElapsedMilliseconds,
-                    Error = $"Timed out after {Timeout.TotalMinutes:F0} minute(s)",
+                    Error = $"Timed out after {SolveTimeout.TotalMinutes:F0} minute(s)",
                 };
             }
             catch (Exception ex)
