@@ -87,14 +87,15 @@ namespace OpenNest.Converters
 
             lastpt = endpt;
 
+            var layer = ClassifyLayer(arc);
             var sweep = System.Math.Abs(arc.SweepAngle());
             if (sweep < Tolerance.Epsilon || sweep.IsEqualTo(Angle.TwoPI))
             {
-                pgm.LineTo(endpt);
+                pgm.Codes.Add(new LinearMove(endpt) { Layer = layer });
             }
             else
             {
-                pgm.ArcTo(endpt, arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW);
+                pgm.Codes.Add(new ArcMove(endpt, arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW) { Layer = layer });
             }
 
             return lastpt;
@@ -107,7 +108,7 @@ namespace OpenNest.Converters
             if (startpt.DistanceTo(lastpt) > Tolerance.ChainTolerance)
                 pgm.MoveTo(startpt);
 
-            pgm.ArcTo(startpt, circle.Center, circle.Rotation);
+            pgm.Codes.Add(new ArcMove(startpt, circle.Center, circle.Rotation) { Layer = ClassifyLayer(circle) });
 
             lastpt = startpt;
             return lastpt;
@@ -118,13 +119,22 @@ namespace OpenNest.Converters
             if (line.StartPoint.DistanceTo(lastpt) > Tolerance.ChainTolerance)
                 pgm.MoveTo(line.StartPoint);
 
-            var move = new LinearMove(line.EndPoint);
-            if (string.Equals(line.Layer?.Name, "ETCH", System.StringComparison.OrdinalIgnoreCase))
-                move.Layer = LayerType.Scribe;
-            pgm.Codes.Add(move);
+            pgm.Codes.Add(new LinearMove(line.EndPoint) { Layer = ClassifyLayer(line) });
 
             lastpt = line.EndPoint;
             return lastpt;
+        }
+
+        // Engrave/etch geometry maps to Scribe so the post processor can treat it as a
+        // separate tool pass; everything else keeps the move's default Cut layer.
+        private static LayerType ClassifyLayer(Entity geo)
+        {
+            var name = geo.Layer?.Name;
+            if (string.Equals(name, "ENGRAVE", System.StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "ETCH", System.StringComparison.OrdinalIgnoreCase))
+                return LayerType.Scribe;
+
+            return LayerType.Cut;
         }
     }
 }

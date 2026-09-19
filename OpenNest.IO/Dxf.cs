@@ -242,6 +242,7 @@ namespace OpenNest.IO
             public ExportContext()
             {
                 Document = new CadDocument();
+                Document.Header.Version = ACadVersion.AC1018;
 
                 CutLayer = new Layer("Cut") { Color = new Color(1) };
                 RapidLayer = new Layer("Rapid") { Color = new Color(5) };

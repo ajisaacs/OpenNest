@@ -57,13 +57,14 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Fits a circular arc constrained to be tangent to the given directions at both
-        /// the first and last points. The center lies at the intersection of the normals
-        /// at P1 and Pn, guaranteeing the arc departs P1 in the start direction and arrives
-        /// at Pn in the end direction. Uses the radius from P1 (exact start tangent);
-        /// deviation includes any endpoint gap at Pn.
+        /// Fits a circular arc that passes exactly through both the first and last points
+        /// while matching the given endpoint tangents as closely as possible. For any
+        /// circle through two points, the tangents at those points make equal mirrored
+        /// angles with the chord, so the achievable inscribed angle is the average of the
+        /// two requested ones — when the requested tangents are consistent with a single
+        /// circular arc, both are matched exactly.
         /// </summary>
-        internal static (Vector center, double radius, double deviation) FitWithDualTangent(
+        internal static (Vector center, double radius, double deviation) FitThroughEndpointsWithTangents(
             List<Vector> points, Vector startTangent, Vector endTangent)
         {
             if (points.Count < 3)
@@ -72,42 +73,39 @@ namespace OpenNest.Geometry
             var p1 = points[0];
             var pn = points[^1];
 
-            var stLen = System.Math.Sqrt(startTangent.X * startTangent.X + startTangent.Y * startTangent.Y);
-            var etLen = System.Math.Sqrt(endTangent.X * endTangent.X + endTangent.Y * endTangent.Y);
-            if (stLen < 1e-10 || etLen < 1e-10)
-                return (Vector.Invalid, 0, double.MaxValue);
-
-            // Normal to start tangent at P1 (perpendicular)
-            var n1x = -startTangent.Y / stLen;
-            var n1y = startTangent.X / stLen;
-
-            // Normal to end tangent at Pn
-            var n2x = -endTangent.Y / etLen;
-            var n2y = endTangent.X / etLen;
-
-            // Solve: P1 + t1*N1 = Pn + t2*N2
-            var det = n1x * (-n2y) - (-n2x) * n1y;
-            if (System.Math.Abs(det) < 1e-10)
-                return (Vector.Invalid, 0, double.MaxValue);
-
             var dx = pn.X - p1.X;
             var dy = pn.Y - p1.Y;
-            var t1 = (dx * (-n2y) - (-n2x) * dy) / det;
-
-            var cx = p1.X + t1 * n1x;
-            var cy = p1.Y + t1 * n1y;
-
-            // Use radius from P1 (guarantees exact start tangent and passes through P1)
-            var r1 = System.Math.Sqrt((cx - p1.X) * (cx - p1.X) + (cy - p1.Y) * (cy - p1.Y));
-            if (r1 < 1e-10)
+            var chordLen = System.Math.Sqrt(dx * dx + dy * dy);
+            if (chordLen < 1e-10)
                 return (Vector.Invalid, 0, double.MaxValue);
 
-            // Measure endpoint gap at Pn
-            var r2 = System.Math.Sqrt((cx - pn.X) * (cx - pn.X) + (cy - pn.Y) * (cy - pn.Y));
-            var endpointDev = System.Math.Abs(r2 - r1);
+            var ux = dx / chordLen;
+            var uy = dy / chordLen;
 
-            var interiorDev = MaxRadialDeviation(points, cx, cy, r1);
-            return (new Vector(cx, cy), r1, System.Math.Max(endpointDev, interiorDev));
+            // Inscribed angle between chord and tangent at each endpoint (mirrored at Pn)
+            var theta1 = SignedAngle(ux, uy, startTangent);
+            var theta2 = -SignedAngle(ux, uy, endTangent);
+            var theta = (theta1 + theta2) / 2;
+
+            // Nearly straight or degenerate (sweep would exceed ~356 degrees)
+            if (System.Math.Abs(theta) < 1e-3 || System.Math.Abs(theta) > System.Math.PI * 0.99)
+                return (Vector.Invalid, 0, double.MaxValue);
+
+            var halfChord = chordLen / 2;
+            var radius = halfChord / System.Math.Abs(System.Math.Sin(theta));
+            var d = -halfChord / System.Math.Tan(theta);
+
+            var cx = (p1.X + pn.X) / 2 + d * -uy;
+            var cy = (p1.Y + pn.Y) / 2 + d * ux;
+
+            return (new Vector(cx, cy), radius, MaxRadialDeviation(points, cx, cy, radius));
+        }
+
+        private static double SignedAngle(double ux, double uy, Vector to)
+        {
+            var len = System.Math.Sqrt(to.X * to.X + to.Y * to.Y);
+            if (len < 1e-10) return 0;
+            return System.Math.Atan2(ux * to.Y - uy * to.X, ux * to.X + uy * to.Y);
         }
 
         /// <summary>
