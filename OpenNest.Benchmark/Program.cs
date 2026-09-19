@@ -3,6 +3,7 @@ using OpenNest.Benchmark;
 using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 return BenchmarkConsole.Run(args);
@@ -40,7 +41,10 @@ static class BenchmarkConsole
             return 1;
         }
 
-        var engines = NestEngineRegistry.AvailableEngines;
+        var enginesDir = Path.Combine(AppContext.BaseDirectory, "Engines");
+        NestingEngineRegistry.LoadPlugins(enginesDir);
+
+        var engines = NestingEngineRegistry.AvailableEngines;
 
         if (options.EngineNames.Count > 0)
         {
@@ -51,7 +55,7 @@ static class BenchmarkConsole
             if (engines.Count == 0)
             {
                 Console.Error.WriteLine("None of the requested engines are registered. Available: " +
-                    string.Join(", ", NestEngineRegistry.AvailableEngines.Select(e => e.Name)));
+                    string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name)));
                 return 1;
             }
         }
@@ -138,16 +142,16 @@ static class BenchmarkConsole
 
     private static void PrintUsage()
     {
-        Console.Error.WriteLine("OpenNest.Benchmark - compare registered nesting engines on a set of .nest files");
+        Console.Error.WriteLine("OpenNest.Benchmark - compare registered whole-job nesting engines on a set of .nest files");
         Console.Error.WriteLine();
         Console.Error.WriteLine("For each .nest file, every drawing with quantity > 0 is nested (mixed together),");
-        Console.Error.WriteLine("once per registered engine. This is a full nest, not a single fixed-size plate:");
-        Console.Error.WriteLine("as many plates as needed are created, one at a time, each sized by picking the");
-        Console.Error.WriteLine("smallest candidate sheet size that fits the largest still-unplaced drawing -");
-        Console.Error.WriteLine("applied identically to every engine, since Nest() itself has no say over its");
-        Console.Error.WriteLine("own plate's size. Scoring: aggregate material utilization across every plate");
-        Console.Error.WriteLine("used, then (if everything requested was placed) fewer plates as the tie-break.");
-        Console.Error.WriteLine("An invalid layout (out of bounds, overlapping, or over-quantity) scores zero.");
+        Console.Error.WriteLine("once per registered INestingEngine. Each engine is handed the full job - every");
+        Console.Error.WriteLine("requested part and the whole pool of candidate sheet sizes - and owns its own");
+        Console.Error.WriteLine("multi-plate/size strategy: how many plates it uses, of which sizes, and how");
+        Console.Error.WriteLine("demand splits across them. Scoring: aggregate material utilization across every");
+        Console.Error.WriteLine("plate used, then (if everything requested was placed) fewer plates as the");
+        Console.Error.WriteLine("tie-break. An invalid layout (out of bounds, overlapping, or over-quantity), a");
+        Console.Error.WriteLine("thrown exception, or a run exceeding its time budget all score zero.");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Usage:");
         Console.Error.WriteLine("  OpenNest.Benchmark <file.nest | folder> [options]");
