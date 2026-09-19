@@ -168,7 +168,7 @@ dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- project.zip ext
 
 ## Benchmarking Nest Engines
 
-`OpenNest.Benchmark` compares every registered `NestEngineBase` implementation against each other on a set of `.nest` files, scoring by material utilization:
+`OpenNest.Benchmark` compares every registered `INestingEngine` implementation against each other on a set of `.nest` files, scoring by material utilization. Each engine owns its own multi-plate/size strategy for the whole job — how many plates it uses, of which sizes, and how demand splits across them:
 
 ```bash
 # Benchmark all registered engines against every .nest file in a folder
@@ -179,7 +179,7 @@ dotnet run --project OpenNest.Benchmark/OpenNest.Benchmark.csproj -- job.nest \
   --sheet-sizes 48x96,60x96,60x120,72x120,72x144 --engines Default,Astra,Claude --csv results.csv
 ```
 
-An engine's layout is rejected (scoring zero for that job) if any part falls outside the work area, any two parts are closer than the required spacing, or a drawing gets more parts placed than requested.
+An engine's layout is rejected (scoring zero for that job) if any part falls outside the work area, any two parts are closer than the required spacing, or a drawing gets more parts placed than requested. A run that doesn't finish within its time budget also scores zero, as a timeout.
 
 ## Project Structure
 
@@ -213,7 +213,7 @@ OpenNest.sln
 | **OpenNest.Gpu** | GPU-accelerated bitmap overlap detection for best-fit pair evaluation using ILGPU. |
 | **OpenNest.Posts.Cincinnati** | Post-processor plugin for Cincinnati CL-707/800/900/940/CLX laser cutting machines. Outputs Cincinnati-format G-code with material library, kerf compensation, and pierce logic. |
 | **OpenNest.Mcp** | MCP (Model Context Protocol) server exposing nesting operations as tools for AI assistants. |
-| **OpenNest.Benchmark** | Runs every registered nest engine against a set of `.nest` files and scores them by material utilization, so engine implementations can be compared head-to-head. |
+| **OpenNest.Benchmark** | Runs every registered whole-job nesting engine (`INestingEngine`) against a set of `.nest` files and scores them by material utilization, so competing engines — each owning its own multi-plate strategy — can be compared head-to-head. |
 | **OpenNest.Tests** | 89 test files covering core geometry, fill strategies, splitting, bending, BOM import, post-processing, and the API. |
 
 ## Nesting Engines
