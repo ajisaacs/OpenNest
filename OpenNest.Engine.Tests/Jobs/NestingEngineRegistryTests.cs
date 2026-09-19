@@ -1,0 +1,49 @@
+using Xunit;
+
+namespace OpenNest.Engine.Tests.Jobs;
+
+public class NestingEngineRegistryTests
+{
+    [Fact]
+    public void BuiltInStrategiesAreRegistered()
+    {
+        var names = NestingEngineRegistry.AvailableEngines.Select(e => e.Name).ToList();
+
+        Assert.Contains("Default", names);
+        Assert.Contains("Strip", names);
+        Assert.Contains("Vertical Remnant", names);
+        Assert.Contains("Horizontal Remnant", names);
+    }
+
+    [Fact]
+    public void EachBuiltInFactoryProducesAWorkingEngine()
+    {
+        foreach (var info in NestingEngineRegistry.AvailableEngines)
+        {
+            var engine = info.Factory();
+            var result = engine.Solve(FiniteStockJobTests.Job(1));
+
+            Assert.Equal(NestJobStatus.Complete, result.Status);
+        }
+    }
+
+    [Fact]
+    public void DuplicateNameIsSkipped()
+    {
+        var before = NestingEngineRegistry.AvailableEngines.Count;
+
+        NestingEngineRegistry.Register("Default", "duplicate", () => new FixedStrategyNestingEngine("Default"));
+
+        Assert.Equal(before, NestingEngineRegistry.AvailableEngines.Count);
+    }
+
+    [Fact]
+    public void LoadPluginsAgainstMissingDirectoryIsANoOp()
+    {
+        var before = NestingEngineRegistry.AvailableEngines.Count;
+
+        NestingEngineRegistry.LoadPlugins(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+
+        Assert.Equal(before, NestingEngineRegistry.AvailableEngines.Count);
+    }
+}
