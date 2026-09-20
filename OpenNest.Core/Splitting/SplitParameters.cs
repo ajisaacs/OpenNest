@@ -4,7 +4,7 @@ public enum SplitType
 {
     Straight,
     WeldGapTabs,
-    SpikeGroove
+    SpikeGroove,
 }
 
 public class SplitParameters
@@ -26,10 +26,11 @@ public class SplitParameters
     /// <summary>
     /// Max protrusion from the split edge (for auto-fit plate size calculation).
     /// </summary>
-    public double FeatureOverhang => Type switch
-    {
-        SplitType.WeldGapTabs => TabHeight,
-        SplitType.SpikeGroove => System.Math.Max(SpikeDepth, GrooveDepth),
-        _ => 0
-    };
+    public double FeatureOverhang =>
+        Type switch
+        {
+            SplitType.WeldGapTabs => TabHeight,
+            SplitType.SpikeGroove => System.Math.Max(SpikeDepth, GrooveDepth),
+            _ => 0,
+        };
 }

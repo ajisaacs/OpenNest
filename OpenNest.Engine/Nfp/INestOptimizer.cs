@@ -1,8 +1,8 @@
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Nfp
 {
@@ -33,9 +33,13 @@ namespace OpenNest.Engine.Nfp
     /// </summary>
     public interface INestOptimizer
     {
-        OptimizationResult Optimize(List<NestItem> items, Box workArea, NfpCache cache,
+        OptimizationResult Optimize(
+            List<NestItem> items,
+            Box workArea,
+            NfpCache cache,
             Dictionary<int, List<double>> candidateRotations,
             IProgress<NestProgress> progress = null,
-            CancellationToken cancellation = default);
+            CancellationToken cancellation = default
+        );
     }
 }

@@ -1,13 +1,13 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using ACadSharp;
 using ACadSharp.IO;
 using CSMath;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 
 namespace OpenNest.IO
 {
@@ -35,14 +35,12 @@ namespace OpenNest.IO
             if (preserveRepairMarks)
             {
                 // Keep source marks separate: optimization could merge two ticks or unrelated scribing.
-                entities.AddRange(ConvertEntities(doc, name => !IsRepairMarkLayer(name), optimize: false));
+                entities.AddRange(
+                    ConvertEntities(doc, name => !IsRepairMarkLayer(name), optimize: false)
+                );
             }
 
-            return new DxfImportResult
-            {
-                Entities = entities,
-                Document = doc
-            };
+            return new DxfImportResult { Entities = entities, Document = doc };
         }
 
         public static List<Entity> GetGeometry(string path)
@@ -167,7 +165,11 @@ namespace OpenNest.IO
             }
         }
 
-        private static List<Entity> ConvertEntities(CadDocument doc, Func<string, bool> layerFilter = null, bool optimize = true)
+        private static List<Entity> ConvertEntities(
+            CadDocument doc,
+            Func<string, bool> layerFilter = null,
+            bool optimize = true
+        )
         {
             var entities = new List<Entity>();
             var lines = new List<Line>();
@@ -197,8 +199,10 @@ namespace OpenNest.IO
                     case ACadSharp.Entities.Spline spline:
                         foreach (var e in spline.ToOpenNest())
                         {
-                            if (e is Line l) lines.Add(l);
-                            else if (e is Arc a) arcs.Add(a);
+                            if (e is Line l)
+                                lines.Add(l);
+                            else if (e is Arc a)
+                                arcs.Add(a);
                         }
                         break;
 
@@ -213,8 +217,10 @@ namespace OpenNest.IO
                     case ACadSharp.Entities.Ellipse ellipse:
                         foreach (var e in ellipse.ToOpenNest())
                         {
-                            if (e is Line l) lines.Add(l);
-                            else if (e is Arc a) arcs.Add(a);
+                            if (e is Line l)
+                                lines.Add(l);
+                            else if (e is Arc a)
+                                arcs.Add(a);
                         }
                         break;
                 }
@@ -275,14 +281,17 @@ namespace OpenNest.IO
                 {
                     StartPoint = start,
                     EndPoint = end,
-                    Layer = layer
+                    Layer = layer,
                 };
                 Document.Entities.Add(ln);
             }
 
             public void AddPlateOutline(Plate plate)
             {
-                XYZ pt1, pt2, pt3, pt4;
+                XYZ pt1,
+                    pt2,
+                    pt3,
+                    pt4;
 
                 switch (plate.Quadrant)
                 {
@@ -323,7 +332,11 @@ namespace OpenNest.IO
                 AddLine(pt3, pt4, PlateLayer);
                 AddLine(pt4, pt1, PlateLayer);
 
-                var m1 = new XYZ(pt1.X + plate.EdgeSpacing.Left, pt1.Y + plate.EdgeSpacing.Bottom, 0);
+                var m1 = new XYZ(
+                    pt1.X + plate.EdgeSpacing.Left,
+                    pt1.Y + plate.EdgeSpacing.Bottom,
+                    0
+                );
                 var m2 = new XYZ(m1.X, pt2.Y - plate.EdgeSpacing.Top, 0);
                 var m3 = new XYZ(pt3.X - plate.EdgeSpacing.Right, m2.Y, 0);
                 var m4 = new XYZ(m3.X, m1.Y, 0);
@@ -398,13 +411,9 @@ namespace OpenNest.IO
                     center = new XYZ(center.X + CurPos.X, center.Y + CurPos.Y, 0);
                 }
 
-                var startAngle = System.Math.Atan2(
-                    CurPos.Y - center.Y,
-                    CurPos.X - center.X);
+                var startAngle = System.Math.Atan2(CurPos.Y - center.Y, CurPos.X - center.X);
 
-                var endAngle = System.Math.Atan2(
-                    endpt.Y - center.Y,
-                    endpt.X - center.X);
+                var endAngle = System.Math.Atan2(endpt.Y - center.Y, endpt.X - center.X);
 
                 if (arc.Rotation == RotationType.CW)
                     Generic.Swap(ref startAngle, ref endAngle);
@@ -419,7 +428,7 @@ namespace OpenNest.IO
                     {
                         Center = center,
                         Radius = radius,
-                        Layer = CutLayer
+                        Layer = CutLayer,
                     };
                     Document.Entities.Add(circle);
                 }
@@ -431,7 +440,7 @@ namespace OpenNest.IO
                         Radius = radius,
                         StartAngle = startAngle,
                         EndAngle = endAngle,
-                        Layer = CutLayer
+                        Layer = CutLayer,
                     };
                     Document.Entities.Add(acadArc);
                 }

@@ -19,8 +19,10 @@ public sealed class CincinnatiPartSubprogramWriter
     private readonly CoordinateFormatter _fmt;
     private readonly Dictionary<int, int> _holeSubprograms;
 
-    public CincinnatiPartSubprogramWriter(CincinnatiPostConfig config,
-        Dictionary<int, int> holeSubprograms = null)
+    public CincinnatiPartSubprogramWriter(
+        CincinnatiPostConfig config,
+        Dictionary<int, int> holeSubprograms = null
+    )
     {
         _config = config;
         _featureWriter = new CincinnatiFeatureWriter(config);
@@ -32,8 +34,15 @@ public sealed class CincinnatiPartSubprogramWriter
     /// Writes a complete part sub-program for the given normalized program.
     /// The program coordinates must already be normalized to origin (0,0).
     /// </summary>
-    public void Write(TextWriter w, Program normalizedProgram, string drawingName,
-        int subNumber, string cutLibrary, string etchLibrary, double sheetDiagonal)
+    public void Write(
+        TextWriter w,
+        Program normalizedProgram,
+        string drawingName,
+        int subNumber,
+        string cutLibrary,
+        string etchLibrary,
+        double sheetDiagonal
+    )
     {
         var allFeatures = FeatureUtils.SplitByRapids(normalizedProgram.Codes);
         if (allFeatures.Count == 0)
@@ -58,9 +67,7 @@ public sealed class CincinnatiPartSubprogramWriter
                 continue;
             }
 
-            var featureNumber = i == 0
-                ? _config.FeatureLineNumberStart
-                : 1000 + i + 1;
+            var featureNumber = i == 0 ? _config.FeatureLineNumberStart : 1000 + i + 1;
             var cutDistance = FeatureUtils.ComputeCutDistance(codes);
 
             var ctx = new FeatureContext
@@ -75,7 +82,7 @@ public sealed class CincinnatiPartSubprogramWriter
                 IsEtch = isEtch,
                 LibraryFile = isEtch ? etchLibrary : cutLibrary,
                 CutDistance = cutDistance,
-                SheetDiagonal = sheetDiagonal
+                SheetDiagonal = sheetDiagonal,
             };
 
             _featureWriter.Write(w, ctx);
@@ -84,15 +91,20 @@ public sealed class CincinnatiPartSubprogramWriter
         w.WriteLine($"M99 (END OF {drawingName})");
     }
 
-    private void WriteHoleSubprogramCall(TextWriter w, SubProgramCall call,
-        int featureIndex, bool isLastFeature)
+    private void WriteHoleSubprogramCall(
+        TextWriter w,
+        SubProgramCall call,
+        int featureIndex,
+        bool isLastFeature
+    )
     {
-        var postSubNum = _holeSubprograms != null && _holeSubprograms.TryGetValue(call.Id, out var num)
-            ? num : call.Id;
+        var postSubNum =
+            _holeSubprograms != null && _holeSubprograms.TryGetValue(call.Id, out var num)
+                ? num
+                : call.Id;
 
-        var featureNumber = featureIndex == 0
-            ? _config.FeatureLineNumberStart
-            : 1000 + featureIndex + 1;
+        var featureNumber =
+            featureIndex == 0 ? _config.FeatureLineNumberStart : 1000 + featureIndex + 1;
 
         var sb = new StringBuilder();
         if (_config.UseLineNumbers)
@@ -138,8 +150,10 @@ public sealed class CincinnatiPartSubprogramWriter
     /// Scans all plates and builds a mapping of unique part geometries to sub-program numbers,
     /// along with their normalized programs for writing.
     /// </summary>
-    internal static (Dictionary<(int, long), int> mapping, List<(int subNum, string name, Program program)> entries)
-        BuildRegistry(IEnumerable<Plate> plates, int startNumber)
+    internal static (
+        Dictionary<(int, long), int> mapping,
+        List<(int subNum, string name, Program program)> entries
+    ) BuildRegistry(IEnumerable<Plate> plates, int startNumber)
     {
         var mapping = new Dictionary<(int, long), int>();
         var entries = new List<(int, string, Program)>();
@@ -149,7 +163,8 @@ public sealed class CincinnatiPartSubprogramWriter
         {
             foreach (var part in plate.Parts)
             {
-                if (part.BaseDrawing.IsCutOff) continue;
+                if (part.BaseDrawing.IsCutOff)
+                    continue;
                 var key = SubprogramKey(part);
                 if (!mapping.ContainsKey(key))
                 {
@@ -180,8 +195,10 @@ public sealed class CincinnatiPartSubprogramWriter
     /// Scans all parts across all plates and builds a nest-level registry of unique
     /// hole sub-programs. Deduplicates by comparing sub-program code content.
     /// </summary>
-    internal static (Dictionary<int, int> modelToPostMapping, List<(int subNum, Program program)> entries)
-        BuildHoleRegistry(IEnumerable<Plate> plates, int startNumber)
+    internal static (
+        Dictionary<int, int> modelToPostMapping,
+        List<(int subNum, Program program)> entries
+    ) BuildHoleRegistry(IEnumerable<Plate> plates, int startNumber)
     {
         var mapping = new Dictionary<int, int>();
         var entries = new List<(int, Program)>();
@@ -192,11 +209,14 @@ public sealed class CincinnatiPartSubprogramWriter
         {
             foreach (var part in plate.Parts)
             {
-                if (part.BaseDrawing.IsCutOff) continue;
+                if (part.BaseDrawing.IsCutOff)
+                    continue;
                 foreach (var code in part.Program.Codes)
                 {
-                    if (code is not SubProgramCall call) continue;
-                    if (mapping.ContainsKey(call.Id)) continue;
+                    if (code is not SubProgramCall call)
+                        continue;
+                    if (mapping.ContainsKey(call.Id))
+                        continue;
 
                     var canonical = ProgramToCanonical(call.Program);
                     if (contentIndex.TryGetValue(canonical, out var existingNum))
@@ -226,7 +246,9 @@ public sealed class CincinnatiPartSubprogramWriter
             if (code is LinearMove lm)
                 sb.Append($"L{lm.EndPoint.X:F6},{lm.EndPoint.Y:F6},{(int)lm.Layer}");
             else if (code is ArcMove am)
-                sb.Append($"A{am.EndPoint.X:F6},{am.EndPoint.Y:F6},{am.CenterPoint.X:F6},{am.CenterPoint.Y:F6},{(int)am.Rotation},{(int)am.Layer}");
+                sb.Append(
+                    $"A{am.EndPoint.X:F6},{am.EndPoint.Y:F6},{am.CenterPoint.X:F6},{am.CenterPoint.Y:F6},{(int)am.Rotation},{(int)am.Layer}"
+                );
             else if (code is RapidMove rm)
                 sb.Append($"R{rm.EndPoint.X:F6},{rm.EndPoint.Y:F6}");
         }

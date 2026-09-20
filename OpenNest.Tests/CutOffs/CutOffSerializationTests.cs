@@ -97,8 +97,12 @@ public class CutOffSerializationTests
 
         var plate = new Plate(100, 50);
         plate.Parts.Add(new Part(drawing));
-        plate.CutOffs.Add(new CutOff(new Vector(85, 30), CutOffAxis.Horizontal) { EndLimit = 85.0 });
-        plate.CutOffs.Add(new CutOff(new Vector(85, 30), CutOffAxis.Vertical) { StartLimit = 30.0 });
+        plate.CutOffs.Add(
+            new CutOff(new Vector(85, 30), CutOffAxis.Horizontal) { EndLimit = 85.0 }
+        );
+        plate.CutOffs.Add(
+            new CutOff(new Vector(85, 30), CutOffAxis.Vertical) { StartLimit = 30.0 }
+        );
         plate.RegenerateCutOffs(new CutOffSettings());
         nest.Plates.Add(plate);
 

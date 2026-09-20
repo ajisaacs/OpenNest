@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Engine.Fill;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Engine.Strategies
 {
@@ -20,27 +20,38 @@ namespace OpenNest.Engine.Strategies
             var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
             var preferred = context.Policy?.PreferredDirection;
 
-            return FillHelpers.BestOverAngles(context, angles,
+            return FillHelpers.BestOverAngles(
+                context,
+                angles,
                 angle =>
                 {
-                    var engine = new FillLinear(workArea, context.Plate.PartSpacing) { Label = "Linear" };
+                    var engine = new FillLinear(workArea, context.Plate.PartSpacing)
+                    {
+                        Label = "Linear",
+                    };
                     var result = FillHelpers.FillWithDirectionPreference(
                         dir => engine.Fill(context.Item.Drawing, angle, dir),
-                        preferred, comparer, workArea);
+                        preferred,
+                        comparer,
+                        workArea
+                    );
 
                     if (result != null && result.Count > 0)
                     {
-                        context.AngleResults.Add(new AngleResult
-                        {
-                            AngleDeg = Angle.ToDegrees(angle),
-                            Direction = preferred ?? NestDirection.Horizontal,
-                            PartCount = result.Count
-                        });
+                        context.AngleResults.Add(
+                            new AngleResult
+                            {
+                                AngleDeg = Angle.ToDegrees(angle),
+                                Direction = preferred ?? NestDirection.Horizontal,
+                                PartCount = result.Count,
+                            }
+                        );
                     }
 
                     return result;
                 },
-                "Linear");
+                "Linear"
+            );
         }
     }
 }

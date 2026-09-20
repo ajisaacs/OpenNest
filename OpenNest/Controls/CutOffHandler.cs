@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Geometry;
-using System.Collections.Generic;
 
 namespace OpenNest.Controls
 {
@@ -65,8 +65,10 @@ namespace OpenNest.Controls
 
                 for (var i = 0; i < program.Codes.Count - 1; i += 2)
                 {
-                    if (program.Codes[i] is RapidMove rapid &&
-                        program.Codes[i + 1] is LinearMove linear)
+                    if (
+                        program.Codes[i] is RapidMove rapid
+                        && program.Codes[i + 1] is LinearMove linear
+                    )
                     {
                         var line = new Line(rapid.EndPoint, linear.EndPoint);
                         if (line.ClosestPointTo(point).DistanceTo(point) <= tolerance)

@@ -1,12 +1,12 @@
-﻿using OpenNest.CNC;
-using OpenNest.Geometry;
-using OpenNest.Math;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using OpenNest.CNC;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.IO
 {
@@ -31,15 +31,25 @@ namespace OpenNest.IO
         {
             // First pass: read all lines, collect variable definitions
             var allLines = new List<string>();
-            var variableDefs = new Dictionary<string, (string expression, bool inline, bool global)>(
-                StringComparer.OrdinalIgnoreCase);
+            var variableDefs = new Dictionary<
+                string,
+                (string expression, bool inline, bool global)
+            >(StringComparer.OrdinalIgnoreCase);
             var codeLines = new List<string>();
             string line;
 
             while ((line = reader.ReadLine()) != null)
             {
                 allLines.Add(line);
-                if (TryParseVariableDefinition(line, out var name, out var expression, out var isInline, out var isGlobal))
+                if (
+                    TryParseVariableDefinition(
+                        line,
+                        out var name,
+                        out var expression,
+                        out var isInline,
+                        out var isGlobal
+                    )
+                )
                     variableDefs[name] = (expression, isInline, isGlobal);
                 else
                     codeLines.Add(line);
@@ -54,7 +64,13 @@ namespace OpenNest.IO
                 var name = kvp.Key;
                 var (expression, isInline, isGlobal) = kvp.Value;
                 var value = resolvedVariables[name];
-                program.Variables[name] = new VariableDefinition(name, expression, value, isInline, isGlobal);
+                program.Variables[name] = new VariableDefinition(
+                    name,
+                    expression,
+                    value,
+                    isInline,
+                    isGlobal
+                );
             }
 
             // Second pass: parse G-code lines with variable substitution
@@ -78,7 +94,10 @@ namespace OpenNest.IO
                 {
                     // Read the maximal variable name (letters, digits, underscores)
                     var start = i + 1;
-                    while (start < line.Length && (char.IsLetterOrDigit(line[start]) || line[start] == '_'))
+                    while (
+                        start < line.Length
+                        && (char.IsLetterOrDigit(line[start]) || line[start] == '_')
+                    )
                         start++;
                     var maxName = line.Substring(i + 1, start - i - 1);
 
@@ -89,8 +108,9 @@ namespace OpenNest.IO
                     while (nameLen > 0)
                     {
                         var candidate = maxName.Substring(0, nameLen);
-                        lookupKey = resolvedVariables.Keys
-                            .FirstOrDefault(k => string.Equals(k, candidate, StringComparison.OrdinalIgnoreCase));
+                        lookupKey = resolvedVariables.Keys.FirstOrDefault(k =>
+                            string.Equals(k, candidate, StringComparison.OrdinalIgnoreCase)
+                        );
                         if (lookupKey != null)
                             break;
                         nameLen--;
@@ -98,7 +118,8 @@ namespace OpenNest.IO
 
                     if (lookupKey != null)
                     {
-                        code.Value = resolvedVariables[lookupKey].ToString(CultureInfo.InvariantCulture);
+                        code.Value = resolvedVariables[lookupKey]
+                            .ToString(CultureInfo.InvariantCulture);
                         code.VariableRef = lookupKey;
                         i += nameLen; // advance past the matched variable name
                     }
@@ -211,7 +232,8 @@ namespace OpenNest.IO
             double y = 0;
             var layer = LayerType.Cut;
             var suppressed = false;
-            string xRef = null, yRef = null;
+            string xRef = null,
+                yRef = null;
 
             while (section == CodeSection.Line)
             {
@@ -235,36 +257,36 @@ namespace OpenNest.IO
                         break;
 
                     case ':':
+                    {
+                        var tags = code.Value.Trim().ToUpper().Split(':');
+
+                        foreach (var tag in tags)
                         {
-                            var tags = code.Value.Trim().ToUpper().Split(':');
-
-                            foreach (var tag in tags)
+                            switch (tag)
                             {
-                                switch (tag)
-                                {
-                                    case "DISPLAY":
-                                        layer = LayerType.Display;
-                                        break;
+                                case "DISPLAY":
+                                    layer = LayerType.Display;
+                                    break;
 
-                                    case "LEADIN":
-                                        layer = LayerType.Leadin;
-                                        break;
+                                case "LEADIN":
+                                    layer = LayerType.Leadin;
+                                    break;
 
-                                    case "LEADOUT":
-                                        layer = LayerType.Leadout;
-                                        break;
+                                case "LEADOUT":
+                                    layer = LayerType.Leadout;
+                                    break;
 
-                                    case "SCRIBE":
-                                        layer = LayerType.Scribe;
-                                        break;
+                                case "SCRIBE":
+                                    layer = LayerType.Scribe;
+                                    break;
 
-                                    case "SUPPRESSED":
-                                        suppressed = true;
-                                        break;
-                                }
+                                case "SUPPRESSED":
+                                    suppressed = true;
+                                    break;
                             }
-                            break;
                         }
+                        break;
+                    }
 
                     default:
                         section = CodeSection.Unknown;
@@ -277,7 +299,14 @@ namespace OpenNest.IO
             if (isRapid)
                 program.Codes.Add(new RapidMove(x, y) { VariableRefs = refs });
             else
-                program.Codes.Add(new LinearMove(x, y) { Layer = layer, Suppressed = suppressed, VariableRefs = refs });
+                program.Codes.Add(
+                    new LinearMove(x, y)
+                    {
+                        Layer = layer,
+                        Suppressed = suppressed,
+                        VariableRefs = refs,
+                    }
+                );
         }
 
         private void ReadArc(RotationType rotation)
@@ -288,7 +317,10 @@ namespace OpenNest.IO
             double j = 0;
             var layer = LayerType.Cut;
             var suppressed = false;
-            string xRef = null, yRef = null, iRef = null, jRef = null;
+            string xRef = null,
+                yRef = null,
+                iRef = null,
+                jRef = null;
 
             while (section == CodeSection.Arc)
             {
@@ -323,51 +355,58 @@ namespace OpenNest.IO
                         break;
 
                     case ':':
+                    {
+                        var tags = code.Value.Trim().ToUpper().Split(':');
+
+                        foreach (var tag in tags)
                         {
-                            var tags = code.Value.Trim().ToUpper().Split(':');
-
-                            foreach (var tag in tags)
+                            switch (tag)
                             {
-                                switch (tag)
-                                {
-                                    case "DISPLAY":
-                                        layer = LayerType.Display;
-                                        break;
+                                case "DISPLAY":
+                                    layer = LayerType.Display;
+                                    break;
 
-                                    case "LEADIN":
-                                        layer = LayerType.Leadin;
-                                        break;
+                                case "LEADIN":
+                                    layer = LayerType.Leadin;
+                                    break;
 
-                                    case "LEADOUT":
-                                        layer = LayerType.Leadout;
-                                        break;
+                                case "LEADOUT":
+                                    layer = LayerType.Leadout;
+                                    break;
 
-                                    case "SCRIBE":
-                                        layer = LayerType.Scribe;
-                                        break;
+                                case "SCRIBE":
+                                    layer = LayerType.Scribe;
+                                    break;
 
-                                    case "SUPPRESSED":
-                                        suppressed = true;
-                                        break;
-                                }
+                                case "SUPPRESSED":
+                                    suppressed = true;
+                                    break;
                             }
-                            break;
                         }
+                        break;
+                    }
 
                     default:
                         section = CodeSection.Unknown;
                         break;
                 }
             }
-            program.Codes.Add(new ArcMove()
-            {
-                EndPoint = new Vector(x, y),
-                CenterPoint = new Vector(i, j),
-                Rotation = rotation,
-                Layer = layer,
-                Suppressed = suppressed,
-                VariableRefs = BuildVariableRefs(("X", xRef), ("Y", yRef), ("I", iRef), ("J", jRef))
-            });
+            program.Codes.Add(
+                new ArcMove()
+                {
+                    EndPoint = new Vector(x, y),
+                    CenterPoint = new Vector(i, j),
+                    Rotation = rotation,
+                    Layer = layer,
+                    Suppressed = suppressed,
+                    VariableRefs = BuildVariableRefs(
+                        ("X", xRef),
+                        ("Y", yRef),
+                        ("I", iRef),
+                        ("J", jRef)
+                    ),
+                }
+            );
         }
 
         private void ReadSubProgram()
@@ -411,12 +450,14 @@ namespace OpenNest.IO
                 }
             }
 
-            program.Codes.Add(new SubProgramCall
-            {
-                Id = p,
-                Rotation = r,
-                Offset = new Geometry.Vector(x, y)
-            });
+            program.Codes.Add(
+                new SubProgramCall
+                {
+                    Id = p,
+                    Rotation = r,
+                    Offset = new Geometry.Vector(x, y),
+                }
+            );
         }
 
         private Code GetNextCode()
@@ -446,8 +487,13 @@ namespace OpenNest.IO
             return block[codeIndex];
         }
 
-        private static bool TryParseVariableDefinition(string line, out string name, out string expression,
-            out bool isInline, out bool isGlobal)
+        private static bool TryParseVariableDefinition(
+            string line,
+            out string name,
+            out string expression,
+            out bool isInline,
+            out bool isGlobal
+        )
         {
             name = null;
             expression = null;
@@ -467,7 +513,22 @@ namespace OpenNest.IO
             if (trimmed.Length >= 2 && char.IsDigit(trimmed[1]))
             {
                 var upper = char.ToUpper(firstChar);
-                if (upper is 'G' or 'M' or 'N' or 'F' or 'X' or 'Y' or 'I' or 'J' or 'T' or 'S' or 'O' or 'P' or 'R')
+                if (
+                    upper
+                    is 'G'
+                        or 'M'
+                        or 'N'
+                        or 'F'
+                        or 'X'
+                        or 'Y'
+                        or 'I'
+                        or 'J'
+                        or 'T'
+                        or 'S'
+                        or 'O'
+                        or 'P'
+                        or 'R'
+                )
                     return false;
             }
 
@@ -515,8 +576,10 @@ namespace OpenNest.IO
             for (var i = flagStart; i < words.Length; i++)
             {
                 var word = words[i].ToLowerInvariant();
-                if (word == "inline") isInline = true;
-                else if (word == "global") isGlobal = true;
+                if (word == "inline")
+                    isInline = true;
+                else if (word == "global")
+                    isGlobal = true;
             }
 
             name = rawName;
@@ -524,13 +587,16 @@ namespace OpenNest.IO
         }
 
         private static Dictionary<string, double> ResolveVariables(
-            Dictionary<string, (string expression, bool inline, bool global)> variableDefs)
+            Dictionary<string, (string expression, bool inline, bool global)> variableDefs
+        )
         {
             if (variableDefs.Count == 0)
                 return new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
 
             // Build dependency graph
-            var dependencies = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            var dependencies = new Dictionary<string, List<string>>(
+                StringComparer.OrdinalIgnoreCase
+            );
             foreach (var kvp in variableDefs)
             {
                 var deps = new List<string>();
@@ -540,12 +606,16 @@ namespace OpenNest.IO
                     if (expr[i] == '$')
                     {
                         var start = i + 1;
-                        while (start < expr.Length && (char.IsLetterOrDigit(expr[start]) || expr[start] == '_'))
+                        while (
+                            start < expr.Length
+                            && (char.IsLetterOrDigit(expr[start]) || expr[start] == '_')
+                        )
                             start++;
                         var refName = expr.Substring(i + 1, start - i - 1);
                         // Find the canonical name (case-insensitive match)
-                        var canonical = variableDefs.Keys
-                            .FirstOrDefault(k => string.Equals(k, refName, StringComparison.OrdinalIgnoreCase));
+                        var canonical = variableDefs.Keys.FirstOrDefault(k =>
+                            string.Equals(k, refName, StringComparison.OrdinalIgnoreCase)
+                        );
                         if (canonical != null)
                             deps.Add(canonical);
                         i = start - 1;
@@ -600,12 +670,16 @@ namespace OpenNest.IO
             }
 
             if (order.Count != variableDefs.Count)
-                throw new InvalidOperationException("Circular dependency detected among variables.");
+                throw new InvalidOperationException(
+                    "Circular dependency detected among variables."
+                );
 
             return resolved;
         }
 
-        private static Dictionary<string, string> BuildVariableRefs(params (string axis, string varRef)[] refs)
+        private static Dictionary<string, string> BuildVariableRefs(
+            params (string axis, string varRef)[] refs
+        )
         {
             Dictionary<string, string> result = null;
             foreach (var (axis, varRef) in refs)
@@ -671,7 +745,7 @@ namespace OpenNest.IO
             Unknown,
             Arc,
             Line,
-            SubProgram
+            SubProgram,
         }
     }
 }

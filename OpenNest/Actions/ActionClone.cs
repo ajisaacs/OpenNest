@@ -1,10 +1,10 @@
-﻿using OpenNest.Controls;
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Controls;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
@@ -17,9 +17,7 @@ namespace OpenNest.Actions
         private double lastScale;
 
         public ActionClone(PlateView plateView, Drawing drawing)
-            : this(plateView, new List<Part> { new Part(drawing) })
-        {
-        }
+            : this(plateView, new List<Part> { new Part(drawing) }) { }
 
         public ActionClone(PlateView plateView, List<Part> partsToClone)
             : base(plateView)
@@ -141,9 +139,7 @@ namespace OpenNest.Actions
             plateView.Invalidate();
         }
 
-        public override void CancelAction()
-        {
-        }
+        public override void CancelAction() { }
 
         public override bool IsBusy()
         {
@@ -156,14 +152,30 @@ namespace OpenNest.Actions
             {
                 var movingParts = parts.Select(p => p.BasePart).ToList();
 
-                PushDirection hDir, vDir;
+                PushDirection hDir,
+                    vDir;
                 switch (plateView.Plate.Quadrant)
                 {
-                    case 1: hDir = PushDirection.Left; vDir = PushDirection.Down; break;
-                    case 2: hDir = PushDirection.Right; vDir = PushDirection.Down; break;
-                    case 3: hDir = PushDirection.Right; vDir = PushDirection.Up; break;
-                    case 4: hDir = PushDirection.Left; vDir = PushDirection.Up; break;
-                    default: hDir = PushDirection.Left; vDir = PushDirection.Down; break;
+                    case 1:
+                        hDir = PushDirection.Left;
+                        vDir = PushDirection.Down;
+                        break;
+                    case 2:
+                        hDir = PushDirection.Right;
+                        vDir = PushDirection.Down;
+                        break;
+                    case 3:
+                        hDir = PushDirection.Right;
+                        vDir = PushDirection.Up;
+                        break;
+                    case 4:
+                        hDir = PushDirection.Left;
+                        vDir = PushDirection.Up;
+                        break;
+                    default:
+                        hDir = PushDirection.Left;
+                        vDir = PushDirection.Down;
+                        break;
                 }
 
                 Compactor.PushBoundingBox(movingParts, plateView.Plate, hDir);

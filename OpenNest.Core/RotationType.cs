@@ -1,5 +1,4 @@
-﻿
-namespace OpenNest
+﻿namespace OpenNest
 {
     public enum RotationType
     {
@@ -11,6 +10,6 @@ namespace OpenNest
         /// <summary>
         /// Counter-Clockwise
         /// </summary>
-        CCW
+        CCW,
     }
 }

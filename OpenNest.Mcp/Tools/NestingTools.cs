@@ -1,11 +1,11 @@
-using ModelContextProtocol.Server;
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using ModelContextProtocol.Server;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 
 namespace OpenNest.Mcp.Tools
 {
@@ -20,11 +20,14 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "fill_plate")]
-        [Description("Fill an entire plate with a single drawing. Returns parts added and utilization.")]
+        [Description(
+            "Fill an entire plate with a single drawing. Returns parts added and utilization."
+        )]
         public string FillPlate(
             [Description("Index of the plate to fill")] int plateIndex,
             [Description("Name of the drawing to fill with")] string drawingName,
-            [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0)
+            [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0
+        )
         {
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
@@ -43,7 +46,9 @@ namespace OpenNest.Mcp.Tools
             var added = countAfter - countBefore;
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Fill plate {plateIndex} with '{drawingName}': {(success ? "success" : "failed")}");
+            sb.AppendLine(
+                $"Fill plate {plateIndex} with '{drawingName}': {(success ? "success" : "failed")}"
+            );
             sb.AppendLine($"  Parts added: {added}");
             sb.AppendLine($"  Total parts: {countAfter}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
@@ -60,7 +65,8 @@ namespace OpenNest.Mcp.Tools
             [Description("Y origin of the area")] double y,
             [Description("Width of the area")] double width,
             [Description("Length of the area")] double length,
-            [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0)
+            [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0
+        )
         {
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
@@ -80,7 +86,9 @@ namespace OpenNest.Mcp.Tools
             var added = countAfter - countBefore;
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Fill area ({x:F1},{y:F1} {width:F1}x{length:F1}) on plate {plateIndex} with '{drawingName}': {(success ? "success" : "failed")}");
+            sb.AppendLine(
+                $"Fill area ({x:F1},{y:F1} {width:F1}x{length:F1}) on plate {plateIndex} with '{drawingName}': {(success ? "success" : "failed")}"
+            );
             sb.AppendLine($"  Parts added: {added}");
             sb.AppendLine($"  Total parts: {countAfter}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
@@ -93,7 +101,8 @@ namespace OpenNest.Mcp.Tools
         public string FillRemnants(
             [Description("Index of the plate")] int plateIndex,
             [Description("Name of the drawing to fill with")] string drawingName,
-            [Description("Maximum quantity per remnant (0 = unlimited)")] int quantity = 0)
+            [Description("Maximum quantity per remnant (0 = unlimited)")] int quantity = 0
+        )
         {
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
@@ -124,7 +133,9 @@ namespace OpenNest.Mcp.Tools
                 var added = plate.Parts.Count - countBefore;
                 totalAdded += added;
 
-                sb.AppendLine($"  Remnant {i}: ({remnant.X:F1},{remnant.Y:F1} {remnant.Width:F1}x{remnant.Length:F1}) -> {added} parts {(success ? "" : "(no fit)")}");
+                sb.AppendLine(
+                    $"  Remnant {i}: ({remnant.X:F1},{remnant.Y:F1} {remnant.Width:F1}x{remnant.Length:F1}) -> {added} parts {(success ? "" : "(no fit)")}"
+                );
             }
 
             sb.AppendLine($"Total parts added: {totalAdded}");
@@ -134,11 +145,14 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "pack_plate")]
-        [Description("Pack multiple drawings onto a plate using bin-packing. Specify drawings and quantities as comma-separated lists.")]
+        [Description(
+            "Pack multiple drawings onto a plate using bin-packing. Specify drawings and quantities as comma-separated lists."
+        )]
         public string PackPlate(
             [Description("Index of the plate")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
-            [Description("Comma-separated quantities for each drawing")] string quantities)
+            [Description("Comma-separated quantities for each drawing")] string quantities
+        )
         {
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
@@ -195,11 +209,14 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "autonest_plate")]
-        [Description("Mixed-part autonesting. Fills the plate with multiple different drawings using iterative per-drawing fills with remainder-strip packing.")]
+        [Description(
+            "Mixed-part autonesting. Fills the plate with multiple different drawings using iterative per-drawing fills with remainder-strip packing."
+        )]
         public string AutoNestPlate(
             [Description("Index of the plate")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
-            [Description("Comma-separated quantities for each drawing")] string quantities)
+            [Description("Comma-separated quantities for each drawing")] string quantities
+        )
         {
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
@@ -241,7 +258,9 @@ namespace OpenNest.Mcp.Tools
             var totalPlaced = nestParts.Count;
 
             var sb = new StringBuilder();
-            sb.AppendLine($"AutoNest plate {plateIndex} ({engine.Name} engine): {(totalPlaced > 0 ? "success" : "no parts placed")}");
+            sb.AppendLine(
+                $"AutoNest plate {plateIndex} ({engine.Name} engine): {(totalPlaced > 0 ? "success" : "no parts placed")}"
+            );
             sb.AppendLine($"  Parts placed: {totalPlaced}");
             sb.AppendLine($"  Total parts: {plate.Parts.Count}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");

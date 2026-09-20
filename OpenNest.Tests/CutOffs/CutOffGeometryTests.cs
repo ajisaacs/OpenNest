@@ -14,12 +14,12 @@ public class CutOffGeometryTests
         var total = 0.0;
         for (var i = 0; i < program.Codes.Count - 1; i += 2)
         {
-            if (program.Codes[i] is RapidMove rapid &&
-                program.Codes[i + 1] is LinearMove linear)
+            if (program.Codes[i] is RapidMove rapid && program.Codes[i + 1] is LinearMove linear)
             {
-                total += axis == CutOffAxis.Vertical
-                    ? System.Math.Abs(rapid.EndPoint.Y - linear.EndPoint.Y)
-                    : System.Math.Abs(rapid.EndPoint.X - linear.EndPoint.X);
+                total +=
+                    axis == CutOffAxis.Vertical
+                        ? System.Math.Abs(rapid.EndPoint.Y - linear.EndPoint.Y)
+                        : System.Math.Abs(rapid.EndPoint.X - linear.EndPoint.X);
             }
         }
         return total;
@@ -113,7 +113,10 @@ public class CutOffGeometryTests
         // cover more of the plate than with BB.
         // Total cut length should be greater than 80 (BB would give 100-20=80)
         var totalCutLength = TotalCutLength(cutoff.Drawing.Program);
-        Assert.True(totalCutLength > 80, $"Geometry should give more cut length than BB. Got {totalCutLength:F2}");
+        Assert.True(
+            totalCutLength > 80,
+            $"Geometry should give more cut length than BB. Got {totalCutLength:F2}"
+        );
     }
 
     [Fact]
@@ -136,7 +139,10 @@ public class CutOffGeometryTests
         // BB would exclude full 20 → cut length = 80.
         // Geometry excludes only 10 → cut length = 90.
         var totalCutLength = TotalCutLength(cutoff.Drawing.Program);
-        Assert.True(totalCutLength > 85, $"Diamond geometry should give more cut than BB. Got {totalCutLength:F2}");
+        Assert.True(
+            totalCutLength > 85,
+            $"Diamond geometry should give more cut than BB. Got {totalCutLength:F2}"
+        );
     }
 
     [Fact]
@@ -159,7 +165,10 @@ public class CutOffGeometryTests
         // BB would exclude [10,40] = 30 → cut = 70.
         // Geometry excludes [10,30] = 20 → cut = 80.
         var totalCutLength = TotalCutLength(cutoff.Drawing.Program);
-        Assert.True(totalCutLength > 75, $"Triangle geometry should give more cut than BB. Got {totalCutLength:F2}");
+        Assert.True(
+            totalCutLength > 75,
+            $"Triangle geometry should give more cut than BB. Got {totalCutLength:F2}"
+        );
     }
 
     [Fact]
@@ -197,7 +206,10 @@ public class CutOffGeometryTests
         // BB would exclude X=[0,20] → cut = 80.
         // Circle chord at Y=2 is much shorter → cut > 80.
         var totalCutLength = TotalCutLength(cutoff.Drawing.Program, CutOffAxis.Horizontal);
-        Assert.True(totalCutLength > 80, $"Circle horizontal cut should use geometry. Got {totalCutLength:F2}");
+        Assert.True(
+            totalCutLength > 80,
+            $"Circle horizontal cut should use geometry. Got {totalCutLength:F2}"
+        );
     }
 
     [Fact]
@@ -283,7 +295,7 @@ public class CutOffGeometryTests
         var entities = new List<Entity>
         {
             new Line(new Vector(0, 0), new Vector(10, 0)),
-            new Arc(new Vector(5, 5), 5, 0, System.Math.PI)
+            new Arc(new Vector(5, 5), 5, 0, System.Math.PI),
         };
 
         var points = entities.CollectPoints();
@@ -333,7 +345,10 @@ public class CutOffGeometryTests
         var cutPart = plate.Parts.First(p => p.BaseDrawing.IsCutOff);
         // BB would give 80 (100 - 20). Geometry should give more.
         var totalCutLength = TotalCutLength(cutPart.BaseDrawing.Program);
-        Assert.True(totalCutLength > 80, $"RegenerateCutOffs should use geometry. Got {totalCutLength:F2}");
+        Assert.True(
+            totalCutLength > 80,
+            $"RegenerateCutOffs should use geometry. Got {totalCutLength:F2}"
+        );
     }
 
     [Fact]
@@ -357,7 +372,7 @@ public class CutOffGeometryTests
 
         // Combine all entities (simulating what ShapeBuilder.GetShapes would produce)
         var entities = new List<Entity>();
-        entities.AddRange(inner.Entities);  // inner first — worst case for old heuristic
+        entities.AddRange(inner.Entities); // inner first — worst case for old heuristic
         entities.AddRange(outer.Entities);
 
         var profile = new ShapeProfile(entities);

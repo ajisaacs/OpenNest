@@ -1,16 +1,17 @@
-using OpenNest.Math;
 using System;
 using System.Drawing;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using OpenNest.Math;
 
 namespace OpenNest
 {
     public static class ArchUnits
     {
-        private static readonly Regex UnitRegex =
-            new Regex("^(?<Feet>\\d+\\.?\\d*\\s*')?\\s*(?<Inches>\\d+\\.?\\d*\\s*\")?$");
+        private static readonly Regex UnitRegex = new Regex(
+            "^(?<Feet>\\d+\\.?\\d*\\s*')?\\s*(?<Inches>\\d+\\.?\\d*\\s*\")?$"
+        );
 
         public static double ParseToInches(string input)
         {

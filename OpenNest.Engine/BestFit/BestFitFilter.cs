@@ -17,8 +17,10 @@ namespace OpenNest.Engine.BestFit
                 if (!result.Keep)
                     continue;
 
-                if (result.ShortestSide > System.Math.Min(MaxPlateWidth, MaxPlateHeight) ||
-                    result.LongestSide > System.Math.Max(MaxPlateWidth, MaxPlateHeight))
+                if (
+                    result.ShortestSide > System.Math.Min(MaxPlateWidth, MaxPlateHeight)
+                    || result.LongestSide > System.Math.Max(MaxPlateWidth, MaxPlateHeight)
+                )
                 {
                     result.Keep = false;
                     result.Reason = "Exceeds plate dimensions";
@@ -30,14 +32,21 @@ namespace OpenNest.Engine.BestFit
                 if (aspect > MaxAspectRatio && result.Utilization < UtilizationOverride)
                 {
                     result.Keep = false;
-                    result.Reason = string.Format("Aspect ratio {0:F1} exceeds max {1}", aspect, MaxAspectRatio);
+                    result.Reason = string.Format(
+                        "Aspect ratio {0:F1} exceeds max {1}",
+                        aspect,
+                        MaxAspectRatio
+                    );
                     continue;
                 }
 
                 if (result.Utilization < MinUtilization)
                 {
                     result.Keep = false;
-                    result.Reason = string.Format("Utilization {0:P0} below minimum", result.Utilization);
+                    result.Reason = string.Format(
+                        "Utilization {0:P0} below minimum",
+                        result.Utilization
+                    );
                     continue;
                 }
 

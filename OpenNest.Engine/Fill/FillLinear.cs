@@ -1,8 +1,8 @@
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Fill
 {
@@ -34,9 +34,7 @@ namespace OpenNest.Engine.Fill
 
         private static PushDirection GetPushDirection(NestDirection direction)
         {
-            return direction == NestDirection.Horizontal
-                ? PushDirection.Left
-                : PushDirection.Down;
+            return direction == NestDirection.Horizontal ? PushDirection.Left : PushDirection.Down;
         }
 
         private static double GetDimension(Box box, NestDirection direction)
@@ -75,10 +73,15 @@ namespace OpenNest.Engine.Fill
 
             var stationaryEntities = PartGeometry.GetOffsetPerimeterEntities(partA, HalfSpacing);
             var movingEntities = PartGeometry.GetOffsetPerimeterEntities(
-                partA.CloneAtOffset(offset), HalfSpacing);
+                partA.CloneAtOffset(offset),
+                HalfSpacing
+            );
 
             var slideDistance = SpatialQuery.DirectionalDistance(
-                movingEntities, stationaryEntities, pushDir);
+                movingEntities,
+                stationaryEntities,
+                pushDir
+            );
 
             if (slideDistance >= double.MaxValue || slideDistance < 0)
                 return bboxDim + PartSpacing;
@@ -140,12 +143,19 @@ namespace OpenNest.Engine.Fill
                         continue;
 
                     stationaryEntities[i] ??= PartGeometry.GetOffsetPerimeterEntities(
-                        parts[i], HalfSpacing);
+                        parts[i],
+                        HalfSpacing
+                    );
                     movingEntities[j] ??= PartGeometry.GetOffsetPerimeterEntities(
-                        parts[j].CloneAtOffset(offset), HalfSpacing);
+                        parts[j].CloneAtOffset(offset),
+                        HalfSpacing
+                    );
 
                     var slideDistance = SpatialQuery.DirectionalDistance(
-                        movingEntities[j], stationaryEntities[i], pushDir);
+                        movingEntities[j],
+                        stationaryEntities[i],
+                        pushDir
+                    );
 
                     if (slideDistance >= double.MaxValue || slideDistance < 0)
                         continue;
@@ -209,10 +219,12 @@ namespace OpenNest.Engine.Fill
                 {
                     var part = basePart.CloneAtOffset(offset);
 
-                    if (part.BoundingBox.Right <= WorkArea.Right + Tolerance.Epsilon &&
-                        part.BoundingBox.Top <= WorkArea.Top + Tolerance.Epsilon &&
-                        part.BoundingBox.Left >= WorkArea.Left - Tolerance.Epsilon &&
-                        part.BoundingBox.Bottom >= WorkArea.Bottom - Tolerance.Epsilon)
+                    if (
+                        part.BoundingBox.Right <= WorkArea.Right + Tolerance.Epsilon
+                        && part.BoundingBox.Top <= WorkArea.Top + Tolerance.Epsilon
+                        && part.BoundingBox.Left >= WorkArea.Left - Tolerance.Epsilon
+                        && part.BoundingBox.Bottom >= WorkArea.Bottom - Tolerance.Epsilon
+                    )
                     {
                         result.Add(part);
                     }
@@ -258,7 +270,11 @@ namespace OpenNest.Engine.Fill
             return result;
         }
 
-        private static bool HasOverlappingParts(List<Part> parts, out int overlapA, out int overlapB)
+        private static bool HasOverlappingParts(
+            List<Part> parts,
+            out int overlapA,
+            out int overlapB
+        )
         {
             for (var i = 0; i < parts.Count; i++)
             {
@@ -268,10 +284,10 @@ namespace OpenNest.Engine.Fill
                 {
                     var b2 = parts[j].BoundingBox;
 
-                    var overlapX = System.Math.Min(b1.Right, b2.Right)
-                                 - System.Math.Max(b1.Left, b2.Left);
-                    var overlapY = System.Math.Min(b1.Top, b2.Top)
-                                 - System.Math.Max(b1.Bottom, b2.Bottom);
+                    var overlapX =
+                        System.Math.Min(b1.Right, b2.Right) - System.Math.Max(b1.Left, b2.Left);
+                    var overlapY =
+                        System.Math.Min(b1.Top, b2.Top) - System.Math.Max(b1.Bottom, b2.Bottom);
 
                     if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
                         continue;
@@ -305,8 +321,10 @@ namespace OpenNest.Engine.Fill
 
             template.Offset(WorkArea.Location - template.BoundingBox.Location);
 
-            if (template.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
-                template.BoundingBox.Length > WorkArea.Length + Tolerance.Epsilon)
+            if (
+                template.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon
+                || template.BoundingBox.Length > WorkArea.Length + Tolerance.Epsilon
+            )
                 return pattern;
 
             pattern.Parts.Add(template);
@@ -367,8 +385,14 @@ namespace OpenNest.Engine.Fill
             return gridResult;
         }
 
-        private void LogOverlap(string step, NestDirection tilingDir,
-            Pattern pattern, List<Part> parts, int idxA, int idxB)
+        private void LogOverlap(
+            string step,
+            NestDirection tilingDir,
+            Pattern pattern,
+            List<Part> parts,
+            int idxA,
+            int idxB
+        )
         {
             var pa = parts[idxA];
             var pb = parts[idxB];
@@ -377,22 +401,32 @@ namespace OpenNest.Engine.Fill
 
             Debug.WriteLine($"[FillLinear] OVERLAP FALLBACK ({Label ?? "unknown"})");
             Debug.WriteLine($"  Step: {step}, TilingDir: {tilingDir}");
-            Debug.WriteLine($"  WorkArea: ({WorkArea.X:F4},{WorkArea.Y:F4}) {WorkArea.Width:F4}x{WorkArea.Length:F4}, Spacing: {PartSpacing}");
-            Debug.WriteLine($"  Pattern: {pattern.Parts.Count} parts, bbox {pattern.BoundingBox.Width:F4}x{pattern.BoundingBox.Length:F4}");
+            Debug.WriteLine(
+                $"  WorkArea: ({WorkArea.X:F4},{WorkArea.Y:F4}) {WorkArea.Width:F4}x{WorkArea.Length:F4}, Spacing: {PartSpacing}"
+            );
+            Debug.WriteLine(
+                $"  Pattern: {pattern.Parts.Count} parts, bbox {pattern.BoundingBox.Width:F4}x{pattern.BoundingBox.Length:F4}"
+            );
             Debug.WriteLine($"  Total parts after tiling: {parts.Count}");
             Debug.WriteLine($"  Overlapping pair [{idxA}] vs [{idxB}]:");
-            Debug.WriteLine($"    [{idxA}]: drawing={pa.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(pa.Rotation):F2}° " +
-                $"loc=({pa.Location.X:F4},{pa.Location.Y:F4}) bbox=({ba.Left:F4},{ba.Bottom:F4})-({ba.Right:F4},{ba.Top:F4})");
-            Debug.WriteLine($"    [{idxB}]: drawing={pb.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(pb.Rotation):F2}° " +
-                $"loc=({pb.Location.X:F4},{pb.Location.Y:F4}) bbox=({bb.Left:F4},{bb.Bottom:F4})-({bb.Right:F4},{bb.Top:F4})");
+            Debug.WriteLine(
+                $"    [{idxA}]: drawing={pa.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(pa.Rotation):F2}° "
+                    + $"loc=({pa.Location.X:F4},{pa.Location.Y:F4}) bbox=({ba.Left:F4},{ba.Bottom:F4})-({ba.Right:F4},{ba.Top:F4})"
+            );
+            Debug.WriteLine(
+                $"    [{idxB}]: drawing={pb.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(pb.Rotation):F2}° "
+                    + $"loc=({pb.Location.X:F4},{pb.Location.Y:F4}) bbox=({bb.Left:F4},{bb.Bottom:F4})-({bb.Right:F4},{bb.Top:F4})"
+            );
 
             // Log all pattern seed parts for reproduction
             Debug.WriteLine($"  Pattern seed parts:");
             for (var i = 0; i < pattern.Parts.Count; i++)
             {
                 var p = pattern.Parts[i];
-                Debug.WriteLine($"    [{i}]: drawing={p.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(p.Rotation):F2}° " +
-                    $"loc=({p.Location.X:F4},{p.Location.Y:F4}) bbox={p.BoundingBox.Width:F4}x{p.BoundingBox.Length:F4}");
+                Debug.WriteLine(
+                    $"    [{i}]: drawing={p.BaseDrawing?.Name ?? "?"} rot={Angle.ToDegrees(p.Rotation):F2}° "
+                        + $"loc=({p.Location.X:F4},{p.Location.Y:F4}) bbox={p.BoundingBox.Width:F4}x{p.BoundingBox.Length:F4}"
+                );
             }
         }
 
@@ -446,8 +480,10 @@ namespace OpenNest.Engine.Fill
             var offset = WorkArea.Location - pattern.BoundingBox.Location;
             var basePattern = pattern.Clone(offset);
 
-            if (basePattern.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon ||
-                basePattern.BoundingBox.Length > WorkArea.Length + Tolerance.Epsilon)
+            if (
+                basePattern.BoundingBox.Width > WorkArea.Width + Tolerance.Epsilon
+                || basePattern.BoundingBox.Length > WorkArea.Length + Tolerance.Epsilon
+            )
                 return new List<Part>();
 
             return FillGrid(basePattern, primaryAxis);

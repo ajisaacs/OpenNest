@@ -5,19 +5,28 @@ namespace OpenNest;
 
 public static class AutoSplitCalculator
 {
-    public static List<SplitLine> FitToPlate(Box partBounds, double plateWidth, double plateHeight,
-        double edgeSpacing, double featureOverhang)
+    public static List<SplitLine> FitToPlate(
+        Box partBounds,
+        double plateWidth,
+        double plateHeight,
+        double edgeSpacing,
+        double featureOverhang
+    )
     {
         var usableWidth = plateWidth - 2 * edgeSpacing - featureOverhang;
         var usableHeight = plateHeight - 2 * edgeSpacing - featureOverhang;
 
         var lines = new List<SplitLine>();
 
-        var verticalSplits = usableWidth > 0 ? (int)System.Math.Ceiling(partBounds.Length / usableWidth) - 1 : 0;
-        var horizontalSplits = usableHeight > 0 ? (int)System.Math.Ceiling(partBounds.Width / usableHeight) - 1 : 0;
+        var verticalSplits =
+            usableWidth > 0 ? (int)System.Math.Ceiling(partBounds.Length / usableWidth) - 1 : 0;
+        var horizontalSplits =
+            usableHeight > 0 ? (int)System.Math.Ceiling(partBounds.Width / usableHeight) - 1 : 0;
 
-        if (verticalSplits < 0) verticalSplits = 0;
-        if (horizontalSplits < 0) horizontalSplits = 0;
+        if (verticalSplits < 0)
+            verticalSplits = 0;
+        if (horizontalSplits < 0)
+            horizontalSplits = 0;
 
         for (var i = 1; i <= verticalSplits; i++)
             lines.Add(new SplitLine(partBounds.X + usableWidth * i, CutOffAxis.Vertical));
@@ -28,7 +37,11 @@ public static class AutoSplitCalculator
         return lines;
     }
 
-    public static List<SplitLine> SplitByCount(Box partBounds, int horizontalPieces, int verticalPieces)
+    public static List<SplitLine> SplitByCount(
+        Box partBounds,
+        int horizontalPieces,
+        int verticalPieces
+    )
     {
         var lines = new List<SplitLine>();
 

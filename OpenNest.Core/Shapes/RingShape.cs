@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Shapes
 {
@@ -21,7 +21,7 @@ namespace OpenNest.Shapes
             var entities = new List<Entity>
             {
                 new Circle(0, 0, OuterDiameter / 2.0),
-                new Circle(0, 0, InnerDiameter / 2.0)
+                new Circle(0, 0, InnerDiameter / 2.0),
             };
 
             return CreateDrawing(entities);

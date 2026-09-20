@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using ACadSharp;
 using OpenNest.Bending;
-using System.Collections.Generic;
 
 namespace OpenNest.IO.Bending
 {

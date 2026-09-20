@@ -8,9 +8,7 @@ namespace OpenNest.Geometry
         public static readonly Box Empty = new Box();
 
         public Box()
-            : this(0, 0, 0, 0)
-        {
-        }
+            : this(0, 0, 0, 0) { }
 
         public Box(double x, double y, double w, double h)
         {
@@ -117,10 +115,14 @@ namespace OpenNest.Geometry
 
         public bool Intersects(Box box)
         {
-            if (Left >= box.Right) return false;
-            if (Right <= box.Left) return false;
-            if (Top <= box.Bottom) return false;
-            if (Bottom >= box.Top) return false;
+            if (Left >= box.Right)
+                return false;
+            if (Right <= box.Left)
+                return false;
+            if (Top <= box.Bottom)
+                return false;
+            if (Bottom >= box.Top)
+                return false;
 
             return true;
         }
@@ -146,18 +148,24 @@ namespace OpenNest.Geometry
 
         public bool Contains(Box box)
         {
-            if (box.Top > Top) return false;
-            if (box.Left < Left) return false;
-            if (box.Right > Right) return false;
-            if (box.Bottom < Bottom) return false;
+            if (box.Top > Top)
+                return false;
+            if (box.Left < Left)
+                return false;
+            if (box.Right > Right)
+                return false;
+            if (box.Bottom < Bottom)
+                return false;
 
             return true;
         }
 
         public bool Contains(Vector pt)
         {
-            return pt.X >= Left - Tolerance.Epsilon && pt.X <= Right + Tolerance.Epsilon
-                && pt.Y >= Bottom - Tolerance.Epsilon && pt.Y <= Top + Tolerance.Epsilon;
+            return pt.X >= Left - Tolerance.Epsilon
+                && pt.X <= Right + Tolerance.Epsilon
+                && pt.Y >= Bottom - Tolerance.Epsilon
+                && pt.Y <= Top + Tolerance.Epsilon;
         }
 
         public bool IsHorizontalTo(Box box)

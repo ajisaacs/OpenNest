@@ -6,8 +6,6 @@ namespace OpenNest.Controls
     {
         private string suffix;
 
-
-
         public NumericUpDown()
         {
             suffix = string.Empty;

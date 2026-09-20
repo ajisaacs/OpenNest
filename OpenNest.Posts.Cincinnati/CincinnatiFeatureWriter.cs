@@ -129,14 +129,28 @@ public sealed class CincinnatiFeatureWriter
                 var sb = new StringBuilder();
 
                 // Kerf compensation on first cutting move (skip for etch)
-                if (!ctx.IsEtch && !kerfEmitted && _config.KerfCompensation == KerfMode.ControllerSide)
+                if (
+                    !ctx.IsEtch
+                    && !kerfEmitted
+                    && _config.KerfCompensation == KerfMode.ControllerSide
+                )
                 {
                     sb.Append(_config.DefaultKerfSide == KerfSide.Left ? "G41 " : "G42 ");
                     kerfEmitted = true;
                 }
 
-                var xCoord = FormatCoordWithVars(linear.EndPoint.X + offset.X, "X", linear.VariableRefs, ctx);
-                var yCoord = FormatCoordWithVars(linear.EndPoint.Y + offset.Y, "Y", linear.VariableRefs, ctx);
+                var xCoord = FormatCoordWithVars(
+                    linear.EndPoint.X + offset.X,
+                    "X",
+                    linear.VariableRefs,
+                    ctx
+                );
+                var yCoord = FormatCoordWithVars(
+                    linear.EndPoint.Y + offset.Y,
+                    "Y",
+                    linear.VariableRefs,
+                    ctx
+                );
                 sb.Append($"G1 X{xCoord} Y{yCoord}");
 
                 // Feedrate — etch always uses process feedrate
@@ -155,7 +169,11 @@ public sealed class CincinnatiFeatureWriter
                 var sb = new StringBuilder();
 
                 // Kerf compensation on first cutting move (skip for etch)
-                if (!ctx.IsEtch && !kerfEmitted && _config.KerfCompensation == KerfMode.ControllerSide)
+                if (
+                    !ctx.IsEtch
+                    && !kerfEmitted
+                    && _config.KerfCompensation == KerfMode.ControllerSide
+                )
                 {
                     sb.Append(_config.DefaultKerfSide == KerfSide.Left ? "G41 " : "G42 ");
                     kerfEmitted = true;
@@ -163,8 +181,18 @@ public sealed class CincinnatiFeatureWriter
 
                 // G2 = CW, G3 = CCW
                 var gCode = arc.Rotation == RotationType.CW ? "G2" : "G3";
-                var xCoord = FormatCoordWithVars(arc.EndPoint.X + offset.X, "X", arc.VariableRefs, ctx);
-                var yCoord = FormatCoordWithVars(arc.EndPoint.Y + offset.Y, "Y", arc.VariableRefs, ctx);
+                var xCoord = FormatCoordWithVars(
+                    arc.EndPoint.X + offset.X,
+                    "X",
+                    arc.VariableRefs,
+                    ctx
+                );
+                var yCoord = FormatCoordWithVars(
+                    arc.EndPoint.Y + offset.Y,
+                    "Y",
+                    arc.VariableRefs,
+                    ctx
+                );
                 sb.Append($"{gCode} X{xCoord} Y{yCoord}");
 
                 // Convert absolute center to incremental I/J
@@ -175,8 +203,7 @@ public sealed class CincinnatiFeatureWriter
                 // Feedrate — etch always uses process feedrate, cut uses layer/radius-based
                 var radius = currentPos.DistanceTo(arc.CenterPoint);
                 var isFullCircle = IsFullCircle(currentPos, arc.EndPoint);
-                var feedVar = ctx.IsEtch ? "#148"
-                    : GetArcFeedrate(arc.Layer, radius, isFullCircle);
+                var feedVar = ctx.IsEtch ? "#148" : GetArcFeedrate(arc.Layer, radius, isFullCircle);
                 if (feedVar != lastFeedVar)
                 {
                     sb.Append($" F{feedVar}");
@@ -211,14 +238,20 @@ public sealed class CincinnatiFeatureWriter
     /// the sheet width/length variables.
     /// Inline variables fall through to literal formatting.
     /// </summary>
-    private string FormatCoordWithVars(double value, string axis,
-        Dictionary<string, string> variableRefs, FeatureContext ctx)
+    private string FormatCoordWithVars(
+        double value,
+        string axis,
+        Dictionary<string, string> variableRefs,
+        FeatureContext ctx
+    )
     {
         // User-defined variable references take priority
-        if (variableRefs != null
+        if (
+            variableRefs != null
             && variableRefs.TryGetValue(axis, out var varName)
             && ctx.UserVariableMapping != null
-            && ctx.UserVariableMapping.TryGetValue((ctx.DrawingId, varName), out var varNum))
+            && ctx.UserVariableMapping.TryGetValue((ctx.DrawingId, varName), out var varNum)
+        )
         {
             return $"#{varNum}";
         }
@@ -268,7 +301,12 @@ public sealed class CincinnatiFeatureWriter
         return Vector.Zero;
     }
 
-    private void WriteRapidToPierce(TextWriter writer, FeatureContext ctx, Vector piercePoint, Vector offset)
+    private void WriteRapidToPierce(
+        TextWriter writer,
+        FeatureContext ctx,
+        Vector piercePoint,
+        Vector offset
+    )
     {
         var sb = new StringBuilder();
 
@@ -311,15 +349,18 @@ public sealed class CincinnatiFeatureWriter
         {
             LayerType.Leadin => "#126",
             LayerType.Leadout => "#129",
-            _ => "#148"
+            _ => "#148",
         };
     }
 
     private string GetArcFeedrate(LayerType layer, double radius, bool isFullCircle)
     {
-        if (layer == LayerType.Leadin) return "#127";
-        if (layer == LayerType.Leadout) return "#129";
-        if (isFullCircle) return "[#148*#128]";
+        if (layer == LayerType.Leadin)
+            return "#127";
+        if (layer == LayerType.Leadout)
+            return "#129";
+        if (isFullCircle)
+            return "[#148*#128]";
         return GetArcCutFeedrate(radius);
     }
 

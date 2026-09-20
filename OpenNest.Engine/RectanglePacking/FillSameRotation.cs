@@ -5,9 +5,7 @@ namespace OpenNest.RectanglePacking
     internal class FillSameRotation : FillEngine
     {
         public FillSameRotation(Bin bin)
-            : base(bin)
-        {
-        }
+            : base(bin) { }
 
         public override void Fill(Item item)
         {

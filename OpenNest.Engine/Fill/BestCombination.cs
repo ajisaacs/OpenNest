@@ -6,7 +6,11 @@ namespace OpenNest
 
     internal static class BestCombination
     {
-        public static CombinationResult FindFrom2(double length1, double length2, double overallLength)
+        public static CombinationResult FindFrom2(
+            double length1,
+            double length2,
+            double overallLength
+        )
         {
             overallLength += Tolerance.Epsilon;
             var count1 = 0;

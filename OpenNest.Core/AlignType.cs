@@ -1,5 +1,4 @@
-﻿
-namespace OpenNest
+﻿namespace OpenNest
 {
     public enum AlignType
     {
@@ -10,6 +9,6 @@ namespace OpenNest
         Horizontally,
         Vertically,
         EvenlySpaceHorizontally,
-        EvenlySpaceVertically
+        EvenlySpaceVertically,
     }
 }

@@ -1,8 +1,8 @@
-﻿using OpenNest.Controls;
-using OpenNest.Geometry;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Controls;
+using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
@@ -121,24 +121,35 @@ namespace OpenNest.Actions
 
             e.Graphics.FillRectangle(fillBrush, rect);
 
-            e.Graphics.DrawRectangle(borderPen,
-                rect.X,
-                rect.Y,
-                rect.Width,
-                rect.Height);
+            e.Graphics.DrawRectangle(borderPen, rect.X, rect.Y, rect.Width, rect.Height);
 
             var centerX = rect.X + rect.Width * 0.5f;
             var centerY = rect.Y + rect.Height * 0.5f;
 
             const float halfWidth = 10;
 
-            e.Graphics.DrawLine(borderPen, centerX, centerY - halfWidth, centerX, centerY + halfWidth);
-            e.Graphics.DrawLine(borderPen, centerX - halfWidth, centerY, centerX + halfWidth, centerY);
+            e.Graphics.DrawLine(
+                borderPen,
+                centerX,
+                centerY - halfWidth,
+                centerX,
+                centerY + halfWidth
+            );
+            e.Graphics.DrawLine(
+                borderPen,
+                centerX - halfWidth,
+                centerY,
+                centerX + halfWidth,
+                centerY
+            );
         }
 
         private void ZoomWindow()
         {
-            double x, y, w, h;
+            double x,
+                y,
+                w,
+                h;
 
             if (Point1.X < Point2.X)
             {
@@ -171,7 +182,7 @@ namespace OpenNest.Actions
         public enum Status
         {
             SetFirstPoint,
-            SetSecondPoint
+            SetSecondPoint,
         }
     }
 }

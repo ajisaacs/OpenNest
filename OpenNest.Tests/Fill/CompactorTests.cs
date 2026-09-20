@@ -1,8 +1,8 @@
+using System.Collections.Generic;
 using OpenNest;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using Xunit;
-using System.Collections.Generic;
 
 namespace OpenNest.Tests.Fill
 {
@@ -31,8 +31,7 @@ namespace OpenNest.Tests.Fill
 
             // Verify: after moving, the closest point on the arc should be within
             // tolerance of the line, not past it.
-            var theta = System.Math.Atan2(
-                line.pt2.X - line.pt1.X, -(line.pt2.Y - line.pt1.Y));
+            var theta = System.Math.Atan2(line.pt2.X - line.pt1.X, -(line.pt2.Y - line.pt1.Y));
             theta = OpenNest.Math.Angle.NormalizeRad(theta + System.Math.PI);
             var qx = arc.Center.X + arc.Radius * System.Math.Cos(theta);
             var qy = arc.Center.Y + arc.Radius * System.Math.Sin(theta) + dist;
@@ -41,9 +40,11 @@ namespace OpenNest.Tests.Fill
             // Line equation: (y - 4) / (x - 3) = (6 - 4) / (7 - 3) = 0.5
             // y = 0.5x + 2.5
             var lineYAtQx = 0.5 * qx + 2.5;
-            Assert.True(qy <= lineYAtQx + 0.001,
-                $"Arc point ({qx:F4}, {qy:F4}) should not be past line (line Y={lineYAtQx:F4} at X={qx:F4}). " +
-                $"dist={dist:F6}, overshot by {qy - lineYAtQx:F6}");
+            Assert.True(
+                qy <= lineYAtQx + 0.001,
+                $"Arc point ({qx:F4}, {qy:F4}) should not be past line (line Y={lineYAtQx:F4} at X={qx:F4}). "
+                    + $"dist={dist:F6}, overshot by {qy - lineYAtQx:F6}"
+            );
         }
 
         [Fact]
@@ -57,17 +58,26 @@ namespace OpenNest.Tests.Fill
             // Phase 1/2 vertex-only distance: sample arc endpoints + cardinal extreme.
             var vertices = new[]
             {
-                new Vector(7, 0),  // arc endpoint θ=0
-                new Vector(3, 0),  // arc endpoint θ=π
-                new Vector(5, 2),  // cardinal extreme θ=π/2
+                new Vector(7, 0), // arc endpoint θ=0
+                new Vector(3, 0), // arc endpoint θ=π
+                new Vector(5, 2), // cardinal extreme θ=π/2
             };
 
             var vertexMin = double.MaxValue;
             foreach (var v in vertices)
             {
-                var d = SpatialQuery.RayEdgeDistance(v.X, v.Y,
-                    line.pt1.X, line.pt1.Y, line.pt2.X, line.pt2.Y, 0, 1);
-                if (d < vertexMin) vertexMin = d;
+                var d = SpatialQuery.RayEdgeDistance(
+                    v.X,
+                    v.Y,
+                    line.pt1.X,
+                    line.pt1.Y,
+                    line.pt2.X,
+                    line.pt2.Y,
+                    0,
+                    1
+                );
+                if (d < vertexMin)
+                    vertexMin = d;
             }
 
             // Full directional distance (includes Phase 3 arc-to-line).
@@ -75,9 +85,12 @@ namespace OpenNest.Tests.Fill
             var stationary = new List<Entity> { line };
             var fullDist = SpatialQuery.DirectionalDistance(moving, stationary, new Vector(0, 1));
 
-            Assert.True(fullDist < vertexMin,
-                $"Full distance ({fullDist:F6}) should be less than vertex-only ({vertexMin:F6})");
+            Assert.True(
+                fullDist < vertexMin,
+                $"Full distance ({fullDist:F6}) should be less than vertex-only ({vertexMin:F6})"
+            );
         }
+
         private static Drawing MakeRectDrawing(double w, double h)
         {
             var pgm = new OpenNest.CNC.Program();
@@ -187,12 +200,24 @@ namespace OpenNest.Tests.Fill
             // Push without spacing.
             var obstacle1 = MakeRectPart(0, 0, 10, 10);
             var part1 = MakeRectPart(50, 0, 10, 10);
-            var distNoSpacing = Compactor.Push(new List<Part> { part1 }, new List<Part> { obstacle1 }, workArea, 0, PushDirection.Left);
+            var distNoSpacing = Compactor.Push(
+                new List<Part> { part1 },
+                new List<Part> { obstacle1 },
+                workArea,
+                0,
+                PushDirection.Left
+            );
 
             // Push with spacing.
             var obstacle2 = MakeRectPart(0, 0, 10, 10);
             var part2 = MakeRectPart(50, 0, 10, 10);
-            var distWithSpacing = Compactor.Push(new List<Part> { part2 }, new List<Part> { obstacle2 }, workArea, 2, PushDirection.Left);
+            var distWithSpacing = Compactor.Push(
+                new List<Part> { part2 },
+                new List<Part> { obstacle2 },
+                workArea,
+                2,
+                PushDirection.Left
+            );
 
             // Spacing should cause the part to stop at a different position than without spacing.
             Assert.NotEqual(distNoSpacing, distWithSpacing);
@@ -235,11 +260,19 @@ namespace OpenNest.Tests.Fill
         public void Push_WithSpacing_StopsBeforeNearMissOutsideRawBounds(double degrees)
         {
             var obstacle = MakeRectPart(20, 20, 10, 10);
-            var moving = Part.CreateAtOrigin(MakeRectDrawing(10, 10), OpenNest.Math.Angle.ToRadians(degrees));
+            var moving = Part.CreateAtOrigin(
+                MakeRectDrawing(10, 10),
+                OpenNest.Math.Angle.ToRadians(degrees)
+            );
             moving.Offset(60, 31);
 
-            Compactor.Push(new List<Part> { moving }, new List<Part> { obstacle },
-                new Box(0, 0, 100, 100), 2, PushDirection.Left);
+            Compactor.Push(
+                new List<Part> { moving },
+                new List<Part> { obstacle },
+                new Box(0, 0, 100, 100),
+                2,
+                PushDirection.Left
+            );
 
             // Must stop at the first clearance boundary, not pass the obstacle
             // and finish in a clear position on the far side.
@@ -253,8 +286,13 @@ namespace OpenNest.Tests.Fill
             var obstacle = MakeRectPart(20, 20, 10, 10);
             var moving = MakeRectPart(60, 20, 10, 10);
 
-            Compactor.Push(new List<Part> { moving }, new List<Part> { obstacle },
-                new Box(31, 0, 100, 100), 2, PushDirection.Left);
+            Compactor.Push(
+                new List<Part> { moving },
+                new List<Part> { obstacle },
+                new Box(31, 0, 100, 100),
+                2,
+                PushDirection.Left
+            );
 
             AssertClearance(moving, obstacle, 2);
             Assert.Equal(32, moving.BoundingBox.Left, 7);
@@ -267,31 +305,39 @@ namespace OpenNest.Tests.Fill
             foreach (var b in PartGeometry.GetPartLines(obstacle))
             {
                 Assert.False(Intersect.Intersects(a, b, out _));
-                clearance = System.Math.Min(clearance, a.StartPoint.DistanceTo(b.ClosestPointTo(a.StartPoint)));
-                clearance = System.Math.Min(clearance, b.StartPoint.DistanceTo(a.ClosestPointTo(b.StartPoint)));
+                clearance = System.Math.Min(
+                    clearance,
+                    a.StartPoint.DistanceTo(b.ClosestPointTo(a.StartPoint))
+                );
+                clearance = System.Math.Min(
+                    clearance,
+                    b.StartPoint.DistanceTo(a.ClosestPointTo(b.StartPoint))
+                );
             }
-            Assert.True(clearance >= spacing - 1e-7, $"Clearance {clearance:R} is less than spacing {spacing:R}");
+            Assert.True(
+                clearance >= spacing - 1e-7,
+                $"Clearance {clearance:R} is less than spacing {spacing:R}"
+            );
         }
 
         [Fact]
         public void Push_Up_AllowsSharedDiagonalEdgeToSeparate()
         {
             var workArea = new Box(0, 0, 20, 20);
-            var obstacle = MakeTrianglePart(
-                new Vector(0, 0),
-                new Vector(10, 0),
-                new Vector(0, 10));
+            var obstacle = MakeTrianglePart(new Vector(0, 0), new Vector(10, 0), new Vector(0, 10));
             var movingPart = MakeTrianglePart(
                 new Vector(0, 10),
                 new Vector(10, 0),
-                new Vector(10, 10));
+                new Vector(10, 10)
+            );
 
             var distance = Compactor.Push(
                 new List<Part> { movingPart },
                 new List<Part> { obstacle },
                 workArea,
                 0,
-                PushDirection.Up);
+                PushDirection.Up
+            );
 
             Assert.True(distance > 0);
             Assert.True(movingPart.BoundingBox.Top > 19.9);
@@ -303,15 +349,19 @@ namespace OpenNest.Tests.Fill
         {
             var workArea = new Box(0, 0, 24, 24);
             var leftTriangle = MakeTrianglePart(
-                2, 2,
+                2,
+                2,
                 new Vector(0, 0),
                 new Vector(8, 0),
-                new Vector(4, 10));
+                new Vector(4, 10)
+            );
             var rightTriangle = MakeTrianglePart(
-                14, 4,
+                14,
+                4,
                 new Vector(0, 10),
                 new Vector(8, 10),
-                new Vector(4, 0));
+                new Vector(4, 0)
+            );
 
             var moving = new List<Part> { rightTriangle };
             var obstacles = new List<Part> { leftTriangle };
@@ -333,21 +383,20 @@ namespace OpenNest.Tests.Fill
         public void Push_Left_BlocksWhenSharedDiagonalEdgeWouldOverlap()
         {
             var workArea = new Box(0, 0, 20, 20);
-            var obstacle = MakeTrianglePart(
-                new Vector(0, 0),
-                new Vector(10, 0),
-                new Vector(0, 10));
+            var obstacle = MakeTrianglePart(new Vector(0, 0), new Vector(10, 0), new Vector(0, 10));
             var movingPart = MakeTrianglePart(
                 new Vector(0, 10),
                 new Vector(10, 0),
-                new Vector(10, 10));
+                new Vector(10, 10)
+            );
 
             var distance = Compactor.Push(
                 new List<Part> { movingPart },
                 new List<Part> { obstacle },
                 workArea,
                 0,
-                PushDirection.Left);
+                PushDirection.Left
+            );
 
             Assert.Equal(0, distance);
             Assert.Equal(0, movingPart.BoundingBox.Left);
@@ -362,7 +411,10 @@ namespace OpenNest.Tests.Fill
             var obstacles = new List<Part>();
 
             // direction = left
-            var direction = new Vector(System.Math.Cos(System.Math.PI), System.Math.Sin(System.Math.PI));
+            var direction = new Vector(
+                System.Math.Cos(System.Math.PI),
+                System.Math.Sin(System.Math.PI)
+            );
             var distance = Compactor.Push(moving, obstacles, workArea, 0, direction);
 
             Assert.True(distance > 0);
@@ -394,7 +446,13 @@ namespace OpenNest.Tests.Fill
             var moving = new List<Part> { part };
             var obstacles = new List<Part>();
 
-            var distance = Compactor.PushBoundingBox(moving, obstacles, workArea, 0, PushDirection.Left);
+            var distance = Compactor.PushBoundingBox(
+                moving,
+                obstacles,
+                workArea,
+                0,
+                PushDirection.Left
+            );
 
             Assert.True(distance > 0);
             Assert.True(part.BoundingBox.Left < 1);

@@ -30,10 +30,13 @@ public class PolygonHelperTests
         // OffsetSide.Left offsets outward or inward depending on winding,
         // but either way the result must be a different size.
         Assert.True(
-            System.Math.Abs(withSpacing.Polygon.BoundingBox.Width - noSpacing.Polygon.BoundingBox.Width) > 0.5,
-            $"Expected polygon width to differ by >0.5 with 1mm spacing. " +
-            $"No-spacing width: {noSpacing.Polygon.BoundingBox.Width:F3}, " +
-            $"With-spacing width: {withSpacing.Polygon.BoundingBox.Width:F3}");
+            System.Math.Abs(
+                withSpacing.Polygon.BoundingBox.Width - noSpacing.Polygon.BoundingBox.Width
+            ) > 0.5,
+            $"Expected polygon width to differ by >0.5 with 1mm spacing. "
+                + $"No-spacing width: {noSpacing.Polygon.BoundingBox.Width:F3}, "
+                + $"With-spacing width: {withSpacing.Polygon.BoundingBox.Width:F3}"
+        );
     }
 
     [Fact]
@@ -47,10 +50,14 @@ public class PolygonHelperTests
         noSpacing.Polygon.UpdateBounds();
         withSpacing.Polygon.UpdateBounds();
 
-        Assert.True(withSpacing.Polygon.BoundingBox.Width > noSpacing.Polygon.BoundingBox.Width,
-            $"Inflated width {withSpacing.Polygon.BoundingBox.Width:F3} should be > original {noSpacing.Polygon.BoundingBox.Width:F3}");
-        Assert.True(withSpacing.Polygon.BoundingBox.Length > noSpacing.Polygon.BoundingBox.Length,
-            $"Inflated length {withSpacing.Polygon.BoundingBox.Length:F3} should be > original {noSpacing.Polygon.BoundingBox.Length:F3}");
+        Assert.True(
+            withSpacing.Polygon.BoundingBox.Width > noSpacing.Polygon.BoundingBox.Width,
+            $"Inflated width {withSpacing.Polygon.BoundingBox.Width:F3} should be > original {noSpacing.Polygon.BoundingBox.Width:F3}"
+        );
+        Assert.True(
+            withSpacing.Polygon.BoundingBox.Length > noSpacing.Polygon.BoundingBox.Length,
+            $"Inflated length {withSpacing.Polygon.BoundingBox.Length:F3} should be > original {noSpacing.Polygon.BoundingBox.Length:F3}"
+        );
     }
 
     [Fact]
@@ -71,10 +78,14 @@ public class PolygonHelperTests
         noSpacing.Polygon.UpdateBounds();
         withSpacing.Polygon.UpdateBounds();
 
-        Assert.True(withSpacing.Polygon.BoundingBox.Width > noSpacing.Polygon.BoundingBox.Width,
-            $"Inflated width {withSpacing.Polygon.BoundingBox.Width:F3} should be > original {noSpacing.Polygon.BoundingBox.Width:F3}");
-        Assert.True(withSpacing.Polygon.BoundingBox.Length > noSpacing.Polygon.BoundingBox.Length,
-            $"Inflated length {withSpacing.Polygon.BoundingBox.Length:F3} should be > original {noSpacing.Polygon.BoundingBox.Length:F3}");
+        Assert.True(
+            withSpacing.Polygon.BoundingBox.Width > noSpacing.Polygon.BoundingBox.Width,
+            $"Inflated width {withSpacing.Polygon.BoundingBox.Width:F3} should be > original {noSpacing.Polygon.BoundingBox.Width:F3}"
+        );
+        Assert.True(
+            withSpacing.Polygon.BoundingBox.Length > noSpacing.Polygon.BoundingBox.Length,
+            $"Inflated length {withSpacing.Polygon.BoundingBox.Length:F3} should be > original {noSpacing.Polygon.BoundingBox.Length:F3}"
+        );
     }
 
     [Fact]

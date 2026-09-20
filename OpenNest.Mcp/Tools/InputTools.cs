@@ -1,9 +1,9 @@
-using ModelContextProtocol.Server;
-using OpenNest.IO;
-using OpenNest.Shapes;
 using System.ComponentModel;
 using System.IO;
 using System.Text;
+using ModelContextProtocol.Server;
+using OpenNest.IO;
+using OpenNest.Shapes;
 using CncProgram = OpenNest.CNC.Program;
 
 namespace OpenNest.Mcp.Tools
@@ -19,7 +19,9 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "load_nest")]
-        [Description("Load a .nest file into the session. Returns a summary of plates, parts, and drawings.")]
+        [Description(
+            "Load a .nest file into the session. Returns a summary of plates, parts, and drawings."
+        )]
         public string LoadNest([Description("Absolute path to the .nest file")] string path)
         {
             if (!File.Exists(path))
@@ -38,10 +40,12 @@ namespace OpenNest.Mcp.Tools
             {
                 var plate = nest.Plates[i];
                 var work = plate.WorkArea();
-                sb.AppendLine($"  Plate {i}: {plate.Size.Width:F1} x {plate.Size.Length:F1}, " +
-                              $"parts={plate.Parts.Count}, " +
-                              $"utilization={plate.Utilization():P1}, " +
-                              $"work area={work.Width:F1} x {work.Length:F1}");
+                sb.AppendLine(
+                    $"  Plate {i}: {plate.Size.Width:F1} x {plate.Size.Length:F1}, "
+                        + $"parts={plate.Parts.Count}, "
+                        + $"utilization={plate.Utilization():P1}, "
+                        + $"work area={work.Width:F1} x {work.Length:F1}"
+                );
             }
 
             sb.AppendLine($"Drawings: {nest.Drawings.Count}");
@@ -49,8 +53,10 @@ namespace OpenNest.Mcp.Tools
             foreach (var dwg in nest.Drawings)
             {
                 var bbox = dwg.Program.BoundingBox();
-                sb.AppendLine($"  {dwg.Name}: bbox={bbox.Width:F2} x {bbox.Length:F2}, " +
-                              $"required={dwg.Quantity.Required}, nested={dwg.Quantity.Nested}");
+                sb.AppendLine(
+                    $"  {dwg.Name}: bbox={bbox.Width:F2} x {bbox.Length:F2}, "
+                        + $"required={dwg.Quantity.Required}, nested={dwg.Quantity.Nested}"
+                );
             }
 
             return sb.ToString();
@@ -60,7 +66,8 @@ namespace OpenNest.Mcp.Tools
         [Description("Save the current session (all drawings and plates) to a .nest file.")]
         public string SaveNest(
             [Description("Absolute path for the output .nest file")] string path,
-            [Description("Name for the nest (optional)")] string name = null)
+            [Description("Name for the nest (optional)")] string name = null
+        )
         {
             var nest = new Nest();
             nest.Name = name ?? Path.GetFileNameWithoutExtension(path);
@@ -89,7 +96,9 @@ namespace OpenNest.Mcp.Tools
         [Description("Import a DXF file as a new drawing. Returns drawing name and bounding box.")]
         public string ImportDxf(
             [Description("Absolute path to the DXF file")] string path,
-            [Description("Name for the drawing (defaults to filename without extension)")] string name = null)
+            [Description("Name for the drawing (defaults to filename without extension)")]
+                string name = null
+        )
         {
             if (!File.Exists(path))
                 return $"Error: file not found: {path}";
@@ -109,21 +118,29 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "create_drawing")]
-        [Description("Create a drawing from a built-in shape or G-code string. Shape can be: rectangle, circle, l_shape, t_shape, gcode.")]
+        [Description(
+            "Create a drawing from a built-in shape or G-code string. Shape can be: rectangle, circle, l_shape, t_shape, gcode."
+        )]
         public string CreateDrawing(
             [Description("Name for the drawing")] string name,
             [Description("Shape type: rectangle, circle, l_shape, t_shape, gcode")] string shape,
             [Description("Width of the shape (not used for circle or gcode)")] double width = 10,
             [Description("Length of the shape (not used for circle or gcode)")] double length = 10,
             [Description("Radius for circle shape")] double radius = 5,
-            [Description("G-code string (only used when shape is 'gcode')")] string gcode = null)
+            [Description("G-code string (only used when shape is 'gcode')")] string gcode = null
+        )
         {
             ShapeDefinition shapeDef;
 
             switch (shape.ToLower())
             {
                 case "rectangle":
-                    shapeDef = new RectangleShape { Name = name, Width = width, Length = length };
+                    shapeDef = new RectangleShape
+                    {
+                        Name = name,
+                        Width = width,
+                        Length = length,
+                    };
                     break;
 
                 case "circle":
@@ -131,11 +148,21 @@ namespace OpenNest.Mcp.Tools
                     break;
 
                 case "l_shape":
-                    shapeDef = new LShape { Name = name, Width = width, Height = length };
+                    shapeDef = new LShape
+                    {
+                        Name = name,
+                        Width = width,
+                        Height = length,
+                    };
                     break;
 
                 case "t_shape":
-                    shapeDef = new TShape { Name = name, Width = width, Height = length };
+                    shapeDef = new TShape
+                    {
+                        Name = name,
+                        Width = width,
+                        Height = length,
+                    };
                     break;
 
                 case "gcode":

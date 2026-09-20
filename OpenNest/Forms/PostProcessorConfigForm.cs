@@ -17,7 +17,10 @@ namespace OpenNest.Forms
             this.Text = postProcessor.Name + " Settings";
 
             // Deep-clone config as JSON backup for cancel/restore
-            configBackup = JsonSerializer.Serialize(postProcessor.Config, postProcessor.Config.GetType());
+            configBackup = JsonSerializer.Serialize(
+                postProcessor.Config,
+                postProcessor.Config.GetType()
+            );
 
             propertyGrid.SelectedObject = postProcessor.Config;
         }

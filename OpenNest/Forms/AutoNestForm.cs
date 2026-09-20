@@ -94,49 +94,61 @@ namespace OpenNest.Forms
 
         private void SetupPartsGrid()
         {
-            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "DrawingName",
-                HeaderText = "Drawing Name",
-                Width = 160,
-                ReadOnly = true,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            });
-            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "Quantity",
-                HeaderText = "Qty",
-                Width = 50,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            });
-            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "Priority",
-                HeaderText = "Priority",
-                Width = 55,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            });
-            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "RotationStart",
-                HeaderText = "Rot Start",
-                Width = 65,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            });
-            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "RotationEnd",
-                HeaderText = "Rot End",
-                Width = 60,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            });
-            partsGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "StepAngle",
-                HeaderText = "Step",
-                Width = 55,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            });
+            partsGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "DrawingName",
+                    HeaderText = "Drawing Name",
+                    Width = 160,
+                    ReadOnly = true,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
+            partsGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "Quantity",
+                    HeaderText = "Qty",
+                    Width = 50,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
+            partsGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "Priority",
+                    HeaderText = "Priority",
+                    Width = 55,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
+            partsGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "RotationStart",
+                    HeaderText = "Rot Start",
+                    Width = 65,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
+            partsGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "RotationEnd",
+                    HeaderText = "Rot End",
+                    Width = 60,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
+            partsGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "StepAngle",
+                    HeaderText = "Step",
+                    Width = 55,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
 
             partsGrid.CellValueChanged += PartsGrid_CellValueChanged;
             partsGrid.CurrentCellDirtyStateChanged += (s, e) =>
@@ -148,20 +160,24 @@ namespace OpenNest.Forms
 
         private void SetupPlateGrid()
         {
-            plateGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "Size",
-                HeaderText = "Size",
-                Width = 120,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            });
-            plateGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "Cost",
-                HeaderText = "Cost",
-                Width = 70,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            });
+            plateGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "Size",
+                    HeaderText = "Size",
+                    Width = 120,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
+            plateGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "Cost",
+                    HeaderText = "Cost",
+                    Width = 70,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                }
+            );
 
             plateGrid.CellValidating += PlateGrid_CellValidating;
         }
@@ -208,7 +224,8 @@ namespace OpenNest.Forms
         {
             var result = new List<PlateOption>();
             var gridItems = plateGrid.DataSource as List<PlateOptionItem>;
-            if (gridItems == null) return result;
+            if (gridItems == null)
+                return result;
 
             foreach (var item in gridItems)
             {
@@ -217,12 +234,14 @@ namespace OpenNest.Forms
                 if (width <= 0 || length <= 0)
                     continue;
 
-                result.Add(new PlateOption
-                {
-                    Width = width,
-                    Length = length,
-                    Cost = item.Cost,
-                });
+                result.Add(
+                    new PlateOption
+                    {
+                        Width = width,
+                        Length = length,
+                        Cost = item.Cost,
+                    }
+                );
             }
 
             return result;
@@ -232,11 +251,13 @@ namespace OpenNest.Forms
         {
             if (options != null && options.Count > 0)
             {
-                var items = options.Select(o => new PlateOptionItem
-                {
-                    Size = FormatSize(o.Width, o.Length),
-                    Cost = o.Cost,
-                }).ToList();
+                var items = options
+                    .Select(o => new PlateOptionItem
+                    {
+                        Size = FormatSize(o.Width, o.Length),
+                        Cost = o.Cost,
+                    })
+                    .ToList();
                 plateGrid.DataSource = items;
                 optimizePlateSizeBox.Checked = true;
             }
@@ -302,7 +323,8 @@ namespace OpenNest.Forms
 
         private void PartsGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex < 0) return;
+            if (e.RowIndex < 0)
+                return;
             if (partsGrid.Columns[e.ColumnIndex].DataPropertyName == "Quantity")
                 UpdateSummary();
         }
@@ -331,11 +353,19 @@ namespace OpenNest.Forms
         {
             width = 0;
             length = 0;
-            if (string.IsNullOrWhiteSpace(value)) return false;
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
             var match = SizePattern.Match(value.Trim());
-            if (!match.Success) return false;
-            width = double.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-            length = double.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+            if (!match.Success)
+                return false;
+            width = double.Parse(
+                match.Groups[1].Value,
+                System.Globalization.CultureInfo.InvariantCulture
+            );
+            length = double.Parse(
+                match.Groups[2].Value,
+                System.Globalization.CultureInfo.InvariantCulture
+            );
             return true;
         }
 
@@ -346,8 +376,10 @@ namespace OpenNest.Forms
 
         private void PartsGrid_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
-            MessageBox.Show("Invalid input. Expected input type is " +
-                partsGrid[e.ColumnIndex, e.RowIndex].ValueType.Name);
+            MessageBox.Show(
+                "Invalid input. Expected input type is "
+                    + partsGrid[e.ColumnIndex, e.RowIndex].ValueType.Name
+            );
         }
 
         private DataGridViewItem GetDataGridViewItem(Drawing dwg)

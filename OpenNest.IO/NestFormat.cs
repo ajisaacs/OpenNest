@@ -11,7 +11,7 @@ namespace OpenNest.IO
         public static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true
+            WriteIndented = true,
         };
 
         public record NestDto

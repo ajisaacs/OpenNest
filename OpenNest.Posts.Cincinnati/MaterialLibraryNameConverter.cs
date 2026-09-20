@@ -18,11 +18,13 @@ namespace OpenNest.Posts.Cincinnati
 
             if (config?.MaterialLibraries != null)
             {
-                names.AddRange(config.MaterialLibraries
-                    .Select(e => e.Library)
-                    .Where(s => !string.IsNullOrWhiteSpace(s))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
+                names.AddRange(
+                    config
+                        .MaterialLibraries.Select(e => e.Library)
+                        .Where(s => !string.IsNullOrWhiteSpace(s))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                );
             }
 
             return new StandardValuesCollection(names);

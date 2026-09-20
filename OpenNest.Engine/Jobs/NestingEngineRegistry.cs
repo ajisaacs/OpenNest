@@ -20,20 +20,35 @@ public static class NestingEngineRegistry
 
     static NestingEngineRegistry()
     {
-        Register("StockLadder", "Caller-stock constrained-first fill and equivalent-demand area repacking",
-            () => new StockLadderNestingEngine());
+        Register(
+            "StockLadder",
+            "Caller-stock constrained-first fill and equivalent-demand area repacking",
+            () => new StockLadderNestingEngine()
+        );
 
-        Register("Default", "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)",
-            () => new FixedStrategyNestingEngine("Default"));
+        Register(
+            "Default",
+            "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)",
+            () => new FixedStrategyNestingEngine("Default")
+        );
 
-        Register("Strip", "Strip-based nesting for mixed-drawing layouts",
-            () => new FixedStrategyNestingEngine("Strip"));
+        Register(
+            "Strip",
+            "Strip-based nesting for mixed-drawing layouts",
+            () => new FixedStrategyNestingEngine("Strip")
+        );
 
-        Register("Vertical Remnant", "Optimizes for largest right-side vertical drop",
-            () => new FixedStrategyNestingEngine("Vertical Remnant"));
+        Register(
+            "Vertical Remnant",
+            "Optimizes for largest right-side vertical drop",
+            () => new FixedStrategyNestingEngine("Vertical Remnant")
+        );
 
-        Register("Horizontal Remnant", "Optimizes for largest top-side horizontal drop",
-            () => new FixedStrategyNestingEngine("Horizontal Remnant"));
+        Register(
+            "Horizontal Remnant",
+            "Optimizes for largest top-side horizontal drop",
+            () => new FixedStrategyNestingEngine("Horizontal Remnant")
+        );
     }
 
     public static IReadOnlyList<NestingEngineInfo> AvailableEngines => engines;
@@ -73,24 +88,32 @@ public static class NestingEngineRegistry
 
                     if (ctor == null)
                     {
-                        Debug.WriteLine($"[NestingEngineRegistry] Skipping {type.Name}: no parameterless constructor");
+                        Debug.WriteLine(
+                            $"[NestingEngineRegistry] Skipping {type.Name}: no parameterless constructor"
+                        );
                         continue;
                     }
 
                     try
                     {
                         Register(type.Name, string.Empty, () => (INestingEngine)ctor.Invoke(null));
-                        Debug.WriteLine($"[NestingEngineRegistry] Loaded plugin engine: {type.Name}");
+                        Debug.WriteLine(
+                            $"[NestingEngineRegistry] Loaded plugin engine: {type.Name}"
+                        );
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[NestingEngineRegistry] Failed to register {type.Name}: {ex.Message}");
+                        Debug.WriteLine(
+                            $"[NestingEngineRegistry] Failed to register {type.Name}: {ex.Message}"
+                        );
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[NestingEngineRegistry] Failed to load assembly {Path.GetFileName(dll)}: {ex.Message}");
+                Debug.WriteLine(
+                    $"[NestingEngineRegistry] Failed to load assembly {Path.GetFileName(dll)}: {ex.Message}"
+                );
             }
         }
     }

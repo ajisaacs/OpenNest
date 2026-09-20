@@ -1,9 +1,9 @@
-using OpenNest.Engine.ML;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using OpenNest.Engine.ML;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Fill
 {
@@ -25,7 +25,11 @@ namespace OpenNest.Engine.Fill
                     return new List<double> { 0 };
 
                 case PartType.Rectangle:
-                    return new List<double> { classification.PrimaryAngle, classification.PrimaryAngle + Angle.HalfPI };
+                    return new List<double>
+                    {
+                        classification.PrimaryAngle,
+                        classification.PrimaryAngle + Angle.HalfPI,
+                    };
 
                 default:
                     return BuildIrregularAngles(item, classification.PrimaryAngle, workArea);
@@ -84,7 +88,11 @@ namespace OpenNest.Engine.Fill
         }
 
         private static List<double> ApplyMlPrediction(
-            NestItem item, Box workArea, double[] baseAngles, List<double> fallback)
+            NestItem item,
+            Box workArea,
+            double[] baseAngles,
+            List<double> fallback
+        )
         {
             var features = FeatureExtractor.Extract(item.Drawing);
             if (features == null)
@@ -108,7 +116,9 @@ namespace OpenNest.Engine.Fill
                     mlAngles.Add(a);
             }
 
-            Debug.WriteLine($"[AngleCandidateBuilder] ML: {fallback.Count} sweep + {predicted.Count} predicted = {mlAngles.Count} total");
+            Debug.WriteLine(
+                $"[AngleCandidateBuilder] ML: {fallback.Count} sweep + {predicted.Count} predicted = {mlAngles.Count} total"
+            );
             return mlAngles;
         }
 
@@ -121,7 +131,9 @@ namespace OpenNest.Engine.Fill
                     pruned.Add(a);
             }
 
-            Debug.WriteLine($"[AngleCandidateBuilder] Pruned to {pruned.Count} angles (known-good)");
+            Debug.WriteLine(
+                $"[AngleCandidateBuilder] Pruned to {pruned.Count} angles (known-good)"
+            );
             return pruned;
         }
 

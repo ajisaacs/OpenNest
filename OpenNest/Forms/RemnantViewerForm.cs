@@ -1,10 +1,10 @@
-using OpenNest.Controls;
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Controls;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 
 namespace OpenNest.Forms
 {
@@ -100,9 +100,15 @@ namespace OpenNest.Forms
 
                 switch (tr.Priority)
                 {
-                    case 0: item.BackColor = Color.FromArgb(220, 255, 220); break;
-                    case 1: item.BackColor = Color.FromArgb(255, 255, 210); break;
-                    default: item.BackColor = Color.FromArgb(255, 220, 220); break;
+                    case 0:
+                        item.BackColor = Color.FromArgb(220, 255, 220);
+                        break;
+                    case 1:
+                        item.BackColor = Color.FromArgb(255, 255, 210);
+                        break;
+                    default:
+                        item.BackColor = Color.FromArgb(255, 220, 220);
+                        break;
                 }
 
                 listView.Items.Add(item);

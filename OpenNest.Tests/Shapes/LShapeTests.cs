@@ -30,7 +30,13 @@ public class LShapeTests
     [Fact]
     public void GetDrawing_CustomLegDimensions()
     {
-        var shape = new LShape { Width = 10, Height = 20, LegWidth = 3, LegHeight = 5 };
+        var shape = new LShape
+        {
+            Width = 10,
+            Height = 20,
+            LegWidth = 3,
+            LegHeight = 5,
+        };
         var drawing = shape.GetDrawing();
 
         // Area = Width*Height - (Width - LegWidth) * (Height - LegHeight)

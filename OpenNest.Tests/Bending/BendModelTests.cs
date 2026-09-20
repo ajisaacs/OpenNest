@@ -15,7 +15,7 @@ public class BendModelTests
             Direction = BendDirection.Up,
             Angle = 90,
             Radius = 0.06,
-            NoteText = "UP 90° R0.06"
+            NoteText = "UP 90° R0.06",
         };
 
         Assert.Equal(0, bend.StartPoint.X);
@@ -29,11 +29,7 @@ public class BendModelTests
     [Fact]
     public void Bend_ToLine_ReturnsGeometryLine()
     {
-        var bend = new Bend
-        {
-            StartPoint = new Vector(0, 5),
-            EndPoint = new Vector(10, 5)
-        };
+        var bend = new Bend { StartPoint = new Vector(0, 5), EndPoint = new Vector(10, 5) };
 
         var line = bend.ToLine();
 
@@ -46,11 +42,7 @@ public class BendModelTests
     [Fact]
     public void Bend_Length_ComputesCorrectly()
     {
-        var bend = new Bend
-        {
-            StartPoint = new Vector(0, 0),
-            EndPoint = new Vector(3, 4)
-        };
+        var bend = new Bend { StartPoint = new Vector(0, 0), EndPoint = new Vector(3, 4) };
 
         Assert.Equal(5.0, bend.Length, 0.001);
     }
@@ -78,7 +70,7 @@ public class BendModelTests
         {
             Direction = BendDirection.Up,
             Angle = 90,
-            Radius = 0.06
+            Radius = 0.06,
         };
 
         var str = bend.ToString();
@@ -96,7 +88,7 @@ public class BendModelTests
             StartPoint = new Vector(0, 0),
             EndPoint = new Vector(10, 0),
             Direction = BendDirection.Down,
-            Angle = 90
+            Angle = 90,
         };
         Assert.Null(bend.SourceEntity);
     }
@@ -109,7 +101,7 @@ public class BendModelTests
         {
             StartPoint = line.StartPoint,
             EndPoint = line.EndPoint,
-            SourceEntity = line
+            SourceEntity = line,
         };
         Assert.Same(line, bend.SourceEntity);
     }

@@ -90,8 +90,7 @@
             a1 = Angle.NormalizeRad(angle - a1);
             a2 = Angle.NormalizeRad(a2 - angle);
 
-            return diff >= a1 - Tolerance.Epsilon ||
-                   diff >= a2 - Tolerance.Epsilon;
+            return diff >= a1 - Tolerance.Epsilon || diff >= a2 - Tolerance.Epsilon;
         }
 
         /// <summary>
@@ -116,8 +115,7 @@
             a1 = Angle.NormalizeRad(angle - a1);
             a2 = Angle.NormalizeRad(a2 - angle);
 
-            return diff >= a1 - Tolerance.Epsilon ||
-                   diff >= a2 - Tolerance.Epsilon;
+            return diff >= a1 - Tolerance.Epsilon || diff >= a2 - Tolerance.Epsilon;
         }
     }
 }

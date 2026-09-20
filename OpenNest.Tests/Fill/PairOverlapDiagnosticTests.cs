@@ -47,10 +47,10 @@ public class PairOverlapDiagnosticTests
     }
 
     [Theory]
-    [InlineData(0)]       // 0 degrees
-    [InlineData(90)]      // 90 degrees
-    [InlineData(180)]     // 180 degrees
-    [InlineData(270)]     // 270 degrees
+    [InlineData(0)] // 0 degrees
+    [InlineData(90)] // 90 degrees
+    [InlineData(180)] // 180 degrees
+    [InlineData(270)] // 270 degrees
     public void PartBoundary_HasEdgesAtAllRotations_RoundedRect(double angleDeg)
     {
         var drawing = MakeRoundedRect();
@@ -109,8 +109,8 @@ public class PairOverlapDiagnosticTests
     }
 
     [Theory]
-    [InlineData(false)]  // simple rect
-    [InlineData(true)]   // rounded rect
+    [InlineData(false)] // simple rect
+    [InlineData(true)] // rounded rect
     public void FillExtents_NoPairOverlap_At90Degrees(bool rounded)
     {
         var drawing = rounded ? MakeRoundedRect() : MakeSimpleRect();
@@ -126,8 +126,10 @@ public class PairOverlapDiagnosticTests
         for (var i = 0; i < parts.Count; i++)
         {
             var p = parts[i];
-            _output.WriteLine($"  [{i}] rot={Angle.ToDegrees(p.Rotation):F1}° " +
-                $"bbox=({p.BoundingBox.Left:F2},{p.BoundingBox.Bottom:F2})-({p.BoundingBox.Right:F2},{p.BoundingBox.Top:F2})");
+            _output.WriteLine(
+                $"  [{i}] rot={Angle.ToDegrees(p.Rotation):F1}° "
+                    + $"bbox=({p.BoundingBox.Left:F2},{p.BoundingBox.Bottom:F2})-({p.BoundingBox.Right:F2},{p.BoundingBox.Top:F2})"
+            );
         }
 
         // Check for overlapping bounding boxes
@@ -137,15 +139,21 @@ public class PairOverlapDiagnosticTests
             for (var j = i + 1; j < parts.Count; j++)
             {
                 var b2 = parts[j].BoundingBox;
-                var overlapX = System.Math.Min(b1.Right, b2.Right) - System.Math.Max(b1.Left, b2.Left);
-                var overlapY = System.Math.Min(b1.Top, b2.Top) - System.Math.Max(b1.Bottom, b2.Bottom);
+                var overlapX =
+                    System.Math.Min(b1.Right, b2.Right) - System.Math.Max(b1.Left, b2.Left);
+                var overlapY =
+                    System.Math.Min(b1.Top, b2.Top) - System.Math.Max(b1.Bottom, b2.Bottom);
 
                 if (overlapX > 0.01 && overlapY > 0.01)
-                    _output.WriteLine($"  OVERLAP: [{i}] and [{j}] overlap by ({overlapX:F3}, {overlapY:F3})");
+                    _output.WriteLine(
+                        $"  OVERLAP: [{i}] and [{j}] overlap by ({overlapX:F3}, {overlapY:F3})"
+                    );
 
-                Assert.False(overlapX > 0.01 && overlapY > 0.01,
-                    $"Parts [{i}] and [{j}] have overlapping bounding boxes " +
-                    $"({overlapX:F3} x {overlapY:F3})");
+                Assert.False(
+                    overlapX > 0.01 && overlapY > 0.01,
+                    $"Parts [{i}] and [{j}] have overlapping bounding boxes "
+                        + $"({overlapX:F3} x {overlapY:F3})"
+                );
             }
         }
     }
@@ -172,8 +180,12 @@ public class PairOverlapDiagnosticTests
         var b1 = new PartBoundary(part1, partSpacing / 2);
         var b2 = new PartBoundary(part2, partSpacing / 2);
 
-        _output.WriteLine($"Part1 (90°) boundary edges: L={b1.GetEdges(PushDirection.Left).Length} R={b1.GetEdges(PushDirection.Right).Length}");
-        _output.WriteLine($"Part2 (270°) boundary edges: L={b2.GetEdges(PushDirection.Left).Length} R={b2.GetEdges(PushDirection.Right).Length}");
+        _output.WriteLine(
+            $"Part1 (90°) boundary edges: L={b1.GetEdges(PushDirection.Left).Length} R={b1.GetEdges(PushDirection.Right).Length}"
+        );
+        _output.WriteLine(
+            $"Part2 (270°) boundary edges: L={b2.GetEdges(PushDirection.Left).Length} R={b2.GetEdges(PushDirection.Right).Length}"
+        );
 
         var movingLines = b2.GetLines(part2.Location, PushDirection.Left);
         var stationaryLines = b1.GetLines(part1.Location, PushDirection.Right);
@@ -189,7 +201,11 @@ public class PairOverlapDiagnosticTests
         foreach (var l in stationaryLines)
             _output.WriteLine($"  ({l.pt1.X:F4},{l.pt1.Y:F4})->({l.pt2.X:F4},{l.pt2.Y:F4})");
 
-        var slideDist = SpatialQuery.DirectionalDistance(movingLines, stationaryLines, PushDirection.Left);
+        var slideDist = SpatialQuery.DirectionalDistance(
+            movingLines,
+            stationaryLines,
+            PushDirection.Left
+        );
         _output.WriteLine($"Slide distance: {slideDist:F4}");
 
         if (slideDist < double.MaxValue && slideDist > 0)
@@ -198,8 +214,12 @@ public class PairOverlapDiagnosticTests
             part2.UpdateBounds();
         }
 
-        _output.WriteLine($"Part1 bbox: ({part1.BoundingBox.Left:F2},{part1.BoundingBox.Bottom:F2})-({part1.BoundingBox.Right:F2},{part1.BoundingBox.Top:F2})");
-        _output.WriteLine($"Part2 bbox: ({part2.BoundingBox.Left:F2},{part2.BoundingBox.Bottom:F2})-({part2.BoundingBox.Right:F2},{part2.BoundingBox.Top:F2})");
+        _output.WriteLine(
+            $"Part1 bbox: ({part1.BoundingBox.Left:F2},{part1.BoundingBox.Bottom:F2})-({part1.BoundingBox.Right:F2},{part1.BoundingBox.Top:F2})"
+        );
+        _output.WriteLine(
+            $"Part2 bbox: ({part2.BoundingBox.Left:F2},{part2.BoundingBox.Bottom:F2})-({part2.BoundingBox.Right:F2},{part2.BoundingBox.Top:F2})"
+        );
 
         // Now tile this pair pattern
         var pattern = new Pattern();
@@ -216,8 +236,10 @@ public class PairOverlapDiagnosticTests
         for (var i = 0; i < parts.Count; i++)
         {
             var p = parts[i];
-            _output.WriteLine($"  [{i}] rot={Angle.ToDegrees(p.Rotation):F1}° " +
-                $"bbox=({p.BoundingBox.Left:F2},{p.BoundingBox.Bottom:F2})-({p.BoundingBox.Right:F2},{p.BoundingBox.Top:F2})");
+            _output.WriteLine(
+                $"  [{i}] rot={Angle.ToDegrees(p.Rotation):F1}° "
+                    + $"bbox=({p.BoundingBox.Left:F2},{p.BoundingBox.Bottom:F2})-({p.BoundingBox.Right:F2},{p.BoundingBox.Top:F2})"
+            );
         }
 
         // Check for overlaps
@@ -230,8 +252,10 @@ public class PairOverlapDiagnosticTests
                 var ox = System.Math.Min(bi.Right, bj.Right) - System.Math.Max(bi.Left, bj.Left);
                 var oy = System.Math.Min(bi.Top, bj.Top) - System.Math.Max(bi.Bottom, bj.Bottom);
 
-                Assert.False(ox > 0.01 && oy > 0.01,
-                    $"Parts [{i}] and [{j}] overlap ({ox:F3} x {oy:F3})");
+                Assert.False(
+                    ox > 0.01 && oy > 0.01,
+                    $"Parts [{i}] and [{j}] overlap ({ox:F3} x {oy:F3})"
+                );
             }
         }
     }

@@ -25,9 +25,10 @@ public sealed class MaterialLibraryResolver
             return EnsureLibExtension(_selectedLibrary);
 
         var entry = _materialLibraries.FirstOrDefault(e =>
-            string.Equals(e.Material, materialName, StringComparison.OrdinalIgnoreCase) &&
-            System.Math.Abs(e.Thickness - thickness) <= ThicknessTolerance &&
-            string.Equals(e.Gas, gas, StringComparison.OrdinalIgnoreCase));
+            string.Equals(e.Material, materialName, StringComparison.OrdinalIgnoreCase)
+            && System.Math.Abs(e.Thickness - thickness) <= ThicknessTolerance
+            && string.Equals(e.Gas, gas, StringComparison.OrdinalIgnoreCase)
+        );
 
         return EnsureLibExtension(entry?.Library ?? "");
     }
@@ -35,7 +36,8 @@ public sealed class MaterialLibraryResolver
     public string ResolveEtchLibrary(string gas)
     {
         var entry = _etchLibraries.FirstOrDefault(e =>
-            string.Equals(e.Gas, gas, StringComparison.OrdinalIgnoreCase));
+            string.Equals(e.Gas, gas, StringComparison.OrdinalIgnoreCase)
+        );
 
         return EnsureLibExtension(entry?.Library ?? "");
     }

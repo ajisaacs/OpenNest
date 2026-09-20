@@ -1,7 +1,7 @@
-﻿using OpenNest.Math;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -331,7 +331,11 @@ namespace OpenNest.Geometry
             return points;
         }
 
-        public static BoundingRectangleResult FindBestRotation(this List<Entity> entities, double startAngle = 0, double endAngle = Angle.TwoPI)
+        public static BoundingRectangleResult FindBestRotation(
+            this List<Entity> entities,
+            double startAngle = 0,
+            double endAngle = Angle.TwoPI
+        )
         {
             // Check for Shape entity first (recursive case returns early)
             foreach (var entity in entities)

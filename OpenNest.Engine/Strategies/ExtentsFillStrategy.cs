@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Engine.Fill;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Engine.Strategies
 {
@@ -22,10 +22,13 @@ namespace OpenNest.Engine.Strategies
 
             var angles = new[] { bestRotation, bestRotation + Angle.HalfPI };
 
-            return FillHelpers.BestOverAngles(context, angles,
-                angle => filler.Fill(context.Item.Drawing, angle,
-                    context.Token, context.ReportProgress),
-                "Extents");
+            return FillHelpers.BestOverAngles(
+                context,
+                angles,
+                angle =>
+                    filler.Fill(context.Item.Drawing, angle, context.Token, context.ReportProgress),
+                "Extents"
+            );
         }
     }
 }

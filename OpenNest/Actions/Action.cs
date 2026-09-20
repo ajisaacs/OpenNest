@@ -1,6 +1,6 @@
-﻿using OpenNest.Controls;
+﻿using System.Drawing;
+using OpenNest.Controls;
 using OpenNest.Geometry;
-using System.Drawing;
 
 namespace OpenNest.Actions
 {

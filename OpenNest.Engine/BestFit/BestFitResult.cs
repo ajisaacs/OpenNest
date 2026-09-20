@@ -1,9 +1,9 @@
-using OpenNest.Engine;
-using OpenNest.Converters;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Converters;
+using OpenNest.Engine;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -44,13 +44,17 @@ namespace OpenNest.Engine.BestFit
 
             if (!OptimalRotation.IsEqualTo(0))
             {
-                var pairBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+                var pairBounds = (
+                    (IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }
+                ).GetBoundingBox();
                 var center = pairBounds.Center;
                 part1.Rotate(-OptimalRotation, center);
                 part2.Rotate(-OptimalRotation, center);
             }
 
-            var finalBounds = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+            var finalBounds = (
+                (IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }
+            ).GetBoundingBox();
             var offset = new Vector(-finalBounds.Left, -finalBounds.Bottom);
             part1.Offset(offset);
             part2.Offset(offset);
@@ -106,7 +110,8 @@ namespace OpenNest.Engine.BestFit
 
             foreach (var part in parts)
             {
-                var partEntities = ConvertProgram.ToGeometry(part.Program)
+                var partEntities = ConvertProgram
+                    .ToGeometry(part.Program)
                     .Where(e => e.Layer != SpecialLayers.Rapid)
                     .ToList();
 
@@ -129,6 +134,6 @@ namespace OpenNest.Engine.BestFit
         Type,
         OriginalSequence,
         Keep,
-        WhyKeepDrop
+        WhyKeepDrop,
     }
 }

@@ -29,7 +29,9 @@ public class GridDedup
     /// <summary>
     /// Gets or creates a GridDedup from FillContext.SharedState.
     /// </summary>
-    public static GridDedup GetOrCreate(System.Collections.Generic.Dictionary<string, object> sharedState)
+    public static GridDedup GetOrCreate(
+        System.Collections.Generic.Dictionary<string, object> sharedState
+    )
     {
         if (sharedState.TryGetValue(SharedStateKey, out var existing))
             return (GridDedup)existing;
@@ -41,7 +43,11 @@ public class GridDedup
 
     private readonly struct GridKey : IEquatable<GridKey>
     {
-        private readonly int _patternW, _patternL, _workW, _workL, _dir;
+        private readonly int _patternW,
+            _patternL,
+            _workW,
+            _workL,
+            _dir;
 
         public GridKey(Box patternBox, Box workArea, NestDirection dir)
         {
@@ -53,9 +59,11 @@ public class GridDedup
         }
 
         public bool Equals(GridKey other) =>
-            _patternW == other._patternW && _patternL == other._patternL &&
-            _workW == other._workW && _workL == other._workL &&
-            _dir == other._dir;
+            _patternW == other._patternW
+            && _patternL == other._patternL
+            && _workW == other._workW
+            && _workL == other._workL
+            && _dir == other._dir;
 
         public override bool Equals(object obj) => obj is GridKey other && Equals(other);
 

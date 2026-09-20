@@ -22,7 +22,7 @@ public class NestRunnerTests
             {
                 Parts = [new NestRequestPart { DxfPath = dxfPath, Quantity = 4 }],
                 SheetSize = new Size(10, 10),
-                Spacing = 0.1
+                Spacing = 0.1,
             };
 
             var response = await NestRunner.RunAsync(request);
@@ -34,7 +34,10 @@ public class NestRunnerTests
             var stock = Assert.Single(response.StockUsage);
             Assert.Equal("legacy-sheet", stock.StockId);
             Assert.Null(stock.Remaining);
-            Assert.All(response.PlateStockMappings, mapping => Assert.Equal("legacy-sheet", mapping.StockId));
+            Assert.All(
+                response.PlateStockMappings,
+                mapping => Assert.Equal("legacy-sheet", mapping.StockId)
+            );
             Assert.Equal(response.SheetCount, response.PlateStockMappings.Count);
             Assert.NotNull(response.Nest);
             Assert.Contains(response.Nest.Drawings, drawing => drawing.Name == "part-0");
@@ -54,21 +57,44 @@ public class NestRunnerTests
 
         try
         {
-            var response = await NestRunner.RunAsync(new NestRequest
-            {
-                Parts = [new NestRequestPart { Id = "square", DxfPath = dxfPath, Quantity = 5 }],
-                Plates =
-                [
-                    new NestRequestPlate { Id = "small", Size = new Size(5, 5), Quantity = 1 },
-                    new NestRequestPlate { Id = "large", Size = new Size(9, 9), Quantity = 1 }
-                ]
-            });
+            var response = await NestRunner.RunAsync(
+                new NestRequest
+                {
+                    Parts =
+                    [
+                        new NestRequestPart
+                        {
+                            Id = "square",
+                            DxfPath = dxfPath,
+                            Quantity = 5,
+                        },
+                    ],
+                    Plates =
+                    [
+                        new NestRequestPlate
+                        {
+                            Id = "small",
+                            Size = new Size(5, 5),
+                            Quantity = 1,
+                        },
+                        new NestRequestPlate
+                        {
+                            Id = "large",
+                            Size = new Size(9, 9),
+                            Quantity = 1,
+                        },
+                    ],
+                }
+            );
 
             Assert.Equal(NestJobStatus.Complete, response.Status);
             Assert.Equal(2, response.SheetCount);
             Assert.Equal(5, Assert.Single(response.Fulfillment).Placed);
             Assert.Equal(0, response.Fulfillment[0].Unplaced);
-            Assert.Equal(new[] { "large", "small" }, response.PlateStockMappings.Select(mapping => mapping.StockId).Order());
+            Assert.Equal(
+                new[] { "large", "small" },
+                response.PlateStockMappings.Select(mapping => mapping.StockId).Order()
+            );
             Assert.Equal(1, response.StockUsage.Single(usage => usage.StockId == "small").Used);
             Assert.Equal(1, response.StockUsage.Single(usage => usage.StockId == "large").Used);
             Assert.All(response.StockUsage, usage => Assert.Equal(0, usage.Remaining));
@@ -86,11 +112,21 @@ public class NestRunnerTests
 
         try
         {
-            var response = await NestRunner.RunAsync(new NestRequest
-            {
-                Parts = [new NestRequestPart { Id = "square", DxfPath = dxfPath, Quantity = 1 }],
-                Plates = []
-            });
+            var response = await NestRunner.RunAsync(
+                new NestRequest
+                {
+                    Parts =
+                    [
+                        new NestRequestPart
+                        {
+                            Id = "square",
+                            DxfPath = dxfPath,
+                            Quantity = 1,
+                        },
+                    ],
+                    Plates = [],
+                }
+            );
 
             Assert.Equal(NestJobStatus.Incomplete, response.Status);
             Assert.Equal(NestJobStopReason.StockExhausted, response.StopReason);
@@ -115,17 +151,30 @@ public class NestRunnerTests
 
         try
         {
-            var response = await NestRunner.RunAsync(new NestRequest
-            {
-                Parts = [new NestRequestPart
+            var response = await NestRunner.RunAsync(
+                new NestRequest
                 {
-                    Id = "locked-square",
-                    DxfPath = dxfPath,
-                    Quantity = 2,
-                    AllowRotation = false
-                }],
-                Plates = [new NestRequestPlate { Id = "only-sheet", Size = new Size(5, 5), Quantity = 1 }]
-            });
+                    Parts =
+                    [
+                        new NestRequestPart
+                        {
+                            Id = "locked-square",
+                            DxfPath = dxfPath,
+                            Quantity = 2,
+                            AllowRotation = false,
+                        },
+                    ],
+                    Plates =
+                    [
+                        new NestRequestPlate
+                        {
+                            Id = "only-sheet",
+                            Size = new Size(5, 5),
+                            Quantity = 1,
+                        },
+                    ],
+                }
+            );
 
             Assert.Equal(NestJobStatus.Incomplete, response.Status);
             Assert.Equal(NestJobStopReason.StockExhausted, response.StopReason);
@@ -153,15 +202,35 @@ public class NestRunnerTests
 
         try
         {
-            var response = await NestRunner.RunAsync(new NestRequest
-            {
-                Parts = [new NestRequestPart { Id = "square", DxfPath = dxfPath, Quantity = 5 }],
-                Plates =
-                [
-                    new NestRequestPlate { Id = "small", Size = new Size(5, 5), Quantity = 1 },
-                    new NestRequestPlate { Id = "large", Size = new Size(9, 9), Quantity = 1 }
-                ]
-            });
+            var response = await NestRunner.RunAsync(
+                new NestRequest
+                {
+                    Parts =
+                    [
+                        new NestRequestPart
+                        {
+                            Id = "square",
+                            DxfPath = dxfPath,
+                            Quantity = 5,
+                        },
+                    ],
+                    Plates =
+                    [
+                        new NestRequestPlate
+                        {
+                            Id = "small",
+                            Size = new Size(5, 5),
+                            Quantity = 1,
+                        },
+                        new NestRequestPlate
+                        {
+                            Id = "large",
+                            Size = new Size(9, 9),
+                            Quantity = 1,
+                        },
+                    ],
+                }
+            );
 
             Assert.Equal(2, response.SheetCount);
             Assert.Equal(80d / 106d, response.Utilization, precision: 6);
@@ -184,8 +253,8 @@ public class NestRunnerTests
                 Parts =
                 [
                     new NestRequestPart { Id = "duplicate", DxfPath = dxfPath },
-                    new NestRequestPart { Id = "duplicate", DxfPath = dxfPath }
-                ]
+                    new NestRequestPart { Id = "duplicate", DxfPath = dxfPath },
+                ],
             };
 
             await Assert.ThrowsAsync<ArgumentException>(() => NestRunner.RunAsync(request));
@@ -201,7 +270,7 @@ public class NestRunnerTests
     {
         var request = new NestRequest
         {
-            Parts = [new NestRequestPart { DxfPath = "nonexistent.dxf", Quantity = 1 }]
+            Parts = [new NestRequestPart { DxfPath = "nonexistent.dxf", Quantity = 1 }],
         };
 
         await Assert.ThrowsAsync<FileNotFoundException>(() => NestRunner.RunAsync(request));

@@ -1,5 +1,5 @@
-using OpenNest.Math;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Sequencing
 {
@@ -27,7 +27,10 @@ namespace OpenNest.Engine.Sequencing
             return result;
         }
 
-        private static List<Part> NearestNeighbor(IReadOnlyList<Part> parts, OpenNest.Geometry.Vector exit)
+        private static List<Part> NearestNeighbor(
+            IReadOnlyList<Part> parts,
+            OpenNest.Geometry.Vector exit
+        )
         {
             var remaining = new List<Part>(parts);
             var ordered = new List<Part>(parts.Count);
@@ -97,7 +100,12 @@ namespace OpenNest.Engine.Sequencing
         /// Only the segment around the reversed segment [i..j] needs to be checked,
         /// but here we compute the full route cost for correctness.
         /// </summary>
-        private static double RouteDistance(List<Part> ordered, OpenNest.Geometry.Vector exit, int i, int j)
+        private static double RouteDistance(
+            List<Part> ordered,
+            OpenNest.Geometry.Vector exit,
+            int i,
+            int j
+        )
         {
             // Full route distance: exit -> ordered[0] -> ... -> ordered[n-1]
             var total = 0.0;

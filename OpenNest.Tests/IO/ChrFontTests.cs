@@ -51,7 +51,10 @@ public class ChrFontTests
         Assert.NotNull(glyph);
 
         var entities = glyph.ToEntities(1.0, 0, 0);
-        Assert.True(entities.Count >= 2, $"Expected at least 2 entities for 'L', got {entities.Count}");
+        Assert.True(
+            entities.Count >= 2,
+            $"Expected at least 2 entities for 'L', got {entities.Count}"
+        );
         Assert.All(entities, e => Assert.Equal(EntityType.Line, e.Type));
     }
 
@@ -99,8 +102,10 @@ public class ChrFontTests
         var abBox = abEntities.GetBoundingBox();
         var aBox = aEntities.GetBoundingBox();
 
-        Assert.True(abBox.Length > aBox.Length * 1.5,
-            $"AB width ({abBox.Length:F1}) should be significantly wider than A width ({aBox.Length:F1})");
+        Assert.True(
+            abBox.Length > aBox.Length * 1.5,
+            $"AB width ({abBox.Length:F1}) should be significantly wider than A width ({aBox.Length:F1})"
+        );
     }
 
     [SkippableFact]
@@ -129,18 +134,28 @@ public class ChrFontTests
 
         var tolerance = 0.5;
 
-        Assert.True(System.Math.Abs(box.Left - refLeft) < tolerance,
-            $"Left: ours={box.Left:F2}, ref={refLeft:F2}, diff={System.Math.Abs(box.Left - refLeft):F2}");
-        Assert.True(System.Math.Abs(box.Right - refRight) < tolerance,
-            $"Right: ours={box.Right:F2}, ref={refRight:F2}, diff={System.Math.Abs(box.Right - refRight):F2}");
-        Assert.True(System.Math.Abs(box.Bottom - refBottom) < tolerance,
-            $"Bottom: ours={box.Bottom:F2}, ref={refBottom:F2}, diff={System.Math.Abs(box.Bottom - refBottom):F2}");
-        Assert.True(System.Math.Abs(box.Top - refTop) < tolerance,
-            $"Top: ours={box.Top:F2}, ref={refTop:F2}, diff={System.Math.Abs(box.Top - refTop):F2}");
+        Assert.True(
+            System.Math.Abs(box.Left - refLeft) < tolerance,
+            $"Left: ours={box.Left:F2}, ref={refLeft:F2}, diff={System.Math.Abs(box.Left - refLeft):F2}"
+        );
+        Assert.True(
+            System.Math.Abs(box.Right - refRight) < tolerance,
+            $"Right: ours={box.Right:F2}, ref={refRight:F2}, diff={System.Math.Abs(box.Right - refRight):F2}"
+        );
+        Assert.True(
+            System.Math.Abs(box.Bottom - refBottom) < tolerance,
+            $"Bottom: ours={box.Bottom:F2}, ref={refBottom:F2}, diff={System.Math.Abs(box.Bottom - refBottom):F2}"
+        );
+        Assert.True(
+            System.Math.Abs(box.Top - refTop) < tolerance,
+            $"Top: ours={box.Top:F2}, ref={refTop:F2}, diff={System.Math.Abs(box.Top - refTop):F2}"
+        );
 
         var actualCapHeight = box.Top - box.Bottom;
-        Assert.True(System.Math.Abs(actualCapHeight - height) < 0.5,
-            $"Cap height: ours={actualCapHeight:F2}, expected={height:F2}");
+        Assert.True(
+            System.Math.Abs(actualCapHeight - height) < 0.5,
+            $"Cap height: ours={actualCapHeight:F2}, expected={height:F2}"
+        );
     }
 
     [SkippableFact]
@@ -152,10 +167,14 @@ public class ChrFontTests
         var entities = font.RenderText("Text", height, Vector.Zero);
         var box = entities.GetBoundingBox();
 
-        Assert.True(measuredWidth >= box.Length,
-            $"Measured={measuredWidth:F2} should be >= rendered={box.Length:F2}");
-        Assert.True(measuredWidth - box.Length < 2.0,
-            $"Measured={measuredWidth:F2}, rendered={box.Length:F2}, diff={measuredWidth - box.Length:F2}");
+        Assert.True(
+            measuredWidth >= box.Length,
+            $"Measured={measuredWidth:F2} should be >= rendered={box.Length:F2}"
+        );
+        Assert.True(
+            measuredWidth - box.Length < 2.0,
+            $"Measured={measuredWidth:F2}, rendered={box.Length:F2}, diff={measuredWidth - box.Length:F2}"
+        );
     }
 
     [SkippableFact]
@@ -171,10 +190,15 @@ public class ChrFontTests
         Assert.True(lines.Count >= 10, $"Expected at least 10 entities for 't', got {lines.Count}");
 
         var curveLines = lines.Skip(1).Take(lines.Count - 3).ToList();
-        Assert.True(curveLines.Count >= 14, $"Expected at least 14 curve segments, got {curveLines.Count}");
+        Assert.True(
+            curveLines.Count >= 14,
+            $"Expected at least 14 curve segments, got {curveLines.Count}"
+        );
 
         var lastCurve = curveLines[^1];
-        Assert.True(lastCurve.EndPoint.X > curveLines[0].StartPoint.X,
-            $"Curve should end to the right of where it starts: start X={curveLines[0].StartPoint.X:F1}, end X={lastCurve.EndPoint.X:F1}");
+        Assert.True(
+            lastCurve.EndPoint.X > curveLines[0].StartPoint.X,
+            $"Curve should end to the right of where it starts: start X={curveLines[0].StartPoint.X:F1}, end X={lastCurve.EndPoint.X:F1}"
+        );
     }
 }

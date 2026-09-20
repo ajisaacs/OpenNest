@@ -1,6 +1,6 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Fill
 {
@@ -90,12 +90,14 @@ namespace OpenNest.Engine.Fill
                     results.Add(new TieredRemnant(remnant, 1));
             }
 
-            results.Sort((a, b) =>
-            {
-                if (a.Priority != b.Priority)
-                    return a.Priority.CompareTo(b.Priority);
-                return b.Box.Area().CompareTo(a.Box.Area());
-            });
+            results.Sort(
+                (a, b) =>
+                {
+                    if (a.Priority != b.Priority)
+                        return a.Priority.CompareTo(b.Priority);
+                    return b.Box.Area().CompareTo(a.Box.Area());
+                }
+            );
 
             return results;
         }
@@ -125,11 +127,7 @@ namespace OpenNest.Engine.Fill
                 ys.Add(obs.Top);
             }
 
-            var grid = new CellGrid
-            {
-                XCoords = xs.ToList(),
-                YCoords = ys.ToList(),
-            };
+            var grid = new CellGrid { XCoords = xs.ToList(), YCoords = ys.ToList() };
 
             grid.Cols = grid.XCoords.Count - 1;
             grid.Rows = grid.YCoords.Count - 1;
@@ -146,9 +144,12 @@ namespace OpenNest.Engine.Fill
             {
                 for (var c = 0; c < grid.Cols; c++)
                 {
-                    var cell = new Box(grid.XCoords[c], grid.YCoords[r],
+                    var cell = new Box(
+                        grid.XCoords[c],
+                        grid.YCoords[r],
                         grid.XCoords[c + 1] - grid.XCoords[c],
-                        grid.YCoords[r + 1] - grid.YCoords[r]);
+                        grid.YCoords[r + 1] - grid.YCoords[r]
+                    );
 
                     grid.Empty[r, c] = !OverlapsAny(cell, clipped);
                 }
@@ -175,8 +176,12 @@ namespace OpenNest.Engine.Fill
         {
             foreach (var obs in obstacles)
             {
-                if (cell.Left < obs.Right && cell.Right > obs.Left &&
-                    cell.Bottom < obs.Top && cell.Top > obs.Bottom)
+                if (
+                    cell.Left < obs.Right
+                    && cell.Right > obs.Left
+                    && cell.Bottom < obs.Top
+                    && cell.Top > obs.Bottom
+                )
                     return true;
             }
 
@@ -227,24 +232,26 @@ namespace OpenNest.Engine.Fill
         private static bool IsContainedIn(Box inner, Box outer)
         {
             var eps = Math.Tolerance.Epsilon;
-            return inner.Left >= outer.Left - eps &&
-                   inner.Right <= outer.Right + eps &&
-                   inner.Bottom >= outer.Bottom - eps &&
-                   inner.Top <= outer.Top + eps;
+            return inner.Left >= outer.Left - eps
+                && inner.Right <= outer.Right + eps
+                && inner.Bottom >= outer.Bottom - eps
+                && inner.Top <= outer.Top + eps;
         }
 
         private void SortByEdgeProximity(List<Box> boxes)
         {
-            boxes.Sort((a, b) =>
-            {
-                var aEdge = TouchesEdge(a) ? 1 : 0;
-                var bEdge = TouchesEdge(b) ? 1 : 0;
+            boxes.Sort(
+                (a, b) =>
+                {
+                    var aEdge = TouchesEdge(a) ? 1 : 0;
+                    var bEdge = TouchesEdge(b) ? 1 : 0;
 
-                if (aEdge != bEdge)
-                    return bEdge.CompareTo(aEdge);
+                    if (aEdge != bEdge)
+                        return bEdge.CompareTo(aEdge);
 
-                return b.Area().CompareTo(a.Area());
-            });
+                    return b.Area().CompareTo(a.Area());
+                }
+            );
         }
 
         private bool TouchesEdge(Box box)
@@ -264,30 +271,47 @@ namespace OpenNest.Engine.Fill
 
             foreach (var obs in Obstacles)
             {
-                if (obs.Left < envLeft) envLeft = obs.Left;
-                if (obs.Bottom < envBottom) envBottom = obs.Bottom;
-                if (obs.Right > envRight) envRight = obs.Right;
-                if (obs.Top > envTop) envTop = obs.Top;
+                if (obs.Left < envLeft)
+                    envLeft = obs.Left;
+                if (obs.Bottom < envBottom)
+                    envBottom = obs.Bottom;
+                if (obs.Right > envRight)
+                    envRight = obs.Right;
+                if (obs.Top > envTop)
+                    envTop = obs.Top;
             }
 
             return new Box(envLeft, envBottom, envRight - envLeft, envTop - envBottom);
         }
 
-        private static void SplitAtEnvelope(Box remnant, Box envelope, double minDim, List<TieredRemnant> results)
+        private static void SplitAtEnvelope(
+            Box remnant,
+            Box envelope,
+            double minDim,
+            List<TieredRemnant> results
+        )
         {
             var eps = Math.Tolerance.Epsilon;
 
             // Fully within the envelope.
-            if (remnant.Left >= envelope.Left - eps && remnant.Right <= envelope.Right + eps &&
-                remnant.Bottom >= envelope.Bottom - eps && remnant.Top <= envelope.Top + eps)
+            if (
+                remnant.Left >= envelope.Left - eps
+                && remnant.Right <= envelope.Right + eps
+                && remnant.Bottom >= envelope.Bottom - eps
+                && remnant.Top <= envelope.Top + eps
+            )
             {
                 results.Add(new TieredRemnant(remnant, 0));
                 return;
             }
 
             // Fully outside the envelope (no overlap).
-            if (remnant.Left >= envelope.Right - eps || remnant.Right <= envelope.Left + eps ||
-                remnant.Bottom >= envelope.Top - eps || remnant.Top <= envelope.Bottom + eps)
+            if (
+                remnant.Left >= envelope.Right - eps
+                || remnant.Right <= envelope.Left + eps
+                || remnant.Bottom >= envelope.Top - eps
+                || remnant.Top <= envelope.Bottom + eps
+            )
             {
                 results.Add(new TieredRemnant(remnant, 2));
                 return;
@@ -300,36 +324,116 @@ namespace OpenNest.Engine.Fill
             var innerTop = System.Math.Min(remnant.Top, envelope.Top);
 
             // Inner portion (priority 0).
-            TryAdd(results, innerLeft, innerBottom, innerRight - innerLeft, innerTop - innerBottom, 0, minDim);
+            TryAdd(
+                results,
+                innerLeft,
+                innerBottom,
+                innerRight - innerLeft,
+                innerTop - innerBottom,
+                0,
+                minDim
+            );
 
             // Edge extensions (priority 1).
             if (remnant.Right > envelope.Right + eps)
-                TryAdd(results, envelope.Right, remnant.Bottom, remnant.Right - envelope.Right, remnant.Width, 1, minDim);
+                TryAdd(
+                    results,
+                    envelope.Right,
+                    remnant.Bottom,
+                    remnant.Right - envelope.Right,
+                    remnant.Width,
+                    1,
+                    minDim
+                );
 
             if (remnant.Left < envelope.Left - eps)
-                TryAdd(results, remnant.Left, remnant.Bottom, envelope.Left - remnant.Left, remnant.Width, 1, minDim);
+                TryAdd(
+                    results,
+                    remnant.Left,
+                    remnant.Bottom,
+                    envelope.Left - remnant.Left,
+                    remnant.Width,
+                    1,
+                    minDim
+                );
 
             if (remnant.Top > envelope.Top + eps)
-                TryAdd(results, innerLeft, envelope.Top, innerRight - innerLeft, remnant.Top - envelope.Top, 1, minDim);
+                TryAdd(
+                    results,
+                    innerLeft,
+                    envelope.Top,
+                    innerRight - innerLeft,
+                    remnant.Top - envelope.Top,
+                    1,
+                    minDim
+                );
 
             if (remnant.Bottom < envelope.Bottom - eps)
-                TryAdd(results, innerLeft, remnant.Bottom, innerRight - innerLeft, envelope.Bottom - remnant.Bottom, 1, minDim);
+                TryAdd(
+                    results,
+                    innerLeft,
+                    remnant.Bottom,
+                    innerRight - innerLeft,
+                    envelope.Bottom - remnant.Bottom,
+                    1,
+                    minDim
+                );
 
             // Corner extensions (priority 2).
             if (remnant.Right > envelope.Right + eps && remnant.Top > envelope.Top + eps)
-                TryAdd(results, envelope.Right, envelope.Top, remnant.Right - envelope.Right, remnant.Top - envelope.Top, 2, minDim);
+                TryAdd(
+                    results,
+                    envelope.Right,
+                    envelope.Top,
+                    remnant.Right - envelope.Right,
+                    remnant.Top - envelope.Top,
+                    2,
+                    minDim
+                );
 
             if (remnant.Right > envelope.Right + eps && remnant.Bottom < envelope.Bottom - eps)
-                TryAdd(results, envelope.Right, remnant.Bottom, remnant.Right - envelope.Right, envelope.Bottom - remnant.Bottom, 2, minDim);
+                TryAdd(
+                    results,
+                    envelope.Right,
+                    remnant.Bottom,
+                    remnant.Right - envelope.Right,
+                    envelope.Bottom - remnant.Bottom,
+                    2,
+                    minDim
+                );
 
             if (remnant.Left < envelope.Left - eps && remnant.Top > envelope.Top + eps)
-                TryAdd(results, remnant.Left, envelope.Top, envelope.Left - remnant.Left, remnant.Top - envelope.Top, 2, minDim);
+                TryAdd(
+                    results,
+                    remnant.Left,
+                    envelope.Top,
+                    envelope.Left - remnant.Left,
+                    remnant.Top - envelope.Top,
+                    2,
+                    minDim
+                );
 
             if (remnant.Left < envelope.Left - eps && remnant.Bottom < envelope.Bottom - eps)
-                TryAdd(results, remnant.Left, remnant.Bottom, envelope.Left - remnant.Left, envelope.Bottom - remnant.Bottom, 2, minDim);
+                TryAdd(
+                    results,
+                    remnant.Left,
+                    remnant.Bottom,
+                    envelope.Left - remnant.Left,
+                    envelope.Bottom - remnant.Bottom,
+                    2,
+                    minDim
+                );
         }
 
-        private static void TryAdd(List<TieredRemnant> results, double x, double y, double w, double h, int priority, double minDim)
+        private static void TryAdd(
+            List<TieredRemnant> results,
+            double x,
+            double y,
+            double w,
+            double h,
+            int priority,
+            double minDim
+        )
         {
             if (w >= minDim && h >= minDim)
                 results.Add(new TieredRemnant(new Box(x, y, w, h), priority));
@@ -379,10 +483,14 @@ namespace OpenNest.Engine.Fill
                         var top = stack.Pop();
                         startCol = top.startCol;
 
-                        candidates.Add(new Box(
-                            grid.XCoords[top.startCol], grid.YCoords[r - top.h + 1],
-                            grid.XCoords[c] - grid.XCoords[top.startCol],
-                            grid.YCoords[r + 1] - grid.YCoords[r - top.h + 1]));
+                        candidates.Add(
+                            new Box(
+                                grid.XCoords[top.startCol],
+                                grid.YCoords[r - top.h + 1],
+                                grid.XCoords[c] - grid.XCoords[top.startCol],
+                                grid.YCoords[r + 1] - grid.YCoords[r - top.h + 1]
+                            )
+                        );
                     }
 
                     if (h > 0)

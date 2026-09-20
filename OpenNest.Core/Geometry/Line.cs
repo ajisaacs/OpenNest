@@ -1,6 +1,6 @@
-﻿using OpenNest.Math;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -9,14 +9,10 @@ namespace OpenNest.Geometry
         internal Vector pt1;
         internal Vector pt2;
 
-        public Line()
-        {
-        }
+        public Line() { }
 
         public Line(double x1, double y1, double x2, double y2)
-            : this(new Vector(x1, y1), new Vector(x2, y2))
-        {
-        }
+            : this(new Vector(x1, y1), new Vector(x2, y2)) { }
 
         public Line(Vector startPoint, Vector endPoint)
         {
@@ -83,9 +79,7 @@ namespace OpenNest.Geometry
                 return EndPoint;
             else
             {
-                return new Vector(
-                    StartPoint.X + param * diff2.X,
-                    StartPoint.Y + param * diff2.Y);
+                return new Vector(StartPoint.X + param * diff2.X, StartPoint.Y + param * diff2.Y);
             }
         }
 
@@ -372,7 +366,7 @@ namespace OpenNest.Geometry
         /// <summary>
         /// Updates the bounding box.
         /// </summary>
-        public override sealed void UpdateBounds()
+        public sealed override void UpdateBounds()
         {
             if (StartPoint.X < EndPoint.X)
             {
@@ -429,13 +423,13 @@ namespace OpenNest.Geometry
         /// <returns>A tuple of (first, second) sub-lines.</returns>
         public (Line first, Line second) SplitAt(Vector point)
         {
-            var first = point.DistanceTo(StartPoint) < Tolerance.Epsilon
-                ? null
-                : new Line(StartPoint, point);
+            var first =
+                point.DistanceTo(StartPoint) < Tolerance.Epsilon
+                    ? null
+                    : new Line(StartPoint, point);
 
-            var second = point.DistanceTo(EndPoint) < Tolerance.Epsilon
-                ? null
-                : new Line(point, EndPoint);
+            var second =
+                point.DistanceTo(EndPoint) < Tolerance.Epsilon ? null : new Line(point, EndPoint);
 
             return (first, second);
         }

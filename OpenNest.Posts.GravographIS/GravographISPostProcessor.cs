@@ -13,7 +13,8 @@ namespace OpenNest.Posts.GravographIS
     {
         public string Name => "Gravograph IS8000";
         public string Author => "OpenNest";
-        public string Description => "Gravograph IS8000 mechanical engraver (binary HPGL over serial)";
+        public string Description =>
+            "Gravograph IS8000 mechanical engraver (binary HPGL over serial)";
 
         public GravographISWriterOptions WriterOptions { get; } = new GravographISWriterOptions();
 
@@ -25,8 +26,10 @@ namespace OpenNest.Posts.GravographIS
 
         public void Post(Nest nest, Stream outputStream)
         {
-            if (nest == null) throw new ArgumentNullException(nameof(nest));
-            if (outputStream == null) throw new ArgumentNullException(nameof(outputStream));
+            if (nest == null)
+                throw new ArgumentNullException(nameof(nest));
+            if (outputStream == null)
+                throw new ArgumentNullException(nameof(outputStream));
 
             var polylines = Extractor.Extract(nest);
             var prepared = PolylinePrePass.Prepare(polylines, StitchTolerance, AllowReverse);
@@ -42,9 +45,12 @@ namespace OpenNest.Posts.GravographIS
         /// <summary>
         /// Buffers the encoded job in memory, then streams it to the named COM port.
         /// </summary>
-        public void Stream(Nest nest, string portName,
+        public void Stream(
+            Nest nest,
+            string portName,
             Handshake handshake = Handshake.RequestToSend,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default
+        )
         {
             byte[] bytes;
             using (var ms = new MemoryStream())

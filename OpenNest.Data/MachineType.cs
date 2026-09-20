@@ -4,5 +4,5 @@ public enum MachineType
 {
     Laser,
     Plasma,
-    Waterjet
+    Waterjet,
 }

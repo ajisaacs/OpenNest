@@ -1,5 +1,5 @@
-using OpenNest.RectanglePacking;
 using System.Collections.Generic;
+using OpenNest.RectanglePacking;
 
 namespace OpenNest.Engine.Strategies
 {

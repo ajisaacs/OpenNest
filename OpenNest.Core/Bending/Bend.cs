@@ -1,7 +1,7 @@
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Drawing;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Bending
 {
@@ -10,7 +10,7 @@ namespace OpenNest.Bending
         public static readonly Layer EtchLayer = new Layer("ETCH")
         {
             Color = Color.Green,
-            IsVisible = true
+            IsVisible = true,
         };
 
         private const double DefaultEtchLength = 1.0;
@@ -32,9 +32,8 @@ namespace OpenNest.Bending
 
         public double Length => StartPoint.DistanceTo(EndPoint);
 
-        public double AngleRadians => Angle.HasValue
-            ? OpenNest.Math.Angle.ToRadians(Angle.Value)
-            : 0;
+        public double AngleRadians =>
+            Angle.HasValue ? OpenNest.Math.Angle.ToRadians(Angle.Value) : 0;
 
         public Line ToLine() => new Line(StartPoint, EndPoint);
 
@@ -66,7 +65,9 @@ namespace OpenNest.Bending
                 var dx = System.Math.Cos(angle) * etchLength;
                 var dy = System.Math.Sin(angle) * etchLength;
 
-                result.Add(CreateEtchLine(StartPoint, new Vector(StartPoint.X + dx, StartPoint.Y + dy)));
+                result.Add(
+                    CreateEtchLine(StartPoint, new Vector(StartPoint.X + dx, StartPoint.Y + dy))
+                );
                 result.Add(CreateEtchLine(new Vector(EndPoint.X - dx, EndPoint.Y - dy), EndPoint));
             }
 
@@ -79,7 +80,8 @@ namespace OpenNest.Bending
         public static void UpdateEtchEntities(List<Entity> entities, List<Bend> bends)
         {
             entities.RemoveAll(e => e.Tag == BendEtchTag);
-            if (bends == null) return;
+            if (bends == null)
+                return;
 
             foreach (var bend in bends)
                 entities.AddRange(bend.GetEtchEntities());
@@ -87,7 +89,12 @@ namespace OpenNest.Bending
 
         private static Line CreateEtchLine(Vector start, Vector end)
         {
-            return new Line(start, end) { Layer = EtchLayer, Color = Color.Green, Tag = BendEtchTag };
+            return new Line(start, end)
+            {
+                Layer = EtchLayer,
+                Color = Color.Green,
+                Tag = BendEtchTag,
+            };
         }
 
         public override string ToString()

@@ -25,7 +25,7 @@ public class CutParametersTests
             PierceTime = TimeSpan.FromSeconds(1.0),
             LeadInLength = 0.25,
             PostProcessor = "CL-707",
-            Units = Units.Millimeters
+            Units = Units.Millimeters,
         };
 
         Assert.Equal(200, cp.Feedrate);

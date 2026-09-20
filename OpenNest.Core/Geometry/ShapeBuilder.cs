@@ -1,13 +1,16 @@
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
     public static class ShapeBuilder
     {
-        public static List<Shape> GetShapes(IEnumerable<Entity> entities, double? weldTolerance = null)
+        public static List<Shape> GetShapes(
+            IEnumerable<Entity> entities,
+            double? weldTolerance = null
+        )
         {
             var lines = new List<Line>();
             var arcs = new List<Arc>();
@@ -141,7 +144,11 @@ namespace OpenNest.Geometry
 
         private static void AddToGroup(
             List<List<(Entity entity, bool isStart, Vector point)>> groups,
-            Entity entity, bool isStart, Vector point, double tolerance)
+            Entity entity,
+            bool isStart,
+            Vector point,
+            double tolerance
+        )
         {
             foreach (var group in groups)
             {

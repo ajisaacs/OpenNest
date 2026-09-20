@@ -17,8 +17,10 @@ namespace OpenNest
 
             foreach (var name in provider.GetMaterialNames())
             {
-                if (!string.IsNullOrWhiteSpace(name)
-                    && !materials.Contains(name, StringComparer.OrdinalIgnoreCase))
+                if (
+                    !string.IsNullOrWhiteSpace(name)
+                    && !materials.Contains(name, StringComparer.OrdinalIgnoreCase)
+                )
                 {
                     materials.Add(name);
                 }

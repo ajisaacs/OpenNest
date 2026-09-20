@@ -1,9 +1,9 @@
-using OpenNest.Converters;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using OpenNest.Converters;
+using OpenNest.Geometry;
 
 namespace OpenNest.Shapes
 {
@@ -11,7 +11,7 @@ namespace OpenNest.Shapes
     {
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
         };
 
         public string Name { get; set; }
@@ -36,7 +36,8 @@ namespace OpenNest.Shapes
 
         public virtual void SetPreviewDefaults() { }
 
-        public static List<T> LoadFromJson<T>(string path) where T : ShapeDefinition
+        public static List<T> LoadFromJson<T>(string path)
+            where T : ShapeDefinition
         {
             var json = File.ReadAllText(path);
             return JsonSerializer.Deserialize<List<T>>(json, JsonOptions);
@@ -50,7 +51,8 @@ namespace OpenNest.Shapes
 
             if (pgm == null)
                 throw new InvalidOperationException(
-                    $"Failed to create program for shape '{Name}'. Check that parameters produce valid geometry.");
+                    $"Failed to create program for shape '{Name}'. Check that parameters produce valid geometry."
+                );
 
             return new Drawing(Name, pgm);
         }

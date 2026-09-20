@@ -1,10 +1,3 @@
-using OpenNest.Bending;
-using OpenNest.CNC;
-using OpenNest.Controls;
-using OpenNest.Converters;
-using OpenNest.Geometry;
-using OpenNest.IO;
-using OpenNest.IO.Bending;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -13,12 +6,18 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Bending;
+using OpenNest.CNC;
+using OpenNest.Controls;
+using OpenNest.Converters;
+using OpenNest.Geometry;
+using OpenNest.IO;
+using OpenNest.IO.Bending;
 
 namespace OpenNest.Forms
 {
     public partial class CadConverterForm : Form
     {
-
         private SimplifierViewerForm simplifierViewer;
         private bool staleProgram = true;
 
@@ -168,9 +167,7 @@ namespace OpenNest.Forms
             txtCustomer.Text = item.Customer ?? "";
 
             var bounds = item.Bounds;
-            lblDimensions.Text = bounds != null
-                ? $"{bounds.Width:0.#} x {bounds.Length:0.#}"
-                : "";
+            lblDimensions.Text = bounds != null ? $"{bounds.Width:0.#} x {bounds.Length:0.#}" : "";
             lblEntityCount.Text = $"{item.EntityCount} entities";
 
             entityView1.ZoomToFit();
@@ -183,27 +180,33 @@ namespace OpenNest.Forms
 
             // Only check original (unsimplified) entities
             var entities = item.OriginalEntities ?? item.Entities;
-            if (entities == null || entities.Count < 10) return;
+            if (entities == null || entities.Count < 10)
+                return;
 
             // Quick line count check — need at least MinLines consecutive lines
             var lineCount = entities.Count(e => e is Geometry.Line);
-            if (lineCount < 3) return;
+            if (lineCount < 3)
+                return;
 
             // Run a quick analysis on a background thread
             var capturedEntities = new List<Entity>(entities);
             Task.Run(() =>
-            {
-                var shapes = ShapeBuilder.GetShapes(capturedEntities);
-                var simplifier = new GeometrySimplifier();
-                var count = 0;
-                foreach (var shape in shapes)
-                    count += simplifier.Analyze(shape).Count;
-                return count;
-            }).ContinueWith(t =>
-            {
-                if (t.IsCompletedSuccessfully && t.Result > 0)
-                    HighlightSimplifyButton(t.Result);
-            }, TaskScheduler.FromCurrentSynchronizationContext());
+                {
+                    var shapes = ShapeBuilder.GetShapes(capturedEntities);
+                    var simplifier = new GeometrySimplifier();
+                    var count = 0;
+                    foreach (var shape in shapes)
+                        count += simplifier.Analyze(shape).Count;
+                    return count;
+                })
+                .ContinueWith(
+                    t =>
+                    {
+                        if (t.IsCompletedSuccessfully && t.Result > 0)
+                            HighlightSimplifyButton(t.Result);
+                    },
+                    TaskScheduler.FromCurrentSynchronizationContext()
+                );
         }
 
         private void HighlightSimplifyButton(int candidateCount)
@@ -233,7 +236,8 @@ namespace OpenNest.Forms
         private void OnFilterChanged(object sender, EventArgs e)
         {
             var item = CurrentItem;
-            if (item == null) return;
+            if (item == null)
+                return;
 
             filterPanel.ApplyFilters(item.Entities);
             ReHidePromotedEntities(item.Bends);
@@ -280,7 +284,8 @@ namespace OpenNest.Forms
         private void OnBendLineRemoved(object sender, int index)
         {
             var item = CurrentItem;
-            if (item == null || index < 0 || index >= item.Bends.Count) return;
+            if (item == null || index < 0 || index >= item.Bends.Count)
+                return;
 
             var bend = item.Bends[index];
             if (bend.SourceEntity != null)
@@ -299,13 +304,15 @@ namespace OpenNest.Forms
         private void OnBendLineEdited(object sender, int index)
         {
             var item = CurrentItem;
-            if (item == null || index < 0 || index >= item.Bends.Count) return;
+            if (item == null || index < 0 || index >= item.Bends.Count)
+                return;
 
             var bend = item.Bends[index];
             using var dialog = new BendLineDialog();
             dialog.LoadBend(bend);
 
-            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
 
             bend.Direction = dialog.Direction;
             bend.Angle = dialog.BendAngle;
@@ -322,7 +329,8 @@ namespace OpenNest.Forms
         private void OnQuantityChanged(object sender, EventArgs e)
         {
             var item = CurrentItem;
-            if (item == null) return;
+            if (item == null)
+                return;
 
             item.Quantity = (int)numQuantity.Value;
             fileList.Invalidate();
@@ -344,10 +352,12 @@ namespace OpenNest.Forms
         private void OnSplitClicked(object sender, EventArgs e)
         {
             var item = CurrentItem;
-            if (item == null) return;
+            if (item == null)
+                return;
 
             var entities = item.Entities.Where(en => en.Layer.IsVisible && en.IsVisible).ToList();
-            if (entities.Count == 0) return;
+            if (entities.Count == 0)
+                return;
 
             var normalized = ShapeProfile.NormalizeEntities(entities);
             var pgm = ConvertGeometry.ToProgram(normalized);
@@ -360,15 +370,23 @@ namespace OpenNest.Forms
             }
 
             var drawing = new Drawing(item.Name, pgm);
-            drawing.Bends = item.Bends.Select(b => new Bend
-            {
-                StartPoint = new Vector(b.StartPoint.X - originOffset.X, b.StartPoint.Y - originOffset.Y),
-                EndPoint = new Vector(b.EndPoint.X - originOffset.X, b.EndPoint.Y - originOffset.Y),
-                Direction = b.Direction,
-                Angle = b.Angle,
-                Radius = b.Radius,
-                NoteText = b.NoteText,
-            }).ToList();
+            drawing.Bends = item
+                .Bends.Select(b => new Bend
+                {
+                    StartPoint = new Vector(
+                        b.StartPoint.X - originOffset.X,
+                        b.StartPoint.Y - originOffset.Y
+                    ),
+                    EndPoint = new Vector(
+                        b.EndPoint.X - originOffset.X,
+                        b.EndPoint.Y - originOffset.Y
+                    ),
+                    Direction = b.Direction,
+                    Angle = b.Angle,
+                    Radius = b.Radius,
+                    NoteText = b.NoteText,
+                })
+                .ToList();
 
             using var form = new SplitDrawingForm(drawing);
             if (form.ShowDialog(this) != DialogResult.OK || form.ResultDrawings?.Count <= 1)
@@ -377,9 +395,10 @@ namespace OpenNest.Forms
             // Write split DXF files and re-import
             var sourceDir = Path.GetDirectoryName(item.Path);
             var baseName = Path.GetFileNameWithoutExtension(item.Path);
-            var writableDir = Directory.Exists(sourceDir) && IsDirectoryWritable(sourceDir)
-                ? sourceDir
-                : Path.GetTempPath();
+            var writableDir =
+                Directory.Exists(sourceDir) && IsDirectoryWritable(sourceDir)
+                    ? sourceDir
+                    : Path.GetTempPath();
 
             var index = fileList.SelectedIndex;
 
@@ -407,7 +426,7 @@ namespace OpenNest.Forms
                     Customer = item.Customer,
                     Bends = splitDrawing.Bends ?? new List<Bend>(),
                     Bounds = result.Entities.GetBoundingBox(),
-                    EntityCount = result.Entities.Count
+                    EntityCount = result.Entities.Count,
                 };
                 splitItems.Add(splitItem);
             }
@@ -418,8 +437,12 @@ namespace OpenNest.Forms
                 fileList.AddItem(splitItem);
 
             if (writableDir != sourceDir)
-                MessageBox.Show($"Split files written to: {writableDir}", "Split Output",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    $"Split files written to: {writableDir}",
+                    "Split Output",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
         }
 
         private void OnAddBendLineClicked(object sender, EventArgs e)
@@ -436,7 +459,8 @@ namespace OpenNest.Forms
                 return;
 
             var item = CurrentItem;
-            if (item == null) return;
+            if (item == null)
+                return;
 
             var bend = new Bend
             {
@@ -445,7 +469,7 @@ namespace OpenNest.Forms
                 Direction = dialog.Direction,
                 Angle = dialog.BendAngle,
                 Radius = dialog.BendRadius,
-                SourceEntity = line
+                SourceEntity = line,
             };
 
             line.IsVisible = false;
@@ -467,10 +491,12 @@ namespace OpenNest.Forms
         private void OnTextConvertRequested(object sender, Controls.CadText text)
         {
             var item = CurrentItem;
-            if (item == null) return;
+            if (item == null)
+                return;
 
             var font = LoadChrFont();
-            if (font == null) return;
+            if (font == null)
+                return;
 
             var layer = new Geometry.Layer("ENGRAVE")
             {
@@ -484,13 +510,15 @@ namespace OpenNest.Forms
                 var box = entities.GetBoundingBox();
                 var shiftX = text.HAlign switch
                 {
-                    System.Drawing.StringAlignment.Center => text.Position.X - (box.Left + box.Right) / 2,
+                    System.Drawing.StringAlignment.Center => text.Position.X
+                        - (box.Left + box.Right) / 2,
                     System.Drawing.StringAlignment.Far => text.Position.X - box.Right,
                     _ => text.Position.X - box.Left,
                 };
                 var shiftY = text.VAlign switch
                 {
-                    System.Drawing.StringAlignment.Center => text.Position.Y - (box.Top + box.Bottom) / 2,
+                    System.Drawing.StringAlignment.Center => text.Position.Y
+                        - (box.Top + box.Bottom) / 2,
                     System.Drawing.StringAlignment.Near => text.Position.Y - box.Top,
                     _ => text.Position.Y - box.Bottom,
                 };
@@ -500,8 +528,12 @@ namespace OpenNest.Forms
             }
             if (entities.Count == 0)
             {
-                MessageBox.Show($"No geometry produced for \"{text.Value}\".", "Convert Text",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    $"No geometry produced for \"{text.Value}\".",
+                    "Convert Text",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
                 return;
             }
 
@@ -556,8 +588,12 @@ namespace OpenNest.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading font: {ex.Message}", "Font Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    $"Error loading font: {ex.Message}",
+                    "Font Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
                 return null;
             }
         }
@@ -584,9 +620,12 @@ namespace OpenNest.Forms
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                var dxfFiles = files.Where(f =>
-                    f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase) ||
-                    f.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)).ToArray();
+                var dxfFiles = files
+                    .Where(f =>
+                        f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
+                        || f.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
+                    )
+                    .ToArray();
                 if (dxfFiles.Length > 0)
                     AddFiles(dxfFiles);
             }
@@ -617,7 +656,8 @@ namespace OpenNest.Forms
                 var screen = Screen.FromControl(this);
                 simplifierViewer.Location = new Point(
                     System.Math.Min(Right, screen.WorkingArea.Right - simplifierViewer.Width),
-                    Top);
+                    Top
+                );
             }
 
             simplifierViewer.LoadShapes(shapes, entityView1);
@@ -658,21 +698,24 @@ namespace OpenNest.Forms
         private void OnExportDxfClick(object sender, EventArgs e)
         {
             var item = CurrentItem;
-            if (item == null) return;
+            if (item == null)
+                return;
 
             using var dlg = new SaveFileDialog
             {
-                Filter = "DXF 2018 (*.dxf)|*.dxf|" +
-                         "DXF 2013 (*.dxf)|*.dxf|" +
-                         "DXF 2010 (*.dxf)|*.dxf|" +
-                         "DXF 2007 (*.dxf)|*.dxf|" +
-                         "DXF 2004 (*.dxf)|*.dxf|" +
-                         "DXF 2000 (*.dxf)|*.dxf|" +
-                         "DXF R14 (*.dxf)|*.dxf",
+                Filter =
+                    "DXF 2018 (*.dxf)|*.dxf|"
+                    + "DXF 2013 (*.dxf)|*.dxf|"
+                    + "DXF 2010 (*.dxf)|*.dxf|"
+                    + "DXF 2007 (*.dxf)|*.dxf|"
+                    + "DXF 2004 (*.dxf)|*.dxf|"
+                    + "DXF 2000 (*.dxf)|*.dxf|"
+                    + "DXF R14 (*.dxf)|*.dxf",
                 FileName = Path.ChangeExtension(item.Name, ".dxf"),
             };
 
-            if (dlg.ShowDialog() != DialogResult.OK) return;
+            if (dlg.ShowDialog() != DialogResult.OK)
+                return;
 
             var version = dlg.FilterIndex switch
             {
@@ -691,11 +734,17 @@ namespace OpenNest.Forms
                 switch (entity)
                 {
                     case Geometry.Line line:
-                        doc.Entities.Add(new ACadSharp.Entities.Line
-                        {
-                            StartPoint = new CSMath.XYZ(line.StartPoint.X, line.StartPoint.Y, 0),
-                            EndPoint = new CSMath.XYZ(line.EndPoint.X, line.EndPoint.Y, 0),
-                        });
+                        doc.Entities.Add(
+                            new ACadSharp.Entities.Line
+                            {
+                                StartPoint = new CSMath.XYZ(
+                                    line.StartPoint.X,
+                                    line.StartPoint.Y,
+                                    0
+                                ),
+                                EndPoint = new CSMath.XYZ(line.EndPoint.X, line.EndPoint.Y, 0),
+                            }
+                        );
                         break;
 
                     case Geometry.Arc arc:
@@ -703,21 +752,25 @@ namespace OpenNest.Forms
                         var endAngle = arc.EndAngle;
                         if (arc.IsReversed)
                             OpenNest.Math.Generic.Swap(ref startAngle, ref endAngle);
-                        doc.Entities.Add(new ACadSharp.Entities.Arc
-                        {
-                            Center = new CSMath.XYZ(arc.Center.X, arc.Center.Y, 0),
-                            Radius = arc.Radius,
-                            StartAngle = startAngle,
-                            EndAngle = endAngle,
-                        });
+                        doc.Entities.Add(
+                            new ACadSharp.Entities.Arc
+                            {
+                                Center = new CSMath.XYZ(arc.Center.X, arc.Center.Y, 0),
+                                Radius = arc.Radius,
+                                StartAngle = startAngle,
+                                EndAngle = endAngle,
+                            }
+                        );
                         break;
 
                     case Geometry.Circle circle:
-                        doc.Entities.Add(new ACadSharp.Entities.Circle
-                        {
-                            Center = new CSMath.XYZ(circle.Center.X, circle.Center.Y, 0),
-                            Radius = circle.Radius,
-                        });
+                        doc.Entities.Add(
+                            new ACadSharp.Entities.Circle
+                            {
+                                Center = new CSMath.XYZ(circle.Center.X, circle.Center.Y, 0),
+                                Radius = circle.Radius,
+                            }
+                        );
                         break;
                 }
             }
@@ -770,11 +823,12 @@ namespace OpenNest.Forms
                     Quantity = drawing.Quantity.Required,
                     Customer = drawing.Customer ?? string.Empty,
                     Bends = drawing.Bends?.ToList() ?? new List<Bend>(),
-                    SuppressedEntityIds = drawing.SuppressedEntityIds.Count > 0
-                        ? new HashSet<Guid>(drawing.SuppressedEntityIds)
-                        : null,
+                    SuppressedEntityIds =
+                        drawing.SuppressedEntityIds.Count > 0
+                            ? new HashSet<Guid>(drawing.SuppressedEntityIds)
+                            : null,
                     Bounds = bounds,
-                    EntityCount = entities.Count
+                    EntityCount = entities.Count,
                 };
 
                 fileList.AddItem(item);
@@ -791,9 +845,7 @@ namespace OpenNest.Forms
 
             foreach (var item in fileList.Items)
             {
-                var visible = item.Entities
-                    .Where(e => e.Layer.IsVisible && e.IsVisible)
-                    .ToList();
+                var visible = item.Entities.Where(e => e.Layer.IsVisible && e.IsVisible).ToList();
 
                 if (visible.Count == 0)
                     continue;
@@ -809,9 +861,10 @@ namespace OpenNest.Forms
                     Name = item.Name,
                 };
 
-                var editedProgram = (item == CurrentItem && programEditor.IsDirty && programEditor.Program != null)
-                    ? programEditor.Program
-                    : null;
+                var editedProgram =
+                    (item == CurrentItem && programEditor.IsDirty && programEditor.Program != null)
+                        ? programEditor.Program
+                        : null;
 
                 var drawing = CadImporter.BuildDrawing(
                     result,
@@ -819,7 +872,8 @@ namespace OpenNest.Forms
                     result.Bends,
                     item.Quantity,
                     item.Customer,
-                    editedProgram);
+                    editedProgram
+                );
 
                 drawings.Add(drawing);
 
@@ -835,7 +889,8 @@ namespace OpenNest.Forms
 
         private static void ReHidePromotedEntities(List<Bend> bends)
         {
-            if (bends == null) return;
+            if (bends == null)
+                return;
             foreach (var bend in bends)
             {
                 if (bend.SourceEntity != null)
@@ -855,9 +910,7 @@ namespace OpenNest.Forms
             }
 
             // If all entities on a layer are suppressed, uncheck the layer too
-            var layerGroups = item.Entities
-                .Where(e => e.Layer != null)
-                .GroupBy(e => e.Layer);
+            var layerGroups = item.Entities.Where(e => e.Layer != null).GroupBy(e => e.Layer);
 
             foreach (var group in layerGroups)
             {
@@ -871,10 +924,11 @@ namespace OpenNest.Forms
             var bendSources = new HashSet<Entity>(
                 (item.Bends ?? new List<Bend>())
                     .Where(b => b.SourceEntity != null)
-                    .Select(b => b.SourceEntity));
+                    .Select(b => b.SourceEntity)
+            );
 
-            var suppressed = item.Entities
-                .Where(e => !(e.Layer.IsVisible && e.IsVisible))
+            var suppressed = item
+                .Entities.Where(e => !(e.Layer.IsVisible && e.IsVisible))
                 .Where(e => !bendSources.Contains(e))
                 .Select(e => e.Id);
 
@@ -893,12 +947,16 @@ namespace OpenNest.Forms
                 File.Delete(testFile);
                 return true;
             }
-            catch { return false; }
+            catch
+            {
+                return false;
+            }
         }
 
         private static string GetUniquePath(string path)
         {
-            if (!File.Exists(path)) return path;
+            if (!File.Exists(path))
+                return path;
 
             var dir = Path.GetDirectoryName(path);
             var name = Path.GetFileNameWithoutExtension(path);
@@ -919,7 +977,8 @@ namespace OpenNest.Forms
         private static List<CadText> ExtractTexts(ACadSharp.CadDocument doc)
         {
             var texts = new List<CadText>();
-            if (doc == null) return texts;
+            if (doc == null)
+                return texts;
 
             foreach (var entity in doc.Entities)
             {
@@ -927,47 +986,66 @@ namespace OpenNest.Forms
                 {
                     case ACadSharp.Entities.MText mtext:
                         var (mh, mv) = MapAttachmentPoint(mtext.AttachmentPoint);
-                        texts.Add(new CadText
-                        {
-                            SourceHandle = mtext.Handle,
-                            Position = new Vector(mtext.InsertPoint.X, mtext.InsertPoint.Y),
-                            Value = ReplaceControlCodes(StripMTextFormatting(mtext.Value)),
-                            Height = mtext.Height,
-                            Rotation = mtext.Rotation,
-                            LayerName = mtext.Layer?.Name,
-                            HAlign = mh,
-                            VAlign = mv,
-                        });
+                        texts.Add(
+                            new CadText
+                            {
+                                SourceHandle = mtext.Handle,
+                                Position = new Vector(mtext.InsertPoint.X, mtext.InsertPoint.Y),
+                                Value = ReplaceControlCodes(StripMTextFormatting(mtext.Value)),
+                                Height = mtext.Height,
+                                Rotation = mtext.Rotation,
+                                LayerName = mtext.Layer?.Name,
+                                HAlign = mh,
+                                VAlign = mv,
+                            }
+                        );
                         break;
 
                     case ACadSharp.Entities.TextEntity text:
-                        var useAlignment = text.HorizontalAlignment != 0
-                            || text.VerticalAlignment != 0;
+                        var useAlignment =
+                            text.HorizontalAlignment != 0 || text.VerticalAlignment != 0;
                         var pt = useAlignment ? text.AlignmentPoint : text.InsertPoint;
                         var ha = text.HorizontalAlignment switch
                         {
-                            ACadSharp.Entities.TextHorizontalAlignment.Center => System.Drawing.StringAlignment.Center,
-                            ACadSharp.Entities.TextHorizontalAlignment.Right => System.Drawing.StringAlignment.Far,
+                            ACadSharp.Entities.TextHorizontalAlignment.Center => System
+                                .Drawing
+                                .StringAlignment
+                                .Center,
+                            ACadSharp.Entities.TextHorizontalAlignment.Right => System
+                                .Drawing
+                                .StringAlignment
+                                .Far,
                             _ => System.Drawing.StringAlignment.Near,
                         };
                         var va = text.VerticalAlignment switch
                         {
-                            ACadSharp.Entities.TextVerticalAlignmentType.Middle => System.Drawing.StringAlignment.Center,
-                            ACadSharp.Entities.TextVerticalAlignmentType.Top => System.Drawing.StringAlignment.Near,
-                            ACadSharp.Entities.TextVerticalAlignmentType.Bottom => System.Drawing.StringAlignment.Far,
+                            ACadSharp.Entities.TextVerticalAlignmentType.Middle => System
+                                .Drawing
+                                .StringAlignment
+                                .Center,
+                            ACadSharp.Entities.TextVerticalAlignmentType.Top => System
+                                .Drawing
+                                .StringAlignment
+                                .Near,
+                            ACadSharp.Entities.TextVerticalAlignmentType.Bottom => System
+                                .Drawing
+                                .StringAlignment
+                                .Far,
                             _ => System.Drawing.StringAlignment.Far,
                         };
-                        texts.Add(new CadText
-                        {
-                            SourceHandle = text.Handle,
-                            Position = new Vector(pt.X, pt.Y),
-                            Value = ReplaceControlCodes(text.Value),
-                            Height = text.Height,
-                            Rotation = text.Rotation,
-                            LayerName = text.Layer?.Name,
-                            HAlign = ha,
-                            VAlign = va,
-                        });
+                        texts.Add(
+                            new CadText
+                            {
+                                SourceHandle = text.Handle,
+                                Position = new Vector(pt.X, pt.Y),
+                                Value = ReplaceControlCodes(text.Value),
+                                Height = text.Height,
+                                Rotation = text.Rotation,
+                                LayerName = text.Layer?.Name,
+                                HAlign = ha,
+                                VAlign = va,
+                            }
+                        );
                         break;
                 }
             }
@@ -975,27 +1053,41 @@ namespace OpenNest.Forms
             return texts;
         }
 
-        private static (System.Drawing.StringAlignment h, System.Drawing.StringAlignment v) MapAttachmentPoint(
-            ACadSharp.Entities.AttachmentPointType apt)
+        private static (
+            System.Drawing.StringAlignment h,
+            System.Drawing.StringAlignment v
+        ) MapAttachmentPoint(ACadSharp.Entities.AttachmentPointType apt)
         {
             var h = apt switch
             {
                 ACadSharp.Entities.AttachmentPointType.TopCenter
-                    or ACadSharp.Entities.AttachmentPointType.MiddleCenter
-                    or ACadSharp.Entities.AttachmentPointType.BottomCenter => System.Drawing.StringAlignment.Center,
+                or ACadSharp.Entities.AttachmentPointType.MiddleCenter
+                or ACadSharp.Entities.AttachmentPointType.BottomCenter => System
+                    .Drawing
+                    .StringAlignment
+                    .Center,
                 ACadSharp.Entities.AttachmentPointType.TopRight
-                    or ACadSharp.Entities.AttachmentPointType.MiddleRight
-                    or ACadSharp.Entities.AttachmentPointType.BottomRight => System.Drawing.StringAlignment.Far,
+                or ACadSharp.Entities.AttachmentPointType.MiddleRight
+                or ACadSharp.Entities.AttachmentPointType.BottomRight => System
+                    .Drawing
+                    .StringAlignment
+                    .Far,
                 _ => System.Drawing.StringAlignment.Near,
             };
             var v = apt switch
             {
                 ACadSharp.Entities.AttachmentPointType.MiddleLeft
-                    or ACadSharp.Entities.AttachmentPointType.MiddleCenter
-                    or ACadSharp.Entities.AttachmentPointType.MiddleRight => System.Drawing.StringAlignment.Center,
+                or ACadSharp.Entities.AttachmentPointType.MiddleCenter
+                or ACadSharp.Entities.AttachmentPointType.MiddleRight => System
+                    .Drawing
+                    .StringAlignment
+                    .Center,
                 ACadSharp.Entities.AttachmentPointType.BottomLeft
-                    or ACadSharp.Entities.AttachmentPointType.BottomCenter
-                    or ACadSharp.Entities.AttachmentPointType.BottomRight => System.Drawing.StringAlignment.Far,
+                or ACadSharp.Entities.AttachmentPointType.BottomCenter
+                or ACadSharp.Entities.AttachmentPointType.BottomRight => System
+                    .Drawing
+                    .StringAlignment
+                    .Far,
                 _ => System.Drawing.StringAlignment.Near,
             };
             return (h, v);
@@ -1003,17 +1095,22 @@ namespace OpenNest.Forms
 
         private static string StripMTextFormatting(string text)
         {
-            if (string.IsNullOrEmpty(text)) return text;
-            var result = System.Text.RegularExpressions.Regex.Replace(text, @"\\[A-Za-z][^;]*;", "");
+            if (string.IsNullOrEmpty(text))
+                return text;
+            var result = System.Text.RegularExpressions.Regex.Replace(
+                text,
+                @"\\[A-Za-z][^;]*;",
+                ""
+            );
             result = result.Replace("{", "").Replace("}", "");
             return result.Trim();
         }
 
         private static string ReplaceControlCodes(string text)
         {
-            if (string.IsNullOrEmpty(text)) return text;
-            return text
-                .Replace("%%p", "±")
+            if (string.IsNullOrEmpty(text))
+                return text;
+            return text.Replace("%%p", "±")
                 .Replace("%%P", "±")
                 .Replace("%%d", "°")
                 .Replace("%%D", "°")
@@ -1022,9 +1119,6 @@ namespace OpenNest.Forms
                 .Replace("%%%", "%");
         }
 
-        private void filterPanel_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
+        private void filterPanel_Paint(object sender, PaintEventArgs e) { }
     }
 }

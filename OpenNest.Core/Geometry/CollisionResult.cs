@@ -5,9 +5,17 @@ namespace OpenNest.Geometry
 {
     public class CollisionResult
     {
-        public static readonly CollisionResult None = new(false, new List<Polygon>(), new List<Vector>());
+        public static readonly CollisionResult None = new(
+            false,
+            new List<Polygon>(),
+            new List<Vector>()
+        );
 
-        public CollisionResult(bool overlaps, List<Polygon> overlapRegions, List<Vector> intersectionPoints)
+        public CollisionResult(
+            bool overlaps,
+            List<Polygon> overlapRegions,
+            List<Vector> intersectionPoints
+        )
         {
             Overlaps = overlaps;
             OverlapRegions = overlapRegions;

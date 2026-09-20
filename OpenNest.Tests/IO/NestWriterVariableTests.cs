@@ -13,7 +13,8 @@ public class NestWriterVariableTests
     public void RoundTrip_VariableDefinitions_Preserved()
     {
         var nest = CreateNestWithVariableProgram(
-            "width = 48.0 global\ndiameter = 0.3\nG90\nG01X$widthY$diameter");
+            "width = 48.0 global\ndiameter = 0.3\nG90\nG01X$widthY$diameter"
+        );
 
         var loaded = RoundTrip(nest);
         var pgm = loaded.Drawings.First().Program;
@@ -28,8 +29,7 @@ public class NestWriterVariableTests
     [Fact]
     public void RoundTrip_VariableRefs_Preserved()
     {
-        var nest = CreateNestWithVariableProgram(
-            "width = 48.0\nG90\nG01X$widthY0");
+        var nest = CreateNestWithVariableProgram("width = 48.0\nG90\nG01X$widthY0");
 
         var loaded = RoundTrip(nest);
         var pgm = loaded.Drawings.First().Program;
@@ -43,8 +43,7 @@ public class NestWriterVariableTests
     [Fact]
     public void RoundTrip_InlineFlag_Preserved()
     {
-        var nest = CreateNestWithVariableProgram(
-            "kerf = 0.06 inline\nG90\nG01X1Y0");
+        var nest = CreateNestWithVariableProgram("kerf = 0.06 inline\nG90\nG01X1Y0");
 
         var loaded = RoundTrip(nest);
         var pgm = loaded.Drawings.First().Program;

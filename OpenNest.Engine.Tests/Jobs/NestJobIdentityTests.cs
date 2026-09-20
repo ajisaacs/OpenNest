@@ -16,17 +16,22 @@ public class NestJobIdentityTests
     {
         var a = new Drawing("identical", TestDrawingFactory.Rectangle(40, 40));
         var b = new Drawing("identical", TestDrawingFactory.Rectangle(40, 40));
-        var job = new NestJob(new[]
-        {
-            DrawingJobMapper.FromDrawing("a", a, 2),
-            DrawingJobMapper.FromDrawing("b", b, 2)
-        }, new[] { new NestPlateStock("s", new Size(90, 90), 1) });
+        var job = new NestJob(
+            new[]
+            {
+                DrawingJobMapper.FromDrawing("a", a, 2),
+                DrawingJobMapper.FromDrawing("b", b, 2),
+            },
+            new[] { new NestPlateStock("s", new Size(90, 90), 1) }
+        );
 
         var result = new NestJobRunner(LegacyPlateNesterAdapter.Create).Solve(job);
 
         // Every placed part maps to a known requirement ID; no part is invented or cross-counted.
         Assert.True(result.Plates.SelectMany(p => p.Placements).All(p => p.PartId is "a" or "b"));
-        var counts = result.Plates.SelectMany(p => p.Placements).GroupBy(p => p.PartId)
+        var counts = result
+            .Plates.SelectMany(p => p.Placements)
+            .GroupBy(p => p.PartId)
             .ToDictionary(g => g.Key, g => g.Count());
         foreach (var (id, placed) in counts)
             Assert.True(placed <= 2, $"Requirement {id} placed {placed} > requested 2");
@@ -40,11 +45,14 @@ public class NestJobIdentityTests
     public void TwoRequirementsOnSameSourceDrawingKeepIndependentQuantities()
     {
         var source = new Drawing("shared", TestDrawingFactory.Rectangle(30, 30));
-        var job = new NestJob(new[]
-        {
-            DrawingJobMapper.FromDrawing("first", source, 2),
-            DrawingJobMapper.FromDrawing("second", source, 2)
-        }, new[] { new NestPlateStock("s", new Size(90, 90), 1) });
+        var job = new NestJob(
+            new[]
+            {
+                DrawingJobMapper.FromDrawing("first", source, 2),
+                DrawingJobMapper.FromDrawing("second", source, 2),
+            },
+            new[] { new NestPlateStock("s", new Size(90, 90), 1) }
+        );
 
         var result = new NestJobRunner(LegacyPlateNesterAdapter.Create).Solve(job);
 
@@ -72,7 +80,7 @@ public class NestJobIdentityTests
         var items = new List<NestItem>
         {
             new() { Drawing = a, Quantity = 2 },
-            new() { Drawing = b, Quantity = 2 }
+            new() { Drawing = b, Quantity = 2 },
         };
         // Place exactly 2 parts from item A and none from item B, then run the base-class
         // deduction. Deterministic regardless of any fill heuristic.
@@ -99,7 +107,7 @@ public class NestJobIdentityTests
         var items = new List<NestItem>
         {
             new() { Drawing = a, Quantity = 1 },
-            new() { Drawing = b, Quantity = 1 }
+            new() { Drawing = b, Quantity = 1 },
         };
         var placed = new BaseNestEngineProbe(plate).Nest(items, null, default);
         Assert.Equal(2, placed.Count);
@@ -110,15 +118,27 @@ public class NestJobIdentityTests
     {
         public override string Name => "probe";
         public override string Description => "probe";
-        public override List<Part> Fill(NestItem item, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
-            => new DefaultNestEngine(Plate).Fill(item, workArea, progress, token);
-        public override List<Part> Fill(List<Part> groupParts, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
-            => new DefaultNestEngine(Plate).Fill(groupParts, workArea, progress, token);
-        public override List<Part> PackArea(Box box, List<NestItem> items,
-            IProgress<NestProgress> progress, CancellationToken token)
-            => new DefaultNestEngine(Plate).PackArea(box, items, progress, token);
+
+        public override List<Part> Fill(
+            NestItem item,
+            Box workArea,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        ) => new DefaultNestEngine(Plate).Fill(item, workArea, progress, token);
+
+        public override List<Part> Fill(
+            List<Part> groupParts,
+            Box workArea,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        ) => new DefaultNestEngine(Plate).Fill(groupParts, workArea, progress, token);
+
+        public override List<Part> PackArea(
+            Box box,
+            List<NestItem> items,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        ) => new DefaultNestEngine(Plate).PackArea(box, items, progress, token);
     }
 
     /// <summary>Places exactly 2 parts from the first multi-quantity item and none from the
@@ -128,10 +148,16 @@ public class NestJobIdentityTests
         private int _first = -1;
         public override string Name => "starving";
         public override string Description => "starves all but the first fill item";
-        public override List<Part> Fill(NestItem item, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
+
+        public override List<Part> Fill(
+            NestItem item,
+            Box workArea,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
-            if (_first < 0) _first = 1;
+            if (_first < 0)
+                _first = 1;
             if (_first++ != 1)
                 return new List<Part>();
             var parts = new List<Part>();

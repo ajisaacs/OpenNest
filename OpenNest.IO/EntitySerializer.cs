@@ -1,7 +1,7 @@
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Geometry;
 using static OpenNest.IO.NestFormat;
 
 namespace OpenNest.IO
@@ -13,7 +13,7 @@ namespace OpenNest.IO
             return new EntitySetDto
             {
                 Entities = entities.Select(ToEntityDto).ToList(),
-                Suppressed = suppressed.Select(id => id.ToString()).ToList()
+                Suppressed = suppressed.Select(id => id.ToString()).ToList(),
             };
         }
 
@@ -39,7 +39,7 @@ namespace OpenNest.IO
                         X1 = line.StartPoint.X,
                         Y1 = line.StartPoint.Y,
                         X2 = line.EndPoint.X,
-                        Y2 = line.EndPoint.Y
+                        Y2 = line.EndPoint.Y,
                     };
 
                 case EntityType.Arc:
@@ -55,7 +55,7 @@ namespace OpenNest.IO
                         R = arc.Radius,
                         StartAngle = arc.StartAngle,
                         EndAngle = arc.EndAngle,
-                        Reversed = arc.IsReversed
+                        Reversed = arc.IsReversed,
                     };
 
                 case EntityType.Circle:
@@ -69,11 +69,13 @@ namespace OpenNest.IO
                         CX = circle.Center.X,
                         CY = circle.Center.Y,
                         R = circle.Radius,
-                        Rotation = circle.Rotation == RotationType.CW ? "CW" : "CCW"
+                        Rotation = circle.Rotation == RotationType.CW ? "CW" : "CCW",
                     };
 
                 default:
-                    throw new NotSupportedException($"Entity type {entity.Type} is not supported for serialization.");
+                    throw new NotSupportedException(
+                        $"Entity type {entity.Type} is not supported for serialization."
+                    );
             }
         }
 
@@ -84,9 +86,7 @@ namespace OpenNest.IO
             switch (dto.Type)
             {
                 case "line":
-                    entity = new Line(
-                        new Vector(dto.X1, dto.Y1),
-                        new Vector(dto.X2, dto.Y2));
+                    entity = new Line(new Vector(dto.X1, dto.Y1), new Vector(dto.X2, dto.Y2));
                     break;
 
                 case "arc":
@@ -95,7 +95,8 @@ namespace OpenNest.IO
                         dto.R,
                         dto.StartAngle,
                         dto.EndAngle,
-                        dto.Reversed);
+                        dto.Reversed
+                    );
                     break;
 
                 case "circle":
@@ -105,7 +106,9 @@ namespace OpenNest.IO
                     break;
 
                 default:
-                    throw new NotSupportedException($"Entity type '{dto.Type}' is not supported for deserialization.");
+                    throw new NotSupportedException(
+                        $"Entity type '{dto.Type}' is not supported for deserialization."
+                    );
             }
 
             entity.Id = Guid.Parse(dto.Id);

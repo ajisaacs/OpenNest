@@ -1,7 +1,7 @@
-﻿using OpenNest.CNC;
+﻿using System.Collections.Generic;
+using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Converters
 {
@@ -18,7 +18,12 @@ namespace OpenNest.Converters
             return geometry;
         }
 
-        private static void AddProgram(Program program, ref Mode mode, ref Vector curpos, ref List<Entity> geometry)
+        private static void AddProgram(
+            Program program,
+            ref Mode mode,
+            ref Vector curpos,
+            ref List<Entity> geometry
+        )
         {
             // Capture the frame origin at entry. Sub-program Offsets are relative
             // to this fixed origin, not to the current tool position.
@@ -49,7 +54,10 @@ namespace OpenNest.Converters
 
                         // The sub-program's frame origin in this program's frame is
                         // frameOrigin + Offset — independent of current tool position.
-                        curpos = new Vector(frameOrigin.X + subpgm.Offset.X, frameOrigin.Y + subpgm.Offset.Y);
+                        curpos = new Vector(
+                            frameOrigin.X + subpgm.Offset.X,
+                            frameOrigin.Y + subpgm.Offset.Y
+                        );
 
                         AddProgram(subpgm.Program, ref mode, ref curpos, ref geometry);
                         mode = savedMode;
@@ -58,7 +66,12 @@ namespace OpenNest.Converters
             }
         }
 
-        private static void AddLinearMove(LinearMove linearMove, ref Mode mode, ref Vector curpos, ref List<Entity> geometry)
+        private static void AddLinearMove(
+            LinearMove linearMove,
+            ref Mode mode,
+            ref Vector curpos,
+            ref List<Entity> geometry
+        )
         {
             var pt = linearMove.EndPoint;
 
@@ -66,16 +79,17 @@ namespace OpenNest.Converters
                 pt += curpos;
 
             var layer = ConvertLayer(linearMove.Layer);
-            var line = new Line(curpos, pt)
-            {
-                Layer = layer,
-                Color = layer.Color
-            };
+            var line = new Line(curpos, pt) { Layer = layer, Color = layer.Color };
             geometry.Add(line);
             curpos = pt;
         }
 
-        private static void AddRapidMove(RapidMove rapidMove, ref Mode mode, ref Vector curpos, ref List<Entity> geometry)
+        private static void AddRapidMove(
+            RapidMove rapidMove,
+            ref Mode mode,
+            ref Vector curpos,
+            ref List<Entity> geometry
+        )
         {
             var pt = rapidMove.EndPoint;
 
@@ -85,13 +99,18 @@ namespace OpenNest.Converters
             var line = new Line(curpos, pt)
             {
                 Layer = SpecialLayers.Rapid,
-                Color = SpecialLayers.Rapid.Color
+                Color = SpecialLayers.Rapid.Color,
             };
             geometry.Add(line);
             curpos = pt;
         }
 
-        private static void AddArcMove(ArcMove arcMove, ref Mode mode, ref Vector curpos, ref List<Entity> geometry)
+        private static void AddArcMove(
+            ArcMove arcMove,
+            ref Mode mode,
+            ref Vector curpos,
+            ref List<Entity> geometry
+        )
         {
             var center = arcMove.CenterPoint;
             var endpt = arcMove.EndPoint;
@@ -112,9 +131,28 @@ namespace OpenNest.Converters
             var layer = ConvertLayer(arcMove.Layer);
 
             if (startAngle.IsEqualTo(endAngle))
-                geometry.Add(new Circle(center, radius) { Layer = layer, Color = layer.Color, Rotation = arcMove.Rotation });
+                geometry.Add(
+                    new Circle(center, radius)
+                    {
+                        Layer = layer,
+                        Color = layer.Color,
+                        Rotation = arcMove.Rotation,
+                    }
+                );
             else
-                geometry.Add(new Arc(center, radius, startAngle, endAngle, arcMove.Rotation == RotationType.CW) { Layer = layer, Color = layer.Color });
+                geometry.Add(
+                    new Arc(
+                        center,
+                        radius,
+                        startAngle,
+                        endAngle,
+                        arcMove.Rotation == RotationType.CW
+                    )
+                    {
+                        Layer = layer,
+                        Color = layer.Color,
+                    }
+                );
 
             curpos = endpt;
         }

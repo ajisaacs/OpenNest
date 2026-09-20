@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -9,14 +9,18 @@ namespace OpenNest.Engine.BestFit
 
         private static readonly (double DirX, double DirY)[] PushDirections =
         {
-            (-1, 0),  // Left
-            (0, -1),  // Down
-            (1, 0),   // Right
-            (0, 1)    // Up
+            (-1, 0), // Left
+            (0, -1), // Down
+            (1, 0), // Right
+            (0, 1), // Up
         };
 
-        public RotationSlideStrategy(double part2Rotation, int strategyIndex, string description,
-            IDistanceComputer distanceComputer)
+        public RotationSlideStrategy(
+            double part2Rotation,
+            int strategyIndex,
+            string description,
+            IDistanceComputer distanceComputer
+        )
         {
             Part2Rotation = part2Rotation;
             StrategyIndex = strategyIndex;
@@ -28,7 +32,11 @@ namespace OpenNest.Engine.BestFit
         public int StrategyIndex { get; }
         public string Description { get; }
 
-        public List<PairCandidate> GenerateCandidates(Drawing drawing, double spacing, double stepSize)
+        public List<PairCandidate> GenerateCandidates(
+            Drawing drawing,
+            double spacing,
+            double stepSize
+        )
         {
             var candidates = new List<PairCandidate>();
 
@@ -48,7 +56,10 @@ namespace OpenNest.Engine.BestFit
                 return candidates;
 
             var distances = _distanceComputer.ComputeDistances(
-                part1Entities, part2Entities, offsets);
+                part1Entities,
+                part2Entities,
+                offsets
+            );
 
             var testNumber = 0;
 
@@ -60,24 +71,32 @@ namespace OpenNest.Engine.BestFit
 
                 var finalPosition = new Vector(
                     part2Template.Location.X + offsets[i].Dx + offsets[i].DirX * slideDist,
-                    part2Template.Location.Y + offsets[i].Dy + offsets[i].DirY * slideDist);
+                    part2Template.Location.Y + offsets[i].Dy + offsets[i].DirY * slideDist
+                );
 
-                candidates.Add(new PairCandidate
-                {
-                    Drawing = drawing,
-                    Part1Rotation = 0,
-                    Part2Rotation = Part2Rotation,
-                    Part2Offset = finalPosition,
-                    StrategyIndex = StrategyIndex,
-                    TestNumber = testNumber++,
-                    Spacing = spacing
-                });
+                candidates.Add(
+                    new PairCandidate
+                    {
+                        Drawing = drawing,
+                        Part1Rotation = 0,
+                        Part2Rotation = Part2Rotation,
+                        Part2Offset = finalPosition,
+                        StrategyIndex = StrategyIndex,
+                        TestNumber = testNumber++,
+                        Spacing = spacing,
+                    }
+                );
             }
 
             return candidates;
         }
 
-        private static SlideOffset[] BuildOffsets(Box bbox1, Box bbox2, double spacing, double stepSize)
+        private static SlideOffset[] BuildOffsets(
+            Box bbox1,
+            Box bbox2,
+            double spacing,
+            double stepSize
+        )
         {
             var offsets = new List<SlideOffset>();
 
@@ -85,7 +104,9 @@ namespace OpenNest.Engine.BestFit
             {
                 var isHorizontalPush = System.Math.Abs(dirX) > System.Math.Abs(dirY);
 
-                double perpMin, perpMax, pushStartOffset;
+                double perpMin,
+                    perpMax,
+                    pushStartOffset;
 
                 if (isHorizontalPush)
                 {

@@ -1,12 +1,12 @@
-﻿using OpenNest.Bending;
-using OpenNest.CNC;
-using OpenNest.Converters;
-using OpenNest.Geometry;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
+using OpenNest.Bending;
+using OpenNest.CNC;
+using OpenNest.Converters;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -18,18 +18,18 @@ namespace OpenNest
 
         public static Color[] PartColors = new Color[]
         {
-            Color.FromArgb(205, 92, 92),    // Indian Red
-            Color.FromArgb(148, 103, 189),  // Medium Purple
-            Color.FromArgb(75, 180, 175),   // Teal
-            Color.FromArgb(210, 190, 75),   // Goldenrod
-            Color.FromArgb(190, 85, 175),   // Orchid
-            Color.FromArgb(185, 115, 85),   // Sienna
-            Color.FromArgb(120, 100, 190),  // Slate Blue
-            Color.FromArgb(200, 100, 140),  // Rose
-            Color.FromArgb(80, 175, 155),   // Sea Green
-            Color.FromArgb(195, 160, 85),   // Dark Khaki
-            Color.FromArgb(175, 95, 160),   // Plum
-            Color.FromArgb(215, 130, 130),  // Light Coral
+            Color.FromArgb(205, 92, 92), // Indian Red
+            Color.FromArgb(148, 103, 189), // Medium Purple
+            Color.FromArgb(75, 180, 175), // Teal
+            Color.FromArgb(210, 190, 75), // Goldenrod
+            Color.FromArgb(190, 85, 175), // Orchid
+            Color.FromArgb(185, 115, 85), // Sienna
+            Color.FromArgb(120, 100, 190), // Slate Blue
+            Color.FromArgb(200, 100, 140), // Rose
+            Color.FromArgb(80, 175, 155), // Sea Green
+            Color.FromArgb(195, 160, 85), // Dark Khaki
+            Color.FromArgb(175, 95, 160), // Plum
+            Color.FromArgb(215, 130, 130), // Light Coral
         };
 
         public static Color GetNextColor()
@@ -40,14 +40,10 @@ namespace OpenNest
         }
 
         public Drawing()
-            : this(string.Empty, new Program())
-        {
-        }
+            : this(string.Empty, new Program()) { }
 
         public Drawing(string name)
-            : this(name, new Program())
-        {
-        }
+            : this(name, new Program()) { }
 
         public Drawing(string name, Program pgm)
         {
@@ -127,7 +123,9 @@ namespace OpenNest
 
         public void UpdateArea()
         {
-            var geometry = ConvertProgram.ToGeometry(Program).Where(entity => entity.Layer != SpecialLayers.Rapid);
+            var geometry = ConvertProgram
+                .ToGeometry(Program)
+                .Where(entity => entity.Layer != SpecialLayers.Rapid);
             var shapes = ShapeBuilder.GetShapes(geometry);
 
             if (shapes.Count == 0)

@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -10,8 +10,11 @@ namespace OpenNest.CNC.CuttingStrategy
         public double ApproachAngle { get; set; } = 135.0;
         public double ArcRadius { get; set; }
 
-        public override List<ICode> Generate(Vector contourStartPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+        public override List<ICode> Generate(
+            Vector contourStartPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
             var piercePoint = GetPiercePoint(contourStartPoint, contourNormalAngle);
 
@@ -22,13 +25,14 @@ namespace OpenNest.CNC.CuttingStrategy
             var lineAngle = contourNormalAngle + Angle.ToRadians(ApproachAngle);
             var arcStart = new Vector(
                 arcCenterX + ArcRadius * System.Math.Cos(lineAngle),
-                arcCenterY + ArcRadius * System.Math.Sin(lineAngle));
+                arcCenterY + ArcRadius * System.Math.Sin(lineAngle)
+            );
 
             return new List<ICode>
             {
                 new RapidMove(piercePoint),
                 new LinearMove(arcStart) { Layer = LayerType.Leadin },
-                new ArcMove(contourStartPoint, arcCenter, winding) { Layer = LayerType.Leadin }
+                new ArcMove(contourStartPoint, arcCenter, winding) { Layer = LayerType.Leadin },
             };
         }
 
@@ -43,10 +47,16 @@ namespace OpenNest.CNC.CuttingStrategy
 
             return new Vector(
                 arcStartX + LineLength * System.Math.Cos(lineAngle),
-                arcStartY + LineLength * System.Math.Sin(lineAngle));
+                arcStartY + LineLength * System.Math.Sin(lineAngle)
+            );
         }
 
         public override LeadIn Scale(double factor) =>
-            new LineArcLeadIn { LineLength = LineLength * factor, ArcRadius = ArcRadius * factor, ApproachAngle = ApproachAngle };
+            new LineArcLeadIn
+            {
+                LineLength = LineLength * factor,
+                ArcRadius = ArcRadius * factor,
+                ApproachAngle = ApproachAngle,
+            };
     }
 }

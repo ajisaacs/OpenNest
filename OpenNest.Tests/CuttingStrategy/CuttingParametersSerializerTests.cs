@@ -12,7 +12,7 @@ public class CuttingParametersSerializerTests
         {
             AutoTabMinSize = 0.5,
             AutoTabMaxSize = 3.0,
-            ExternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
         };
 
         var json = CuttingParametersSerializer.Serialize(original);
@@ -25,7 +25,8 @@ public class CuttingParametersSerializerTests
     [Fact]
     public void Deserialize_MissingAutoTabFields_DefaultsToZero()
     {
-        var json = "{\"externalLeadIn\":{\"type\":\"None\"},\"externalLeadOut\":{\"type\":\"None\"},\"internalLeadIn\":{\"type\":\"None\"},\"internalLeadOut\":{\"type\":\"None\"},\"arcCircleLeadIn\":{\"type\":\"None\"},\"arcCircleLeadOut\":{\"type\":\"None\"},\"tabsEnabled\":false,\"tabWidth\":0.25,\"pierceClearance\":0.0625}";
+        var json =
+            "{\"externalLeadIn\":{\"type\":\"None\"},\"externalLeadOut\":{\"type\":\"None\"},\"internalLeadIn\":{\"type\":\"None\"},\"internalLeadOut\":{\"type\":\"None\"},\"arcCircleLeadIn\":{\"type\":\"None\"},\"arcCircleLeadOut\":{\"type\":\"None\"},\"tabsEnabled\":false,\"tabWidth\":0.25,\"pierceClearance\":0.0625}";
 
         var restored = CuttingParametersSerializer.Deserialize(json);
 

@@ -1,10 +1,9 @@
-﻿
-namespace OpenNest
+﻿namespace OpenNest
 {
     public enum Units
     {
         Inches,
-        Millimeters
+        Millimeters,
     }
 
     public static class UnitsHelper

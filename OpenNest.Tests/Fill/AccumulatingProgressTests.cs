@@ -7,6 +7,7 @@ public class AccumulatingProgressTests
     private class CapturingProgress : IProgress<NestProgress>
     {
         public NestProgress Last { get; private set; }
+
         public void Report(NestProgress value) => Last = value;
     }
 

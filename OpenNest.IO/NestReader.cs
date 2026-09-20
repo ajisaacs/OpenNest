@@ -1,7 +1,3 @@
-using OpenNest.Bending;
-using OpenNest.CNC;
-using OpenNest.Engine.BestFit;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -9,6 +5,10 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using OpenNest.Bending;
+using OpenNest.CNC;
+using OpenNest.Engine.BestFit;
+using OpenNest.Geometry;
 using static OpenNest.IO.NestFormat;
 
 namespace OpenNest.IO
@@ -49,7 +49,8 @@ namespace OpenNest.IO
 
         private string ReadEntry(string name)
         {
-            var entry = zipArchive.GetEntry(name)
+            var entry =
+                zipArchive.GetEntry(name)
                 ?? throw new InvalidDataException($"Nest file is missing required entry '{name}'.");
             using var entryStream = entry.Open();
             using var reader = new StreamReader(entryStream);
@@ -62,7 +63,8 @@ namespace OpenNest.IO
             for (var i = 1; i <= count; i++)
             {
                 var entry = zipArchive.GetEntry($"programs/program-{i}");
-                if (entry == null) continue;
+                if (entry == null)
+                    continue;
 
                 using var entryStream = entry.Open();
                 var memStream = new MemoryStream();
@@ -120,7 +122,10 @@ namespace OpenNest.IO
             // Wire up SubProgramCall.Program references
             foreach (var code in parent.Codes)
             {
-                if (code is SubProgramCall call && parent.SubPrograms.TryGetValue(call.Id, out var sub))
+                if (
+                    code is SubProgramCall call
+                    && parent.SubPrograms.TryGetValue(call.Id, out var sub)
+                )
                     call.Program = sub;
             }
         }
@@ -133,13 +138,16 @@ namespace OpenNest.IO
             return reader.Read();
         }
 
-        private Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> ReadEntitySets(int count)
+        private Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> ReadEntitySets(
+            int count
+        )
         {
             var result = new Dictionary<int, (List<Entity>, HashSet<Guid>)>();
             for (var i = 1; i <= count; i++)
             {
                 var entry = zipArchive.GetEntry($"entities/entities-{i}");
-                if (entry == null) continue;
+                if (entry == null)
+                    continue;
 
                 using var entryStream = entry.Open();
                 using var reader = new StreamReader(entryStream);
@@ -150,8 +158,11 @@ namespace OpenNest.IO
             return result;
         }
 
-        private Dictionary<int, Drawing> BuildDrawings(NestDto dto, Dictionary<int, Program> programs,
-            Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> entitySets)
+        private Dictionary<int, Drawing> BuildDrawings(
+            NestDto dto,
+            Dictionary<int, Program> programs,
+            Dictionary<int, (List<Entity> entities, HashSet<Guid> suppressed)> entitySets
+        )
         {
             var map = new Dictionary<int, Drawing>();
             foreach (var d in dto.Drawings)
@@ -165,7 +176,11 @@ namespace OpenNest.IO
                 drawing.Constraints.StartAngle = d.Constraints.StartAngle;
                 drawing.Constraints.EndAngle = d.Constraints.EndAngle;
                 drawing.Constraints.Allow180Equivalent = d.Constraints.Allow180Equivalent;
-                drawing.Material = new Material(d.Material.Name, d.Material.Grade, d.Material.Density);
+                drawing.Material = new Material(
+                    d.Material.Name,
+                    d.Material.Grade,
+                    d.Material.Density
+                );
                 drawing.Source.Path = d.Source.Path;
                 drawing.Source.Offset = new Vector(d.Source.Offset.X, d.Source.Offset.Y);
 
@@ -173,16 +188,23 @@ namespace OpenNest.IO
                 {
                     foreach (var b in d.Bends)
                     {
-                        drawing.Bends.Add(new Bend
-                        {
-                            StartPoint = new Vector(b.StartX, b.StartY),
-                            EndPoint = new Vector(b.EndX, b.EndY),
-                            Direction = Enum.TryParse<BendDirection>(b.Direction, true, out var dir)
-                                ? dir : BendDirection.Unknown,
-                            Angle = b.Angle,
-                            Radius = b.Radius,
-                            NoteText = b.NoteText
-                        });
+                        drawing.Bends.Add(
+                            new Bend
+                            {
+                                StartPoint = new Vector(b.StartX, b.StartY),
+                                EndPoint = new Vector(b.EndX, b.EndY),
+                                Direction = Enum.TryParse<BendDirection>(
+                                    b.Direction,
+                                    true,
+                                    out var dir
+                                )
+                                    ? dir
+                                    : BendDirection.Unknown,
+                                Angle = b.Angle,
+                                Radius = b.Radius,
+                                NoteText = b.NoteText,
+                            }
+                        );
                     }
                 }
 
@@ -205,14 +227,16 @@ namespace OpenNest.IO
             foreach (var kvp in drawingMap)
             {
                 var entry = zipArchive.GetEntry($"bestfits/bestfit-{kvp.Key}");
-                if (entry == null) continue;
+                if (entry == null)
+                    continue;
 
                 using var entryStream = entry.Open();
                 using var reader = new StreamReader(entryStream);
                 var json = reader.ReadToEnd();
 
                 var sets = JsonSerializer.Deserialize<List<BestFitSetDto>>(json, JsonOptions);
-                if (sets == null) continue;
+                if (sets == null)
+                    continue;
 
                 PopulateBestFitSets(kvp.Value, sets);
             }
@@ -222,29 +246,37 @@ namespace OpenNest.IO
         {
             foreach (var set in sets)
             {
-                var results = set.Results.Select(r => new BestFitResult
-                {
-                    Candidate = new PairCandidate
+                var results = set
+                    .Results.Select(r => new BestFitResult
                     {
-                        Drawing = drawing,
-                        Part1Rotation = r.Part1Rotation,
-                        Part2Rotation = r.Part2Rotation,
-                        Part2Offset = new Vector(r.Part2OffsetX, r.Part2OffsetY),
-                        StrategyIndex = r.StrategyType,
-                        TestNumber = r.TestNumber,
-                        Spacing = r.CandidateSpacing
-                    },
-                    RotatedArea = r.RotatedArea,
-                    BoundingWidth = r.BoundingWidth,
-                    BoundingHeight = r.BoundingHeight,
-                    OptimalRotation = r.OptimalRotation,
-                    Keep = r.Keep,
-                    Reason = r.Reason,
-                    TrueArea = r.TrueArea,
-                    HullAngles = r.HullAngles
-                }).ToList();
+                        Candidate = new PairCandidate
+                        {
+                            Drawing = drawing,
+                            Part1Rotation = r.Part1Rotation,
+                            Part2Rotation = r.Part2Rotation,
+                            Part2Offset = new Vector(r.Part2OffsetX, r.Part2OffsetY),
+                            StrategyIndex = r.StrategyType,
+                            TestNumber = r.TestNumber,
+                            Spacing = r.CandidateSpacing,
+                        },
+                        RotatedArea = r.RotatedArea,
+                        BoundingWidth = r.BoundingWidth,
+                        BoundingHeight = r.BoundingHeight,
+                        OptimalRotation = r.OptimalRotation,
+                        Keep = r.Keep,
+                        Reason = r.Reason,
+                        TrueArea = r.TrueArea,
+                        HullAngles = r.HullAngles,
+                    })
+                    .ToList();
 
-                BestFitCache.Populate(drawing, set.PlateWidth, set.PlateHeight, set.Spacing, results);
+                BestFitCache.Populate(
+                    drawing,
+                    set.PlateWidth,
+                    set.PlateHeight,
+                    set.Spacing,
+                    results
+                );
             }
         }
 
@@ -273,18 +305,25 @@ namespace OpenNest.IO
             nest.PlateDefaults.Size = new OpenNest.Geometry.Size(pd.Size.Width, pd.Size.Length);
             nest.PlateDefaults.Quadrant = pd.Quadrant;
             nest.PlateDefaults.PartSpacing = pd.PartSpacing;
-            nest.PlateDefaults.EdgeSpacing = new Spacing(pd.EdgeSpacing.Left, pd.EdgeSpacing.Bottom, pd.EdgeSpacing.Right, pd.EdgeSpacing.Top);
+            nest.PlateDefaults.EdgeSpacing = new Spacing(
+                pd.EdgeSpacing.Left,
+                pd.EdgeSpacing.Bottom,
+                pd.EdgeSpacing.Right,
+                pd.EdgeSpacing.Top
+            );
 
             // Plate optimizer settings
             nest.SalvageRate = dto.SalvageRate;
             if (dto.PlateOptions != null)
             {
-                nest.PlateOptions = dto.PlateOptions.Select(o => new PlateOption
-                {
-                    Width = o.Width,
-                    Length = o.Length,
-                    Cost = o.Cost,
-                }).ToList();
+                nest.PlateOptions = dto
+                    .PlateOptions.Select(o => new PlateOption
+                    {
+                        Width = o.Width,
+                        Length = o.Length,
+                        Cost = o.Cost,
+                    })
+                    .ToList();
             }
 
             // Drawings
@@ -299,7 +338,12 @@ namespace OpenNest.IO
                 plate.Quadrant = p.Quadrant;
                 plate.Quantity = p.Quantity;
                 plate.PartSpacing = p.PartSpacing;
-                plate.EdgeSpacing = new Spacing(p.EdgeSpacing.Left, p.EdgeSpacing.Bottom, p.EdgeSpacing.Right, p.EdgeSpacing.Top);
+                plate.EdgeSpacing = new Spacing(
+                    p.EdgeSpacing.Left,
+                    p.EdgeSpacing.Bottom,
+                    p.EdgeSpacing.Right,
+                    p.EdgeSpacing.Top
+                );
                 plate.GrainAngle = p.GrainAngle;
 
                 foreach (var partDto in p.Parts)
@@ -318,13 +362,14 @@ namespace OpenNest.IO
                 {
                     foreach (var cutoffDto in p.CutOffs)
                     {
-                        var axis = cutoffDto.Axis?.ToLowerInvariant() == "horizontal"
-                            ? CutOffAxis.Horizontal
-                            : CutOffAxis.Vertical;
+                        var axis =
+                            cutoffDto.Axis?.ToLowerInvariant() == "horizontal"
+                                ? CutOffAxis.Horizontal
+                                : CutOffAxis.Vertical;
                         var cutoff = new CutOff(new Vector(cutoffDto.X, cutoffDto.Y), axis)
                         {
                             StartLimit = cutoffDto.StartLimit,
-                            EndLimit = cutoffDto.EndLimit
+                            EndLimit = cutoffDto.EndLimit,
                         };
                         plate.CutOffs.Add(cutoff);
                     }

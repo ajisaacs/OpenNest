@@ -1,5 +1,4 @@
-﻿
-namespace OpenNest.CNC
+﻿namespace OpenNest.CNC
 {
     public enum CodeType
     {
@@ -9,6 +8,6 @@ namespace OpenNest.CNC
         RapidMove,
         SetFeedrate,
         SetKerf,
-        SubProgramCall
+        SubProgramCall,
     }
 }

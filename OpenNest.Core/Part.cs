@@ -1,9 +1,9 @@
-﻿using OpenNest.CNC;
+﻿using System.Collections.Generic;
+using System.Linq;
+using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace OpenNest
 {
@@ -27,9 +27,7 @@ namespace OpenNest
         public readonly Drawing BaseDrawing;
 
         public Part(Drawing baseDrawing)
-            : this(baseDrawing, new Vector())
-        {
-        }
+            : this(baseDrawing, new Vector()) { }
 
         public Part(Drawing baseDrawing, Vector location)
         {
@@ -61,15 +59,25 @@ namespace OpenNest
 
         public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
 
-        public void ApplyLeadIns(CNC.CuttingStrategy.CuttingParameters parameters, Vector approachPoint)
+        public void ApplyLeadIns(
+            CNC.CuttingStrategy.CuttingParameters parameters,
+            Vector approachPoint
+        )
         {
             ApplyLeadIns(parameters, approachPoint, Geometry.Vector.Invalid);
         }
 
-        public void ApplyLeadIns(CNC.CuttingStrategy.CuttingParameters parameters, Vector approachPoint, Vector nextPartStart)
+        public void ApplyLeadIns(
+            CNC.CuttingStrategy.CuttingParameters parameters,
+            Vector approachPoint,
+            Vector nextPartStart
+        )
         {
             preLeadInRotation = Rotation;
-            var strategy = new CNC.CuttingStrategy.ContourCuttingStrategy { Parameters = parameters };
+            var strategy = new CNC.CuttingStrategy.ContourCuttingStrategy
+            {
+                Parameters = parameters,
+            };
             var result = strategy.Apply(Program, approachPoint, nextPartStart);
             Program = result.Program;
             CuttingParameters = parameters;
@@ -77,11 +85,18 @@ namespace OpenNest
             UpdateBounds();
         }
 
-        public void ApplySingleLeadIn(CNC.CuttingStrategy.CuttingParameters parameters,
-            Geometry.Vector point, Geometry.Entity entity, CNC.CuttingStrategy.ContourType contourType)
+        public void ApplySingleLeadIn(
+            CNC.CuttingStrategy.CuttingParameters parameters,
+            Geometry.Vector point,
+            Geometry.Entity entity,
+            CNC.CuttingStrategy.ContourType contourType
+        )
         {
             preLeadInRotation = Rotation;
-            var strategy = new CNC.CuttingStrategy.ContourCuttingStrategy { Parameters = parameters };
+            var strategy = new CNC.CuttingStrategy.ContourCuttingStrategy
+            {
+                Parameters = parameters,
+            };
             var result = strategy.ApplySingle(Program, point, entity, contourType);
             Program = result.Program;
             CuttingParameters = parameters;
@@ -214,10 +229,12 @@ namespace OpenNest
         {
             pts = new List<Vector>();
 
-            var entities1 = ConvertProgram.ToGeometry(Program)
+            var entities1 = ConvertProgram
+                .ToGeometry(Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid)
                 .ToList();
-            var entities2 = ConvertProgram.ToGeometry(part.Program)
+            var entities2 = ConvertProgram
+                .ToGeometry(part.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid)
                 .ToList();
 
@@ -286,10 +303,17 @@ namespace OpenNest
         {
             // Share the Program instance — offset-only copies don't modify the program codes.
             // This is a major performance win for tiling large patterns.
-            var part = new Part(BaseDrawing, Program,
+            var part = new Part(
+                BaseDrawing,
+                Program,
                 location + offset,
-                new Box(BoundingBox.X + offset.X, BoundingBox.Y + offset.Y,
-                    BoundingBox.Length, BoundingBox.Width));
+                new Box(
+                    BoundingBox.X + offset.X,
+                    BoundingBox.Y + offset.Y,
+                    BoundingBox.Length,
+                    BoundingBox.Width
+                )
+            );
 
             return part;
         }

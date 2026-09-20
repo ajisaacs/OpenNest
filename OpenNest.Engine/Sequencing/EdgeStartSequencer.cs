@@ -12,9 +12,11 @@ namespace OpenNest.Engine.Sequencing
             // corrected extents: Size.Length = X-extent, Size.Width = Y-extent.
             var origin = plate.BoundingBox(false);
             var plateBox = new OpenNest.Geometry.Box(
-                origin.X, origin.Y,
+                origin.X,
+                origin.Y,
                 plate.Size.Length,
-                plate.Size.Width);
+                plate.Size.Width
+            );
 
             return parts
                 .OrderBy(p => MinEdgeDistance(p.BoundingBox.Center, plateBox))
@@ -23,14 +25,20 @@ namespace OpenNest.Engine.Sequencing
                 .ToList();
         }
 
-        private static double MinEdgeDistance(OpenNest.Geometry.Vector center, OpenNest.Geometry.Box plateBox)
+        private static double MinEdgeDistance(
+            OpenNest.Geometry.Vector center,
+            OpenNest.Geometry.Box plateBox
+        )
         {
             var distLeft = center.X - plateBox.Left;
             var distRight = plateBox.Right - center.X;
             var distBottom = center.Y - plateBox.Bottom;
             var distTop = plateBox.Top - center.Y;
 
-            return System.Math.Min(System.Math.Min(distLeft, distRight), System.Math.Min(distBottom, distTop));
+            return System.Math.Min(
+                System.Math.Min(distLeft, distRight),
+                System.Math.Min(distBottom, distTop)
+            );
         }
     }
 }

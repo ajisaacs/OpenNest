@@ -28,16 +28,99 @@ namespace OpenNest.Posts.GravographIS
         // fixed return-to-home block.
         private static readonly byte[] PreambleTemplate = new byte[]
         {
-            0x21, 0x41, 0x53, 0x20, 0x33, 0x38, 0x3b, 0x01, 0x90, 0x01,
-            0xf4, 0x01, 0x90, 0x01, 0xf4, 0x01, 0x90, 0x01, 0xf4, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x09, 0x00, 0x00, 0x03, 0xe8, 0x05, 0x06, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xfd, 0x32, 0x44, 0x00,
-            0x00, 0xff, 0xfd, 0x4d, 0x43, 0x00, 0x01, 0xff, 0xfd, 0x4f,
-            0x55, 0xff, 0xfb, 0xff, 0xfd, 0x4f, 0x55, 0xff, 0xfa, 0xff,
-            0xfd, 0x50, 0x5a, 0x00, 0x00, 0xff, 0xfd, 0x56, 0x53, 0x00,
-            0x23, 0xff, 0xfd, 0x56, 0x5a, 0x00, 0x23, 0xff, 0xfd, 0x44,
-            0x5a, 0x01, 0xfc,
+            0x21,
+            0x41,
+            0x53,
+            0x20,
+            0x33,
+            0x38,
+            0x3b,
+            0x01,
+            0x90,
+            0x01,
+            0xf4,
+            0x01,
+            0x90,
+            0x01,
+            0xf4,
+            0x01,
+            0x90,
+            0x01,
+            0xf4,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x09,
+            0x00,
+            0x00,
+            0x03,
+            0xe8,
+            0x05,
+            0x06,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0xff,
+            0xfd,
+            0x32,
+            0x44,
+            0x00,
+            0x00,
+            0xff,
+            0xfd,
+            0x4d,
+            0x43,
+            0x00,
+            0x01,
+            0xff,
+            0xfd,
+            0x4f,
+            0x55,
+            0xff,
+            0xfb,
+            0xff,
+            0xfd,
+            0x4f,
+            0x55,
+            0xff,
+            0xfa,
+            0xff,
+            0xfd,
+            0x50,
+            0x5a,
+            0x00,
+            0x00,
+            0xff,
+            0xfd,
+            0x56,
+            0x53,
+            0x00,
+            0x23,
+            0xff,
+            0xfd,
+            0x56,
+            0x5a,
+            0x00,
+            0x23,
+            0xff,
+            0xfd,
+            0x44,
+            0x5a,
+            0x01,
+            0xfc,
         };
 
         // Stripped 36-byte postamble: lift, aux off, motor off, operator beep,
@@ -53,11 +136,36 @@ namespace OpenNest.Posts.GravographIS
         // lift + PU travel to the operator-set origin before these final commands.
         private static readonly byte[] EndJobBytes = new byte[]
         {
-            0xff, 0xfd, 0x4f, 0x55, 0xff, 0xfa, // OU 0xFFFA  aux off
-            0xff, 0xfd, 0x4f, 0x55, 0xff, 0xfb, // OU 0xFFFB  aux off
-            0xff, 0xfd, 0x4d, 0x43, 0x00, 0x00, // MC 0x0000  motor off
-            0xff, 0xfd, 0x4f, 0x50, 0x00, 0x00, // OP 0x0000  operator beep
-            0xff, 0xfd, 0x4a, 0x46, 0x00, 0x00, // JF 0x0000  job finish
+            0xff,
+            0xfd,
+            0x4f,
+            0x55,
+            0xff,
+            0xfa, // OU 0xFFFA  aux off
+            0xff,
+            0xfd,
+            0x4f,
+            0x55,
+            0xff,
+            0xfb, // OU 0xFFFB  aux off
+            0xff,
+            0xfd,
+            0x4d,
+            0x43,
+            0x00,
+            0x00, // MC 0x0000  motor off
+            0xff,
+            0xfd,
+            0x4f,
+            0x50,
+            0x00,
+            0x00, // OP 0x0000  operator beep
+            0xff,
+            0xfd,
+            0x4a,
+            0x46,
+            0x00,
+            0x00, // JF 0x0000  job finish
         };
 
         // 80 steps/mm × 25.4 mm/in
@@ -66,9 +174,7 @@ namespace OpenNest.Posts.GravographIS
         public GravographISWriterOptions Options { get; }
 
         public GravographISWriter()
-            : this(new GravographISWriterOptions())
-        {
-        }
+            : this(new GravographISWriterOptions()) { }
 
         public GravographISWriter(GravographISWriterOptions options)
         {
@@ -83,8 +189,10 @@ namespace OpenNest.Posts.GravographIS
         /// </summary>
         public void Write(IEnumerable<IReadOnlyList<Vector>> polylines, Stream output)
         {
-            if (polylines == null) throw new ArgumentNullException(nameof(polylines));
-            if (output == null) throw new ArgumentNullException(nameof(output));
+            if (polylines == null)
+                throw new ArgumentNullException(nameof(polylines));
+            if (output == null)
+                throw new ArgumentNullException(nameof(output));
 
             var preamble = (byte[])PreambleTemplate.Clone();
             PatchOperand(preamble, (byte)'V', (byte)'S', (short)Options.FeedMmPerSec);
@@ -98,10 +206,16 @@ namespace OpenNest.Posts.GravographIS
             // catch bad records before they ship to the engraver.
             var headX = 0;
             var headY = 0;
-            var envelopeXSteps = (int)System.Math.Round(Options.WorkEnvelopeXMm * StepsPerMm,
-                MidpointRounding.AwayFromZero);
-            var envelopeYSteps = (int)System.Math.Round(Options.WorkEnvelopeYMm * StepsPerMm,
-                MidpointRounding.AwayFromZero);
+            var envelopeXSteps = (int)
+                System.Math.Round(
+                    Options.WorkEnvelopeXMm * StepsPerMm,
+                    MidpointRounding.AwayFromZero
+                );
+            var envelopeYSteps = (int)
+                System.Math.Round(
+                    Options.WorkEnvelopeYMm * StepsPerMm,
+                    MidpointRounding.AwayFromZero
+                );
 
             var firstPolyline = true;
             var polyIndex = 0;
@@ -113,11 +227,18 @@ namespace OpenNest.Posts.GravographIS
                     continue;
 
                 var (startX, startY) = ToWire(poly[0]);
-                WriteTravel(output,
+                WriteTravel(
+                    output,
                     firstPolyline ? (byte)'D' : (byte)'P',
                     firstPolyline ? (byte)'R' : (byte)'U',
-                    checked(startX - headX), checked(startY - headY),
-                    ref headX, ref headY, envelopeXSteps, envelopeYSteps, polyIndex);
+                    checked(startX - headX),
+                    checked(startY - headY),
+                    ref headX,
+                    ref headY,
+                    envelopeXSteps,
+                    envelopeYSteps,
+                    polyIndex
+                );
 
                 // PD command + single records-follow flag, then one record per segment.
                 output.WriteByte(0xFF);
@@ -134,8 +255,15 @@ namespace OpenNest.Posts.GravographIS
                     var (cx, cy) = ToWire(poly[i]);
                     var dx = checked(cx - prevX);
                     var dy = checked(cy - prevY);
-                    EnsureEnvelope(headX + dx, headY + dy, envelopeXSteps, envelopeYSteps,
-                        polyIndex, segment: i, isTravel: false);
+                    EnsureEnvelope(
+                        headX + dx,
+                        headY + dy,
+                        envelopeXSteps,
+                        envelopeYSteps,
+                        polyIndex,
+                        segment: i,
+                        isTravel: false
+                    );
                     WriteRecord(output, dx, dy);
                     prevX = cx;
                     prevY = cy;
@@ -149,20 +277,36 @@ namespace OpenNest.Posts.GravographIS
             WriteLiftOnly(output);
             if (Options.ReturnToOriginAtEnd && !firstPolyline)
             {
-                WriteTravel(output, (byte)'P', (byte)'U',
-                    checked(-headX), checked(-headY),
-                    ref headX, ref headY, envelopeXSteps, envelopeYSteps, polyIndex);
+                WriteTravel(
+                    output,
+                    (byte)'P',
+                    (byte)'U',
+                    checked(-headX),
+                    checked(-headY),
+                    ref headX,
+                    ref headY,
+                    envelopeXSteps,
+                    envelopeYSteps,
+                    polyIndex
+                );
             }
             output.Write(EndJobBytes, 0, EndJobBytes.Length);
         }
 
         private const double StepsPerMm = 80.0;
 
-        private void EnsureEnvelope(int wireX, int wireY,
-            int envXSteps, int envYSteps,
-            int polyIndex, int segment, bool isTravel)
+        private void EnsureEnvelope(
+            int wireX,
+            int wireY,
+            int envXSteps,
+            int envYSteps,
+            int polyIndex,
+            int segment,
+            bool isTravel
+        )
         {
-            if (!Options.EnvelopeGuardEnabled) return;
+            if (!Options.EnvelopeGuardEnabled)
+                return;
 
             // Wire frame: X is identity to input; Y is negated. With the operator
             // origin set at the upper-left of the work envelope and an OpenNest
@@ -176,16 +320,24 @@ namespace OpenNest.Posts.GravographIS
             var inputY = -wireY / (double)StepsPerInch;
             var kind = isTravel ? "pen-up travel" : "cut segment";
             throw new InvalidOperationException(
-                $"Polyline {polyIndex} {kind} (segment {segment}) would place the head at " +
-                $"({inputX:F3}\", {inputY:F3}\"), outside the {Options.WorkEnvelopeXMm}×{Options.WorkEnvelopeYMm} mm " +
-                $"work envelope from upper-left origin. Refusing to emit the record.");
+                $"Polyline {polyIndex} {kind} (segment {segment}) would place the head at "
+                    + $"({inputX:F3}\", {inputY:F3}\"), outside the {Options.WorkEnvelopeXMm}×{Options.WorkEnvelopeYMm} mm "
+                    + $"work envelope from upper-left origin. Refusing to emit the record."
+            );
         }
 
         private short DepthInStepsAsInt16()
         {
-            var steps = (long)System.Math.Round(Options.DepthInches * StepsPerInch, MidpointRounding.AwayFromZero);
+            var steps = (long)
+                System.Math.Round(
+                    Options.DepthInches * StepsPerInch,
+                    MidpointRounding.AwayFromZero
+                );
             if (steps < short.MinValue || steps > short.MaxValue)
-                throw new ArgumentOutOfRangeException(nameof(Options.DepthInches), $"Depth {Options.DepthInches} in. → {steps} steps overflows int16.");
+                throw new ArgumentOutOfRangeException(
+                    nameof(Options.DepthInches),
+                    $"Depth {Options.DepthInches} in. → {steps} steps overflows int16."
+                );
             return (short)steps;
         }
 
@@ -198,10 +350,18 @@ namespace OpenNest.Posts.GravographIS
             return (x, y);
         }
 
-        private void WriteTravel(Stream s, byte c0, byte c1, int dx, int dy,
-            ref int headX, ref int headY,
-            int envelopeXSteps, int envelopeYSteps,
-            int polyIndex)
+        private void WriteTravel(
+            Stream s,
+            byte c0,
+            byte c1,
+            int dx,
+            int dy,
+            ref int headX,
+            ref int headY,
+            int envelopeXSteps,
+            int envelopeYSteps,
+            int polyIndex
+        )
         {
             if (dx == 0 && dy == 0)
                 return;
@@ -215,20 +375,31 @@ namespace OpenNest.Posts.GravographIS
 
             var chunks = System.Math.Max(
                 (int)System.Math.Ceiling(System.Math.Abs(dx) / (double)short.MaxValue),
-                (int)System.Math.Ceiling(System.Math.Abs(dy) / (double)short.MaxValue));
-            if (chunks < 1) chunks = 1;
+                (int)System.Math.Ceiling(System.Math.Abs(dy) / (double)short.MaxValue)
+            );
+            if (chunks < 1)
+                chunks = 1;
 
             var emittedX = 0;
             var emittedY = 0;
             for (var i = 1; i <= chunks; i++)
             {
-                var targetX = (int)System.Math.Round(dx * (i / (double)chunks), MidpointRounding.AwayFromZero);
-                var targetY = (int)System.Math.Round(dy * (i / (double)chunks), MidpointRounding.AwayFromZero);
+                var targetX = (int)
+                    System.Math.Round(dx * (i / (double)chunks), MidpointRounding.AwayFromZero);
+                var targetY = (int)
+                    System.Math.Round(dy * (i / (double)chunks), MidpointRounding.AwayFromZero);
                 var chunkX = checked(targetX - emittedX);
                 var chunkY = checked(targetY - emittedY);
 
-                EnsureEnvelope(headX + chunkX, headY + chunkY, envelopeXSteps, envelopeYSteps,
-                    polyIndex, segment: 0, isTravel: true);
+                EnsureEnvelope(
+                    headX + chunkX,
+                    headY + chunkY,
+                    envelopeXSteps,
+                    envelopeYSteps,
+                    polyIndex,
+                    segment: 0,
+                    isTravel: true
+                );
                 WriteRecord(s, chunkX, chunkY);
 
                 emittedX = targetX;
@@ -262,11 +433,16 @@ namespace OpenNest.Posts.GravographIS
 
         private static void WriteRecord(Stream s, int dx, int dy)
         {
-            if (dx < short.MinValue || dx > short.MaxValue ||
-                dy < short.MinValue || dy > short.MaxValue)
+            if (
+                dx < short.MinValue
+                || dx > short.MaxValue
+                || dy < short.MinValue
+                || dy > short.MaxValue
+            )
             {
                 throw new InvalidOperationException(
-                    $"Move delta ({dx}, {dy}) steps overflows signed int16 — split moves upstream.");
+                    $"Move delta ({dx}, {dy}) steps overflows signed int16 — split moves upstream."
+                );
             }
 
             int word1;
@@ -286,11 +462,15 @@ namespace OpenNest.Posts.GravographIS
             else
             {
                 var maxAbs = System.Math.Max(absDx, absDy);
-                word1 = (int)System.Math.Round(16384.0 * maxAbs / len, MidpointRounding.AwayFromZero);
+                word1 = (int)
+                    System.Math.Round(16384.0 * maxAbs / len, MidpointRounding.AwayFromZero);
                 param = (int)System.Math.Round(len / 22.4, MidpointRounding.AwayFromZero);
-                if (param < 1) param = 1;
-                if (param > 180) param = 180;
-                if (word1 > 16384) word1 = 16384;
+                if (param < 1)
+                    param = 1;
+                if (param > 180)
+                    param = 180;
+                if (word1 > 16384)
+                    word1 = 16384;
             }
 
             WriteBigEndianInt16(s, (short)word1);
@@ -311,8 +491,12 @@ namespace OpenNest.Posts.GravographIS
         {
             for (int i = 0; i <= buffer.Length - 6; i++)
             {
-                if (buffer[i] == 0xFF && buffer[i + 1] == 0xFD &&
-                    buffer[i + 2] == c0 && buffer[i + 3] == c1)
+                if (
+                    buffer[i] == 0xFF
+                    && buffer[i + 1] == 0xFD
+                    && buffer[i + 2] == c0
+                    && buffer[i + 3] == c1
+                )
                 {
                     buffer[i + 4] = (byte)((value >> 8) & 0xFF);
                     buffer[i + 5] = (byte)(value & 0xFF);
@@ -321,7 +505,8 @@ namespace OpenNest.Posts.GravographIS
             }
 
             throw new InvalidOperationException(
-                $"Command '{(char)c0}{(char)c1}' not found in preamble template.");
+                $"Command '{(char)c0}{(char)c1}' not found in preamble template."
+            );
         }
     }
 }

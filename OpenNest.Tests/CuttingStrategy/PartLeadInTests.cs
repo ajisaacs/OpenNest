@@ -25,7 +25,7 @@ public class PartLeadInTests
         var parameters = new CuttingParameters
         {
             ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
-            InternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 }
+            InternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
         };
 
         part.ApplyLeadIns(parameters, new Vector(-5, -5));
@@ -40,7 +40,7 @@ public class PartLeadInTests
         var parameters = new CuttingParameters
         {
             ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
-            InternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 }
+            InternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
         };
 
         part.ApplyLeadIns(parameters, new Vector(-5, -5));
@@ -54,12 +54,14 @@ public class PartLeadInTests
         var part = MakeSquarePart();
         var parameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         part.ApplyLeadIns(parameters, new Vector(-5, -5));
 
-        var hasLeadin = part.Program.Codes.OfType<LinearMove>().Any(m => m.Layer == LayerType.Leadin);
+        var hasLeadin = part
+            .Program.Codes.OfType<LinearMove>()
+            .Any(m => m.Layer == LayerType.Leadin);
         Assert.True(hasLeadin);
     }
 
@@ -70,7 +72,7 @@ public class PartLeadInTests
         var originalCodeCount = part.Program.Codes.Count;
         var parameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         part.ApplyLeadIns(parameters, new Vector(-5, -5));
@@ -90,7 +92,7 @@ public class PartLeadInTests
 
         var parameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         part.ApplyLeadIns(parameters, new Vector(-5, -5));
@@ -108,7 +110,7 @@ public class PartLeadInTests
 
         var parameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         part.ApplyLeadIns(parameters, new Vector(-5, -5));
@@ -131,7 +133,7 @@ public class PartLeadInTests
         var part = MakeSquarePart();
         var parameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var entity = new Line(new Vector(10, 0), new Vector(0, 0));
@@ -146,13 +148,15 @@ public class PartLeadInTests
         var part = MakeSquarePart();
         var parameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var entity = new Line(new Vector(10, 0), new Vector(0, 0));
         part.ApplySingleLeadIn(parameters, new Vector(5, 0), entity, ContourType.External);
 
-        var hasLeadin = part.Program.Codes.OfType<LinearMove>().Any(m => m.Layer == LayerType.Leadin);
+        var hasLeadin = part
+            .Program.Codes.OfType<LinearMove>()
+            .Any(m => m.Layer == LayerType.Leadin);
         Assert.True(hasLeadin);
     }
 
@@ -163,7 +167,7 @@ public class PartLeadInTests
         var originalCodeCount = part.Program.Codes.Count;
         var parameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var entity = new Line(new Vector(10, 0), new Vector(0, 0));
@@ -183,7 +187,7 @@ public class PartLeadInTests
 
         var parameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         // After rotation, the edges change. Use a point on the rotated bottom edge.

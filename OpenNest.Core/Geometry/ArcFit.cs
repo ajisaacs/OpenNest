@@ -14,7 +14,9 @@ namespace OpenNest.Geometry
         /// the arc passes through both endpoints and departs P1 in the given direction.
         /// </summary>
         internal static (Vector center, double radius, double deviation) FitWithStartTangent(
-            List<Vector> points, Vector tangent)
+            List<Vector> points,
+            Vector tangent
+        )
         {
             if (points.Count < 3)
                 return (Vector.Invalid, 0, double.MaxValue);
@@ -64,7 +66,10 @@ namespace OpenNest.Geometry
         /// deviation includes any endpoint gap at Pn.
         /// </summary>
         internal static (Vector center, double radius, double deviation) FitWithDualTangent(
-            List<Vector> points, Vector startTangent, Vector endTangent)
+            List<Vector> points,
+            Vector startTangent,
+            Vector endTangent
+        )
         {
             if (points.Count < 3)
                 return (Vector.Invalid, 0, double.MaxValue);
@@ -72,7 +77,9 @@ namespace OpenNest.Geometry
             var p1 = points[0];
             var pn = points[^1];
 
-            var stLen = System.Math.Sqrt(startTangent.X * startTangent.X + startTangent.Y * startTangent.Y);
+            var stLen = System.Math.Sqrt(
+                startTangent.X * startTangent.X + startTangent.Y * startTangent.Y
+            );
             var etLen = System.Math.Sqrt(endTangent.X * endTangent.X + endTangent.Y * endTangent.Y);
             if (stLen < 1e-10 || etLen < 1e-10)
                 return (Vector.Invalid, 0, double.MaxValue);
@@ -113,7 +120,12 @@ namespace OpenNest.Geometry
         /// <summary>
         /// Computes the maximum radial deviation of interior points from a circle.
         /// </summary>
-        internal static double MaxRadialDeviation(List<Vector> points, double cx, double cy, double radius)
+        internal static double MaxRadialDeviation(
+            List<Vector> points,
+            double cx,
+            double cy,
+            double radius
+        )
         {
             var maxDev = 0.0;
             for (var i = 1; i < points.Count - 1; i++)
@@ -122,7 +134,8 @@ namespace OpenNest.Geometry
                 var py = points[i].Y - cy;
                 var dist = System.Math.Sqrt(px * px + py * py);
                 var dev = System.Math.Abs(dist - radius);
-                if (dev > maxDev) maxDev = dev;
+                if (dev > maxDev)
+                    maxDev = dev;
             }
             return maxDev;
         }

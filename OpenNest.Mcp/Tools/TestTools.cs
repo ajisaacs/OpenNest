@@ -1,8 +1,8 @@
-using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using ModelContextProtocol.Server;
 
 namespace OpenNest.Mcp.Tools
 {
@@ -12,15 +12,24 @@ namespace OpenNest.Mcp.Tools
         private const string SolutionRoot = @"C:\Users\AJ\Desktop\Projects\OpenNest";
 
         private static readonly string HarnessProject = Path.Combine(
-            SolutionRoot, "OpenNest.Console", "OpenNest.Console.csproj");
+            SolutionRoot,
+            "OpenNest.Console",
+            "OpenNest.Console.csproj"
+        );
 
         [McpServerTool(Name = "test_engine")]
-        [Description("Build and run the nesting engine against a nest file. Returns fill results and a debug log file path for grepping. Use this to test engine changes without restarting the MCP server.")]
+        [Description(
+            "Build and run the nesting engine against a nest file. Returns fill results and a debug log file path for grepping. Use this to test engine changes without restarting the MCP server."
+        )]
         public string TestEngine(
-            [Description("Path to the nest .nest file")] string nestFile = @"C:\Users\AJ\Desktop\4980 A24 PT02 60x120  45pcs v2.nest",
-            [Description("Drawing name to fill with (default: first drawing)")] string drawingName = null,
+            [Description("Path to the nest .nest file")]
+                string nestFile = @"C:\Users\AJ\Desktop\4980 A24 PT02 60x120  45pcs v2.nest",
+            [Description("Drawing name to fill with (default: first drawing)")]
+                string drawingName = null,
             [Description("Plate index to fill (default: 0)")] int plateIndex = 0,
-            [Description("Output nest file path (default: <input>-result.nest)")] string outputFile = null)
+            [Description("Output nest file path (default: <input>-result.nest)")]
+                string outputFile = null
+        )
         {
             if (!File.Exists(nestFile))
                 return $"Error: nest file not found: {nestFile}";
@@ -44,7 +53,7 @@ namespace OpenNest.Mcp.Tools
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
-                WorkingDirectory = SolutionRoot
+                WorkingDirectory = SolutionRoot,
             };
 
             var sb = new StringBuilder();

@@ -14,11 +14,7 @@ public class CincinnatiPostProcessorTests
     public void Post_ProducesOutput_ForSinglePlateNest()
     {
         var nest = CreateTestNest();
-        var config = new CincinnatiPostConfig
-        {
-            ConfigurationName = "CL940",
-            PostedAccuracy = 4
-        };
+        var config = new CincinnatiPostConfig { ConfigurationName = "CL940", PostedAccuracy = 4 };
         var post = new CincinnatiPostProcessor(config);
 
         using var ms = new MemoryStream();
@@ -64,7 +60,7 @@ public class CincinnatiPostProcessorTests
         var config = new CincinnatiPostConfig
         {
             PostedAccuracy = 4,
-            ArcFeedrate = ArcFeedrateMode.Variables
+            ArcFeedrate = ArcFeedrateMode.Variables,
         };
         var post = new CincinnatiPostProcessor(config);
 
@@ -84,7 +80,7 @@ public class CincinnatiPostProcessorTests
         var config = new CincinnatiPostConfig
         {
             PostedAccuracy = 4,
-            ArcFeedrate = ArcFeedrateMode.None
+            ArcFeedrate = ArcFeedrateMode.None,
         };
         var post = new CincinnatiPostProcessor(config);
 
@@ -189,18 +185,24 @@ public class CincinnatiPostProcessorTests
             UseAntiDive = true,
             MaterialLibraries = new()
             {
-                new MaterialLibraryEntry { Material = "Mild Steel", Thickness = 0.135, Gas = "N2", Library = "MS135N2PANEL.lib" }
+                new MaterialLibraryEntry
+                {
+                    Material = "Mild Steel",
+                    Thickness = 0.135,
+                    Gas = "N2",
+                    Library = "MS135N2PANEL.lib",
+                },
             },
             EtchLibraries = new()
             {
-                new EtchLibraryEntry { Gas = "N2", Library = "EtchN2.lib" }
-            }
+                new EtchLibraryEntry { Gas = "N2", Library = "EtchN2.lib" },
+            },
         };
 
         var opts = new JsonSerializerOptions
         {
             WriteIndented = true,
-            Converters = { new JsonStringEnumConverter() }
+            Converters = { new JsonStringEnumConverter() },
         };
         var json = JsonSerializer.Serialize(config, opts);
         var deserialized = JsonSerializer.Deserialize<CincinnatiPostConfig>(json, opts);
@@ -239,7 +241,7 @@ public class CincinnatiPostProcessorTests
         {
             PostedAccuracy = 4,
             UsePartSubprograms = true,
-            PartSubprogramStart = 200
+            PartSubprogramStart = 200,
         };
         var post = new CincinnatiPostProcessor(config);
 
@@ -279,7 +281,7 @@ public class CincinnatiPostProcessorTests
         {
             PostedAccuracy = 4,
             UsePartSubprograms = true,
-            PartSubprogramStart = 200
+            PartSubprogramStart = 200,
         };
         var post = new CincinnatiPostProcessor(config);
 
@@ -317,7 +319,7 @@ public class CincinnatiPostProcessorTests
         {
             PostedAccuracy = 4,
             UsePartSubprograms = true,
-            PartSubprogramStart = 200
+            PartSubprogramStart = 200,
         };
         var post = new CincinnatiPostProcessor(config);
 
@@ -349,7 +351,7 @@ public class CincinnatiPostProcessorTests
         {
             PostedAccuracy = 4,
             UsePartSubprograms = true,
-            PartSubprogramStart = 200
+            PartSubprogramStart = 200,
         };
         var post = new CincinnatiPostProcessor(config);
 
@@ -372,13 +374,13 @@ public class CincinnatiPostProcessorTests
         var config = new CincinnatiPostConfig
         {
             UsePartSubprograms = true,
-            PartSubprogramStart = 300
+            PartSubprogramStart = 300,
         };
 
         var opts = new JsonSerializerOptions
         {
             WriteIndented = true,
-            Converters = { new JsonStringEnumConverter() }
+            Converters = { new JsonStringEnumConverter() },
         };
         var json = JsonSerializer.Serialize(config, opts);
         var deserialized = JsonSerializer.Deserialize<CincinnatiPostConfig>(json, opts);
@@ -394,10 +396,10 @@ public class CincinnatiPostProcessorTests
         // first segment in the CNC output because the feature writer uses
         // the first LinearMove endpoint as the pierce point.
         var pgm = new Program(Mode.Incremental);
-        pgm.Codes.Add(new LinearMove(0, 2));    // (0,0) → (0,2)
-        pgm.Codes.Add(new LinearMove(2, 0));    // (0,2) → (2,2)
-        pgm.Codes.Add(new LinearMove(0, -2));   // (2,2) → (2,0)
-        pgm.Codes.Add(new LinearMove(-2, 0));   // (2,0) → (0,0)
+        pgm.Codes.Add(new LinearMove(0, 2)); // (0,0) → (0,2)
+        pgm.Codes.Add(new LinearMove(2, 0)); // (0,2) → (2,2)
+        pgm.Codes.Add(new LinearMove(0, -2)); // (2,2) → (2,0)
+        pgm.Codes.Add(new LinearMove(-2, 0)); // (2,0) → (0,0)
 
         var drawing = new Drawing("ClosedSquare", pgm);
         var nest = new Nest("TestClosure");
@@ -406,11 +408,7 @@ public class CincinnatiPostProcessorTests
         plate.Parts.Add(new Part(drawing, new Vector(1, 1)));
         nest.Plates.Add(plate);
 
-        var config = new CincinnatiPostConfig
-        {
-            UsePartSubprograms = true,
-            PostedAccuracy = 4
-        };
+        var config = new CincinnatiPostConfig { UsePartSubprograms = true, PostedAccuracy = 4 };
         var post = new CincinnatiPostProcessor(config);
 
         using var ms = new MemoryStream();

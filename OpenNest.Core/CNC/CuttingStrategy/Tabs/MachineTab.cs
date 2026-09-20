@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -8,13 +8,13 @@ namespace OpenNest.CNC.CuttingStrategy
         public int MachineTabId { get; set; }
 
         public override List<ICode> Generate(
-            Vector tabStartPoint, Vector tabEndPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+            Vector tabStartPoint,
+            Vector tabEndPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
-            return new List<ICode>
-            {
-                new RapidMove(tabEndPoint)
-            };
+            return new List<ICode> { new RapidMove(tabEndPoint) };
         }
     }
 }

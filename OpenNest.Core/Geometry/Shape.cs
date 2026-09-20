@@ -282,11 +282,7 @@ namespace OpenNest.Geometry
 
                     case EntityType.Line:
                         var line = (Line)entity;
-                        polygon.Vertices.AddRange(new[]
-                        {
-                            line.StartPoint,
-                            line.EndPoint
-                        });
+                        polygon.Vertices.AddRange(new[] { line.StartPoint, line.EndPoint });
                         break;
 
                     case EntityType.Circle:
@@ -320,21 +316,21 @@ namespace OpenNest.Geometry
                 {
                     case EntityType.Arc:
                         var arc = (Arc)entity;
-                        polygon.Vertices.AddRange(arc.ToPoints(arc.SegmentsForTolerance(tolerance), circumscribe));
+                        polygon.Vertices.AddRange(
+                            arc.ToPoints(arc.SegmentsForTolerance(tolerance), circumscribe)
+                        );
                         break;
 
                     case EntityType.Line:
                         var line = (Line)entity;
-                        polygon.Vertices.AddRange(new[]
-                        {
-                            line.StartPoint,
-                            line.EndPoint
-                        });
+                        polygon.Vertices.AddRange(new[] { line.StartPoint, line.EndPoint });
                         break;
 
                     case EntityType.Circle:
                         var circle = (Circle)entity;
-                        polygon.Vertices.AddRange(circle.ToPoints(circle.SegmentsForTolerance(tolerance), circumscribe));
+                        polygon.Vertices.AddRange(
+                            circle.ToPoints(circle.SegmentsForTolerance(tolerance), circumscribe)
+                        );
                         break;
 
                     default:
@@ -462,9 +458,7 @@ namespace OpenNest.Geometry
         /// </summary>
         public override void UpdateBounds()
         {
-            boundingBox = Entities.Select(geo => geo.BoundingBox)
-                .ToList()
-                .GetBoundingBox();
+            boundingBox = Entities.Select(geo => geo.BoundingBox).ToList().GetBoundingBox();
         }
 
         public override Entity OffsetEntity(double distance, OffsetSide side)
@@ -493,21 +487,26 @@ namespace OpenNest.Geometry
                 switch (entity.Type)
                 {
                     case EntityType.Line:
+                    {
+                        var line = (Line)entity;
+                        var offsetLine = (Line)offsetEntity;
+
+                        if (lastOffsetEntity != null && lastOffsetEntity.Type == EntityType.Line)
                         {
-                            var line = (Line)entity;
-                            var offsetLine = (Line)offsetEntity;
-
-                            if (lastOffsetEntity != null && lastOffsetEntity.Type == EntityType.Line)
-                            {
-                                JoinOffsetLines(
-                                    (Line)lastEntity, (Line)lastOffsetEntity,
-                                    line, offsetLine,
-                                    distance, side, offsetShape);
-                            }
-
-                            offsetShape.Entities.Add(offsetLine);
-                            break;
+                            JoinOffsetLines(
+                                (Line)lastEntity,
+                                (Line)lastOffsetEntity,
+                                line,
+                                offsetLine,
+                                distance,
+                                side,
+                                offsetShape
+                            );
                         }
+
+                        offsetShape.Entities.Add(offsetLine);
+                        break;
+                    }
 
                     default:
                         offsetShape.Entities.Add(offsetEntity);
@@ -519,27 +518,42 @@ namespace OpenNest.Geometry
             }
 
             // Close the shape: join last offset entity back to first
-            if (lastOffsetEntity != null && firstOffsetEntity != null
+            if (
+                lastOffsetEntity != null
+                && firstOffsetEntity != null
                 && lastOffsetEntity != firstOffsetEntity
                 && lastOffsetEntity.Type == EntityType.Line
-                && firstOffsetEntity.Type == EntityType.Line)
+                && firstOffsetEntity.Type == EntityType.Line
+            )
             {
                 JoinOffsetLines(
-                    (Line)lastEntity, (Line)lastOffsetEntity,
-                    (Line)firstEntity, (Line)firstOffsetEntity,
-                    distance, side, offsetShape);
+                    (Line)lastEntity,
+                    (Line)lastOffsetEntity,
+                    (Line)firstEntity,
+                    (Line)firstOffsetEntity,
+                    distance,
+                    side,
+                    offsetShape
+                );
             }
 
             foreach (var cutout in definedShape.Cutouts)
-                offsetShape.Entities.AddRange(((Shape)cutout.OffsetEntity(distance, side)).Entities);
+                offsetShape.Entities.AddRange(
+                    ((Shape)cutout.OffsetEntity(distance, side)).Entities
+                );
 
             return offsetShape;
         }
 
         private static void JoinOffsetLines(
-            Line lastLine, Line lastOffsetLine,
-            Line line, Line offsetLine,
-            double distance, OffsetSide side, Shape offsetShape)
+            Line lastLine,
+            Line lastOffsetLine,
+            Line line,
+            Line offsetLine,
+            double distance,
+            OffsetSide side,
+            Shape offsetShape
+        )
         {
             // Determine if this is a convex corner using the cross product of
             // the original line directions. Convex corners need an arc; concave
@@ -548,8 +562,9 @@ namespace OpenNest.Geometry
             var d2 = line.EndPoint - line.StartPoint;
             var cross = d1.X * d2.Y - d1.Y * d2.X;
 
-            var isConvex = (side == OffsetSide.Left && cross < -OpenNest.Math.Tolerance.Epsilon) ||
-                           (side == OffsetSide.Right && cross > OpenNest.Math.Tolerance.Epsilon);
+            var isConvex =
+                (side == OffsetSide.Left && cross < -OpenNest.Math.Tolerance.Epsilon)
+                || (side == OffsetSide.Right && cross > OpenNest.Math.Tolerance.Epsilon);
 
             if (isConvex)
             {
@@ -559,11 +574,13 @@ namespace OpenNest.Geometry
                     line.StartPoint.AngleTo(lastOffsetLine.EndPoint),
                     line.StartPoint.AngleTo(offsetLine.StartPoint),
                     side == OffsetSide.Left
-                    );
+                );
 
                 offsetShape.Entities.Add(arc);
             }
-            else if (Intersect.IntersectsUnbounded(offsetLine, lastOffsetLine, out var intersection))
+            else if (
+                Intersect.IntersectsUnbounded(offsetLine, lastOffsetLine, out var intersection)
+            )
             {
                 offsetLine.StartPoint = intersection;
                 lastOffsetLine.EndPoint = intersection;
@@ -576,7 +593,7 @@ namespace OpenNest.Geometry
                     line.StartPoint.AngleTo(lastOffsetLine.EndPoint),
                     line.StartPoint.AngleTo(offsetLine.StartPoint),
                     side == OffsetSide.Left
-                    );
+                );
 
                 offsetShape.Entities.Add(arc);
             }
@@ -596,8 +613,11 @@ namespace OpenNest.Geometry
         {
             var poly = ToPolygon();
 
-            if (poly == null || poly.Vertices.Count < 3
-                || poly.RotationDirection() == RotationType.CW)
+            if (
+                poly == null
+                || poly.Vertices.Count < 3
+                || poly.RotationDirection() == RotationType.CW
+            )
                 return OffsetEntity(distance, OffsetSide.Left) as Shape;
 
             // Shape is CCW — reverse to CW so Left offset goes outward.
@@ -611,10 +631,21 @@ namespace OpenNest.Geometry
                         copy.Entities.Add(new Line(l.EndPoint, l.StartPoint) { Layer = l.Layer });
                         break;
                     case Arc a:
-                        copy.Entities.Add(new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed) { Layer = a.Layer });
+                        copy.Entities.Add(
+                            new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed)
+                            {
+                                Layer = a.Layer,
+                            }
+                        );
                         break;
                     case Circle c:
-                        copy.Entities.Add(new Circle(c.Center, c.Radius) { Layer = c.Layer, Rotation = RotationType.CW });
+                        copy.Entities.Add(
+                            new Circle(c.Center, c.Radius)
+                            {
+                                Layer = c.Layer,
+                                Rotation = RotationType.CW,
+                            }
+                        );
                         break;
                 }
             }
@@ -631,8 +662,11 @@ namespace OpenNest.Geometry
         {
             var poly = ToPolygon();
 
-            if (poly == null || poly.Vertices.Count < 3
-                || poly.RotationDirection() == RotationType.CCW)
+            if (
+                poly == null
+                || poly.Vertices.Count < 3
+                || poly.RotationDirection() == RotationType.CCW
+            )
                 return OffsetEntity(distance, OffsetSide.Left) as Shape;
 
             // Create a reversed copy to avoid mutating shared entity objects.
@@ -646,10 +680,21 @@ namespace OpenNest.Geometry
                         copy.Entities.Add(new Line(l.EndPoint, l.StartPoint) { Layer = l.Layer });
                         break;
                     case Arc a:
-                        copy.Entities.Add(new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed) { Layer = a.Layer });
+                        copy.Entities.Add(
+                            new Arc(a.Center, a.Radius, a.EndAngle, a.StartAngle, !a.IsReversed)
+                            {
+                                Layer = a.Layer,
+                            }
+                        );
                         break;
                     case Circle c:
-                        copy.Entities.Add(new Circle(c.Center, c.Radius) { Layer = c.Layer, Rotation = RotationType.CCW });
+                        copy.Entities.Add(
+                            new Circle(c.Center, c.Radius)
+                            {
+                                Layer = c.Layer,
+                                Rotation = RotationType.CCW,
+                            }
+                        );
                         break;
                 }
             }

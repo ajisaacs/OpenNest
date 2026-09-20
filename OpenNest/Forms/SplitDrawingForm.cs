@@ -35,8 +35,10 @@ public partial class SplitDrawingForm : Form
         InitializeComponent();
 
         _drawing = drawing;
-        _drawingEntities = ConvertProgram.ToGeometry(drawing.Program)
-            .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+        _drawingEntities = ConvertProgram
+            .ToGeometry(drawing.Program)
+            .Where(e => e.Layer != SpecialLayers.Rapid)
+            .ToList();
         _drawingBounds = drawing.Program.BoundingBox();
 
         foreach (var entity in _drawingEntities)
@@ -80,7 +82,9 @@ public partial class SplitDrawingForm : Form
                 {
                     var splits = (int)System.Math.Ceiling(_drawingBounds.Length / usable) - 1;
                     for (var i = 1; i <= splits; i++)
-                        _splitLines.Add(new SplitLine(_drawingBounds.X + usable * i, CutOffAxis.Vertical));
+                        _splitLines.Add(
+                            new SplitLine(_drawingBounds.X + usable * i, CutOffAxis.Vertical)
+                        );
                 }
             }
             else if (axisIndex == 2)
@@ -90,19 +94,31 @@ public partial class SplitDrawingForm : Form
                 {
                     var splits = (int)System.Math.Ceiling(_drawingBounds.Width / usable) - 1;
                     for (var i = 1; i <= splits; i++)
-                        _splitLines.Add(new SplitLine(_drawingBounds.Y + usable * i, CutOffAxis.Horizontal));
+                        _splitLines.Add(
+                            new SplitLine(_drawingBounds.Y + usable * i, CutOffAxis.Horizontal)
+                        );
                 }
             }
             else
             {
-                _splitLines.AddRange(AutoSplitCalculator.FitToPlate(_drawingBounds, plateW, plateH, spacing, overhang));
+                _splitLines.AddRange(
+                    AutoSplitCalculator.FitToPlate(
+                        _drawingBounds,
+                        plateW,
+                        plateH,
+                        spacing,
+                        overhang
+                    )
+                );
             }
         }
         else if (radByCount.Checked)
         {
             var hPieces = (int)nudHorizontalPieces.Value;
             var vPieces = (int)nudVerticalPieces.Value;
-            _splitLines.AddRange(AutoSplitCalculator.SplitByCount(_drawingBounds, hPieces, vPieces));
+            _splitLines.AddRange(
+                AutoSplitCalculator.SplitByCount(_drawingBounds, hPieces, vPieces)
+            );
         }
 
         InitializeAllFeaturePositions();
@@ -173,8 +189,10 @@ public partial class SplitDrawingForm : Form
 
     private int GetFeatureCount()
     {
-        if (radTabs.Checked) return (int)nudTabCount.Value;
-        if (radSpike.Checked) return (int)nudSpikePairCount.Value;
+        if (radTabs.Checked)
+            return (int)nudTabCount.Value;
+        if (radSpike.Checked)
+            return (int)nudSpikePairCount.Value;
         return 0;
     }
 
@@ -199,7 +217,8 @@ public partial class SplitDrawingForm : Form
         var extent = end - start;
 
         sl.FeaturePositions.Clear();
-        if (count <= 0 || extent <= 0) return;
+        if (count <= 0 || extent <= 0)
+            return;
 
         if (radSpike.Checked)
         {
@@ -233,7 +252,8 @@ public partial class SplitDrawingForm : Form
 
     private void OnPreviewMouseDown(object sender, MouseEventArgs e)
     {
-        if (e.Button != MouseButtons.Left) return;
+        if (e.Button != MouseButtons.Left)
+            return;
 
         var worldPt = pnlPreview.PointControlToWorld(e.Location);
 
@@ -279,9 +299,14 @@ public partial class SplitDrawingForm : Form
             {
                 _hoverLineIndex = lineIdx;
                 _hoverFeatureIndex = featIdx;
-                pnlPreview.Cursor = _hoverLineIndex >= 0
-                    ? (_splitLines[_hoverLineIndex].Axis == CutOffAxis.Vertical ? Cursors.SizeNS : Cursors.SizeWE)
-                    : Cursors.Cross;
+                pnlPreview.Cursor =
+                    _hoverLineIndex >= 0
+                        ? (
+                            _splitLines[_hoverLineIndex].Axis == CutOffAxis.Vertical
+                                ? Cursors.SizeNS
+                                : Cursors.SizeWE
+                        )
+                        : Cursors.Cross;
                 pnlPreview.Invalidate();
             }
         }
@@ -307,7 +332,8 @@ public partial class SplitDrawingForm : Form
 
     private (int lineIndex, int featureIndex) HitTestFeatureHandle(Vector worldPt)
     {
-        if (radStraight.Checked) return (-1, -1);
+        if (radStraight.Checked)
+            return (-1, -1);
 
         var hitRadius = HandleRadius / pnlPreview.ViewScale;
         for (var li = 0; li < _splitLines.Count; li++)
@@ -337,7 +363,8 @@ public partial class SplitDrawingForm : Form
     {
         if (keyData == Keys.Space)
         {
-            _currentAxis = _currentAxis == CutOffAxis.Vertical ? CutOffAxis.Horizontal : CutOffAxis.Vertical;
+            _currentAxis =
+                _currentAxis == CutOffAxis.Vertical ? CutOffAxis.Horizontal : CutOffAxis.Vertical;
             pnlPreview.Invalidate();
             return true;
         }
@@ -377,8 +404,13 @@ public partial class SplitDrawingForm : Form
             var r = regions[i];
             var tl = pnlPreview.PointWorldToGraph(r.Left, r.Top);
             var br = pnlPreview.PointWorldToGraph(r.Right, r.Bottom);
-            g.FillRectangle(brush, System.Math.Min(tl.X, br.X), System.Math.Min(tl.Y, br.Y),
-                System.Math.Abs(br.X - tl.X), System.Math.Abs(br.Y - tl.Y));
+            g.FillRectangle(
+                brush,
+                System.Math.Min(tl.X, br.X),
+                System.Math.Min(tl.Y, br.Y),
+                System.Math.Abs(br.X - tl.X),
+                System.Math.Abs(br.Y - tl.Y)
+            );
         }
 
         // Piece number and dimension labels at center of each region
@@ -388,7 +420,11 @@ public partial class SplitDrawingForm : Form
             using var dimFont = new Font("Segoe UI", 11f, FontStyle.Regular, GraphicsUnit.Pixel);
             using var labelBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255));
             using var shadowBrush = new SolidBrush(Color.FromArgb(160, 0, 0, 0));
-            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            var sf = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center,
+            };
 
             for (var i = 0; i < regions.Count; i++)
             {
@@ -481,7 +517,8 @@ public partial class SplitDrawingForm : Form
             var pos = isVert ? snapped.X : snapped.Y;
             var margin = 10.0;
 
-            PointF pp1, pp2;
+            PointF pp1,
+                pp2;
             if (isVert)
             {
                 pp1 = pnlPreview.PointWorldToGraph(pos, _drawingBounds.Bottom - margin);
@@ -496,8 +533,6 @@ public partial class SplitDrawingForm : Form
             using var previewPen = new Pen(Color.FromArgb(180, 255, 213, 79), 1.5f);
             previewPen.DashStyle = DashStyle.DashDot;
             g.DrawLine(previewPen, pp1, pp2);
-
-
         }
 
         // Feature position handles
@@ -511,15 +546,26 @@ public partial class SplitDrawingForm : Form
                     var center = pnlPreview.PointWorldToGraph(GetFeatureHandleWorld(sl, fi));
                     var isDrag = li == _dragLineIndex && fi == _dragFeatureIndex;
                     var isHover = li == _hoverLineIndex && fi == _hoverFeatureIndex;
-                    var fillColor = isDrag ? Color.FromArgb(255, 82, 82)
-                                  : isHover ? Color.FromArgb(255, 183, 77)
-                                  : Color.White;
+                    var fillColor =
+                        isDrag ? Color.FromArgb(255, 82, 82)
+                        : isHover ? Color.FromArgb(255, 183, 77)
+                        : Color.White;
                     using var fill = new SolidBrush(fillColor);
                     using var border = new Pen(Color.FromArgb(80, 80, 80));
-                    g.FillEllipse(fill, center.X - HandleRadius, center.Y - HandleRadius,
-                        HandleRadius * 2, HandleRadius * 2);
-                    g.DrawEllipse(border, center.X - HandleRadius, center.Y - HandleRadius,
-                        HandleRadius * 2, HandleRadius * 2);
+                    g.FillEllipse(
+                        fill,
+                        center.X - HandleRadius,
+                        center.Y - HandleRadius,
+                        HandleRadius * 2,
+                        HandleRadius * 2
+                    );
+                    g.DrawEllipse(
+                        border,
+                        center.X - HandleRadius,
+                        center.Y - HandleRadius,
+                        HandleRadius * 2,
+                        HandleRadius * 2
+                    );
                 }
             }
         }
@@ -532,13 +578,19 @@ public partial class SplitDrawingForm : Form
         Color.FromArgb(40, 255, 183, 77),
         Color.FromArgb(40, 206, 147, 216),
         Color.FromArgb(40, 255, 138, 128),
-        Color.FromArgb(40, 128, 222, 234)
+        Color.FromArgb(40, 128, 222, 234),
     };
 
     private List<Box> BuildPreviewRegions()
     {
-        var verticals = _splitLines.Where(l => l.Axis == CutOffAxis.Vertical).OrderBy(l => l.Position).ToList();
-        var horizontals = _splitLines.Where(l => l.Axis == CutOffAxis.Horizontal).OrderBy(l => l.Position).ToList();
+        var verticals = _splitLines
+            .Where(l => l.Axis == CutOffAxis.Vertical)
+            .OrderBy(l => l.Position)
+            .ToList();
+        var horizontals = _splitLines
+            .Where(l => l.Axis == CutOffAxis.Horizontal)
+            .OrderBy(l => l.Position)
+            .ToList();
 
         var xEdges = new List<double> { _drawingBounds.Left };
         xEdges.AddRange(verticals.Select(v => v.Position));
@@ -550,8 +602,15 @@ public partial class SplitDrawingForm : Form
 
         var regions = new List<Box>();
         for (var yi = 0; yi < yEdges.Count - 1; yi++)
-            for (var xi = 0; xi < xEdges.Count - 1; xi++)
-                regions.Add(new Box(xEdges[xi], yEdges[yi], xEdges[xi + 1] - xEdges[xi], yEdges[yi + 1] - yEdges[yi]));
+        for (var xi = 0; xi < xEdges.Count - 1; xi++)
+            regions.Add(
+                new Box(
+                    xEdges[xi],
+                    yEdges[yi],
+                    xEdges[xi + 1] - xEdges[xi],
+                    yEdges[yi + 1] - yEdges[yi]
+                )
+            );
 
         return regions;
     }
@@ -562,7 +621,12 @@ public partial class SplitDrawingForm : Form
     {
         if (_splitLines.Count == 0)
         {
-            MessageBox.Show("No split lines defined.", "Split Drawing", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                "No split lines defined.",
+                "Split Drawing",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
             return;
         }
 
@@ -598,7 +662,8 @@ public partial class SplitDrawingForm : Form
     private void UpdateUI()
     {
         var pieceCount = _splitLines.Count == 0 ? 1 : BuildPreviewRegions().Count;
-        lblStatus.Text = $"Part: {_drawingBounds.Width:F2} x {_drawingBounds.Length:F2} | {_splitLines.Count} split lines | {pieceCount} pieces";
+        lblStatus.Text =
+            $"Part: {_drawingBounds.Width:F2} x {_drawingBounds.Length:F2} | {_splitLines.Count} split lines | {pieceCount} pieces";
     }
 
     // --- Feature rendering helpers ---
@@ -609,7 +674,7 @@ public partial class SplitDrawingForm : Form
         {
             SplitType.WeldGapTabs => new WeldGapTabSplit(),
             SplitType.SpikeGroove => new SpikeGrooveSplit(),
-            _ => new StraightSplit()
+            _ => new StraightSplit(),
         };
     }
 
@@ -618,12 +683,18 @@ public partial class SplitDrawingForm : Form
         return p.Type switch
         {
             SplitType.WeldGapTabs => p.TabWidth / 2,
-            SplitType.SpikeGroove => p.GrooveDepth * System.Math.Tan(OpenNest.Math.Angle.ToRadians(p.SpikeAngle / 2)),
-            _ => 0
+            SplitType.SpikeGroove => p.GrooveDepth
+                * System.Math.Tan(OpenNest.Math.Angle.ToRadians(p.SpikeAngle / 2)),
+            _ => 0,
         };
     }
 
-    private void DrawFeatureEdge(Graphics g, Pen pen, List<Geometry.Entity> entities, bool isVertical)
+    private void DrawFeatureEdge(
+        Graphics g,
+        Pen pen,
+        List<Geometry.Entity> entities,
+        bool isVertical
+    )
     {
         foreach (var entity in entities)
         {

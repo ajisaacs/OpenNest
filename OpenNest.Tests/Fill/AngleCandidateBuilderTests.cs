@@ -18,8 +18,10 @@ public class AngleCandidateBuilderTests
         return new Drawing("rect", pgm);
     }
 
-    private static ClassificationResult MakeClassification(double primaryAngle = 0, PartType type = PartType.Irregular)
-        => new ClassificationResult { PrimaryAngle = primaryAngle, Type = type };
+    private static ClassificationResult MakeClassification(
+        double primaryAngle = 0,
+        PartType type = PartType.Irregular
+    ) => new ClassificationResult { PrimaryAngle = primaryAngle, Type = type };
 
     [Fact]
     public void Build_ReturnsAtLeastTwoAngles()
@@ -81,8 +83,10 @@ public class AngleCandidateBuilderTests
         builder.ForceFullSweep = false;
         var secondAngles = builder.Build(item, MakeClassification(), workArea);
 
-        Assert.True(secondAngles.Count < firstAngles.Count,
-            $"Pruned ({secondAngles.Count}) should be fewer than full ({firstAngles.Count})");
+        Assert.True(
+            secondAngles.Count < firstAngles.Count,
+            $"Pruned ({secondAngles.Count}) should be fewer than full ({firstAngles.Count})"
+        );
     }
 
     [Fact]
@@ -128,8 +132,10 @@ public class AngleCandidateBuilderTests
 
         var angles = builder.Build(item, classification, workArea);
 
-        Assert.True(angles.Count > 2,
-            $"User constraints should override rect classification, got {angles.Count} angles");
+        Assert.True(
+            angles.Count > 2,
+            $"User constraints should override rect classification, got {angles.Count} angles"
+        );
     }
 
     [Fact]
@@ -149,7 +155,9 @@ public class AngleCandidateBuilderTests
         var angles = builder.Build(item, classification, workArea);
 
         // Start=0, End=PI is NOT "no constraints" — it's a real 0-180 range
-        Assert.True(angles.Count > 2,
-            $"0-to-PI constraint should produce multiple angles, got {angles.Count}");
+        Assert.True(
+            angles.Count > 2,
+            $"0-to-PI constraint should produce multiple angles, got {angles.Count}"
+        );
     }
 }

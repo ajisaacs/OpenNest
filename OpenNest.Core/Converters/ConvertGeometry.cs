@@ -1,7 +1,7 @@
-﻿using OpenNest.CNC;
+﻿using System.Collections.Generic;
+using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Converters
 {

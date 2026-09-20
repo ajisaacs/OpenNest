@@ -82,8 +82,10 @@ namespace OpenNest.Forms
                 SetValueWithFlash(densityValue, densityText, densityFlashColor);
                 densityBar.Value = progress.BestDensity;
 
-                SetValueWithFlash(nestedAreaValue,
-                    $"{progress.NestedWidth:F1} x {progress.NestedLength:F1} ({progress.NestedArea:F1} sq in)");
+                SetValueWithFlash(
+                    nestedAreaValue,
+                    $"{progress.NestedWidth:F1} x {progress.NestedLength:F1} ({progress.NestedArea:F1} sq in)"
+                );
             }
 
             descriptionValue.Text = !string.IsNullOrEmpty(progress.Description)
@@ -130,9 +132,10 @@ namespace OpenNest.Forms
                 return;
 
             var elapsed = stopwatch.Elapsed;
-            elapsedValue.Text = elapsed.TotalHours >= 1
-                ? elapsed.ToString(@"h\:mm\:ss")
-                : elapsed.ToString(@"m\:ss");
+            elapsedValue.Text =
+                elapsed.TotalHours >= 1
+                    ? elapsed.ToString(@"h\:mm\:ss")
+                    : elapsed.ToString(@"m\:ss");
         }
 
         private void AcceptButton_Click(object sender, EventArgs e)

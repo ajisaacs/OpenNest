@@ -1,12 +1,17 @@
+using System.Collections.Generic;
+using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace OpenNest.Engine
 {
-    public enum PartType { Rectangle, Circle, Irregular }
+    public enum PartType
+    {
+        Rectangle,
+        Circle,
+        Irregular,
+    }
 
     public struct ClassificationResult
     {
@@ -27,7 +32,8 @@ namespace OpenNest.Engine
         {
             var result = new ClassificationResult { Type = PartType.Irregular };
 
-            var entities = ConvertProgram.ToGeometry(drawing.Program)
+            var entities = ConvertProgram
+                .ToGeometry(drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
 
             var shapes = ShapeBuilder.GetShapes(entities);
@@ -72,7 +78,8 @@ namespace OpenNest.Engine
 
             // Circularity: 4*PI*area / perimeter^2. Circles ~ 1.0.
             if (drawingPerimeter > Tolerance.Epsilon)
-                result.Circularity = 4 * System.Math.PI * perimeterArea / (drawingPerimeter * drawingPerimeter);
+                result.Circularity =
+                    4 * System.Math.PI * perimeterArea / (drawingPerimeter * drawingPerimeter);
 
             // Check circle first (rotationally invariant).
             if (result.Circularity >= CircularityThreshold)
@@ -90,8 +97,10 @@ namespace OpenNest.Engine
                 result.PerimeterRatio = mbrPerimeter / drawingPerimeter;
 
             // Rectangle: both metrics pass thresholds.
-            if (result.Rectangularity >= RectangularityThreshold
-                && result.PerimeterRatio >= PerimeterRatioThreshold)
+            if (
+                result.Rectangularity >= RectangularityThreshold
+                && result.PerimeterRatio >= PerimeterRatioThreshold
+            )
             {
                 result.Type = PartType.Rectangle;
                 return result;

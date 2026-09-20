@@ -29,17 +29,18 @@ namespace OpenNest.Shapes
         /// Standard mill sheet sizes (inches), sorted by area ascending.
         /// Canonical orientation: Width &lt;= Length.
         /// </summary>
-        public static IReadOnlyList<Entry> All { get; } = new[]
-        {
-            new Entry("48x96",   48,  96),   // 4608
-            new Entry("48x120",  48, 120),   // 5760
-            new Entry("48x144",  48, 144),   // 6912
-            new Entry("60x120",  60, 120),   // 7200
-            new Entry("60x144",  60, 144),   // 8640
-            new Entry("72x120",  72, 120),   // 8640
-            new Entry("72x144",  72, 144),   // 10368
-            new Entry("96x240",  96, 240),   // 23040
-        };
+        public static IReadOnlyList<Entry> All { get; } =
+            new[]
+            {
+                new Entry("48x96", 48, 96), // 4608
+                new Entry("48x120", 48, 120), // 5760
+                new Entry("48x144", 48, 144), // 6912
+                new Entry("60x120", 60, 120), // 7200
+                new Entry("60x144", 60, 144), // 8640
+                new Entry("72x120", 72, 120), // 8640
+                new Entry("72x144", 72, 144), // 10368
+                new Entry("96x240", 96, 240), // 23040
+            };
 
         /// <summary>
         /// Looks up a standard size by label. Case-insensitive.
@@ -77,7 +78,10 @@ namespace OpenNest.Shapes
         /// <summary>
         /// Recommends a plate size for the envelope of the given boxes.
         /// </summary>
-        public static PlateSizeResult Recommend(IEnumerable<Box> boxes, PlateSizeOptions options = null)
+        public static PlateSizeResult Recommend(
+            IEnumerable<Box> boxes,
+            PlateSizeOptions options = null
+        )
         {
             if (boxes == null)
                 throw new ArgumentNullException(nameof(boxes));
@@ -91,10 +95,14 @@ namespace OpenNest.Shapes
             foreach (var box in boxes)
             {
                 hasAny = true;
-                if (box.Left < minX) minX = box.Left;
-                if (box.Bottom < minY) minY = box.Bottom;
-                if (box.Right > maxX) maxX = box.Right;
-                if (box.Top > maxY) maxY = box.Top;
+                if (box.Left < minX)
+                    minX = box.Left;
+                if (box.Bottom < minY)
+                    minY = box.Bottom;
+                if (box.Right > maxX)
+                    maxX = box.Right;
+                if (box.Top > maxY)
+                    maxY = box.Top;
             }
 
             if (!hasAny)
@@ -109,7 +117,11 @@ namespace OpenNest.Shapes
         /// Recommends a plate size for a (width, length) pair.
         /// Inputs are treated as orientation-independent.
         /// </summary>
-        public static PlateSizeResult Recommend(double width, double length, PlateSizeOptions options = null)
+        public static PlateSizeResult Recommend(
+            double width,
+            double length,
+            PlateSizeOptions options = null
+        )
         {
             options ??= new PlateSizeOptions();
 
@@ -174,10 +186,23 @@ namespace OpenNest.Shapes
             if (!string.IsNullOrWhiteSpace(label))
             {
                 var parts = label.Split(new[] { 'x', 'X' }, 2);
-                if (parts.Length == 2
-                    && double.TryParse(parts[0].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var a)
-                    && double.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var b)
-                    && a > 0 && b > 0)
+                if (
+                    parts.Length == 2
+                    && double.TryParse(
+                        parts[0].Trim(),
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out var a
+                    )
+                    && double.TryParse(
+                        parts[1].Trim(),
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out var b
+                    )
+                    && a > 0
+                    && b > 0
+                )
                 {
                     var width = System.Math.Min(a, b);
                     var length = System.Math.Max(a, b);
@@ -190,13 +215,20 @@ namespace OpenNest.Shapes
             return false;
         }
 
-        private static Entry? PickBest(IReadOnlyList<Entry> catalog, double width, double length, PlateSizeSelection selection)
+        private static Entry? PickBest(
+            IReadOnlyList<Entry> catalog,
+            double width,
+            double length,
+            PlateSizeSelection selection
+        )
         {
             var fitting = catalog.Where(e => e.Fits(width, length));
 
             fitting = selection switch
             {
-                PlateSizeSelection.NarrowestFirst => fitting.OrderBy(e => e.Width).ThenBy(e => e.Area),
+                PlateSizeSelection.NarrowestFirst => fitting
+                    .OrderBy(e => e.Width)
+                    .ThenBy(e => e.Area),
                 _ => fitting.OrderBy(e => e.Area).ThenBy(e => e.Width),
             };
 
@@ -249,6 +281,7 @@ namespace OpenNest.Shapes
     {
         /// <summary>Pick the cheapest sheet that contains the bbox (smallest area).</summary>
         SmallestArea,
+
         /// <summary>Prefer narrower-width sheets (e.g. 48-wide before 60-wide).</summary>
         NarrowestFirst,
     }

@@ -1,11 +1,11 @@
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Nfp
 {
@@ -15,9 +15,12 @@ namespace OpenNest.Engine.Nfp
     /// </summary>
     public static class AutoNester
     {
-        public static List<Part> Nest(List<NestItem> items, Plate plate,
+        public static List<Part> Nest(
+            List<NestItem> items,
+            Plate plate,
             IProgress<NestProgress> progress = null,
-            CancellationToken cancellation = default)
+            CancellationToken cancellation = default
+        )
         {
             var workArea = plate.WorkArea();
             var halfSpacing = plate.PartSpacing / 2.0;
@@ -36,7 +39,9 @@ namespace OpenNest.Engine.Nfp
 
                 if (perimeterPolygon == null)
                 {
-                    Debug.WriteLine($"[AutoNest] Skipping drawing '{drawing.Name}': no valid perimeter");
+                    Debug.WriteLine(
+                        $"[AutoNest] Skipping drawing '{drawing.Name}': no valid perimeter"
+                    );
                     continue;
                 }
 
@@ -58,11 +63,20 @@ namespace OpenNest.Engine.Nfp
             // Pre-compute all NFPs.
             nfpCache.PreComputeAll();
 
-            Debug.WriteLine($"[AutoNest] NFP cache: {nfpCache.Count} entries for {candidateRotations.Count} drawings");
+            Debug.WriteLine(
+                $"[AutoNest] NFP cache: {nfpCache.Count} entries for {candidateRotations.Count} drawings"
+            );
 
             // Run simulated annealing optimizer.
             var optimizer = new SimulatedAnnealing();
-            var result = optimizer.Optimize(items, workArea, nfpCache, candidateRotations, progress, cancellation);
+            var result = optimizer.Optimize(
+                items,
+                workArea,
+                nfpCache,
+                candidateRotations,
+                progress,
+                cancellation
+            );
 
             if (result.Sequence == null || result.Sequence.Count == 0)
                 return new List<Part>();
@@ -72,17 +86,22 @@ namespace OpenNest.Engine.Nfp
             var placedParts = blf.Fill(result.Sequence);
             var parts = BottomLeftFill.ToNestParts(placedParts);
 
-            Debug.WriteLine($"[AutoNest] Result: {parts.Count} parts placed, {result.Iterations} SA iterations");
+            Debug.WriteLine(
+                $"[AutoNest] Result: {parts.Count} parts placed, {result.Iterations} SA iterations"
+            );
 
-            NestEngineBase.ReportProgress(progress, new ProgressReport
-            {
-                Phase = NestPhase.Nfp,
-                PlateNumber = 0,
-                Parts = parts,
-                WorkArea = workArea,
-                Description = $"NFP: {parts.Count} parts, {result.Iterations} iterations",
-                IsOverallBest = true,
-            });
+            NestEngineBase.ReportProgress(
+                progress,
+                new ProgressReport
+                {
+                    Phase = NestPhase.Nfp,
+                    PlateNumber = 0,
+                    Parts = parts,
+                    WorkArea = workArea,
+                    Description = $"NFP: {parts.Count} parts, {result.Iterations} iterations",
+                    IsOverallBest = true,
+                }
+            );
 
             return parts;
         }
@@ -147,7 +166,9 @@ namespace OpenNest.Engine.Nfp
             // Only use the NFP result if it kept all parts and improved density.
             if (optimized.Count < parts.Count)
             {
-                Debug.WriteLine($"[AutoNest.Optimize] Rejected: placed {optimized.Count}/{parts.Count} parts");
+                Debug.WriteLine(
+                    $"[AutoNest.Optimize] Rejected: placed {optimized.Count}/{parts.Count} parts"
+                );
                 return parts;
             }
 
@@ -163,24 +184,32 @@ namespace OpenNest.Engine.Nfp
 
             if (optimizedScore > originalScore)
             {
-                Debug.WriteLine($"[AutoNest.Optimize] Improved: density {originalScore.Density:P1} -> {optimizedScore.Density:P1}");
+                Debug.WriteLine(
+                    $"[AutoNest.Optimize] Improved: density {originalScore.Density:P1} -> {optimizedScore.Density:P1}"
+                );
                 return optimized;
             }
 
-            Debug.WriteLine($"[AutoNest.Optimize] No improvement: {originalScore.Density:P1} >= {optimizedScore.Density:P1}");
+            Debug.WriteLine(
+                $"[AutoNest.Optimize] No improvement: {originalScore.Density:P1} >= {optimizedScore.Density:P1}"
+            );
             return parts;
         }
 
         private static bool AllPartsInBounds(List<Part> parts, Box workArea)
         {
             var logPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log");
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                "nest-debug.log"
+            );
 
             var allInBounds = true;
 
             // Append to the log that BLF already started
             using var log = new StreamWriter(logPath, true);
-            log.WriteLine($"\n[Bounds] workArea: X={workArea.X} Y={workArea.Y} W={workArea.Width} H={workArea.Length}  Right={workArea.Right} Top={workArea.Top}");
+            log.WriteLine(
+                $"\n[Bounds] workArea: X={workArea.X} Y={workArea.Y} W={workArea.Width} H={workArea.Length}  Right={workArea.Right} Top={workArea.Top}"
+            );
 
             foreach (var part in parts)
             {
@@ -193,7 +222,9 @@ namespace OpenNest.Engine.Nfp
 
                 if (oob)
                 {
-                    log.WriteLine($"[Bounds] OOB  DrawingId={part.BaseDrawing.Id} \"{part.BaseDrawing.Name}\"  loc=({part.Location.X:F4},{part.Location.Y:F4}) rot={part.Rotation:F3}  bb=({bb.Left:F4},{bb.Bottom:F4})-({bb.Right:F4},{bb.Top:F4})  violations: {(outLeft ? "LEFT " : "")}{(outBottom ? "BOTTOM " : "")}{(outRight ? "RIGHT " : "")}{(outTop ? "TOP " : "")}");
+                    log.WriteLine(
+                        $"[Bounds] OOB  DrawingId={part.BaseDrawing.Id} \"{part.BaseDrawing.Name}\"  loc=({part.Location.X:F4},{part.Location.Y:F4}) rot={part.Rotation:F3}  bb=({bb.Left:F4},{bb.Bottom:F4})-({bb.Right:F4},{bb.Top:F4})  violations: {(outLeft ? "LEFT " : "")}{(outBottom ? "BOTTOM " : "")}{(outRight ? "RIGHT " : "")}{(outTop ? "TOP " : "")}"
+                    );
                     allInBounds = false;
                 }
             }
@@ -215,8 +246,11 @@ namespace OpenNest.Engine.Nfp
         /// <summary>
         /// Computes candidate rotation angles for a drawing.
         /// </summary>
-        private static List<double> ComputeCandidateRotations(NestItem item,
-            Polygon perimeterPolygon, Box workArea)
+        private static List<double> ComputeCandidateRotations(
+            NestItem item,
+            Polygon perimeterPolygon,
+            Box workArea
+        )
         {
             var rotations = new List<double> { 0 };
 

@@ -27,15 +27,23 @@ public static class NestResultMaterializer
         ArgumentNullException.ThrowIfNull(job);
         ArgumentNullException.ThrowIfNull(result);
         var nest = new Nest();
-        var drawings = job.Parts.ToDictionary(p => p.Id, DrawingJobMapper.CreateDrawing, StringComparer.Ordinal);
-        foreach (var drawing in drawings.Values) nest.Drawings.Add(drawing);
+        var drawings = job.Parts.ToDictionary(
+            p => p.Id,
+            DrawingJobMapper.CreateDrawing,
+            StringComparer.Ordinal
+        );
+        foreach (var drawing in drawings.Values)
+            nest.Drawings.Add(drawing);
         foreach (var sheet in result.Plates)
         {
             var plate = DrawingJobMapper.CreatePlate(sheet.Stock);
             foreach (var pose in sheet.Placements)
             {
                 if (!drawings.TryGetValue(pose.PartId, out var drawing))
-                    throw new ArgumentException("Result contains a requirement not present in the job.", nameof(result));
+                    throw new ArgumentException(
+                        "Result contains a requirement not present in the job.",
+                        nameof(result)
+                    );
                 // Do not use CreateAtOrigin: it normalizes bounds and would change the snapshot frame.
                 var part = new Part(drawing);
                 part.Rotate(pose.Rotation);

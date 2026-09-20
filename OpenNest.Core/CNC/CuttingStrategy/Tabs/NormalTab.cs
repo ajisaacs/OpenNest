@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -11,8 +11,11 @@ namespace OpenNest.CNC.CuttingStrategy
         public double CutoutMaxHeight { get; set; }
 
         public override List<ICode> Generate(
-            Vector tabStartPoint, Vector tabEndPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+            Vector tabStartPoint,
+            Vector tabEndPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
             var codes = new List<ICode>();
 
@@ -29,8 +32,10 @@ namespace OpenNest.CNC.CuttingStrategy
 
         public bool AppliesToCutout(double cutoutWidth, double cutoutHeight)
         {
-            return cutoutWidth >= CutoutMinWidth && cutoutWidth <= CutoutMaxWidth
-                && cutoutHeight >= CutoutMinHeight && cutoutHeight <= CutoutMaxHeight;
+            return cutoutWidth >= CutoutMinWidth
+                && cutoutWidth <= CutoutMaxWidth
+                && cutoutHeight >= CutoutMinHeight
+                && cutoutHeight <= CutoutMaxHeight;
         }
     }
 }

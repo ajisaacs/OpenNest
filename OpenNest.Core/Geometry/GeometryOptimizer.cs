@@ -1,21 +1,25 @@
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
     public static class GeometryOptimizer
     {
         public static void Optimize(IList<Arc> arcs) =>
-            MergePass(arcs,
+            MergePass(
+                arcs,
                 (list, item, i) => list.GetCoradialArs(item, i),
-                (Arc a, Arc b, out Arc joined) => TryJoinArcs(a, b, out joined));
+                (Arc a, Arc b, out Arc joined) => TryJoinArcs(a, b, out joined)
+            );
 
         public static void Optimize(IList<Line> lines) =>
-            MergePass(lines,
+            MergePass(
+                lines,
                 (list, item, i) => list.GetCollinearLines(item, i),
-                (Line a, Line b, out Line joined) => TryJoinLines(a, b, out joined));
+                (Line a, Line b, out Line joined) => TryJoinLines(a, b, out joined)
+            );
 
         public static void Deduplicate(IList<Circle> circles)
         {
@@ -23,8 +27,10 @@ namespace OpenNest.Geometry
             {
                 for (var j = i - 1; j >= 0; j--)
                 {
-                    if (circles[i].Center.DistanceTo(circles[j].Center) <= Tolerance.Epsilon
-                        && circles[i].Radius.IsEqualTo(circles[j].Radius))
+                    if (
+                        circles[i].Center.DistanceTo(circles[j].Center) <= Tolerance.Epsilon
+                        && circles[i].Radius.IsEqualTo(circles[j].Radius)
+                    )
                     {
                         circles.RemoveAt(i);
                         break;
@@ -39,9 +45,11 @@ namespace OpenNest.Geometry
             {
                 for (var j = arcs.Count - 1; j >= 0; j--)
                 {
-                    if (arcs[j].Center.DistanceTo(circles[i].Center) <= Tolerance.Epsilon
+                    if (
+                        arcs[j].Center.DistanceTo(circles[i].Center) <= Tolerance.Epsilon
                         && arcs[j].Radius.IsEqualTo(circles[i].Radius)
-                        && arcs[j].IsFullCircle())
+                        && arcs[j].IsFullCircle()
+                    )
                     {
                         arcs.RemoveAt(j);
                     }
@@ -51,9 +59,12 @@ namespace OpenNest.Geometry
 
         private delegate bool TryJoin<T>(T a, T b, out T joined);
 
-        private static void MergePass<T>(IList<T> items,
+        private static void MergePass<T>(
+            IList<T> items,
             Func<IList<T>, T, int, List<T>> findCandidates,
-            TryJoin<T> tryJoin) where T : class
+            TryJoin<T> tryJoin
+        )
+            where T : class
         {
             for (var i = 0; i < items.Count; ++i)
             {
@@ -117,10 +128,14 @@ namespace OpenNest.Geometry
 
             if (!onPoint)
             {
-                if (t1 < b2 - Tolerance.Epsilon) return false;
-                if (b1 > t2 + Tolerance.Epsilon) return false;
-                if (l1 > r2 + Tolerance.Epsilon) return false;
-                if (r1 < l2 - Tolerance.Epsilon) return false;
+                if (t1 < b2 - Tolerance.Epsilon)
+                    return false;
+                if (b1 > t2 + Tolerance.Epsilon)
+                    return false;
+                if (l1 > r2 + Tolerance.Epsilon)
+                    return false;
+                if (r1 < l2 - Tolerance.Epsilon)
+                    return false;
             }
 
             var l = l1 < l2 ? l1 : l2;
@@ -129,9 +144,17 @@ namespace OpenNest.Geometry
             var b = b1 < b2 ? b1 : b2;
 
             if (!line1.IsVertical() && line1.Slope() < 0)
-                lineOut = new Line(new Vector(l, t), new Vector(r, b)) { Layer = line1.Layer, Color = line1.Color };
+                lineOut = new Line(new Vector(l, t), new Vector(r, b))
+                {
+                    Layer = line1.Layer,
+                    Color = line1.Color,
+                };
             else
-                lineOut = new Line(new Vector(l, b), new Vector(r, t)) { Layer = line1.Layer, Color = line1.Color };
+                lineOut = new Line(new Vector(l, b), new Vector(r, t))
+                {
+                    Layer = line1.Layer,
+                    Color = line1.Color,
+                };
 
             return true;
         }
@@ -177,33 +200,47 @@ namespace OpenNest.Geometry
             if (sweep >= Angle.TwoPI - Tolerance.Epsilon)
                 return false;
 
-            if (startAngle < 0) startAngle += Angle.TwoPI;
-            if (endAngle < 0) endAngle += Angle.TwoPI;
+            if (startAngle < 0)
+                startAngle += Angle.TwoPI;
+            if (endAngle < 0)
+                endAngle += Angle.TwoPI;
 
-            arcOut = new Arc(arc1.Center, arc1.Radius, startAngle, endAngle) { Layer = arc1.Layer, Color = arc1.Color };
+            arcOut = new Arc(arc1.Center, arc1.Radius, startAngle, endAngle)
+            {
+                Layer = arc1.Layer,
+                Color = arc1.Color,
+            };
 
             return true;
         }
 
-        private static List<Line> GetCollinearLines(this IList<Line> lines, Line line, int startIndex)
+        private static List<Line> GetCollinearLines(
+            this IList<Line> lines,
+            Line line,
+            int startIndex
+        )
         {
             var collinearLines = new List<Line>();
 
-            Parallel.For(startIndex, lines.Count, index =>
-            {
-                var compareLine = lines[index];
-
-                if (Object.ReferenceEquals(line, compareLine))
-                    return;
-
-                if (!line.IsCollinearTo(compareLine))
-                    return;
-
-                lock (collinearLines)
+            Parallel.For(
+                startIndex,
+                lines.Count,
+                index =>
                 {
-                    collinearLines.Add(compareLine);
+                    var compareLine = lines[index];
+
+                    if (Object.ReferenceEquals(line, compareLine))
+                        return;
+
+                    if (!line.IsCollinearTo(compareLine))
+                        return;
+
+                    lock (collinearLines)
+                    {
+                        collinearLines.Add(compareLine);
+                    }
                 }
-            });
+            );
 
             return collinearLines;
         }
@@ -212,21 +249,25 @@ namespace OpenNest.Geometry
         {
             var coradialArcs = new List<Arc>();
 
-            Parallel.For(startIndex, arcs.Count, index =>
-            {
-                var compareArc = arcs[index];
-
-                if (Object.ReferenceEquals(arc, compareArc))
-                    return;
-
-                if (!arc.IsCoradialTo(compareArc))
-                    return;
-
-                lock (coradialArcs)
+            Parallel.For(
+                startIndex,
+                arcs.Count,
+                index =>
                 {
-                    coradialArcs.Add(compareArc);
+                    var compareArc = arcs[index];
+
+                    if (Object.ReferenceEquals(arc, compareArc))
+                        return;
+
+                    if (!arc.IsCoradialTo(compareArc))
+                        return;
+
+                    lock (coradialArcs)
+                    {
+                        coradialArcs.Add(compareArc);
+                    }
                 }
-            });
+            );
 
             return coradialArcs;
         }

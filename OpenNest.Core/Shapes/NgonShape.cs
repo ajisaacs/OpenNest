@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Shapes
 {
@@ -30,7 +30,8 @@ namespace OpenNest.Shapes
                 var angle = start + i * step;
                 vertices[i] = new Vector(
                     center + circumRadius * System.Math.Cos(angle),
-                    center + circumRadius * System.Math.Sin(angle));
+                    center + circumRadius * System.Math.Sin(angle)
+                );
             }
 
             var entities = new List<Entity>();

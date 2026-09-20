@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -10,8 +10,11 @@ namespace OpenNest.CNC.CuttingStrategy
         public double BreakerAngle { get; set; }
 
         public override List<ICode> Generate(
-            Vector tabStartPoint, Vector tabEndPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+            Vector tabStartPoint,
+            Vector tabEndPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
             var codes = new List<ICode>();
 
@@ -21,7 +24,8 @@ namespace OpenNest.CNC.CuttingStrategy
             var scoreAngle = contourNormalAngle + System.Math.PI;
             var scoreEnd = new Vector(
                 tabStartPoint.X + BreakerDepth * System.Math.Cos(scoreAngle),
-                tabStartPoint.Y + BreakerDepth * System.Math.Sin(scoreAngle));
+                tabStartPoint.Y + BreakerDepth * System.Math.Sin(scoreAngle)
+            );
             codes.Add(new LinearMove(scoreEnd));
             codes.Add(new RapidMove(tabEndPoint));
 

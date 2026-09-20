@@ -22,12 +22,10 @@ public class DxfRoundtripTests
         return reimported;
     }
 
-    private static List<T> FilterByLayer<T>(List<Entity> entities, string layerName) where T : Entity
+    private static List<T> FilterByLayer<T>(List<Entity> entities, string layerName)
+        where T : Entity
     {
-        return entities
-            .Where(e => e is T && e.Layer?.Name == layerName)
-            .Cast<T>()
-            .ToList();
+        return entities.Where(e => e is T && e.Layer?.Name == layerName).Cast<T>().ToList();
     }
 
     [Fact]
@@ -38,7 +36,7 @@ public class DxfRoundtripTests
         {
             new Line(0, 0, 10, 0),
             new Line(10, 0, 5, 8),
-            new Line(5, 8, 0, 0)
+            new Line(5, 8, 0, 0),
         };
 
         var reimported = ExportAndReimport(original);
@@ -97,7 +95,7 @@ public class DxfRoundtripTests
             new Line(0, 0, 10, 0),
             new Line(10, 0, 10, 5),
             new Circle(20, 20, 3),
-            new Arc(15, 15, 5, 0.0, System.Math.PI)
+            new Arc(15, 15, 5, 0.0, System.Math.PI),
         };
 
         var reimported = ExportAndReimport(original);
@@ -120,17 +118,25 @@ public class DxfRoundtripTests
             new Line(0, 0, 20, 0),
             new Line(20, 0, 20, 10),
             new Line(20, 10, 0, 10),
-            new Line(0, 10, 0, 0)
+            new Line(0, 10, 0, 0),
         };
 
         var reimported = ExportAndReimport(original);
         var cutLines = FilterByLayer<Line>(reimported, "Cut");
 
         // Verify bounding box is preserved regardless of line order
-        var origMinX = original.Cast<Line>().Min(l => System.Math.Min(l.StartPoint.X, l.EndPoint.X));
-        var origMaxX = original.Cast<Line>().Max(l => System.Math.Max(l.StartPoint.X, l.EndPoint.X));
-        var origMinY = original.Cast<Line>().Min(l => System.Math.Min(l.StartPoint.Y, l.EndPoint.Y));
-        var origMaxY = original.Cast<Line>().Max(l => System.Math.Max(l.StartPoint.Y, l.EndPoint.Y));
+        var origMinX = original
+            .Cast<Line>()
+            .Min(l => System.Math.Min(l.StartPoint.X, l.EndPoint.X));
+        var origMaxX = original
+            .Cast<Line>()
+            .Max(l => System.Math.Max(l.StartPoint.X, l.EndPoint.X));
+        var origMinY = original
+            .Cast<Line>()
+            .Min(l => System.Math.Min(l.StartPoint.Y, l.EndPoint.Y));
+        var origMaxY = original
+            .Cast<Line>()
+            .Max(l => System.Math.Max(l.StartPoint.Y, l.EndPoint.Y));
 
         var rtMinX = cutLines.Min(l => System.Math.Min(l.StartPoint.X, l.EndPoint.X));
         var rtMaxX = cutLines.Max(l => System.Math.Max(l.StartPoint.X, l.EndPoint.X));

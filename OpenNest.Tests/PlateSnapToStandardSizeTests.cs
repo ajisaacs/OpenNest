@@ -31,7 +31,7 @@ public class PlateSnapToStandardSizeTests
         // 10x20 is well below 48x48 MinSheet -> snap to integer increment.
         Assert.Null(result.MatchedLabel);
         Assert.Equal(10, plate.Size.Length); // X axis
-        Assert.Equal(20, plate.Size.Width);  // Y axis
+        Assert.Equal(20, plate.Size.Width); // Y axis
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class PlateSnapToStandardSizeTests
 
         Assert.Equal("48x96", result.MatchedLabel);
         Assert.Equal(96, plate.Size.Length); // X axis = long
-        Assert.Equal(48, plate.Size.Width);  // Y axis = short
+        Assert.Equal(48, plate.Size.Width); // Y axis = short
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class PlateSnapToStandardSizeTests
 
         Assert.Equal("48x96", result.MatchedLabel);
         Assert.Equal(48, plate.Size.Length); // X axis = short
-        Assert.Equal(96, plate.Size.Width);  // Y axis = long
+        Assert.Equal(96, plate.Size.Width); // Y axis = long
     }
 
     [Fact]
@@ -105,8 +105,8 @@ public class PlateSnapToStandardSizeTests
     {
         var plate = new Plate(200, 200);
         plate.Parts.Add(MakeRectPart(0, 0, 30, 40));
-        plate.Parts.Add(MakeRectPart(30, 0, 30, 40));  // combined X-extent = 60
-        plate.Parts.Add(MakeRectPart(0, 40, 60, 60));  // combined extent = 60 x 100
+        plate.Parts.Add(MakeRectPart(30, 0, 30, 40)); // combined X-extent = 60
+        plate.Parts.Add(MakeRectPart(0, 40, 60, 60)); // combined extent = 60 x 100
 
         var result = plate.SnapToStandardSize();
 

@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -8,11 +8,13 @@ namespace OpenNest.Engine.BestFit
         double[] ComputeDistances(
             List<Line> stationaryLines,
             List<Line> movingTemplateLines,
-            SlideOffset[] offsets);
+            SlideOffset[] offsets
+        );
 
         double[] ComputeDistances(
             List<Entity> stationaryEntities,
             List<Entity> movingEntities,
-            SlideOffset[] offsets);
+            SlideOffset[] offsets
+        );
     }
 }

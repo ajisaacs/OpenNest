@@ -14,13 +14,15 @@ public class MachineConfig
     public ThicknessConfig? GetParameters(string material, double thickness)
     {
         var mat = GetMaterial(material);
-        if (mat is null) return null;
+        if (mat is null)
+            return null;
         return mat.Thicknesses.FirstOrDefault(t => t.Value.IsEqualTo(thickness));
     }
 
     public MaterialConfig? GetMaterial(string name)
     {
         return Materials.FirstOrDefault(m =>
-            string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+            string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)
+        );
     }
 }

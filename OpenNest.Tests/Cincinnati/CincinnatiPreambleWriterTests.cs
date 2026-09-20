@@ -14,7 +14,7 @@ public class CincinnatiPreambleWriterTests
         var config = new CincinnatiPostConfig
         {
             ConfigurationName = "CL940",
-            PostedUnits = Units.Inches
+            PostedUnits = Units.Inches,
         };
         var sb = new StringBuilder();
         using var sw = new StringWriter(sb);
@@ -152,7 +152,7 @@ public class CincinnatiPreambleWriterTests
         {
             new(48, 96) { Quantity = 5 },
             new(72, 48) { Quantity = 2 },
-            new(36, 48) { Quantity = 1 }
+            new(36, 48) { Quantity = 1 },
         };
         writer.WriteMainProgram(sw, "Test", "", plates, "");
 

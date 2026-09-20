@@ -51,15 +51,17 @@ public class ApplySingleTests
         {
             Parameters = new CuttingParameters
             {
-                ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
-            }
+                ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
+            },
         };
 
         var clickPoint = new Vector(5, 0);
         var entity = new Line(new Vector(10, 0), new Vector(0, 0));
         var result = strategy.ApplySingle(pgm, clickPoint, entity, ContourType.External);
 
-        var hasLeadin = result.Program.Codes.OfType<LinearMove>().Any(m => m.Layer == LayerType.Leadin);
+        var hasLeadin = result
+            .Program.Codes.OfType<LinearMove>()
+            .Any(m => m.Layer == LayerType.Leadin);
         Assert.True(hasLeadin);
     }
 
@@ -71,8 +73,8 @@ public class ApplySingleTests
         {
             Parameters = new CuttingParameters
             {
-                ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
-            }
+                ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
+            },
         };
 
         var clickPoint = new Vector(5, 0);
@@ -82,7 +84,8 @@ public class ApplySingleTests
         // Convert back to absolute to check positions
         result.Program.Mode = Mode.Absolute;
 
-        var firstLinear = result.Program.Codes.OfType<LinearMove>()
+        var firstLinear = result
+            .Program.Codes.OfType<LinearMove>()
             .First(m => m.Layer == LayerType.Leadin);
         Assert.Equal(clickPoint.X, firstLinear.EndPoint.X, 4);
         Assert.Equal(clickPoint.Y, firstLinear.EndPoint.Y, 4);
@@ -96,8 +99,8 @@ public class ApplySingleTests
         {
             Parameters = new CuttingParameters
             {
-                ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
-            }
+                ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
+            },
         };
 
         var clickPoint = new Vector(5, 0);
@@ -116,8 +119,8 @@ public class ApplySingleTests
             Parameters = new CuttingParameters
             {
                 ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
-                InternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 }
-            }
+                InternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
+            },
         };
 
         var clickPoint = new Vector(10, 0);

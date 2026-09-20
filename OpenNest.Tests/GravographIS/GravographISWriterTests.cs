@@ -14,16 +14,16 @@ public class GravographISWriterTests
     // those frozen deltas send the head to a fixed point regardless of the job. The
     // writer now emits a job-specific leading DR travel from operator zero instead.
     private const string PreambleHex =
-        "21 41 53 20 33 38 3b 01 90 01 f4 01 90 01 f4 01 90 01 f4 00 00 00 00 00 00 00 00 00 00 " +
-        "00 00 00 09 00 00 03 e8 05 06 00 00 00 00 00 00 ff fd 32 44 00 00 ff fd 4d 43 00 01 ff fd " +
-        "4f 55 ff fb ff fd 4f 55 ff fa ff fd 50 5a 00 00 ff fd 56 53 00 23 ff fd 56 5a 00 23 ff fd " +
-        "44 5a 01 fc";
+        "21 41 53 20 33 38 3b 01 90 01 f4 01 90 01 f4 01 90 01 f4 00 00 00 00 00 00 00 00 00 00 "
+        + "00 00 00 09 00 00 03 e8 05 06 00 00 00 00 00 00 ff fd 32 44 00 00 ff fd 4d 43 00 01 ff fd "
+        + "4f 55 ff fb ff fd 4f 55 ff fa ff fd 50 5a 00 00 ff fd 56 53 00 23 ff fd 56 5a 00 23 ff fd "
+        + "44 5a 01 fc";
 
     // Legacy 36-byte tail with lift, aux off, motor off, operator beep, job finish.
     // Byte-exact capture tests disable dynamic return-to-origin to preserve this form.
     private const string PostambleHex =
-        "ff fd 50 55 00 01 ff fd 4f 55 ff fa ff fd 4f 55 ff fb ff fd 4d 43 00 00 " +
-        "ff fd 4f 50 00 00 ff fd 4a 46 00 00";
+        "ff fd 50 55 00 01 ff fd 4f 55 ff fa ff fd 4f 55 ff fb ff fd 4d 43 00 00 "
+        + "ff fd 4f 50 00 00 ff fd 4a 46 00 00";
 
     [Fact]
     public void TestA_SingleTwoInchVerticalLine_IsByteExact()
@@ -33,20 +33,22 @@ public class GravographISWriterTests
             new[] { new Vector(1, 1), new Vector(1, 3) },
         };
 
-        var writer = new GravographISWriter(new GravographISWriterOptions
-        {
-            DepthInches = 0.25,
-            FeedMmPerSec = 35,
-            EnvelopeGuardEnabled = false,
-            ReturnToOriginAtEnd = false,
-        });
+        var writer = new GravographISWriter(
+            new GravographISWriterOptions
+            {
+                DepthInches = 0.25,
+                FeedMmPerSec = 35,
+                EnvelopeGuardEnabled = false,
+                ReturnToOriginAtEnd = false,
+            }
+        );
 
         using var ms = new MemoryStream();
         writer.Write(polylines, ms);
 
         const string GeomHex =
-            "ff fd 44 52 00 00 2d 41 00 80 07 f0 f8 10 " +
-            "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20";
+            "ff fd 44 52 00 00 2d 41 00 80 07 f0 f8 10 "
+            + "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20";
         var expected = HexToBytes(PreambleHex + " " + GeomHex + " " + PostambleHex);
 
         Assert.Equal(expected, ms.ToArray());
@@ -63,26 +65,28 @@ public class GravographISWriterTests
             new[] { new Vector(1, 5), new Vector(1, 7) },
         };
 
-        var writer = new GravographISWriter(new GravographISWriterOptions
-        {
-            DepthInches = 0.25,
-            FeedMmPerSec = 35,
-            EnvelopeGuardEnabled = false,
-            ReturnToOriginAtEnd = false,
-        });
+        var writer = new GravographISWriter(
+            new GravographISWriterOptions
+            {
+                DepthInches = 0.25,
+                FeedMmPerSec = 35,
+                EnvelopeGuardEnabled = false,
+                ReturnToOriginAtEnd = false,
+            }
+        );
 
         using var ms = new MemoryStream();
         writer.Write(polylines, ms);
 
         const string GeomHex =
-            "ff fd 44 52 00 00 2d 41 00 80 07 f0 f8 10 " +
-            "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20 " +
-            "ff fd 50 55 00 00 35 40 00 b4 17 d0 0f e0 " +
-            "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20 " +
-            "ff fd 50 55 00 00 40 00 00 b4 00 00 f0 20 " +
-            "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20 " +
-            "ff fd 50 55 00 00 35 40 00 b4 e8 30 0f e0 " +
-            "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20";
+            "ff fd 44 52 00 00 2d 41 00 80 07 f0 f8 10 "
+            + "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20 "
+            + "ff fd 50 55 00 00 35 40 00 b4 17 d0 0f e0 "
+            + "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20 "
+            + "ff fd 50 55 00 00 40 00 00 b4 00 00 f0 20 "
+            + "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20 "
+            + "ff fd 50 55 00 00 35 40 00 b4 e8 30 0f e0 "
+            + "ff fd 50 44 00 00 40 00 00 b4 00 00 f0 20";
         var expected = HexToBytes(PreambleHex + " " + GeomHex + " " + PostambleHex);
 
         Assert.Equal(expected, ms.ToArray());
@@ -97,7 +101,9 @@ public class GravographISWriterTests
         };
 
         using var ms = new MemoryStream();
-        new GravographISWriter(new GravographISWriterOptions { EnvelopeGuardEnabled = false }).Write(polylines, ms);
+        new GravographISWriter(
+            new GravographISWriterOptions { EnvelopeGuardEnabled = false }
+        ).Write(polylines, ms);
 
         var bytes = ms.ToArray();
         // First command after the 93-byte preamble must be DR to the first point,
@@ -122,7 +128,9 @@ public class GravographISWriterTests
         };
 
         using var ms = new MemoryStream();
-        new GravographISWriter(new GravographISWriterOptions { EnvelopeGuardEnabled = false }).Write(polylines, ms);
+        new GravographISWriter(
+            new GravographISWriterOptions { EnvelopeGuardEnabled = false }
+        ).Write(polylines, ms);
 
         var bytes = ms.ToArray();
         Assert.Equal((byte)'D', bytes[95]);
@@ -140,11 +148,13 @@ public class GravographISWriterTests
         };
 
         using var ms = new MemoryStream();
-        new GravographISWriter(new GravographISWriterOptions
-        {
-            DepthInches = 0.125,   // 254 steps = 0x00FE
-            FeedMmPerSec = 50,     // 0x0032
-        }).Write(polylines, ms);
+        new GravographISWriter(
+            new GravographISWriterOptions
+            {
+                DepthInches = 0.125, // 254 steps = 0x00FE
+                FeedMmPerSec = 50, // 0x0032
+            }
+        ).Write(polylines, ms);
 
         var bytes = ms.ToArray();
         AssertOperand(bytes, (byte)'V', (byte)'S', 0x00, 0x32);
@@ -182,7 +192,12 @@ public class GravographISWriterTests
     {
         for (var i = 0; i < bytes.Length - 5; i++)
         {
-            if (bytes[i] == 0xFF && bytes[i + 1] == 0xFD && bytes[i + 2] == c0 && bytes[i + 3] == c1)
+            if (
+                bytes[i] == 0xFF
+                && bytes[i + 1] == 0xFD
+                && bytes[i + 2] == c0
+                && bytes[i + 3] == c1
+            )
             {
                 Assert.Equal(hi, bytes[i + 4]);
                 Assert.Equal(lo, bytes[i + 5]);
@@ -196,9 +211,14 @@ public class GravographISWriterTests
     {
         for (var i = bytes.Length - 6; i >= 0; i--)
         {
-            if (bytes[i] == 0xFF && bytes[i + 1] == 0xFD &&
-                bytes[i + 2] == c0 && bytes[i + 3] == c1 &&
-                bytes[i + 4] == hi && bytes[i + 5] == lo)
+            if (
+                bytes[i] == 0xFF
+                && bytes[i + 1] == 0xFD
+                && bytes[i + 2] == c0
+                && bytes[i + 3] == c1
+                && bytes[i + 4] == hi
+                && bytes[i + 5] == lo
+            )
             {
                 return i;
             }
@@ -214,7 +234,9 @@ public class GravographISWriterTests
 
     internal static byte[] HexToBytes(string hex)
     {
-        var clean = hex.Replace(" ", string.Empty).Replace("\n", string.Empty).Replace("\r", string.Empty);
+        var clean = hex.Replace(" ", string.Empty)
+            .Replace("\n", string.Empty)
+            .Replace("\r", string.Empty);
         var bytes = new byte[clean.Length / 2];
         for (var i = 0; i < bytes.Length; i++)
             bytes[i] = System.Convert.ToByte(clean.Substring(i * 2, 2), 16);

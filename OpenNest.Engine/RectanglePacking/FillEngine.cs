@@ -1,5 +1,5 @@
-﻿using OpenNest.Geometry;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.RectanglePacking
 {
@@ -16,7 +16,13 @@ namespace OpenNest.RectanglePacking
 
         public abstract void Fill(Item item, int maxCount);
 
-        protected List<Item> FillGrid(Item item, int rows, int columns, int maxCount, bool columnMajor = true)
+        protected List<Item> FillGrid(
+            Item item,
+            int rows,
+            int columns,
+            int maxCount,
+            bool columnMajor = true
+        )
         {
             var items = new List<Item>();
 

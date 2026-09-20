@@ -14,7 +14,10 @@ public class RowFillStrategy : IFillStrategy
         if (context.PartType == PartType.Rectangle)
             return null;
 
-        var filler = new StripeFiller(context, NestDirection.Horizontal) { CompleteStripesOnly = true };
+        var filler = new StripeFiller(context, NestDirection.Horizontal)
+        {
+            CompleteStripesOnly = true,
+        };
         return filler.Fill();
     }
 }

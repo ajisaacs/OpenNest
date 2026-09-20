@@ -7,6 +7,7 @@ public class NestRequestPlate
 {
     public string Id { get; init; }
     public Size Size { get; init; }
+
     /// <summary>Available physical sheets; null means unlimited.</summary>
     public int? Quantity { get; init; }
     public double PartSpacing { get; init; }

@@ -102,8 +102,10 @@ public partial class SimplifierViewerForm : Form
         {
             var left = entity.OffsetEntity(tol, OffsetSide.Left);
             var right = entity.OffsetEntity(tol, OffsetSide.Right);
-            if (left != null) leftEntities.Add(left);
-            if (right != null) rightEntities.Add(right);
+            if (left != null)
+                leftEntities.Add(left);
+            if (right != null)
+                rightEntities.Add(right);
         }
         entityView.SimplifierToleranceLeft = leftEntities;
         entityView.SimplifierToleranceRight = rightEntities;
@@ -113,7 +115,8 @@ public partial class SimplifierViewerForm : Form
             candidate.BoundingBox.X - tol * 2,
             candidate.BoundingBox.Y - tol * 2,
             candidate.BoundingBox.Length + tol * 4,
-            candidate.BoundingBox.Width + tol * 4);
+            candidate.BoundingBox.Width + tol * 4
+        );
         entityView.ZoomToArea(padded);
     }
 
@@ -128,7 +131,8 @@ public partial class SimplifierViewerForm : Form
 
     private void OnToleranceChanged(object sender, System.EventArgs e)
     {
-        if (simplifier == null) return;
+        if (simplifier == null)
+            return;
         simplifier.Tolerance = (double)numTolerance.Value;
         entityView?.ClearSimplifierPreview();
         RunAnalysis();

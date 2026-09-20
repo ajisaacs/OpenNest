@@ -15,7 +15,8 @@ namespace OpenNest.CNC.CuttingStrategy
         public LeadIn ExternalLeadIn { get; set; } = new NoLeadIn();
         public LeadOut ExternalLeadOut { get; set; } = new NoLeadOut();
 
-        public LeadIn InternalLeadIn { get; set; } = new LineLeadIn { Length = 0.125, ApproachAngle = 90 };
+        public LeadIn InternalLeadIn { get; set; } =
+            new LineLeadIn { Length = 0.125, ApproachAngle = 90 };
         public LeadOut InternalLeadOut { get; set; } = new NoLeadOut();
 
         public LeadIn ArcCircleLeadIn { get; set; } = new NoLeadIn();

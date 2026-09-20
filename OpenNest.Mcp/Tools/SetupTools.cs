@@ -1,7 +1,7 @@
-using ModelContextProtocol.Server;
-using OpenNest.Geometry;
 using System.ComponentModel;
 using System.Text;
+using ModelContextProtocol.Server;
+using OpenNest.Geometry;
 
 namespace OpenNest.Mcp.Tools
 {
@@ -16,14 +16,20 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "create_plate")]
-        [Description("Create a new plate with the given dimensions and spacing. Returns plate index and work area.")]
+        [Description(
+            "Create a new plate with the given dimensions and spacing. Returns plate index and work area."
+        )]
         public string CreatePlate(
             [Description("Plate width")] double width,
             [Description("Plate length")] double length,
             [Description("Spacing between parts (default 0)")] double partSpacing = 0,
             [Description("Edge spacing on all sides (default 0)")] double edgeSpacing = 0,
-            [Description("Quadrant 1-4 (default 1). 1=TopRight, 2=TopLeft, 3=BottomLeft, 4=BottomRight")] int quadrant = 1,
-            [Description("Material name (optional)")] string material = null)
+            [Description(
+                "Quadrant 1-4 (default 1). 1=TopRight, 2=TopLeft, 3=BottomLeft, 4=BottomRight"
+            )]
+                int quadrant = 1,
+            [Description("Material name (optional)")] string material = null
+        )
         {
             var plate = new Plate(width, length);
             plate.PartSpacing = partSpacing;
@@ -44,7 +50,9 @@ namespace OpenNest.Mcp.Tools
             sb.AppendLine($"Created plate {index}: {plate.Size.Width:F1} x {plate.Size.Length:F1}");
             sb.AppendLine($"  Quadrant: {plate.Quadrant}");
             sb.AppendLine($"  Part spacing: {plate.PartSpacing:F2}");
-            sb.AppendLine($"  Edge spacing: L={plate.EdgeSpacing.Left:F2} B={plate.EdgeSpacing.Bottom:F2} R={plate.EdgeSpacing.Right:F2} T={plate.EdgeSpacing.Top:F2}");
+            sb.AppendLine(
+                $"  Edge spacing: L={plate.EdgeSpacing.Left:F2} B={plate.EdgeSpacing.Bottom:F2} R={plate.EdgeSpacing.Right:F2} T={plate.EdgeSpacing.Top:F2}"
+            );
             sb.AppendLine($"  Work area: {work.Width:F1} x {work.Length:F1}");
 
             return sb.ToString();
@@ -52,8 +60,7 @@ namespace OpenNest.Mcp.Tools
 
         [McpServerTool(Name = "clear_plate")]
         [Description("Remove all parts from a plate. Returns how many parts were removed.")]
-        public string ClearPlate(
-            [Description("Index of the plate to clear")] int plateIndex)
+        public string ClearPlate([Description("Index of the plate to clear")] int plateIndex)
         {
             var plate = _session.GetPlate(plateIndex);
 

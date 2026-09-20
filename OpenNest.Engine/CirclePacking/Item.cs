@@ -12,7 +12,7 @@ namespace OpenNest.CirclePacking
             {
                 Radius = this.Radius,
                 Center = this.Center,
-                Id = this.Id
+                Id = this.Id,
             };
         }
     }

@@ -1,8 +1,8 @@
-﻿using OpenNest.Geometry;
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using OpenNest.Geometry;
 
 namespace OpenNest.Controls
 {
@@ -201,7 +201,8 @@ namespace OpenNest.Controls
             ViewScale *= zoomFactor;
             UpdateMatrix();
 
-            if (redraw) Invalidate();
+            if (redraw)
+                Invalidate();
         }
 
         public virtual void ZoomToArea(Box box, bool redraw = true)
@@ -209,7 +210,13 @@ namespace OpenNest.Controls
             ZoomToArea(box.X, box.Y, box.Length, box.Width, redraw);
         }
 
-        public virtual void ZoomToArea(double x, double y, double width, double height, bool redraw = true)
+        public virtual void ZoomToArea(
+            double x,
+            double y,
+            double width,
+            double height,
+            bool redraw = true
+        )
         {
             if (width <= 0 || height <= 0)
                 return;
@@ -234,7 +241,8 @@ namespace OpenNest.Controls
 
             UpdateMatrix();
 
-            if (redraw) Invalidate();
+            if (redraw)
+                Invalidate();
         }
 
         protected virtual void UpdateMatrix()

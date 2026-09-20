@@ -1,6 +1,6 @@
-﻿using OpenNest.Geometry;
-using System;
+﻿using System;
 using System.Windows.Forms;
+using OpenNest.Geometry;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Forms
@@ -23,7 +23,7 @@ namespace OpenNest.Forms
                 SynchronizingObject = this,
                 Enabled = true,
                 AutoReset = false,
-                Interval = SystemInformation.KeyboardDelay + 1
+                Interval = SystemInformation.KeyboardDelay + 1,
             };
             timer.Elapsed += (sender, e) => EnableCheck();
             EnableCheck();
@@ -151,7 +151,7 @@ namespace OpenNest.Forms
                 leftSpacingBox,
                 topSpacingBox,
                 rightSpacingBox,
-                bottomSpacingBox
+                bottomSpacingBox,
             };
 
             var unitString = " " + UnitsHelper.GetShortString(GetUnits());
@@ -223,7 +223,12 @@ namespace OpenNest.Forms
             nest.Material = new Material(MaterialName);
             nest.PlateDefaults.Size = OpenNest.Geometry.Size.Parse(SizeString);
             nest.PlateDefaults.PartSpacing = PartSpacing;
-            nest.PlateDefaults.EdgeSpacing = new Spacing(LeftSpacing, BottomSpacing, RightSpacing, TopSpacing);
+            nest.PlateDefaults.EdgeSpacing = new Spacing(
+                LeftSpacing,
+                BottomSpacing,
+                RightSpacing,
+                TopSpacing
+            );
             nest.PlateDefaults.Quadrant = Quadrant;
         }
 

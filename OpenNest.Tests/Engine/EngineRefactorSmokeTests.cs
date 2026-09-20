@@ -22,7 +22,12 @@ public class EngineRefactorSmokeTests
         var engine = new DefaultNestEngine(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
-        var parts = engine.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
+        var parts = engine.Fill(
+            item,
+            plate.WorkArea(),
+            null,
+            System.Threading.CancellationToken.None
+        );
 
         Assert.True(parts.Count > 0, "DefaultNestEngine should fill parts");
     }
@@ -35,7 +40,12 @@ public class EngineRefactorSmokeTests
         var drawing = MakeRectDrawing(20, 10);
         var groupParts = new List<Part> { new Part(drawing) };
 
-        var parts = engine.Fill(groupParts, plate.WorkArea(), null, System.Threading.CancellationToken.None);
+        var parts = engine.Fill(
+            groupParts,
+            plate.WorkArea(),
+            null,
+            System.Threading.CancellationToken.None
+        );
 
         Assert.True(parts.Count > 0, "DefaultNestEngine group fill should produce parts");
     }
@@ -48,7 +58,12 @@ public class EngineRefactorSmokeTests
         engine.ForceFullAngleSweep = true;
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
-        var parts = engine.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
+        var parts = engine.Fill(
+            item,
+            plate.WorkArea(),
+            null,
+            System.Threading.CancellationToken.None
+        );
 
         Assert.True(parts.Count > 0, "ForceFullAngleSweep should still produce results");
     }
@@ -91,7 +106,11 @@ public class EngineRefactorSmokeTests
         var plate = new Plate(60, 120);
         var drawing = MakeRectDrawing(20, 10);
 
-        var result = OpenNest.Engine.ML.BruteForceRunner.Run(drawing, plate, forceFullAngleSweep: true);
+        var result = OpenNest.Engine.ML.BruteForceRunner.Run(
+            drawing,
+            plate,
+            forceFullAngleSweep: true
+        );
 
         Assert.NotNull(result);
         Assert.True(result.PartCount > 0);

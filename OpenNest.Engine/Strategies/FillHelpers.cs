@@ -1,10 +1,10 @@
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Strategies
 {
@@ -30,25 +30,34 @@ namespace OpenNest.Engine.Strategies
             return pattern;
         }
 
-        public static List<Part> FillPattern(FillLinear engine, List<Part> groupParts, List<double> angles, Box workArea, IFillComparer comparer = null)
+        public static List<Part> FillPattern(
+            FillLinear engine,
+            List<Part> groupParts,
+            List<double> angles,
+            Box workArea,
+            IFillComparer comparer = null
+        )
         {
             var results = new ConcurrentBag<(List<Part> Parts, FillScore Score)>();
 
-            Parallel.ForEach(angles, angle =>
-            {
-                var pattern = BuildRotatedPattern(groupParts, angle);
+            Parallel.ForEach(
+                angles,
+                angle =>
+                {
+                    var pattern = BuildRotatedPattern(groupParts, angle);
 
-                if (pattern.Parts.Count == 0)
-                    return;
+                    if (pattern.Parts.Count == 0)
+                        return;
 
-                var h = engine.Fill(pattern, NestDirection.Horizontal);
-                if (h != null && h.Count > 0)
-                    results.Add((h, FillScore.Compute(h, workArea)));
+                    var h = engine.Fill(pattern, NestDirection.Horizontal);
+                    if (h != null && h.Count > 0)
+                        results.Add((h, FillScore.Compute(h, workArea)));
 
-                var v = engine.Fill(pattern, NestDirection.Vertical);
-                if (v != null && v.Count > 0)
-                    results.Add((v, FillScore.Compute(v, workArea)));
-            });
+                    var v = engine.Fill(pattern, NestDirection.Vertical);
+                    if (v != null && v.Count > 0)
+                        results.Add((v, FillScore.Compute(v, workArea)));
+                }
+            );
 
             List<Part> best = null;
             var bestScore = default(FillScore);
@@ -82,7 +91,8 @@ namespace OpenNest.Engine.Strategies
             Func<NestDirection, List<Part>> fillFunc,
             NestDirection? preferred,
             IFillComparer comparer,
-            Box workArea)
+            Box workArea
+        )
         {
             if (preferred == null)
             {
@@ -92,15 +102,18 @@ namespace OpenNest.Engine.Strategies
                 if ((h == null || h.Count == 0) && (v == null || v.Count == 0))
                     return new List<Part>();
 
-                if (h == null || h.Count == 0) return v;
-                if (v == null || v.Count == 0) return h;
+                if (h == null || h.Count == 0)
+                    return v;
+                if (v == null || v.Count == 0)
+                    return h;
 
                 return comparer.IsBetter(h, v, workArea) ? h : v;
             }
 
-            var other = preferred == NestDirection.Horizontal
-                ? NestDirection.Vertical
-                : NestDirection.Horizontal;
+            var other =
+                preferred == NestDirection.Horizontal
+                    ? NestDirection.Vertical
+                    : NestDirection.Horizontal;
 
             var pref = fillFunc(preferred.Value);
             if (pref != null && pref.Count > 0)
@@ -119,7 +132,8 @@ namespace OpenNest.Engine.Strategies
             FillContext context,
             IReadOnlyList<double> angles,
             Func<double, List<Part>> fillAtAngle,
-            string phaseLabel)
+            string phaseLabel
+        )
         {
             var workArea = context.WorkArea;
             var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
@@ -139,8 +153,10 @@ namespace OpenNest.Engine.Strategies
                         best = result;
                 }
 
-                context.ReportProgress(best,
-                    $"{phaseLabel}: {i + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts");
+                context.ReportProgress(
+                    best,
+                    $"{phaseLabel}: {i + 1}/{angles.Count} angles, {angleDeg:F0}° best = {best?.Count ?? 0} parts"
+                );
             }
 
             return best ?? new List<Part>();
@@ -160,10 +176,10 @@ namespace OpenNest.Engine.Strategies
                 {
                     var b2 = parts[j].BoundingBox;
 
-                    var overlapX = System.Math.Min(b1.Right, b2.Right)
-                                 - System.Math.Max(b1.Left, b2.Left);
-                    var overlapY = System.Math.Min(b1.Top, b2.Top)
-                                 - System.Math.Max(b1.Bottom, b2.Bottom);
+                    var overlapX =
+                        System.Math.Min(b1.Right, b2.Right) - System.Math.Max(b1.Left, b2.Left);
+                    var overlapY =
+                        System.Math.Min(b1.Top, b2.Top) - System.Math.Max(b1.Bottom, b2.Bottom);
 
                     if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
                         continue;

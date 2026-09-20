@@ -1,6 +1,6 @@
-﻿using OpenNest.Math;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -12,16 +12,18 @@ namespace OpenNest.Geometry
         private Vector center;
         private bool reversed;
 
-        public Arc()
-        {
-        }
+        public Arc() { }
 
         public Arc(double x, double y, double r, double a1, double a2, bool reversed = false)
-            : this(new Vector(x, y), r, a1, a2, reversed)
-        {
-        }
+            : this(new Vector(x, y), r, a1, a2, reversed) { }
 
-        public Arc(Vector center, double radius, double startAngle, double endAngle, bool reversed = false)
+        public Arc(
+            Vector center,
+            double radius,
+            double startAngle,
+            double endAngle,
+            bool reversed = false
+        )
         {
             this.center = center;
             this.radius = radius;
@@ -93,8 +95,7 @@ namespace OpenNest.Geometry
             }
         }
 
-        public bool IsFullCircle() =>
-            SweepAngle() >= Angle.TwoPI - Tolerance.Epsilon;
+        public bool IsFullCircle() => SweepAngle() >= Angle.TwoPI - Tolerance.Epsilon;
 
         /// <summary>
         /// Angle in radians between start and end angles.
@@ -130,10 +131,7 @@ namespace OpenNest.Geometry
         public RotationType Rotation
         {
             get { return IsReversed ? RotationType.CW : RotationType.CCW; }
-            set
-            {
-                IsReversed = (value == RotationType.CW);
-            }
+            set { IsReversed = (value == RotationType.CW); }
         }
 
         /// <summary>
@@ -144,7 +142,8 @@ namespace OpenNest.Geometry
         {
             return new Vector(
                 Center.X + Radius * System.Math.Cos(StartAngle),
-                Center.Y + Radius * System.Math.Sin(StartAngle));
+                Center.Y + Radius * System.Math.Sin(StartAngle)
+            );
         }
 
         /// <summary>
@@ -155,7 +154,8 @@ namespace OpenNest.Geometry
         {
             return new Vector(
                 Center.X + Radius * System.Math.Cos(EndAngle),
-                Center.Y + Radius * System.Math.Sin(EndAngle));
+                Center.Y + Radius * System.Math.Sin(EndAngle)
+            );
         }
 
         /// <summary>
@@ -166,7 +166,8 @@ namespace OpenNest.Geometry
             var midAngle = StartAngle + (IsReversed ? -SweepAngle() / 2 : SweepAngle() / 2);
             return new Vector(
                 Center.X + Radius * System.Math.Cos(midAngle),
-                Center.Y + Radius * System.Math.Sin(midAngle));
+                Center.Y + Radius * System.Math.Sin(midAngle)
+            );
         }
 
         /// <summary>
@@ -231,7 +232,10 @@ namespace OpenNest.Geometry
                 return 1;
 
             var maxAngle = 2.0 * System.Math.Acos(1.0 - tolerance / Radius);
-            return System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Abs(SweepAngle()) / maxAngle));
+            return System.Math.Max(
+                1,
+                (int)System.Math.Ceiling(System.Math.Abs(SweepAngle()) / maxAngle)
+            );
         }
 
         /// <summary>
@@ -242,21 +246,23 @@ namespace OpenNest.Geometry
         public List<Vector> ToPoints(int segments = 1000, bool circumscribe = false)
         {
             var points = new List<Vector>();
-            var stepAngle = reversed
-                ? -SweepAngle() / segments
-                : SweepAngle() / segments;
+            var stepAngle = reversed ? -SweepAngle() / segments : SweepAngle() / segments;
 
-            var r = circumscribe && segments > 0
-                ? Radius / System.Math.Cos(System.Math.Abs(stepAngle) / 2.0)
-                : Radius;
+            var r =
+                circumscribe && segments > 0
+                    ? Radius / System.Math.Cos(System.Math.Abs(stepAngle) / 2.0)
+                    : Radius;
 
             for (int i = 0; i <= segments; ++i)
             {
                 var angle = stepAngle * i + StartAngle;
 
-                points.Add(new Vector(
-                    System.Math.Cos(angle) * r + Center.X,
-                    System.Math.Sin(angle) * r + Center.Y));
+                points.Add(
+                    new Vector(
+                        System.Math.Cos(angle) * r + Center.X,
+                        System.Math.Sin(angle) * r + Center.Y
+                    )
+                );
             }
 
             return points;
@@ -470,7 +476,8 @@ namespace OpenNest.Geometry
             {
                 return new Vector(
                     System.Math.Cos(angle) * Radius + Center.X,
-                    System.Math.Sin(angle) * Radius + Center.Y);
+                    System.Math.Sin(angle) * Radius + Center.Y
+                );
             }
             else
             {
@@ -500,7 +507,8 @@ namespace OpenNest.Geometry
         /// <returns></returns>
         public override bool Intersects(Arc arc, out List<Vector> pts)
         {
-            return Intersect.Intersects(this, arc, out pts); ;
+            return Intersect.Intersects(this, arc, out pts);
+            ;
         }
 
         /// <summary>

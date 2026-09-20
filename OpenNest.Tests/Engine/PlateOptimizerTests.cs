@@ -20,14 +20,24 @@ public class PlateOptimizerTests
     {
         var options = new List<PlateOption>
         {
-            new() { Width = 20, Length = 20, Cost = 100 },
-            new() { Width = 40, Length = 40, Cost = 400 },
+            new()
+            {
+                Width = 20,
+                Length = 20,
+                Cost = 100,
+            },
+            new()
+            {
+                Width = 40,
+                Length = 40,
+                Cost = 400,
+            },
         };
 
         var templatePlate = new Plate(40, 40) { PartSpacing = 0 };
         var items = new List<NestItem>
         {
-            new() { Drawing = MakeRectDrawing(10, 10), Quantity = 1 }
+            new() { Drawing = MakeRectDrawing(10, 10), Quantity = 1 },
         };
 
         var result = PlateOptimizer.Optimize(items, options, 0.0, templatePlate);
@@ -42,14 +52,24 @@ public class PlateOptimizerTests
     {
         var options = new List<PlateOption>
         {
-            new() { Width = 12, Length = 12, Cost = 50 },
-            new() { Width = 24, Length = 12, Cost = 100 },
+            new()
+            {
+                Width = 12,
+                Length = 12,
+                Cost = 50,
+            },
+            new()
+            {
+                Width = 24,
+                Length = 12,
+                Cost = 100,
+            },
         };
 
         var templatePlate = new Plate(24, 12) { PartSpacing = 0 };
         var items = new List<NestItem>
         {
-            new() { Drawing = MakeRectDrawing(10, 10), Quantity = 2 }
+            new() { Drawing = MakeRectDrawing(10, 10), Quantity = 2 },
         };
 
         var result = PlateOptimizer.Optimize(items, options, 0.0, templatePlate);
@@ -68,15 +88,25 @@ public class PlateOptimizerTests
         //   Net = 800 - 1500*(800/1600)*1.0 = 800-750 = 50
         var options = new List<PlateOption>
         {
-            new() { Width = 20, Length = 20, Cost = 400 },
-            new() { Width = 40, Length = 40, Cost = 800 },
+            new()
+            {
+                Width = 20,
+                Length = 20,
+                Cost = 400,
+            },
+            new()
+            {
+                Width = 40,
+                Length = 40,
+                Cost = 800,
+            },
         };
 
         var templatePlate = new Plate(40, 40) { PartSpacing = 0 };
         templatePlate.EdgeSpacing = new Spacing();
         var items = new List<NestItem>
         {
-            new() { Drawing = MakeRectDrawing(10, 10), Quantity = 1 }
+            new() { Drawing = MakeRectDrawing(10, 10), Quantity = 1 },
         };
 
         var result = PlateOptimizer.Optimize(items, options, 1.0, templatePlate);
@@ -90,14 +120,24 @@ public class PlateOptimizerTests
     {
         var options = new List<PlateOption>
         {
-            new() { Width = 20, Length = 20, Cost = 100 },
-            new() { Width = 40, Length = 40, Cost = 400 },
+            new()
+            {
+                Width = 20,
+                Length = 20,
+                Cost = 100,
+            },
+            new()
+            {
+                Width = 40,
+                Length = 40,
+                Cost = 400,
+            },
         };
 
         var templatePlate = new Plate(40, 40) { PartSpacing = 0 };
         var items = new List<NestItem>
         {
-            new() { Drawing = MakeRectDrawing(30, 30), Quantity = 1 }
+            new() { Drawing = MakeRectDrawing(30, 30), Quantity = 1 },
         };
 
         var result = PlateOptimizer.Optimize(items, options, 0.0, templatePlate);
@@ -111,13 +151,18 @@ public class PlateOptimizerTests
     {
         var options = new List<PlateOption>
         {
-            new() { Width = 10, Length = 10, Cost = 50 },
+            new()
+            {
+                Width = 10,
+                Length = 10,
+                Cost = 50,
+            },
         };
 
         var templatePlate = new Plate(10, 10) { PartSpacing = 0 };
         var items = new List<NestItem>
         {
-            new() { Drawing = MakeRectDrawing(20, 20), Quantity = 1 }
+            new() { Drawing = MakeRectDrawing(20, 20), Quantity = 1 },
         };
 
         var result = PlateOptimizer.Optimize(items, options, 0.0, templatePlate);

@@ -1,7 +1,7 @@
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Geometry;
 
 namespace OpenNest.Converters
 {
@@ -10,7 +10,7 @@ namespace OpenNest.Converters
         Perimeter,
         Hole,
         Etch,
-        Open
+        Open,
     }
 
     public sealed class ContourInfo
@@ -91,7 +91,8 @@ namespace OpenNest.Converters
             // Non-perimeter shapes first (matches CNC cut order: holes before perimeter)
             for (var i = 0; i < shapes.Count; i++)
             {
-                if (i == perimeterIndex) continue;
+                if (i == perimeterIndex)
+                    continue;
                 var shape = shapes[i];
                 var type = ClassifyShape(shape);
 
@@ -116,7 +117,13 @@ namespace OpenNest.Converters
             }
 
             // Perimeter last
-            result.Add(new ContourInfo(shapes[perimeterIndex], ContourClassification.Perimeter, "Perimeter"));
+            result.Add(
+                new ContourInfo(
+                    shapes[perimeterIndex],
+                    ContourClassification.Perimeter,
+                    "Perimeter"
+                )
+            );
 
             return result;
         }
@@ -124,8 +131,12 @@ namespace OpenNest.Converters
         private static ContourClassification ClassifyShape(Shape shape)
         {
             // Check etch layer — all entities must be on ETCH layer
-            if (shape.Entities.Count > 0 &&
-                shape.Entities.All(e => string.Equals(e.Layer?.Name, "ETCH", StringComparison.OrdinalIgnoreCase)))
+            if (
+                shape.Entities.Count > 0
+                && shape.Entities.All(e =>
+                    string.Equals(e.Layer?.Name, "ETCH", StringComparison.OrdinalIgnoreCase)
+                )
+            )
                 return ContourClassification.Etch;
 
             if (shape.IsClosed())

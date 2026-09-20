@@ -28,7 +28,7 @@ public class RemnantFillerTests2
         var drawing = MakeSquareDrawing(10);
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = drawing, Quantity = 5 }
+            new NestItem { Drawing = drawing, Quantity = 5 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
@@ -52,7 +52,7 @@ public class RemnantFillerTests2
         var drawing = MakeSquareDrawing(10);
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = drawing, Quantity = 3 }
+            new NestItem { Drawing = drawing, Quantity = 3 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
@@ -92,7 +92,7 @@ public class RemnantFillerTests2
         var drawing = MakeSquareDrawing(10);
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = drawing, Quantity = 5 }
+            new NestItem { Drawing = drawing, Quantity = 5 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>

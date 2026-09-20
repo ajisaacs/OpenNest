@@ -1,7 +1,7 @@
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Fill
 {
@@ -31,7 +31,8 @@ namespace OpenNest.Engine.Fill
             List<NestItem> items,
             Func<NestItem, Box, List<Part>> fillFunc,
             CancellationToken token = default,
-            IProgress<NestProgress> progress = null)
+            IProgress<NestProgress> progress = null
+        )
         {
             if (items == null || items.Count == 0)
                 return new List<Part>();
@@ -60,13 +61,19 @@ namespace OpenNest.Engine.Fill
 
         private static Dictionary<Drawing, int> BuildLocalQuantities(List<NestItem> items)
         {
-            var localQty = new Dictionary<Drawing, int>(items.Count, ReferenceEqualityComparer.Instance);
+            var localQty = new Dictionary<Drawing, int>(
+                items.Count,
+                ReferenceEqualityComparer.Instance
+            );
             foreach (var item in items)
                 localQty[item.Drawing] = item.Quantity;
             return localQty;
         }
 
-        private static double FindMinItemDimension(List<NestItem> items, Dictionary<Drawing, int> localQty)
+        private static double FindMinItemDimension(
+            List<NestItem> items,
+            Dictionary<Drawing, int> localQty
+        )
         {
             var minDim = double.MaxValue;
             foreach (var item in items)
@@ -87,7 +94,8 @@ namespace OpenNest.Engine.Fill
             Dictionary<Drawing, int> localQty,
             Func<NestItem, Box, List<Part>> fillFunc,
             List<Part> allParts,
-            CancellationToken token)
+            CancellationToken token
+        )
         {
             foreach (var item in items)
             {
@@ -147,21 +155,30 @@ namespace OpenNest.Engine.Fill
             foreach (var p in parts)
             {
                 var bb = p.BoundingBox;
-                if (bb.Left < left) left = bb.Left;
-                if (bb.Bottom < bottom) bottom = bb.Bottom;
-                if (bb.Right > right) right = bb.Right;
-                if (bb.Top > top) top = bb.Top;
+                if (bb.Left < left)
+                    left = bb.Left;
+                if (bb.Bottom < bottom)
+                    bottom = bb.Bottom;
+                if (bb.Right > right)
+                    right = bb.Right;
+                if (bb.Top > top)
+                    top = bb.Top;
             }
 
-            return new Box(left - spacing, bottom - spacing,
-                right - left + spacing * 2, top - bottom + spacing * 2);
+            return new Box(
+                left - spacing,
+                bottom - spacing,
+                right - left + spacing * 2,
+                top - bottom + spacing * 2
+            );
         }
 
         private static List<Part> TryFillInRemnants(
             NestItem item,
             int qty,
             List<Box> freeBoxes,
-            Func<NestItem, Box, List<Part>> fillFunc)
+            Func<NestItem, Box, List<Part>> fillFunc
+        )
         {
             var itemBbox = item.Drawing.Program.BoundingBox();
 

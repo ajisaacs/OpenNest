@@ -28,19 +28,27 @@ namespace OpenNest.Benchmark
                 var ranked = jobGroup.OrderBy(r => r, Comparer<JobResult>.Create(Compare)).ToList();
                 var best = ranked.Count > 0 ? ranked[0] : null;
 
-                Console.WriteLine($"{"Engine",-16} {"Result",-9} {"Parts",-10} {"Util%",-8} {"Plates",-18} {"Time(ms)",-9} Notes");
+                Console.WriteLine(
+                    $"{"Engine", -16} {"Result", -9} {"Parts", -10} {"Util%", -8} {"Plates", -18} {"Time(ms)", -9} Notes"
+                );
 
                 foreach (var r in ranked)
                 {
                     var isWinner = best != null && Compare(r, best) == 0 && r.Valid;
                     var marker = isWinner ? "*" : " ";
-                    var status = r.Crashed ? "CRASH" : r.Valid ? "ok" : "INVALID";
+                    var status =
+                        r.Crashed ? "CRASH"
+                        : r.Valid ? "ok"
+                        : "INVALID";
                     var partsCol = $"{r.PartsPlaced}/{r.PartsRequested}";
                     var utilCol = r.Valid ? $"{r.Utilization * 100:F1}" : "-";
-                    var platesCol = r.PlatesUsed > 0 ? $"{r.PlatesUsed} ({SizeSummary(r.SizeBreakdown)})" : "-";
+                    var platesCol =
+                        r.PlatesUsed > 0 ? $"{r.PlatesUsed} ({SizeSummary(r.SizeBreakdown)})" : "-";
                     var notes = r.Crashed ? r.Error : string.Join("; ", r.Violations.Take(2));
 
-                    Console.WriteLine($"{marker}{r.EngineName,-15} {status,-9} {partsCol,-10} {utilCol,-8} {platesCol,-18} {r.ElapsedMs,-9} {notes}");
+                    Console.WriteLine(
+                        $"{marker}{r.EngineName, -15} {status, -9} {partsCol, -10} {utilCol, -8} {platesCol, -18} {r.ElapsedMs, -9} {notes}"
+                    );
                 }
             }
         }
@@ -68,30 +76,47 @@ namespace OpenNest.Benchmark
 
             var wins = CountWins(results);
 
-            Console.WriteLine($"{"Engine",-16} {"Jobs",-6} {"Valid",-7} {"Complete",-9} {"Wins",-6} {"AvgUtil%",-10} {"Plates",-8} {"TotalTime(ms)",-14}");
+            Console.WriteLine(
+                $"{"Engine", -16} {"Jobs", -6} {"Valid", -7} {"Complete", -9} {"Wins", -6} {"AvgUtil%", -10} {"Plates", -8} {"TotalTime(ms)", -14}"
+            );
 
             foreach (var e in byEngine)
             {
                 var avgUtil = e.Jobs > 0 ? e.TotalUtilization / e.Jobs * 100 : 0;
                 var winCount = wins.TryGetValue(e.Engine, out var w) ? w : 0;
-                Console.WriteLine($"{e.Engine,-16} {e.Jobs,-6} {e.Valid,-7} {e.FullyPlaced,-9} {winCount,-6} {avgUtil,-10:F1} {e.TotalPlates,-8} {e.TotalTimeMs,-14}");
+                Console.WriteLine(
+                    $"{e.Engine, -16} {e.Jobs, -6} {e.Valid, -7} {e.FullyPlaced, -9} {winCount, -6} {avgUtil, -10:F1} {e.TotalPlates, -8} {e.TotalTimeMs, -14}"
+                );
             }
         }
 
         public static void WriteCsv(string path, List<JobResult> results)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Job,Engine,Valid,Crashed,FullyPlaced,PartsPlaced,PartsRequested,Utilization,PlatesUsed,SizeBreakdown,ElapsedMs,Notes");
+            sb.AppendLine(
+                "Job,Engine,Valid,Crashed,FullyPlaced,PartsPlaced,PartsRequested,Utilization,PlatesUsed,SizeBreakdown,ElapsedMs,Notes"
+            );
 
             foreach (var r in results)
             {
                 var notes = r.Crashed ? r.Error : string.Join(" | ", r.Violations);
-                sb.AppendLine(string.Join(",",
-                    Csv(r.JobName), Csv(r.EngineName), r.Valid, r.Crashed, r.FullyPlaced,
-                    r.PartsPlaced, r.PartsRequested,
-                    r.Utilization.ToString("F4", CultureInfo.InvariantCulture),
-                    r.PlatesUsed, Csv(SizeSummary(r.SizeBreakdown)),
-                    r.ElapsedMs, Csv(notes)));
+                sb.AppendLine(
+                    string.Join(
+                        ",",
+                        Csv(r.JobName),
+                        Csv(r.EngineName),
+                        r.Valid,
+                        r.Crashed,
+                        r.FullyPlaced,
+                        r.PartsPlaced,
+                        r.PartsRequested,
+                        r.Utilization.ToString("F4", CultureInfo.InvariantCulture),
+                        r.PlatesUsed,
+                        Csv(SizeSummary(r.SizeBreakdown)),
+                        r.ElapsedMs,
+                        Csv(notes)
+                    )
+                );
             }
 
             File.WriteAllText(path, sb.ToString());

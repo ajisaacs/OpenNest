@@ -108,16 +108,15 @@ public class RemnantFinderTests
         var remnants = finder.FindRemnants();
 
         var gap = remnants.FirstOrDefault(r =>
-            r.Length >= 19.9 && r.Length <= 20.1 &&
-            r.Width >= 99.9);
+            r.Length >= 19.9 && r.Length <= 20.1 && r.Width >= 99.9
+        );
         Assert.NotNull(gap);
     }
 
     [Fact]
     public void FromPlate_CreatesFinderWithPartsAsObstacles()
     {
-        var plate = TestHelpers.MakePlate(60, 120,
-            TestHelpers.MakePartAt(0, 0, 20));
+        var plate = TestHelpers.MakePlate(60, 120, TestHelpers.MakePartAt(0, 0, 20));
         var finder = RemnantFinder.FromPlate(plate);
         var remnants = finder.FindRemnants();
 
@@ -146,8 +145,8 @@ public class RemnantFinderTests
 
         // Should find the 80x100 strip on the left
         var left = remnants.FirstOrDefault(r =>
-            r.Length >= 79.9 && r.Length <= 80.1 &&
-            r.Width >= 99.9);
+            r.Length >= 79.9 && r.Length <= 80.1 && r.Width >= 99.9
+        );
         Assert.NotNull(left);
     }
 
@@ -163,9 +162,16 @@ public class RemnantFinderTests
         foreach (var r in remnants)
         {
             Assert.False(
-                r.Left < 60 && r.Right > 0 && r.Bottom < 60 && r.Top > 0
-                && r.Left < 100 && r.Right > 40 && r.Bottom < 100 && r.Top > 40,
-                "Remnant should not overlap both obstacles simultaneously in their shared region");
+                r.Left < 60
+                    && r.Right > 0
+                    && r.Bottom < 60
+                    && r.Top > 0
+                    && r.Left < 100
+                    && r.Right > 40
+                    && r.Bottom < 100
+                    && r.Top > 40,
+                "Remnant should not overlap both obstacles simultaneously in their shared region"
+            );
         }
 
         // Total remnant area + obstacle coverage should not exceed work area
@@ -177,16 +183,11 @@ public class RemnantFinderTests
     [Fact]
     public void ConstructorWithObstaclesList()
     {
-        var obstacles = new List<Box>
-        {
-            new Box(0, 0, 40, 100),
-            new Box(60, 0, 40, 100)
-        };
+        var obstacles = new List<Box> { new Box(0, 0, 40, 100), new Box(60, 0, 40, 100) };
         var finder = new RemnantFinder(new Box(0, 0, 100, 100), obstacles);
         var remnants = finder.FindRemnants();
 
-        var gap = remnants.FirstOrDefault(r =>
-            r.Length >= 19.9 && r.Length <= 20.1);
+        var gap = remnants.FirstOrDefault(r => r.Length >= 19.9 && r.Length <= 20.1);
         Assert.NotNull(gap);
     }
 
@@ -194,15 +195,10 @@ public class RemnantFinderTests
     public void AddObstacles_Plural_AddsMultiple()
     {
         var finder = new RemnantFinder(new Box(0, 0, 100, 100));
-        finder.AddObstacles(new[]
-        {
-            new Box(0, 0, 40, 100),
-            new Box(60, 0, 40, 100)
-        });
+        finder.AddObstacles(new[] { new Box(0, 0, 40, 100), new Box(60, 0, 40, 100) });
         var remnants = finder.FindRemnants();
 
-        var gap = remnants.FirstOrDefault(r =>
-            r.Length >= 19.9 && r.Length <= 20.1);
+        var gap = remnants.FirstOrDefault(r => r.Length >= 19.9 && r.Length <= 20.1);
         Assert.NotNull(gap);
     }
 
@@ -239,11 +235,17 @@ public class RemnantFinderTests
         {
             // Check no remnant overlaps obstacle 1
             var overlaps1 = r.Left < 50 && r.Right > 20 && r.Bottom < 50 && r.Top > 20;
-            Assert.False(overlaps1, $"Remnant ({r.X},{r.Y} {r.Width}x{r.Length}) overlaps obstacle 1");
+            Assert.False(
+                overlaps1,
+                $"Remnant ({r.X},{r.Y} {r.Width}x{r.Length}) overlaps obstacle 1"
+            );
 
             // Check no remnant overlaps obstacle 2
             var overlaps2 = r.Left < 85 && r.Right > 60 && r.Bottom < 90 && r.Top > 10;
-            Assert.False(overlaps2, $"Remnant ({r.X},{r.Y} {r.Width}x{r.Length}) overlaps obstacle 2");
+            Assert.False(
+                overlaps2,
+                $"Remnant ({r.X},{r.Y} {r.Width}x{r.Length}) overlaps obstacle 2"
+            );
         }
     }
 
@@ -254,8 +256,8 @@ public class RemnantFinderTests
 
         // Place a 5x5 grid of 10x10 obstacles with 10-unit gaps
         for (var row = 0; row < 5; row++)
-            for (var col = 0; col < 5; col++)
-                finder.AddObstacle(new Box(col * 20, row * 20, 10, 10));
+        for (var col = 0; col < 5; col++)
+            finder.AddObstacle(new Box(col * 20, row * 20, 10, 10));
 
         var remnants = finder.FindRemnants();
 
@@ -304,16 +306,19 @@ public class RemnantFinderTests
 
         // Use smallest drawing bbox dimension as minDim (same as UI).
         var minDim = nest.Drawings.Min(d =>
-            System.Math.Min(d.Program.BoundingBox().Width, d.Program.BoundingBox().Length));
+            System.Math.Min(d.Program.BoundingBox().Width, d.Program.BoundingBox().Length)
+        );
 
         var tiered = finder.FindTieredRemnants(minDim);
 
         // Should find a remnant near (0.25, 53.13) — the gap above the main grid.
         var topGap = tiered.FirstOrDefault(t =>
-            t.Box.Bottom > 50 && t.Box.Bottom < 55 &&
-            t.Box.Left < 1 &&
-            t.Box.Length > 100 &&
-            t.Box.Width > 5);
+            t.Box.Bottom > 50
+            && t.Box.Bottom < 55
+            && t.Box.Left < 1
+            && t.Box.Length > 100
+            && t.Box.Width > 5
+        );
 
         Assert.True(topGap.Box.Length > 0, "Expected remnant above main grid");
     }
@@ -337,24 +342,44 @@ public class RemnantFinderTests
         double[] oddY = { 0.75, 9.48, 18.21, 26.94, 35.67, 44.40 };
 
         foreach (var cx in colX)
-            foreach (var ey in evenY)
-                obstacles.Add(new Box(cx - spacing, ey - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2));
+        foreach (var ey in evenY)
+            obstacles.Add(
+                new Box(cx - spacing, ey - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2)
+            );
         foreach (var cx in colXOdd)
-            foreach (var oy in oddY)
-                obstacles.Add(new Box(cx - spacing, oy - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2));
+        foreach (var oy in oddY)
+            obstacles.Add(
+                new Box(cx - spacing, oy - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2)
+            );
 
         // Right-side rotated parts (only 2 extend high: parts 62 and 66).
-        obstacles.Add(new Box(106.70 - spacing, 37.59 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
-        obstacles.Add(new Box(114.19 - spacing, 37.59 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        obstacles.Add(
+            new Box(106.70 - spacing, 37.59 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2)
+        );
+        obstacles.Add(
+            new Box(114.19 - spacing, 37.59 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2)
+        );
         // Parts 63, 67 (lower rotated)
-        obstacles.Add(new Box(105.02 - spacing, 29.35 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
-        obstacles.Add(new Box(112.51 - spacing, 29.35 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        obstacles.Add(
+            new Box(105.02 - spacing, 29.35 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2)
+        );
+        obstacles.Add(
+            new Box(112.51 - spacing, 29.35 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2)
+        );
         // Parts 60, 64 (upper-right rotated, lower)
-        obstacles.Add(new Box(106.70 - spacing, 8.99 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
-        obstacles.Add(new Box(114.19 - spacing, 8.99 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        obstacles.Add(
+            new Box(106.70 - spacing, 8.99 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2)
+        );
+        obstacles.Add(
+            new Box(114.19 - spacing, 8.99 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2)
+        );
         // Parts 61, 65
-        obstacles.Add(new Box(105.02 - spacing, 0.75 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
-        obstacles.Add(new Box(112.51 - spacing, 0.75 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2));
+        obstacles.Add(
+            new Box(105.02 - spacing, 0.75 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2)
+        );
+        obstacles.Add(
+            new Box(112.51 - spacing, 0.75 - spacing, 5.56 + spacing * 2, 20.65 + spacing * 2)
+        );
 
         var finder = new RemnantFinder(workArea, obstacles);
         var remnants = finder.FindRemnants(5.375);

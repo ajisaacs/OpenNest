@@ -1,10 +1,10 @@
-using ACadSharp.Entities;
-using CSMath;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using ACadSharp.Entities;
+using CSMath;
+using OpenNest.Geometry;
 
 namespace OpenNest.IO
 {
@@ -23,11 +23,14 @@ namespace OpenNest.IO
         public static Geometry.Arc ToOpenNest(this ACadSharp.Entities.Arc arc)
         {
             var result = new Geometry.Arc(
-                arc.Center.X, arc.Center.Y, arc.Radius,
+                arc.Center.X,
+                arc.Center.Y,
+                arc.Radius,
                 arc.StartAngle,
-                arc.EndAngle)
+                arc.EndAngle
+            )
             {
-                Layer = arc.Layer.ToOpenNest()
+                Layer = arc.Layer.ToOpenNest(),
             };
             result.ApplyDxfProperties(arc);
             return result;
@@ -35,11 +38,9 @@ namespace OpenNest.IO
 
         public static Geometry.Circle ToOpenNest(this ACadSharp.Entities.Circle circle)
         {
-            var result = new Geometry.Circle(
-                circle.Center.X, circle.Center.Y,
-                circle.Radius)
+            var result = new Geometry.Circle(circle.Center.X, circle.Center.Y, circle.Radius)
             {
-                Layer = circle.Layer.ToOpenNest()
+                Layer = circle.Layer.ToOpenNest(),
             };
             result.ApplyDxfProperties(circle);
             return result;
@@ -48,10 +49,13 @@ namespace OpenNest.IO
         public static Geometry.Line ToOpenNest(this ACadSharp.Entities.Line line)
         {
             var result = new Geometry.Line(
-                line.StartPoint.X, line.StartPoint.Y,
-                line.EndPoint.X, line.EndPoint.Y)
+                line.StartPoint.X,
+                line.StartPoint.Y,
+                line.EndPoint.X,
+                line.EndPoint.Y
+            )
             {
-                Layer = line.Layer.ToOpenNest()
+                Layer = line.Layer.ToOpenNest(),
             };
             result.ApplyDxfProperties(line);
             return result;
@@ -115,25 +119,30 @@ namespace OpenNest.IO
             {
                 var nextPoint = polyline.Vertices[i].Location.ToOpenNest();
 
-                lines.Add(new Geometry.Line(lastPoint, nextPoint)
-                {
-                    Layer = layer,
-                    Color = color,
-                    LineTypeName = lineTypeName
-                });
+                lines.Add(
+                    new Geometry.Line(lastPoint, nextPoint)
+                    {
+                        Layer = layer,
+                        Color = color,
+                        LineTypeName = lineTypeName,
+                    }
+                );
 
                 lastPoint = nextPoint;
             }
 
-            var isClosed = (polyline.Flags & PolylineFlags.ClosedPolylineOrClosedPolygonMeshInM) != 0;
+            var isClosed =
+                (polyline.Flags & PolylineFlags.ClosedPolylineOrClosedPolygonMeshInM) != 0;
 
             if (isClosed)
-                lines.Add(new Geometry.Line(lastPoint, polyline.Vertices[0].Location.ToOpenNest())
-                {
-                    Layer = layer,
-                    Color = color,
-                    LineTypeName = lineTypeName
-                });
+                lines.Add(
+                    new Geometry.Line(lastPoint, polyline.Vertices[0].Location.ToOpenNest())
+                    {
+                        Layer = layer,
+                        Color = color,
+                        LineTypeName = lineTypeName,
+                    }
+                );
 
             return lines;
         }
@@ -154,12 +163,14 @@ namespace OpenNest.IO
             {
                 var nextPoint = polyline.Vertices[i].ToOpenNest();
 
-                lines.Add(new Geometry.Line(lastPoint, nextPoint)
-                {
-                    Layer = layer,
-                    Color = color,
-                    LineTypeName = lineTypeName
-                });
+                lines.Add(
+                    new Geometry.Line(lastPoint, nextPoint)
+                    {
+                        Layer = layer,
+                        Color = color,
+                        LineTypeName = lineTypeName,
+                    }
+                );
 
                 lastPoint = nextPoint;
             }
@@ -167,17 +178,22 @@ namespace OpenNest.IO
             var isClosed = (polyline.Flags & LwPolylineFlags.Closed) != 0;
 
             if (isClosed)
-                lines.Add(new Geometry.Line(lastPoint, polyline.Vertices[0].ToOpenNest())
-                {
-                    Layer = layer,
-                    Color = color,
-                    LineTypeName = lineTypeName
-                });
+                lines.Add(
+                    new Geometry.Line(lastPoint, polyline.Vertices[0].ToOpenNest())
+                    {
+                        Layer = layer,
+                        Color = color,
+                        LineTypeName = lineTypeName,
+                    }
+                );
 
             return lines;
         }
 
-        public static List<Geometry.Entity> ToOpenNest(this ACadSharp.Entities.Ellipse ellipse, double tolerance = 0.001)
+        public static List<Geometry.Entity> ToOpenNest(
+            this ACadSharp.Entities.Ellipse ellipse,
+            double tolerance = 0.001
+        )
         {
             var center = new Vector(ellipse.Center.X, ellipse.Center.Y);
             var majorAxis = new Vector(ellipse.MajorAxisEndPoint.X, ellipse.MajorAxisEndPoint.Y);
@@ -201,8 +217,15 @@ namespace OpenNest.IO
             var color = ellipse.ResolveColor();
             var lineTypeName = ellipse.ResolveLineTypeName();
 
-            var entities = EllipseConverter.Convert(center, semiMajor, semiMinor, rotation,
-                startParam, endParam, tolerance);
+            var entities = EllipseConverter.Convert(
+                center,
+                semiMajor,
+                semiMinor,
+                rotation,
+                startParam,
+                endParam,
+                tolerance
+            );
 
             foreach (var entity in entities)
             {
@@ -220,7 +243,7 @@ namespace OpenNest.IO
             {
                 Color = Color.FromArgb(layer.Color.R, layer.Color.G, layer.Color.B),
                 IsVisible = layer.IsOn,
-                LineTypeName = layer.LineType?.Name
+                LineTypeName = layer.LineType?.Name,
             };
         }
 
@@ -238,13 +261,19 @@ namespace OpenNest.IO
         {
             var lt = entity.LineType;
 
-            if (lt == null || string.Equals(lt.Name, "ByLayer", System.StringComparison.OrdinalIgnoreCase))
+            if (
+                lt == null
+                || string.Equals(lt.Name, "ByLayer", System.StringComparison.OrdinalIgnoreCase)
+            )
                 return entity.Layer.LineType?.Name ?? "Continuous";
 
             return lt.Name;
         }
 
-        public static void ApplyDxfProperties(this Geometry.Entity target, ACadSharp.Entities.Entity source)
+        public static void ApplyDxfProperties(
+            this Geometry.Entity target,
+            ACadSharp.Entities.Entity source
+        )
         {
             target.Color = source.ResolveColor();
             target.LineTypeName = source.ResolveLineTypeName();

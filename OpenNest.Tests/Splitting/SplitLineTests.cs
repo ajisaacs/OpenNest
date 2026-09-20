@@ -69,7 +69,11 @@ public class AutoSplitCalculatorTests
     public void SplitByCount_SingleAxis_EvenlySpaced()
     {
         var partBounds = new Box(0, 0, 100, 50);
-        var lines = AutoSplitCalculator.SplitByCount(partBounds, horizontalPieces: 1, verticalPieces: 3);
+        var lines = AutoSplitCalculator.SplitByCount(
+            partBounds,
+            horizontalPieces: 1,
+            verticalPieces: 3
+        );
 
         Assert.Equal(2, lines.Count);
         Assert.All(lines, l => Assert.Equal(CutOffAxis.Vertical, l.Axis));

@@ -11,7 +11,12 @@ public class WeldGapTabSplit : ISplitFeature
 {
     public string Name => "Weld-Gap Tabs";
 
-    public SplitFeatureResult GenerateFeatures(SplitLine line, double extentStart, double extentEnd, SplitParameters parameters)
+    public SplitFeatureResult GenerateFeatures(
+        SplitLine line,
+        double extentStart,
+        double extentEnd,
+        SplitParameters parameters
+    )
     {
         var extent = extentEnd - extentStart;
         var tabCount = parameters.TabCount;
@@ -51,18 +56,42 @@ public class WeldGapTabSplit : ISplitFeature
                 if (tabStart > cursor + OpenNest.Math.Tolerance.Epsilon)
                     negEntities.Add(new Line(new Vector(pos, cursor), new Vector(pos, tabStart)));
 
-                negEntities.Add(new Line(new Vector(pos, tabStart), new Vector(pos + tabDir * tabHeight, tabStart)));
-                negEntities.Add(new Line(new Vector(pos + tabDir * tabHeight, tabStart), new Vector(pos + tabDir * tabHeight, tabEnd)));
-                negEntities.Add(new Line(new Vector(pos + tabDir * tabHeight, tabEnd), new Vector(pos, tabEnd)));
+                negEntities.Add(
+                    new Line(
+                        new Vector(pos, tabStart),
+                        new Vector(pos + tabDir * tabHeight, tabStart)
+                    )
+                );
+                negEntities.Add(
+                    new Line(
+                        new Vector(pos + tabDir * tabHeight, tabStart),
+                        new Vector(pos + tabDir * tabHeight, tabEnd)
+                    )
+                );
+                negEntities.Add(
+                    new Line(new Vector(pos + tabDir * tabHeight, tabEnd), new Vector(pos, tabEnd))
+                );
             }
             else
             {
                 if (tabStart > cursor + OpenNest.Math.Tolerance.Epsilon)
                     negEntities.Add(new Line(new Vector(cursor, pos), new Vector(tabStart, pos)));
 
-                negEntities.Add(new Line(new Vector(tabStart, pos), new Vector(tabStart, pos + tabDir * tabHeight)));
-                negEntities.Add(new Line(new Vector(tabStart, pos + tabDir * tabHeight), new Vector(tabEnd, pos + tabDir * tabHeight)));
-                negEntities.Add(new Line(new Vector(tabEnd, pos + tabDir * tabHeight), new Vector(tabEnd, pos)));
+                negEntities.Add(
+                    new Line(
+                        new Vector(tabStart, pos),
+                        new Vector(tabStart, pos + tabDir * tabHeight)
+                    )
+                );
+                negEntities.Add(
+                    new Line(
+                        new Vector(tabStart, pos + tabDir * tabHeight),
+                        new Vector(tabEnd, pos + tabDir * tabHeight)
+                    )
+                );
+                negEntities.Add(
+                    new Line(new Vector(tabEnd, pos + tabDir * tabHeight), new Vector(tabEnd, pos))
+                );
             }
 
             cursor = tabEnd;

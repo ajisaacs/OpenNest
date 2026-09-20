@@ -1,9 +1,9 @@
-using OpenNest.Converters;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Converters;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Gpu
 {
@@ -18,13 +18,22 @@ namespace OpenNest.Gpu
 
         public const double DefaultCellSize = 0.05;
 
-        public static PartBitmap FromDrawing(Drawing drawing, double cellSize = DefaultCellSize, double spacingDilation = 0)
+        public static PartBitmap FromDrawing(
+            Drawing drawing,
+            double cellSize = DefaultCellSize,
+            double spacingDilation = 0
+        )
         {
             var polygons = GetClosedPolygons(drawing);
             return Rasterize(polygons, cellSize, spacingDilation);
         }
 
-        public static PartBitmap FromDrawingRotated(Drawing drawing, double rotation, double cellSize = DefaultCellSize, double spacingDilation = 0)
+        public static PartBitmap FromDrawingRotated(
+            Drawing drawing,
+            double rotation,
+            double cellSize = DefaultCellSize,
+            double spacingDilation = 0
+        )
         {
             var polygons = GetClosedPolygons(drawing);
 
@@ -45,7 +54,8 @@ namespace OpenNest.Gpu
         /// </summary>
         public static PartBitmap FromPart(Part part, double cellSize = DefaultCellSize)
         {
-            var entities = ConvertProgram.ToGeometry(part.Program)
+            var entities = ConvertProgram
+                .ToGeometry(part.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
             var shapes = ShapeBuilder.GetShapes(entities);
 
@@ -65,10 +75,20 @@ namespace OpenNest.Gpu
             return Rasterize(polygons, cellSize, 0);
         }
 
-        private static PartBitmap Rasterize(List<Polygon> polygons, double cellSize, double spacingDilation)
+        private static PartBitmap Rasterize(
+            List<Polygon> polygons,
+            double cellSize,
+            double spacingDilation
+        )
         {
             if (polygons.Count == 0)
-                return new PartBitmap { Cells = Array.Empty<int>(), Width = 0, Height = 0, CellSize = cellSize };
+                return new PartBitmap
+                {
+                    Cells = Array.Empty<int>(),
+                    Width = 0,
+                    Height = 0,
+                    CellSize = cellSize,
+                };
 
             var minX = double.MaxValue;
             var minY = double.MaxValue;
@@ -79,10 +99,14 @@ namespace OpenNest.Gpu
             {
                 poly.UpdateBounds();
                 var bb = poly.BoundingBox;
-                if (bb.Left < minX) minX = bb.Left;
-                if (bb.Bottom < minY) minY = bb.Bottom;
-                if (bb.Right > maxX) maxX = bb.Right;
-                if (bb.Top > maxY) maxY = bb.Top;
+                if (bb.Left < minX)
+                    minX = bb.Left;
+                if (bb.Bottom < minY)
+                    minY = bb.Bottom;
+                if (bb.Right > maxX)
+                    maxX = bb.Right;
+                if (bb.Top > maxY)
+                    maxY = bb.Top;
             }
 
             minX -= spacingDilation;
@@ -94,7 +118,13 @@ namespace OpenNest.Gpu
             var height = (int)System.Math.Ceiling((maxY - minY) / cellSize);
 
             if (width <= 0 || height <= 0)
-                return new PartBitmap { Cells = Array.Empty<int>(), Width = 0, Height = 0, CellSize = cellSize };
+                return new PartBitmap
+                {
+                    Cells = Array.Empty<int>(),
+                    Width = 0,
+                    Height = 0,
+                    CellSize = cellSize,
+                };
 
             var cells = new int[width * height];
 
@@ -129,13 +159,14 @@ namespace OpenNest.Gpu
                 Height = height,
                 CellSize = cellSize,
                 OriginX = minX,
-                OriginY = minY
+                OriginY = minY,
             };
         }
 
         private static List<Polygon> GetClosedPolygons(Drawing drawing)
         {
-            var entities = ConvertProgram.ToGeometry(drawing.Program)
+            var entities = ConvertProgram
+                .ToGeometry(drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
             var shapes = ShapeBuilder.GetShapes(entities);
 
@@ -160,7 +191,11 @@ namespace OpenNest.Gpu
         /// arrays of identical dimensions with no fractional offset math.
         /// </summary>
         public static (int[] cellsA, int[] cellsB, int width, int height) BlitPair(
-            PartBitmap bitmapA, PartBitmap bitmapB, double offsetX, double offsetY)
+            PartBitmap bitmapA,
+            PartBitmap bitmapB,
+            double offsetX,
+            double offsetY
+        )
         {
             var cellSize = bitmapA.CellSize;
 
@@ -173,10 +208,12 @@ namespace OpenNest.Gpu
             var combinedMinY = System.Math.Min(bitmapA.OriginY, bWorldOriginY);
             var combinedMaxX = System.Math.Max(
                 bitmapA.OriginX + bitmapA.Width * cellSize,
-                bWorldOriginX + bitmapB.Width * cellSize);
+                bWorldOriginX + bitmapB.Width * cellSize
+            );
             var combinedMaxY = System.Math.Max(
                 bitmapA.OriginY + bitmapA.Height * cellSize,
-                bWorldOriginY + bitmapB.Height * cellSize);
+                bWorldOriginY + bitmapB.Height * cellSize
+            );
 
             var sharedWidth = (int)System.Math.Ceiling((combinedMaxX - combinedMinX) / cellSize);
             var sharedHeight = (int)System.Math.Ceiling((combinedMaxY - combinedMinY) / cellSize);

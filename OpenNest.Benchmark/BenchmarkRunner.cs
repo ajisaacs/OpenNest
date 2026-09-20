@@ -23,8 +23,13 @@ namespace OpenNest.Benchmark
         /// <summary>Wall-clock budget for one engine solving one job.</summary>
         private static readonly TimeSpan SolveTimeout = TimeSpan.FromMinutes(5);
 
-        public static List<JobResult> Run(List<BenchmarkJob> jobs, IReadOnlyList<NestingEngineInfo> engines,
-            double salvageRate = 0, double minimumSalvageDimension = 0, string outputDirectory = null)
+        public static List<JobResult> Run(
+            List<BenchmarkJob> jobs,
+            IReadOnlyList<NestingEngineInfo> engines,
+            double salvageRate = 0,
+            double minimumSalvageDimension = 0,
+            string outputDirectory = null
+        )
         {
             var results = new List<JobResult>(jobs.Count * engines.Count);
 
@@ -32,15 +37,28 @@ namespace OpenNest.Benchmark
             {
                 foreach (var engineInfo in engines)
                 {
-                    results.Add(RunOne(job, engineInfo, salvageRate, minimumSalvageDimension, outputDirectory));
+                    results.Add(
+                        RunOne(
+                            job,
+                            engineInfo,
+                            salvageRate,
+                            minimumSalvageDimension,
+                            outputDirectory
+                        )
+                    );
                 }
             }
 
             return results;
         }
 
-        private static JobResult RunOne(BenchmarkJob job, NestingEngineInfo engineInfo,
-            double salvageRate, double minimumSalvageDimension, string outputDirectory)
+        private static JobResult RunOne(
+            BenchmarkJob job,
+            NestingEngineInfo engineInfo,
+            double salvageRate,
+            double minimumSalvageDimension,
+            string outputDirectory
+        )
         {
             var requested = job.TotalRequestedQuantity;
             var sw = Stopwatch.StartNew();
@@ -53,18 +71,25 @@ namespace OpenNest.Benchmark
                 var jobResult = engine.Solve(nestJob, null, cts.Token);
 
                 var materialized = NestResultMaterializer.Materialize(nestJob, jobResult);
-                var plateRuns = materialized.Nest.Plates
-                    .Select(plate => (Plate: plate, Parts: plate.Parts.ToList()))
+                var plateRuns = materialized
+                    .Nest.Plates.Select(plate => (Plate: plate, Parts: plate.Parts.ToList()))
                     .ToList();
 
-                var requirements = job.Requests.ToDictionary<DrawingRequest, Drawing, (string Name, int Quantity)>(
+                var requirements = job.Requests.ToDictionary<
+                    DrawingRequest,
+                    Drawing,
+                    (string Name, int Quantity)
+                >(
                     r => materialized.DrawingsByPartId[r.Drawing.Id.ToString()],
                     r => (r.Drawing.Name, r.Quantity),
-                    ReferenceEqualityComparer.Instance);
+                    ReferenceEqualityComparer.Instance
+                );
 
                 var validation = NestValidator.Validate(plateRuns, requirements);
                 var totalPlaced = plateRuns.Sum(pr => pr.Parts.Count);
-                var placedArea = validation.Valid ? plateRuns.Sum(pr => pr.Parts.Sum(p => p.BaseDrawing.Area)) : 0;
+                var placedArea = validation.Valid
+                    ? plateRuns.Sum(pr => pr.Parts.Sum(p => p.BaseDrawing.Area))
+                    : 0;
                 var plateArea = plateRuns.Sum(pr => pr.Plate.Area());
 
                 var sizeBreakdown = plateRuns
@@ -83,23 +108,48 @@ namespace OpenNest.Benchmark
                     materialized.Nest.Thickness = source.Thickness;
                     materialized.Nest.SalvageRate = salvageRate;
                     foreach (var request in job.Requests)
-                        materialized.DrawingsByPartId[request.Drawing.Id.ToString()].Name = request.Drawing.Name;
-                    var path = System.IO.Path.Combine(outputDirectory, $"{job.Name}-{engineInfo.Name}.nest");
-                    if (System.IO.Path.GetFullPath(path) == System.IO.Path.GetFullPath(job.SourceFile))
-                        throw new InvalidOperationException("Output must not overwrite the source nest.");
+                        materialized.DrawingsByPartId[request.Drawing.Id.ToString()].Name = request
+                            .Drawing
+                            .Name;
+                    var path = System.IO.Path.Combine(
+                        outputDirectory,
+                        $"{job.Name}-{engineInfo.Name}.nest"
+                    );
+                    if (
+                        System.IO.Path.GetFullPath(path)
+                        == System.IO.Path.GetFullPath(job.SourceFile)
+                    )
+                        throw new InvalidOperationException(
+                            "Output must not overwrite the source nest."
+                        );
                     new OpenNest.IO.NestWriter(materialized.Nest).Write(path);
                     var report = new
                     {
-                        Source = job.SourceFile, Engine = engineInfo.Name, jobResult.Status, jobResult.StopReason,
-                        Requested = requested, Placed = totalPlaced, SheetArea = plateArea, PlacedArea = placedArea,
-                        SalvageRate = salvageRate, MinimumSalvageDimension = minimumSalvageDimension,
-                        EstimatedNetArea = jobResult.Plates.Sum(p => StockLadderNestingEngine.EstimateNetArea(nestJob, p)),
-                        Fulfillment = jobResult.Fulfillment, StockUsage = jobResult.StockUsage,
-                        Plates = jobResult.Plates, validation.Violations
+                        Source = job.SourceFile,
+                        Engine = engineInfo.Name,
+                        jobResult.Status,
+                        jobResult.StopReason,
+                        Requested = requested,
+                        Placed = totalPlaced,
+                        SheetArea = plateArea,
+                        PlacedArea = placedArea,
+                        SalvageRate = salvageRate,
+                        MinimumSalvageDimension = minimumSalvageDimension,
+                        EstimatedNetArea = jobResult.Plates.Sum(p =>
+                            StockLadderNestingEngine.EstimateNetArea(nestJob, p)
+                        ),
+                        Fulfillment = jobResult.Fulfillment,
+                        StockUsage = jobResult.StockUsage,
+                        Plates = jobResult.Plates,
+                        validation.Violations,
                     };
-                    System.IO.File.WriteAllText(System.IO.Path.ChangeExtension(path, ".json"),
-                        System.Text.Json.JsonSerializer.Serialize(report,
-                            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                    System.IO.File.WriteAllText(
+                        System.IO.Path.ChangeExtension(path, ".json"),
+                        System.Text.Json.JsonSerializer.Serialize(
+                            report,
+                            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+                        )
+                    );
                 }
                 sw.Stop();
 

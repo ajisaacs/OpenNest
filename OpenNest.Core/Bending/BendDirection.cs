@@ -4,6 +4,6 @@ namespace OpenNest.Bending
     {
         Unknown,
         Up,
-        Down
+        Down,
     }
 }

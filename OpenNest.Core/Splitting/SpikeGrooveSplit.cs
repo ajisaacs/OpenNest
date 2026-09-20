@@ -13,7 +13,12 @@ public class SpikeGrooveSplit : ISplitFeature
 {
     public string Name => "Spike / V-Groove";
 
-    public SplitFeatureResult GenerateFeatures(SplitLine line, double extentStart, double extentEnd, SplitParameters parameters)
+    public SplitFeatureResult GenerateFeatures(
+        SplitLine line,
+        double extentStart,
+        double extentEnd,
+        SplitParameters parameters
+    )
     {
         var extent = extentEnd - extentStart;
         var pairCount = parameters.SpikePairCount;
@@ -44,14 +49,37 @@ public class SpikeGrooveSplit : ISplitFeature
                 pairPositions.Add(extentStart + margin + usable * i / (pairCount - 1));
         }
 
-        var negEntities = BuildGrooveSide(pairPositions, grooveHalfWidth, grooveDepth, extentStart, extentEnd, pos, isVertical);
-        var posEntities = BuildSpikeSide(pairPositions, spikeHalfWidth, spikeDepth, extentStart, extentEnd, pos, isVertical);
+        var negEntities = BuildGrooveSide(
+            pairPositions,
+            grooveHalfWidth,
+            grooveDepth,
+            extentStart,
+            extentEnd,
+            pos,
+            isVertical
+        );
+        var posEntities = BuildSpikeSide(
+            pairPositions,
+            spikeHalfWidth,
+            spikeDepth,
+            extentStart,
+            extentEnd,
+            pos,
+            isVertical
+        );
 
         return new SplitFeatureResult(negEntities, posEntities);
     }
 
-    private static List<Entity> BuildGrooveSide(List<double> pairPositions, double halfWidth, double depth,
-        double extentStart, double extentEnd, double pos, bool isVertical)
+    private static List<Entity> BuildGrooveSide(
+        List<double> pairPositions,
+        double halfWidth,
+        double depth,
+        double extentStart,
+        double extentEnd,
+        double pos,
+        bool isVertical
+    )
     {
         var entities = new List<Entity>();
         var cursor = extentStart;
@@ -76,8 +104,15 @@ public class SpikeGrooveSplit : ISplitFeature
         return entities;
     }
 
-    private static List<Entity> BuildSpikeSide(List<double> pairPositions, double halfWidth, double depth,
-        double extentStart, double extentEnd, double pos, bool isVertical)
+    private static List<Entity> BuildSpikeSide(
+        List<double> pairPositions,
+        double halfWidth,
+        double depth,
+        double extentStart,
+        double extentEnd,
+        double pos,
+        bool isVertical
+    )
     {
         var entities = new List<Entity>();
         var cursor = extentEnd;
@@ -103,7 +138,13 @@ public class SpikeGrooveSplit : ISplitFeature
         return entities;
     }
 
-    private static Line MakeLine(double splitAxis1, double along1, double splitAxis2, double along2, bool isVertical)
+    private static Line MakeLine(
+        double splitAxis1,
+        double along1,
+        double splitAxis2,
+        double along2,
+        bool isVertical
+    )
     {
         return isVertical
             ? new Line(new Vector(splitAxis1, along1), new Vector(splitAxis2, along2))

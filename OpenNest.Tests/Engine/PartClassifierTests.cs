@@ -30,15 +30,26 @@ public class PartClassifierTests
         var result = PartClassifier.Classify(drawing);
 
         Assert.Equal(PartType.Rectangle, result.Type);
-        Assert.True(result.Rectangularity >= 0.99, $"Expected rectangularity>=0.99, got {result.Rectangularity:F4}");
-        Assert.True(result.PerimeterRatio >= 0.99, $"Expected perimeterRatio>=0.99, got {result.PerimeterRatio:F4}");
+        Assert.True(
+            result.Rectangularity >= 0.99,
+            $"Expected rectangularity>=0.99, got {result.Rectangularity:F4}"
+        );
+        Assert.True(
+            result.PerimeterRatio >= 0.99,
+            $"Expected perimeterRatio>=0.99, got {result.PerimeterRatio:F4}"
+        );
     }
 
     [Fact]
     public void Classify_RoundedRectangle_ReturnsRectangle()
     {
         // Use the built-in shape builder so arc geometry is constructed correctly.
-        var shape = new RoundedRectangleShape { Length = 100, Width = 50, Radius = 5 };
+        var shape = new RoundedRectangleShape
+        {
+            Length = 100,
+            Width = 50,
+            Radius = 5,
+        };
         var drawing = shape.GetDrawing();
 
         var result = PartClassifier.Classify(drawing);
@@ -54,14 +65,14 @@ public class PartClassifierTests
         var pgm = new OpenNest.CNC.Program();
         pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
         // Bottom edge left section -> notch -> bottom edge right section
-        pgm.Codes.Add(new LinearMove(new Vector(45, 0)));   // along bottom to notch start
-        pgm.Codes.Add(new LinearMove(new Vector(45, 2)));   // up into notch
-        pgm.Codes.Add(new LinearMove(new Vector(50, 2)));   // across notch (5 wide)
-        pgm.Codes.Add(new LinearMove(new Vector(50, 0)));   // back down
-        pgm.Codes.Add(new LinearMove(new Vector(100, 0)));  // remainder of bottom edge
+        pgm.Codes.Add(new LinearMove(new Vector(45, 0))); // along bottom to notch start
+        pgm.Codes.Add(new LinearMove(new Vector(45, 2))); // up into notch
+        pgm.Codes.Add(new LinearMove(new Vector(50, 2))); // across notch (5 wide)
+        pgm.Codes.Add(new LinearMove(new Vector(50, 0))); // back down
+        pgm.Codes.Add(new LinearMove(new Vector(100, 0))); // remainder of bottom edge
         pgm.Codes.Add(new LinearMove(new Vector(100, 50))); // right edge
-        pgm.Codes.Add(new LinearMove(new Vector(0, 50)));   // top edge
-        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));    // left edge back to start
+        pgm.Codes.Add(new LinearMove(new Vector(0, 50))); // top edge
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0))); // left edge back to start
         var drawing = new Drawing("rect-notch", pgm);
 
         var result = PartClassifier.Classify(drawing);
@@ -78,8 +89,10 @@ public class PartClassifierTests
         var result = PartClassifier.Classify(drawing);
 
         Assert.Equal(PartType.Circle, result.Type);
-        Assert.True(result.Circularity >= PartClassifier.CircularityThreshold,
-            $"Expected circularity>={PartClassifier.CircularityThreshold}, got {result.Circularity:F4}");
+        Assert.True(
+            result.Circularity >= PartClassifier.CircularityThreshold,
+            $"Expected circularity>={PartClassifier.CircularityThreshold}, got {result.Circularity:F4}"
+        );
     }
 
     [Fact]
@@ -151,8 +164,10 @@ public class PartClassifierTests
         var result = PartClassifier.Classify(drawing);
 
         Assert.Equal(PartType.Irregular, result.Type);
-        Assert.True(result.PerimeterRatio < PartClassifier.PerimeterRatioThreshold,
-            $"Expected perimeterRatio<{PartClassifier.PerimeterRatioThreshold}, got {result.PerimeterRatio:F4}");
+        Assert.True(
+            result.PerimeterRatio < PartClassifier.PerimeterRatioThreshold,
+            $"Expected perimeterRatio<{PartClassifier.PerimeterRatioThreshold}, got {result.PerimeterRatio:F4}"
+        );
     }
 
     [Fact]
@@ -186,8 +201,10 @@ public class PartClassifierTests
         var result = PartClassifier.Classify(drawing);
 
         // The MBR must be tilted — primary angle should be non-zero.
-        Assert.True(System.Math.Abs(result.PrimaryAngle) > 0.01,
-            $"Expected non-zero primary angle for 30°-tilted rect, got {result.PrimaryAngle:F4} rad");
+        Assert.True(
+            System.Math.Abs(result.PrimaryAngle) > 0.01,
+            $"Expected non-zero primary angle for 30°-tilted rect, got {result.PrimaryAngle:F4} rad"
+        );
     }
 
     [Fact]

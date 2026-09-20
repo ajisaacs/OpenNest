@@ -1,12 +1,16 @@
-using OpenNest.Math;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
     public static class Collision
     {
-        public static CollisionResult Check(Polygon a, Polygon b,
-            List<Polygon> holesA = null, List<Polygon> holesB = null)
+        public static CollisionResult Check(
+            Polygon a,
+            Polygon b,
+            List<Polygon> holesA = null,
+            List<Polygon> holesB = null
+        )
         {
             // Step 1: Bounding box pre-filter
             if (!BoundingBoxesOverlap(a.BoundingBox, b.BoundingBox))
@@ -46,8 +50,12 @@ namespace OpenNest.Geometry
             return new CollisionResult(true, regions, intersectionPoints);
         }
 
-        public static bool HasOverlap(Polygon a, Polygon b,
-            List<Polygon> holesA = null, List<Polygon> holesB = null)
+        public static bool HasOverlap(
+            Polygon a,
+            Polygon b,
+            List<Polygon> holesA = null,
+            List<Polygon> holesB = null
+        )
         {
             if (!BoundingBoxesOverlap(a.BoundingBox, b.BoundingBox))
                 return false;
@@ -57,8 +65,10 @@ namespace OpenNest.Geometry
             return Check(a, b, holesA, holesB).Overlaps;
         }
 
-        public static List<CollisionResult> CheckAll(List<Polygon> polygons,
-            List<List<Polygon>> holes = null)
+        public static List<CollisionResult> CheckAll(
+            List<Polygon> polygons,
+            List<List<Polygon>> holes = null
+        )
         {
             var results = new List<CollisionResult>();
 
@@ -78,8 +88,7 @@ namespace OpenNest.Geometry
             return results;
         }
 
-        public static bool HasAnyOverlap(List<Polygon> polygons,
-            List<List<Polygon>> holes = null)
+        public static bool HasAnyOverlap(List<Polygon> polygons, List<List<Polygon>> holes = null)
         {
             for (var i = 0; i < polygons.Count; i++)
             {
@@ -98,10 +107,8 @@ namespace OpenNest.Geometry
 
         private static bool BoundingBoxesOverlap(Box a, Box b)
         {
-            var overlapX = System.Math.Min(a.Right, b.Right)
-                         - System.Math.Max(a.Left, b.Left);
-            var overlapY = System.Math.Min(a.Top, b.Top)
-                         - System.Math.Max(a.Bottom, b.Bottom);
+            var overlapX = System.Math.Min(a.Right, b.Right) - System.Math.Max(a.Left, b.Left);
+            var overlapY = System.Math.Min(a.Top, b.Top) - System.Math.Max(a.Bottom, b.Bottom);
 
             return overlapX > Tolerance.Epsilon && overlapY > Tolerance.Epsilon;
         }
@@ -164,13 +171,19 @@ namespace OpenNest.Geometry
             var output = new List<Vector>(subject.Vertices);
 
             // Remove closing vertex if present
-            if (output.Count > 1 && output[0].X == output[output.Count - 1].X
-                                  && output[0].Y == output[output.Count - 1].Y)
+            if (
+                output.Count > 1
+                && output[0].X == output[output.Count - 1].X
+                && output[0].Y == output[output.Count - 1].Y
+            )
                 output.RemoveAt(output.Count - 1);
 
             var clipVerts = new List<Vector>(clip.Vertices);
-            if (clipVerts.Count > 1 && clipVerts[0].X == clipVerts[clipVerts.Count - 1].X
-                                     && clipVerts[0].Y == clipVerts[clipVerts.Count - 1].Y)
+            if (
+                clipVerts.Count > 1
+                && clipVerts[0].X == clipVerts[clipVerts.Count - 1].X
+                && clipVerts[0].Y == clipVerts[clipVerts.Count - 1].Y
+            )
                 clipVerts.RemoveAt(clipVerts.Count - 1);
 
             for (var i = 0; i < clipVerts.Count; i++)
@@ -231,7 +244,7 @@ namespace OpenNest.Geometry
         private static double Cross(Vector edgeStart, Vector edgeEnd, Vector point)
         {
             return (edgeEnd.X - edgeStart.X) * (point.Y - edgeStart.Y)
-                 - (edgeEnd.Y - edgeStart.Y) * (point.X - edgeStart.X);
+                - (edgeEnd.Y - edgeStart.Y) * (point.X - edgeStart.X);
         }
 
         /// <summary>
@@ -255,12 +268,17 @@ namespace OpenNest.Geometry
         /// <summary>
         /// Subtracts holes from overlap regions.
         /// </summary>
-        private static List<Polygon> SubtractHoles(List<Polygon> regions,
-            List<Polygon> holesA, List<Polygon> holesB)
+        private static List<Polygon> SubtractHoles(
+            List<Polygon> regions,
+            List<Polygon> holesA,
+            List<Polygon> holesB
+        )
         {
             var allHoles = new List<Polygon>();
-            if (holesA != null) allHoles.AddRange(holesA);
-            if (holesB != null) allHoles.AddRange(holesB);
+            if (holesA != null)
+                allHoles.AddRange(holesA);
+            if (holesB != null)
+                allHoles.AddRange(holesB);
 
             if (allHoles.Count == 0)
                 return regions;
@@ -313,9 +331,16 @@ namespace OpenNest.Geometry
                         var holeCount = holeTri.IsClosed() ? holeVerts.Count - 1 : holeVerts.Count;
                         var survived = false;
                         for (var i = 0; i < holeCount; i++)
-                            survived |= AddIfPositiveArea(next,
-                                ClipOutsideHalfSpace(pieceTri, holeVerts[i], holeVerts[(i + 1) % holeCount]));
-                        if (!survived) continue; // piece lies entirely within the hole
+                            survived |= AddIfPositiveArea(
+                                next,
+                                ClipOutsideHalfSpace(
+                                    pieceTri,
+                                    holeVerts[i],
+                                    holeVerts[(i + 1) % holeCount]
+                                )
+                            );
+                        if (!survived)
+                            continue; // piece lies entirely within the hole
                     }
                 }
 
@@ -329,7 +354,11 @@ namespace OpenNest.Geometry
         /// Sutherland-Hodgman clip of a convex polygon to the strict outside of the
         /// infinite line edgeStart->edgeEnd of a CCW hole edge (Cross &lt; -Epsilon).
         /// </summary>
-        private static List<Vector> ClipOutsideHalfSpace(Polygon piece, Vector edgeStart, Vector edgeEnd)
+        private static List<Vector> ClipOutsideHalfSpace(
+            Polygon piece,
+            Vector edgeStart,
+            Vector edgeEnd
+        )
         {
             var verts = piece.Vertices;
             var count = piece.IsClosed() ? verts.Count - 1 : verts.Count;
@@ -340,22 +369,27 @@ namespace OpenNest.Geometry
                 var next = verts[(i + 1) % count];
                 var currentInside = Cross(edgeStart, edgeEnd, current) >= -Tolerance.Epsilon;
                 var nextInside = Cross(edgeStart, edgeEnd, next) >= -Tolerance.Epsilon;
-                if (!currentInside) kept.Add(current);
-                if (currentInside == nextInside) continue;
+                if (!currentInside)
+                    kept.Add(current);
+                if (currentInside == nextInside)
+                    continue;
                 var intersection = LineIntersection(edgeStart, edgeEnd, current, next);
-                if (intersection.IsValid()) kept.Add(intersection);
+                if (intersection.IsValid())
+                    kept.Add(intersection);
             }
             return kept;
         }
 
         private static bool AddIfPositiveArea(List<Polygon> polygons, List<Vector> vertices)
         {
-            if (vertices.Count < 3) return false;
+            if (vertices.Count < 3)
+                return false;
             var polygon = new Polygon();
             polygon.Vertices.AddRange(vertices);
             polygon.Close();
             polygon.UpdateBounds();
-            if (polygon.Area() <= Tolerance.Epsilon) return false;
+            if (polygon.Area() <= Tolerance.Epsilon)
+                return false;
             polygons.Add(polygon);
             return true;
         }

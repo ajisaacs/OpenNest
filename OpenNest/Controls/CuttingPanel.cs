@@ -1,26 +1,38 @@
-using OpenNest.CNC.CuttingStrategy;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.CNC.CuttingStrategy;
 
 namespace OpenNest.Controls
 {
     public class CuttingPanel : Panel
     {
         private static readonly string[] LeadInTypes =
-            { "None", "Line", "Arc", "Line + Arc", "Clean Hole", "Line + Line" };
+        {
+            "None",
+            "Line",
+            "Arc",
+            "Line + Arc",
+            "Clean Hole",
+            "Line + Line",
+        };
 
-        private static readonly string[] LeadOutTypes =
-            { "None", "Line", "Arc" };
+        private static readonly string[] LeadOutTypes = { "None", "Line", "Arc" };
 
         private readonly TabControl tabControl;
-        private readonly ComboBox cboExternalLeadIn, cboExternalLeadOut;
-        private readonly ComboBox cboInternalLeadIn, cboInternalLeadOut;
-        private readonly ComboBox cboArcCircleLeadIn, cboArcCircleLeadOut;
+        private readonly ComboBox cboExternalLeadIn,
+            cboExternalLeadOut;
+        private readonly ComboBox cboInternalLeadIn,
+            cboInternalLeadOut;
+        private readonly ComboBox cboArcCircleLeadIn,
+            cboArcCircleLeadOut;
 
-        private readonly Panel pnlExternalLeadIn, pnlExternalLeadOut;
-        private readonly Panel pnlInternalLeadIn, pnlInternalLeadOut;
-        private readonly Panel pnlArcCircleLeadIn, pnlArcCircleLeadOut;
+        private readonly Panel pnlExternalLeadIn,
+            pnlExternalLeadOut;
+        private readonly Panel pnlInternalLeadIn,
+            pnlInternalLeadOut;
+        private readonly Panel pnlArcCircleLeadIn,
+            pnlArcCircleLeadOut;
 
         private readonly CheckBox chkTabsEnabled;
         private readonly NumericUpDown nudTabWidth;
@@ -55,7 +67,7 @@ namespace OpenNest.Controls
                     0 => ContourType.External,
                     1 => ContourType.Internal,
                     2 => ContourType.ArcCircle,
-                    _ => null
+                    _ => null,
                 };
             }
             set
@@ -68,7 +80,7 @@ namespace OpenNest.Controls
                     ContourType.External => 0,
                     ContourType.Internal => 1,
                     ContourType.ArcCircle => 2,
-                    _ => -1
+                    _ => -1,
                 };
 
                 if (index >= 0 && tabControl.SelectedIndex != index)
@@ -82,31 +94,39 @@ namespace OpenNest.Controls
             BackColor = Color.White;
 
             // Tab control for contour types — wrapped in a fixed-height panel for Dock.Top
-            tabControl = new TabControl
-            {
-                Dock = DockStyle.Fill
-            };
+            tabControl = new TabControl { Dock = DockStyle.Fill };
 
             var tabExternal = new TabPage("External") { Padding = new Padding(4) };
             var tabInternal = new TabPage("Internal") { Padding = new Padding(4) };
             var tabArcCircle = new TabPage("Arc / Circle") { Padding = new Padding(4) };
 
-            SetupTab(tabExternal, out cboExternalLeadIn, out pnlExternalLeadIn,
-                out cboExternalLeadOut, out pnlExternalLeadOut);
-            SetupTab(tabInternal, out cboInternalLeadIn, out pnlInternalLeadIn,
-                out cboInternalLeadOut, out pnlInternalLeadOut);
-            SetupTab(tabArcCircle, out cboArcCircleLeadIn, out pnlArcCircleLeadIn,
-                out cboArcCircleLeadOut, out pnlArcCircleLeadOut);
+            SetupTab(
+                tabExternal,
+                out cboExternalLeadIn,
+                out pnlExternalLeadIn,
+                out cboExternalLeadOut,
+                out pnlExternalLeadOut
+            );
+            SetupTab(
+                tabInternal,
+                out cboInternalLeadIn,
+                out pnlInternalLeadIn,
+                out cboInternalLeadOut,
+                out pnlInternalLeadOut
+            );
+            SetupTab(
+                tabArcCircle,
+                out cboArcCircleLeadIn,
+                out pnlArcCircleLeadIn,
+                out cboArcCircleLeadOut,
+                out pnlArcCircleLeadOut
+            );
 
             tabControl.Controls.Add(tabExternal);
             tabControl.Controls.Add(tabInternal);
             tabControl.Controls.Add(tabArcCircle);
 
-            var tabWrapper = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 340
-            };
+            var tabWrapper = new Panel { Dock = DockStyle.Top, Height = 340 };
             tabWrapper.Controls.Add(tabControl);
 
             // Tabs section
@@ -115,23 +135,25 @@ namespace OpenNest.Controls
                 HeaderText = "Tabs",
                 Dock = DockStyle.Top,
                 ExpandedHeight = 160,
-                IsExpanded = false
+                IsExpanded = false,
             };
 
             chkTabsEnabled = new CheckBox
             {
                 Text = "Enable Tabs",
                 Location = new Point(12, 4),
-                AutoSize = true
+                AutoSize = true,
             };
             tabsPanel.ContentPanel.Controls.Add(chkTabsEnabled);
 
-            tabsPanel.ContentPanel.Controls.Add(new Label
-            {
-                Text = "Tab Size:",
-                Location = new Point(160, 6),
-                AutoSize = true
-            });
+            tabsPanel.ContentPanel.Controls.Add(
+                new Label
+                {
+                    Text = "Tab Size:",
+                    Location = new Point(160, 6),
+                    AutoSize = true,
+                }
+            );
 
             nudTabWidth = CreateNumeric(225, 3, 0.25, 0.0625);
             nudTabWidth.Enabled = false;
@@ -143,7 +165,7 @@ namespace OpenNest.Controls
                 Location = new Point(28, 28),
                 AutoSize = true,
                 Enabled = false,
-                Checked = true
+                Checked = true,
             };
             tabsPanel.ContentPanel.Controls.Add(rbTabAll);
 
@@ -152,27 +174,31 @@ namespace OpenNest.Controls
                 Text = "Auto-tab when smallest part dimension is between:",
                 Location = new Point(28, 50),
                 AutoSize = true,
-                Enabled = false
+                Enabled = false,
             };
             tabsPanel.ContentPanel.Controls.Add(rbAutoTab);
 
-            tabsPanel.ContentPanel.Controls.Add(new Label
-            {
-                Text = "Min:",
-                Location = new Point(44, 76),
-                AutoSize = true
-            });
+            tabsPanel.ContentPanel.Controls.Add(
+                new Label
+                {
+                    Text = "Min:",
+                    Location = new Point(44, 76),
+                    AutoSize = true,
+                }
+            );
 
             nudAutoTabMin = CreateNumeric(77, 73, 0, 0.0625);
             nudAutoTabMin.Enabled = false;
             tabsPanel.ContentPanel.Controls.Add(nudAutoTabMin);
 
-            tabsPanel.ContentPanel.Controls.Add(new Label
-            {
-                Text = "Max:",
-                Location = new Point(210, 76),
-                AutoSize = true
-            });
+            tabsPanel.ContentPanel.Controls.Add(
+                new Label
+                {
+                    Text = "Max:",
+                    Location = new Point(210, 76),
+                    AutoSize = true,
+                }
+            );
 
             nudAutoTabMax = CreateNumeric(245, 73, 0, 0.0625);
             nudAutoTabMax.Enabled = false;
@@ -202,15 +228,17 @@ namespace OpenNest.Controls
                 HeaderText = "Pierce",
                 Dock = DockStyle.Top,
                 ExpandedHeight = 90,
-                IsExpanded = true
+                IsExpanded = true,
             };
 
-            piercePanel.ContentPanel.Controls.Add(new Label
-            {
-                Text = "Pierce Clearance:",
-                Location = new Point(12, 6),
-                AutoSize = true
-            });
+            piercePanel.ContentPanel.Controls.Add(
+                new Label
+                {
+                    Text = "Pierce Clearance:",
+                    Location = new Point(12, 6),
+                    AutoSize = true,
+                }
+            );
 
             nudPierceClearance = CreateNumeric(130, 3, 0.0625, 0.0625);
             piercePanel.ContentPanel.Controls.Add(nudPierceClearance);
@@ -219,7 +247,7 @@ namespace OpenNest.Controls
             {
                 Text = "Round Lead-In Angles",
                 Location = new Point(12, 32),
-                AutoSize = true
+                AutoSize = true,
             };
             chkRoundLeadInAngles.CheckedChanged += (s, e) =>
             {
@@ -228,12 +256,14 @@ namespace OpenNest.Controls
             };
             piercePanel.ContentPanel.Controls.Add(chkRoundLeadInAngles);
 
-            piercePanel.ContentPanel.Controls.Add(new Label
-            {
-                Text = "Increment:",
-                Location = new Point(175, 34),
-                AutoSize = true
-            });
+            piercePanel.ContentPanel.Controls.Add(
+                new Label
+                {
+                    Text = "Increment:",
+                    Location = new Point(175, 34),
+                    AutoSize = true,
+                }
+            );
 
             nudLeadInAngleIncrement = CreateNumeric(245, 31, 5, 1);
             nudLeadInAngleIncrement.DecimalPlaces = 0;
@@ -249,7 +279,7 @@ namespace OpenNest.Controls
                 Text = "Auto-Assign Lead-ins",
                 Dock = DockStyle.Top,
                 Height = 32,
-                Visible = false
+                Visible = false,
             };
             btnAutoAssign.Click += (s, e) => AutoAssignClicked?.Invoke(this, EventArgs.Empty);
 
@@ -257,7 +287,7 @@ namespace OpenNest.Controls
             {
                 Dock = DockStyle.Top,
                 Height = 36,
-                Padding = new Padding(4, 2, 4, 2)
+                Padding = new Padding(4, 2, 4, 2),
             };
             btnWrapper.Controls.Add(btnAutoAssign);
 
@@ -287,8 +317,10 @@ namespace OpenNest.Controls
                 PierceClearance = (double)nudPierceClearance.Value,
                 RoundLeadInAngles = chkRoundLeadInAngles.Checked,
                 LeadInAngleIncrement = (double)nudLeadInAngleIncrement.Value,
-                AutoTabMinSize = chkTabsEnabled.Checked && rbAutoTab.Checked ? (double)nudAutoTabMin.Value : 0,
-                AutoTabMaxSize = chkTabsEnabled.Checked && rbAutoTab.Checked ? (double)nudAutoTabMax.Value : 0
+                AutoTabMinSize =
+                    chkTabsEnabled.Checked && rbAutoTab.Checked ? (double)nudAutoTabMin.Value : 0,
+                AutoTabMaxSize =
+                    chkTabsEnabled.Checked && rbAutoTab.Checked ? (double)nudAutoTabMax.Value : 0,
             };
         }
 
@@ -325,30 +357,36 @@ namespace OpenNest.Controls
                 ParametersChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private static void SetupTab(TabPage tab,
-            out ComboBox leadInCombo, out Panel leadInPanel,
-            out ComboBox leadOutCombo, out Panel leadOutPanel)
+        private static void SetupTab(
+            TabPage tab,
+            out ComboBox leadInCombo,
+            out Panel leadInPanel,
+            out ComboBox leadOutCombo,
+            out Panel leadOutPanel
+        )
         {
             var grpLeadIn = new GroupBox
             {
                 Text = "Lead-In",
                 Location = new Point(4, 4),
-                Size = new Size(340, 148)
+                Size = new Size(340, 148),
             };
             tab.Controls.Add(grpLeadIn);
 
-            grpLeadIn.Controls.Add(new Label
-            {
-                Text = "Type:",
-                Location = new Point(8, 22),
-                AutoSize = true
-            });
+            grpLeadIn.Controls.Add(
+                new Label
+                {
+                    Text = "Type:",
+                    Location = new Point(8, 22),
+                    AutoSize = true,
+                }
+            );
 
             leadInCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(90, 19),
-                Size = new Size(230, 24)
+                Size = new Size(230, 24),
             };
             grpLeadIn.Controls.Add(leadInCombo);
 
@@ -356,7 +394,7 @@ namespace OpenNest.Controls
             {
                 Location = new Point(8, 48),
                 Size = new Size(320, 92),
-                AutoScroll = true
+                AutoScroll = true,
             };
             grpLeadIn.Controls.Add(leadInPanel);
 
@@ -364,22 +402,24 @@ namespace OpenNest.Controls
             {
                 Text = "Lead-Out",
                 Location = new Point(4, 156),
-                Size = new Size(340, 132)
+                Size = new Size(340, 132),
             };
             tab.Controls.Add(grpLeadOut);
 
-            grpLeadOut.Controls.Add(new Label
-            {
-                Text = "Type:",
-                Location = new Point(8, 22),
-                AutoSize = true
-            });
+            grpLeadOut.Controls.Add(
+                new Label
+                {
+                    Text = "Type:",
+                    Location = new Point(8, 22),
+                    AutoSize = true,
+                }
+            );
 
             leadOutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(90, 19),
-                Size = new Size(230, 24)
+                Size = new Size(230, 24),
             };
             grpLeadOut.Controls.Add(leadOutCombo);
 
@@ -387,20 +427,24 @@ namespace OpenNest.Controls
             {
                 Location = new Point(8, 48),
                 Size = new Size(320, 76),
-                AutoScroll = true
+                AutoScroll = true,
             };
             grpLeadOut.Controls.Add(leadOutPanel);
         }
 
         private void PopulateDropdowns()
         {
-            foreach (var combo in new[] { cboExternalLeadIn, cboInternalLeadIn, cboArcCircleLeadIn })
+            foreach (
+                var combo in new[] { cboExternalLeadIn, cboInternalLeadIn, cboArcCircleLeadIn }
+            )
             {
                 combo.Items.AddRange(LeadInTypes);
                 combo.SelectedIndex = 0;
             }
 
-            foreach (var combo in new[] { cboExternalLeadOut, cboInternalLeadOut, cboArcCircleLeadOut })
+            foreach (
+                var combo in new[] { cboExternalLeadOut, cboInternalLeadOut, cboArcCircleLeadOut }
+            )
             {
                 combo.Items.AddRange(LeadOutTypes);
                 combo.SelectedIndex = 0;
@@ -438,17 +482,23 @@ namespace OpenNest.Controls
 
         private Panel GetLeadInPanel(ComboBox combo)
         {
-            if (combo == cboExternalLeadIn) return pnlExternalLeadIn;
-            if (combo == cboInternalLeadIn) return pnlInternalLeadIn;
-            if (combo == cboArcCircleLeadIn) return pnlArcCircleLeadIn;
+            if (combo == cboExternalLeadIn)
+                return pnlExternalLeadIn;
+            if (combo == cboInternalLeadIn)
+                return pnlInternalLeadIn;
+            if (combo == cboArcCircleLeadIn)
+                return pnlArcCircleLeadIn;
             return null;
         }
 
         private Panel GetLeadOutPanel(ComboBox combo)
         {
-            if (combo == cboExternalLeadOut) return pnlExternalLeadOut;
-            if (combo == cboInternalLeadOut) return pnlInternalLeadOut;
-            if (combo == cboArcCircleLeadOut) return pnlArcCircleLeadOut;
+            if (combo == cboExternalLeadOut)
+                return pnlExternalLeadOut;
+            if (combo == cboInternalLeadOut)
+                return pnlInternalLeadOut;
+            if (combo == cboArcCircleLeadOut)
+                return pnlArcCircleLeadOut;
             return null;
         }
 
@@ -502,15 +552,22 @@ namespace OpenNest.Controls
             }
         }
 
-        private void AddNumericField(Panel panel, string label, double defaultValue,
-            ref int y, string tag)
+        private void AddNumericField(
+            Panel panel,
+            string label,
+            double defaultValue,
+            ref int y,
+            string tag
+        )
         {
-            panel.Controls.Add(new Label
-            {
-                Text = label,
-                Location = new Point(0, y + 3),
-                AutoSize = true
-            });
+            panel.Controls.Add(
+                new Label
+                {
+                    Text = label,
+                    Location = new Point(0, y + 3),
+                    AutoSize = true,
+                }
+            );
 
             var nud = CreateNumeric(130, y, defaultValue, 0.0625);
             nud.Tag = tag;
@@ -520,7 +577,12 @@ namespace OpenNest.Controls
             y += 30;
         }
 
-        private static NumericUpDown CreateNumeric(int x, int y, double defaultValue, double increment)
+        private static NumericUpDown CreateNumeric(
+            int x,
+            int y,
+            double defaultValue,
+            double increment
+        )
         {
             return new NumericUpDown
             {
@@ -530,7 +592,7 @@ namespace OpenNest.Controls
                 Increment = (decimal)increment,
                 Minimum = 0,
                 Maximum = 9999,
-                Value = (decimal)defaultValue
+                Value = (decimal)defaultValue,
             };
         }
 
@@ -598,32 +660,29 @@ namespace OpenNest.Controls
                 1 => new LineLeadIn
                 {
                     Length = GetParam(panel, "Length", 0.25),
-                    ApproachAngle = GetParam(panel, "ApproachAngle", 90)
+                    ApproachAngle = GetParam(panel, "ApproachAngle", 90),
                 },
-                2 => new ArcLeadIn
-                {
-                    Radius = GetParam(panel, "Radius", 0.25)
-                },
+                2 => new ArcLeadIn { Radius = GetParam(panel, "Radius", 0.25) },
                 3 => new LineArcLeadIn
                 {
                     LineLength = GetParam(panel, "LineLength", 0.25),
                     ArcRadius = GetParam(panel, "ArcRadius", 0.125),
-                    ApproachAngle = GetParam(panel, "ApproachAngle", 135)
+                    ApproachAngle = GetParam(panel, "ApproachAngle", 135),
                 },
                 4 => new CleanHoleLeadIn
                 {
                     LineLength = GetParam(panel, "LineLength", 0.25),
                     ArcRadius = GetParam(panel, "ArcRadius", 0.125),
-                    Kerf = GetParam(panel, "Kerf", 0.06)
+                    Kerf = GetParam(panel, "Kerf", 0.06),
                 },
                 5 => new LineLineLeadIn
                 {
                     Length1 = GetParam(panel, "Length1", 0.25),
                     ApproachAngle1 = GetParam(panel, "Angle1", 90),
                     Length2 = GetParam(panel, "Length2", 0.25),
-                    ApproachAngle2 = GetParam(panel, "Angle2", 90)
+                    ApproachAngle2 = GetParam(panel, "Angle2", 90),
                 },
-                _ => new NoLeadIn()
+                _ => new NoLeadIn(),
             };
         }
 
@@ -634,13 +693,10 @@ namespace OpenNest.Controls
                 1 => new LineLeadOut
                 {
                     Length = GetParam(panel, "Length", 0.25),
-                    ApproachAngle = GetParam(panel, "ApproachAngle", 90)
+                    ApproachAngle = GetParam(panel, "ApproachAngle", 90),
                 },
-                2 => new ArcLeadOut
-                {
-                    Radius = GetParam(panel, "Radius", 0.25)
-                },
-                _ => new NoLeadOut()
+                2 => new ArcLeadOut { Radius = GetParam(panel, "Radius", 0.25) },
+                _ => new NoLeadOut(),
             };
         }
 

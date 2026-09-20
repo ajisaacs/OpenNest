@@ -30,7 +30,12 @@ public class LeadInLayerTagTests
     [Fact]
     public void LineArcLeadIn_SetsLeadinLayerOnAllMoves()
     {
-        var leadIn = new LineArcLeadIn { LineLength = 0.5, ArcRadius = 0.25, ApproachAngle = 135 };
+        var leadIn = new LineArcLeadIn
+        {
+            LineLength = 0.5,
+            ArcRadius = 0.25,
+            ApproachAngle = 135,
+        };
         var codes = leadIn.Generate(Point, Normal);
         Assert.All(codes.OfType<LinearMove>(), m => Assert.Equal(LayerType.Leadin, m.Layer));
         Assert.All(codes.OfType<ArcMove>(), m => Assert.Equal(LayerType.Leadin, m.Layer));
@@ -39,7 +44,12 @@ public class LeadInLayerTagTests
     [Fact]
     public void CleanHoleLeadIn_SetsLeadinLayerOnAllMoves()
     {
-        var leadIn = new CleanHoleLeadIn { LineLength = 0.5, ArcRadius = 0.25, Kerf = 0.05 };
+        var leadIn = new CleanHoleLeadIn
+        {
+            LineLength = 0.5,
+            ArcRadius = 0.25,
+            Kerf = 0.05,
+        };
         var codes = leadIn.Generate(Point, Normal);
         Assert.All(codes.OfType<LinearMove>(), m => Assert.Equal(LayerType.Leadin, m.Layer));
         Assert.All(codes.OfType<ArcMove>(), m => Assert.Equal(LayerType.Leadin, m.Layer));
@@ -48,7 +58,13 @@ public class LeadInLayerTagTests
     [Fact]
     public void LineLineLeadIn_SetsLeadinLayerOnAllMoves()
     {
-        var leadIn = new LineLineLeadIn { Length1 = 0.5, Length2 = 0.3, ApproachAngle1 = 90, ApproachAngle2 = 90 };
+        var leadIn = new LineLineLeadIn
+        {
+            Length1 = 0.5,
+            Length2 = 0.3,
+            ApproachAngle1 = 90,
+            ApproachAngle2 = 90,
+        };
         var codes = leadIn.Generate(Point, Normal);
         Assert.All(codes.OfType<LinearMove>(), m => Assert.Equal(LayerType.Leadin, m.Layer));
     }

@@ -1,7 +1,7 @@
+using System.Collections.Generic;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Engine
 {
@@ -23,8 +23,8 @@ namespace OpenNest.Engine
             var angle = drawing.Source?.Angle ?? 0.0;
 
             // Clone program (never mutate the source).
-            var pgm = (drawing.Program.Clone() as OpenNest.CNC.Program)
-                      ?? new OpenNest.CNC.Program();
+            var pgm =
+                (drawing.Program.Clone() as OpenNest.CNC.Program) ?? new OpenNest.CNC.Program();
 
             if (!Tolerance.IsEqualTo(angle, 0))
                 pgm.Rotate(angle, pgm.BoundingBox().Center);

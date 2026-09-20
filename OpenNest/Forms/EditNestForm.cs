@@ -1,4 +1,12 @@
-﻿using OpenNest.Actions;
+﻿using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+using OpenNest.Actions;
+using OpenNest.Api;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Controls;
@@ -8,14 +16,6 @@ using OpenNest.IO;
 using OpenNest.Math;
 using OpenNest.Properties;
 using OpenNest.Shapes;
-using System;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Windows.Forms;
-using OpenNest.Api;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Forms
@@ -86,7 +86,7 @@ namespace OpenNest.Forms
                 Dock = DockStyle.Top,
                 Height = 30,
                 BackColor = Color.FromArgb(240, 240, 240),
-                Padding = new Padding(4, 0, 4, 0)
+                Padding = new Padding(4, 0, 4, 0),
             };
 
             plateInfoLabel = new Label
@@ -96,7 +96,7 @@ namespace OpenNest.Forms
                 Font = new Font("Segoe UI", 12f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(120, 120, 120),
                 Dock = DockStyle.Left,
-                Padding = new Padding(4, 4, 4, 4)
+                Padding = new Padding(4, 4, 4, 4),
             };
 
             var btnSize = new System.Drawing.Size(28, 28);
@@ -118,7 +118,7 @@ namespace OpenNest.Forms
             {
                 Width = btnSize.Width * 4,
                 Height = btnSize.Height,
-                Anchor = AnchorStyles.None
+                Anchor = AnchorStyles.None,
             };
 
             btnFirstPlate.Location = new Point(0, 0);
@@ -126,7 +126,9 @@ namespace OpenNest.Forms
             btnNextPlate.Location = new Point(btnSize.Width * 2, 0);
             btnLastPlate.Location = new Point(btnSize.Width * 3, 0);
 
-            navPanel.Controls.AddRange(new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate });
+            navPanel.Controls.AddRange(
+                new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate }
+            );
 
             plateHeaderPanel.Controls.Add(navPanel);
             plateHeaderPanel.Controls.Add(plateInfoLabel);
@@ -148,7 +150,7 @@ namespace OpenNest.Forms
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
-                BackColor = Color.White
+                BackColor = Color.White,
             };
 
             viewSplitContainer = new SplitContainer
@@ -156,7 +158,7 @@ namespace OpenNest.Forms
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
                 FixedPanel = FixedPanel.Panel2,
-                Panel2MinSize = 0
+                Panel2MinSize = 0,
             };
 
             viewSplitContainer.Panel1.Controls.Add(PlateView);
@@ -187,7 +189,7 @@ namespace OpenNest.Forms
                 Size = new System.Drawing.Size(28, 28),
                 FlatStyle = FlatStyle.Flat,
                 FlatAppearance = { BorderSize = 0 },
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
             };
         }
 
@@ -198,7 +200,7 @@ namespace OpenNest.Forms
             {
                 AutoReset = false,
                 Enabled = true,
-                Interval = 50
+                Interval = 50,
             };
             updateDrawingListTimer.Elapsed += drawingListUpdateTimer_Elapsed;
 
@@ -220,7 +222,6 @@ namespace OpenNest.Forms
             drawingListBox1.Units = Nest.Units;
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
         }
-
 
         public void UpdatePlateList()
         {
@@ -270,7 +271,11 @@ namespace OpenNest.Forms
 
             foreach (var dwg in Nest.Drawings.OrderBy(d => d.Name).ToList())
             {
-                if (hideNestedButton.Checked && dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
+                if (
+                    hideNestedButton.Checked
+                    && dwg.Quantity.Required > 0
+                    && dwg.Quantity.Remaining == 0
+                )
                     continue;
 
                 drawingListBox1.Items.Add(dwg);
@@ -329,7 +334,8 @@ namespace OpenNest.Forms
         {
             var dlg = new OpenFileDialog();
             dlg.Multiselect = true;
-            dlg.Filter = "CAD Files (*.dxf;*.dwg)|*.dxf;*.dwg|DXF Files (*.dxf)|*.dxf|DWG Files (*.dwg)|*.dwg";
+            dlg.Filter =
+                "CAD Files (*.dxf;*.dwg)|*.dxf;*.dwg|DXF Files (*.dxf)|*.dxf|DWG Files (*.dwg)|*.dwg";
 
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;
@@ -351,9 +357,10 @@ namespace OpenNest.Forms
         public bool Export()
         {
             var dlg = new SaveFileDialog();
-            dlg.Filter = "DXF file (*.dxf)|*.dxf|" +
-                "Image as displayed (*.jpg)|*.jpg|" +
-                "Locations and rotations (*.txt)|*.txt";
+            dlg.Filter =
+                "DXF file (*.dxf)|*.dxf|"
+                + "Image as displayed (*.jpg)|*.jpg|"
+                + "Locations and rotations (*.txt)|*.txt";
 
             dlg.FileName = string.Format("{0}-P{1}", Nest.Name, PlateManager.CurrentIndex + 1);
             dlg.AddExtension = true;
@@ -371,7 +378,10 @@ namespace OpenNest.Forms
                     try
                     {
                         var img = new Bitmap(PlateView.Width, PlateView.Height);
-                        PlateView.DrawToBitmap(img, new Rectangle(0, 0, PlateView.Width, PlateView.Height));
+                        PlateView.DrawToBitmap(
+                            img,
+                            new Rectangle(0, 0, PlateView.Width, PlateView.Height)
+                        );
                         img.Save(dlg.FileName);
                     }
                     catch { }
@@ -390,11 +400,13 @@ namespace OpenNest.Forms
                         {
                             var pt = part.BaseDrawing.Source.Offset.Rotate(part.Rotation);
 
-                            writer.WriteLine("{0}|{1},{2}|{3}",
+                            writer.WriteLine(
+                                "{0}|{1},{2}|{3}",
                                 part.BaseDrawing.Source.Path,
                                 System.Math.Round(part.Location.X - pt.X, 8),
                                 System.Math.Round(part.Location.Y - pt.Y, 8),
-                                Angle.ToDegrees(part.Rotation));
+                                Angle.ToDegrees(part.Rotation)
+                            );
                         }
                     }
                     catch { }
@@ -415,9 +427,9 @@ namespace OpenNest.Forms
 
             do
             {
-                if (!Export()) return;
-            }
-            while (PlateManager.LoadNext());
+                if (!Export())
+                    return;
+            } while (PlateManager.LoadNext());
         }
 
         public void RotateCw()
@@ -642,8 +654,12 @@ namespace OpenNest.Forms
 
             if (plate != null)
             {
-                plateInfoLabel.Text = string.Format("Plate {0} of {1}  |  {2}",
-                    PlateManager.CurrentIndex + 1, PlateManager.Count, plate.Size);
+                plateInfoLabel.Text = string.Format(
+                    "Plate {0} of {1}  |  {2}",
+                    PlateManager.CurrentIndex + 1,
+                    PlateManager.Count,
+                    plate.Size
+                );
             }
             else
             {
@@ -735,10 +751,7 @@ namespace OpenNest.Forms
             plate.CuttingParameters = parameters;
             SaveCuttingParameters(parameters);
 
-            var assigner = new LeadInAssigner
-            {
-                Sequencer = new LeftSideSequencer()
-            };
+            var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
             assigner.Assign(plate);
 
             foreach (var lp in PlateView.Parts)
@@ -795,10 +808,7 @@ namespace OpenNest.Forms
             parameters = dlg.GetParameters();
             SaveCuttingParameters(parameters);
 
-            var assigner = new LeadInAssigner
-            {
-                Sequencer = new LeftSideSequencer()
-            };
+            var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
 
             foreach (var plate in Nest.Plates)
             {
@@ -855,8 +865,13 @@ namespace OpenNest.Forms
             var json = Properties.Settings.Default.CuttingParametersJson;
             if (!string.IsNullOrEmpty(json))
             {
-                try { return CuttingParametersSerializer.Deserialize(json); }
-                catch { /* fall through */ }
+                try
+                {
+                    return CuttingParametersSerializer.Deserialize(json);
+                }
+                catch
+                { /* fall through */
+                }
             }
 
             return new CuttingParameters();
@@ -880,7 +895,8 @@ namespace OpenNest.Forms
             form.ShowDialog();
 
             var drawings = form.GetDrawings();
-            if (drawings.Count == 0) return;
+            if (drawings.Count == 0)
+                return;
 
             drawings.ForEach(d => Nest.Drawings.Add(d));
             UpdateDrawingList();
@@ -927,9 +943,9 @@ namespace OpenNest.Forms
 
             // Refresh all parts to use the updated programs
             foreach (var plate in Nest.Plates)
-                foreach (var part in plate.Parts)
-                    if (!part.BaseDrawing.IsCutOff)
-                        part.Update();
+            foreach (var part in plate.Parts)
+                if (!part.BaseDrawing.IsCutOff)
+                    part.Update();
 
             UpdateDrawingList();
             PlateView.Invalidate();
@@ -942,7 +958,8 @@ namespace OpenNest.Forms
                 "Clean Drawings",
                 MessageBoxButtons.YesNoCancel,
                 MessageBoxIcon.Question,
-                MessageBoxDefaultButton.Button1);
+                MessageBoxDefaultButton.Button1
+            );
 
             if (result == DialogResult.Yes)
             {
@@ -1016,33 +1033,35 @@ namespace OpenNest.Forms
             if (!drawingListBox1.IsHandleCreated)
                 return;
 
-            drawingListBox1.Invoke(new MethodInvoker(() =>
-            {
-                if (hideNestedButton.Checked)
+            drawingListBox1.Invoke(
+                new MethodInvoker(() =>
                 {
-                    drawingListBox1.BeginUpdate();
-
-                    for (var i = drawingListBox1.Items.Count - 1; i >= 0; i--)
+                    if (hideNestedButton.Checked)
                     {
-                        var dwg = (Drawing)drawingListBox1.Items[i];
-                        if (dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
-                            drawingListBox1.Items.RemoveAt(i);
+                        drawingListBox1.BeginUpdate();
+
+                        for (var i = drawingListBox1.Items.Count - 1; i >= 0; i--)
+                        {
+                            var dwg = (Drawing)drawingListBox1.Items[i];
+                            if (dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
+                                drawingListBox1.Items.RemoveAt(i);
+                        }
+
+                        foreach (var dwg in Nest.Drawings.OrderBy(d => d.Name))
+                        {
+                            if (dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
+                                continue;
+
+                            if (!drawingListBox1.Items.Contains(dwg))
+                                drawingListBox1.Items.Add(dwg);
+                        }
+
+                        drawingListBox1.EndUpdate();
                     }
 
-                    foreach (var dwg in Nest.Drawings.OrderBy(d => d.Name))
-                    {
-                        if (dwg.Quantity.Required > 0 && dwg.Quantity.Remaining == 0)
-                            continue;
-
-                        if (!drawingListBox1.Items.Contains(dwg))
-                            drawingListBox1.Items.Add(dwg);
-                    }
-
-                    drawingListBox1.EndUpdate();
-                }
-
-                drawingListBox1.Invalidate();
-            }));
+                    drawingListBox1.Invalidate();
+                })
+            );
         }
 
         private void drawingListBox1_DoubleClick(object sender, EventArgs e)
@@ -1075,7 +1094,8 @@ namespace OpenNest.Forms
                 "Delete Drawing",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2);
+                MessageBoxDefaultButton.Button2
+            );
 
             if (result != DialogResult.Yes)
                 return;

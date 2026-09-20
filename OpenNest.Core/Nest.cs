@@ -1,7 +1,7 @@
-﻿using OpenNest.Collections;
-using OpenNest.Geometry;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using OpenNest.Collections;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -11,9 +11,7 @@ namespace OpenNest
         public DrawingCollection Drawings;
 
         public Nest()
-            : this(string.Empty)
-        {
-        }
+            : this(string.Empty) { }
 
         public Nest(string name)
         {
@@ -128,7 +126,7 @@ namespace OpenNest
                     EdgeSpacing = EdgeSpacing,
                     PartSpacing = PartSpacing,
                     Quadrant = Quadrant,
-                    Quantity = 1
+                    Quantity = 1,
                 };
             }
         }

@@ -17,10 +17,14 @@ namespace OpenNest.Geometry
 
             foreach (var box in boxes)
             {
-                if (box.Left < minX) minX = box.Left;
-                if (box.Right > maxX) maxX = box.Right;
-                if (box.Bottom < minY) minY = box.Bottom;
-                if (box.Top > maxY) maxY = box.Top;
+                if (box.Left < minX)
+                    minX = box.Left;
+                if (box.Right > maxX)
+                    maxX = box.Right;
+                if (box.Bottom < minY)
+                    minY = box.Bottom;
+                if (box.Top > maxY)
+                    maxY = box.Top;
             }
 
             return new Box(minX, minY, maxX - minX, maxY - minY);
@@ -41,11 +45,15 @@ namespace OpenNest.Geometry
             {
                 var vertex = pts[i];
 
-                if (vertex.X < minX) minX = vertex.X;
-                else if (vertex.X > maxX) maxX = vertex.X;
+                if (vertex.X < minX)
+                    minX = vertex.X;
+                else if (vertex.X > maxX)
+                    maxX = vertex.X;
 
-                if (vertex.Y < minY) minY = vertex.Y;
-                else if (vertex.Y > maxY) maxY = vertex.Y;
+                if (vertex.Y < minY)
+                    minY = vertex.Y;
+                else if (vertex.Y > maxY)
+                    maxY = vertex.Y;
             }
 
             return new Box(minX, minY, maxX - minX, maxY - minY);
@@ -65,10 +73,14 @@ namespace OpenNest.Geometry
 
             foreach (var box in items)
             {
-                if (box.Left < left) left = box.Left;
-                if (box.Right > right) right = box.Right;
-                if (box.Bottom < bottom) bottom = box.Bottom;
-                if (box.Top > top) top = box.Top;
+                if (box.Left < left)
+                    left = box.Left;
+                if (box.Right > right)
+                    right = box.Right;
+                if (box.Bottom < bottom)
+                    bottom = box.Bottom;
+                if (box.Top > top)
+                    top = box.Top;
             }
 
             return new Box(left, bottom, right - left, top - bottom);

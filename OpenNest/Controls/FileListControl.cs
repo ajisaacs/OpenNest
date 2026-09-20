@@ -1,12 +1,12 @@
 // OpenNest/Controls/FileListControl.cs
-using OpenNest.Bending;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Bending;
+using OpenNest.Geometry;
 
 namespace OpenNest.Controls
 {
@@ -48,18 +48,24 @@ namespace OpenNest.Controls
         public FileListControl()
         {
             SetStyle(
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.UserPaint |
-                ControlStyles.ResizeRedraw |
-                ControlStyles.Selectable, true);
+                ControlStyles.AllPaintingInWmPaint
+                    | ControlStyles.OptimizedDoubleBuffer
+                    | ControlStyles.UserPaint
+                    | ControlStyles.ResizeRedraw
+                    | ControlStyles.Selectable,
+                true
+            );
 
             BackColor = Color.White;
             Font = new Font("Segoe UI", 9f);
 
             scrollBar.Dock = DockStyle.Right;
             scrollBar.Visible = false;
-            scrollBar.Scroll += (s, e) => { scrollOffset = e.NewValue; Invalidate(); };
+            scrollBar.Scroll += (s, e) =>
+            {
+                scrollOffset = e.NewValue;
+                Invalidate();
+            };
             Controls.Add(scrollBar);
         }
 
@@ -67,15 +73,18 @@ namespace OpenNest.Controls
         public int SelectedIndex => selectedIndex;
 
         public FileListItem SelectedItem =>
-            selectedIndex >= 0 && selectedIndex < items.Count
-                ? items[selectedIndex]
-                : null;
+            selectedIndex >= 0 && selectedIndex < items.Count ? items[selectedIndex] : null;
 
         public void AddItem(FileListItem item)
         {
-            var index = items.BinarySearch(item, Comparer<FileListItem>.Create(
-                (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase)));
-            if (index < 0) index = ~index;
+            var index = items.BinarySearch(
+                item,
+                Comparer<FileListItem>.Create(
+                    (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase)
+                )
+            );
+            if (index < 0)
+                index = ~index;
             items.Insert(index, item);
 
             if (items.Count == 1)
@@ -135,7 +144,8 @@ namespace OpenNest.Controls
 
         private void EnsureVisible(int index)
         {
-            if (index < 0 || index >= items.Count) return;
+            if (index < 0 || index >= items.Count)
+                return;
             var itemTop = index * ItemHeight;
             var itemBottom = itemTop + ItemHeight;
 
@@ -145,7 +155,10 @@ namespace OpenNest.Controls
                 scrollOffset = itemBottom - Height;
 
             if (scrollBar.Visible)
-                scrollBar.Value = System.Math.Min(scrollOffset, scrollBar.Maximum - scrollBar.LargeChange + 1);
+                scrollBar.Value = System.Math.Min(
+                    scrollOffset,
+                    scrollBar.Maximum - scrollBar.LargeChange + 1
+                );
         }
 
         protected override void OnResize(EventArgs e)
@@ -156,7 +169,8 @@ namespace OpenNest.Controls
 
         public void ProcessArrowKey(Keys keyData)
         {
-            if (items.Count == 0) return;
+            if (items.Count == 0)
+                return;
 
             var newIndex = selectedIndex;
             if (keyData == Keys.Down)
@@ -214,7 +228,8 @@ namespace OpenNest.Controls
             for (var i = 0; i < items.Count; i++)
             {
                 var y = i * ItemHeight - scrollOffset;
-                if (y + ItemHeight < 0 || y > Height) continue;
+                if (y + ItemHeight < 0 || y > Height)
+                    continue;
 
                 var item = items[i];
                 var rect = new Rectangle(0, y, contentWidth, ItemHeight);
@@ -231,24 +246,52 @@ namespace OpenNest.Controls
 
                 // Name
                 var nameRect = new Rectangle(AccentBarWidth + 8, y + 6, contentWidth - 70, 20);
-                TextRenderer.DrawText(g, item.Name, boldFont, nameRect, ForeColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(
+                    g,
+                    item.Name,
+                    boldFont,
+                    nameRect,
+                    ForeColor,
+                    TextFormatFlags.Left | TextFormatFlags.EndEllipsis
+                );
 
                 // Dimensions + entity count
                 var bounds = item.Bounds;
-                var dimText = bounds != null
-                    ? $"{bounds.Width:0.#} x {bounds.Length:0.#} — {item.EntityCount} entities"
-                    : $"{item.EntityCount} entities";
+                var dimText =
+                    bounds != null
+                        ? $"{bounds.Width:0.#} x {bounds.Length:0.#} — {item.EntityCount} entities"
+                        : $"{item.EntityCount} entities";
                 var dimRect = new Rectangle(AccentBarWidth + 8, y + 26, contentWidth - 70, 16);
-                TextRenderer.DrawText(g, dimText, smallFont, dimRect, Color.FromArgb(130, 130, 130), TextFormatFlags.Left);
+                TextRenderer.DrawText(
+                    g,
+                    dimText,
+                    smallFont,
+                    dimRect,
+                    Color.FromArgb(130, 130, 130),
+                    TextFormatFlags.Left
+                );
 
                 // Quantity badge
                 var qtyText = $"x{item.Quantity}";
                 var qtyRect = new Rectangle(contentWidth - 50, y + 12, 40, 24);
-                TextRenderer.DrawText(g, qtyText, Font, qtyRect, Color.FromArgb(100, 100, 100), TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(
+                    g,
+                    qtyText,
+                    Font,
+                    qtyRect,
+                    Color.FromArgb(100, 100, 100),
+                    TextFormatFlags.Right | TextFormatFlags.VerticalCenter
+                );
 
                 // Separator
                 if (i < items.Count - 1)
-                    g.DrawLine(separatorPen, AccentBarWidth + 8, y + ItemHeight - 1, contentWidth - 8, y + ItemHeight - 1);
+                    g.DrawLine(
+                        separatorPen,
+                        AccentBarWidth + 8,
+                        y + ItemHeight - 1,
+                        contentWidth - 8,
+                        y + ItemHeight - 1
+                    );
             }
 
             boldFont.Dispose();
@@ -263,15 +306,22 @@ namespace OpenNest.Controls
             var size = g.MeasureString(text, Font);
             var x = (Width - size.Width) / 2;
             var y = (Height - size.Height) / 2;
-            g.DrawString(text, Font, emptyStateBrush, x, y,
-                new StringFormat { Alignment = StringAlignment.Center });
+            g.DrawString(
+                text,
+                Font,
+                emptyStateBrush,
+                x,
+                y,
+                new StringFormat { Alignment = StringAlignment.Center }
+            );
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
             var index = GetIndexAt(e.Y);
-            if (index < 0 || index >= items.Count) return;
+            if (index < 0 || index >= items.Count)
+                return;
 
             if (e.Button == MouseButtons.Right)
             {
@@ -314,7 +364,10 @@ namespace OpenNest.Controls
             var maxScroll = System.Math.Max(0, items.Count * ItemHeight - Height);
             scrollOffset = System.Math.Max(0, System.Math.Min(maxScroll, scrollOffset - e.Delta));
             if (scrollBar.Visible)
-                scrollBar.Value = System.Math.Min(scrollOffset, scrollBar.Maximum - scrollBar.LargeChange + 1);
+                scrollBar.Value = System.Math.Min(
+                    scrollOffset,
+                    scrollBar.Maximum - scrollBar.LargeChange + 1
+                );
             Invalidate();
         }
 

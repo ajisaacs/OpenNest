@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Shapes
 {
@@ -9,7 +9,8 @@ namespace OpenNest.Shapes
         public double BottomWidth { get; set; }
         public double Height { get; set; }
 
-        public override string GenerateName() => $"Trapezoid {Dim(TopWidth)}x{Dim(BottomWidth)}x{Dim(Height)}";
+        public override string GenerateName() =>
+            $"Trapezoid {Dim(TopWidth)}x{Dim(BottomWidth)}x{Dim(Height)}";
 
         public override void SetPreviewDefaults()
         {
@@ -27,7 +28,7 @@ namespace OpenNest.Shapes
                 new Line(0, 0, BottomWidth, 0),
                 new Line(BottomWidth, 0, offset + TopWidth, Height),
                 new Line(offset + TopWidth, Height, offset, Height),
-                new Line(offset, Height, 0, 0)
+                new Line(offset, Height, 0, 0),
             };
 
             return CreateDrawing(entities);

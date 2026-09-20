@@ -1,5 +1,5 @@
-﻿using OpenNest.Geometry;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -28,7 +28,14 @@ namespace OpenNest
             seqList.Add(lastPart);
             dupList.Remove(lastPart);
 
-            for (int i = 0; i < parts.Count - 1 /*STOP BEFORE LAST PART*/; i++)
+            for (
+                int i = 0;
+                i
+                    < parts.Count
+                        - 1 /*STOP BEFORE LAST PART*/
+                ;
+                i++
+            )
             {
                 var nextPart = GetClosestPart(lastPart.Location, dupList);
 

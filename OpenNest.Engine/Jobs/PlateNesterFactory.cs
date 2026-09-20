@@ -1,4 +1,5 @@
 using System;
+
 namespace OpenNest;
 
 /// <summary>
@@ -16,9 +17,13 @@ public static class PlateNesterFactory
         {
             "Default" => new DefaultPlateNester(),
             "Strip" => new StripPlateNester(),
-            "Vertical Remnant" => new LegacyPlateNesterAdapter(plate => new VerticalRemnantEngine(plate)),
-            "Horizontal Remnant" => new LegacyPlateNesterAdapter(plate => new HorizontalRemnantEngine(plate)),
-            _ => throw new NotSupportedException($"Unknown placement strategy: {strategy}.")
+            "Vertical Remnant" => new LegacyPlateNesterAdapter(plate => new VerticalRemnantEngine(
+                plate
+            )),
+            "Horizontal Remnant" => new LegacyPlateNesterAdapter(
+                plate => new HorizontalRemnantEngine(plate)
+            ),
+            _ => throw new NotSupportedException($"Unknown placement strategy: {strategy}."),
         };
     }
 }

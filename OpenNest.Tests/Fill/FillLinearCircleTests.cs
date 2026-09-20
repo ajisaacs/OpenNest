@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using OpenNest;
 using OpenNest.CNC;
 using OpenNest.Converters;
@@ -6,8 +8,6 @@ using OpenNest.Geometry;
 using OpenNest.Math;
 using Xunit;
 using Xunit.Abstractions;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace OpenNest.Tests.Fill
 {
@@ -32,19 +32,23 @@ namespace OpenNest.Tests.Fill
             // Outer circle (CCW)
             var outerStart = new Vector(outerRadius * 2, outerRadius);
             pgm.Codes.Add(new RapidMove(outerStart));
-            pgm.Codes.Add(new ArcMove(outerStart, new Vector(outerRadius, outerRadius), RotationType.CCW));
+            pgm.Codes.Add(
+                new ArcMove(outerStart, new Vector(outerRadius, outerRadius), RotationType.CCW)
+            );
             // Inner circle (CW = hole)
             var innerStart = new Vector(outerRadius + innerRadius, outerRadius);
             pgm.Codes.Add(new RapidMove(innerStart));
-            pgm.Codes.Add(new ArcMove(innerStart, new Vector(outerRadius, outerRadius), RotationType.CW));
+            pgm.Codes.Add(
+                new ArcMove(innerStart, new Vector(outerRadius, outerRadius), RotationType.CW)
+            );
             return new Drawing("ring", pgm);
         }
 
         [Theory]
-        [InlineData(2.0, 0.125)]   // 4" diameter circle, 1/8" spacing
-        [InlineData(1.0, 0.125)]   // 2" diameter circle
-        [InlineData(3.0, 0.0625)]  // 6" diameter circle, 1/16" spacing
-        [InlineData(0.5, 0.25)]    // 1" diameter circle, 1/4" spacing
+        [InlineData(2.0, 0.125)] // 4" diameter circle, 1/8" spacing
+        [InlineData(1.0, 0.125)] // 2" diameter circle
+        [InlineData(3.0, 0.0625)] // 6" diameter circle, 1/16" spacing
+        [InlineData(0.5, 0.25)] // 1" diameter circle, 1/4" spacing
         public void CircleFill_OffsetBoundaries_DoNotOverlap(double radius, double spacing)
         {
             var drawing = MakeCircleDrawing(radius);
@@ -58,21 +62,31 @@ namespace OpenNest.Tests.Fill
         }
 
         [Theory]
-        [InlineData(2.0, 1.5, 0.125)]  // Ring: outer R=2, inner R=1.5
-        [InlineData(1.5, 1.0, 0.125)]  // Ring: outer R=1.5, inner R=1.0
-        public void RingFill_OffsetBoundaries_DoNotOverlap(double outerR, double innerR, double spacing)
+        [InlineData(2.0, 1.5, 0.125)] // Ring: outer R=2, inner R=1.5
+        [InlineData(1.5, 1.0, 0.125)] // Ring: outer R=1.5, inner R=1.0
+        public void RingFill_OffsetBoundaries_DoNotOverlap(
+            double outerR,
+            double innerR,
+            double spacing
+        )
         {
             var drawing = MakeRingDrawing(outerR, innerR);
             var workArea = new Box(0, 0, 48, 48);
             var engine = new FillLinear(workArea, spacing);
             var parts = engine.Fill(drawing, 0, NestDirection.Horizontal);
 
-            _output.WriteLine($"Ring outerR={outerR}, innerR={innerR}, spacing={spacing}: {parts.Count} parts");
+            _output.WriteLine(
+                $"Ring outerR={outerR}, innerR={innerR}, spacing={spacing}: {parts.Count} parts"
+            );
 
             AssertNoOffsetOverlap(parts, spacing, outerR * 2);
         }
 
-        private void AssertNoOffsetOverlap(List<Part> parts, double spacing, double expectedDiameter)
+        private void AssertNoOffsetOverlap(
+            List<Part> parts,
+            double spacing,
+            double expectedDiameter
+        )
         {
             if (parts.Count < 2)
             {
@@ -109,21 +123,27 @@ namespace OpenNest.Tests.Fill
                         violationCount++;
                         if (violationCount <= 5)
                         {
-                            _output.WriteLine($"  SPACING VIOLATION parts[{i}] vs parts[{j}]: " +
-                                $"centerDist={centerDist:F6}, rawGap={rawGap:F6}, offsetGap={offsetGap:F6}, " +
-                                $"expected>={spacing:F4}");
+                            _output.WriteLine(
+                                $"  SPACING VIOLATION parts[{i}] vs parts[{j}]: "
+                                    + $"centerDist={centerDist:F6}, rawGap={rawGap:F6}, offsetGap={offsetGap:F6}, "
+                                    + $"expected>={spacing:F4}"
+                            );
                         }
                     }
                 }
             }
 
-            _output.WriteLine($"  Min gap={minGap:F6}, expected>={spacing:F4}, violations={violationCount}");
+            _output.WriteLine(
+                $"  Min gap={minGap:F6}, expected>={spacing:F4}, violations={violationCount}"
+            );
 
             if (violationCount > 0)
             {
                 var maxDeficit = spacing - minGap;
                 _output.WriteLine($"  Max deficit={maxDeficit:F6}");
-                Assert.Fail($"{violationCount} pairs violate spacing: min gap={minGap:F6}, expected>={spacing}, deficit={maxDeficit:F6}");
+                Assert.Fail(
+                    $"{violationCount} pairs violate spacing: min gap={minGap:F6}, expected>={spacing}, deficit={maxDeficit:F6}"
+                );
             }
         }
     }

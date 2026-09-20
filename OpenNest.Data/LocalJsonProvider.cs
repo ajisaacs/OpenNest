@@ -11,7 +11,7 @@ public class LocalJsonProvider : IDataProvider
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
     public LocalJsonProvider(string directory)
@@ -77,19 +77,23 @@ public class LocalJsonProvider : IDataProvider
             return;
 
         var assembly = typeof(LocalJsonProvider).Assembly;
-        var resourceName = assembly.GetManifestResourceNames()
+        var resourceName = assembly
+            .GetManifestResourceNames()
             .FirstOrDefault(n => n.EndsWith("CL-980.json"));
 
-        if (resourceName is null) return;
+        if (resourceName is null)
+            return;
 
         using var stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream is null) return;
+        if (stream is null)
+            return;
 
         using var reader = new StreamReader(stream);
         var json = reader.ReadToEnd();
 
         var config = JsonSerializer.Deserialize<MachineConfig>(json, JsonOptions);
-        if (config is null) return;
+        if (config is null)
+            return;
 
         SaveMachine(config);
     }

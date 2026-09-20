@@ -1,0 +1,4 @@
+# CSharpier formats only C# sources; project/config XML keeps its layout.
+**/*.csproj
+**/*.config
+**/*.xml

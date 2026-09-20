@@ -1,9 +1,9 @@
-using OpenNest.Geometry;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -15,12 +15,23 @@ namespace OpenNest
 
     public enum NestPhase
     {
-        [Description("Trying rotations..."), ShortName("Linear")] Linear,
-        [Description("Trying best fit..."), ShortName("BestFit")] RectBestFit,
-        [Description("Trying pairs..."), ShortName("Pairs")] Pairs,
-        [Description("Trying NFP..."), ShortName("NFP")] Nfp,
-        [Description("Trying extents..."), ShortName("Extents")] Extents,
-        [Description("Custom"), ShortName("Custom")] Custom
+        [Description("Trying rotations..."), ShortName("Linear")]
+        Linear,
+
+        [Description("Trying best fit..."), ShortName("BestFit")]
+        RectBestFit,
+
+        [Description("Trying pairs..."), ShortName("Pairs")]
+        Pairs,
+
+        [Description("Trying NFP..."), ShortName("NFP")]
+        Nfp,
+
+        [Description("Trying extents..."), ShortName("Extents")]
+        Extents,
+
+        [Description("Custom"), ShortName("Custom")]
+        Custom,
     }
 
     public static class NestPhaseExtensions
@@ -30,22 +41,28 @@ namespace OpenNest
 
         public static string DisplayName(this NestPhase phase)
         {
-            return DisplayNames.GetOrAdd(phase, p =>
-            {
-                var field = typeof(NestPhase).GetField(p.ToString());
-                var attr = field?.GetCustomAttribute<DescriptionAttribute>();
-                return attr?.Description ?? p.ToString();
-            });
+            return DisplayNames.GetOrAdd(
+                phase,
+                p =>
+                {
+                    var field = typeof(NestPhase).GetField(p.ToString());
+                    var attr = field?.GetCustomAttribute<DescriptionAttribute>();
+                    return attr?.Description ?? p.ToString();
+                }
+            );
         }
 
         public static string ShortName(this NestPhase phase)
         {
-            return ShortNames.GetOrAdd(phase, p =>
-            {
-                var field = typeof(NestPhase).GetField(p.ToString());
-                var attr = field?.GetCustomAttribute<ShortNameAttribute>();
-                return attr?.Name ?? p.ToString();
-            });
+            return ShortNames.GetOrAdd(
+                phase,
+                p =>
+                {
+                    var field = typeof(NestPhase).GetField(p.ToString());
+                    var attr = field?.GetCustomAttribute<ShortNameAttribute>();
+                    return attr?.Name ?? p.ToString();
+                }
+            );
         }
     }
 
@@ -89,7 +106,11 @@ namespace OpenNest
         public List<Part> BestParts
         {
             get => bestParts;
-            set { bestParts = value; cachedParts = null; }
+            set
+            {
+                bestParts = value;
+                cachedParts = null;
+            }
         }
 
         public string Description { get; set; }
@@ -104,7 +125,8 @@ namespace OpenNest
 
         private void EnsureCache()
         {
-            if (cachedParts == bestParts) return;
+            if (cachedParts == bestParts)
+                return;
             cachedParts = bestParts;
             if (bestParts == null || bestParts.Count == 0)
             {
@@ -122,7 +144,8 @@ namespace OpenNest
         {
             get
             {
-                if (BestParts == null || BestParts.Count == 0) return 0;
+                if (BestParts == null || BestParts.Count == 0)
+                    return 0;
                 EnsureCache();
                 var bboxArea = cachedBounds.Width * cachedBounds.Length;
                 return bboxArea > 0 ? cachedPartArea / bboxArea : 0;
@@ -133,7 +156,8 @@ namespace OpenNest
         {
             get
             {
-                if (BestParts == null || BestParts.Count == 0) return 0;
+                if (BestParts == null || BestParts.Count == 0)
+                    return 0;
                 EnsureCache();
                 return cachedBounds.Width;
             }
@@ -143,7 +167,8 @@ namespace OpenNest
         {
             get
             {
-                if (BestParts == null || BestParts.Count == 0) return 0;
+                if (BestParts == null || BestParts.Count == 0)
+                    return 0;
                 EnsureCache();
                 return cachedBounds.Length;
             }
@@ -153,7 +178,8 @@ namespace OpenNest
         {
             get
             {
-                if (BestParts == null || BestParts.Count == 0) return 0;
+                if (BestParts == null || BestParts.Count == 0)
+                    return 0;
                 EnsureCache();
                 return cachedPartArea;
             }

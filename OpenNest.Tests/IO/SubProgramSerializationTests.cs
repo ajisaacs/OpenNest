@@ -54,7 +54,14 @@ public class SubProgramSerializationTests
 
         var pgm = new Program(Mode.Absolute);
         pgm.SubPrograms[42] = sub;
-        pgm.Codes.Add(new SubProgramCall { Id = 42, Program = sub, Offset = new Vector(5, 5) });
+        pgm.Codes.Add(
+            new SubProgramCall
+            {
+                Id = 42,
+                Program = sub,
+                Offset = new Vector(5, 5),
+            }
+        );
         // Add perimeter so the drawing has non-zero geometry
         pgm.Codes.Add(new RapidMove(0, 0));
         pgm.Codes.Add(new LinearMove(10, 0));

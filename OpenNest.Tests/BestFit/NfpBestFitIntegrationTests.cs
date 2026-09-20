@@ -38,9 +38,7 @@ public class NfpBestFitIntegrationTests
         var drawing = TestHelpers.MakeLShapeDrawing();
         var results = finder.FindBestFits(drawing);
 
-        var bestUtilization = results
-            .Where(r => r.Keep)
-            .Max(r => r.Utilization);
+        var bestUtilization = results.Where(r => r.Keep).Max(r => r.Utilization);
         Assert.True(bestUtilization > 0.5);
     }
 
@@ -51,7 +49,6 @@ public class NfpBestFitIntegrationTests
         var drawing = TestHelpers.MakeSquareDrawing();
         var results = finder.FindBestFits(drawing);
 
-        Assert.All(results.Where(r => r.Keep), r =>
-            Assert.Equal("Valid", r.Reason));
+        Assert.All(results.Where(r => r.Keep), r => Assert.Equal("Valid", r.Reason));
     }
 }

@@ -43,12 +43,12 @@ public class PlateSizesTests
     }
 
     [Theory]
-    [InlineData(40, 40, true)]    // small - fits trivially
-    [InlineData(48, 96, true)]    // exact
-    [InlineData(96, 48, true)]    // rotated exact
-    [InlineData(90, 40, true)]    // rotated
-    [InlineData(49, 97, false)]   // just over in both dims
-    [InlineData(50, 50, false)]   // too wide in both orientations
+    [InlineData(40, 40, true)] // small - fits trivially
+    [InlineData(48, 96, true)] // exact
+    [InlineData(96, 48, true)] // rotated exact
+    [InlineData(90, 40, true)] // rotated
+    [InlineData(49, 97, false)] // just over in both dims
+    [InlineData(50, 50, false)] // too wide in both orientations
     public void Entry_Fits_RespectsRotation(double w, double h, bool expected)
     {
         var entry = new PlateSizes.Entry("48x96", 48, 96);
@@ -233,11 +233,7 @@ public class PlateSizesTests
     public void Recommend_BoxEnumerable_CombinesIntoEnvelope()
     {
         // Two boxes that together span 0..40 x 0..90 -> fits 48x96
-        var boxes = new[]
-        {
-            new Box(0, 0, 40, 50),
-            new Box(0, 40, 30, 50),
-        };
+        var boxes = new[] { new Box(0, 0, 40, 50), new Box(0, 40, 30, 50) };
 
         var result = PlateSizes.Recommend(boxes);
 
@@ -247,8 +243,9 @@ public class PlateSizesTests
     [Fact]
     public void Recommend_BoxEnumerable_Empty_Throws()
     {
-        Assert.Throws<System.ArgumentException>(
-            () => PlateSizes.Recommend(System.Array.Empty<Box>()));
+        Assert.Throws<System.ArgumentException>(() =>
+            PlateSizes.Recommend(System.Array.Empty<Box>())
+        );
     }
 
     [Fact]

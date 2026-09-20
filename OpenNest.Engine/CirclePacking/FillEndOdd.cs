@@ -1,15 +1,13 @@
-﻿using OpenNest.Geometry;
+﻿using System;
+using OpenNest.Geometry;
 using OpenNest.Math;
-using System;
 
 namespace OpenNest.CirclePacking
 {
     internal class FillEndOdd : FillEngine
     {
         public FillEndOdd(Bin bin)
-            : base(bin)
-        {
-        }
+            : base(bin) { }
 
         public override void Fill(Item item)
         {
@@ -37,7 +35,8 @@ namespace OpenNest.CirclePacking
 
             var max = new Vector(
                 bin.Right - item.BoundingBox.Right + Tolerance.Epsilon,
-                bin.Top - item.BoundingBox.Top + Tolerance.Epsilon);
+                bin.Top - item.BoundingBox.Top + Tolerance.Epsilon
+            );
 
             var primarySize = horizontal ? bin.Width : bin.Length;
             var count = System.Math.Floor((primarySize + Tolerance.Epsilon) / item.Diameter);
@@ -64,7 +63,9 @@ namespace OpenNest.CirclePacking
                 for (; inner <= innerMax; inner += primaryOffset)
                 {
                     var addedItem = item.Clone() as Item;
-                    addedItem.Center = horizontal ? new Vector(inner, outer) : new Vector(outer, inner);
+                    addedItem.Center = horizontal
+                        ? new Vector(inner, outer)
+                        : new Vector(outer, inner);
                     bin.Items.Add(addedItem);
                 }
 

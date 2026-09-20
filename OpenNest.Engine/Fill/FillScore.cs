@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Fill
 {
@@ -37,10 +37,14 @@ namespace OpenNest.Engine.Fill
                 totalPartArea += part.BaseDrawing.Area;
                 var bb = part.BoundingBox;
 
-                if (bb.Left < minX) minX = bb.Left;
-                if (bb.Bottom < minY) minY = bb.Bottom;
-                if (bb.Right > maxX) maxX = bb.Right;
-                if (bb.Top > maxY) maxY = bb.Top;
+                if (bb.Left < minX)
+                    minX = bb.Left;
+                if (bb.Bottom < minY)
+                    minY = bb.Bottom;
+                if (bb.Right > maxX)
+                    maxX = bb.Right;
+                if (bb.Top > maxY)
+                    maxY = bb.Top;
             }
 
             var bboxArea = (maxX - minX) * (maxY - minY);
@@ -63,8 +67,11 @@ namespace OpenNest.Engine.Fill
         }
 
         public static bool operator >(FillScore a, FillScore b) => a.CompareTo(b) > 0;
+
         public static bool operator <(FillScore a, FillScore b) => a.CompareTo(b) < 0;
+
         public static bool operator >=(FillScore a, FillScore b) => a.CompareTo(b) >= 0;
+
         public static bool operator <=(FillScore a, FillScore b) => a.CompareTo(b) <= 0;
     }
 }

@@ -1,15 +1,15 @@
-using OpenNest;
-using OpenNest.Geometry;
-using OpenNest.IO;
-using OpenNest.IO.Bending;
-using System.Globalization;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using OpenNest;
+using OpenNest.Geometry;
+using OpenNest.IO;
+using OpenNest.IO.Bending;
 
 return NestConsole.Run(args);
 
@@ -22,11 +22,19 @@ static class NestConsole
         if (options == null)
             return 0; // --help was requested
 
-        if (options.RepairBendsMillimeters.HasValue &&
-            (options.CadUnits == BendRepairUnits.Unspecified || !double.IsFinite(options.RepairBendsMillimeters.Value)
-             || options.RepairBendsMillimeters <= 0.001 || options.RepairBendsMillimeters > 3.175))
+        if (
+            options.RepairBendsMillimeters.HasValue
+            && (
+                options.CadUnits == BendRepairUnits.Unspecified
+                || !double.IsFinite(options.RepairBendsMillimeters.Value)
+                || options.RepairBendsMillimeters <= 0.001
+                || options.RepairBendsMillimeters > 3.175
+            )
+        )
         {
-            Console.Error.WriteLine("Error: --repair-bends-mm requires a limit > 0.001 and <= 3.175 mm and --cad-units inches|mm.");
+            Console.Error.WriteLine(
+                "Error: --repair-bends-mm requires a limit > 0.001 and <= 3.175 mm and --cad-units inches|mm."
+            );
             return 1;
         }
 
@@ -93,10 +101,24 @@ static class NestConsole
             switch (args[i])
             {
                 case "--repair-bends-mm":
-                    o.RepairBendsMillimeters = i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var limit) ? limit : double.NaN;
+                    o.RepairBendsMillimeters =
+                        i + 1 < args.Length
+                        && double.TryParse(
+                            args[++i],
+                            NumberStyles.Float,
+                            CultureInfo.InvariantCulture,
+                            out var limit
+                        )
+                            ? limit
+                            : double.NaN;
                     break;
                 case "--cad-units" when i + 1 < args.Length:
-                    o.CadUnits = args[++i] switch { "inches" => BendRepairUnits.Inches, "mm" => BendRepairUnits.Millimeters, _ => BendRepairUnits.Unspecified };
+                    o.CadUnits = args[++i] switch
+                    {
+                        "inches" => BendRepairUnits.Inches,
+                        "mm" => BendRepairUnits.Millimeters,
+                        _ => BendRepairUnits.Unspecified,
+                    };
                     break;
                 case "--drawing" when i + 1 < args.Length:
                     o.DrawingName = args[++i];
@@ -165,10 +187,14 @@ static class NestConsole
     {
         var nestFile = options.InputFiles.FirstOrDefault(f =>
             f.EndsWith(NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase)
-            || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
-        var dxfFiles = options.InputFiles.Where(f =>
-            f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase) ||
-            f.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)).ToList();
+            || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+        );
+        var dxfFiles = options
+            .InputFiles.Where(f =>
+                f.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
+                || f.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
+            )
+            .ToList();
 
         // If we have a nest file, load it and optionally add DXFs.
         if (nestFile != null)
@@ -183,7 +209,9 @@ static class NestConsole
 
             if (options.PlateIndex >= nest.Plates.Count)
             {
-                Console.Error.WriteLine($"Error: plate index {options.PlateIndex} out of range (0-{nest.Plates.Count - 1})");
+                Console.Error.WriteLine(
+                    $"Error: plate index {options.PlateIndex} out of range (0-{nest.Plates.Count - 1})"
+                );
                 return null;
             }
 
@@ -210,7 +238,9 @@ static class NestConsole
 
         if (!options.PlateSize.HasValue)
         {
-            Console.Error.WriteLine("Error: --size WxL is required when importing DXF files without a nest");
+            Console.Error.WriteLine(
+                "Error: --size WxL is required when importing DXF files without a nest"
+            );
             return null;
         }
 
@@ -236,16 +266,23 @@ static class NestConsole
     {
         try
         {
-            var result = CadImporter.Import(path, new CadImportOptions
-            {
-                BendRepair = options.RepairBendsMillimeters.HasValue ? new BendRepairOptions
+            var result = CadImporter.Import(
+                path,
+                new CadImportOptions
                 {
-                    DrawingUnits = options.CadUnits,
-                    MaxEndpointMovementMillimeters = options.RepairBendsMillimeters.Value
-                } : null
-            });
+                    BendRepair = options.RepairBendsMillimeters.HasValue
+                        ? new BendRepairOptions
+                        {
+                            DrawingUnits = options.CadUnits,
+                            MaxEndpointMovementMillimeters = options.RepairBendsMillimeters.Value,
+                        }
+                        : null,
+                }
+            );
             foreach (var report in result.BendRepairReports)
-                Console.WriteLine($"Bend repair {Path.GetFileName(path)} #{report.BendIndex + 1}: {report.Status}: {report.Reason} ({report.OriginalStart} -> {report.Start}; {report.OriginalEnd} -> {report.End})");
+                Console.WriteLine(
+                    $"Bend repair {Path.GetFileName(path)} #{report.BendIndex + 1}: {report.Status}: {report.Reason} ({report.OriginalStart} -> {report.Start}; {report.OriginalEnd} -> {report.End})"
+                );
             return CadImporter.BuildDrawing(result, result.Entities, result.Bends, 1, null, null);
         }
         catch (System.Exception ex)
@@ -282,7 +319,8 @@ static class NestConsole
         // Only apply size override when it wasn't already used to create the plate.
         var hasDxfOnly = !options.InputFiles.Any(f =>
             f.EndsWith(NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase)
-            || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase));
+            || f.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+        );
 
         if (options.PlateSize.HasValue && !hasDxfOnly)
             plate.Size = options.PlateSize.Value;
@@ -290,33 +328,51 @@ static class NestConsole
 
     static Drawing ResolveDrawing(Nest nest, Options options)
     {
-        var drawing = options.DrawingName != null
-            ? nest.Drawings.FirstOrDefault(d => d.Name == options.DrawingName)
-            : nest.Drawings.FirstOrDefault();
+        var drawing =
+            options.DrawingName != null
+                ? nest.Drawings.FirstOrDefault(d => d.Name == options.DrawingName)
+                : nest.Drawings.FirstOrDefault();
 
         if (drawing != null)
             return drawing;
 
-        Console.Error.WriteLine(options.DrawingName != null
-            ? $"Error: drawing '{options.DrawingName}' not found. Available: {string.Join(", ", nest.Drawings.Select(d => d.Name))}"
-            : "Error: nest file contains no drawings");
+        Console.Error.WriteLine(
+            options.DrawingName != null
+                ? $"Error: drawing '{options.DrawingName}' not found. Available: {string.Join(", ", nest.Drawings.Select(d => d.Name))}"
+                : "Error: nest file contains no drawings"
+        );
 
         return null;
     }
 
-    static void PrintHeader(Nest nest, Plate plate, Drawing drawing, int existingCount, Options options)
+    static void PrintHeader(
+        Nest nest,
+        Plate plate,
+        Drawing drawing,
+        int existingCount,
+        Options options
+    )
     {
         Console.WriteLine($"Nest: {nest.Name}");
         var wa = plate.WorkArea();
-        Console.WriteLine($"Plate: {options.PlateIndex} ({plate.Size.Width:F1} x {plate.Size.Length:F1}), spacing={plate.PartSpacing:F2}, edge=({plate.EdgeSpacing.Left},{plate.EdgeSpacing.Bottom},{plate.EdgeSpacing.Right},{plate.EdgeSpacing.Top}), workArea={wa.Width:F1}x{wa.Length:F1}");
+        Console.WriteLine(
+            $"Plate: {options.PlateIndex} ({plate.Size.Width:F1} x {plate.Size.Length:F1}), spacing={plate.PartSpacing:F2}, edge=({plate.EdgeSpacing.Left},{plate.EdgeSpacing.Bottom},{plate.EdgeSpacing.Right},{plate.EdgeSpacing.Top}), workArea={wa.Width:F1}x{wa.Length:F1}"
+        );
         Console.WriteLine($"Drawing: {drawing.Name}");
-        Console.WriteLine(options.KeepParts
-            ? $"Keeping {existingCount} existing parts"
-            : $"Cleared {existingCount} existing parts");
+        Console.WriteLine(
+            options.KeepParts
+                ? $"Keeping {existingCount} existing parts"
+                : $"Cleared {existingCount} existing parts"
+        );
         Console.WriteLine("---");
     }
 
-    static (bool success, long elapsedMs) Fill(Nest nest, Plate plate, Drawing drawing, Options options)
+    static (bool success, long elapsedMs) Fill(
+        Nest nest,
+        Plate plate,
+        Drawing drawing,
+        Options options
+    )
     {
         var sw = Stopwatch.StartNew();
         bool success;
@@ -336,7 +392,9 @@ static class NestConsole
                     nestItems.Add(new NestItem { Drawing = d, Quantity = qty });
             }
 
-            Console.WriteLine($"AutoNest: {nestItems.Count} drawing(s), {nestItems.Sum(i => i.Quantity)} total parts");
+            Console.WriteLine(
+                $"AutoNest: {nestItems.Count} drawing(s), {nestItems.Sum(i => i.Quantity)} total parts"
+            );
 
             var engine = NestEngineRegistry.Create(plate);
             var nestParts = engine.Nest(nestItems, null, CancellationToken.None);
@@ -360,9 +418,11 @@ static class NestConsole
             return 0;
 
         var hasOverlaps = plate.HasOverlappingParts(out var overlapPts);
-        Console.WriteLine(hasOverlaps
-            ? $"OVERLAPS DETECTED: {overlapPts.Count} intersection points"
-            : "Overlap check: PASS");
+        Console.WriteLine(
+            hasOverlaps
+                ? $"OVERLAPS DETECTED: {overlapPts.Count} intersection points"
+                : "Overlap check: PASS"
+        );
 
         return overlapPts.Count;
     }
@@ -381,9 +441,12 @@ static class NestConsole
             return;
 
         var firstInput = options.InputFiles[0];
-        var outputFile = options.OutputFile ?? Path.Combine(
-            Path.GetDirectoryName(firstInput),
-            $"{Path.GetFileNameWithoutExtension(firstInput)}-result{NestFormat.FileExtension}");
+        var outputFile =
+            options.OutputFile
+            ?? Path.Combine(
+                Path.GetDirectoryName(firstInput),
+                $"{Path.GetFileNameWithoutExtension(firstInput)}-result{NestFormat.FileExtension}"
+            );
 
         new NestWriter(nest).Write(outputFile);
         Console.WriteLine($"Saved: {outputFile}");
@@ -394,8 +457,8 @@ static class NestConsole
         if (options.PostsDir != null)
             return options.PostsDir;
 
-        var exePath = Assembly.GetEntryAssembly()?.Location
-                      ?? typeof(NestConsole).Assembly.Location;
+        var exePath =
+            Assembly.GetEntryAssembly()?.Location ?? typeof(NestConsole).Assembly.Location;
         return Path.Combine(Path.GetDirectoryName(exePath), "Posts");
     }
 
@@ -414,7 +477,11 @@ static class NestConsole
 
                 foreach (var type in assembly.GetTypes())
                 {
-                    if (!typeof(IPostProcessor).IsAssignableFrom(type) || type.IsInterface || type.IsAbstract)
+                    if (
+                        !typeof(IPostProcessor).IsAssignableFrom(type)
+                        || type.IsInterface
+                        || type.IsAbstract
+                    )
                         continue;
 
                     if (Activator.CreateInstance(type) is IPostProcessor processor)
@@ -423,7 +490,9 @@ static class NestConsole
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Warning: failed to load post processor from {Path.GetFileName(file)}: {ex.Message}");
+                Console.Error.WriteLine(
+                    $"Warning: failed to load post processor from {Path.GetFileName(file)}: {ex.Message}"
+                );
             }
         }
 
@@ -444,7 +513,7 @@ static class NestConsole
         Console.WriteLine($"Post processors ({postsDir}):");
 
         foreach (var p in processors)
-            Console.WriteLine($"  {p.Name,-30} {p.Description}");
+            Console.WriteLine($"  {p.Name, -30} {p.Description}");
     }
 
     static void PostProcess(Nest nest, Options options)
@@ -455,14 +524,17 @@ static class NestConsole
         var postsDir = ResolvePostsDir(options);
         var processors = LoadPostProcessors(postsDir);
         var post = processors.FirstOrDefault(p =>
-            p.Name.Equals(options.PostName, StringComparison.OrdinalIgnoreCase));
+            p.Name.Equals(options.PostName, StringComparison.OrdinalIgnoreCase)
+        );
 
         if (post == null)
         {
             Console.Error.WriteLine($"Error: post processor '{options.PostName}' not found");
 
             if (processors.Count > 0)
-                Console.Error.WriteLine($"Available: {string.Join(", ", processors.Select(p => p.Name))}");
+                Console.Error.WriteLine(
+                    $"Available: {string.Join(", ", processors.Select(p => p.Name))}"
+                );
             else
                 Console.Error.WriteLine($"No post processors found in: {postsDir}");
 
@@ -476,7 +548,8 @@ static class NestConsole
             var firstInput = options.InputFiles[0];
             outputFile = Path.Combine(
                 Path.GetDirectoryName(firstInput),
-                $"{Path.GetFileNameWithoutExtension(firstInput)}.cnc");
+                $"{Path.GetFileNameWithoutExtension(firstInput)}.cnc"
+            );
         }
 
         post.Post(nest, outputFile);
@@ -488,30 +561,58 @@ static class NestConsole
         Console.Error.WriteLine("Usage: OpenNest.Console <input-files...> [options]");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Arguments:");
-        Console.Error.WriteLine("  input-files            One or more .nest nest files or .dxf/.dwg drawing files");
+        Console.Error.WriteLine(
+            "  input-files            One or more .nest nest files or .dxf/.dwg drawing files"
+        );
         Console.Error.WriteLine();
         Console.Error.WriteLine("Modes:");
         Console.Error.WriteLine("  <nest.nest>             Load nest and fill (existing behavior)");
         Console.Error.WriteLine("  <part.dxf> --size WxL     Import DXF, create plate, and fill");
-        Console.Error.WriteLine("  <nest.nest> <part.dxf>  Load nest and add imported DXF drawings");
+        Console.Error.WriteLine(
+            "  <nest.nest> <part.dxf>  Load nest and add imported DXF drawings"
+        );
         Console.Error.WriteLine();
         Console.Error.WriteLine("Options:");
-        Console.Error.WriteLine("  --repair-bends-mm <n>   Opt-in endpoint/tick repair, limit >0.001 to 3.175 physical mm");
-        Console.Error.WriteLine("  --cad-units inches|mm  Explicit source coordinate units required for bend repair");
-        Console.Error.WriteLine("  --drawing <name>       Drawing name to fill with (default: first drawing)");
+        Console.Error.WriteLine(
+            "  --repair-bends-mm <n>   Opt-in endpoint/tick repair, limit >0.001 to 3.175 physical mm"
+        );
+        Console.Error.WriteLine(
+            "  --cad-units inches|mm  Explicit source coordinate units required for bend repair"
+        );
+        Console.Error.WriteLine(
+            "  --drawing <name>       Drawing name to fill with (default: first drawing)"
+        );
         Console.Error.WriteLine("  --plate <index>        Plate index to fill (default: 0)");
-        Console.Error.WriteLine("  --quantity <n>          Max parts to place (default: 0 = unlimited)");
+        Console.Error.WriteLine(
+            "  --quantity <n>          Max parts to place (default: 0 = unlimited)"
+        );
         Console.Error.WriteLine("  --spacing <value>      Override part spacing");
-        Console.Error.WriteLine("  --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode");
-        Console.Error.WriteLine("  --output <path>        Output nest file path (default: <input>-result.nest)");
-        Console.Error.WriteLine("  --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)");
-        Console.Error.WriteLine("  --autonest             Use NFP-based mixed-part autonesting instead of linear fill");
-        Console.Error.WriteLine("  --keep-parts           Don't clear existing parts before filling");
-        Console.Error.WriteLine("  --check-overlaps       Run overlap detection after fill (exit code 1 if found)");
+        Console.Error.WriteLine(
+            "  --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode"
+        );
+        Console.Error.WriteLine(
+            "  --output <path>        Output nest file path (default: <input>-result.nest)"
+        );
+        Console.Error.WriteLine(
+            "  --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)"
+        );
+        Console.Error.WriteLine(
+            "  --autonest             Use NFP-based mixed-part autonesting instead of linear fill"
+        );
+        Console.Error.WriteLine(
+            "  --keep-parts           Don't clear existing parts before filling"
+        );
+        Console.Error.WriteLine(
+            "  --check-overlaps       Run overlap detection after fill (exit code 1 if found)"
+        );
         Console.Error.WriteLine("  --no-save              Skip saving output file");
         Console.Error.WriteLine("  --post <name>          Run a post processor after nesting");
-        Console.Error.WriteLine("  --post-output <path>   Output file for post processor (default: <input>.cnc)");
-        Console.Error.WriteLine("  --posts-dir <path>     Directory containing post processor DLLs (default: Posts/)");
+        Console.Error.WriteLine(
+            "  --post-output <path>   Output file for post processor (default: <input>.cnc)"
+        );
+        Console.Error.WriteLine(
+            "  --posts-dir <path>     Directory containing post processor DLLs (default: Posts/)"
+        );
         Console.Error.WriteLine("  --list-posts           List available post processors and exit");
         Console.Error.WriteLine("  -h, --help             Show this help");
     }

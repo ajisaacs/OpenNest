@@ -28,10 +28,14 @@ namespace OpenNest.Geometry
 
             for (var i = 1; i < verts.Count; i++)
             {
-                if (verts[i].X < minX) minX = verts[i].X;
-                if (verts[i].X > maxX) maxX = verts[i].X;
-                if (verts[i].Y < minY) minY = verts[i].Y;
-                if (verts[i].Y > maxY) maxY = verts[i].Y;
+                if (verts[i].X < minX)
+                    minX = verts[i].X;
+                if (verts[i].X > maxX)
+                    maxX = verts[i].X;
+                if (verts[i].Y < minY)
+                    minY = verts[i].Y;
+                if (verts[i].Y > maxY)
+                    maxY = verts[i].Y;
             }
 
             // The IFP is the work area shrunk inward by the part's extent in each direction.

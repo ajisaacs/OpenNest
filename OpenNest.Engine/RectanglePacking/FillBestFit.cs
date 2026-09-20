@@ -1,14 +1,12 @@
-﻿using OpenNest.Math;
-using System;
+﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest.RectanglePacking
 {
     internal class FillBestFit : FillEngine
     {
         public FillBestFit(Bin bin)
-            : base(bin)
-        {
-        }
+            : base(bin) { }
 
         public override void Fill(Item item)
         {
@@ -29,8 +27,7 @@ namespace OpenNest.RectanglePacking
                 Bin.Items.AddRange(bin1.Items);
             else
                 Bin.Items.AddRange(bin2.Items);
-        }   
-
+        }
 
         public override void Fill(Item item, int maxCount)
         {
@@ -60,8 +57,10 @@ namespace OpenNest.RectanglePacking
             var normalPrimary = combo.Count1;
             var rotatePrimary = combo.Count2;
 
-            var normalSecondary = (int)System.Math.Floor((binSecondary + Tolerance.Epsilon) / secondarySize);
-            var rotateSecondary = (int)System.Math.Floor((binSecondary + Tolerance.Epsilon) / primarySize);
+            var normalSecondary = (int)
+                System.Math.Floor((binSecondary + Tolerance.Epsilon) / secondarySize);
+            var rotateSecondary = (int)
+                System.Math.Floor((binSecondary + Tolerance.Epsilon) / primarySize);
 
             var (normalRows, normalCols) = horizontal
                 ? (normalSecondary, normalPrimary)

@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC
 {
@@ -36,7 +36,13 @@ namespace OpenNest.CNC
             return basePos;
         }
 
-        private static void Walk(Program pgm, Vector basePos, ref Vector pos, bool skipFirst, List<Segment> results)
+        private static void Walk(
+            Program pgm,
+            Vector basePos,
+            ref Vector pos,
+            bool skipFirst,
+            List<Segment> results
+        )
         {
             var skipped = !skipFirst;
 
@@ -60,9 +66,10 @@ namespace OpenNest.CNC
                 }
                 else if (code is Motion motion)
                 {
-                    var endpt = pgm.Mode == Mode.Incremental
-                        ? motion.EndPoint + pos
-                        : motion.EndPoint + basePos;
+                    var endpt =
+                        pgm.Mode == Mode.Incremental
+                            ? motion.EndPoint + pos
+                            : motion.EndPoint + basePos;
 
                     if (code.Type == CodeType.RapidMove)
                     {

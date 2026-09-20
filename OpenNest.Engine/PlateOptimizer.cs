@@ -1,12 +1,12 @@
-using OpenNest.Engine;
-using OpenNest.Engine.BestFit;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine;
+using OpenNest.Engine.BestFit;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest
 {
@@ -18,9 +18,15 @@ namespace OpenNest
             double salvageRate,
             Plate templatePlate,
             IProgress<NestProgress> progress = null,
-            CancellationToken token = default)
+            CancellationToken token = default
+        )
         {
-            if (items == null || items.Count == 0 || plateOptions == null || plateOptions.Count == 0)
+            if (
+                items == null
+                || items.Count == 0
+                || plateOptions == null
+                || plateOptions.Count == 0
+            )
                 return null;
 
             // Find the minimum dimension needed to fit the largest part,
@@ -29,20 +35,29 @@ namespace OpenNest
             var minPartLength = 0.0;
             foreach (var item in items)
             {
-                if (item.Quantity <= 0) continue;
+                if (item.Quantity <= 0)
+                    continue;
                 var bb = item.Drawing.Program.BoundingBox();
                 var shortSide = System.Math.Min(bb.Width, bb.Length);
                 var longSide = System.Math.Max(bb.Width, bb.Length);
 
-                if (!plateOptions.Any(o => FitsPart(o, shortSide, longSide, templatePlate.EdgeSpacing)))
+                if (
+                    !plateOptions.Any(o =>
+                        FitsPart(o, shortSide, longSide, templatePlate.EdgeSpacing)
+                    )
+                )
                 {
-                    Debug.WriteLine($"[PlateOptimizer] Skipping oversized item '{item.Drawing.Name}' " +
-                        $"({shortSide:F1}x{longSide:F1}) — does not fit any plate option");
+                    Debug.WriteLine(
+                        $"[PlateOptimizer] Skipping oversized item '{item.Drawing.Name}' "
+                            + $"({shortSide:F1}x{longSide:F1}) — does not fit any plate option"
+                    );
                     continue;
                 }
 
-                if (shortSide > minPartWidth) minPartWidth = shortSide;
-                if (longSide > minPartLength) minPartLength = longSide;
+                if (shortSide > minPartWidth)
+                    minPartWidth = shortSide;
+                if (longSide > minPartLength)
+                    minPartLength = longSide;
             }
 
             // Sort candidates by cost ascending — try cheapest first.
@@ -57,13 +72,12 @@ namespace OpenNest
             // Pre-compute best fits for all candidate plate sizes at once.
             // This runs the expensive GPU evaluation once on the largest plate
             // and filters the results for each smaller size.
-            var plateSizes = candidates
-                .Select(o => (Width: o.Length, Height: o.Width))
-                .ToList();
+            var plateSizes = candidates.Select(o => (Width: o.Length, Height: o.Width)).ToList();
 
             foreach (var item in items)
             {
-                if (item.Quantity <= 0) continue;
+                if (item.Quantity <= 0)
+                    continue;
                 BestFitCache.ComputeForSizes(item.Drawing, templatePlate.PartSpacing, plateSizes);
             }
 
@@ -74,7 +88,14 @@ namespace OpenNest
                 if (token.IsCancellationRequested)
                     break;
 
-                var result = TryPlateSize(option, items, salvageRate, templatePlate, progress, token);
+                var result = TryPlateSize(
+                    option,
+                    items,
+                    salvageRate,
+                    templatePlate,
+                    progress,
+                    token
+                );
                 if (result == null)
                     continue;
 
@@ -86,11 +107,16 @@ namespace OpenNest
                 // remnant credit never offsets the extra plate cost, so skip.
                 if (salvageRate < 1.0)
                 {
-                    var allPlaced = items.All(i => i.Quantity <= 0 ||
-                        result.Parts.Count(p => p.BaseDrawing.Name == i.Drawing.Name) >= i.Quantity);
+                    var allPlaced = items.All(i =>
+                        i.Quantity <= 0
+                        || result.Parts.Count(p => p.BaseDrawing.Name == i.Drawing.Name)
+                            >= i.Quantity
+                    );
                     if (allPlaced)
                     {
-                        Debug.WriteLine($"[PlateOptimizer] Early exit: {option.Width}x{option.Length} placed all items");
+                        Debug.WriteLine(
+                            $"[PlateOptimizer] Early exit: {option.Width}x{option.Length} placed all items"
+                        );
                         break;
                     }
                 }
@@ -99,14 +125,21 @@ namespace OpenNest
             return best;
         }
 
-        private static bool FitsPart(PlateOption option, double minWidth, double minLength, Spacing edgeSpacing)
+        private static bool FitsPart(
+            PlateOption option,
+            double minWidth,
+            double minLength,
+            Spacing edgeSpacing
+        )
         {
             var workW = option.Width - edgeSpacing.Left - edgeSpacing.Right;
             var workL = option.Length - edgeSpacing.Top - edgeSpacing.Bottom;
 
             // Part fits in either orientation.
-            var fitsNormal = workW >= minWidth - Tolerance.Epsilon && workL >= minLength - Tolerance.Epsilon;
-            var fitsRotated = workW >= minLength - Tolerance.Epsilon && workL >= minWidth - Tolerance.Epsilon;
+            var fitsNormal =
+                workW >= minWidth - Tolerance.Epsilon && workL >= minLength - Tolerance.Epsilon;
+            var fitsRotated =
+                workW >= minLength - Tolerance.Epsilon && workL >= minWidth - Tolerance.Epsilon;
             return fitsNormal || fitsRotated;
         }
 
@@ -116,7 +149,8 @@ namespace OpenNest
             double salvageRate,
             Plate templatePlate,
             IProgress<NestProgress> progress,
-            CancellationToken token)
+            CancellationToken token
+        )
         {
             // Create a temporary plate with candidate size + settings from template.
             var tempPlate = new Plate(option.Width, option.Length)
@@ -132,15 +166,17 @@ namespace OpenNest
             };
 
             // Clone items so the dry run doesn't mutate originals.
-            var clonedItems = items.Select(i => new NestItem
-            {
-                Drawing = i.Drawing,  // share Drawing reference for BestFitCache compatibility
-                Priority = i.Priority,
-                Quantity = i.Quantity,
-                StepAngle = i.StepAngle,
-                RotationStart = i.RotationStart,
-                RotationEnd = i.RotationEnd,
-            }).ToList();
+            var clonedItems = items
+                .Select(i => new NestItem
+                {
+                    Drawing = i.Drawing, // share Drawing reference for BestFitCache compatibility
+                    Priority = i.Priority,
+                    Quantity = i.Quantity,
+                    StepAngle = i.StepAngle,
+                    RotationStart = i.RotationStart,
+                    RotationEnd = i.RotationEnd,
+                })
+                .ToList();
 
             var engine = NestEngineRegistry.Create(tempPlate);
             var parts = engine.Nest(clonedItems, progress, token);
@@ -158,8 +194,10 @@ namespace OpenNest
             var costPerSqUnit = option.Cost / option.Area;
             var netCost = option.Cost - (remnantArea * costPerSqUnit * salvageRate);
 
-            Debug.WriteLine($"[PlateOptimizer] {option.Width}x{option.Length} ${option.Cost}: " +
-                $"{parts.Count} parts, util={partsArea / plateArea:P1}, net=${netCost:F2}");
+            Debug.WriteLine(
+                $"[PlateOptimizer] {option.Width}x{option.Length} ${option.Cost}: "
+                    + $"{parts.Count} parts, util={partsArea / plateArea:P1}, net=${netCost:F2}"
+            );
 
             return new PlateOptimizerResult
             {
@@ -172,7 +210,8 @@ namespace OpenNest
 
         private static bool IsBetter(PlateOptimizerResult candidate, PlateOptimizerResult current)
         {
-            if (current == null) return true;
+            if (current == null)
+                return true;
 
             // 1. More parts placed is always better.
             if (candidate.Parts.Count != current.Parts.Count)

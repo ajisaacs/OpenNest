@@ -1,3 +1,6 @@
 namespace OpenNest.Api;
 
-public enum NestStrategy { Auto }
+public enum NestStrategy
+{
+    Auto,
+}

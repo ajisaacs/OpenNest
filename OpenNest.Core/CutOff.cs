@@ -1,14 +1,14 @@
-using OpenNest.CNC;
-using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.CNC;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
     public enum CutOffAxis
     {
         Horizontal,
-        Vertical
+        Vertical,
     }
 
     public class CutOff
@@ -26,7 +26,11 @@ namespace OpenNest
             Drawing = new Drawing(GetName()) { IsCutOff = true };
         }
 
-        public void Regenerate(Plate plate, CutOffSettings settings, Dictionary<Part, Entity> cache = null)
+        public void Regenerate(
+            Plate plate,
+            CutOffSettings settings,
+            Dictionary<Part, Entity> cache = null
+        )
         {
             var segments = ComputeSegments(plate, settings, cache);
             var program = BuildProgram(segments, settings);
@@ -40,11 +44,17 @@ namespace OpenNest
             return $"CutOff-{axisChar}-{coord:F2}";
         }
 
-        private List<(double Start, double End)> ComputeSegments(Plate plate, CutOffSettings settings, Dictionary<Part, Entity> cache)
+        private List<(double Start, double End)> ComputeSegments(
+            Plate plate,
+            CutOffSettings settings,
+            Dictionary<Part, Entity> cache
+        )
         {
             var bounds = plate.BoundingBox(includeParts: false);
 
-            double lineStart, lineEnd, cutPosition;
+            double lineStart,
+                lineEnd,
+                cutPosition;
 
             if (Axis == CutOffAxis.Vertical)
             {
@@ -68,7 +78,14 @@ namespace OpenNest
 
                 Entity perimeter = null;
                 cache?.TryGetValue(part, out perimeter);
-                var partExclusions = GetPartExclusions(part, perimeter, cutPosition, lineStart, lineEnd, settings.PartClearance);
+                var partExclusions = GetPartExclusions(
+                    part,
+                    perimeter,
+                    cutPosition,
+                    lineStart,
+                    lineEnd,
+                    settings.PartClearance
+                );
                 exclusions.AddRange(partExclusions);
             }
 
@@ -107,7 +124,13 @@ namespace OpenNest
         private static readonly List<(double Start, double End)> EmptyExclusions = new();
 
         private List<(double Start, double End)> GetPartExclusions(
-            Part part, Entity perimeter, double cutPosition, double lineStart, double lineEnd, double clearance)
+            Part part,
+            Entity perimeter,
+            double cutPosition,
+            double lineStart,
+            double lineEnd,
+            double clearance
+        )
         {
             var bb = part.BoundingBox;
             var (partMin, partMax) = AxisBounds(bb, clearance);
@@ -118,7 +141,13 @@ namespace OpenNest
 
             if (perimeter != null)
             {
-                var perimeterExclusions = IntersectPerimeter(perimeter, cutPosition, lineStart, lineEnd, clearance);
+                var perimeterExclusions = IntersectPerimeter(
+                    perimeter,
+                    cutPosition,
+                    lineStart,
+                    lineEnd,
+                    clearance
+                );
                 if (perimeterExclusions != null)
                     return perimeterExclusions;
             }
@@ -127,17 +156,24 @@ namespace OpenNest
         }
 
         private List<(double Start, double End)> IntersectPerimeter(
-            Entity perimeter, double cutPosition, double lineStart, double lineEnd, double clearance)
+            Entity perimeter,
+            double cutPosition,
+            double lineStart,
+            double lineEnd,
+            double clearance
+        )
         {
             var target = OffsetOutward(perimeter, clearance) ?? perimeter;
             var usedOffset = target != perimeter;
-            var cutLine = new Line(MakePoint(cutPosition, lineStart), MakePoint(cutPosition, lineEnd));
+            var cutLine = new Line(
+                MakePoint(cutPosition, lineStart),
+                MakePoint(cutPosition, lineEnd)
+            );
 
             if (!target.Intersects(cutLine, out var pts) || pts.Count < 2)
                 return null;
 
-            var coords = pts
-                .Select(pt => Axis == CutOffAxis.Vertical ? pt.Y : pt.X)
+            var coords = pts.Select(pt => Axis == CutOffAxis.Vertical ? pt.Y : pt.X)
                 .OrderBy(c => c)
                 .ToList();
 
@@ -184,7 +220,10 @@ namespace OpenNest
                 ? (bb.Y - clearance, bb.Y + bb.Width + clearance)
                 : (bb.X - clearance, bb.X + bb.Length + clearance);
 
-        private Program BuildProgram(List<(double Start, double End)> segments, CutOffSettings settings)
+        private Program BuildProgram(
+            List<(double Start, double End)> segments,
+            CutOffSettings settings
+        )
         {
             var program = new Program();
 

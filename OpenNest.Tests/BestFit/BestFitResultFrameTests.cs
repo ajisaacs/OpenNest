@@ -16,8 +16,10 @@ public class BestFitResultFrameTests
 
         var result = EvaluateOffsetPair(canonical, new Vector(40, 30));
 
-        Assert.True(IsNonAxisAligned(result.OptimalRotation),
-            $"Expected a non-axis-aligned result, got {Angle.ToDegrees(result.OptimalRotation):F2} degrees.");
+        Assert.True(
+            IsNonAxisAligned(result.OptimalRotation),
+            $"Expected a non-axis-aligned result, got {Angle.ToDegrees(result.OptimalRotation):F2} degrees."
+        );
 
         var parts = result.BuildCanonicalParts();
         var bounds = result.GetCutBounds(parts);
@@ -55,7 +57,7 @@ public class BestFitResultFrameTests
             Part1Rotation = 0,
             Part2Rotation = System.Math.PI,
             Part2Offset = offset,
-            Spacing = 0.25
+            Spacing = 0.25,
         };
 
         return new PairEvaluator().Evaluate(candidate);

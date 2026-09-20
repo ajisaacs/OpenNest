@@ -1,5 +1,5 @@
-﻿using OpenNest.Math;
-using System;
+﻿using System;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -31,7 +31,7 @@ namespace OpenNest.Geometry
         {
             unchecked
             {
-                // Use a simple but effective hash combine. 
+                // Use a simple but effective hash combine.
                 // We use a small epsilon-safe rounding if needed, but for uniqueness in HashSet
                 // during a single operation, raw bits or slightly rounded is usually fine.
                 // However, IsEqualTo uses Tolerance.Epsilon, so we should probably round to some precision.

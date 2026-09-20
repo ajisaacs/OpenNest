@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -15,7 +15,8 @@ namespace OpenNest.Engine.BestFit
         public double[] ComputeDistances(
             List<Line> stationaryLines,
             List<Line> movingTemplateLines,
-            SlideOffset[] offsets)
+            SlideOffset[] offsets
+        )
         {
             var stationarySegments = SpatialQuery.FlattenLines(stationaryLines);
             var movingSegments = SpatialQuery.FlattenLines(movingTemplateLines);
@@ -31,15 +32,21 @@ namespace OpenNest.Engine.BestFit
             }
 
             return _slideComputer.ComputeBatchMultiDir(
-                stationarySegments, stationaryLines.Count,
-                movingSegments, movingTemplateLines.Count,
-                flatOffsets, count, directions);
+                stationarySegments,
+                stationaryLines.Count,
+                movingSegments,
+                movingTemplateLines.Count,
+                flatOffsets,
+                count,
+                directions
+            );
         }
 
         public double[] ComputeDistances(
             List<Entity> stationaryEntities,
             List<Entity> movingEntities,
-            SlideOffset[] offsets)
+            SlideOffset[] offsets
+        )
         {
             // GPU path doesn't support native entities yet — fall back to CPU.
             var cpu = new CpuDistanceComputer();
@@ -52,9 +59,12 @@ namespace OpenNest.Engine.BestFit
         /// </summary>
         private static int DirectionVectorToInt(double dirX, double dirY)
         {
-            if (dirX < -0.5) return (int)PushDirection.Left;
-            if (dirX > 0.5) return (int)PushDirection.Right;
-            if (dirY < -0.5) return (int)PushDirection.Down;
+            if (dirX < -0.5)
+                return (int)PushDirection.Left;
+            if (dirX > 0.5)
+                return (int)PushDirection.Right;
+            if (dirY < -0.5)
+                return (int)PushDirection.Down;
             return (int)PushDirection.Up;
         }
     }

@@ -1,5 +1,5 @@
-﻿using OpenNest.Geometry;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -7,7 +7,10 @@ namespace OpenNest
     {
         public static void Vertically(Entity fixedEntity, Entity movableEntity)
         {
-            movableEntity.Offset(fixedEntity.BoundingBox.Center.X - movableEntity.BoundingBox.Center.X, 0);
+            movableEntity.Offset(
+                fixedEntity.BoundingBox.Center.X - movableEntity.BoundingBox.Center.X,
+                0
+            );
         }
 
         public static void Vertically(Entity fixedEntity, List<Entity> entities)
@@ -17,7 +20,10 @@ namespace OpenNest
 
         public static void Vertically(Part fixedPart, Part movablePart)
         {
-            movablePart.Offset(fixedPart.BoundingBox.Center.X - movablePart.BoundingBox.Center.X, 0);
+            movablePart.Offset(
+                fixedPart.BoundingBox.Center.X - movablePart.BoundingBox.Center.X,
+                0
+            );
         }
 
         public static void Vertically(Part fixedPart, List<Part> parts)
@@ -27,7 +33,10 @@ namespace OpenNest
 
         public static void Horizontally(Entity fixedEntity, Entity movableEntity)
         {
-            movableEntity.Offset(0, fixedEntity.BoundingBox.Center.Y - movableEntity.BoundingBox.Center.Y);
+            movableEntity.Offset(
+                0,
+                fixedEntity.BoundingBox.Center.Y - movableEntity.BoundingBox.Center.Y
+            );
         }
 
         public static void Horizontally(Entity fixedEntity, List<Entity> entities)
@@ -37,7 +46,10 @@ namespace OpenNest
 
         public static void Horizontally(Part fixedPart, Part movablePart)
         {
-            movablePart.Offset(0, fixedPart.BoundingBox.Center.Y - movablePart.BoundingBox.Center.Y);
+            movablePart.Offset(
+                0,
+                fixedPart.BoundingBox.Center.Y - movablePart.BoundingBox.Center.Y
+            );
         }
 
         public static void Horizontally(Part fixedPart, List<Part> parts)
@@ -67,7 +79,10 @@ namespace OpenNest
 
         public static void Right(Entity fixedEntity, Entity movableEntity)
         {
-            movableEntity.Offset(fixedEntity.BoundingBox.Right - movableEntity.BoundingBox.Right, 0);
+            movableEntity.Offset(
+                fixedEntity.BoundingBox.Right - movableEntity.BoundingBox.Right,
+                0
+            );
         }
 
         public static void Right(Entity fixedEntity, List<Entity> entities)
@@ -107,7 +122,10 @@ namespace OpenNest
 
         public static void Bottom(Entity fixedEntity, Entity movableEntity)
         {
-            movableEntity.Offset(0, fixedEntity.BoundingBox.Bottom - movableEntity.BoundingBox.Bottom);
+            movableEntity.Offset(
+                0,
+                fixedEntity.BoundingBox.Bottom - movableEntity.BoundingBox.Bottom
+            );
         }
 
         public static void Bottom(Entity fixedEntity, List<Entity> entities)
@@ -137,14 +155,19 @@ namespace OpenNest
                 return;
 
             var list = new List<Part>(parts);
-            list.Sort((p1, p2) => horizontal
-                ? p1.BoundingBox.Center.X.CompareTo(p2.BoundingBox.Center.X)
-                : p1.BoundingBox.Center.Y.CompareTo(p2.BoundingBox.Center.Y));
+            list.Sort(
+                (p1, p2) =>
+                    horizontal
+                        ? p1.BoundingBox.Center.X.CompareTo(p2.BoundingBox.Center.X)
+                        : p1.BoundingBox.Center.Y.CompareTo(p2.BoundingBox.Center.Y)
+            );
 
             var lastIndex = list.Count - 1;
 
             var start = horizontal ? list[0].BoundingBox.Center.X : list[0].BoundingBox.Center.Y;
-            var end = horizontal ? list[lastIndex].BoundingBox.Center.X : list[lastIndex].BoundingBox.Center.Y;
+            var end = horizontal
+                ? list[lastIndex].BoundingBox.Center.X
+                : list[lastIndex].BoundingBox.Center.Y;
 
             var spacing = (end - start) / lastIndex;
 

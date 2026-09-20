@@ -10,12 +10,19 @@ public class NestJobRunnerTests
     {
         var fake = new FakePlateNester();
         var factoryCalls = 0;
-        var runner = new NestJobRunner(_ => { factoryCalls++; return fake; });
-        var job = new NestJob(Array.Empty<NestJobPart>(), new[]
+        var runner = new NestJobRunner(_ =>
         {
-            new NestPlateStock("finite", new Size(100, 200), 2),
-            new NestPlateStock("unlimited", new Size(100, 200))
+            factoryCalls++;
+            return fake;
         });
+        var job = new NestJob(
+            Array.Empty<NestJobPart>(),
+            new[]
+            {
+                new NestPlateStock("finite", new Size(100, 200), 2),
+                new NestPlateStock("unlimited", new Size(100, 200)),
+            }
+        );
 
         var result = runner.Solve(job);
 
@@ -23,9 +30,19 @@ public class NestJobRunnerTests
         Assert.Equal(NestJobStopReason.Completed, result.StopReason);
         Assert.Empty(result.Plates);
         Assert.Empty(result.Fulfillment);
-        Assert.Collection(result.StockUsage,
-            usage => { Assert.Equal(0, usage.Used); Assert.Equal(2, usage.Remaining); },
-            usage => { Assert.Equal(0, usage.Used); Assert.Null(usage.Remaining); });
+        Assert.Collection(
+            result.StockUsage,
+            usage =>
+            {
+                Assert.Equal(0, usage.Used);
+                Assert.Equal(2, usage.Remaining);
+            },
+            usage =>
+            {
+                Assert.Equal(0, usage.Used);
+                Assert.Null(usage.Remaining);
+            }
+        );
         Assert.Equal(0, factoryCalls);
         Assert.Equal(0, fake.Calls);
     }
@@ -37,13 +54,19 @@ public class NestJobRunnerTests
         cancellation.Cancel();
         var runner = new NestJobRunner(_ => new FakePlateNester());
         var job = new NestJob(Array.Empty<NestJobPart>(), Array.Empty<NestPlateStock>());
-        Assert.Throws<OperationCanceledException>(() => runner.Solve(job, token: cancellation.Token));
+        Assert.Throws<OperationCanceledException>(() =>
+            runner.Solve(job, token: cancellation.Token)
+        );
     }
 
     [Fact]
     public void EmptyStockReturnsIncomplete()
     {
-        var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle()), 1);
+        var part = new NestJobPart(
+            "part",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle()),
+            1
+        );
         var job = new NestJob(new[] { part }, Array.Empty<NestPlateStock>());
         var runner = new NestJobRunner(_ => new FakePlateNester());
         var result = runner.Solve(job);
@@ -64,7 +87,11 @@ public class NestJobRunnerTests
         var edges = new Spacing(1, 2, 3, 4);
         var stocks = new List<NestPlateStock> { new("s", size, 0, 2, edges, 3) };
         var job = new NestJob(parts, stocks);
-        parts.Clear(); stocks.Clear(); program.Codes.Clear(); size.Width = 0; edges.Left = 999;
+        parts.Clear();
+        stocks.Clear();
+        program.Codes.Clear();
+        size.Width = 0;
+        edges.Left = 999;
 
         Assert.Single(job.Parts);
         Assert.Equal(3, job.Parts[0].Quantity);
@@ -92,8 +119,12 @@ public class NestJobRunnerTests
     private sealed class FakePlateNester : IPlateNester
     {
         public int Calls { get; private set; }
-        public PlateCandidate Place(PlatePlacementRequest request, IProgress<NestJobProgress>? progress = null,
-            CancellationToken token = default)
+
+        public PlateCandidate Place(
+            PlatePlacementRequest request,
+            IProgress<NestJobProgress>? progress = null,
+            CancellationToken token = default
+        )
         {
             Calls++;
             return new PlateCandidate(Array.Empty<NestJobPlacement>());

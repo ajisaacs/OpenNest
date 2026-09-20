@@ -9,9 +9,27 @@ public class BomAnalyzerTests
     {
         var items = new List<BomItem>
         {
-            new BomItem { FileName = "PT01", Thickness = 0.25, Material = "AISI 304", Qty = 2 },
-            new BomItem { FileName = "PT02", Thickness = 0.25, Material = "AISI 304", Qty = 3 },
-            new BomItem { FileName = "PT03", Thickness = 0.375, Material = "AISI 304", Qty = 1 },
+            new BomItem
+            {
+                FileName = "PT01",
+                Thickness = 0.25,
+                Material = "AISI 304",
+                Qty = 2,
+            },
+            new BomItem
+            {
+                FileName = "PT02",
+                Thickness = 0.25,
+                Material = "AISI 304",
+                Qty = 3,
+            },
+            new BomItem
+            {
+                FileName = "PT03",
+                Thickness = 0.375,
+                Material = "AISI 304",
+                Qty = 1,
+            },
         };
 
         var result = BomAnalyzer.Analyze(items, "C:\\fake");
@@ -26,9 +44,27 @@ public class BomAnalyzerTests
     {
         var items = new List<BomItem>
         {
-            new BomItem { FileName = "PT01", Thickness = 0.25, Material = "AISI 304", Qty = 2 },
-            new BomItem { FileName = null, Thickness = 0.25, Material = "AISI 304", Qty = 3 },
-            new BomItem { FileName = "", Thickness = 0.25, Material = "AISI 304", Qty = 1 },
+            new BomItem
+            {
+                FileName = "PT01",
+                Thickness = 0.25,
+                Material = "AISI 304",
+                Qty = 2,
+            },
+            new BomItem
+            {
+                FileName = null,
+                Thickness = 0.25,
+                Material = "AISI 304",
+                Qty = 3,
+            },
+            new BomItem
+            {
+                FileName = "",
+                Thickness = 0.25,
+                Material = "AISI 304",
+                Qty = 1,
+            },
         };
 
         var result = BomAnalyzer.Analyze(items, "C:\\fake");
@@ -41,8 +77,20 @@ public class BomAnalyzerTests
     {
         var items = new List<BomItem>
         {
-            new BomItem { FileName = "PT01", Thickness = 0.25, Material = "AISI 304", Qty = 2 },
-            new BomItem { FileName = "PT02", Thickness = null, Material = "AISI 304", Qty = 3 },
+            new BomItem
+            {
+                FileName = "PT01",
+                Thickness = 0.25,
+                Material = "AISI 304",
+                Qty = 2,
+            },
+            new BomItem
+            {
+                FileName = "PT02",
+                Thickness = null,
+                Material = "AISI 304",
+                Qty = 3,
+            },
         };
 
         var result = BomAnalyzer.Analyze(items, "C:\\fake");
@@ -56,8 +104,20 @@ public class BomAnalyzerTests
     {
         var items = new List<BomItem>
         {
-            new BomItem { FileName = "PT01", Thickness = 0.25, Material = "AISI 304", Qty = 1 },
-            new BomItem { FileName = "PT02", Thickness = 0.25, Material = "aisi 304", Qty = 1 },
+            new BomItem
+            {
+                FileName = "PT01",
+                Thickness = 0.25,
+                Material = "AISI 304",
+                Qty = 1,
+            },
+            new BomItem
+            {
+                FileName = "PT02",
+                Thickness = 0.25,
+                Material = "aisi 304",
+                Qty = 1,
+            },
         };
 
         var result = BomAnalyzer.Analyze(items, "C:\\fake");
@@ -69,7 +129,10 @@ public class BomAnalyzerTests
     [Fact]
     public void Analyze_MatchesDxfFiles_WithAndWithoutExtension()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), "BomAnalyzerTest_" + Guid.NewGuid().ToString("N"));
+        var tempDir = Path.Combine(
+            Path.GetTempPath(),
+            "BomAnalyzerTest_" + Guid.NewGuid().ToString("N")
+        );
         Directory.CreateDirectory(tempDir);
 
         try
@@ -78,14 +141,24 @@ public class BomAnalyzerTests
 
             var items = new List<BomItem>
             {
-                new BomItem { FileName = "PT01", Thickness = 0.25, Material = "AISI 304", Qty = 2 },
+                new BomItem
+                {
+                    FileName = "PT01",
+                    Thickness = 0.25,
+                    Material = "AISI 304",
+                    Qty = 2,
+                },
             };
 
             var result = BomAnalyzer.Analyze(items, tempDir);
 
             Assert.Single(result.Groups);
             Assert.Single(result.Groups[0].Parts);
-            Assert.EndsWith(".dxf", result.Groups[0].Parts[0].DxfPath, StringComparison.OrdinalIgnoreCase);
+            Assert.EndsWith(
+                ".dxf",
+                result.Groups[0].Parts[0].DxfPath,
+                StringComparison.OrdinalIgnoreCase
+            );
             Assert.Empty(result.Unmatched);
         }
         finally
@@ -97,14 +170,23 @@ public class BomAnalyzerTests
     [Fact]
     public void Analyze_ReportsUnmatchedItems_WhenDxfNotFound()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), "BomAnalyzerTest_" + Guid.NewGuid().ToString("N"));
+        var tempDir = Path.Combine(
+            Path.GetTempPath(),
+            "BomAnalyzerTest_" + Guid.NewGuid().ToString("N")
+        );
         Directory.CreateDirectory(tempDir);
 
         try
         {
             var items = new List<BomItem>
             {
-                new BomItem { FileName = "PT99", Thickness = 0.25, Material = "AISI 304", Qty = 1 },
+                new BomItem
+                {
+                    FileName = "PT99",
+                    Thickness = 0.25,
+                    Material = "AISI 304",
+                    Qty = 1,
+                },
             };
 
             var result = BomAnalyzer.Analyze(items, tempDir);
@@ -123,8 +205,20 @@ public class BomAnalyzerTests
     {
         var items = new List<BomItem>
         {
-            new BomItem { FileName = "PT01", Thickness = 0.25, Material = "AISI 304", Qty = 1 },
-            new BomItem { FileName = "PT02", Thickness = 0.25, Material = "Plain Carbon Steel", Qty = 1 },
+            new BomItem
+            {
+                FileName = "PT01",
+                Thickness = 0.25,
+                Material = "AISI 304",
+                Qty = 1,
+            },
+            new BomItem
+            {
+                FileName = "PT02",
+                Thickness = 0.25,
+                Material = "Plain Carbon Steel",
+                Qty = 1,
+            },
         };
 
         var result = BomAnalyzer.Analyze(items, "C:\\fake");
@@ -135,7 +229,10 @@ public class BomAnalyzerTests
     [Fact]
     public void Analyze_GroupPartsCount_MatchesBomItems()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), "BomAnalyzerTest_" + Guid.NewGuid().ToString("N"));
+        var tempDir = Path.Combine(
+            Path.GetTempPath(),
+            "BomAnalyzerTest_" + Guid.NewGuid().ToString("N")
+        );
         Directory.CreateDirectory(tempDir);
 
         try
@@ -146,9 +243,27 @@ public class BomAnalyzerTests
 
             var items = new List<BomItem>
             {
-                new BomItem { FileName = "PT01", Thickness = 0.25, Material = "AISI 304", Qty = 2 },
-                new BomItem { FileName = "PT02", Thickness = 0.25, Material = "AISI 304", Qty = 5 },
-                new BomItem { FileName = "PT03", Thickness = 0.375, Material = "AISI 304", Qty = 1 },
+                new BomItem
+                {
+                    FileName = "PT01",
+                    Thickness = 0.25,
+                    Material = "AISI 304",
+                    Qty = 2,
+                },
+                new BomItem
+                {
+                    FileName = "PT02",
+                    Thickness = 0.25,
+                    Material = "AISI 304",
+                    Qty = 5,
+                },
+                new BomItem
+                {
+                    FileName = "PT03",
+                    Thickness = 0.375,
+                    Material = "AISI 304",
+                    Qty = 1,
+                },
             };
 
             var result = BomAnalyzer.Analyze(items, tempDir);

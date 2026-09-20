@@ -22,7 +22,7 @@ namespace OpenNest.Forms
                 SynchronizingObject = this,
                 Enabled = true,
                 AutoReset = false,
-                Interval = SystemInformation.KeyboardDelay + 1
+                Interval = SystemInformation.KeyboardDelay + 1,
             };
             timer.Elapsed += (sender, e) => EnableCheck();
 
@@ -62,7 +62,7 @@ namespace OpenNest.Forms
                 numericUpDownEdgeSpacingBottom,
                 numericUpDownEdgeSpacingLeft,
                 numericUpDownEdgeSpacingRight,
-                numericUpDownEdgeSpacingTop
+                numericUpDownEdgeSpacingTop,
             };
 
             foreach (var control in controls)

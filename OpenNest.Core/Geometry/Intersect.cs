@@ -1,6 +1,6 @@
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -18,8 +18,19 @@ namespace OpenNest.Geometry
             }
 
             pts = pts.Where(pt =>
-                Angle.IsBetweenRad(arc1.Center.AngleTo(pt), arc1.StartAngle, arc1.EndAngle, arc1.IsReversed) &&
-                Angle.IsBetweenRad(arc2.Center.AngleTo(pt), arc2.StartAngle, arc2.EndAngle, arc2.IsReversed))
+                    Angle.IsBetweenRad(
+                        arc1.Center.AngleTo(pt),
+                        arc1.StartAngle,
+                        arc1.EndAngle,
+                        arc1.IsReversed
+                    )
+                    && Angle.IsBetweenRad(
+                        arc2.Center.AngleTo(pt),
+                        arc2.StartAngle,
+                        arc2.EndAngle,
+                        arc2.IsReversed
+                    )
+                )
                 .ToList();
 
             return pts.Count > 0;
@@ -35,11 +46,15 @@ namespace OpenNest.Geometry
                 return false;
             }
 
-            pts = pts.Where(pt => Angle.IsBetweenRad(
-                arc.Center.AngleTo(pt),
-                arc.StartAngle,
-                arc.EndAngle,
-                arc.IsReversed)).ToList();
+            pts = pts.Where(pt =>
+                    Angle.IsBetweenRad(
+                        arc.Center.AngleTo(pt),
+                        arc.StartAngle,
+                        arc.EndAngle,
+                        arc.IsReversed
+                    )
+                )
+                .ToList();
 
             return pts.Count > 0;
         }
@@ -54,11 +69,15 @@ namespace OpenNest.Geometry
                 return false;
             }
 
-            pts = pts.Where(pt => Angle.IsBetweenRad(
-                arc.Center.AngleTo(pt),
-                arc.StartAngle,
-                arc.EndAngle,
-                arc.IsReversed)).ToList();
+            pts = pts.Where(pt =>
+                    Angle.IsBetweenRad(
+                        arc.Center.AngleTo(pt),
+                        arc.StartAngle,
+                        arc.EndAngle,
+                        arc.IsReversed
+                    )
+                )
+                .ToList();
 
             return pts.Count > 0;
         }
@@ -74,11 +93,15 @@ namespace OpenNest.Geometry
                 pts2.AddRange(pts3);
             }
 
-            pts = pts2.Where(pt => Angle.IsBetweenRad(
-                arc.Center.AngleTo(pt),
-                arc.StartAngle,
-                arc.EndAngle,
-                arc.IsReversed)).ToList();
+            pts = pts2.Where(pt =>
+                    Angle.IsBetweenRad(
+                        arc.Center.AngleTo(pt),
+                        arc.StartAngle,
+                        arc.EndAngle,
+                        arc.IsReversed
+                    )
+                )
+                .ToList();
 
             return pts.Count > 0;
         }
@@ -95,11 +118,15 @@ namespace OpenNest.Geometry
                 pts2.AddRange(pts3);
             }
 
-            pts = pts2.Where(pt => Angle.IsBetweenRad(
-                arc.Center.AngleTo(pt),
-                arc.StartAngle,
-                arc.EndAngle,
-                arc.IsReversed)).ToList();
+            pts = pts2.Where(pt =>
+                    Angle.IsBetweenRad(
+                        arc.Center.AngleTo(pt),
+                        arc.StartAngle,
+                        arc.EndAngle,
+                        arc.IsReversed
+                    )
+                )
+                .ToList();
 
             return pts.Count > 0;
         }
@@ -123,20 +150,22 @@ namespace OpenNest.Geometry
             }
 
             var d = circle2.Center - circle1.Center;
-            var a = (circle1.Radius * circle1.Radius - circle2.Radius * circle2.Radius + distance * distance) / (2.0 * distance);
+            var a =
+                (
+                    circle1.Radius * circle1.Radius
+                    - circle2.Radius * circle2.Radius
+                    + distance * distance
+                ) / (2.0 * distance);
             var h = System.Math.Sqrt(circle1.Radius * circle1.Radius - a * a);
 
             var pt = new Vector(
                 circle1.Center.X + (a * d.X) / distance,
-                circle1.Center.Y + (a * d.Y) / distance);
+                circle1.Center.Y + (a * d.Y) / distance
+            );
 
-            var i1 = new Vector(
-                pt.X + (h * d.Y) / distance,
-                pt.Y - (h * d.X) / distance);
+            var i1 = new Vector(pt.X + (h * d.Y) / distance, pt.Y - (h * d.X) / distance);
 
-            var i2 = new Vector(
-                pt.X - (h * d.Y) / distance,
-                pt.Y + (h * d.X) / distance);
+            var i2 = new Vector(pt.X - (h * d.Y) / distance, pt.Y + (h * d.X) / distance);
 
             pts = i1 != i2 ? new List<Vector> { i1, i2 } : new List<Vector> { i1 };
 

@@ -18,10 +18,14 @@ namespace OpenNest.Controls
             activeParts.Count > 0 ? activeParts : stationaryParts;
 
         public Brush PreviewBrush =>
-            activeParts.Count > 0 ? view.ColorScheme.ActivePreviewPartBrush : view.ColorScheme.PreviewPartBrush;
+            activeParts.Count > 0
+                ? view.ColorScheme.ActivePreviewPartBrush
+                : view.ColorScheme.PreviewPartBrush;
 
         public Pen PreviewPen =>
-            activeParts.Count > 0 ? view.ColorScheme.ActivePreviewPartPen : view.ColorScheme.PreviewPartPen;
+            activeParts.Count > 0
+                ? view.ColorScheme.ActivePreviewPartPen
+                : view.ColorScheme.PreviewPartPen;
 
         public void SetStationaryParts(List<Part> parts)
         {

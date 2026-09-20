@@ -19,7 +19,12 @@ public class IterativeShrinkFillerTests
     public void Fill_EmptyItems_ReturnsEmpty()
     {
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) => new List<Part>();
-        var result = IterativeShrinkFiller.Fill(new List<NestItem>(), new Box(0, 0, 100, 100), fillFunc, 1.0);
+        var result = IterativeShrinkFiller.Fill(
+            new List<NestItem>(),
+            new Box(0, 0, 100, 100),
+            fillFunc,
+            1.0
+        );
 
         Assert.Empty(result.Parts);
         Assert.Empty(result.Leftovers);
@@ -42,7 +47,7 @@ public class IterativeShrinkFillerTests
         var drawing = MakeRectDrawing(20, 10);
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = drawing, Quantity = 5 }
+            new NestItem { Drawing = drawing, Quantity = 5 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
@@ -110,7 +115,7 @@ public class IterativeShrinkFillerTests
     {
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = MakeRectDrawing(20, 10), Quantity = 0 }
+            new NestItem { Drawing = MakeRectDrawing(20, 10), Quantity = 0 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
@@ -134,13 +139,19 @@ public class IterativeShrinkFillerTests
 
         var items = new List<NestItem>
         {
-            new NestItem { Drawing = MakeRectDrawing(20, 10), Quantity = 10 }
+            new NestItem { Drawing = MakeRectDrawing(20, 10), Quantity = 10 },
         };
 
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
             new List<Part> { TestHelpers.MakePartAt(0, 0, 10) };
 
-        var result = IterativeShrinkFiller.Fill(items, new Box(0, 0, 100, 100), fillFunc, 1.0, cts.Token);
+        var result = IterativeShrinkFiller.Fill(
+            items,
+            new Box(0, 0, 100, 100),
+            fillFunc,
+            1.0,
+            cts.Token
+        );
 
         Assert.NotNull(result);
     }

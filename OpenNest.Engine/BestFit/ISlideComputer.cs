@@ -20,19 +20,27 @@ namespace OpenNest.Engine.BestFit
         /// <param name="direction">Push direction.</param>
         /// <returns>Array of minimum distances, one per offset position.</returns>
         double[] ComputeBatch(
-            double[] stationarySegments, int stationaryCount,
-            double[] movingTemplateSegments, int movingCount,
-            double[] offsets, int offsetCount,
-            PushDirection direction);
+            double[] stationarySegments,
+            int stationaryCount,
+            double[] movingTemplateSegments,
+            int movingCount,
+            double[] offsets,
+            int offsetCount,
+            PushDirection direction
+        );
 
         /// <summary>
         /// Computes minimum directional distance for offsets with per-offset directions.
         /// Uploads segment data once for all offsets, reducing GPU round-trips.
         /// </summary>
         double[] ComputeBatchMultiDir(
-            double[] stationarySegments, int stationaryCount,
-            double[] movingTemplateSegments, int movingCount,
-            double[] offsets, int offsetCount,
-            int[] directions);
+            double[] stationarySegments,
+            int stationaryCount,
+            double[] movingTemplateSegments,
+            int movingCount,
+            double[] offsets,
+            int offsetCount,
+            int[] directions
+        );
     }
 }

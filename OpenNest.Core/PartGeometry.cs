@@ -1,7 +1,7 @@
-using OpenNest.Converters;
-using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Converters;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -10,7 +10,9 @@ namespace OpenNest
         public static List<Line> GetPartLines(Part part, double chordTolerance = 0.001)
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var shapes = ShapeBuilder.GetShapes(
+                entities.Where(e => e.Layer != SpecialLayers.Rapid)
+            );
             var lines = new List<Line>();
 
             foreach (var shape in shapes)
@@ -23,10 +25,16 @@ namespace OpenNest
             return lines;
         }
 
-        public static List<Line> GetPartLines(Part part, PushDirection facingDirection, double chordTolerance = 0.001)
+        public static List<Line> GetPartLines(
+            Part part,
+            PushDirection facingDirection,
+            double chordTolerance = 0.001
+        )
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var shapes = ShapeBuilder.GetShapes(
+                entities.Where(e => e.Layer != SpecialLayers.Rapid)
+            );
             var lines = new List<Line>();
 
             foreach (var shape in shapes)
@@ -47,7 +55,8 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+            );
 
             var offsetShape = profile.Perimeter.OffsetOutward(spacing);
             if (offsetShape == null)
@@ -69,7 +78,8 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+            );
             var entities = new List<Entity>();
 
             var perimeter = profile.Perimeter.OffsetOutward(spacing);
@@ -83,7 +93,8 @@ namespace OpenNest
             foreach (var cutout in profile.Cutouts)
             {
                 var inset = cutout.OffsetInward(spacing);
-                if (inset == null) continue;
+                if (inset == null)
+                    continue;
                 foreach (var entity in inset.Entities)
                     entity.Offset(part.Location);
                 entities.AddRange(inset.Entities);
@@ -100,7 +111,8 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+            );
 
             return CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
         }
@@ -113,7 +125,8 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+            );
             var entities = CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
 
             foreach (var cutout in profile.Cutouts)
@@ -136,50 +149,85 @@ namespace OpenNest
             return result;
         }
 
-        public static List<Line> GetOffsetPartLines(Part part, double spacing, double chordTolerance = 0.001,
-            bool perimeterOnly = false)
+        public static List<Line> GetOffsetPartLines(
+            Part part,
+            double spacing,
+            double chordTolerance = 0.001,
+            bool perimeterOnly = false
+        )
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+            );
             var lines = new List<Line>();
             var totalSpacing = spacing;
 
-            AddOffsetLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
-                chordTolerance, part.Location);
+            AddOffsetLines(
+                lines,
+                profile.Perimeter.OffsetOutward(totalSpacing),
+                chordTolerance,
+                part.Location
+            );
 
             if (!perimeterOnly)
             {
                 foreach (var cutout in profile.Cutouts)
-                    AddOffsetLines(lines, cutout.OffsetInward(totalSpacing),
-                        chordTolerance, part.Location);
+                    AddOffsetLines(
+                        lines,
+                        cutout.OffsetInward(totalSpacing),
+                        chordTolerance,
+                        part.Location
+                    );
             }
 
             return lines;
         }
 
-        public static List<Line> GetOffsetPartLines(Part part, double spacing, PushDirection facingDirection, double chordTolerance = 0.001)
+        public static List<Line> GetOffsetPartLines(
+            Part part,
+            double spacing,
+            PushDirection facingDirection,
+            double chordTolerance = 0.001
+        )
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+            );
             var lines = new List<Line>();
             var totalSpacing = spacing;
 
-            AddOffsetDirectionalLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
-                chordTolerance, part.Location, facingDirection);
+            AddOffsetDirectionalLines(
+                lines,
+                profile.Perimeter.OffsetOutward(totalSpacing),
+                chordTolerance,
+                part.Location,
+                facingDirection
+            );
 
             foreach (var cutout in profile.Cutouts)
-                AddOffsetDirectionalLines(lines, cutout.OffsetInward(totalSpacing),
-                    chordTolerance, part.Location, facingDirection);
+                AddOffsetDirectionalLines(
+                    lines,
+                    cutout.OffsetInward(totalSpacing),
+                    chordTolerance,
+                    part.Location,
+                    facingDirection
+                );
 
             return lines;
         }
 
-        public static List<Line> GetPartLines(Part part, Vector facingDirection, double chordTolerance = 0.001)
+        public static List<Line> GetPartLines(
+            Part part,
+            Vector facingDirection,
+            double chordTolerance = 0.001
+        )
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(entities.Where(e => e.Layer != SpecialLayers.Rapid));
+            var shapes = ShapeBuilder.GetShapes(
+                entities.Where(e => e.Layer != SpecialLayers.Rapid)
+            );
             var lines = new List<Line>();
 
             foreach (var shape in shapes)
@@ -192,20 +240,36 @@ namespace OpenNest
             return lines;
         }
 
-        public static List<Line> GetOffsetPartLines(Part part, double spacing, Vector facingDirection, double chordTolerance = 0.001)
+        public static List<Line> GetOffsetPartLines(
+            Part part,
+            double spacing,
+            Vector facingDirection,
+            double chordTolerance = 0.001
+        )
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+            );
             var lines = new List<Line>();
             var totalSpacing = spacing;
 
-            AddOffsetDirectionalLines(lines, profile.Perimeter.OffsetOutward(totalSpacing),
-                chordTolerance, part.Location, facingDirection);
+            AddOffsetDirectionalLines(
+                lines,
+                profile.Perimeter.OffsetOutward(totalSpacing),
+                chordTolerance,
+                part.Location,
+                facingDirection
+            );
 
             foreach (var cutout in profile.Cutouts)
-                AddOffsetDirectionalLines(lines, cutout.OffsetInward(totalSpacing),
-                    chordTolerance, part.Location, facingDirection);
+                AddOffsetDirectionalLines(
+                    lines,
+                    cutout.OffsetInward(totalSpacing),
+                    chordTolerance,
+                    part.Location,
+                    facingDirection
+                );
 
             return lines;
         }
@@ -242,7 +306,10 @@ namespace OpenNest
         /// <summary>
         /// Returns only polygon edges whose outward normal faces the specified direction.
         /// </summary>
-        private static List<Line> GetDirectionalLines(Polygon polygon, PushDirection facingDirection)
+        private static List<Line> GetDirectionalLines(
+            Polygon polygon,
+            PushDirection facingDirection
+        )
         {
             if (polygon.Vertices.Count < 3)
                 return polygon.ToLines();
@@ -261,11 +328,21 @@ namespace OpenNest
 
                 switch (facingDirection)
                 {
-                    case PushDirection.Left: keep = -sign * dy > 0; break;
-                    case PushDirection.Right: keep = sign * dy > 0; break;
-                    case PushDirection.Up: keep = -sign * dx > 0; break;
-                    case PushDirection.Down: keep = sign * dx > 0; break;
-                    default: keep = true; break;
+                    case PushDirection.Left:
+                        keep = -sign * dy > 0;
+                        break;
+                    case PushDirection.Right:
+                        keep = sign * dy > 0;
+                        break;
+                    case PushDirection.Up:
+                        keep = -sign * dx > 0;
+                        break;
+                    case PushDirection.Down:
+                        keep = sign * dx > 0;
+                        break;
+                    default:
+                        keep = true;
+                        break;
                 }
 
                 if (keep)
@@ -277,8 +354,12 @@ namespace OpenNest
             return lines;
         }
 
-        private static void AddOffsetLines(List<Line> lines, Shape offsetEntity,
-            double chordTolerance, Vector location)
+        private static void AddOffsetLines(
+            List<Line> lines,
+            Shape offsetEntity,
+            double chordTolerance,
+            Vector location
+        )
         {
             if (offsetEntity == null)
                 return;
@@ -289,8 +370,13 @@ namespace OpenNest
             lines.AddRange(polygon.ToLines());
         }
 
-        private static void AddOffsetDirectionalLines(List<Line> lines, Shape offsetEntity,
-            double chordTolerance, Vector location, PushDirection facingDirection)
+        private static void AddOffsetDirectionalLines(
+            List<Line> lines,
+            Shape offsetEntity,
+            double chordTolerance,
+            Vector location,
+            PushDirection facingDirection
+        )
         {
             if (offsetEntity == null)
                 return;
@@ -301,8 +387,13 @@ namespace OpenNest
             lines.AddRange(GetDirectionalLines(polygon, facingDirection));
         }
 
-        private static void AddOffsetDirectionalLines(List<Line> lines, Shape offsetEntity,
-            double chordTolerance, Vector location, Vector facingDirection)
+        private static void AddOffsetDirectionalLines(
+            List<Line> lines,
+            Shape offsetEntity,
+            double chordTolerance,
+            Vector location,
+            Vector facingDirection
+        )
         {
             if (offsetEntity == null)
                 return;

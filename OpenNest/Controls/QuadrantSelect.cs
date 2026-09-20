@@ -7,9 +7,7 @@ namespace OpenNest.Controls
     {
         private int quadrant;
 
-        public QuadrantSelect()
-        {
-        }
+        public QuadrantSelect() { }
 
         public int Quadrant
         {
@@ -60,8 +58,9 @@ namespace OpenNest.Controls
                 new StringFormat()
                 {
                     Alignment = StringAlignment.Center,
-                    LineAlignment = StringAlignment.Center
-                });
+                    LineAlignment = StringAlignment.Center,
+                }
+            );
         }
 
         protected override void OnMouseClick(MouseEventArgs e)

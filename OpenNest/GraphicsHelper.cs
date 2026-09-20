@@ -1,8 +1,8 @@
-﻿using OpenNest.CNC;
+﻿using System.Drawing;
+using System.Drawing.Drawing2D;
+using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Drawing;
-using System.Drawing.Drawing2D;
 
 namespace OpenNest
 {
@@ -47,7 +47,12 @@ namespace OpenNest
             return pgm.GetImage(size, pen, null);
         }
 
-        public static Image GetImage(this Program pgm, System.Drawing.Size size, Pen pen, Brush brush)
+        public static Image GetImage(
+            this Program pgm,
+            System.Drawing.Size size,
+            Pen pen,
+            Brush brush
+        )
         {
             var img = new Bitmap(size.Width, size.Height);
             var path = pgm.GetGraphicsPath();
@@ -66,7 +71,8 @@ namespace OpenNest
 
             var offset = new PointF(
                 (size.Width - bounds.Width) * 0.5f - bounds.X,
-                (size.Height - bounds.Height) * 0.5f - bounds.Y);
+                (size.Height - bounds.Height) * 0.5f - bounds.Y
+            );
 
             var graphics = Graphics.FromImage(img);
             graphics.TranslateTransform(offset.X, offset.Y);
@@ -85,8 +91,12 @@ namespace OpenNest
             return img;
         }
 
-        public static void GetGraphicsPaths(this Program pgm, Vector origin,
-            out GraphicsPath cutPath, out GraphicsPath leadPath)
+        public static void GetGraphicsPaths(
+            this Program pgm,
+            Vector origin,
+            out GraphicsPath cutPath,
+            out GraphicsPath leadPath
+        )
         {
             cutPath = new GraphicsPath();
             leadPath = new GraphicsPath();
@@ -95,8 +105,13 @@ namespace OpenNest
             AddProgramSplit(cutPath, leadPath, pgm, pgm.Mode, ref curpos);
         }
 
-        private static void AddProgramSplit(GraphicsPath cutPath, GraphicsPath leadPath,
-            Program pgm, Mode mode, ref Vector curpos)
+        private static void AddProgramSplit(
+            GraphicsPath cutPath,
+            GraphicsPath leadPath,
+            Program pgm,
+            Mode mode,
+            ref Vector curpos
+        )
         {
             // Capture the frame origin at entry. Sub-program Offsets are relative
             // to this fixed origin, not to the current tool position.
@@ -114,12 +129,15 @@ namespace OpenNest
                         if (arc.Suppressed)
                         {
                             var endpt = arc.EndPoint;
-                            if (mode == Mode.Incremental) endpt += curpos;
+                            if (mode == Mode.Incremental)
+                                endpt += curpos;
                             curpos = endpt;
                             break;
                         }
-                        var arcPath = (arc.Layer == LayerType.Leadin || arc.Layer == LayerType.Leadout)
-                            ? leadPath : cutPath;
+                        var arcPath =
+                            (arc.Layer == LayerType.Leadin || arc.Layer == LayerType.Leadout)
+                                ? leadPath
+                                : cutPath;
                         AddArc(arcPath, arc, mode, ref curpos);
                         break;
 
@@ -128,12 +146,15 @@ namespace OpenNest
                         if (line.Suppressed)
                         {
                             var endpt = line.EndPoint;
-                            if (mode == Mode.Incremental) endpt += curpos;
+                            if (mode == Mode.Incremental)
+                                endpt += curpos;
                             curpos = endpt;
                             break;
                         }
-                        var linePath = (line.Layer == LayerType.Leadin || line.Layer == LayerType.Leadout)
-                            ? leadPath : cutPath;
+                        var linePath =
+                            (line.Layer == LayerType.Leadin || line.Layer == LayerType.Leadout)
+                                ? leadPath
+                                : cutPath;
                         AddLine(linePath, line, mode, ref curpos);
                         break;
 
@@ -161,7 +182,10 @@ namespace OpenNest
                         {
                             cutPath.StartFigure();
                             leadPath.StartFigure();
-                            curpos = new Vector(frameOrigin.X + subpgm.Offset.X, frameOrigin.Y + subpgm.Offset.Y);
+                            curpos = new Vector(
+                                frameOrigin.X + subpgm.Offset.X,
+                                frameOrigin.Y + subpgm.Offset.Y
+                            );
                             AddProgramSplit(cutPath, leadPath, subpgm.Program, mode, ref curpos);
                         }
                         mode = tmpmode;
@@ -182,14 +206,14 @@ namespace OpenNest
             }
 
             // start angle in degrees
-            var startAngle = Angle.ToDegrees(System.Math.Atan2(
-                curpos.Y - center.Y,
-                curpos.X - center.X));
+            var startAngle = Angle.ToDegrees(
+                System.Math.Atan2(curpos.Y - center.Y, curpos.X - center.X)
+            );
 
             // end angle in degrees
-            var endAngle = Angle.ToDegrees(System.Math.Atan2(
-                endpt.Y - center.Y,
-                endpt.X - center.X));
+            var endAngle = Angle.ToDegrees(
+                System.Math.Atan2(endpt.Y - center.Y, endpt.X - center.X)
+            );
 
             endAngle = Angle.NormalizeDeg(endAngle);
             startAngle = Angle.NormalizeDeg(startAngle);
@@ -215,17 +239,18 @@ namespace OpenNest
             {
                 var sweepAngle = (endAngle - startAngle);
 
-                path.AddArc(
-                    pt.X, pt.Y,
-                    size, size,
-                    (float)startAngle,
-                    (float)sweepAngle);
+                path.AddArc(pt.X, pt.Y, size, size, (float)startAngle, (float)sweepAngle);
             }
 
             curpos = endpt;
         }
 
-        private static void AddLine(GraphicsPath path, LinearMove line, Mode mode, ref Vector curpos)
+        private static void AddLine(
+            GraphicsPath path,
+            LinearMove line,
+            Mode mode,
+            ref Vector curpos
+        )
         {
             var pt = line.EndPoint;
 
@@ -279,14 +304,16 @@ namespace OpenNest
                             var arc = (ArcMove)code;
                             if (arc.Layer != LayerType.Leadin && arc.Layer != LayerType.Leadout)
                             {
-                                if (currentFigure == null) currentFigure = new GraphicsPath();
+                                if (currentFigure == null)
+                                    currentFigure = new GraphicsPath();
                                 AddArc(currentFigure, arc, mode, ref curpos);
                             }
                             else
                             {
                                 Flush();
                                 var endpt = arc.EndPoint;
-                                if (mode == Mode.Incremental) endpt += curpos;
+                                if (mode == Mode.Incremental)
+                                    endpt += curpos;
                                 curpos = endpt;
                             }
                         }
@@ -297,14 +324,16 @@ namespace OpenNest
                             var line = (LinearMove)code;
                             if (line.Layer != LayerType.Leadin && line.Layer != LayerType.Leadout)
                             {
-                                if (currentFigure == null) currentFigure = new GraphicsPath();
+                                if (currentFigure == null)
+                                    currentFigure = new GraphicsPath();
                                 AddLine(currentFigure, line, mode, ref curpos);
                             }
                             else
                             {
                                 Flush();
                                 var endpt = line.EndPoint;
-                                if (mode == Mode.Incremental) endpt += curpos;
+                                if (mode == Mode.Incremental)
+                                    endpt += curpos;
                                 curpos = endpt;
                             }
                         }
@@ -325,20 +354,23 @@ namespace OpenNest
                         break;
 
                     case CodeType.SubProgramCall:
+                    {
+                        Flush();
+                        var tmpmode = mode;
+                        var subpgm = (SubProgramCall)code;
+
+                        if (subpgm.Program != null)
                         {
-                            Flush();
-                            var tmpmode = mode;
-                            var subpgm = (SubProgramCall)code;
-
-                            if (subpgm.Program != null)
-                            {
-                                curpos = new Vector(frameOrigin.X + subpgm.Offset.X, frameOrigin.Y + subpgm.Offset.Y);
-                                AddProgram(path, subpgm.Program, mode, ref curpos);
-                            }
-
-                            mode = tmpmode;
-                            break;
+                            curpos = new Vector(
+                                frameOrigin.X + subpgm.Offset.X,
+                                frameOrigin.Y + subpgm.Offset.Y
+                            );
+                            AddProgram(path, subpgm.Program, mode, ref curpos);
                         }
+
+                        mode = tmpmode;
+                        break;
+                    }
                 }
             }
 
@@ -365,7 +397,8 @@ namespace OpenNest
                 (float)diameter,
                 (float)diameter,
                 (float)(startAngle),
-                (float)sweepAngle);
+                (float)sweepAngle
+            );
         }
 
         private static void AddCircle(GraphicsPath path, Circle circle)
@@ -376,7 +409,8 @@ namespace OpenNest
                 (float)(circle.Center.X - circle.Radius),
                 (float)(circle.Center.Y - circle.Radius),
                 (float)diameter,
-                (float)diameter);
+                (float)diameter
+            );
         }
 
         private static void AddLine(GraphicsPath path, Line line)
@@ -385,7 +419,8 @@ namespace OpenNest
                 (float)line.StartPoint.X,
                 (float)line.StartPoint.Y,
                 (float)line.EndPoint.X,
-                (float)line.EndPoint.Y);
+                (float)line.EndPoint.Y
+            );
         }
 
         private static void AddShape(GraphicsPath path, Shape shape)
@@ -394,8 +429,18 @@ namespace OpenNest
             {
                 if (entity.Layer != null)
                 {
-                    if (string.Equals(entity.Layer.Name, SpecialLayers.Leadin.Name, System.StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(entity.Layer.Name, SpecialLayers.Leadout.Name, System.StringComparison.OrdinalIgnoreCase))
+                    if (
+                        string.Equals(
+                            entity.Layer.Name,
+                            SpecialLayers.Leadin.Name,
+                            System.StringComparison.OrdinalIgnoreCase
+                        )
+                        || string.Equals(
+                            entity.Layer.Name,
+                            SpecialLayers.Leadout.Name,
+                            System.StringComparison.OrdinalIgnoreCase
+                        )
+                    )
                     {
                         continue;
                     }

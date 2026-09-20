@@ -20,7 +20,7 @@ public class PlateProcessorTests
         var processor = new PlateProcessor
         {
             Sequencer = new RightSideSequencer(),
-            RapidPlanner = new SafeHeightRapidPlanner()
+            RapidPlanner = new SafeHeightRapidPlanner(),
         };
 
         var result = processor.Process(plate);
@@ -40,7 +40,7 @@ public class PlateProcessorTests
         var processor = new PlateProcessor
         {
             Sequencer = new RightSideSequencer(),
-            RapidPlanner = new SafeHeightRapidPlanner()
+            RapidPlanner = new SafeHeightRapidPlanner(),
         };
 
         var result = processor.Process(plate);
@@ -60,11 +60,8 @@ public class PlateProcessorTests
         var processor = new PlateProcessor
         {
             Sequencer = new LeftSideSequencer(),
-            CuttingStrategy = new ContourCuttingStrategy
-            {
-                Parameters = new CuttingParameters()
-            },
-            RapidPlanner = new SafeHeightRapidPlanner()
+            CuttingStrategy = new ContourCuttingStrategy { Parameters = new CuttingParameters() },
+            RapidPlanner = new SafeHeightRapidPlanner(),
         };
 
         var result = processor.Process(plate);
@@ -83,7 +80,7 @@ public class PlateProcessorTests
         var processor = new PlateProcessor
         {
             Sequencer = new LeftSideSequencer(),
-            RapidPlanner = new SafeHeightRapidPlanner()
+            RapidPlanner = new SafeHeightRapidPlanner(),
         };
 
         var result = processor.Process(plate);
@@ -101,7 +98,7 @@ public class PlateProcessorTests
         var processor = new PlateProcessor
         {
             Sequencer = new LeftSideSequencer(),
-            RapidPlanner = new SafeHeightRapidPlanner()
+            RapidPlanner = new SafeHeightRapidPlanner(),
         };
 
         var result = processor.Process(plate);
@@ -117,7 +114,7 @@ public class PlateProcessorTests
         var processor = new PlateProcessor
         {
             Sequencer = new LeftSideSequencer(),
-            RapidPlanner = new SafeHeightRapidPlanner()
+            RapidPlanner = new SafeHeightRapidPlanner(),
         };
 
         var result = processor.Process(plate);

@@ -62,8 +62,10 @@ namespace OpenNest.IO.Bom
 
                 var lookupName = item.FileName;
 
-                if (lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-                    || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase))
+                if (
+                    lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
+                    || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
+                )
                     lookupName = Path.GetFileNameWithoutExtension(lookupName);
 
                 if (!folderExists)
@@ -86,13 +88,13 @@ namespace OpenNest.IO.Bom
                 .GroupBy(p => new
                 {
                     Material = (p.Item.Material ?? "").ToUpperInvariant(),
-                    Thickness = p.Item.Thickness.Value
+                    Thickness = p.Item.Thickness.Value,
                 })
                 .Select(g => new MaterialGroup
                 {
                     Material = g.First().Item.Material ?? "",
                     Thickness = g.Key.Thickness,
-                    Parts = g.ToList()
+                    Parts = g.ToList(),
                 })
                 .OrderBy(g => g.Material)
                 .ThenBy(g => g.Thickness)

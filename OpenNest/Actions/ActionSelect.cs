@@ -1,8 +1,8 @@
-﻿using OpenNest.Controls;
-using OpenNest.Geometry;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Controls;
+using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
@@ -150,11 +150,7 @@ namespace OpenNest.Actions
 
             e.Graphics.FillRectangle(fillBrush, rect);
 
-            e.Graphics.DrawRectangle(borderPen,
-                rect.X,
-                rect.Y,
-                rect.Width,
-                rect.Height);
+            e.Graphics.DrawRectangle(borderPen, rect.X, rect.Y, rect.Width, rect.Height);
         }
 
         private bool SelectPartAtCurrentPoint()
@@ -168,7 +164,10 @@ namespace OpenNest.Actions
                 return false;
             }
 
-            if (Control.ModifierKeys != Keys.Control && plateView.SelectedParts.Contains(part) == false)
+            if (
+                Control.ModifierKeys != Keys.Control
+                && plateView.SelectedParts.Contains(part) == false
+            )
                 plateView.DeselectAll();
 
             if (plateView.SelectedParts.Contains(part) == false)
@@ -216,18 +215,13 @@ namespace OpenNest.Actions
 
         public SelectionType SelectionType
         {
-            get
-            {
-                return Point1.X < Point2.X
-                    ? SelectionType.Contains
-                    : SelectionType.Intersect;
-            }
+            get { return Point1.X < Point2.X ? SelectionType.Contains : SelectionType.Intersect; }
         }
 
         public enum Status
         {
             SetFirstPoint,
-            SetSecondPoint
+            SetSecondPoint,
         }
     }
 }

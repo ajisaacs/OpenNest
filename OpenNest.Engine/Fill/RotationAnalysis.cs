@@ -1,8 +1,8 @@
+using System.Collections.Generic;
+using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace OpenNest.Engine.Fill
 {
@@ -14,7 +14,8 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         public static double FindBestRotation(NestItem item)
         {
-            var entities = ConvertProgram.ToGeometry(item.Drawing.Program)
+            var entities = ConvertProgram
+                .ToGeometry(item.Drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
 
             var shapes = ShapeBuilder.GetShapes(entities);
@@ -62,7 +63,8 @@ namespace OpenNest.Engine.Fill
 
             foreach (var part in parts)
             {
-                var entities = ConvertProgram.ToGeometry(part.Program)
+                var entities = ConvertProgram
+                    .ToGeometry(part.Program)
                     .Where(e => e.Layer != SpecialLayers.Rapid);
 
                 var shapes = ShapeBuilder.GetShapes(entities);

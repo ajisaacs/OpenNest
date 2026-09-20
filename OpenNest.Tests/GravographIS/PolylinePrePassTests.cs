@@ -108,8 +108,10 @@ public class PolylinePrePassTests
         Assert.Equal(3, reordered.Count);
         var travelBefore = TotalPenUpTravel(inputs);
         var travelAfter = TotalPenUpTravel(reordered);
-        Assert.True(travelAfter < travelBefore,
-            $"Expected reorder to reduce pen-up travel; before={travelBefore}, after={travelAfter}");
+        Assert.True(
+            travelAfter < travelBefore,
+            $"Expected reorder to reduce pen-up travel; before={travelBefore}, after={travelAfter}"
+        );
     }
 
     [Fact]
@@ -150,7 +152,8 @@ public class PolylinePrePassTests
         Vector? last = null;
         foreach (var p in polylines)
         {
-            if (p == null || p.Count < 2) continue;
+            if (p == null || p.Count < 2)
+                continue;
             if (last.HasValue)
             {
                 var dx = p[0].X - last.Value.X;

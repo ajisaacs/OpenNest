@@ -6,14 +6,10 @@ namespace OpenNest.CNC
     public class LinearMove : Motion
     {
         public LinearMove()
-            : this(new Vector())
-        {
-        }
+            : this(new Vector()) { }
 
         public LinearMove(double x, double y)
-            : this(new Vector(x, y))
-        {
-        }
+            : this(new Vector(x, y)) { }
 
         public LinearMove(Vector endPoint)
         {
@@ -34,7 +30,8 @@ namespace OpenNest.CNC
             {
                 Layer = Layer,
                 Suppressed = Suppressed,
-                VariableRefs = VariableRefs != null ? new Dictionary<string, string>(VariableRefs) : null
+                VariableRefs =
+                    VariableRefs != null ? new Dictionary<string, string>(VariableRefs) : null,
             };
         }
 

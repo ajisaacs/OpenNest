@@ -1,9 +1,9 @@
-﻿using OpenNest.Controls;
-using OpenNest.Geometry;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Controls;
+using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
@@ -34,7 +34,7 @@ namespace OpenNest.Actions
             stringFormat = new StringFormat
             {
                 Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
+                LineAlignment = StringAlignment.Center,
             };
 
             SelectedArea = Box.Empty;
@@ -93,15 +93,17 @@ namespace OpenNest.Actions
             var location = plateView.PointWorldToGraph(SelectedArea.Location);
             var size = new SizeF(
                 plateView.LengthWorldToGui(SelectedArea.Length),
-                plateView.LengthWorldToGui(SelectedArea.Width));
+                plateView.LengthWorldToGui(SelectedArea.Width)
+            );
 
-            var rect = new System.Drawing.RectangleF(location.X, location.Y - size.Height, size.Width, size.Height);
+            var rect = new System.Drawing.RectangleF(
+                location.X,
+                location.Y - size.Height,
+                size.Width,
+                size.Height
+            );
 
-            e.Graphics.DrawRectangle(pen,
-                rect.X,
-                rect.Y,
-                rect.Width,
-                rect.Height);
+            e.Graphics.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
 
             e.Graphics.FillRectangle(brush, rect);
 
@@ -110,7 +112,8 @@ namespace OpenNest.Actions
                 font,
                 Brushes.Green,
                 rect,
-                stringFormat);
+                stringFormat
+            );
         }
 
         private void plateView_MouseMove(object sender, System.Windows.Forms.MouseEventArgs e)

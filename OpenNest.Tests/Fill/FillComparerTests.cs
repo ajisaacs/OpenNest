@@ -37,12 +37,12 @@ public class DefaultFillComparerTests
         {
             TestHelpers.MakePartAt(0, 0, 10),
             TestHelpers.MakePartAt(20, 0, 10),
-            TestHelpers.MakePartAt(40, 0, 10)
+            TestHelpers.MakePartAt(40, 0, 10),
         };
         var current = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(20, 0, 10)
+            TestHelpers.MakePartAt(20, 0, 10),
         };
         Assert.True(comparer.IsBetter(candidate, current, workArea));
     }
@@ -53,12 +53,12 @@ public class DefaultFillComparerTests
         var candidate = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(12, 0, 10)
+            TestHelpers.MakePartAt(12, 0, 10),
         };
         var current = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(50, 0, 10)
+            TestHelpers.MakePartAt(50, 0, 10),
         };
         Assert.True(comparer.IsBetter(candidate, current, workArea));
     }
@@ -76,12 +76,12 @@ public class VerticalRemnantComparerTests
         {
             TestHelpers.MakePartAt(0, 0, 10),
             TestHelpers.MakePartAt(40, 0, 10),
-            TestHelpers.MakePartAt(80, 0, 10)
+            TestHelpers.MakePartAt(80, 0, 10),
         };
         var current = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(12, 0, 10)
+            TestHelpers.MakePartAt(12, 0, 10),
         };
         Assert.True(comparer.IsBetter(candidate, current, workArea));
     }
@@ -92,12 +92,12 @@ public class VerticalRemnantComparerTests
         var candidate = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(12, 0, 10)
+            TestHelpers.MakePartAt(12, 0, 10),
         };
         var current = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(50, 0, 10)
+            TestHelpers.MakePartAt(50, 0, 10),
         };
         Assert.True(comparer.IsBetter(candidate, current, workArea));
     }
@@ -108,12 +108,12 @@ public class VerticalRemnantComparerTests
         var candidate = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(40, 0, 10)
+            TestHelpers.MakePartAt(40, 0, 10),
         };
         var current = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(40, 40, 10)
+            TestHelpers.MakePartAt(40, 40, 10),
         };
         Assert.True(comparer.IsBetter(candidate, current, workArea));
     }
@@ -144,12 +144,12 @@ public class HorizontalRemnantComparerTests
         var candidate = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(0, 12, 10)
+            TestHelpers.MakePartAt(0, 12, 10),
         };
         var current = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(0, 50, 10)
+            TestHelpers.MakePartAt(0, 50, 10),
         };
         Assert.True(comparer.IsBetter(candidate, current, workArea));
     }
@@ -161,12 +161,12 @@ public class HorizontalRemnantComparerTests
         {
             TestHelpers.MakePartAt(0, 0, 10),
             TestHelpers.MakePartAt(0, 40, 10),
-            TestHelpers.MakePartAt(0, 80, 10)
+            TestHelpers.MakePartAt(0, 80, 10),
         };
         var current = new List<Part>
         {
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(0, 12, 10)
+            TestHelpers.MakePartAt(0, 12, 10),
         };
         Assert.True(comparer.IsBetter(candidate, current, workArea));
     }

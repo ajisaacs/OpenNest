@@ -2,9 +2,7 @@
 {
     public class Comment : ICode
     {
-        public Comment()
-        {
-        }
+        public Comment() { }
 
         public Comment(string value)
         {

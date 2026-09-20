@@ -1,9 +1,8 @@
-﻿
-namespace OpenNest
+﻿namespace OpenNest
 {
     public enum OffsetSide
     {
         Left,
-        Right
+        Right,
     }
 }

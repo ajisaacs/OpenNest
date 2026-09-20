@@ -12,7 +12,7 @@ namespace OpenNest
         MediaToolbar,
         CommunicationsToolbar,
         BrowserTabBar,
-        HelpBar
+        HelpBar,
     }
 
     /// <summary>Renders a toolstrip using the UxTheme API via VisualStyleRenderer and a specific style.</summary>
@@ -30,7 +30,7 @@ namespace OpenNest
         /// It shouldn't be necessary to P/Invoke like this, however VisualStyleRenderer.GetMargins
         /// misses out a parameter in its own P/Invoke.
         /// </summary>
-        static internal class NativeMethods
+        internal static class NativeMethods
         {
             [StructLayout(LayoutKind.Sequential)]
             public struct MARGINS
@@ -42,7 +42,15 @@ namespace OpenNest
             }
 
             [DllImport("uxtheme.dll")]
-            public extern static int GetThemeMargins(IntPtr hTheme, IntPtr hdc, int iPartId, int iStateId, int iPropId, IntPtr rect, out MARGINS pMargins);
+            public static extern int GetThemeMargins(
+                IntPtr hTheme,
+                IntPtr hdc,
+                int iPartId,
+                int iStateId,
+                int iPropId,
+                IntPtr rect,
+                out MARGINS pMargins
+            );
         }
 
         // See http://msdn2.microsoft.com/en-us/library/bb773210.aspx - "Parts and States"
@@ -68,13 +76,13 @@ namespace OpenNest
             SystemClose = 17,
             SystemMaximize = 18,
             SystemMinimize = 19,
-            SystemRestore = 20
+            SystemRestore = 20,
         }
 
         enum MenuBarStates : int
         {
             Active = 1,
-            Inactive = 2
+            Inactive = 2,
         }
 
         enum MenuBarItemStates : int
@@ -84,7 +92,7 @@ namespace OpenNest
             Pushed = 3,
             Disabled = 4,
             DisabledHover = 5,
-            DisabledPushed = 6
+            DisabledPushed = 6,
         }
 
         enum MenuPopupItemStates : int
@@ -92,7 +100,7 @@ namespace OpenNest
             Normal = 1,
             Hover = 2,
             Disabled = 3,
-            DisabledHover = 4
+            DisabledHover = 4,
         }
 
         enum MenuPopupCheckStates : int
@@ -100,27 +108,27 @@ namespace OpenNest
             CheckmarkNormal = 1,
             CheckmarkDisabled = 2,
             BulletNormal = 3,
-            BulletDisabled = 4
+            BulletDisabled = 4,
         }
 
         enum MenuPopupCheckBackgroundStates : int
         {
             Disabled = 1,
             Normal = 2,
-            Bitmap = 3
+            Bitmap = 3,
         }
 
         enum MenuPopupSubMenuStates : int
         {
             Normal = 1,
-            Disabled = 2
+            Disabled = 2,
         }
 
         enum MarginTypes : int
         {
             Sizing = 3601,
             Content = 3602,
-            Caption = 3603
+            Caption = 3603,
         }
 
         static readonly int RebarBackground = 6;
@@ -131,8 +139,24 @@ namespace OpenNest
             try
             {
                 IntPtr hDC = dc.GetHdc();
-                if (0 == NativeMethods.GetThemeMargins(renderer.Handle, hDC, renderer.Part, renderer.State, (int)marginType, IntPtr.Zero, out margins))
-                    return new Padding(margins.cxLeftWidth, margins.cyTopHeight, margins.cxRightWidth, margins.cyBottomHeight);
+                if (
+                    0
+                    == NativeMethods.GetThemeMargins(
+                        renderer.Handle,
+                        hDC,
+                        renderer.Part,
+                        renderer.State,
+                        (int)marginType,
+                        IntPtr.Zero,
+                        out margins
+                    )
+                )
+                    return new Padding(
+                        margins.cxLeftWidth,
+                        margins.cyTopHeight,
+                        margins.cxRightWidth,
+                        margins.cyBottomHeight
+                    );
                 return new Padding(0);
             }
             finally
@@ -149,46 +173,37 @@ namespace OpenNest
             {
                 if (item.Enabled)
                     return hot ? (int)MenuPopupItemStates.Hover : (int)MenuPopupItemStates.Normal;
-                return hot ? (int)MenuPopupItemStates.DisabledHover : (int)MenuPopupItemStates.Disabled;
+                return hot
+                    ? (int)MenuPopupItemStates.DisabledHover
+                    : (int)MenuPopupItemStates.Disabled;
             }
             else
             {
                 if (item.Pressed)
-                    return item.Enabled ? (int)MenuBarItemStates.Pushed : (int)MenuBarItemStates.DisabledPushed;
+                    return item.Enabled
+                        ? (int)MenuBarItemStates.Pushed
+                        : (int)MenuBarItemStates.DisabledPushed;
                 if (item.Enabled)
                     return hot ? (int)MenuBarItemStates.Hover : (int)MenuBarItemStates.Normal;
                 return hot ? (int)MenuBarItemStates.DisabledHover : (int)MenuBarItemStates.Disabled;
             }
         }
 
-        public ToolbarTheme Theme
-        {
-            get;
-            set;
-        }
+        public ToolbarTheme Theme { get; set; }
 
         private string RebarClass
         {
-            get
-            {
-                return SubclassPrefix + "Rebar";
-            }
+            get { return SubclassPrefix + "Rebar"; }
         }
 
         private string ToolbarClass
         {
-            get
-            {
-                return SubclassPrefix + "ToolBar";
-            }
+            get { return SubclassPrefix + "ToolBar"; }
         }
 
         private string MenuClass
         {
-            get
-            {
-                return SubclassPrefix + "Menu";
-            }
+            get { return SubclassPrefix + "Menu"; }
         }
 
         private string SubclassPrefix
@@ -197,19 +212,27 @@ namespace OpenNest
             {
                 switch (Theme)
                 {
-                    case ToolbarTheme.MediaToolbar: return "Media::";
-                    case ToolbarTheme.CommunicationsToolbar: return "Communications::";
-                    case ToolbarTheme.BrowserTabBar: return "BrowserTabBar::";
-                    case ToolbarTheme.HelpBar: return "Help::";
-                    default: return string.Empty;
+                    case ToolbarTheme.MediaToolbar:
+                        return "Media::";
+                    case ToolbarTheme.CommunicationsToolbar:
+                        return "Communications::";
+                    case ToolbarTheme.BrowserTabBar:
+                        return "BrowserTabBar::";
+                    case ToolbarTheme.HelpBar:
+                        return "Help::";
+                    default:
+                        return string.Empty;
                 }
             }
         }
 
         private VisualStyleElement Subclass(VisualStyleElement element)
         {
-            return VisualStyleElement.CreateElement(SubclassPrefix + element.ClassName,
-                    element.Part, element.State);
+            return VisualStyleElement.CreateElement(
+                SubclassPrefix + element.ClassName,
+                element.Part,
+                element.State
+            );
         }
 
         private bool EnsureRenderer()
@@ -233,8 +256,8 @@ namespace OpenNest
         }
 
         // Using just ToolStripManager.Renderer without setting the Renderer individually per ToolStrip means
-        // that the ToolStrip is not passed to the Initialize method. ToolStripPanels, however, are. So we can 
-        // simply initialize it here too, and this should guarantee that the ToolStrip is initialized at least 
+        // that the ToolStrip is not passed to the Initialize method. ToolStripPanels, however, are. So we can
+        // simply initialize it here too, and this should guarantee that the ToolStrip is initialized at least
         // once. Hopefully it isn't any more complicated than this.
         protected override void InitializePanel(ToolStripPanel toolStripPanel)
         {
@@ -260,7 +283,11 @@ namespace OpenNest
                     insideRect.Inflate(-1, -1);
                     e.Graphics.ExcludeClip(insideRect);
 
-                    renderer.DrawBackground(e.Graphics, e.ToolStrip.ClientRectangle, e.AffectedBounds);
+                    renderer.DrawBackground(
+                        e.Graphics,
+                        e.ToolStrip.ClientRectangle,
+                        e.AffectedBounds
+                    );
 
                     // Restore the old clip in case the Graphics is used again (does that ever happen?)
                     e.Graphics.Clip = oldClip;
@@ -281,7 +308,7 @@ namespace OpenNest
             // This ensures that's the case.
             Rectangle rect = item.Bounds;
 
-            // The background rectangle should be inset two pixels horizontally (on both sides), but we have 
+            // The background rectangle should be inset two pixels horizontally (on both sides), but we have
             // to take into account the border.
             rect.X = item.ContentRectangle.X + 1;
             rect.Width = item.ContentRectangle.Width - 1;
@@ -295,7 +322,9 @@ namespace OpenNest
         {
             if (EnsureRenderer())
             {
-                int partID = e.Item.IsOnDropDown ? (int)MenuParts.PopupItem : (int)MenuParts.BarItem;
+                int partID = e.Item.IsOnDropDown
+                    ? (int)MenuParts.PopupItem
+                    : (int)MenuParts.BarItem;
                 renderer.SetParameters(MenuClass, partID, GetItemState(e.Item));
 
                 Rectangle bgRect = GetBackgroundRectangle(e.Item);
@@ -313,7 +342,11 @@ namespace OpenNest
             {
                 // Draw the background using Rebar & RP_BACKGROUND (or, if that is not available, fall back to
                 // Rebar.Band.Normal)
-                if (VisualStyleRenderer.IsElementDefined(VisualStyleElement.CreateElement(RebarClass, RebarBackground, 0)))
+                if (
+                    VisualStyleRenderer.IsElementDefined(
+                        VisualStyleElement.CreateElement(RebarClass, RebarBackground, 0)
+                    )
+                )
                 {
                     renderer.SetParameters(RebarClass, RebarBackground, 0);
                 }
@@ -323,7 +356,11 @@ namespace OpenNest
                 }
 
                 if (renderer.IsBackgroundPartiallyTransparent())
-                    renderer.DrawParentBackground(e.Graphics, e.ToolStripPanel.ClientRectangle, e.ToolStripPanel);
+                    renderer.DrawParentBackground(
+                        e.Graphics,
+                        e.ToolStripPanel.ClientRectangle,
+                        e.ToolStripPanel
+                    );
 
                 renderer.DrawBackground(e.Graphics, e.ToolStripPanel.ClientRectangle);
 
@@ -336,7 +373,9 @@ namespace OpenNest
         }
 
         // Render the background of an actual menu bar, dropdown menu or toolbar.
-        protected override void OnRenderToolStripBackground(System.Windows.Forms.ToolStripRenderEventArgs e)
+        protected override void OnRenderToolStripBackground(
+            System.Windows.Forms.ToolStripRenderEventArgs e
+        )
         {
             if (EnsureRenderer())
             {
@@ -361,7 +400,11 @@ namespace OpenNest
                         // A lone toolbar/menubar should act like it's inside a toolbox, I guess.
                         // Maybe I should use the MenuClass in the case of a MenuStrip, although that would break
                         // the other themes...
-                        if (VisualStyleRenderer.IsElementDefined(VisualStyleElement.CreateElement(RebarClass, RebarBackground, 0)))
+                        if (
+                            VisualStyleRenderer.IsElementDefined(
+                                VisualStyleElement.CreateElement(RebarClass, RebarBackground, 0)
+                            )
+                        )
                             renderer.SetParameters(RebarClass, RebarBackground, 0);
                         else
                             renderer.SetParameters(RebarClass, 0, 0);
@@ -369,7 +412,11 @@ namespace OpenNest
                 }
 
                 if (renderer.IsBackgroundPartiallyTransparent())
-                    renderer.DrawParentBackground(e.Graphics, e.ToolStrip.ClientRectangle, e.ToolStrip);
+                    renderer.DrawParentBackground(
+                        e.Graphics,
+                        e.ToolStrip.ClientRectangle,
+                        e.ToolStrip
+                    );
 
                 renderer.DrawBackground(e.Graphics, e.ToolStrip.ClientRectangle, e.AffectedBounds);
             }
@@ -389,7 +436,15 @@ namespace OpenNest
                 base.OnRenderSplitButtonBackground(e);
 
                 // It doesn't matter what colour of arrow we tell it to draw. OnRenderArrow will compute it from the item anyway.
-                OnRenderArrow(new ToolStripArrowRenderEventArgs(e.Graphics, sb, sb.DropDownButtonBounds, Color.Red, ArrowDirection.Down));
+                OnRenderArrow(
+                    new ToolStripArrowRenderEventArgs(
+                        e.Graphics,
+                        sb,
+                        sb.DropDownButtonBounds,
+                        Color.Red,
+                        ArrowDirection.Down
+                    )
+                );
             }
             else
             {
@@ -425,7 +480,14 @@ namespace OpenNest
                     // do that anyway.)
                     // Using the DisplayRectangle gets roughly the right size so that the separator is closer to the text.
                     Padding margins = GetThemeMargins(e.Graphics, MarginTypes.Sizing);
-                    int extraWidth = (e.ToolStrip.Width - e.ToolStrip.DisplayRectangle.Width - margins.Left - margins.Right - 1) - e.AffectedBounds.Width;
+                    int extraWidth =
+                        (
+                            e.ToolStrip.Width
+                            - e.ToolStrip.DisplayRectangle.Width
+                            - margins.Left
+                            - margins.Right
+                            - 1
+                        ) - e.AffectedBounds.Width;
                     Rectangle rect = e.AffectedBounds;
                     rect.Y += 2;
                     rect.Height -= 4;
@@ -437,7 +499,12 @@ namespace OpenNest
                     }
                     else
                     {
-                        rect = new Rectangle(rect.Width + extraWidth - sepWidth, rect.Y, sepWidth, rect.Height);
+                        rect = new Rectangle(
+                            rect.Width + extraWidth - sepWidth,
+                            rect.Y,
+                            sepWidth,
+                            rect.Height
+                        );
                     }
                     renderer.DrawBackground(e.Graphics, rect);
                 }
@@ -453,16 +520,23 @@ namespace OpenNest
             if (e.ToolStrip.IsDropDown && EnsureRenderer())
             {
                 renderer.SetParameters(MenuClass, (int)MenuParts.PopupSeparator, 0);
-                Rectangle rect = new Rectangle(e.ToolStrip.DisplayRectangle.Left, 0, e.ToolStrip.DisplayRectangle.Width, e.Item.Height);
+                Rectangle rect = new Rectangle(
+                    e.ToolStrip.DisplayRectangle.Left,
+                    0,
+                    e.ToolStrip.DisplayRectangle.Width,
+                    e.Item.Height
+                );
                 renderer.DrawBackground(e.Graphics, rect, rect);
             }
             else
             {
-                e.Graphics.DrawLine(Pens.LightGray,
+                e.Graphics.DrawLine(
+                    Pens.LightGray,
                     e.Item.ContentRectangle.X,
                     e.Item.ContentRectangle.Y,
                     e.Item.ContentRectangle.X,
-                    e.Item.ContentRectangle.Y + e.Item.Height - 6);
+                    e.Item.ContentRectangle.Y + e.Item.Height - 6
+                );
             }
         }
 
@@ -475,9 +549,20 @@ namespace OpenNest
 
                 // Now, mirror its position if the menu item is RTL.
                 if (e.Item.RightToLeft == RightToLeft.Yes)
-                    bgRect = new Rectangle(e.ToolStrip.ClientSize.Width - bgRect.X - bgRect.Width, bgRect.Y, bgRect.Width, bgRect.Height);
+                    bgRect = new Rectangle(
+                        e.ToolStrip.ClientSize.Width - bgRect.X - bgRect.Width,
+                        bgRect.Y,
+                        bgRect.Width,
+                        bgRect.Height
+                    );
 
-                renderer.SetParameters(MenuClass, (int)MenuParts.PopupCheckBackground, e.Item.Enabled ? (int)MenuPopupCheckBackgroundStates.Normal : (int)MenuPopupCheckBackgroundStates.Disabled);
+                renderer.SetParameters(
+                    MenuClass,
+                    (int)MenuParts.PopupCheckBackground,
+                    e.Item.Enabled
+                        ? (int)MenuPopupCheckBackgroundStates.Normal
+                        : (int)MenuPopupCheckBackgroundStates.Disabled
+                );
                 renderer.DrawBackground(e.Graphics, bgRect);
 
                 Rectangle checkRect = e.ImageRectangle;
@@ -485,7 +570,13 @@ namespace OpenNest
                 checkRect.Y = bgRect.Y + bgRect.Height / 2 - checkRect.Height / 2;
 
                 // I don't think ToolStrip even supports radio box items, so no need to render them.
-                renderer.SetParameters(MenuClass, (int)MenuParts.PopupCheck, e.Item.Enabled ? (int)MenuPopupCheckStates.CheckmarkNormal : (int)MenuPopupCheckStates.CheckmarkDisabled);
+                renderer.SetParameters(
+                    MenuClass,
+                    (int)MenuParts.PopupCheck,
+                    e.Item.Enabled
+                        ? (int)MenuPopupCheckStates.CheckmarkNormal
+                        : (int)MenuPopupCheckStates.CheckmarkDisabled
+                );
 
                 renderer.DrawBackground(e.Graphics, checkRect);
             }
@@ -519,7 +610,11 @@ namespace OpenNest
                 else if (e.Item.Selected)
                     state = VisualStyleElement.Rebar.Chevron.Hot.State;
 
-                renderer.SetParameters(rebarClass, VisualStyleElement.Rebar.Chevron.Normal.Part, state);
+                renderer.SetParameters(
+                    rebarClass,
+                    VisualStyleElement.Rebar.Chevron.Normal.Part,
+                    state
+                );
                 renderer.DrawBackground(e.Graphics, new Rectangle(Point.Empty, e.Item.Size));
             }
             else
@@ -536,11 +631,13 @@ namespace OpenNest
                     return false;
 
                 // Needs a more robust check. It seems mono supports very different style sets.
-                return
-                        VisualStyleRenderer.IsElementDefined(
-                                VisualStyleElement.CreateElement("Menu",
-                                        (int)MenuParts.BarBackground,
-                                        (int)MenuBarStates.Active));
+                return VisualStyleRenderer.IsElementDefined(
+                    VisualStyleElement.CreateElement(
+                        "Menu",
+                        (int)MenuParts.BarBackground,
+                        (int)MenuBarStates.Active
+                    )
+                );
             }
         }
     }

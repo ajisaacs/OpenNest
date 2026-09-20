@@ -17,8 +17,11 @@ public class PlateNesterParityTests
     private static readonly Size PlateSize = new(30, 50);
     private static readonly Spacing Edge = new(1, 1, 1, 1);
 
-    private static NestJob Job(IReadOnlyList<NestJobPart> parts, int? stockQuantity = 3,
-        string strategy = "Default")
+    private static NestJob Job(
+        IReadOnlyList<NestJobPart> parts,
+        int? stockQuantity = 3,
+        string strategy = "Default"
+    )
     {
         var stock = new NestPlateStock("stock", PlateSize, stockQuantity, 1, Edge);
         return new NestJob(parts, new[] { stock }, new NestJobOptions(strategy));
@@ -45,8 +48,10 @@ public class PlateNesterParityTests
                 Assert.Equal(lSorted[j].PartId, rSorted[j].PartId);
                 Assert.Equal(lSorted[j].X, rSorted[j].X, 6);
                 Assert.Equal(lSorted[j].Y, rSorted[j].Y, 6);
-                Assert.True(AnglesEqual(lSorted[j].Rotation, rSorted[j].Rotation),
-                    $"rotation differs: {lSorted[j].Rotation} vs {rSorted[j].Rotation}");
+                Assert.True(
+                    AnglesEqual(lSorted[j].Rotation, rSorted[j].Rotation),
+                    $"rotation differs: {lSorted[j].Rotation} vs {rSorted[j].Rotation}"
+                );
             }
         }
     }
@@ -54,8 +59,8 @@ public class PlateNesterParityTests
     private static bool AnglesEqual(double left, double right)
     {
         var delta = (left - right) % (System.Math.PI * 2);
-        return System.Math.Abs(delta) <= Tolerance ||
-            System.Math.Abs(System.Math.Abs(delta) - System.Math.PI * 2) <= Tolerance;
+        return System.Math.Abs(delta) <= Tolerance
+            || System.Math.Abs(System.Math.Abs(delta) - System.Math.PI * 2) <= Tolerance;
     }
 
     [Fact]
@@ -63,18 +68,32 @@ public class PlateNesterParityTests
     {
         var parts = new[]
         {
-            new NestJobPart("a", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)), 4),
-            new NestJobPart("b", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 3)), 3)
+            new NestJobPart(
+                "a",
+                PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
+                4
+            ),
+            new NestJobPart(
+                "b",
+                PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 3)),
+                3
+            ),
         };
 
-        var legacy = Solve(new LegacyPlateNesterAdapter(plate => new DefaultNestEngine(plate)), Job(parts));
+        var legacy = Solve(
+            new LegacyPlateNesterAdapter(plate => new DefaultNestEngine(plate)),
+            Job(parts)
+        );
         var migrated = Solve(new DefaultPlateNester(), Job(parts));
 
         Assert.Equal(legacy.Status, migrated.Status);
         Assert.Equal(NestJobStatus.Complete, migrated.Status);
         Assert.Equal(ByPart(legacy), ByPart(migrated));
         foreach (var usage in legacy.StockUsage)
-            Assert.Equal(usage.Used, migrated.StockUsage.First(u => u.StockId == usage.StockId).Used);
+            Assert.Equal(
+                usage.Used,
+                migrated.StockUsage.First(u => u.StockId == usage.StockId).Used
+            );
         // Automatic-rotation rectangles on a single stock size are deterministic: identical layouts.
         AssertLayoutsIdentical(legacy, migrated);
     }
@@ -84,19 +103,31 @@ public class PlateNesterParityTests
     {
         var parts = new[]
         {
-            new NestJobPart("a", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)), 4),
-            new NestJobPart("b", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 3)), 3)
+            new NestJobPart(
+                "a",
+                PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
+                4
+            ),
+            new NestJobPart(
+                "b",
+                PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 3)),
+                3
+            ),
         };
 
-        var legacy = Solve(new LegacyPlateNesterAdapter(plate => new StripNestEngine(plate)),
-            Job(parts, strategy: "Strip"));
+        var legacy = Solve(
+            new LegacyPlateNesterAdapter(plate => new StripNestEngine(plate)),
+            Job(parts, strategy: "Strip")
+        );
         var migrated = Solve(new StripPlateNester(), Job(parts, strategy: "Strip"));
 
         Assert.Equal(legacy.Status, migrated.Status);
         Assert.Equal(NestJobStatus.Complete, migrated.Status);
         Assert.Equal(ByPart(legacy), ByPart(migrated));
-        Assert.Equal(legacy.Plates.SelectMany(p => p.Placements).Count(),
-            migrated.Plates.SelectMany(p => p.Placements).Count());
+        Assert.Equal(
+            legacy.Plates.SelectMany(p => p.Placements).Count(),
+            migrated.Plates.SelectMany(p => p.Placements).Count()
+        );
         // Shrink-fill ordering can differ between engine instances; do not assert identical coordinates.
     }
 
@@ -125,7 +156,11 @@ public class PlateNesterParityTests
         var parts = new[]
         {
             new NestJobPart("l", PartGeometrySnapshot.FromProgram(lshape), 3),
-            new NestJobPart("sq", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 3)), 2)
+            new NestJobPart(
+                "sq",
+                PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 3)),
+                2
+            ),
         };
         var result = Solve(new DefaultPlateNester(), Job(parts));
 
@@ -161,7 +196,7 @@ public class PlateNesterParityTests
         var parts = new[]
         {
             new NestJobPart("holed", PartGeometrySnapshot.FromProgram(holed), 2),
-            new NestJobPart("arc", PartGeometrySnapshot.FromProgram(arc), 2)
+            new NestJobPart("arc", PartGeometrySnapshot.FromProgram(arc), 2),
         };
         var result = Solve(new DefaultPlateNester(), Job(parts));
 
@@ -173,15 +208,22 @@ public class PlateNesterParityTests
     [Fact]
     public void FixedRotation_Respected()
     {
-        var part = new NestJobPart("fixed", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
-            2, rotation: RotationPolicy.Fixed(0));
+        var part = new NestJobPart(
+            "fixed",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
+            2,
+            rotation: RotationPolicy.Fixed(0)
+        );
         var result = Solve(new DefaultPlateNester(), Job(new[] { part }));
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         var placements = result.Plates.SelectMany(p => p.Placements).ToList();
         Assert.Equal(2, placements.Count);
         foreach (var placement in placements)
-            Assert.True(AnglesEqual(placement.Rotation, 0), $"fixed rotation violated: {placement.Rotation}");
+            Assert.True(
+                AnglesEqual(placement.Rotation, 0),
+                $"fixed rotation violated: {placement.Rotation}"
+            );
     }
 
     [Fact]
@@ -192,7 +234,7 @@ public class PlateNesterParityTests
         var parts = new[]
         {
             new NestJobPart("first", PartGeometrySnapshot.FromProgram(program), 2),
-            new NestJobPart("second", PartGeometrySnapshot.FromProgram(program), 1)
+            new NestJobPart("second", PartGeometrySnapshot.FromProgram(program), 1),
         };
         var result = Solve(new DefaultPlateNester(), Job(parts));
 
@@ -229,10 +271,16 @@ public class PlateNesterParityTests
         // 14x9 parts on 30x20: one sheet holds fewer than five, so the runner runs multiple candidate
         // trials through the same nester instance. The run-scoped drawing cache must keep producing
         // valid, correctly-attributed placements across trials.
-        var part = new NestJobPart("p", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(14, 9)), 5);
+        var part = new NestJobPart(
+            "p",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(14, 9)),
+            5
+        );
         var stock = new NestPlateStock("stock", new Size(30, 20), 3);
         var nester = new DefaultPlateNester();
-        var result = new NestJobRunner(_ => nester).Solve(new NestJob(new[] { part }, new[] { stock }));
+        var result = new NestJobRunner(_ => nester).Solve(
+            new NestJob(new[] { part }, new[] { stock })
+        );
 
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(5, result.Fulfillment.Single(f => f.PartId == "p").Placed);
@@ -246,10 +294,17 @@ public class PlateNesterParityTests
     public void LegacyRemnantStrategies_StillResolveThroughAdapter()
     {
         // Remnant strategies must keep working through the legacy adapter after the factory change.
-        var part = new NestJobPart("p", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)), 2);
+        var part = new NestJobPart(
+            "p",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
+            2
+        );
         foreach (var strategy in new[] { "Vertical Remnant", "Horizontal Remnant" })
         {
-            var result = Solve(PlateNesterFactory.Create(strategy), Job(new[] { part }, strategy: strategy));
+            var result = Solve(
+                PlateNesterFactory.Create(strategy),
+                Job(new[] { part }, strategy: strategy)
+            );
             Assert.Equal(NestJobStatus.Complete, result.Status);
             Assert.Equal(2, result.Fulfillment.Single(f => f.PartId == "p").Placed);
         }

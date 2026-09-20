@@ -42,7 +42,12 @@ namespace OpenNest.IO
             return width;
         }
 
-        public List<Entity> RenderText(string text, double height, Vector position, Layer layer = null)
+        public List<Entity> RenderText(
+            string text,
+            double height,
+            Vector position,
+            Layer layer = null
+        )
         {
             var scale = height / CapHeight;
             var entities = new List<Entity>();
@@ -97,7 +102,8 @@ namespace OpenNest.IO
             while (i + 5 < data.Length)
             {
                 var charCode = data[i] | (data[i + 1] << 8);
-                var offset = data[i + 2] | (data[i + 3] << 8) | (data[i + 4] << 16) | (data[i + 5] << 24);
+                var offset =
+                    data[i + 2] | (data[i + 3] << 8) | (data[i + 4] << 16) | (data[i + 5] << 24);
 
                 if (charCode < 0x20 || offset == 0 || offset >= data.Length)
                     break;
@@ -110,9 +116,10 @@ namespace OpenNest.IO
             {
                 var (charCode, offset) = charTable[c];
 
-                var nextOffset = c + 1 < charTable.Count
-                    ? FindNextOffset(charTable, offset, data.Length)
-                    : data.Length;
+                var nextOffset =
+                    c + 1 < charTable.Count
+                        ? FindNextOffset(charTable, offset, data.Length)
+                        : data.Length;
 
                 var glyph = ParseGlyph(data, offset, nextOffset);
                 if (glyph != null)
@@ -134,7 +141,11 @@ namespace OpenNest.IO
             return font;
         }
 
-        private static int FindNextOffset(List<(int charCode, int offset)> table, int currentOffset, int fileLength)
+        private static int FindNextOffset(
+            List<(int charCode, int offset)> table,
+            int currentOffset,
+            int fileLength
+        )
         {
             var best = fileLength;
             foreach (var (_, off) in table)
@@ -199,7 +210,8 @@ namespace OpenNest.IO
         private static int ReadBE16(byte[] data, int offset)
         {
             var val = (data[offset] << 8) | data[offset + 1];
-            if (val > 32767) val -= 65536;
+            if (val > 32767)
+                val -= 65536;
             return val;
         }
     }
@@ -234,19 +246,26 @@ namespace OpenNest.IO
 
         private const int ArcSamples = 16;
 
-        public List<Entity> ToEntities(double scale, double offsetX, double offsetY, Layer layer = null)
+        public List<Entity> ToEntities(
+            double scale,
+            double offsetX,
+            double offsetY,
+            Layer layer = null
+        )
         {
             var entities = new List<Entity>();
             layer ??= Layer.Default;
 
             foreach (var stroke in Strokes)
             {
-                if (stroke.Count < 2) continue;
+                if (stroke.Count < 2)
+                    continue;
 
                 var segments = BuildSegments(stroke);
                 foreach (var seg in segments)
                 {
-                    if (seg.Points.Count < 2) continue;
+                    if (seg.Points.Count < 2)
+                        continue;
 
                     var scaled = new List<Vector>(seg.Points.Count);
                     foreach (var pt in seg.Points)
@@ -324,14 +343,23 @@ namespace OpenNest.IO
             public bool HasCurves;
         }
 
-        private static void SampleCircularArc(List<Vector> output, Vector p0, Vector pMid, Vector p1, int samples)
+        private static void SampleCircularArc(
+            List<Vector> output,
+            Vector p0,
+            Vector pMid,
+            Vector p1,
+            int samples
+        )
         {
             if (output.Count == 0 || output[^1].DistanceTo(p0) > 0.01)
                 output.Add(p0);
 
-            double ax = p0.X, ay = p0.Y;
-            double bx = pMid.X, by = pMid.Y;
-            double cx = p1.X, cy = p1.Y;
+            double ax = p0.X,
+                ay = p0.Y;
+            double bx = pMid.X,
+                by = pMid.Y;
+            double cx = p1.X,
+                cy = p1.Y;
 
             var d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
 
@@ -342,8 +370,18 @@ namespace OpenNest.IO
                 return;
             }
 
-            var ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d;
-            var uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d;
+            var ux =
+                (
+                    (ax * ax + ay * ay) * (by - cy)
+                    + (bx * bx + by * by) * (cy - ay)
+                    + (cx * cx + cy * cy) * (ay - by)
+                ) / d;
+            var uy =
+                (
+                    (ax * ax + ay * ay) * (cx - bx)
+                    + (bx * bx + by * by) * (ax - cx)
+                    + (cx * cx + cy * cy) * (bx - ax)
+                ) / d;
             var radius = System.Math.Sqrt((ax - ux) * (ax - ux) + (ay - uy) * (ay - uy));
 
             var a0 = System.Math.Atan2(ay - uy, ax - ux);
@@ -351,10 +389,12 @@ namespace OpenNest.IO
             var a1 = System.Math.Atan2(cy - uy, cx - ux);
 
             var ccwSweep = a1 - a0;
-            while (ccwSweep <= 0) ccwSweep += 2 * System.Math.PI;
+            while (ccwSweep <= 0)
+                ccwSweep += 2 * System.Math.PI;
 
             var midRel = am - a0;
-            while (midRel < 0) midRel += 2 * System.Math.PI;
+            while (midRel < 0)
+                midRel += 2 * System.Math.PI;
 
             var sweep = midRel < ccwSweep ? ccwSweep : ccwSweep - 2 * System.Math.PI;
 
@@ -362,7 +402,12 @@ namespace OpenNest.IO
             {
                 var t = (double)i / samples;
                 var angle = a0 + sweep * t;
-                output.Add(new Vector(ux + radius * System.Math.Cos(angle), uy + radius * System.Math.Sin(angle)));
+                output.Add(
+                    new Vector(
+                        ux + radius * System.Math.Cos(angle),
+                        uy + radius * System.Math.Sin(angle)
+                    )
+                );
             }
         }
     }

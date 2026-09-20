@@ -30,17 +30,13 @@ namespace OpenNest.Training.Data
             modelBuilder.Entity<TrainingRun>(e =>
             {
                 e.HasIndex(r => r.PartId).HasDatabaseName("idx_runs_partid");
-                e.HasOne(r => r.Part)
-                    .WithMany(p => p.Runs)
-                    .HasForeignKey(r => r.PartId);
+                e.HasOne(r => r.Part).WithMany(p => p.Runs).HasForeignKey(r => r.PartId);
             });
 
             modelBuilder.Entity<TrainingAngleResult>(e =>
             {
                 e.HasIndex(a => a.RunId).HasDatabaseName("idx_angleresults_runid");
-                e.HasOne(a => a.Run)
-                    .WithMany(r => r.AngleResults)
-                    .HasForeignKey(a => a.RunId);
+                e.HasOne(a => a.Run).WithMany(r => r.AngleResults).HasForeignKey(a => a.RunId);
             });
         }
     }

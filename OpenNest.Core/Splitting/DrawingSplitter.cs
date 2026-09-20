@@ -10,7 +10,11 @@ namespace OpenNest;
 /// </summary>
 public static class DrawingSplitter
 {
-    public static List<Drawing> Split(Drawing drawing, List<SplitLine> splitLines, SplitParameters parameters)
+    public static List<Drawing> Split(
+        Drawing drawing,
+        List<SplitLine> splitLines,
+        SplitParameters parameters
+    )
     {
         if (splitLines.Count == 0)
             return new List<Drawing> { drawing };
@@ -35,8 +39,8 @@ public static class DrawingSplitter
         // Polygonize cutouts once. Used for trimming feature edges (so cut lines
         // don't travel through a cutout interior) and for hole/containment tests
         // in the final component-assembly pass.
-        var cutoutPolygons = profile.Cutouts
-            .Select(c => c.ToPolygon())
+        var cutoutPolygons = profile
+            .Cutouts.Select(c => c.ToPolygon())
             .Where(p => p != null)
             .ToList();
 
@@ -45,7 +49,14 @@ public static class DrawingSplitter
 
         foreach (var region in regions)
         {
-            var pieceEntities = ClipPerimeterToRegion(perimeter, region, sortedLines, feature, parameters, cutoutPolygons);
+            var pieceEntities = ClipPerimeterToRegion(
+                perimeter,
+                region,
+                sortedLines,
+                feature,
+                parameters,
+                cutoutPolygons
+            );
             if (pieceEntities.Count == 0)
                 continue;
 
@@ -72,13 +83,18 @@ public static class DrawingSplitter
 
     private static ShapeProfile BuildProfile(Drawing drawing)
     {
-        var entities = ConvertProgram.ToGeometry(drawing.Program)
+        var entities = ConvertProgram
+            .ToGeometry(drawing.Program)
             .Where(e => e.Layer != SpecialLayers.Rapid)
             .ToList();
         return new ShapeProfile(entities);
     }
 
-    private static List<Entity> CollectCutouts(List<Shape> cutouts, Box region, List<SplitLine> splitLines)
+    private static List<Entity> CollectCutouts(
+        List<Shape> cutouts,
+        Box region,
+        List<SplitLine> splitLines
+    )
     {
         var entities = new List<Entity>();
         foreach (var cutout in cutouts)
@@ -95,7 +111,12 @@ public static class DrawingSplitter
         return entities;
     }
 
-    private static Drawing BuildPieceDrawing(Drawing source, List<Entity> entities, int pieceIndex, Box region)
+    private static Drawing BuildPieceDrawing(
+        Drawing source,
+        List<Entity> entities,
+        int pieceIndex,
+        Box region
+    )
     {
         var pieceBounds = entities.Select(e => e.BoundingBox).ToList().GetBoundingBox();
         var offsetX = -pieceBounds.X;
@@ -123,15 +144,23 @@ public static class DrawingSplitter
                 if (clipped == null)
                     continue;
 
-                piece.Bends.Add(new Bending.Bend
-                {
-                    StartPoint = new Vector(clipped.Value.Start.X + offsetX, clipped.Value.Start.Y + offsetY),
-                    EndPoint = new Vector(clipped.Value.End.X + offsetX, clipped.Value.End.Y + offsetY),
-                    Direction = bend.Direction,
-                    Angle = bend.Angle,
-                    Radius = bend.Radius,
-                    NoteText = bend.NoteText,
-                });
+                piece.Bends.Add(
+                    new Bending.Bend
+                    {
+                        StartPoint = new Vector(
+                            clipped.Value.Start.X + offsetX,
+                            clipped.Value.Start.Y + offsetY
+                        ),
+                        EndPoint = new Vector(
+                            clipped.Value.End.X + offsetX,
+                            clipped.Value.End.Y + offsetY
+                        ),
+                        Direction = bend.Direction,
+                        Angle = bend.Angle,
+                        Radius = bend.Radius,
+                        NoteText = bend.NoteText,
+                    }
+                );
             }
         }
 
@@ -146,10 +175,17 @@ public static class DrawingSplitter
     {
         var dx = end.X - start.X;
         var dy = end.Y - start.Y;
-        double t0 = 0, t1 = 1;
+        double t0 = 0,
+            t1 = 1;
 
         double[] p = { -dx, dx, -dy, dy };
-        double[] q = { start.X - box.Left, box.Right - start.X, start.Y - box.Bottom, box.Top - start.Y };
+        double[] q =
+        {
+            start.X - box.Left,
+            box.Right - start.X,
+            start.Y - box.Bottom,
+            box.Top - start.Y,
+        };
 
         for (var i = 0; i < 4; i++)
         {
@@ -190,7 +226,12 @@ public static class DrawingSplitter
             if (shape.Entities[i] is Circle circle)
             {
                 var arc1 = new Arc(circle.Center, circle.Radius, 0, System.Math.PI);
-                var arc2 = new Arc(circle.Center, circle.Radius, System.Math.PI, System.Math.PI * 2);
+                var arc2 = new Arc(
+                    circle.Center,
+                    circle.Radius,
+                    System.Math.PI,
+                    System.Math.PI * 2
+                );
                 shape.Entities.RemoveAt(i);
                 shape.Entities.Insert(i, arc2);
                 shape.Entities.Insert(i, arc1);
@@ -202,15 +243,21 @@ public static class DrawingSplitter
     {
         return line.Axis == CutOffAxis.Vertical
             ? line.Position > bounds.Left + OpenNest.Math.Tolerance.Epsilon
-              && line.Position < bounds.Right - OpenNest.Math.Tolerance.Epsilon
+                && line.Position < bounds.Right - OpenNest.Math.Tolerance.Epsilon
             : line.Position > bounds.Bottom + OpenNest.Math.Tolerance.Epsilon
-              && line.Position < bounds.Top - OpenNest.Math.Tolerance.Epsilon;
+                && line.Position < bounds.Top - OpenNest.Math.Tolerance.Epsilon;
     }
 
     private static List<Box> BuildClipRegions(List<SplitLine> sortedLines, Box bounds)
     {
-        var verticals = sortedLines.Where(l => l.Axis == CutOffAxis.Vertical).OrderBy(l => l.Position).ToList();
-        var horizontals = sortedLines.Where(l => l.Axis == CutOffAxis.Horizontal).OrderBy(l => l.Position).ToList();
+        var verticals = sortedLines
+            .Where(l => l.Axis == CutOffAxis.Vertical)
+            .OrderBy(l => l.Position)
+            .ToList();
+        var horizontals = sortedLines
+            .Where(l => l.Axis == CutOffAxis.Horizontal)
+            .OrderBy(l => l.Position)
+            .ToList();
 
         var xEdges = new List<double> { bounds.Left };
         xEdges.AddRange(verticals.Select(v => v.Position));
@@ -222,8 +269,15 @@ public static class DrawingSplitter
 
         var regions = new List<Box>();
         for (var yi = 0; yi < yEdges.Count - 1; yi++)
-            for (var xi = 0; xi < xEdges.Count - 1; xi++)
-                regions.Add(new Box(xEdges[xi], yEdges[yi], xEdges[xi + 1] - xEdges[xi], yEdges[yi + 1] - yEdges[yi]));
+        for (var xi = 0; xi < xEdges.Count - 1; xi++)
+            regions.Add(
+                new Box(
+                    xEdges[xi],
+                    yEdges[yi],
+                    xEdges[xi + 1] - xEdges[xi],
+                    yEdges[yi + 1] - yEdges[yi]
+                )
+            );
 
         return regions;
     }
@@ -232,9 +286,14 @@ public static class DrawingSplitter
     /// Clip perimeter to a region by walking entities, splitting at split line crossings,
     /// and stitching in feature edges. No polygon clipping library needed.
     /// </summary>
-    private static List<Entity> ClipPerimeterToRegion(Shape perimeter, Box region,
-        List<SplitLine> splitLines, ISplitFeature feature, SplitParameters parameters,
-        List<Polygon> cutoutPolygons)
+    private static List<Entity> ClipPerimeterToRegion(
+        Shape perimeter,
+        Box region,
+        List<SplitLine> splitLines,
+        ISplitFeature feature,
+        SplitParameters parameters,
+        List<Polygon> cutoutPolygons
+    )
     {
         var boundarySplitLines = GetBoundarySplitLines(region, splitLines);
         var entities = new List<Entity>();
@@ -245,7 +304,14 @@ public static class DrawingSplitter
         if (entities.Count == 0)
             return new List<Entity>();
 
-        InsertFeatureEdges(entities, region, boundarySplitLines, feature, parameters, cutoutPolygons);
+        InsertFeatureEdges(
+            entities,
+            region,
+            boundarySplitLines,
+            feature,
+            parameters,
+            cutoutPolygons
+        );
         // Winding is handled later in AssemblePieces, once connected components
         // are known. At this stage the piece may still be multiple disjoint loops.
         return entities;
@@ -256,8 +322,10 @@ public static class DrawingSplitter
         if (entity is Line line)
         {
             var clipped = ClipLineToBox(line.StartPoint, line.EndPoint, region);
-            if (clipped == null) return;
-            if (clipped.Value.Start.DistanceTo(clipped.Value.End) < Math.Tolerance.Epsilon) return;
+            if (clipped == null)
+                return;
+            if (clipped.Value.Start.DistanceTo(clipped.Value.End) < Math.Tolerance.Epsilon)
+                return;
             entities.Add(new Line(clipped.Value.Start, clipped.Value.End));
             return;
         }
@@ -279,10 +347,13 @@ public static class DrawingSplitter
     {
         var edges = new[]
         {
-            new Line(new Vector(region.Left, region.Bottom), new Vector(region.Right, region.Bottom)),
+            new Line(
+                new Vector(region.Left, region.Bottom),
+                new Vector(region.Right, region.Bottom)
+            ),
             new Line(new Vector(region.Right, region.Bottom), new Vector(region.Right, region.Top)),
             new Line(new Vector(region.Right, region.Top), new Vector(region.Left, region.Top)),
-            new Line(new Vector(region.Left, region.Top), new Vector(region.Left, region.Bottom))
+            new Line(new Vector(region.Left, region.Top), new Vector(region.Left, region.Bottom)),
         };
 
         var arcs = new List<Arc> { arc };
@@ -308,7 +379,11 @@ public static class DrawingSplitter
                     foreach (var w in working)
                     {
                         var onArc = OpenNest.Math.Angle.IsBetweenRad(
-                            w.Center.AngleTo(pt), w.StartAngle, w.EndAngle, w.IsReversed);
+                            w.Center.AngleTo(pt),
+                            w.StartAngle,
+                            w.EndAngle,
+                            w.IsReversed
+                        );
                         if (!onArc)
                         {
                             replaced.Add(w);
@@ -316,8 +391,10 @@ public static class DrawingSplitter
                         }
 
                         var (first, second) = w.SplitAt(pt);
-                        if (first != null && first.SweepAngle() > Math.Tolerance.Epsilon) replaced.Add(first);
-                        if (second != null && second.SweepAngle() > Math.Tolerance.Epsilon) replaced.Add(second);
+                        if (first != null && first.SweepAngle() > Math.Tolerance.Epsilon)
+                            replaced.Add(first);
+                        if (second != null && second.SweepAngle() > Math.Tolerance.Epsilon)
+                            replaced.Add(second);
                     }
                     working = replaced;
                 }
@@ -345,14 +422,18 @@ public static class DrawingSplitter
         {
             if (sl.Axis == CutOffAxis.Vertical)
             {
-                if (System.Math.Abs(sl.Position - region.Left) < OpenNest.Math.Tolerance.Epsilon
-                    || System.Math.Abs(sl.Position - region.Right) < OpenNest.Math.Tolerance.Epsilon)
+                if (
+                    System.Math.Abs(sl.Position - region.Left) < OpenNest.Math.Tolerance.Epsilon
+                    || System.Math.Abs(sl.Position - region.Right) < OpenNest.Math.Tolerance.Epsilon
+                )
                     result.Add(sl);
             }
             else
             {
-                if (System.Math.Abs(sl.Position - region.Bottom) < OpenNest.Math.Tolerance.Epsilon
-                    || System.Math.Abs(sl.Position - region.Top) < OpenNest.Math.Tolerance.Epsilon)
+                if (
+                    System.Math.Abs(sl.Position - region.Bottom) < OpenNest.Math.Tolerance.Epsilon
+                    || System.Math.Abs(sl.Position - region.Top) < OpenNest.Math.Tolerance.Epsilon
+                )
                     result.Add(sl);
             }
         }
@@ -381,7 +462,8 @@ public static class DrawingSplitter
             var midAngle = (arc.StartAngle + arc.EndAngle) / 2;
             return new Vector(
                 arc.Center.X + arc.Radius * System.Math.Cos(midAngle),
-                arc.Center.Y + arc.Radius * System.Math.Sin(midAngle));
+                arc.Center.Y + arc.Radius * System.Math.Sin(midAngle)
+            );
         }
 
         return new Vector(0, 0);
@@ -395,10 +477,14 @@ public static class DrawingSplitter
     /// crossing), spanning cutouts (two holes puncturing the line), and
     /// normal mid-part splits uniformly.
     /// </summary>
-    private static void InsertFeatureEdges(List<Entity> entities,
-        Box region, List<SplitLine> boundarySplitLines,
-        ISplitFeature feature, SplitParameters parameters,
-        List<Polygon> cutoutPolygons)
+    private static void InsertFeatureEdges(
+        List<Entity> entities,
+        Box region,
+        List<SplitLine> boundarySplitLines,
+        ISplitFeature feature,
+        SplitParameters parameters,
+        List<Polygon> cutoutPolygons
+    )
     {
         foreach (var sl in boundarySplitLines)
         {
@@ -411,7 +497,9 @@ public static class DrawingSplitter
 
             var featureResult = feature.GenerateFeatures(sl, extentStart, extentEnd, parameters);
             var isNegativeSide = RegionSideOf(region, sl) < 0;
-            var featureEdge = isNegativeSide ? featureResult.NegativeSideEdge : featureResult.PositiveSideEdge;
+            var featureEdge = isNegativeSide
+                ? featureResult.NegativeSideEdge
+                : featureResult.PositiveSideEdge;
 
             // Trim any line segments that cross a cutout — cut lines must never
             // travel through a hole.
@@ -427,7 +515,10 @@ public static class DrawingSplitter
     /// passed through unchanged; a tighter fix for arcs in feature edges (weld-gap
     /// tabs, spike-groove) can be added later if a test demands it.
     /// </summary>
-    private static List<Entity> TrimFeatureEdgeAgainstCutouts(List<Entity> featureEdge, List<Polygon> cutoutPolygons)
+    private static List<Entity> TrimFeatureEdgeAgainstCutouts(
+        List<Entity> featureEdge,
+        List<Polygon> cutoutPolygons
+    )
     {
         if (cutoutPolygons.Count == 0 || featureEdge.Count == 0)
             return featureEdge;
@@ -456,7 +547,15 @@ public static class DrawingSplitter
             var polyLines = poly.ToLines();
             foreach (var edge in polyLines)
             {
-                if (TryIntersectSegments(line.StartPoint, line.EndPoint, edge.StartPoint, edge.EndPoint, out var t))
+                if (
+                    TryIntersectSegments(
+                        line.StartPoint,
+                        line.EndPoint,
+                        edge.StartPoint,
+                        edge.EndPoint,
+                        out var t
+                    )
+                )
                 {
                     if (t > Math.Tolerance.Epsilon && t < 1.0 - Math.Tolerance.Epsilon)
                         ts.Add(t);
@@ -471,12 +570,14 @@ public static class DrawingSplitter
         {
             var t0 = ts[i];
             var t1 = ts[i + 1];
-            if (t1 - t0 < Math.Tolerance.Epsilon) continue;
+            if (t1 - t0 < Math.Tolerance.Epsilon)
+                continue;
 
             var tMid = (t0 + t1) * 0.5;
             var mid = new Vector(
                 line.StartPoint.X + (line.EndPoint.X - line.StartPoint.X) * tMid,
-                line.StartPoint.Y + (line.EndPoint.Y - line.StartPoint.Y) * tMid);
+                line.StartPoint.Y + (line.EndPoint.Y - line.StartPoint.Y) * tMid
+            );
 
             var insideCutout = false;
             foreach (var poly in cutoutPolygons)
@@ -487,14 +588,17 @@ public static class DrawingSplitter
                     break;
                 }
             }
-            if (insideCutout) continue;
+            if (insideCutout)
+                continue;
 
             var p0 = new Vector(
                 line.StartPoint.X + (line.EndPoint.X - line.StartPoint.X) * t0,
-                line.StartPoint.Y + (line.EndPoint.Y - line.StartPoint.Y) * t0);
+                line.StartPoint.Y + (line.EndPoint.Y - line.StartPoint.Y) * t0
+            );
             var p1 = new Vector(
                 line.StartPoint.X + (line.EndPoint.X - line.StartPoint.X) * t1,
-                line.StartPoint.Y + (line.EndPoint.Y - line.StartPoint.Y) * t1);
+                line.StartPoint.Y + (line.EndPoint.Y - line.StartPoint.Y) * t1
+            );
 
             segments.Add(new Line(p0, p1));
         }
@@ -506,7 +610,13 @@ public static class DrawingSplitter
     /// Segment-segment intersection. On hit, returns the parameter t along segment AB
     /// (0 = a0, 1 = a1) via <paramref name="tOnA"/>.
     /// </summary>
-    private static bool TryIntersectSegments(Vector a0, Vector a1, Vector b0, Vector b1, out double tOnA)
+    private static bool TryIntersectSegments(
+        Vector a0,
+        Vector a1,
+        Vector b0,
+        Vector b1,
+        out double tOnA
+    )
     {
         tOnA = 0;
         var rx = a1.X - a0.X;
@@ -523,8 +633,10 @@ public static class DrawingSplitter
         var t = (dx * sy - dy * sx) / denom;
         var u = (dx * ry - dy * rx) / denom;
 
-        if (t < -Math.Tolerance.Epsilon || t > 1 + Math.Tolerance.Epsilon) return false;
-        if (u < -Math.Tolerance.Epsilon || u > 1 + Math.Tolerance.Epsilon) return false;
+        if (t < -Math.Tolerance.Epsilon || t > 1 + Math.Tolerance.Epsilon)
+            return false;
+        if (u < -Math.Tolerance.Epsilon || u > 1 + Math.Tolerance.Epsilon)
+            return false;
 
         tOnA = t;
         return true;
@@ -532,7 +644,8 @@ public static class DrawingSplitter
 
     private static bool IsCutoutInRegion(Shape cutout, Box region)
     {
-        if (cutout.Entities.Count == 0) return false;
+        if (cutout.Entities.Count == 0)
+            return false;
         var bb = cutout.BoundingBox;
         // Fully contained iff the cutout's bounding box fits inside the region.
         return bb.Left >= region.Left - Math.Tolerance.Epsilon
@@ -566,7 +679,11 @@ public static class DrawingSplitter
     /// using endpoint connectivity, which produces the correct closed loops — one
     /// loop per physically-connected strip of material.
     /// </summary>
-    private static List<Entity> ClipCutoutToRegion(Shape cutout, Box region, List<SplitLine> splitLines)
+    private static List<Entity> ClipCutoutToRegion(
+        Shape cutout,
+        Box region,
+        List<SplitLine> splitLines
+    )
     {
         var entities = new List<Entity>();
         foreach (var entity in cutout.Entities)
@@ -583,10 +700,12 @@ public static class DrawingSplitter
     private static List<List<Entity>> AssemblePieces(List<Entity> entities)
     {
         var pieces = new List<List<Entity>>();
-        if (entities.Count == 0) return pieces;
+        if (entities.Count == 0)
+            return pieces;
 
         var shapes = ShapeBuilder.GetShapes(entities);
-        if (shapes.Count == 0) return pieces;
+        if (shapes.Count == 0)
+            return pieces;
 
         // Polygonize every shape once so we can run containment tests.
         var polygons = new List<Polygon>(shapes.Count);
@@ -606,13 +725,18 @@ public static class DrawingSplitter
 
             for (var j = 0; j < shapes.Count; j++)
             {
-                if (i == j) continue;
-                if (polygons[j] == null) continue;
-                if (polygons[j].Vertices.Count < 3) continue;
+                if (i == j)
+                    continue;
+                if (polygons[j] == null)
+                    continue;
+                if (polygons[j].Vertices.Count < 3)
+                    continue;
 
                 var bbB = shapes[j].BoundingBox;
-                if (!BoxContainsBox(bbB, bbA)) continue;
-                if (!polygons[j].ContainsPoint(repA)) continue;
+                if (!BoxContainsBox(bbB, bbA))
+                    continue;
+                if (!polygons[j].ContainsPoint(repA))
+                    continue;
 
                 isHole[i] = true;
                 break;
@@ -622,14 +746,18 @@ public static class DrawingSplitter
         // For each outer, attach the holes that fall inside it.
         for (var i = 0; i < shapes.Count; i++)
         {
-            if (isHole[i]) continue;
+            if (isHole[i])
+                continue;
 
             var outer = shapes[i];
             var outerPoly = polygons[i];
 
             // Enforce perimeter winding = CW.
-            if (outerPoly != null && outerPoly.Vertices.Count >= 3
-                && outerPoly.RotationDirection() != RotationType.CW)
+            if (
+                outerPoly != null
+                && outerPoly.Vertices.Count >= 3
+                && outerPoly.RotationDirection() != RotationType.CW
+            )
                 outer.Reverse();
 
             var piece = new List<Entity>();
@@ -637,19 +765,26 @@ public static class DrawingSplitter
 
             for (var j = 0; j < shapes.Count; j++)
             {
-                if (!isHole[j]) continue;
-                if (polygons[i] == null || polygons[i].Vertices.Count < 3) continue;
+                if (!isHole[j])
+                    continue;
+                if (polygons[i] == null || polygons[i].Vertices.Count < 3)
+                    continue;
 
                 var bbJ = shapes[j].BoundingBox;
-                if (!BoxContainsBox(shapes[i].BoundingBox, bbJ)) continue;
+                if (!BoxContainsBox(shapes[i].BoundingBox, bbJ))
+                    continue;
 
                 var rep = FirstVertexOf(shapes[j]);
-                if (!polygons[i].ContainsPoint(rep)) continue;
+                if (!polygons[i].ContainsPoint(rep))
+                    continue;
 
                 var hole = shapes[j];
                 var holePoly = polygons[j];
-                if (holePoly != null && holePoly.Vertices.Count >= 3
-                    && holePoly.RotationDirection() != RotationType.CCW)
+                if (
+                    holePoly != null
+                    && holePoly.Vertices.Count >= 3
+                    && holePoly.RotationDirection() != RotationType.CCW
+                )
                     hole.Reverse();
 
                 piece.AddRange(hole.Entities);
@@ -692,7 +827,7 @@ public static class DrawingSplitter
         {
             Line l => l.StartPoint,
             Arc a => a.StartPoint(),
-            _ => new Vector(0, 0)
+            _ => new Vector(0, 0),
         };
     }
 
@@ -702,7 +837,7 @@ public static class DrawingSplitter
         {
             Line l => l.EndPoint,
             Arc a => a.EndPoint(),
-            _ => new Vector(0, 0)
+            _ => new Vector(0, 0),
         };
     }
 
@@ -713,7 +848,7 @@ public static class DrawingSplitter
             SplitType.Straight => new StraightSplit(),
             SplitType.WeldGapTabs => new WeldGapTabSplit(),
             SplitType.SpikeGroove => new SpikeGrooveSplit(),
-            _ => new StraightSplit()
+            _ => new StraightSplit(),
         };
     }
 }

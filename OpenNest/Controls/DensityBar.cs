@@ -15,7 +15,12 @@ namespace OpenNest.Controls
         public DensityBar()
         {
             DoubleBuffered = true;
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
+            SetStyle(
+                ControlStyles.OptimizedDoubleBuffer
+                    | ControlStyles.AllPaintingInWmPaint
+                    | ControlStyles.UserPaint,
+                true
+            );
             Size = new Size(60, 8);
         }
 
@@ -50,8 +55,11 @@ namespace OpenNest.Controls
                 var fillRect = new Rectangle(rect.X, rect.Y, fillWidth, rect.Height);
                 using var fillPath = CreateRoundedRect(fillRect, fillRadius);
                 using var gradientBrush = new LinearGradientBrush(
-                    new Point(rect.X, 0), new Point(rect.Right, 0),
-                    LowColor, HighColor);
+                    new Point(rect.X, 0),
+                    new Point(rect.Right, 0),
+                    LowColor,
+                    HighColor
+                );
                 g.FillPath(gradientBrush, fillPath);
             }
         }

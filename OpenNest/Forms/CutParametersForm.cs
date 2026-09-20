@@ -58,7 +58,7 @@ namespace OpenNest.Forms
                 Feedrate = (double)numericUpDown1.Value,
                 RapidTravelRate = (double)numericUpDown2.Value,
                 PierceTime = TimeSpan.FromSeconds((double)numericUpDown3.Value),
-                Units = units
+                Units = units,
             };
         }
     }

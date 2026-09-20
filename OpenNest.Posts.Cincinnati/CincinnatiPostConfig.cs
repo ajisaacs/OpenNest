@@ -17,7 +17,7 @@ namespace OpenNest.Posts.Cincinnati
         G91,
 
         /// <summary>Use machine coordinate system.</summary>
-        G53
+        G53,
     }
 
     /// <summary>
@@ -29,7 +29,7 @@ namespace OpenNest.Posts.Cincinnati
         LibraryFile,
 
         /// <summary>Explicitly define G89 parameters in the program.</summary>
-        Explicit
+        Explicit,
     }
 
     /// <summary>
@@ -41,7 +41,7 @@ namespace OpenNest.Posts.Cincinnati
         ControllerSide,
 
         /// <summary>Pre-applied to part geometry during post-processing.</summary>
-        PreApplied
+        PreApplied,
     }
 
     /// <summary>
@@ -53,7 +53,7 @@ namespace OpenNest.Posts.Cincinnati
         Left,
 
         /// <summary>Kerf applied to the right side of the cut.</summary>
-        Right
+        Right,
     }
 
     /// <summary>
@@ -71,7 +71,7 @@ namespace OpenNest.Posts.Cincinnati
         Auto,
 
         /// <summary>Do not use M47.</summary>
-        None
+        None,
     }
 
     /// <summary>
@@ -86,7 +86,7 @@ namespace OpenNest.Posts.Cincinnati
         EndOfSheet,
 
         /// <summary>Pallet exchange at start and end of sheet.</summary>
-        StartAndEnd
+        StartAndEnd,
     }
 
     /// <summary>
@@ -132,7 +132,9 @@ namespace OpenNest.Posts.Cincinnati
 
         [Category("2. Subprograms")]
         [DisplayName("Use Part Subprograms")]
-        [Description("Use M98 sub-programs for part geometry. Reduces output size for repeated parts.")]
+        [Description(
+            "Use M98 sub-programs for part geometry. Reduces output size for repeated parts."
+        )]
         public bool UsePartSubprograms { get; set; } = false;
 
         [Category("2. Subprograms")]
@@ -247,13 +249,31 @@ namespace OpenNest.Posts.Cincinnati
 
         [Category("9. Feedrates")]
         [DisplayName("Arc Feedrate Ranges")]
-        [Description("Radius-based arc feedrate ranges. Matched from smallest to largest MaxRadius.")]
-        public List<ArcFeedrateRange> ArcFeedrateRanges { get; set; } = new()
-        {
-            new() { MaxRadius = 0.125, FeedratePercent = 0.25, VariableNumber = 123 },
-            new() { MaxRadius = 0.750, FeedratePercent = 0.50, VariableNumber = 124 },
-            new() { MaxRadius = 4.500, FeedratePercent = 0.80, VariableNumber = 125 }
-        };
+        [Description(
+            "Radius-based arc feedrate ranges. Matched from smallest to largest MaxRadius."
+        )]
+        public List<ArcFeedrateRange> ArcFeedrateRanges { get; set; } =
+            new()
+            {
+                new()
+                {
+                    MaxRadius = 0.125,
+                    FeedratePercent = 0.25,
+                    VariableNumber = 123,
+                },
+                new()
+                {
+                    MaxRadius = 0.750,
+                    FeedratePercent = 0.50,
+                    VariableNumber = 124,
+                },
+                new()
+                {
+                    MaxRadius = 4.500,
+                    FeedratePercent = 0.80,
+                    VariableNumber = 125,
+                },
+            };
 
         [Category("A. Variables")]
         [DisplayName("User Variable Start")]
@@ -272,7 +292,9 @@ namespace OpenNest.Posts.Cincinnati
 
         [Category("B. Libraries")]
         [DisplayName("Material Libraries")]
-        [Description("Material-to-library mapping for cut operations. Maps (material, thickness, gas) to a G89 library file.")]
+        [Description(
+            "Material-to-library mapping for cut operations. Maps (material, thickness, gas) to a G89 library file."
+        )]
         public List<MaterialLibraryEntry> MaterialLibraries { get; set; } = new();
 
         [Category("B. Libraries")]
@@ -282,7 +304,9 @@ namespace OpenNest.Posts.Cincinnati
 
         [Category("B. Libraries")]
         [DisplayName("Selected Library")]
-        [Description("Overrides Material/Thickness/Gas auto-resolution. Pick an existing entry from Material Libraries, or leave blank to auto-resolve.")]
+        [Description(
+            "Overrides Material/Thickness/Gas auto-resolution. Pick an existing entry from Material Libraries, or leave blank to auto-resolve."
+        )]
         [TypeConverter(typeof(MaterialLibraryNameConverter))]
         public string SelectedLibrary { get; set; } = "";
 
@@ -292,10 +316,13 @@ namespace OpenNest.Posts.Cincinnati
                 return "";
 
             return MaterialLibraries
-                .Where(e => string.Equals(e.Material, materialName, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(e => System.Math.Abs(e.Thickness - thickness))
-                .Select(e => e.Library)
-                .FirstOrDefault() ?? "";
+                    .Where(e =>
+                        string.Equals(e.Material, materialName, StringComparison.OrdinalIgnoreCase)
+                    )
+                    .OrderBy(e => System.Math.Abs(e.Thickness - thickness))
+                    .Select(e => e.Library)
+                    .FirstOrDefault()
+                ?? "";
         }
     }
 
@@ -325,7 +352,7 @@ namespace OpenNest.Posts.Cincinnati
         Percentages,
 
         /// <summary>Radius-range-based variables: F #varNum based on radius range.</summary>
-        Variables
+        Variables,
     }
 
     /// <summary>

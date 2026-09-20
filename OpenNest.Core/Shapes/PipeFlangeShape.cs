@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Shapes
 {
@@ -50,7 +50,11 @@ namespace OpenNest.Shapes
                 entities.Add(new Circle(cx, cy, holeRadius));
             }
 
-            if (!Blind && !string.IsNullOrEmpty(PipeSize) && PipeSizes.TryGetOD(PipeSize, out var pipeOD))
+            if (
+                !Blind
+                && !string.IsNullOrEmpty(PipeSize)
+                && PipeSizes.TryGetOD(PipeSize, out var pipeOD)
+            )
             {
                 var boreDiameter = pipeOD + PipeClearance;
                 entities.Add(new Circle(0, 0, boreDiameter / 2.0));

@@ -20,8 +20,8 @@ namespace OpenNest.CNC
 
         public List<string> EmitDeclarations()
         {
-            return _variables.Values
-                .Where(v => v.Expression != null)
+            return _variables
+                .Values.Where(v => v.Expression != null)
                 .OrderBy(v => v.Number)
                 .Select(v => $"{v.Reference}={v.Expression} ({FormatComment(v.Name)})")
                 .ToList();

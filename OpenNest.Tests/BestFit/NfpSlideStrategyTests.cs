@@ -119,6 +119,9 @@ public class NfpSlideStrategyTests
                 validCount++;
         }
 
-        Assert.True(validCount > 0, $"No non-overlapping candidates found out of {candidates.Count} total. Candidate 0 offset: {candidates[0].Part2Offset}");
+        Assert.True(
+            validCount > 0,
+            $"No non-overlapping candidates found out of {candidates.Count} total. Candidate 0 offset: {candidates[0].Part2Offset}"
+        );
     }
 }

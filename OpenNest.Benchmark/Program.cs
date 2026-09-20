@@ -1,10 +1,10 @@
-using OpenNest;
-using OpenNest.Benchmark;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using OpenNest;
+using OpenNest.Benchmark;
+using OpenNest.Geometry;
 
 return BenchmarkConsole.Run(args);
 
@@ -37,7 +37,9 @@ static class BenchmarkConsole
 
         if (jobs.Count == 0)
         {
-            Console.Error.WriteLine("No benchmark jobs found (no .nest files with any drawing quantity > 0).");
+            Console.Error.WriteLine(
+                "No benchmark jobs found (no .nest files with any drawing quantity > 0)."
+            );
             return 1;
         }
 
@@ -49,13 +51,22 @@ static class BenchmarkConsole
         if (options.EngineNames.Count > 0)
         {
             engines = engines
-                .Where(e => options.EngineNames.Any(n => n.Equals(e.Name, StringComparison.OrdinalIgnoreCase)))
+                .Where(e =>
+                    options.EngineNames.Any(n =>
+                        n.Equals(e.Name, StringComparison.OrdinalIgnoreCase)
+                    )
+                )
                 .ToList();
 
             if (engines.Count == 0)
             {
-                Console.Error.WriteLine("None of the requested engines are registered. Available: " +
-                    string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name)));
+                Console.Error.WriteLine(
+                    "None of the requested engines are registered. Available: "
+                        + string.Join(
+                            ", ",
+                            NestingEngineRegistry.AvailableEngines.Select(e => e.Name)
+                        )
+                );
                 return 1;
             }
         }
@@ -65,12 +76,20 @@ static class BenchmarkConsole
         foreach (var job in jobs)
         {
             var sizes = string.Join(", ", job.CandidateSizes.Select(s => s.ToString(1)));
-            Console.WriteLine($"  {job.Name}: {job.Requests.Count} drawing(s), {job.TotalRequestedQuantity} part(s) requested, candidate sizes: {sizes}");
+            Console.WriteLine(
+                $"  {job.Name}: {job.Requests.Count} drawing(s), {job.TotalRequestedQuantity} part(s) requested, candidate sizes: {sizes}"
+            );
         }
 
         Console.WriteLine($"Engines: {string.Join(", ", engines.Select(e => e.Name))}");
 
-        var results = BenchmarkRunner.Run(jobs, engines, options.SalvageRate, options.MinimumSalvageDimension, options.OutputDirectory);
+        var results = BenchmarkRunner.Run(
+            jobs,
+            engines,
+            options.SalvageRate,
+            options.MinimumSalvageDimension,
+            options.OutputDirectory
+        );
 
         Report.PrintDetailed(results);
         Report.PrintSummary(results);
@@ -103,7 +122,10 @@ static class BenchmarkConsole
 
                 case "--engines" when i + 1 < args.Length:
                     o.EngineNames = args[++i]
-                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Split(
+                            ',',
+                            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+                        )
                         .ToList();
                     break;
 
@@ -112,10 +134,16 @@ static class BenchmarkConsole
                     break;
 
                 case "--salvage-rate" when i + 1 < args.Length:
-                    o.SalvageRate = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
+                    o.SalvageRate = double.Parse(
+                        args[++i],
+                        System.Globalization.CultureInfo.InvariantCulture
+                    );
                     break;
                 case "--min-salvage-dimension" when i + 1 < args.Length:
-                    o.MinimumSalvageDimension = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
+                    o.MinimumSalvageDimension = double.Parse(
+                        args[++i],
+                        System.Globalization.CultureInfo.InvariantCulture
+                    );
                     break;
                 case "--output" when i + 1 < args.Length:
                     o.OutputDirectory = args[++i];
@@ -139,7 +167,12 @@ static class BenchmarkConsole
     {
         var sizes = new List<Size>();
 
-        foreach (var token in arg.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (
+            var token in arg.Split(
+                ',',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+        )
         {
             if (Size.TryParse(token, out var size))
                 sizes.Add(size);
@@ -152,29 +185,63 @@ static class BenchmarkConsole
 
     private static void PrintUsage()
     {
-        Console.Error.WriteLine("OpenNest.Benchmark - compare registered whole-job nesting engines on a set of .nest files");
+        Console.Error.WriteLine(
+            "OpenNest.Benchmark - compare registered whole-job nesting engines on a set of .nest files"
+        );
         Console.Error.WriteLine();
-        Console.Error.WriteLine("For each .nest file, every drawing with quantity > 0 is nested (mixed together),");
-        Console.Error.WriteLine("once per registered INestingEngine. Each engine is handed the full job - every");
-        Console.Error.WriteLine("requested part and the whole pool of candidate sheet sizes - and owns its own");
-        Console.Error.WriteLine("multi-plate/size strategy: how many plates it uses, of which sizes, and how");
-        Console.Error.WriteLine("demand splits across them. Scoring: aggregate material utilization across every");
-        Console.Error.WriteLine("plate used, then (if everything requested was placed) fewer plates as the");
-        Console.Error.WriteLine("tie-break. An invalid layout (out of bounds, overlapping, or over-quantity), a");
-        Console.Error.WriteLine("thrown exception, or a run exceeding its time budget all score zero.");
+        Console.Error.WriteLine(
+            "For each .nest file, every drawing with quantity > 0 is nested (mixed together),"
+        );
+        Console.Error.WriteLine(
+            "once per registered INestingEngine. Each engine is handed the full job - every"
+        );
+        Console.Error.WriteLine(
+            "requested part and the whole pool of candidate sheet sizes - and owns its own"
+        );
+        Console.Error.WriteLine(
+            "multi-plate/size strategy: how many plates it uses, of which sizes, and how"
+        );
+        Console.Error.WriteLine(
+            "demand splits across them. Scoring: aggregate material utilization across every"
+        );
+        Console.Error.WriteLine(
+            "plate used, then (if everything requested was placed) fewer plates as the"
+        );
+        Console.Error.WriteLine(
+            "tie-break. An invalid layout (out of bounds, overlapping, or over-quantity), a"
+        );
+        Console.Error.WriteLine(
+            "thrown exception, or a run exceeding its time budget all score zero."
+        );
         Console.Error.WriteLine();
         Console.Error.WriteLine("Usage:");
         Console.Error.WriteLine("  OpenNest.Benchmark <file.nest | folder> [options]");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Options:");
-        Console.Error.WriteLine("  --sheet-sizes W1xL1,W2xL2,...  Candidate sheet-size pool for the whole nest");
-        Console.Error.WriteLine("                                 (default: the distinct sizes already in each file)");
-        Console.Error.WriteLine("  --spacing <value>               Override part spacing for every job");
-        Console.Error.WriteLine("  --engines Name1,Name2,...       Only benchmark these registered engines (default: all)");
-        Console.Error.WriteLine("  --csv <path>                    Write a flat CSV of all results");
-        Console.Error.WriteLine("  --salvage-rate <0..1>           Fraction of eligible offcut area credited (default 0)");
-        Console.Error.WriteLine("  --min-salvage-dimension <value> Both offcut dimensions must qualify; 0 disables credit");
-        Console.Error.WriteLine("  --output <directory>           Save valid layouts as .nest plus detailed JSON reports");
+        Console.Error.WriteLine(
+            "  --sheet-sizes W1xL1,W2xL2,...  Candidate sheet-size pool for the whole nest"
+        );
+        Console.Error.WriteLine(
+            "                                 (default: the distinct sizes already in each file)"
+        );
+        Console.Error.WriteLine(
+            "  --spacing <value>               Override part spacing for every job"
+        );
+        Console.Error.WriteLine(
+            "  --engines Name1,Name2,...       Only benchmark these registered engines (default: all)"
+        );
+        Console.Error.WriteLine(
+            "  --csv <path>                    Write a flat CSV of all results"
+        );
+        Console.Error.WriteLine(
+            "  --salvage-rate <0..1>           Fraction of eligible offcut area credited (default 0)"
+        );
+        Console.Error.WriteLine(
+            "  --min-salvage-dimension <value> Both offcut dimensions must qualify; 0 disables credit"
+        );
+        Console.Error.WriteLine(
+            "  --output <directory>           Save valid layouts as .nest plus detailed JSON reports"
+        );
         Console.Error.WriteLine("  --help                          Show this message");
     }
 

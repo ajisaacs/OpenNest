@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Linq;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.ML
 {
@@ -7,10 +7,10 @@ namespace OpenNest.Engine.ML
     {
         // --- Geometric Features ---
         public double Area { get; set; }
-        public double Convexity { get; set; }        // Area / Convex Hull Area
-        public double AspectRatio { get; set; }      // Width / Length
-        public double BoundingBoxFill { get; set; }  // Area / (Width * Length)
-        public double Circularity { get; set; }      // 4 * PI * Area / Perimeter^2
+        public double Convexity { get; set; } // Area / Convex Hull Area
+        public double AspectRatio { get; set; } // Width / Length
+        public double BoundingBoxFill { get; set; } // Area / (Width * Length)
+        public double Circularity { get; set; } // 4 * PI * Area / Perimeter^2
         public double PerimeterToAreaRatio { get; set; } // Perimeter / Area — spacing sensitivity
         public int VertexCount { get; set; }
 
@@ -30,14 +30,16 @@ namespace OpenNest.Engine.ML
             // Normalize to canonical frame so features are invariant to import orientation.
             var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
 
-            var entities = OpenNest.Converters.ConvertProgram.ToGeometry(canonical.Program)
+            var entities = OpenNest
+                .Converters.ConvertProgram.ToGeometry(canonical.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid)
                 .ToList();
 
             var profile = new ShapeProfile(entities);
             var perimeter = profile.Perimeter;
 
-            if (perimeter == null) return null;
+            if (perimeter == null)
+                return null;
 
             var polygon = perimeter.ToPolygonWithTolerance(0.01);
             polygon.UpdateBounds();
@@ -53,12 +55,13 @@ namespace OpenNest.Engine.ML
                 AspectRatio = bb.Length / (bb.Width > 0 ? bb.Width : 1.0),
                 BoundingBoxFill = canonical.Area / (bb.Area() > 0 ? bb.Area() : 1.0),
                 VertexCount = polygon.Vertices.Count,
-                Bitmask = GenerateBitmask(polygon, 32)
+                Bitmask = GenerateBitmask(polygon, 32),
             };
 
             // Circularity = 4 * PI * Area / Perimeter^2
             var perimeterLen = polygon.Perimeter();
-            features.Circularity = (4 * System.Math.PI * canonical.Area) / (perimeterLen * perimeterLen);
+            features.Circularity =
+                (4 * System.Math.PI * canonical.Area) / (perimeterLen * perimeterLen);
             features.PerimeterToAreaRatio = canonical.Area > 0 ? perimeterLen / canonical.Area : 0;
 
             return features;

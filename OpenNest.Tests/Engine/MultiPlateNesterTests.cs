@@ -1,10 +1,10 @@
-using OpenNest.Geometry;
-using OpenNest.IO;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using OpenNest.Geometry;
+using OpenNest.IO;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -18,6 +18,7 @@ public class MultiPlateNesterTests
     {
         _output = output;
     }
+
     private static Drawing MakeDrawing(string name, double width, double length)
     {
         var program = new OpenNest.CNC.Program();
@@ -33,11 +34,7 @@ public class MultiPlateNesterTests
 
     private static NestItem MakeItem(string name, double width, double length, int qty = 1)
     {
-        return new NestItem
-        {
-            Drawing = MakeDrawing(name, width, length),
-            Quantity = qty,
-        };
+        return new NestItem { Drawing = MakeDrawing(name, width, length), Quantity = qty };
     }
 
     [Fact]
@@ -62,9 +59,9 @@ public class MultiPlateNesterTests
     {
         var items = new List<NestItem>
         {
-            MakeItem("short-wide", 50, 20),    // longest = 50
-            MakeItem("tall-narrow", 10, 80),    // longest = 80
-            MakeItem("square", 30, 30),         // longest = 30
+            MakeItem("short-wide", 50, 20), // longest = 50
+            MakeItem("tall-narrow", 10, 80), // longest = 80
+            MakeItem("square", 30, 30), // longest = 30
         };
 
         var sorted = MultiPlateNester.SortItems(items, PartSortOrder.Size);
@@ -153,8 +150,10 @@ public class MultiPlateNesterTests
         // All returned zones should have both dims < 12
         foreach (var zone in scrap)
         {
-            Assert.True(zone.Width < 12.0 && zone.Length < 12.0,
-                $"Zone {zone.Width:F1}x{zone.Length:F1} is not scrap — at least one dimension >= 12");
+            Assert.True(
+                zone.Width < 12.0 && zone.Length < 12.0,
+                $"Zone {zone.Width:F1}x{zone.Length:F1} is not scrap — at least one dimension >= 12"
+            );
         }
     }
 
@@ -164,7 +163,13 @@ public class MultiPlateNesterTests
     public void CreatePlate_UsesTemplateWhenNoOptions()
     {
         var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
-        template.EdgeSpacing = new Spacing { Left = 1, Right = 1, Top = 1, Bottom = 1 };
+        template.EdgeSpacing = new Spacing
+        {
+            Left = 1,
+            Right = 1,
+            Top = 1,
+            Bottom = 1,
+        };
 
         var plate = MultiPlateNester.CreatePlate(template, null, null);
 
@@ -178,13 +183,34 @@ public class MultiPlateNesterTests
     public void CreatePlate_PicksSmallestFittingOption()
     {
         var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
-        template.EdgeSpacing = new Spacing { Left = 1, Right = 1, Top = 1, Bottom = 1 };
+        template.EdgeSpacing = new Spacing
+        {
+            Left = 1,
+            Right = 1,
+            Top = 1,
+            Bottom = 1,
+        };
 
         var options = new List<PlateOption>
         {
-            new() { Width = 48, Length = 96, Cost = 100 },
-            new() { Width = 60, Length = 120, Cost = 200 },
-            new() { Width = 72, Length = 144, Cost = 300 },
+            new()
+            {
+                Width = 48,
+                Length = 96,
+                Cost = 100,
+            },
+            new()
+            {
+                Width = 60,
+                Length = 120,
+                Cost = 200,
+            },
+            new()
+            {
+                Width = 72,
+                Length = 144,
+                Cost = 300,
+            },
         };
 
         // Part needs 50x50 work area — 48x96 (after edge spacing: 46x94) — 46 < 50, doesn't fit.
@@ -200,9 +226,24 @@ public class MultiPlateNesterTests
     [Fact]
     public void EvaluateUpgrade_PrefersCheaperOption()
     {
-        var currentOption = new PlateOption { Width = 48, Length = 96, Cost = 100 };
-        var upgradeOption = new PlateOption { Width = 60, Length = 120, Cost = 160 };
-        var newPlateOption = new PlateOption { Width = 48, Length = 96, Cost = 100 };
+        var currentOption = new PlateOption
+        {
+            Width = 48,
+            Length = 96,
+            Cost = 100,
+        };
+        var upgradeOption = new PlateOption
+        {
+            Width = 60,
+            Length = 120,
+            Cost = 160,
+        };
+        var newPlateOption = new PlateOption
+        {
+            Width = 48,
+            Length = 96,
+            Cost = 100,
+        };
 
         // Upgrade cost = 160 - 100 = 60
         // New plate cost with 50% utilization, 50% salvage:
@@ -210,7 +251,12 @@ public class MultiPlateNesterTests
         // netNewCost = 100 - 25 = 75
         // Upgrade (60) < new plate (75), so upgrade wins
         var decision = MultiPlateNester.EvaluateUpgradeVsNew(
-            currentOption, upgradeOption, newPlateOption, 0.5, 0.5);
+            currentOption,
+            upgradeOption,
+            newPlateOption,
+            0.5,
+            0.5
+        );
 
         Assert.True(decision.ShouldUpgrade);
     }
@@ -223,19 +269,17 @@ public class MultiPlateNesterTests
         var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
         template.EdgeSpacing = new Spacing();
 
-        var items = new List<NestItem>
-        {
-            MakeItem("big1", 80, 40, 1),
-            MakeItem("big2", 70, 35, 1),
-        };
+        var items = new List<NestItem> { MakeItem("big1", 80, 40, 1), MakeItem("big2", 70, 35, 1) };
 
         var options = new MultiPlateNestOptions { Template = template };
 
         var result = MultiPlateNester.Nest(items, options);
 
         // Each large part should be on its own plate.
-        Assert.True(result.Plates.Count >= 2,
-            $"Expected at least 2 plates, got {result.Plates.Count}");
+        Assert.True(
+            result.Plates.Count >= 2,
+            $"Expected at least 2 plates, got {result.Plates.Count}"
+        );
     }
 
     [Fact]
@@ -260,8 +304,10 @@ public class MultiPlateNesterTests
 
         // Both small drawing types should share space — not each on their own plate.
         // With consolidation, they pack into remaining space alongside the big part.
-        Assert.True(result.Plates.Count <= 2,
-            $"Expected at most 2 plates (small parts consolidated), got {result.Plates.Count}");
+        Assert.True(
+            result.Plates.Count <= 2,
+            $"Expected at most 2 plates (small parts consolidated), got {result.Plates.Count}"
+        );
         Assert.Equal(0, result.UnplacedItems.Count);
     }
 
@@ -271,17 +317,9 @@ public class MultiPlateNesterTests
         var template = new Plate(96, 48) { PartSpacing = 0.25, Quadrant = 1 };
         template.EdgeSpacing = new Spacing();
 
-        var items = new List<NestItem>
-        {
-            MakeItem("big1", 80, 40, 1),
-            MakeItem("big2", 70, 35, 1),
-        };
+        var items = new List<NestItem> { MakeItem("big1", 80, 40, 1), MakeItem("big2", 70, 35, 1) };
 
-        var options = new MultiPlateNestOptions
-        {
-            Template = template,
-            AllowPlateCreation = false,
-        };
+        var options = new MultiPlateNestOptions { Template = template, AllowPlateCreation = false };
 
         var result = MultiPlateNester.Nest(items, options);
 
@@ -303,15 +341,15 @@ public class MultiPlateNesterTests
         // Plate WorkArea: Width=96, Length=48. Half: 48, 24.
         // Part 24x22: Length=24 (not > 24), Width=22 (not > 48) — not Large.
         // Area = 528 > 4608/9 = 512 — Medium.
-        var items = new List<NestItem>
-        {
-            MakeItem("medium", 24, 22, 1),
-        };
+        var items = new List<NestItem> { MakeItem("medium", 24, 22, 1) };
 
         var options = new MultiPlateNestOptions { Template = template };
 
-        var result = MultiPlateNester.Nest(items, options,
-            existingPlates: new List<Plate> { existingPlate });
+        var result = MultiPlateNester.Nest(
+            items,
+            options,
+            existingPlates: new List<Plate> { existingPlate }
+        );
 
         // Part should be placed on the existing plate, not a new one.
         Assert.Single(result.Plates);
@@ -331,34 +369,43 @@ public class MultiPlateNesterTests
         var nest = new NestReader(nestPath).Read();
         var template = nest.PlateDefaults.CreateNew();
 
-        _output.WriteLine($"Plate: {template.Size.Width}x{template.Size.Length}, " +
-            $"spacing={template.PartSpacing}, edge=({template.EdgeSpacing.Left},{template.EdgeSpacing.Bottom},{template.EdgeSpacing.Right},{template.EdgeSpacing.Top})");
+        _output.WriteLine(
+            $"Plate: {template.Size.Width}x{template.Size.Length}, "
+                + $"spacing={template.PartSpacing}, edge=({template.EdgeSpacing.Left},{template.EdgeSpacing.Bottom},{template.EdgeSpacing.Right},{template.EdgeSpacing.Top})"
+        );
 
         var wa = template.WorkArea();
         _output.WriteLine($"Work area: {wa.Width:F1}x{wa.Length:F1}");
-        _output.WriteLine($"Classification thresholds: Large if dim > {wa.Width / 2:F1} or {wa.Length / 2:F1}, " +
-            $"Medium if area > {wa.Width * wa.Length / 9:F0}");
+        _output.WriteLine(
+            $"Classification thresholds: Large if dim > {wa.Width / 2:F1} or {wa.Length / 2:F1}, "
+                + $"Medium if area > {wa.Width * wa.Length / 9:F0}"
+        );
         _output.WriteLine("---");
 
         var items = new List<NestItem>();
         foreach (var d in nest.Drawings)
         {
             var qty = d.Quantity.Required > 0 ? d.Quantity.Required : d.Quantity.Remaining;
-            if (qty <= 0) qty = 1;
+            if (qty <= 0)
+                qty = 1;
 
             var bb = d.Program.BoundingBox();
             var classification = MultiPlateNester.Classify(bb, wa);
 
-            _output.WriteLine($"  {d.Name,-25} {bb.Width:F1}x{bb.Length:F1} (area={bb.Width * bb.Length:F0})  qty={qty}  class={classification}");
+            _output.WriteLine(
+                $"  {d.Name, -25} {bb.Width:F1}x{bb.Length:F1} (area={bb.Width * bb.Length:F0})  qty={qty}  class={classification}"
+            );
 
-            items.Add(new NestItem
-            {
-                Drawing = d,
-                Quantity = qty,
-                StepAngle = d.Constraints.StepAngle,
-                RotationStart = d.Constraints.StartAngle,
-                RotationEnd = d.Constraints.EndAngle,
-            });
+            items.Add(
+                new NestItem
+                {
+                    Drawing = d,
+                    Quantity = qty,
+                    StepAngle = d.Constraints.StepAngle,
+                    RotationStart = d.Constraints.StartAngle,
+                    RotationEnd = d.Constraints.EndAngle,
+                }
+            );
         }
 
         _output.WriteLine("---");
@@ -366,18 +413,65 @@ public class MultiPlateNesterTests
 
         var plateOptions = new List<PlateOption>
         {
-            new() { Width = 48, Length = 96, Cost = 0 },
-            new() { Width = 48, Length = 120, Cost = 0 },
-            new() { Width = 48, Length = 144, Cost = 0 },
-            new() { Width = 60, Length = 96, Cost = 0 },
-            new() { Width = 60, Length = 120, Cost = 0 },
-            new() { Width = 60, Length = 144, Cost = 0 },
-            new() { Width = 72, Length = 96, Cost = 0 },
-            new() { Width = 72, Length = 120, Cost = 0 },
-            new() { Width = 72, Length = 144, Cost = 0 },
+            new()
+            {
+                Width = 48,
+                Length = 96,
+                Cost = 0,
+            },
+            new()
+            {
+                Width = 48,
+                Length = 120,
+                Cost = 0,
+            },
+            new()
+            {
+                Width = 48,
+                Length = 144,
+                Cost = 0,
+            },
+            new()
+            {
+                Width = 60,
+                Length = 96,
+                Cost = 0,
+            },
+            new()
+            {
+                Width = 60,
+                Length = 120,
+                Cost = 0,
+            },
+            new()
+            {
+                Width = 60,
+                Length = 144,
+                Cost = 0,
+            },
+            new()
+            {
+                Width = 72,
+                Length = 96,
+                Cost = 0,
+            },
+            new()
+            {
+                Width = 72,
+                Length = 120,
+                Cost = 0,
+            },
+            new()
+            {
+                Width = 72,
+                Length = 144,
+                Cost = 0,
+            },
         };
 
-        _output.WriteLine($"Plate options: {string.Join(", ", plateOptions.Select(o => $"{o.Width}x{o.Length}"))}");
+        _output.WriteLine(
+            $"Plate options: {string.Join(", ", plateOptions.Select(o => $"{o.Width}x{o.Length}"))}"
+        );
         _output.WriteLine("");
 
         var options = new MultiPlateNestOptions
@@ -393,16 +487,21 @@ public class MultiPlateNesterTests
         for (var i = 0; i < result.Plates.Count; i++)
         {
             var pr = result.Plates[i];
-            var groups = pr.Parts.GroupBy(p => p.BaseDrawing.Name)
+            var groups = pr
+                .Parts.GroupBy(p => p.BaseDrawing.Name)
                 .Select(g => $"{g.Key} x{g.Count()}")
                 .ToList();
-            _output.WriteLine($"  Plate {i + 1} ({pr.Plate.Size.Width}x{pr.Plate.Size.Length}): " +
-                $"{pr.Parts.Count} parts, util={pr.Plate.Utilization():P1}  [{string.Join(", ", groups)}]");
+            _output.WriteLine(
+                $"  Plate {i + 1} ({pr.Plate.Size.Width}x{pr.Plate.Size.Length}): "
+                    + $"{pr.Parts.Count} parts, util={pr.Plate.Utilization():P1}  [{string.Join(", ", groups)}]"
+            );
         }
 
         if (result.UnplacedItems.Count > 0)
         {
-            _output.WriteLine($"  Unplaced: {string.Join(", ", result.UnplacedItems.Select(i => $"{i.Drawing.Name} x{i.Quantity}"))}");
+            _output.WriteLine(
+                $"  Unplaced: {string.Join(", ", result.UnplacedItems.Select(i => $"{i.Drawing.Name} x{i.Quantity}"))}"
+            );
         }
 
         _output.WriteLine($"\nTotal parts placed: {result.Plates.Sum(p => p.Parts.Count)}");

@@ -1,7 +1,7 @@
-using OpenNest.CNC.CuttingStrategy;
-using OpenNest.Controls;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Controls;
 
 namespace OpenNest.Forms
 {
@@ -18,23 +18,16 @@ namespace OpenNest.Forms
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
 
-            cuttingPanel = new CuttingPanel
-            {
-                Dock = DockStyle.Fill
-            };
+            cuttingPanel = new CuttingPanel { Dock = DockStyle.Fill };
 
-            var buttonPanel = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 40
-            };
+            var buttonPanel = new Panel { Dock = DockStyle.Bottom, Height = 40 };
 
             var btnOk = new Button
             {
                 Text = "OK",
                 DialogResult = DialogResult.OK,
                 Size = new Size(80, 28),
-                Location = new Point(220, 6)
+                Location = new Point(220, 6),
             };
 
             var btnCancel = new Button
@@ -42,7 +35,7 @@ namespace OpenNest.Forms
                 Text = "Cancel",
                 DialogResult = DialogResult.Cancel,
                 Size = new Size(80, 28),
-                Location = new Point(305, 6)
+                Location = new Point(305, 6),
             };
 
             buttonPanel.Controls.Add(btnOk);

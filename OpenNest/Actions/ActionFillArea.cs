@@ -1,10 +1,10 @@
-using OpenNest.Controls;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Controls;
 
 namespace OpenNest.Actions
 {
@@ -17,13 +17,15 @@ namespace OpenNest.Actions
         private Action<List<Part>> onFillComplete;
 
         public ActionFillArea(PlateView plateView, Drawing drawing)
-            : this(plateView, drawing, null, null, null)
-        {
-        }
+            : this(plateView, drawing, null, null, null) { }
 
-        public ActionFillArea(PlateView plateView, Drawing drawing,
-            IProgress<NestProgress> progress, CancellationTokenSource cts,
-            Action<List<Part>> onFillComplete)
+        public ActionFillArea(
+            PlateView plateView,
+            Drawing drawing,
+            IProgress<NestProgress> progress,
+            CancellationTokenSource cts,
+            Action<List<Part>> onFillComplete
+        )
             : base(plateView)
         {
             plateView.PreviewKeyDown += plateView_PreviewKeyDown;
@@ -49,8 +51,13 @@ namespace OpenNest.Actions
                 {
                     var engine = NestEngineRegistry.Create(plateView.Plate);
                     var parts = await Task.Run(() =>
-                        engine.Fill(new NestItem { Drawing = drawing },
-                            SelectedArea, progress, cts.Token));
+                        engine.Fill(
+                            new NestItem { Drawing = drawing },
+                            SelectedArea,
+                            progress,
+                            cts.Token
+                        )
+                    );
 
                     onFillComplete?.Invoke(parts);
                 }
