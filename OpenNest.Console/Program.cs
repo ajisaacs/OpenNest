@@ -1,6 +1,8 @@
 using OpenNest;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using OpenNest.IO.Bending;
+using System.Globalization;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -19,6 +21,14 @@ static class NestConsole
 
         if (options == null)
             return 0; // --help was requested
+
+        if (options.RepairBendsMillimeters.HasValue &&
+            (options.CadUnits == BendRepairUnits.Unspecified || !double.IsFinite(options.RepairBendsMillimeters.Value)
+             || options.RepairBendsMillimeters <= 0.001 || options.RepairBendsMillimeters > 3.175))
+        {
+            Console.Error.WriteLine("Error: --repair-bends-mm requires a limit > 0.001 and <= 3.175 mm and --cad-units inches|mm.");
+            return 1;
+        }
 
         if (options.ListPosts)
         {
@@ -82,6 +92,12 @@ static class NestConsole
         {
             switch (args[i])
             {
+                case "--repair-bends-mm":
+                    o.RepairBendsMillimeters = i + 1 < args.Length && double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var limit) ? limit : double.NaN;
+                    break;
+                case "--cad-units" when i + 1 < args.Length:
+                    o.CadUnits = args[++i] switch { "inches" => BendRepairUnits.Inches, "mm" => BendRepairUnits.Millimeters, _ => BendRepairUnits.Unspecified };
+                    break;
                 case "--drawing" when i + 1 < args.Length:
                     o.DrawingName = args[++i];
                     break;
@@ -173,7 +189,7 @@ static class NestConsole
 
             foreach (var dxf in dxfFiles)
             {
-                var drawing = ImportDxf(dxf);
+                var drawing = ImportDxf(dxf, options);
 
                 if (drawing == null)
                     return null;
@@ -204,7 +220,7 @@ static class NestConsole
 
         foreach (var dxf in dxfFiles)
         {
-            var drawing = ImportDxf(dxf);
+            var drawing = ImportDxf(dxf, options);
 
             if (drawing == null)
                 return null;
@@ -216,11 +232,21 @@ static class NestConsole
         return newNest;
     }
 
-    static Drawing ImportDxf(string path)
+    static Drawing ImportDxf(string path, Options options)
     {
         try
         {
-            return CadImporter.ImportDrawing(path);
+            var result = CadImporter.Import(path, new CadImportOptions
+            {
+                BendRepair = options.RepairBendsMillimeters.HasValue ? new BendRepairOptions
+                {
+                    DrawingUnits = options.CadUnits,
+                    MaxEndpointMovementMillimeters = options.RepairBendsMillimeters.Value
+                } : null
+            });
+            foreach (var report in result.BendRepairReports)
+                Console.WriteLine($"Bend repair {Path.GetFileName(path)} #{report.BendIndex + 1}: {report.Status}: {report.Reason} ({report.OriginalStart} -> {report.Start}; {report.OriginalEnd} -> {report.End})");
+            return CadImporter.BuildDrawing(result, result.Entities, result.Bends, 1, null, null);
         }
         catch (System.Exception ex)
         {
@@ -470,6 +496,8 @@ static class NestConsole
         Console.Error.WriteLine("  <nest.nest> <part.dxf>  Load nest and add imported DXF drawings");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Options:");
+        Console.Error.WriteLine("  --repair-bends-mm <n>   Opt-in endpoint/tick repair, limit >0.001 to 3.175 physical mm");
+        Console.Error.WriteLine("  --cad-units inches|mm  Explicit source coordinate units required for bend repair");
         Console.Error.WriteLine("  --drawing <name>       Drawing name to fill with (default: first drawing)");
         Console.Error.WriteLine("  --plate <index>        Plate index to fill (default: 0)");
         Console.Error.WriteLine("  --quantity <n>          Max parts to place (default: 0 = unlimited)");
@@ -506,5 +534,7 @@ static class NestConsole
         public string PostOutput;
         public string PostsDir;
         public bool ListPosts;
+        public double? RepairBendsMillimeters;
+        public BendRepairUnits CadUnits;
     }
 }

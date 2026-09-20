@@ -51,7 +51,8 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 
 ## Prerequisites
 
-- **Windows 10 or later**
+- **Windows 10 or later** for the desktop app and Windows-dependent projects
+- The headless console and engine/import test projects target `net8.0` and can be built independently on Linux, macOS, or Windows
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ## Getting Started
@@ -183,6 +184,47 @@ An engine's layout is rejected (scoring zero for that job) if any part falls out
 
 Custom competitor engines can be added by dropping a DLL implementing `INestingEngine` with a public parameterless constructor into the `Engines/` directory next to the benchmark executable; each one is registered under its own CLR type name. This is a separate plugin contract from the desktop app's `NestEngineRegistry`/`NestEngineBase` (which requires a `(Plate)` constructor) — a `NestEngineBase` plugin dropped into the benchmark's `Engines/` folder is silently skipped, since the benchmark only ever solves whole jobs.
 
+### Conservative bend endpoint repair (opt-in)
+
+Bend endpoint repair is disabled by default in the shared CAD importer.
+To opt in for newly imported DXFs in the console, add:
+
+```text
+--repair-bends-mm 2 --cad-units inches
+```
+
+Use `--cad-units mm` for millimeter coordinates. The movement limit is always in
+physical millimeters, must be greater than `0.001`, and cannot exceed `3.175`.
+This declares the source units; it does **not** rescale the drawing. A conflicting
+or unsupported DXF insertion-unit header prevents repair. A unitless header requires
+the explicit caller declaration.
+
+Library callers set `CadImportOptions.BendRepair` to a `BendRepairOptions` with
+`DrawingUnits` and `MaxEndpointMovementMillimeters`, then inspect
+`CadImportResult.BendRepairReports` (`Repaired`, `Unchanged`, or `Skipped`, with
+reasons and before/after endpoints). The console prints the same reports.
+
+Repair requires exactly one short, inward, continuous `ETCH`/`SCRIBE` line tick
+collinear with **each original detected bend endpoint** (association tolerance
+`0.001` physical mm, tick length at most one inch). It fits only along the existing
+bend axis to an unambiguous closed material interval on continuous `0`/`CUT`
+boundaries. It never rotates a bend, moves cuts, or creates missing ticks. Missing,
+shared, duplicate, excessive-movement, open-boundary, hole-crossing, and ambiguous
+cases stay unchanged. A successful repair replaces only the two matched ticks,
+keeping their lengths and properties. Reapplying repair is idempotent.
+
+In opt-in mode source marks are preserved separately from geometry optimization;
+the legacy blanket etch regeneration is bypassed, including for skipped bends.
+Unrelated scribing remains intact. This is a narrow import repair, not general
+geometry cleanup or certification of machine-ready output. No desktop toggle or
+saved-nest repair is included.
+
+Run its cross-platform unit and synthetic-DXF integration tests with:
+
+```bash
+dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj
+```
+
 ## Project Structure
 
 ```
@@ -192,6 +234,7 @@ OpenNest.sln
 ├── OpenNest.Engine/            # Nesting algorithms and whole-job contracts
 ├── OpenNest.Engine.Tests/      # Cross-platform whole-job contract tests (net8.0)
 ├── OpenNest.IO/                # File I/O — DXF import/export, nest file format
+├── OpenNest.IO.Tests/          # Cross-platform CAD import and bend repair tests (net8.0)
 ├── OpenNest.Console/           # Command-line interface for batch nesting
 ├── OpenNest.Api/               # Programmatic nesting API (NestRunner pipeline)
 ├── OpenNest.Data/              # Machine configuration and cutting parameters

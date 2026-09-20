@@ -8,13 +8,15 @@ OpenNest is a Windows desktop application for CNC nesting — arranging 2D parts
 
 ## Build
 
-This is a .NET 8 solution using SDK-style `.csproj` files targeting `net8.0-windows`. Build with:
+This is a .NET 8 solution using SDK-style `.csproj` files. The desktop app and Windows-dependent projects target `net8.0-windows`; the core libraries and `OpenNest.Console` target `net8.0`. Build the full solution on Windows with:
 
 ```bash
 dotnet build OpenNest.sln
 ```
 
 Cross-platform whole-job engine tests (net8.0, runs on Linux/macOS/Windows without the desktop project or DXF fixtures): `dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj`. The existing `OpenNest.Tests` suite targets `net8.0-windows` and requires a Windows runner; cross-compiling on Linux is not Windows runtime verification.
+
+Cross-platform CAD import tests: `dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj`. These synthetic-DXF and bend-repair tests target `net8.0`, require no external fixtures, and are included in the solution. Build the headless console independently with `dotnet build OpenNest.Console/OpenNest.Console.csproj`.
 
 NuGet dependencies: `ACadSharp` 3.1.32 (DXF/DWG import/export, in OpenNest.IO), `System.Drawing.Common` 8.0.10, `ModelContextProtocol` + `Microsoft.Extensions.Hosting` (in OpenNest.Mcp), `Microsoft.ML.OnnxRuntime` (in OpenNest.Engine for ML angle prediction), `Microsoft.EntityFrameworkCore.Sqlite` (in OpenNest.Training).
 
@@ -63,9 +65,10 @@ File I/O and format conversion. Uses ACadSharp for DXF/DWG support.
 - `Extensions` — conversion helpers between ACadSharp and OpenNest geometry types.
 - `CadImporter` — shared "DXF → Drawing" service used by the UI, console, MCP, API, and training projects. Two-stage API: `Import(path, options)` loads raw entities, runs bend detection, and returns a mutable `CadImportResult`; `BuildDrawing(result, visible, bends, quantity, customer, editedProgram)` produces a fully-populated `Drawing` with `Source.Offset`, `SourceEntities`, `SuppressedEntityIds`, and bends. `ImportDrawing(path, options)` composes both stages for headless callers.
 - `CadImportOptions`, `CadImportResult` — inputs and intermediate state for `CadImporter`.
+- `Bending/BendRepair` — conservative opt-in repair configured by `CadImportOptions.BendRepair`. Requires explicit inches/mm source units and an endpoint movement limit above 0.001 and at most 3.175 physical mm. Only unambiguous paired ETCH/SCRIBE ticks may move along the existing bend axis; cut geometry and unrelated marks must remain unchanged. Opt-in imports preserve source marks without blanket etch regeneration and expose per-bend outcomes in `CadImportResult.BendRepairReports`.
 
 ### OpenNest.Console (console app, depends on Core + Engine + IO)
-Command-line interface for batch nesting. Supports DXF import, plate configuration, linear fill, and NFP-based auto-nesting (`--autonest`).
+Command-line interface for batch nesting (`net8.0`). Supports DXF import, plate configuration, linear fill, and NFP-based auto-nesting (`--autonest`). `--repair-bends-mm <limit> --cad-units inches|mm` opts newly imported DXFs into conservative bend repair and prints per-bend reports; it does not rescale coordinates or repair saved nests.
 
 ### OpenNest.Gpu (class library, depends on Core + Engine)
 GPU-accelerated pair evaluation for best-fit nesting. `GpuPairEvaluator` implements `IPairEvaluator`, `GpuSlideComputer` implements `ISlideComputer`, and `PartBitmap` handles rasterization. `GpuEvaluatorFactory` provides factory methods.
@@ -133,4 +136,4 @@ Always keep `README.md` and `CLAUDE.md` up to date when making changes that affe
 - `FillScore` uses lexicographic comparison (count > utilization > compactness) to rank fill results consistently across all fill strategies.
 - **Cut-off materialization lifecycle**: `CutOff` objects live on `Plate.CutOffs`. Each generates a `Drawing` (with `IsCutOff = true`) whose `Program` contains trimmed line segments. `Plate.RegenerateCutOffs(settings)` removes old cut-off Parts, recomputes programs, and re-adds them to `Plate.Parts`. Regeneration triggers: cut-off add/remove/move, part drag complete, fill complete, plate transform. Cut-off Parts are excluded from quantity tracking, utilization, overlap detection, and nest file serialization (programs are regenerated from definitions on load).
 - **User-defined G-code variables**: Programs can contain named variable definitions (`name = expression [inline] [global]`) referenced in coordinates with `$name`. Variables resolve to doubles at parse time for geometry/nesting. `VariableRefs` on `Motion`/`Feedrate` track the symbolic link so post processors can emit machine variable references. Cincinnati post maps non-inline variables to numbered machine variables (`#200+`) with descriptive comments. Global variables share a number across programs; local variables get per-drawing numbers. `ProgramReader` uses a two-pass parse (collect definitions, then parse G-code with substitution). `NestWriter` serializes definitions and `$references` back to text for round-trip fidelity.
-- **CAD import pipeline**: All "DXF → Drawing" conversion goes through `OpenNest.IO.CadImporter`. The UI form uses `Import` on file load (storing the mutable result in a `FileListItem`) and `BuildDrawing` on save (passing the user's current visible entities and bends). Console, MCP, API, and Training projects use `ImportDrawing` for headless conversion. This guarantees all callers produce drawings with the same shape: pierce-point `Source.Offset`, stable `SourceEntities` with GUIDs, `SuppressedEntityIds`, detected bends, and metadata.
+- **CAD import pipeline**: All "DXF → Drawing" conversion goes through `OpenNest.IO.CadImporter`. The UI form uses `Import` on file load (storing the mutable result in a `FileListItem`) and `BuildDrawing` on save (passing the user's current visible entities and bends). MCP, API, and Training projects use `ImportDrawing` for headless conversion. The console uses `Import` followed by `BuildDrawing` so it can report bend-repair outcomes. This guarantees all callers produce drawings with the same shape: pierce-point `Source.Offset`, stable `SourceEntities` with GUIDs, `SuppressedEntityIds`, detected bends, and metadata.
