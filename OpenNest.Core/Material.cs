@@ -2,9 +2,7 @@
 {
     public class Material
     {
-        public Material()
-        {
-        }
+        public Material() { }
 
         public Material(string name)
         {

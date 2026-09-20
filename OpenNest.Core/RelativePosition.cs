@@ -1,5 +1,4 @@
-﻿
-namespace OpenNest
+﻿namespace OpenNest
 {
     public enum RelativePosition
     {
@@ -8,6 +7,6 @@ namespace OpenNest
         Right,
         Top,
         Bottom,
-        None
+        None,
     }
 }

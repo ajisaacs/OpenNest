@@ -1,21 +1,25 @@
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.RectanglePacking
 {
     internal class PackBottomLeft : PackEngine
     {
         public PackBottomLeft(Bin bin)
-            : base(bin)
-        {
-        }
+            : base(bin) { }
 
         public override void Pack(List<Item> items)
         {
-            var byArea = items.Select(i => i.Clone() as Item).OrderByDescending(i => i.Area()).ToList();
-            var byLength = items.Select(i => i.Clone() as Item).OrderByDescending(i => System.Math.Max(i.Width, i.Length)).ToList();
+            var byArea = items
+                .Select(i => i.Clone() as Item)
+                .OrderByDescending(i => i.Area())
+                .ToList();
+            var byLength = items
+                .Select(i => i.Clone() as Item)
+                .OrderByDescending(i => System.Math.Max(i.Width, i.Length))
+                .ToList();
 
             var resultA = PackWithOrder(byArea);
             var resultB = PackWithOrder(byLength);

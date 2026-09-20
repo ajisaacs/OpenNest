@@ -1,12 +1,12 @@
-﻿using OpenNest.Controls;
-using OpenNest.Converters;
-using OpenNest.Forms;
-using OpenNest.Geometry;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Controls;
+using OpenNest.Converters;
+using OpenNest.Forms;
+using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
@@ -26,7 +26,10 @@ namespace OpenNest.Actions
             get { return sequenceNumber; }
             set
             {
-                if (value <= SequenceForm.numericUpDown1.Maximum && value >= SequenceForm.numericUpDown1.Minimum)
+                if (
+                    value <= SequenceForm.numericUpDown1.Maximum
+                    && value >= SequenceForm.numericUpDown1.Minimum
+                )
                 {
                     sequenceNumber = value;
                     SequenceForm.numericUpDown1.Value = sequenceNumber;
@@ -38,7 +41,13 @@ namespace OpenNest.Actions
             : base(plateView)
         {
             SequenceForm = new Forms.SequenceForm();
-            SequenceForm.numericUpDown1.DataBindings.Add("Value", this, "SequenceNumber", false, DataSourceUpdateMode.OnPropertyChanged);
+            SequenceForm.numericUpDown1.DataBindings.Add(
+                "Value",
+                this,
+                "SequenceNumber",
+                false,
+                DataSourceUpdateMode.OnPropertyChanged
+            );
             SequenceForm.numericUpDown1.Maximum = plateView.Plate.Parts.Count;
             SequenceForm.Owner = Application.OpenForms[0];
             SequenceForm.Show();
@@ -50,7 +59,10 @@ namespace OpenNest.Actions
 
             foreach (var part in plateView.Plate.Parts)
             {
-                var entities = ConvertProgram.ToGeometry(part.Program).Where(e => e.Layer == SpecialLayers.Cut).ToList();
+                var entities = ConvertProgram
+                    .ToGeometry(part.Program)
+                    .Where(e => e.Layer == SpecialLayers.Cut)
+                    .ToList();
                 entities.ForEach(entity => entity.Offset(part.Location));
                 var shapes = ShapeBuilder.GetShapes(entities);
                 var shape = new Shape();
@@ -97,7 +109,8 @@ namespace OpenNest.Actions
 
         private void plateView_Paint(object sender, PaintEventArgs e)
         {
-            if (ClosestShape == null) return;
+            if (ClosestShape == null)
+                return;
 
             var path = ClosestShape.GetGraphicsPath();
             path.Transform(plateView.Matrix);

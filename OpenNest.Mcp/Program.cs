@@ -5,8 +5,8 @@ using OpenNest.Mcp;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddSingleton<NestSession>();
-builder.Services
-    .AddMcpServer()
+builder
+    .Services.AddMcpServer()
     .WithStdioServerTransport()
     .WithToolsFromAssembly(typeof(Program).Assembly);
 

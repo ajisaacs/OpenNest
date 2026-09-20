@@ -76,9 +76,10 @@ public static class FillResultCache
         }
 
         public bool Equals(CacheKey other) =>
-            ReferenceEquals(Drawing, other.Drawing) &&
-            Width == other.Width && Height == other.Height &&
-            Spacing == other.Spacing;
+            ReferenceEquals(Drawing, other.Drawing)
+            && Width == other.Width
+            && Height == other.Height
+            && Spacing == other.Spacing;
 
         public override bool Equals(object obj) => obj is CacheKey other && Equals(other);
 

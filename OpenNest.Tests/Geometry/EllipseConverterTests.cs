@@ -1,9 +1,9 @@
+using System.Linq;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.Math;
 using Xunit;
 using Xunit.Abstractions;
-using System.Linq;
 
 namespace OpenNest.Tests.Geometry;
 
@@ -89,8 +89,14 @@ public class EllipseConverterTests
     public void Convert_Circle_ProducesOneOrTwoArcs()
     {
         var result = EllipseConverter.Convert(
-            new Vector(0, 0), semiMajor: 10, semiMinor: 10, rotation: 0,
-            startParam: 0, endParam: Angle.TwoPI, tolerance: 0.001);
+            new Vector(0, 0),
+            semiMajor: 10,
+            semiMinor: 10,
+            rotation: 0,
+            startParam: 0,
+            endParam: Angle.TwoPI,
+            tolerance: 0.001
+        );
 
         Assert.All(result, e => Assert.IsType<Arc>(e));
         Assert.InRange(result.Count, 1, 4);
@@ -103,8 +109,14 @@ public class EllipseConverterTests
         var b = 7.0;
         var tolerance = 0.001;
         var result = EllipseConverter.Convert(
-            new Vector(0, 0), a, b, rotation: 0,
-            startParam: 0, endParam: Angle.TwoPI, tolerance: tolerance);
+            new Vector(0, 0),
+            a,
+            b,
+            rotation: 0,
+            startParam: 0,
+            endParam: Angle.TwoPI,
+            tolerance: tolerance
+        );
 
         Assert.True(result.Count >= 4, $"Expected at least 4 arcs, got {result.Count}");
         Assert.All(result, e => Assert.IsType<Arc>(e));
@@ -113,9 +125,11 @@ public class EllipseConverterTests
         {
             var arc = (Arc)entity;
             var maxDev = MaxDeviationFromEllipse(arc, new Vector(0, 0), a, b, 0, 50);
-            Assert.True(maxDev <= tolerance,
-                $"Arc at center ({arc.Center.X:F4},{arc.Center.Y:F4}) r={arc.Radius:F4} " +
-                $"deviates {maxDev:F6} from ellipse (tolerance={tolerance})");
+            Assert.True(
+                maxDev <= tolerance,
+                $"Arc at center ({arc.Center.X:F4},{arc.Center.Y:F4}) r={arc.Radius:F4} "
+                    + $"deviates {maxDev:F6} from ellipse (tolerance={tolerance})"
+            );
         }
     }
 
@@ -126,18 +140,29 @@ public class EllipseConverterTests
         var b = 3.0;
         var tolerance = 0.001;
         var result = EllipseConverter.Convert(
-            new Vector(0, 0), a, b, rotation: 0,
-            startParam: 0, endParam: Angle.TwoPI, tolerance: tolerance);
+            new Vector(0, 0),
+            a,
+            b,
+            rotation: 0,
+            startParam: 0,
+            endParam: Angle.TwoPI,
+            tolerance: tolerance
+        );
 
-        Assert.True(result.Count >= 8, $"Expected at least 8 arcs for eccentric ellipse, got {result.Count}");
+        Assert.True(
+            result.Count >= 8,
+            $"Expected at least 8 arcs for eccentric ellipse, got {result.Count}"
+        );
         Assert.All(result, e => Assert.IsType<Arc>(e));
 
         foreach (var entity in result)
         {
             var arc = (Arc)entity;
             var maxDev = MaxDeviationFromEllipse(arc, new Vector(0, 0), a, b, 0, 50);
-            Assert.True(maxDev <= tolerance,
-                $"Deviation {maxDev:F6} exceeds tolerance {tolerance}");
+            Assert.True(
+                maxDev <= tolerance,
+                $"Deviation {maxDev:F6} exceeds tolerance {tolerance}"
+            );
         }
     }
 
@@ -148,8 +173,14 @@ public class EllipseConverterTests
         var b = 5.0;
         var tolerance = 0.001;
         var result = EllipseConverter.Convert(
-            new Vector(0, 0), a, b, rotation: 0,
-            startParam: 0, endParam: System.Math.PI / 2, tolerance: tolerance);
+            new Vector(0, 0),
+            a,
+            b,
+            rotation: 0,
+            startParam: 0,
+            endParam: System.Math.PI / 2,
+            tolerance: tolerance
+        );
 
         Assert.NotEmpty(result);
         Assert.All(result, e => Assert.IsType<Arc>(e));
@@ -169,23 +200,27 @@ public class EllipseConverterTests
     public void Convert_EndpointContinuity_ArcsConnect()
     {
         var result = EllipseConverter.Convert(
-            new Vector(5, 10), semiMajor: 15, semiMinor: 8, rotation: 0.5,
-            startParam: 0, endParam: Angle.TwoPI, tolerance: 0.001);
+            new Vector(5, 10),
+            semiMajor: 15,
+            semiMinor: 8,
+            rotation: 0.5,
+            startParam: 0,
+            endParam: Angle.TwoPI,
+            tolerance: 0.001
+        );
 
         for (var i = 0; i < result.Count - 1; i++)
         {
             var current = (Arc)result[i];
             var next = (Arc)result[i + 1];
             var gap = current.EndPoint().DistanceTo(next.StartPoint());
-            Assert.True(gap < 1e-6,
-                $"Gap of {gap:E4} between arc {i} and arc {i + 1}");
+            Assert.True(gap < 1e-6, $"Gap of {gap:E4} between arc {i} and arc {i + 1}");
         }
 
         var lastArc = (Arc)result[^1];
         var firstArc = (Arc)result[0];
         var closingGap = lastArc.EndPoint().DistanceTo(firstArc.StartPoint());
-        Assert.True(closingGap < 1e-6,
-            $"Closing gap of {closingGap:E4}");
+        Assert.True(closingGap < 1e-6, $"Closing gap of {closingGap:E4}");
     }
 
     [Fact]
@@ -197,16 +232,25 @@ public class EllipseConverterTests
         var b = 6.0;
         var tolerance = 0.001;
 
-        var result = EllipseConverter.Convert(center, a, b, rotation,
-            startParam: 0, endParam: Angle.TwoPI, tolerance: tolerance);
+        var result = EllipseConverter.Convert(
+            center,
+            a,
+            b,
+            rotation,
+            startParam: 0,
+            endParam: Angle.TwoPI,
+            tolerance: tolerance
+        );
 
         Assert.NotEmpty(result);
         foreach (var entity in result)
         {
             var arc = (Arc)entity;
             var maxDev = MaxDeviationFromEllipse(arc, center, a, b, rotation, 50);
-            Assert.True(maxDev <= tolerance,
-                $"Deviation {maxDev:F6} exceeds tolerance {tolerance}");
+            Assert.True(
+                maxDev <= tolerance,
+                $"Deviation {maxDev:F6} exceeds tolerance {tolerance}"
+            );
         }
     }
 
@@ -221,7 +265,7 @@ public class EllipseConverterTests
             MajorAxisEndPoint = new CSMath.XYZ(10, 0, 0),
             RadiusRatio = 0.6,
             StartParameter = 0,
-            EndParameter = System.Math.PI * 2
+            EndParameter = System.Math.PI * 2,
         };
         doc.Entities.Add(ellipse);
 
@@ -253,19 +297,24 @@ public class EllipseConverterTests
     public void DxfImport_ArcBoundingBoxes_Diagnostic()
     {
         var path = @"C:\Users\aisaacs\Desktop\11ga tab.dxf";
-        if (!System.IO.File.Exists(path)) return;
+        if (!System.IO.File.Exists(path))
+            return;
 
         var result = Dxf.Import(path);
         var all = (System.Collections.Generic.IEnumerable<IBoundable>)result.Entities;
         var bbox = all.GetBoundingBox();
-        _output.WriteLine($"Overall: X={bbox.X:F4} Y={bbox.Y:F4} W={bbox.Length:F4} H={bbox.Width:F4}");
+        _output.WriteLine(
+            $"Overall: X={bbox.X:F4} Y={bbox.Y:F4} W={bbox.Length:F4} H={bbox.Width:F4}"
+        );
 
         for (var i = 0; i < result.Entities.Count; i++)
         {
             var e = result.Entities[i];
             var b = e.BoundingBox;
             var flag = (b.Length > 1 || b.Width > 1) ? " ***" : "";
-            _output.WriteLine($"{i + 1,3}. {e.GetType().Name,-8} X={b.X:F4} Y={b.Y:F4} W={b.Length:F4} H={b.Width:F4}{flag}");
+            _output.WriteLine(
+                $"{i + 1, 3}. {e.GetType().Name, -8} X={b.X:F4} Y={b.Y:F4} W={b.Length:F4} H={b.Width:F4}{flag}"
+            );
         }
     }
 
@@ -279,7 +328,7 @@ public class EllipseConverterTests
             RadiusRatio = 0.28,
             StartParameter = 0.017,
             EndParameter = 1.571,
-            Normal = new CSMath.XYZ(0, 0, 1)
+            Normal = new CSMath.XYZ(0, 0, 1),
         };
 
         var flipped = new ACadSharp.Entities.Ellipse
@@ -289,7 +338,7 @@ public class EllipseConverterTests
             RadiusRatio = 0.28,
             StartParameter = 0.017,
             EndParameter = 1.571,
-            Normal = new CSMath.XYZ(0, 0, -1)
+            Normal = new CSMath.XYZ(0, 0, -1),
         };
 
         var normalArcs = normal.ToOpenNest();
@@ -305,13 +354,25 @@ public class EllipseConverterTests
         var normalStart = GetArcStart(normalFirst);
         var flippedStart = GetArcStart(flippedFirst);
 
-        Assert.True(normalStart.X < 0, $"Normal ellipse start X should be negative, got {normalStart.X}");
-        Assert.True(flippedStart.X > 0, $"Flipped ellipse should bulge right, got {flippedStart.X}");
+        Assert.True(
+            normalStart.X < 0,
+            $"Normal ellipse start X should be negative, got {normalStart.X}"
+        );
+        Assert.True(
+            flippedStart.X > 0,
+            $"Flipped ellipse should bulge right, got {flippedStart.X}"
+        );
 
         var normalBbox = GetBoundingBox(normalArcs.Cast<Arc>());
         var flippedBbox = GetBoundingBox(flippedArcs.Cast<Arc>());
-        Assert.True(flippedBbox.minX > 0, $"Flipped ellipse should stay on positive X side, minX={flippedBbox.minX}");
-        Assert.True(normalBbox.maxX < 0, $"Normal ellipse should stay on negative X side, maxX={normalBbox.maxX}");
+        Assert.True(
+            flippedBbox.minX > 0,
+            $"Flipped ellipse should stay on positive X side, minX={flippedBbox.minX}"
+        );
+        Assert.True(
+            normalBbox.maxX < 0,
+            $"Normal ellipse should stay on negative X side, maxX={normalBbox.maxX}"
+        );
     }
 
     private static (double minX, double maxX) GetBoundingBox(IEnumerable<Arc> arcs)
@@ -333,7 +394,8 @@ public class EllipseConverterTests
         var angle = arc.IsReversed ? arc.EndAngle : arc.StartAngle;
         return new Vector(
             arc.Center.X + arc.Radius * System.Math.Cos(angle),
-            arc.Center.Y + arc.Radius * System.Math.Sin(angle));
+            arc.Center.Y + arc.Radius * System.Math.Sin(angle)
+        );
     }
 
     private static Vector GetArcEnd(Arc arc)
@@ -341,11 +403,18 @@ public class EllipseConverterTests
         var angle = arc.IsReversed ? arc.StartAngle : arc.EndAngle;
         return new Vector(
             arc.Center.X + arc.Radius * System.Math.Cos(angle),
-            arc.Center.Y + arc.Radius * System.Math.Sin(angle));
+            arc.Center.Y + arc.Radius * System.Math.Sin(angle)
+        );
     }
 
-    private static double MaxDeviationFromEllipse(Arc arc, Vector ellipseCenter,
-        double semiMajor, double semiMinor, double rotation, int samples)
+    private static double MaxDeviationFromEllipse(
+        Arc arc,
+        Vector ellipseCenter,
+        double semiMajor,
+        double semiMinor,
+        double rotation,
+        int samples
+    )
     {
         var maxDev = 0.0;
         var sweep = arc.SweepAngle();
@@ -367,9 +436,19 @@ public class EllipseConverterTests
             for (var j = 0; j <= 1000; j++)
             {
                 var t = (double)j / 1000 * Angle.TwoPI;
-                var ep2 = EllipseConverter.EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, t);
+                var ep2 = EllipseConverter.EvaluatePoint(
+                    semiMajor,
+                    semiMinor,
+                    rotation,
+                    ellipseCenter,
+                    t
+                );
                 var dist = arcPoint.DistanceTo(ep2);
-                if (dist < minDist) { minDist = dist; bestT = t; }
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    bestT = t;
+                }
             }
 
             // Refine with local bisection around bestT
@@ -379,12 +458,40 @@ public class EllipseConverterTests
             {
                 var t1 = lo + (hi - lo) / 3;
                 var t2 = lo + 2 * (hi - lo) / 3;
-                var d1 = arcPoint.DistanceTo(EllipseConverter.EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, t1));
-                var d2 = arcPoint.DistanceTo(EllipseConverter.EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, t2));
-                if (d1 < d2) hi = t2; else lo = t1;
+                var d1 = arcPoint.DistanceTo(
+                    EllipseConverter.EvaluatePoint(
+                        semiMajor,
+                        semiMinor,
+                        rotation,
+                        ellipseCenter,
+                        t1
+                    )
+                );
+                var d2 = arcPoint.DistanceTo(
+                    EllipseConverter.EvaluatePoint(
+                        semiMajor,
+                        semiMinor,
+                        rotation,
+                        ellipseCenter,
+                        t2
+                    )
+                );
+                if (d1 < d2)
+                    hi = t2;
+                else
+                    lo = t1;
             }
-            var bestDist = arcPoint.DistanceTo(EllipseConverter.EvaluatePoint(semiMajor, semiMinor, rotation, ellipseCenter, (lo + hi) / 2));
-            if (bestDist > maxDev) maxDev = bestDist;
+            var bestDist = arcPoint.DistanceTo(
+                EllipseConverter.EvaluatePoint(
+                    semiMajor,
+                    semiMinor,
+                    rotation,
+                    ellipseCenter,
+                    (lo + hi) / 2
+                )
+            );
+            if (bestDist > maxDev)
+                maxDev = bestDist;
         }
 
         return maxDev;

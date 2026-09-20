@@ -10,7 +10,10 @@ public class FillStrategyRegistryTests
     {
         var strategies = FillStrategyRegistry.Strategies;
 
-        Assert.True(strategies.Count >= 6, $"Expected at least 6 built-in strategies, got {strategies.Count}");
+        Assert.True(
+            strategies.Count >= 6,
+            $"Expected at least 6 built-in strategies, got {strategies.Count}"
+        );
         Assert.Contains(strategies, s => s.Name == "Pairs");
         Assert.Contains(strategies, s => s.Name == "RectBestFit");
         Assert.Contains(strategies, s => s.Name == "Extents");
@@ -25,8 +28,10 @@ public class FillStrategyRegistryTests
         var strategies = FillStrategyRegistry.Strategies;
 
         for (var i = 1; i < strategies.Count; i++)
-            Assert.True(strategies[i].Order >= strategies[i - 1].Order,
-                $"Strategy '{strategies[i].Name}' (Order={strategies[i].Order}) should not precede '{strategies[i - 1].Name}' (Order={strategies[i - 1].Order})");
+            Assert.True(
+                strategies[i].Order >= strategies[i - 1].Order,
+                $"Strategy '{strategies[i].Name}' (Order={strategies[i].Order}) should not precede '{strategies[i - 1].Name}' (Order={strategies[i - 1].Order})"
+            );
     }
 
     [Fact]

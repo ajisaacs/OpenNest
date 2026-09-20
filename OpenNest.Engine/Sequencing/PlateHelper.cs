@@ -15,7 +15,7 @@ namespace OpenNest.Engine.Sequencing
                 2 => new Vector(0, yExtent),
                 3 => new Vector(0, 0),
                 4 => new Vector(xExtent, 0),
-                _ => new Vector(xExtent, yExtent)
+                _ => new Vector(xExtent, yExtent),
             };
         }
     }

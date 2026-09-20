@@ -13,8 +13,11 @@ internal sealed class OrderedPlateNester : IPlateNester
 {
     private readonly Dictionary<string, Drawing> drawings = new(StringComparer.Ordinal);
 
-    public PlateCandidate Place(PlatePlacementRequest request, IProgress<NestJobProgress> progress = null,
-        CancellationToken token = default)
+    public PlateCandidate Place(
+        PlatePlacementRequest request,
+        IProgress<NestJobProgress> progress = null,
+        CancellationToken token = default
+    )
     {
         var work = DrawingJobMapper.CreatePlate(request.Stock).WorkArea();
         var poses = new List<NestJobPlacement>();
@@ -38,27 +41,55 @@ internal sealed class OrderedPlateNester : IPlateNester
                         token.ThrowIfCancellationRequested();
                         // FillLinear uses actual line/arc geometry for copy distances.
                         var parts = new FillLinear(region, request.Stock.PartSpacing)
-                            .Fill(drawing, angle, NestDirection.Horizontal).Take(left).ToList();
-                        if (parts.Count == 0 || (best != null && parts.Count <= best.Count)) continue;
-                        var trial = poses.Concat(parts.Select(p => new NestJobPlacement(requirement.Id, 0,
-                            p.Location.X, p.Location.Y, p.Rotation))).ToList();
+                            .Fill(drawing, angle, NestDirection.Horizontal)
+                            .Take(left)
+                            .ToList();
+                        if (parts.Count == 0 || (best != null && parts.Count <= best.Count))
+                            continue;
+                        var trial = poses
+                            .Concat(
+                                parts.Select(p => new NestJobPlacement(
+                                    requirement.Id,
+                                    0,
+                                    p.Location.X,
+                                    p.Location.Y,
+                                    p.Rotation
+                                ))
+                            )
+                            .ToList();
                         try
                         {
-                            NestJobValidator.ValidateCandidate(new PlateCandidate(trial), request.Stock, demand, requirements);
+                            NestJobValidator.ValidateCandidate(
+                                new PlateCandidate(trial),
+                                request.Stock,
+                                demand,
+                                requirements
+                            );
                             best = parts;
                         }
                         catch (InvalidOperationException)
                         {
                             // Geometry kernels are proposal generators, never the acceptance gate.
                         }
-                        if (best?.Count == left) break;
+                        if (best?.Count == left)
+                            break;
                     }
-                    if (best?.Count == left) break;
+                    if (best?.Count == left)
+                        break;
                 }
-                if (best == null) break;
+                if (best == null)
+                    break;
                 foreach (var part in best)
                 {
-                    poses.Add(new NestJobPlacement(requirement.Id, 0, part.Location.X, part.Location.Y, part.Rotation));
+                    poses.Add(
+                        new NestJobPlacement(
+                            requirement.Id,
+                            0,
+                            part.Location.X,
+                            part.Location.Y,
+                            part.Rotation
+                        )
+                    );
                     obstacles.Add(part.BoundingBox.Offset(request.Stock.PartSpacing));
                 }
                 left -= best.Count;
@@ -83,13 +114,15 @@ internal sealed class OrderedPlateNester : IPlateNester
             yield return System.Math.PI;
             yield return 3 * System.Math.PI / 2;
             for (var degrees = 5; degrees < 180; degrees += 5)
-                if (degrees != 90) yield return degrees * System.Math.PI / 180;
+                if (degrees != 90)
+                    yield return degrees * System.Math.PI / 180;
             yield break;
         }
         for (var index = 0L; ; index++)
         {
             var angle = policy.Start + index * policy.Step;
-            if (angle > policy.End + 1e-9) yield break;
+            if (angle > policy.End + 1e-9)
+                yield break;
             yield return angle;
         }
     }

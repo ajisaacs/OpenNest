@@ -98,7 +98,8 @@ public class EntitySplitTests
         var expectedHigh = 50.0 + System.Math.Sqrt(300);
         Assert.True(
             System.Math.Abs(y - expectedLow) < 0.1 || System.Math.Abs(y - expectedHigh) < 0.1,
-            $"Expected Y near {expectedLow:F2} or {expectedHigh:F2}, got {y:F2}");
+            $"Expected Y near {expectedLow:F2} or {expectedHigh:F2}, got {y:F2}"
+        );
     }
 
     // --- CrossesSplitLine ---

@@ -58,9 +58,11 @@ public class BestFitOverlapTests
             if (parts[0].Intersects(parts[1], out var pts))
             {
                 overlapping++;
-                _output.WriteLine($"  OVERLAP #{overlapping}: Test {result.Candidate.TestNumber} " +
-                    $"Part2Rot={OpenNest.Math.Angle.ToDegrees(result.Candidate.Part2Rotation):F1}° " +
-                    $"collision pts={pts.Count}");
+                _output.WriteLine(
+                    $"  OVERLAP #{overlapping}: Test {result.Candidate.TestNumber} "
+                        + $"Part2Rot={OpenNest.Math.Angle.ToDegrees(result.Candidate.Part2Rotation):F1}° "
+                        + $"collision pts={pts.Count}"
+                );
             }
         }
 

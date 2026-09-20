@@ -11,33 +11,54 @@ internal static class NestJobPlacementValidator
 {
     private const double Epsilon = 0.0000001;
 
-    internal static void ValidateCandidate(PlateCandidate candidate, NestPlateStock stock,
-        IReadOnlyDictionary<string, int> remaining, IReadOnlyDictionary<string, NestJobPart> parts)
+    internal static void ValidateCandidate(
+        PlateCandidate candidate,
+        NestPlateStock stock,
+        IReadOnlyDictionary<string, int> remaining,
+        IReadOnlyDictionary<string, NestJobPart> parts
+    )
     {
-        if (candidate == null) throw new InvalidOperationException("The plate nester returned a null candidate.");
+        if (candidate == null)
+            throw new InvalidOperationException("The plate nester returned a null candidate.");
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         var placed = new List<ShapeTopology>();
         foreach (var placement in candidate.Placements)
         {
-            if (placement.PartId == null || !remaining.TryGetValue(placement.PartId, out var available) ||
-                !parts.TryGetValue(placement.PartId, out var part))
-                throw new InvalidOperationException("Candidate references an unknown requirement ID.");
-            if (!double.IsFinite(placement.X) || !double.IsFinite(placement.Y) || !double.IsFinite(placement.Rotation))
+            if (
+                placement.PartId == null
+                || !remaining.TryGetValue(placement.PartId, out var available)
+                || !parts.TryGetValue(placement.PartId, out var part)
+            )
+                throw new InvalidOperationException(
+                    "Candidate references an unknown requirement ID."
+                );
+            if (
+                !double.IsFinite(placement.X)
+                || !double.IsFinite(placement.Y)
+                || !double.IsFinite(placement.Rotation)
+            )
                 throw new InvalidOperationException("Candidate poses must be finite.");
             counts.TryGetValue(placement.PartId, out var count);
-            if (count >= available) throw new InvalidOperationException("Candidate overproduces a requirement.");
+            if (count >= available)
+                throw new InvalidOperationException("Candidate overproduces a requirement.");
             if (!RotationIsAllowed(part.Rotation, placement.Rotation))
-                throw new InvalidOperationException("Candidate rotation is not allowed for the requirement.");
+                throw new InvalidOperationException(
+                    "Candidate rotation is not allowed for the requirement."
+                );
 
             var shape = Transform(CreateShape(part.Geometry), placement);
             if (!FitsWorkArea(shape, stock))
-                throw new InvalidOperationException("Candidate placement falls outside the usable stock area.");
+                throw new InvalidOperationException(
+                    "Candidate placement falls outside the usable stock area."
+                );
             foreach (var other in placed)
             {
                 if (Overlaps(shape, other))
                     throw new InvalidOperationException("Candidate placements overlap.");
                 if (stock.PartSpacing > 0 && Distance(shape, other) < stock.PartSpacing - Epsilon)
-                    throw new InvalidOperationException("Candidate placements violate required part spacing.");
+                    throw new InvalidOperationException(
+                        "Candidate placements violate required part spacing."
+                    );
             }
 
             placed.Add(shape);
@@ -52,10 +73,12 @@ internal static class NestJobPlacementValidator
 
     private static bool RotationIsAllowed(RotationPolicy policy, double rotation)
     {
-        if (policy.Kind == RotationPolicyKind.Automatic) return true;
+        if (policy.Kind == RotationPolicyKind.Automatic)
+            return true;
         if (policy.Kind == RotationPolicyKind.Fixed)
             return AnglesEqual(rotation, policy.Start);
-        if (rotation < policy.Start - Epsilon || rotation > policy.End + Epsilon) return false;
+        if (rotation < policy.Start - Epsilon || rotation > policy.End + Epsilon)
+            return false;
         var steps = (rotation - policy.Start) / policy.Step;
         return System.Math.Abs(steps - System.Math.Round(steps)) <= Epsilon;
     }
@@ -63,7 +86,8 @@ internal static class NestJobPlacementValidator
     private static bool AnglesEqual(double left, double right)
     {
         var delta = (left - right) % (System.Math.PI * 2);
-        return System.Math.Abs(delta) <= Epsilon || System.Math.Abs(System.Math.Abs(delta) - System.Math.PI * 2) <= Epsilon;
+        return System.Math.Abs(delta) <= Epsilon
+            || System.Math.Abs(System.Math.Abs(delta) - System.Math.PI * 2) <= Epsilon;
     }
 
     private static ShapeTopology CreateShape(PartGeometrySnapshot geometry)
@@ -75,7 +99,8 @@ internal static class NestJobPlacementValidator
                 cutEntities.Add(entity);
 
         var contours = ShapeBuilder.GetShapes(cutEntities);
-        if (contours.Count == 0) throw new ArgumentException("Geometry must contain a closed contour.");
+        if (contours.Count == 0)
+            throw new ArgumentException("Geometry must contain a closed contour.");
         var closedEntities = new List<Entity>();
         var marks = new List<Shape>();
         foreach (var contour in contours)
@@ -85,7 +110,8 @@ internal static class NestJobPlacementValidator
                 ValidateContour(contour);
                 closedEntities.AddRange(contour.Entities);
             }
-            else marks.Add(contour);
+            else
+                marks.Add(contour);
         }
         if (closedEntities.Count == 0)
             throw new ArgumentException("Geometry must contain a closed outer contour.");
@@ -126,25 +152,32 @@ internal static class NestJobPlacementValidator
             for (var index = 0; index < parameters.Count; index++)
             {
                 Check(PointAt(parameters[index]));
-                if (index > 0) Check(PointAt((parameters[index - 1] + parameters[index]) / 2));
+                if (index > 0)
+                    Check(PointAt((parameters[index - 1] + parameters[index]) / 2));
             }
 
             void AddParameter(Vector point)
             {
-                if (!point.IsValid()) throw new ArgumentException("Indeterminate mark intersection.");
+                if (!point.IsValid())
+                    throw new ArgumentException("Indeterminate mark intersection.");
                 var value = entity is Line line
                     ? line.StartPoint.DistanceTo(point) / line.Length
-                    : Angle.NormalizeRad(((Arc)entity).IsReversed
-                        ? ((Arc)entity).StartAngle - ((Arc)entity).Center.AngleTo(point)
-                        : ((Arc)entity).Center.AngleTo(point) - ((Arc)entity).StartAngle) / ((Arc)entity).SweepAngle();
-                if (value >= 0 && value <= 1) parameters.Add(value);
+                    : Angle.NormalizeRad(
+                        ((Arc)entity).IsReversed
+                            ? ((Arc)entity).StartAngle - ((Arc)entity).Center.AngleTo(point)
+                            : ((Arc)entity).Center.AngleTo(point) - ((Arc)entity).StartAngle
+                    ) / ((Arc)entity).SweepAngle();
+                if (value >= 0 && value <= 1)
+                    parameters.Add(value);
             }
             Vector PointAt(double value)
             {
-                if (entity is Line line) return line.StartPoint + (line.EndPoint - line.StartPoint) * value;
+                if (entity is Line line)
+                    return line.StartPoint + (line.EndPoint - line.StartPoint) * value;
                 var arc = (Arc)entity;
                 var angle = arc.StartAngle + (arc.IsReversed ? -1 : 1) * arc.SweepAngle() * value;
-                return arc.Center + new Vector(System.Math.Cos(angle), System.Math.Sin(angle)) * arc.Radius;
+                return arc.Center
+                    + new Vector(System.Math.Cos(angle), System.Math.Sin(angle)) * arc.Radius;
             }
             void Check(Vector point)
             {
@@ -153,14 +186,20 @@ internal static class NestJobPlacementValidator
                     // Exact analytic boundary contact is allowed; near-boundary uncertainty is not.
                     var onBoundary = false;
                     foreach (var edge in boundaries[index].Entities)
-                        if (edge.ClosestPointTo(point).DistanceTo(point) <= Epsilon) onBoundary = true;
-                    if (onBoundary) continue;
+                        if (edge.ClosestPointTo(point).DistanceTo(point) <= Epsilon)
+                            onBoundary = true;
+                    if (onBoundary)
+                        continue;
                     foreach (var edge in polygons[index].ToLines())
                         if (edge.ClosestPointTo(point).DistanceTo(point) <= 2 * chordTolerance)
-                            throw new ArgumentException("Internal mark is too close to a material boundary.");
+                            throw new ArgumentException(
+                                "Internal mark is too close to a material boundary."
+                            );
                     var inside = StrictlyInside(polygons[index], point);
                     if (index == 0 ? !inside : inside)
-                        throw new ArgumentException("Open geometry leaves the closed material region.");
+                        throw new ArgumentException(
+                            "Open geometry leaves the closed material region."
+                        );
                 }
             }
         }
@@ -184,19 +223,25 @@ internal static class NestJobPlacementValidator
                 Line line => line.StartPoint,
                 Arc arc => arc.StartPoint(),
                 Circle circle => circle.Center.Offset(circle.Radius, 0),
-                _ => throw new ArgumentException("Unsupported internal geometry.")
+                _ => throw new ArgumentException("Unsupported internal geometry."),
             };
             if (!StrictlyInside(polygons[0], point))
-                throw new ArgumentException("Open or disconnected geometry lies outside the closed perimeter.");
+                throw new ArgumentException(
+                    "Open or disconnected geometry lies outside the closed perimeter."
+                );
             for (var index = 0; index < boundaries.Count; index++)
             {
                 if (index > 0 && polygons[index].ContainsPoint(point))
                     throw new ArgumentException("Internal geometry lies in a cutout.");
                 foreach (var edge in polygons[index].ToLines())
                     if (edge.ClosestPointTo(point).DistanceTo(point) <= 2 * chordTolerance)
-                        throw new ArgumentException("Internal geometry is too close to a material boundary.");
+                        throw new ArgumentException(
+                            "Internal geometry is too close to a material boundary."
+                        );
                 if (entity.Intersects(boundaries[index]))
-                    throw new ArgumentException("Internal geometry crosses or touches a material boundary.");
+                    throw new ArgumentException(
+                        "Internal geometry crosses or touches a material boundary."
+                    );
             }
         }
     }
@@ -232,9 +277,11 @@ internal static class NestJobPlacementValidator
     private static bool FitsWorkArea(ShapeTopology shape, NestPlateStock stock)
     {
         var workArea = WorkArea(stock);
-        if (!FitsWorkArea(shape.Perimeter, workArea)) return false;
+        if (!FitsWorkArea(shape.Perimeter, workArea))
+            return false;
         foreach (var cutout in shape.Cutouts)
-            if (!FitsWorkArea(cutout, workArea)) return false;
+            if (!FitsWorkArea(cutout, workArea))
+                return false;
         return true;
     }
 
@@ -242,16 +289,21 @@ internal static class NestJobPlacementValidator
     {
         var left = stock.Quadrant is 1 or 4 ? 0 : -stock.Size.Length;
         var bottom = stock.Quadrant is 1 or 2 ? 0 : -stock.Size.Width;
-        return new Box(left + stock.EdgeSpacing.Left, bottom + stock.EdgeSpacing.Bottom,
+        return new Box(
+            left + stock.EdgeSpacing.Left,
+            bottom + stock.EdgeSpacing.Bottom,
             stock.Size.Length - stock.EdgeSpacing.Left - stock.EdgeSpacing.Right,
-            stock.Size.Width - stock.EdgeSpacing.Bottom - stock.EdgeSpacing.Top);
+            stock.Size.Width - stock.EdgeSpacing.Bottom - stock.EdgeSpacing.Top
+        );
     }
 
     private static bool FitsWorkArea(Shape contour, Box workArea)
     {
         var bounds = contour.BoundingBox;
-        return bounds.Left >= workArea.Left - Epsilon && bounds.Right <= workArea.Right + Epsilon &&
-            bounds.Bottom >= workArea.Bottom - Epsilon && bounds.Top <= workArea.Top + Epsilon;
+        return bounds.Left >= workArea.Left - Epsilon
+            && bounds.Right <= workArea.Right + Epsilon
+            && bounds.Bottom >= workArea.Bottom - Epsilon
+            && bounds.Top <= workArea.Top + Epsilon;
     }
 
     private static bool Overlaps(ShapeTopology left, ShapeTopology right)
@@ -265,7 +317,12 @@ internal static class NestJobPlacementValidator
         // Collision checks this by clipping triangulated polygons and rejecting zero-area
         // slivers, so it catches containment and small corner intersections that a witness
         // probe can miss, while contact stays legal; cutouts are subtracted from both sides.
-        return Collision.HasOverlap(leftPoly, rightPoly, ToPolygons(left.Cutouts), ToPolygons(right.Cutouts));
+        return Collision.HasOverlap(
+            leftPoly,
+            rightPoly,
+            ToPolygons(left.Cutouts),
+            ToPolygons(right.Cutouts)
+        );
     }
 
     /// <summary>
@@ -274,13 +331,15 @@ internal static class NestJobPlacementValidator
     private static bool StrictlyInside(Polygon polygon, Vector point)
     {
         var n = polygon.IsClosed() ? polygon.Vertices.Count - 1 : polygon.Vertices.Count;
-        if (n < 3) return false;
+        if (n < 3)
+            return false;
         var winding = 0;
         for (var i = 0; i < n; i++)
         {
             var p1 = polygon.Vertices[i];
             var p2 = polygon.Vertices[(i + 1) % n];
-            if (OnSegment(p1, p2, point)) return false;
+            if (OnSegment(p1, p2, point))
+                return false;
             if (p1.Y <= point.Y)
             {
                 if (p2.Y > point.Y && IsLeft(p1, p2, point) > 0)
@@ -297,9 +356,12 @@ internal static class NestJobPlacementValidator
     private static bool OnSegment(Vector a, Vector b, Vector p)
     {
         var cross = (b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X);
-        if (!cross.IsEqualTo(0.0)) return false;
-        return System.Math.Min(a.X, b.X) - Epsilon <= p.X && p.X <= System.Math.Max(a.X, b.X) + Epsilon &&
-               System.Math.Min(a.Y, b.Y) - Epsilon <= p.Y && p.Y <= System.Math.Max(a.Y, b.Y) + Epsilon;
+        if (!cross.IsEqualTo(0.0))
+            return false;
+        return System.Math.Min(a.X, b.X) - Epsilon <= p.X
+            && p.X <= System.Math.Max(a.X, b.X) + Epsilon
+            && System.Math.Min(a.Y, b.Y) - Epsilon <= p.Y
+            && p.Y <= System.Math.Max(a.Y, b.Y) + Epsilon;
     }
 
     private static double IsLeft(Vector p1, Vector p2, Vector p) =>
@@ -309,8 +371,11 @@ internal static class NestJobPlacementValidator
     {
         var result = double.PositiveInfinity;
         foreach (var leftContour in AllContours(left))
-            foreach (var rightContour in AllContours(right))
-                result = System.Math.Min(result, BoundaryDistance(ToPolygon(leftContour), ToPolygon(rightContour)));
+        foreach (var rightContour in AllContours(right))
+            result = System.Math.Min(
+                result,
+                BoundaryDistance(ToPolygon(leftContour), ToPolygon(rightContour))
+            );
         return result;
     }
 
@@ -343,11 +408,24 @@ internal static class NestJobPlacementValidator
         {
             foreach (var rightLine in right.ToLines())
             {
-                if (leftLine.Intersects(rightLine)) return 0;
-                result = System.Math.Min(result, leftLine.ClosestPointTo(rightLine.StartPoint).DistanceTo(rightLine.StartPoint));
-                result = System.Math.Min(result, leftLine.ClosestPointTo(rightLine.EndPoint).DistanceTo(rightLine.EndPoint));
-                result = System.Math.Min(result, rightLine.ClosestPointTo(leftLine.StartPoint).DistanceTo(leftLine.StartPoint));
-                result = System.Math.Min(result, rightLine.ClosestPointTo(leftLine.EndPoint).DistanceTo(leftLine.EndPoint));
+                if (leftLine.Intersects(rightLine))
+                    return 0;
+                result = System.Math.Min(
+                    result,
+                    leftLine.ClosestPointTo(rightLine.StartPoint).DistanceTo(rightLine.StartPoint)
+                );
+                result = System.Math.Min(
+                    result,
+                    leftLine.ClosestPointTo(rightLine.EndPoint).DistanceTo(rightLine.EndPoint)
+                );
+                result = System.Math.Min(
+                    result,
+                    rightLine.ClosestPointTo(leftLine.StartPoint).DistanceTo(leftLine.StartPoint)
+                );
+                result = System.Math.Min(
+                    result,
+                    rightLine.ClosestPointTo(leftLine.EndPoint).DistanceTo(leftLine.EndPoint)
+                );
             }
         }
         return result;

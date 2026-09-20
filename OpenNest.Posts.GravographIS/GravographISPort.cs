@@ -42,8 +42,9 @@ namespace OpenNest.Posts.GravographIS
                 ReadTimeout = WriteTimeoutMs,
                 // DTR/RTS are needed for some USB-serial bridges and for RTS/CTS flow:
                 DtrEnable = true,
-                RtsEnable = handshake != Handshake.RequestToSend &&
-                            handshake != Handshake.RequestToSendXOnXOff,
+                RtsEnable =
+                    handshake != Handshake.RequestToSend
+                    && handshake != Handshake.RequestToSendXOnXOff,
             };
 
             port.Open();
@@ -57,7 +58,8 @@ namespace OpenNest.Posts.GravographIS
         /// </summary>
         public void StreamJob(byte[] data, CancellationToken cancellationToken = default)
         {
-            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
             if (port == null || !port.IsOpen)
                 throw new InvalidOperationException("Port is not open.");
 
@@ -76,16 +78,23 @@ namespace OpenNest.Posts.GravographIS
             // Block until the OS has handed the last bytes to the line. SerialPort
             // doesn't expose flush-and-drain directly; BaseStream.Flush is a no-op
             // on Windows, so this is best-effort.
-            try { port.BaseStream.Flush(); }
-            catch { /* ignored — Flush is advisory on SerialPort */ }
+            try
+            {
+                port.BaseStream.Flush();
+            }
+            catch
+            { /* ignored — Flush is advisory on SerialPort */
+            }
         }
 
         public void Close()
         {
-            if (port == null) return;
+            if (port == null)
+                return;
             try
             {
-                if (port.IsOpen) port.Close();
+                if (port.IsOpen)
+                    port.Close();
             }
             finally
             {

@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -9,18 +9,19 @@ namespace OpenNest.CNC.CuttingStrategy
         public double Length { get; set; }
         public double ApproachAngle { get; set; } = 90.0;
 
-        public override List<ICode> Generate(Vector contourEndPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+        public override List<ICode> Generate(
+            Vector contourEndPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
             var overcutAngle = contourNormalAngle + Angle.HalfPI - Angle.ToRadians(ApproachAngle);
             var endPoint = new Vector(
                 contourEndPoint.X + Length * System.Math.Cos(overcutAngle),
-                contourEndPoint.Y + Length * System.Math.Sin(overcutAngle));
+                contourEndPoint.Y + Length * System.Math.Sin(overcutAngle)
+            );
 
-            return new List<ICode>
-            {
-                new LinearMove(endPoint) { Layer = LayerType.Leadout }
-            };
+            return new List<ICode> { new LinearMove(endPoint) { Layer = LayerType.Leadout } };
         }
     }
 }

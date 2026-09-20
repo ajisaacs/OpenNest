@@ -22,10 +22,24 @@ public class FixedStrategyNestingEngineTests
     public void PreservesJobMaxPlates()
     {
         var engine = new FixedStrategyNestingEngine("Default");
-        var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(100, 100)), 6);
-        var stock = new NestPlateStock("sheet", new Size(220, 220), quantity: null, partSpacing: 2.0,
-            edgeSpacing: new Spacing(5.0, 5.0, 5.0, 5.0), quadrant: 1);
-        var job = new NestJob(new[] { part }, new[] { stock }, new NestJobOptions("Default", maxPlates: 1));
+        var part = new NestJobPart(
+            "part",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(100, 100)),
+            6
+        );
+        var stock = new NestPlateStock(
+            "sheet",
+            new Size(220, 220),
+            quantity: null,
+            partSpacing: 2.0,
+            edgeSpacing: new Spacing(5.0, 5.0, 5.0, 5.0),
+            quadrant: 1
+        );
+        var job = new NestJob(
+            new[] { part },
+            new[] { stock },
+            new NestJobOptions("Default", maxPlates: 1)
+        );
 
         var result = engine.Solve(job);
 

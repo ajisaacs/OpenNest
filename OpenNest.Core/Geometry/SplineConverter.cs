@@ -1,6 +1,6 @@
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -8,7 +8,11 @@ namespace OpenNest.Geometry
     {
         private const int MinPointsForArc = 3;
 
-        public static List<Entity> Convert(List<Vector> points, bool isClosed, double tolerance = 0.001)
+        public static List<Entity> Convert(
+            List<Vector> points,
+            bool isClosed,
+            double tolerance = 0.001
+        )
         {
             if (points == null || points.Count < 2)
                 return new List<Entity>();
@@ -37,8 +41,12 @@ namespace OpenNest.Geometry
             return entities;
         }
 
-        private static ArcFitResult TryFitArc(List<Vector> points, int start,
-            Vector chainedTangent, double tolerance)
+        private static ArcFitResult TryFitArc(
+            List<Vector> points,
+            int start,
+            Vector chainedTangent,
+            double tolerance
+        )
         {
             var minEnd = start + MinPointsForArc - 1;
             if (minEnd >= points.Count)
@@ -83,7 +91,8 @@ namespace OpenNest.Geometry
         }
 
         private static (Vector center, double radius, double deviation) FitCircumscribed(
-            List<Vector> points)
+            List<Vector> points
+        )
         {
             if (points.Count < 3)
                 return (Vector.Invalid, 0, double.MaxValue);
@@ -131,11 +140,16 @@ namespace OpenNest.Geometry
         }
 
         private static (Vector center, double radius, double deviation) FitWithStartTangent(
-            List<Vector> points, Vector tangent) =>
-            ArcFit.FitWithStartTangent(points, tangent);
+            List<Vector> points,
+            Vector tangent
+        ) => ArcFit.FitWithStartTangent(points, tangent);
 
-        private static double MaxRadialDeviation(List<Vector> points, double cx, double cy, double radius) =>
-            ArcFit.MaxRadialDeviation(points, cx, cy, radius);
+        private static double MaxRadialDeviation(
+            List<Vector> points,
+            double cx,
+            double cy,
+            double radius
+        ) => ArcFit.MaxRadialDeviation(points, cx, cy, radius);
 
         private static double SumSignedAngles(Vector center, List<Vector> points)
         {
@@ -145,8 +159,10 @@ namespace OpenNest.Geometry
                 var a1 = System.Math.Atan2(points[i].Y - center.Y, points[i].X - center.X);
                 var a2 = System.Math.Atan2(points[i + 1].Y - center.Y, points[i + 1].X - center.X);
                 var da = a2 - a1;
-                while (da > System.Math.PI) da -= Angle.TwoPI;
-                while (da < -System.Math.PI) da += Angle.TwoPI;
+                while (da > System.Math.PI)
+                    da -= Angle.TwoPI;
+                while (da < -System.Math.PI)
+                    da += Angle.TwoPI;
                 total += da;
             }
             return total;
@@ -160,9 +176,7 @@ namespace OpenNest.Geometry
             var rx = lastPt.X - center.X;
             var ry = lastPt.Y - center.Y;
 
-            return totalAngle >= 0
-                ? new Vector(-ry, rx)
-                : new Vector(ry, -rx);
+            return totalAngle >= 0 ? new Vector(-ry, rx) : new Vector(ry, -rx);
         }
 
         private static Arc CreateArc(Vector center, double radius, List<Vector> points)
@@ -174,8 +188,10 @@ namespace OpenNest.Geometry
             var endAngle = System.Math.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X);
             var isReversed = SumSignedAngles(center, points) < 0;
 
-            if (startAngle < 0) startAngle += Angle.TwoPI;
-            if (endAngle < 0) endAngle += Angle.TwoPI;
+            if (startAngle < 0)
+                startAngle += Angle.TwoPI;
+            if (endAngle < 0)
+                endAngle += Angle.TwoPI;
 
             return new Arc(center, radius, startAngle, endAngle, isReversed);
         }

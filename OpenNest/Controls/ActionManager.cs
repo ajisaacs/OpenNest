@@ -25,7 +25,10 @@ namespace OpenNest.Controls
 
             if (currentAction != null)
             {
-                if (type == typeof(Actions.ActionSelect) && !(currentAction is Actions.ActionSelect))
+                if (
+                    type == typeof(Actions.ActionSelect)
+                    && !(currentAction is Actions.ActionSelect)
+                )
                     previousAction = currentAction;
                 else
                     previousAction = null;

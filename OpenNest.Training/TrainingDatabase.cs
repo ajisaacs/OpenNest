@@ -1,12 +1,12 @@
-using Microsoft.EntityFrameworkCore;
-using OpenNest.Engine.ML;
-using OpenNest.IO;
-using OpenNest.Training.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using OpenNest.Engine.ML;
+using OpenNest.IO;
+using OpenNest.Training.Data;
 
 namespace OpenNest.Training
 {
@@ -27,7 +27,8 @@ namespace OpenNest.Training
         public long GetOrAddPart(string fileName, PartFeatures features, string geometryData)
         {
             var existing = _db.Parts.FirstOrDefault(p => p.FileName == fileName);
-            if (existing != null) return existing.Id;
+            if (existing != null)
+                return existing.Id;
 
             var part = new TrainingPart
             {
@@ -40,7 +41,7 @@ namespace OpenNest.Training
                 PerimeterToAreaRatio = features.PerimeterToAreaRatio,
                 VertexCount = features.VertexCount,
                 Bitmask = features.Bitmask,
-                GeometryData = geometryData
+                GeometryData = geometryData,
             };
 
             _db.Parts.Add(part);
@@ -51,10 +52,11 @@ namespace OpenNest.Training
         public bool HasRun(string fileName, double sheetWidth, double sheetHeight, double spacing)
         {
             return _db.Runs.Any(r =>
-                r.Part.FileName == fileName &&
-                r.SheetWidth == sheetWidth &&
-                r.SheetHeight == sheetHeight &&
-                r.Spacing == spacing);
+                r.Part.FileName == fileName
+                && r.SheetWidth == sheetWidth
+                && r.SheetHeight == sheetHeight
+                && r.Spacing == spacing
+            );
         }
 
         public int RunCount(string fileName)
@@ -62,7 +64,15 @@ namespace OpenNest.Training
             return _db.Runs.Count(r => r.Part.FileName == fileName);
         }
 
-        public void AddRun(long partId, double w, double h, double s, BruteForceResult result, string filePath, List<AngleResult> angleResults = null)
+        public void AddRun(
+            long partId,
+            double w,
+            double h,
+            double s,
+            BruteForceResult result,
+            string filePath,
+            List<AngleResult> angleResults = null
+        )
         {
             var run = new TrainingRun
             {
@@ -82,7 +92,7 @@ namespace OpenNest.Training
                 RunnerUpTimeMs = result.RunnerUpTimeMs,
                 ThirdPlaceEngine = result.ThirdPlaceEngine ?? "",
                 ThirdPlacePartCount = result.ThirdPlacePartCount,
-                ThirdPlaceTimeMs = result.ThirdPlaceTimeMs
+                ThirdPlaceTimeMs = result.ThirdPlaceTimeMs,
             };
 
             _db.Runs.Add(run);
@@ -91,13 +101,15 @@ namespace OpenNest.Training
             {
                 foreach (var ar in angleResults)
                 {
-                    _db.AngleResults.Add(new Data.TrainingAngleResult
-                    {
-                        Run = run,
-                        AngleDeg = ar.AngleDeg,
-                        Direction = ar.Direction.ToString(),
-                        PartCount = ar.PartCount
-                    });
+                    _db.AngleResults.Add(
+                        new Data.TrainingAngleResult
+                        {
+                            Run = run,
+                            AngleDeg = ar.AngleDeg,
+                            Direction = ar.Direction.ToString(),
+                            PartCount = ar.PartCount,
+                        }
+                    );
                 }
             }
 
@@ -106,12 +118,13 @@ namespace OpenNest.Training
 
         public int BackfillPerimeterToAreaRatio()
         {
-            var partsToFix = _db.Parts
-                .Where(p => p.PerimeterToAreaRatio == 0)
+            var partsToFix = _db
+                .Parts.Where(p => p.PerimeterToAreaRatio == 0)
                 .Select(p => new { p.Id, p.GeometryData })
                 .ToList();
 
-            if (partsToFix.Count == 0) return 0;
+            if (partsToFix.Count == 0)
+                return 0;
 
             var updated = 0;
             foreach (var item in partsToFix)
@@ -126,7 +139,8 @@ namespace OpenNest.Training
                     drawing.UpdateArea();
 
                     var features = FeatureExtractor.Extract(drawing);
-                    if (features == null) continue;
+                    if (features == null)
+                        continue;
 
                     var part = _db.Parts.Find(item.Id);
                     part.PerimeterToAreaRatio = features.PerimeterToAreaRatio;
@@ -170,7 +184,8 @@ namespace OpenNest.Training
 
             try
             {
-                _db.Database.ExecuteSqlRaw(@"
+                _db.Database.ExecuteSqlRaw(
+                    @"
                     CREATE TABLE IF NOT EXISTS AngleResults (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         RunId INTEGER NOT NULL,
@@ -178,9 +193,11 @@ namespace OpenNest.Training
                         Direction TEXT NOT NULL,
                         PartCount INTEGER NOT NULL,
                         FOREIGN KEY (RunId) REFERENCES Runs(Id)
-                    )");
+                    )"
+                );
                 _db.Database.ExecuteSqlRaw(
-                    "CREATE INDEX IF NOT EXISTS idx_angleresults_runid ON AngleResults (RunId)");
+                    "CREATE INDEX IF NOT EXISTS idx_angleresults_runid ON AngleResults (RunId)"
+                );
             }
             catch
             {

@@ -10,24 +10,46 @@ public static class DrawingJobMapper
     {
         ArgumentNullException.ThrowIfNull(drawing);
         var constraints = drawing.Constraints;
-        return new NestJobPart(partId, PartGeometrySnapshot.FromProgram(drawing.Program), quantity, drawing.Priority,
-            constraints == null ? RotationPolicy.Automatic :
-                RotationPolicy.FromLegacy(constraints.StepAngle, constraints.StartAngle, constraints.EndAngle));
+        return new NestJobPart(
+            partId,
+            PartGeometrySnapshot.FromProgram(drawing.Program),
+            quantity,
+            drawing.Priority,
+            constraints == null
+                ? RotationPolicy.Automatic
+                : RotationPolicy.FromLegacy(
+                    constraints.StepAngle,
+                    constraints.StartAngle,
+                    constraints.EndAngle
+                )
+        );
     }
 
     public static NestJobPart FromItem(string partId, NestItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(item.Drawing);
-        return new NestJobPart(partId, PartGeometrySnapshot.FromProgram(item.Drawing.Program), item.Quantity,
-            item.Priority, RotationPolicy.FromLegacy(item.StepAngle, item.RotationStart, item.RotationEnd));
+        return new NestJobPart(
+            partId,
+            PartGeometrySnapshot.FromProgram(item.Drawing.Program),
+            item.Quantity,
+            item.Priority,
+            RotationPolicy.FromLegacy(item.StepAngle, item.RotationStart, item.RotationEnd)
+        );
     }
 
     /// <summary>Available stock is explicit; the legacy plate repeat count is not inventory.</summary>
     public static NestPlateStock FromPlate(string stockId, Plate plate, int? quantity)
     {
         ArgumentNullException.ThrowIfNull(plate);
-        return new NestPlateStock(stockId, plate.Size, quantity, plate.PartSpacing, plate.EdgeSpacing, plate.Quadrant);
+        return new NestPlateStock(
+            stockId,
+            plate.Size,
+            quantity,
+            plate.PartSpacing,
+            plate.EdgeSpacing,
+            plate.Quadrant
+        );
     }
 
     public static Program ToProgram(PartGeometrySnapshot geometry)
@@ -40,9 +62,17 @@ public static class DrawingJobMapper
             {
                 CodeType.RapidMove => (Motion)new RapidMove(motion.X, motion.Y),
                 CodeType.LinearMove => new LinearMove(motion.X, motion.Y) { Layer = motion.Layer },
-                CodeType.ArcMove => new ArcMove(motion.X, motion.Y, motion.CenterX, motion.CenterY, motion.Rotation)
-                    { Layer = motion.Layer },
-                _ => throw new NotSupportedException("Unsupported snapshot motion.")
+                CodeType.ArcMove => new ArcMove(
+                    motion.X,
+                    motion.Y,
+                    motion.CenterX,
+                    motion.CenterY,
+                    motion.Rotation
+                )
+                {
+                    Layer = motion.Layer,
+                },
+                _ => throw new NotSupportedException("Unsupported snapshot motion."),
             };
             code.Suppressed = motion.Suppressed;
             program.Codes.Add(code);
@@ -58,20 +88,21 @@ public static class DrawingJobMapper
         {
             StepAngle = LegacyStep(part.Rotation),
             StartAngle = part.Rotation.Start,
-            EndAngle = part.Rotation.End
+            EndAngle = part.Rotation.End,
         };
         return drawing;
     }
 
     // A fixed angle needs a nonzero legacy step so it is not misread as automatic.
-    internal static double LegacyStep(RotationPolicy policy) => policy.Kind == RotationPolicyKind.Fixed
-        ? OpenNest.Math.Angle.TwoPI : policy.Step;
+    internal static double LegacyStep(RotationPolicy policy) =>
+        policy.Kind == RotationPolicyKind.Fixed ? OpenNest.Math.Angle.TwoPI : policy.Step;
 
-    internal static Plate CreatePlate(NestPlateStock stock) => new(stock.Size)
-    {
-        Quantity = 1,
-        PartSpacing = stock.PartSpacing,
-        EdgeSpacing = stock.EdgeSpacing,
-        Quadrant = stock.Quadrant
-    };
+    internal static Plate CreatePlate(NestPlateStock stock) =>
+        new(stock.Size)
+        {
+            Quantity = 1,
+            PartSpacing = stock.PartSpacing,
+            EdgeSpacing = stock.EdgeSpacing,
+            Quadrant = stock.Quadrant,
+        };
 }

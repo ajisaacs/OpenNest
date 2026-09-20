@@ -1,6 +1,6 @@
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Nfp
 {
@@ -12,10 +12,10 @@ namespace OpenNest.Engine.Nfp
     public class NfpCache
     {
         private readonly Dictionary<NfpKey, Polygon> cache = new Dictionary<NfpKey, Polygon>();
-        private readonly Dictionary<int, Dictionary<double, Polygon>> polygonCache
-            = new Dictionary<int, Dictionary<double, Polygon>>();
-        private readonly Dictionary<(int drawingId, double rotation), Polygon> ifpCache
-            = new Dictionary<(int drawingId, double rotation), Polygon>();
+        private readonly Dictionary<int, Dictionary<double, Polygon>> polygonCache =
+            new Dictionary<int, Dictionary<double, Polygon>>();
+        private readonly Dictionary<(int drawingId, double rotation), Polygon> ifpCache =
+            new Dictionary<(int drawingId, double rotation), Polygon>();
 
         /// <summary>
         /// Registers a pre-computed polygon for a drawing at a specific rotation.
@@ -107,8 +107,12 @@ namespace OpenNest.Engine.Nfp
             {
                 for (var j = 0; j < entries.Count; j++)
                 {
-                    Get(entries[i].drawingId, entries[i].rotation,
-                        entries[j].drawingId, entries[j].rotation);
+                    Get(
+                        entries[i].drawingId,
+                        entries[i].rotation,
+                        entries[j].drawingId,
+                        entries[j].rotation
+                    );
                 }
             }
         }
@@ -136,9 +140,9 @@ namespace OpenNest.Engine.Nfp
             public bool Equals(NfpKey other)
             {
                 return DrawingIdA == other.DrawingIdA
-                       && RotationA == other.RotationA
-                       && DrawingIdB == other.DrawingIdB
-                       && RotationB == other.RotationB;
+                    && RotationA == other.RotationA
+                    && DrawingIdB == other.DrawingIdB
+                    && RotationB == other.RotationB;
             }
 
             public override bool Equals(object obj) => obj is NfpKey key && Equals(key);

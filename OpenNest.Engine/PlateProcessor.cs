@@ -1,10 +1,10 @@
+using System.Collections.Generic;
+using System.Linq;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Engine.RapidPlanning;
 using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace OpenNest.Engine
 {
@@ -61,7 +61,11 @@ namespace OpenNest.Engine
                     if (i + 1 < sequenced.Count)
                     {
                         var nextStart = ToPartLocal(piercePoints[i + 1], part);
-                        cuttingResult = CuttingStrategy.Apply(part.Program, localApproach, nextStart);
+                        cuttingResult = CuttingStrategy.Apply(
+                            part.Program,
+                            localApproach,
+                            nextStart
+                        );
                     }
                     else
                     {
@@ -82,12 +86,14 @@ namespace OpenNest.Engine
 
                 var rapidPath = RapidPlanner.Plan(currentPoint, piercePoint, cutAreas);
 
-                results.Add(new ProcessedPart
-                {
-                    Part = part,
-                    ProcessedProgram = processedProgram,
-                    RapidPath = rapidPath
-                });
+                results.Add(
+                    new ProcessedPart
+                    {
+                        Part = part,
+                        ProcessedProgram = processedProgram,
+                        RapidPath = rapidPath,
+                    }
+                );
 
                 var perimeter = GetPartPerimeter(part);
                 if (perimeter != null)

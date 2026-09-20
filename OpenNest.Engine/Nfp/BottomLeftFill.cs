@@ -1,8 +1,8 @@
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using Clipper2Lib;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Nfp
 {
@@ -14,7 +14,9 @@ namespace OpenNest.Engine.Nfp
     public class BottomLeftFill
     {
         private static readonly string DebugLogPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "nest-debug.log");
+            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+            "nest-debug.log"
+        );
 
         private readonly Box workArea;
         private readonly NfpCache nfpCache;
@@ -34,7 +36,9 @@ namespace OpenNest.Engine.Nfp
             var placedParts = new List<PlacedPart>();
 
             using var log = new StreamWriter(DebugLogPath, false);
-            log.WriteLine($"[BLF] {DateTime.Now:HH:mm:ss.fff}  workArea: X={workArea.X} Y={workArea.Y} W={workArea.Width} H={workArea.Length}  Right={workArea.Right} Top={workArea.Top}");
+            log.WriteLine(
+                $"[BLF] {DateTime.Now:HH:mm:ss.fff}  workArea: X={workArea.X} Y={workArea.Y} W={workArea.Width} H={workArea.Length}  Right={workArea.Right} Top={workArea.Top}"
+            );
             log.WriteLine($"[BLF] Sequence count: {sequence.Count}");
 
             foreach (var entry in sequence)
@@ -43,13 +47,22 @@ namespace OpenNest.Engine.Nfp
 
                 if (ifp.Vertices.Count < 3)
                 {
-                    log.WriteLine($"[BLF] DrawingId={entry.DrawingId} rot={entry.Rotation:F3}  SKIPPED (IFP has {ifp.Vertices.Count} verts)");
+                    log.WriteLine(
+                        $"[BLF] DrawingId={entry.DrawingId} rot={entry.Rotation:F3}  SKIPPED (IFP has {ifp.Vertices.Count} verts)"
+                    );
                     continue;
                 }
 
-                log.WriteLine($"[BLF] DrawingId={entry.DrawingId} rot={entry.Rotation:F3}  IFP verts={ifp.Vertices.Count} bounds=({ifp.BoundingBox.X:F2},{ifp.BoundingBox.Y:F2},{ifp.BoundingBox.Width:F2},{ifp.BoundingBox.Length:F2})");
+                log.WriteLine(
+                    $"[BLF] DrawingId={entry.DrawingId} rot={entry.Rotation:F3}  IFP verts={ifp.Vertices.Count} bounds=({ifp.BoundingBox.X:F2},{ifp.BoundingBox.Y:F2},{ifp.BoundingBox.Width:F2},{ifp.BoundingBox.Length:F2})"
+                );
 
-                var nfpPaths = ComputeNfpPaths(placedParts, entry.DrawingId, entry.Rotation, ifp.BoundingBox);
+                var nfpPaths = ComputeNfpPaths(
+                    placedParts,
+                    entry.DrawingId,
+                    entry.Rotation,
+                    ifp.BoundingBox
+                );
                 var feasible = InnerFitPolygon.ComputeFeasibleRegion(ifp, nfpPaths);
                 var point = InnerFitPolygon.FindBottomLeftPoint(feasible);
 
@@ -63,17 +76,22 @@ namespace OpenNest.Engine.Nfp
                 var ifpBb = ifp.BoundingBox;
                 point = new Vector(
                     System.Math.Max(ifpBb.X, System.Math.Min(ifpBb.Right, point.X)),
-                    System.Math.Max(ifpBb.Y, System.Math.Min(ifpBb.Top, point.Y)));
+                    System.Math.Max(ifpBb.Y, System.Math.Min(ifpBb.Top, point.Y))
+                );
 
-                log.WriteLine($"[BLF]   -> placed at ({point.X:F4}, {point.Y:F4})  nfpPaths={nfpPaths.Count} feasibleVerts={feasible.Vertices.Count}");
+                log.WriteLine(
+                    $"[BLF]   -> placed at ({point.X:F4}, {point.Y:F4})  nfpPaths={nfpPaths.Count} feasibleVerts={feasible.Vertices.Count}"
+                );
 
-                placedParts.Add(new PlacedPart
-                {
-                    DrawingId = entry.DrawingId,
-                    Rotation = entry.Rotation,
-                    Position = point,
-                    Drawing = entry.Drawing
-                });
+                placedParts.Add(
+                    new PlacedPart
+                    {
+                        DrawingId = entry.DrawingId,
+                        Rotation = entry.Rotation,
+                        Position = point,
+                        Drawing = entry.Drawing,
+                    }
+                );
             }
 
             log.WriteLine($"[BLF] Total placed: {placedParts.Count}/{sequence.Count}");
@@ -106,7 +124,12 @@ namespace OpenNest.Engine.Nfp
         /// returned as Clipper paths with translations applied.
         /// Filters NFPs that don't intersect the target IFP.
         /// </summary>
-        private PathsD ComputeNfpPaths(List<PlacedPart> placedParts, int drawingId, double rotation, Box ifpBounds)
+        private PathsD ComputeNfpPaths(
+            List<PlacedPart> placedParts,
+            int drawingId,
+            double rotation,
+            Box ifpBounds
+        )
         {
             var nfpPaths = new PathsD(placedParts.Count);
 

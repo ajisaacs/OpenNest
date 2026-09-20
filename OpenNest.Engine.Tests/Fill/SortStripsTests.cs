@@ -25,7 +25,7 @@ public class SortStripsTests
         // shortest, then medium). The tallest column's original position leaves a
         // 5-unit gap to its neighbor; that single sampled gap must not get replayed
         // as the spacing for the whole staircase once it's no longer the leading pair.
-        var tall = MakeRectPart(0, 0, 10, 30);    // Left 0-10,  gap of 5 to next
+        var tall = MakeRectPart(0, 0, 10, 30); // Left 0-10,  gap of 5 to next
         var shortCol = MakeRectPart(15, 0, 5, 5); // Left 15-20, gap of 1 to next
         var medium = MakeRectPart(21, 0, 20, 15); // Left 21-41
 
@@ -40,7 +40,9 @@ public class SortStripsTests
         var newLeft = parts.Min(p => p.BoundingBox.Left);
         var newSpan = newRight - newLeft;
 
-        Assert.True(newSpan <= originalSpan + 1e-9,
-            $"Resequenced columns must not exceed the original footprint: original span {originalSpan}, new span {newSpan}");
+        Assert.True(
+            newSpan <= originalSpan + 1e-9,
+            $"Resequenced columns must not exceed the original footprint: original span {originalSpan}, new span {newSpan}"
+        );
     }
 }

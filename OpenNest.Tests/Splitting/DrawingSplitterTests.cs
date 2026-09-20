@@ -9,7 +9,12 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_Rectangle_Vertical_ProducesTwoPieces()
     {
-        var drawing = new RectangleShape { Name = "RECT", Length = 100, Width = 50 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "RECT",
+            Length = 100,
+            Width = 50,
+        }.GetDrawing();
         var splitLines = new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Vertical) };
         var parameters = new SplitParameters { Type = SplitType.Straight };
 
@@ -27,7 +32,12 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_Rectangle_Horizontal_ProducesTwoPieces()
     {
-        var drawing = new RectangleShape { Name = "RECT", Length = 100, Width = 60 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "RECT",
+            Length = 100,
+            Width = 60,
+        }.GetDrawing();
         var splitLines = new List<SplitLine> { new SplitLine(30.0, CutOffAxis.Horizontal) };
         var parameters = new SplitParameters { Type = SplitType.Straight };
 
@@ -41,11 +51,16 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_ThreePieces_NamesSequentially()
     {
-        var drawing = new RectangleShape { Name = "PART", Length = 150, Width = 50 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "PART",
+            Length = 150,
+            Width = 50,
+        }.GetDrawing();
         var splitLines = new List<SplitLine>
         {
             new SplitLine(50.0, CutOffAxis.Vertical),
-            new SplitLine(100.0, CutOffAxis.Vertical)
+            new SplitLine(100.0, CutOffAxis.Vertical),
         };
         var parameters = new SplitParameters { Type = SplitType.Straight };
 
@@ -60,28 +75,45 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_CopiesDrawingProperties()
     {
-        var drawing = new RectangleShape { Name = "PART", Length = 100, Width = 50 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "PART",
+            Length = 100,
+            Width = 50,
+        }.GetDrawing();
         drawing.Color = System.Drawing.Color.Red;
         drawing.Priority = 5;
 
-        var results = DrawingSplitter.Split(drawing,
+        var results = DrawingSplitter.Split(
+            drawing,
             new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Vertical) },
-            new SplitParameters());
+            new SplitParameters()
+        );
 
-        Assert.All(results, d =>
-        {
-            Assert.Equal(System.Drawing.Color.Red, d.Color);
-            Assert.Equal(5, d.Priority);
-        });
+        Assert.All(
+            results,
+            d =>
+            {
+                Assert.Equal(System.Drawing.Color.Red, d.Color);
+                Assert.Equal(5, d.Priority);
+            }
+        );
     }
 
     [Fact]
     public void Split_PiecesNormalizedToOrigin()
     {
-        var drawing = new RectangleShape { Name = "PART", Length = 100, Width = 50 }.GetDrawing();
-        var results = DrawingSplitter.Split(drawing,
+        var drawing = new RectangleShape
+        {
+            Name = "PART",
+            Length = 100,
+            Width = 50,
+        }.GetDrawing();
+        var results = DrawingSplitter.Split(
+            drawing,
             new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Vertical) },
-            new SplitParameters());
+            new SplitParameters()
+        );
 
         // Each piece's program bounding box should start near (0,0)
         foreach (var d in results)
@@ -101,14 +133,14 @@ public class DrawingSplitterTests
             new Line(new Vector(0, 0), new Vector(100, 0)),
             new Line(new Vector(100, 0), new Vector(100, 50)),
             new Line(new Vector(100, 50), new Vector(0, 50)),
-            new Line(new Vector(0, 50), new Vector(0, 0))
+            new Line(new Vector(0, 50), new Vector(0, 0)),
         };
         var cutoutEntities = new List<Entity>
         {
             new Line(new Vector(20, 20), new Vector(30, 20)),
             new Line(new Vector(30, 20), new Vector(30, 30)),
             new Line(new Vector(30, 30), new Vector(20, 30)),
-            new Line(new Vector(20, 30), new Vector(20, 20))
+            new Line(new Vector(20, 30), new Vector(20, 20)),
         };
         var allEntities = new List<Entity>();
         allEntities.AddRange(perimeterEntities);
@@ -118,24 +150,33 @@ public class DrawingSplitterTests
         var drawing = new Drawing("HOLE", pgm);
 
         // Split at X=50 — cutout is in the left half
-        var results = DrawingSplitter.Split(drawing,
+        var results = DrawingSplitter.Split(
+            drawing,
             new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Vertical) },
-            new SplitParameters());
+            new SplitParameters()
+        );
 
         Assert.Equal(2, results.Count);
         // Left piece should have smaller area (has the cutout)
-        Assert.True(results[0].Area < results[1].Area,
-            "Left piece should have less area due to cutout");
+        Assert.True(
+            results[0].Area < results[1].Area,
+            "Left piece should have less area due to cutout"
+        );
     }
 
     [Fact]
     public void Split_GridSplit_ProducesFourPieces()
     {
-        var drawing = new RectangleShape { Name = "GRID", Length = 100, Width = 100 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "GRID",
+            Length = 100,
+            Width = 100,
+        }.GetDrawing();
         var splitLines = new List<SplitLine>
         {
             new SplitLine(50.0, CutOffAxis.Vertical),
-            new SplitLine(50.0, CutOffAxis.Horizontal)
+            new SplitLine(50.0, CutOffAxis.Horizontal),
         };
         var results = DrawingSplitter.Split(drawing, splitLines, new SplitParameters());
 
@@ -149,7 +190,12 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_Square_Vertical_PieceWidthsSumToOriginal()
     {
-        var drawing = new RectangleShape { Name = "SQ", Length = 100, Width = 100 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "SQ",
+            Length = 100,
+            Width = 100,
+        }.GetDrawing();
         var splitLines = new List<SplitLine> { new SplitLine(40.0, CutOffAxis.Vertical) };
         var parameters = new SplitParameters { Type = SplitType.Straight };
 
@@ -171,7 +217,12 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_Square_Horizontal_PieceHeightsSumToOriginal()
     {
-        var drawing = new RectangleShape { Name = "SQ", Length = 100, Width = 100 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "SQ",
+            Length = 100,
+            Width = 100,
+        }.GetDrawing();
         var splitLines = new List<SplitLine> { new SplitLine(60.0, CutOffAxis.Horizontal) };
         var parameters = new SplitParameters { Type = SplitType.Straight };
 
@@ -193,7 +244,12 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_Square_Vertical_AreaPreserved()
     {
-        var drawing = new RectangleShape { Name = "SQ", Length = 100, Width = 100 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "SQ",
+            Length = 100,
+            Width = 100,
+        }.GetDrawing();
         var originalArea = drawing.Area;
         var splitLines = new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Vertical) };
         var parameters = new SplitParameters { Type = SplitType.Straight };
@@ -207,7 +263,12 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_Square_Vertical_PiecesAreClosedPerimeters()
     {
-        var drawing = new RectangleShape { Name = "SQ", Length = 100, Width = 100 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "SQ",
+            Length = 100,
+            Width = 100,
+        }.GetDrawing();
         var splitLines = new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Vertical) };
         var parameters = new SplitParameters { Type = SplitType.Straight };
 
@@ -215,17 +276,24 @@ public class DrawingSplitterTests
 
         foreach (var piece in results)
         {
-            var entities = ConvertProgram.ToGeometry(piece.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var entities = ConvertProgram
+                .ToGeometry(piece.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
 
-            Assert.True(entities.Count >= 4, $"{piece.Name} should have at least 4 entities for a rectangle");
+            Assert.True(
+                entities.Count >= 4,
+                $"{piece.Name} should have at least 4 entities for a rectangle"
+            );
 
             // First entity start should connect to last entity end (closed shape)
             var firstStart = GetStartPoint(entities[0]);
             var lastEnd = GetEndPoint(entities[^1]);
             var closingGap = firstStart.DistanceTo(lastEnd);
-            Assert.True(closingGap < 0.01,
-                $"{piece.Name} is not closed: gap of {closingGap:F6} between last end and first start");
+            Assert.True(
+                closingGap < 0.01,
+                $"{piece.Name} is not closed: gap of {closingGap:F6} between last end and first start"
+            );
 
             // Consecutive entities should connect
             for (var i = 0; i < entities.Count - 1; i++)
@@ -233,8 +301,10 @@ public class DrawingSplitterTests
                 var end = GetEndPoint(entities[i]);
                 var start = GetStartPoint(entities[i + 1]);
                 var gap = end.DistanceTo(start);
-                Assert.True(gap < 0.01,
-                    $"Gap of {gap:F6} between entities {i} and {i + 1} in {piece.Name}");
+                Assert.True(
+                    gap < 0.01,
+                    $"Gap of {gap:F6} between entities {i} and {i + 1} in {piece.Name}"
+                );
             }
         }
     }
@@ -242,7 +312,12 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_Square_Horizontal_PiecesAreClosedPerimeters()
     {
-        var drawing = new RectangleShape { Name = "SQ", Length = 100, Width = 100 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "SQ",
+            Length = 100,
+            Width = 100,
+        }.GetDrawing();
         var splitLines = new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Horizontal) };
         var parameters = new SplitParameters { Type = SplitType.Straight };
 
@@ -250,24 +325,33 @@ public class DrawingSplitterTests
 
         foreach (var piece in results)
         {
-            var entities = ConvertProgram.ToGeometry(piece.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var entities = ConvertProgram
+                .ToGeometry(piece.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
 
-            Assert.True(entities.Count >= 4, $"{piece.Name} should have at least 4 entities for a rectangle");
+            Assert.True(
+                entities.Count >= 4,
+                $"{piece.Name} should have at least 4 entities for a rectangle"
+            );
 
             var firstStart = GetStartPoint(entities[0]);
             var lastEnd = GetEndPoint(entities[^1]);
             var closingGap = firstStart.DistanceTo(lastEnd);
-            Assert.True(closingGap < 0.01,
-                $"{piece.Name} is not closed: gap of {closingGap:F6} between last end and first start");
+            Assert.True(
+                closingGap < 0.01,
+                $"{piece.Name} is not closed: gap of {closingGap:F6} between last end and first start"
+            );
 
             for (var i = 0; i < entities.Count - 1; i++)
             {
                 var end = GetEndPoint(entities[i]);
                 var start = GetStartPoint(entities[i + 1]);
                 var gap = end.DistanceTo(start);
-                Assert.True(gap < 0.01,
-                    $"Gap of {gap:F6} between entities {i} and {i + 1} in {piece.Name}");
+                Assert.True(
+                    gap < 0.01,
+                    $"Gap of {gap:F6} between entities {i} and {i + 1} in {piece.Name}"
+                );
             }
         }
     }
@@ -275,7 +359,12 @@ public class DrawingSplitterTests
     [Fact]
     public void Split_Square_AsymmetricSplit_PieceDimensionsMatchSplitPosition()
     {
-        var drawing = new RectangleShape { Name = "SQ", Length = 100, Width = 100 }.GetDrawing();
+        var drawing = new RectangleShape
+        {
+            Name = "SQ",
+            Length = 100,
+            Width = 100,
+        }.GetDrawing();
         var splitLines = new List<SplitLine> { new SplitLine(30.0, CutOffAxis.Vertical) };
         var parameters = new SplitParameters { Type = SplitType.Straight };
 
@@ -301,7 +390,7 @@ public class DrawingSplitterTests
             new Line(new Vector(0, 0), new Vector(100, 0)),
             new Line(new Vector(100, 0), new Vector(100, 50)),
             new Line(new Vector(100, 50), new Vector(0, 50)),
-            new Line(new Vector(0, 50), new Vector(0, 0))
+            new Line(new Vector(0, 50), new Vector(0, 0)),
         };
         var hole = new Circle(new Vector(20, 25), 3);
         var allEntities = new List<Entity>();
@@ -311,24 +400,32 @@ public class DrawingSplitterTests
         var pgm = ConvertGeometry.ToProgram(allEntities);
         var drawing = new Drawing("CIRC", pgm);
 
-        var results = DrawingSplitter.Split(drawing,
+        var results = DrawingSplitter.Split(
+            drawing,
             new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Vertical) },
-            new SplitParameters());
+            new SplitParameters()
+        );
 
         Assert.Equal(2, results.Count);
 
         // Left piece should have the hole — verify by checking it has arc entities
-        var leftEntities = ConvertProgram.ToGeometry(results[0].Program)
-            .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+        var leftEntities = ConvertProgram
+            .ToGeometry(results[0].Program)
+            .Where(e => e.Layer != SpecialLayers.Rapid)
+            .ToList();
         var leftArcs = leftEntities.OfType<Arc>().ToList();
 
         // Decomposed circle = 2 arcs. Both should be present.
-        Assert.True(leftArcs.Count >= 2,
-            $"Left piece should have at least 2 arcs (full circle), but has {leftArcs.Count}");
+        Assert.True(
+            leftArcs.Count >= 2,
+            $"Left piece should have at least 2 arcs (full circle), but has {leftArcs.Count}"
+        );
 
         // Right piece should have no arcs (hole is on the left)
-        var rightEntities = ConvertProgram.ToGeometry(results[1].Program)
-            .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+        var rightEntities = ConvertProgram
+            .ToGeometry(results[1].Program)
+            .Where(e => e.Layer != SpecialLayers.Rapid)
+            .ToList();
         var rightArcs = rightEntities.OfType<Arc>().ToList();
         Assert.Equal(0, rightArcs.Count);
     }
@@ -344,7 +441,7 @@ public class DrawingSplitterTests
             new Line(new Vector(0, 0), new Vector(100, 0)),
             new Line(new Vector(100, 0), new Vector(100, 50)),
             new Line(new Vector(100, 50), new Vector(0, 50)),
-            new Line(new Vector(0, 50), new Vector(0, 0))
+            new Line(new Vector(0, 50), new Vector(0, 0)),
         };
         var hole = new Circle(new Vector(20, 25), 3);
         var allEntities = new List<Entity>();
@@ -356,14 +453,19 @@ public class DrawingSplitterTests
         drawing.Bends = new List<OpenNest.Bending.Bend>();
 
         // Split — the circle gets decomposed into two arcs
-        var results = DrawingSplitter.Split(drawing,
+        var results = DrawingSplitter.Split(
+            drawing,
             new List<SplitLine> { new SplitLine(50.0, CutOffAxis.Vertical) },
-            new SplitParameters());
+            new SplitParameters()
+        );
 
         Assert.Equal(2, results.Count);
 
         // Write left piece to DXF and re-import
-        var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "split_roundtrip_test.dxf");
+        var tempPath = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "split_roundtrip_test.dxf"
+        );
         try
         {
             var writer = new OpenNest.IO.SplitDxfWriter();
@@ -374,8 +476,10 @@ public class DrawingSplitterTests
             var afterArcs = reimportResult.Entities.OfType<Arc>().Count();
             var afterCircles = reimportResult.Entities.OfType<Circle>().Count();
 
-            Assert.True(afterArcs + afterCircles * 2 >= 2,
-                $"After DXF round-trip: {afterArcs} arcs, {afterCircles} circles (expected 2+ for full hole)");
+            Assert.True(
+                afterArcs + afterCircles * 2 >= 2,
+                $"After DXF round-trip: {afterArcs} arcs, {afterCircles} circles (expected 2+ for full hole)"
+            );
         }
         finally
         {
@@ -401,14 +505,14 @@ public class DrawingSplitterTests
             new Line(new Vector(0, 0), new Vector(255, 0)),
             new Line(new Vector(255, 0), new Vector(255, 55)),
             new Line(new Vector(255, 55), new Vector(0, 55)),
-            new Line(new Vector(0, 55), new Vector(0, 0))
+            new Line(new Vector(0, 55), new Vector(0, 0)),
         };
         var slotEntities = new List<Entity>
         {
             new Line(new Vector(10, 10), new Vector(245, 10)),
             new Line(new Vector(245, 10), new Vector(245, 45)),
             new Line(new Vector(245, 45), new Vector(10, 45)),
-            new Line(new Vector(10, 45), new Vector(10, 10))
+            new Line(new Vector(10, 45), new Vector(10, 10)),
         };
         var allEntities = new List<Entity>();
         allEntities.AddRange(outerEntities);
@@ -422,10 +526,14 @@ public class DrawingSplitterTests
             new SplitLine(55.0, CutOffAxis.Vertical),
             new SplitLine(110.0, CutOffAxis.Vertical),
             new SplitLine(165.0, CutOffAxis.Vertical),
-            new SplitLine(220.0, CutOffAxis.Vertical)
+            new SplitLine(220.0, CutOffAxis.Vertical),
         };
 
-        var results = DrawingSplitter.Split(drawing, splitLines, new SplitParameters { Type = SplitType.Straight });
+        var results = DrawingSplitter.Split(
+            drawing,
+            splitLines,
+            new SplitParameters { Type = SplitType.Straight }
+        );
 
         // R1 (0..55)   → 1 notched piece,  height 55
         // R2 (55..110) → upper strip + lower strip, each height 10
@@ -454,8 +562,10 @@ public class DrawingSplitterTests
         // Each piece should form a closed perimeter (no dangling edges, no gaps).
         foreach (var piece in results)
         {
-            var entities = ConvertProgram.ToGeometry(piece.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var entities = ConvertProgram
+                .ToGeometry(piece.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
 
             Assert.True(entities.Count >= 3, $"{piece.Name} must have at least 3 edges");
 
@@ -464,8 +574,10 @@ public class DrawingSplitterTests
                 var end = GetEndPoint(entities[i]);
                 var nextStart = GetStartPoint(entities[(i + 1) % entities.Count]);
                 var gap = end.DistanceTo(nextStart);
-                Assert.True(gap < 0.01,
-                    $"{piece.Name} gap of {gap:F4} between edge {i} end and edge {(i + 1) % entities.Count} start");
+                Assert.True(
+                    gap < 0.01,
+                    $"{piece.Name} gap of {gap:F4} between edge {i} end and edge {(i + 1) % entities.Count} start"
+                );
             }
         }
     }
@@ -477,7 +589,12 @@ public class DrawingSplitterTests
         // five columns. Exercises the same path as the synthetic
         // Split_RectangleWithSpanningSlot_ProducesDisconnectedStrips test but through
         // the full DXF import pipeline.
-        var path = Path.Combine(AppContext.BaseDirectory, "Splitting", "TestData", "split_test.dxf");
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            "Splitting",
+            "TestData",
+            "split_test.dxf"
+        );
         Assert.True(File.Exists(path), $"Test DXF not found: {path}");
 
         var imported = OpenNest.IO.Dxf.Import(path);
@@ -487,13 +604,16 @@ public class DrawingSplitterTests
         var bb = profile.Perimeter.BoundingBox;
         var offsetX = -bb.X;
         var offsetY = -bb.Y;
-        foreach (var e in profile.Perimeter.Entities) e.Offset(offsetX, offsetY);
+        foreach (var e in profile.Perimeter.Entities)
+            e.Offset(offsetX, offsetY);
         foreach (var cutout in profile.Cutouts)
-            foreach (var e in cutout.Entities) e.Offset(offsetX, offsetY);
+        foreach (var e in cutout.Entities)
+            e.Offset(offsetX, offsetY);
 
         var allEntities = new List<Entity>();
         allEntities.AddRange(profile.Perimeter.Entities);
-        foreach (var cutout in profile.Cutouts) allEntities.AddRange(cutout.Entities);
+        foreach (var cutout in profile.Cutouts)
+            allEntities.AddRange(cutout.Entities);
 
         var drawing = new Drawing("SPLITTEST", ConvertGeometry.ToProgram(allEntities));
         var originalArea = drawing.Area;
@@ -504,10 +624,14 @@ public class DrawingSplitterTests
             new SplitLine(55.0, CutOffAxis.Vertical),
             new SplitLine(110.0, CutOffAxis.Vertical),
             new SplitLine(165.0, CutOffAxis.Vertical),
-            new SplitLine(220.0, CutOffAxis.Vertical)
+            new SplitLine(220.0, CutOffAxis.Vertical),
         };
 
-        var results = DrawingSplitter.Split(drawing, splitLines, new SplitParameters { Type = SplitType.Straight });
+        var results = DrawingSplitter.Split(
+            drawing,
+            splitLines,
+            new SplitParameters { Type = SplitType.Straight }
+        );
 
         // Area must be preserved within tolerance (floating-point coords in the DXF).
         var totalArea = results.Sum(d => d.Area);
@@ -515,16 +639,20 @@ public class DrawingSplitterTests
 
         // At least one region must yield more than one physical strip — that's the
         // whole point of the fix: a cutout that spans a region disconnects it.
-        Assert.True(results.Count > splitLines.Count + 1,
-            $"Expected more than {splitLines.Count + 1} pieces (some regions split into strips), got {results.Count}");
+        Assert.True(
+            results.Count > splitLines.Count + 1,
+            $"Expected more than {splitLines.Count + 1} pieces (some regions split into strips), got {results.Count}"
+        );
 
         // Every output drawing must resolve into fully-closed shapes (outer loop
         // and any hole loops), with no dangling geometry. A piece that contains
         // a cutout will have its entities span more than one connected loop.
         foreach (var piece in results)
         {
-            var entities = ConvertProgram.ToGeometry(piece.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var entities = ConvertProgram
+                .ToGeometry(piece.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
 
             Assert.True(entities.Count >= 3, $"{piece.Name} has only {entities.Count} entities");
 
@@ -533,8 +661,10 @@ public class DrawingSplitterTests
 
             foreach (var shape in shapes)
             {
-                Assert.True(shape.IsClosed(),
-                    $"{piece.Name} contains an open chain of {shape.Entities.Count} entities");
+                Assert.True(
+                    shape.IsClosed(),
+                    $"{piece.Name} contains an open chain of {shape.Entities.Count} entities"
+                );
             }
         }
     }
@@ -545,7 +675,7 @@ public class DrawingSplitterTests
         {
             Line l => l.StartPoint,
             Arc a => a.StartPoint(),
-            _ => new Vector(0, 0)
+            _ => new Vector(0, 0),
         };
     }
 
@@ -555,7 +685,7 @@ public class DrawingSplitterTests
         {
             Line l => l.EndPoint,
             Arc a => a.EndPoint(),
-            _ => new Vector(0, 0)
+            _ => new Vector(0, 0),
         };
     }
 }

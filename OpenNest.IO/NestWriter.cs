@@ -1,6 +1,3 @@
-using OpenNest.Bending;
-using OpenNest.CNC;
-using OpenNest.Engine.BestFit;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,6 +5,9 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using OpenNest.Bending;
+using OpenNest.CNC;
+using OpenNest.Engine.BestFit;
 using static OpenNest.IO.NestFormat;
 
 namespace OpenNest.IO
@@ -85,17 +85,20 @@ namespace OpenNest.IO
                 {
                     Name = nest.Material.Name ?? "",
                     Grade = nest.Material.Grade ?? "",
-                    Density = nest.Material.Density
+                    Density = nest.Material.Density,
                 },
                 PlateDefaults = BuildPlateDefaultsDto(),
                 Drawings = BuildDrawingDtos(),
                 Plates = BuildPlateDtos(),
-                PlateOptions = nest.PlateOptions?.Select(o => new PlateOptionDto
-                {
-                    Width = o.Width,
-                    Length = o.Length,
-                    Cost = o.Cost,
-                }).ToList() ?? new(),
+                PlateOptions =
+                    nest.PlateOptions?.Select(o => new PlateOptionDto
+                        {
+                            Width = o.Width,
+                            Length = o.Length,
+                            Cost = o.Cost,
+                        })
+                        .ToList()
+                    ?? new(),
                 SalvageRate = nest.SalvageRate,
             };
         }
@@ -113,15 +116,15 @@ namespace OpenNest.IO
                 {
                     Name = nest.Material.Name ?? "",
                     Grade = nest.Material.Grade ?? "",
-                    Density = nest.Material.Density
+                    Density = nest.Material.Density,
                 },
                 EdgeSpacing = new SpacingDto
                 {
                     Left = pd.EdgeSpacing.Left,
                     Top = pd.EdgeSpacing.Top,
                     Right = pd.EdgeSpacing.Right,
-                    Bottom = pd.EdgeSpacing.Bottom
-                }
+                    Bottom = pd.EdgeSpacing.Bottom,
+                },
             };
         }
 
@@ -131,44 +134,55 @@ namespace OpenNest.IO
             foreach (var kvp in drawingDict.OrderBy(k => k.Key))
             {
                 var d = kvp.Value;
-                list.Add(new DrawingDto
-                {
-                    Id = kvp.Key,
-                    Name = d.Name ?? "",
-                    Customer = d.Customer ?? "",
-                    Color = new ColorDto { A = d.Color.A, R = d.Color.R, G = d.Color.G, B = d.Color.B },
-                    Quantity = new QuantityDto { Required = d.Quantity.Required },
-                    Priority = d.Priority,
-                    Constraints = new ConstraintsDto
+                list.Add(
+                    new DrawingDto
                     {
-                        StepAngle = d.Constraints.StepAngle,
-                        StartAngle = d.Constraints.StartAngle,
-                        EndAngle = d.Constraints.EndAngle,
-                        Allow180Equivalent = d.Constraints.Allow180Equivalent
-                    },
-                    Material = new MaterialDto
-                    {
-                        Name = d.Material.Name ?? "",
-                        Grade = d.Material.Grade ?? "",
-                        Density = d.Material.Density
-                    },
-                    Source = new SourceDto
-                    {
-                        Path = d.Source.Path ?? "",
-                        Offset = new OffsetDto { X = d.Source.Offset.X, Y = d.Source.Offset.Y }
-                    },
-                    Bends = d.Bends?.Select(b => new BendDto
-                    {
-                        StartX = b.StartPoint.X,
-                        StartY = b.StartPoint.Y,
-                        EndX = b.EndPoint.X,
-                        EndY = b.EndPoint.Y,
-                        Direction = b.Direction.ToString(),
-                        Angle = b.Angle,
-                        Radius = b.Radius,
-                        NoteText = b.NoteText ?? ""
-                    }).ToList() ?? new List<BendDto>()
-                });
+                        Id = kvp.Key,
+                        Name = d.Name ?? "",
+                        Customer = d.Customer ?? "",
+                        Color = new ColorDto
+                        {
+                            A = d.Color.A,
+                            R = d.Color.R,
+                            G = d.Color.G,
+                            B = d.Color.B,
+                        },
+                        Quantity = new QuantityDto { Required = d.Quantity.Required },
+                        Priority = d.Priority,
+                        Constraints = new ConstraintsDto
+                        {
+                            StepAngle = d.Constraints.StepAngle,
+                            StartAngle = d.Constraints.StartAngle,
+                            EndAngle = d.Constraints.EndAngle,
+                            Allow180Equivalent = d.Constraints.Allow180Equivalent,
+                        },
+                        Material = new MaterialDto
+                        {
+                            Name = d.Material.Name ?? "",
+                            Grade = d.Material.Grade ?? "",
+                            Density = d.Material.Density,
+                        },
+                        Source = new SourceDto
+                        {
+                            Path = d.Source.Path ?? "",
+                            Offset = new OffsetDto { X = d.Source.Offset.X, Y = d.Source.Offset.Y },
+                        },
+                        Bends =
+                            d.Bends?.Select(b => new BendDto
+                                {
+                                    StartX = b.StartPoint.X,
+                                    StartY = b.StartPoint.Y,
+                                    EndX = b.EndPoint.X,
+                                    EndY = b.EndPoint.Y,
+                                    Direction = b.Direction.ToString(),
+                                    Angle = b.Angle,
+                                    Radius = b.Radius,
+                                    NoteText = b.NoteText ?? "",
+                                })
+                                .ToList()
+                            ?? new List<BendDto>(),
+                    }
+                );
             }
             return list;
         }
@@ -181,56 +195,67 @@ namespace OpenNest.IO
             {
                 var plate = nest.Plates[i];
 
-                if (plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0 && plate.CutOffs.Count == 0)
+                if (
+                    plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
+                    && plate.CutOffs.Count == 0
+                )
                     continue;
 
                 id++;
                 var parts = new List<PartDto>();
                 foreach (var part in plate.Parts.Where(p => !p.BaseDrawing.IsCutOff))
                 {
-                    var match = drawingDict.Where(dwg => dwg.Value == part.BaseDrawing).FirstOrDefault();
-                    parts.Add(new PartDto
-                    {
-                        DrawingId = match.Key,
-                        X = part.Location.X,
-                        Y = part.Location.Y,
-                        Rotation = part.Rotation,
-                        HasManualLeadIns = part.HasManualLeadIns,
-                        LeadInsLocked = part.LeadInsLocked
-                    });
+                    var match = drawingDict
+                        .Where(dwg => dwg.Value == part.BaseDrawing)
+                        .FirstOrDefault();
+                    parts.Add(
+                        new PartDto
+                        {
+                            DrawingId = match.Key,
+                            X = part.Location.X,
+                            Y = part.Location.Y,
+                            Rotation = part.Rotation,
+                            HasManualLeadIns = part.HasManualLeadIns,
+                            LeadInsLocked = part.LeadInsLocked,
+                        }
+                    );
                 }
 
                 var cutoffs = new List<CutOffDto>();
                 foreach (var cutoff in plate.CutOffs)
                 {
-                    cutoffs.Add(new CutOffDto
-                    {
-                        X = cutoff.Position.X,
-                        Y = cutoff.Position.Y,
-                        Axis = cutoff.Axis == CutOffAxis.Vertical ? "vertical" : "horizontal",
-                        StartLimit = cutoff.StartLimit,
-                        EndLimit = cutoff.EndLimit
-                    });
+                    cutoffs.Add(
+                        new CutOffDto
+                        {
+                            X = cutoff.Position.X,
+                            Y = cutoff.Position.Y,
+                            Axis = cutoff.Axis == CutOffAxis.Vertical ? "vertical" : "horizontal",
+                            StartLimit = cutoff.StartLimit,
+                            EndLimit = cutoff.EndLimit,
+                        }
+                    );
                 }
 
-                list.Add(new PlateDto
-                {
-                    Id = id,
-                    Size = new SizeDto { Width = plate.Size.Width, Length = plate.Size.Length },
-                    Quadrant = plate.Quadrant,
-                    Quantity = plate.Quantity,
-                    PartSpacing = plate.PartSpacing,
-                    EdgeSpacing = new SpacingDto
+                list.Add(
+                    new PlateDto
                     {
-                        Left = plate.EdgeSpacing.Left,
-                        Top = plate.EdgeSpacing.Top,
-                        Right = plate.EdgeSpacing.Right,
-                        Bottom = plate.EdgeSpacing.Bottom
-                    },
-                    Parts = parts,
-                    CutOffs = cutoffs,
-                    GrainAngle = plate.GrainAngle
-                });
+                        Id = id,
+                        Size = new SizeDto { Width = plate.Size.Width, Length = plate.Size.Length },
+                        Quadrant = plate.Quadrant,
+                        Quantity = plate.Quantity,
+                        PartSpacing = plate.PartSpacing,
+                        EdgeSpacing = new SpacingDto
+                        {
+                            Left = plate.EdgeSpacing.Left,
+                            Top = plate.EdgeSpacing.Top,
+                            Right = plate.EdgeSpacing.Right,
+                            Bottom = plate.EdgeSpacing.Bottom,
+                        },
+                        Parts = parts,
+                        CutOffs = cutoffs,
+                        GrainAngle = plate.GrainAngle,
+                    }
+                );
             }
             return list;
         }
@@ -247,11 +272,13 @@ namespace OpenNest.IO
 
             foreach (var kvp in allBestFits)
             {
-                if (!plateSizes.Contains((kvp.Key.PlateWidth, kvp.Key.PlateHeight, kvp.Key.Spacing)))
+                if (
+                    !plateSizes.Contains((kvp.Key.PlateWidth, kvp.Key.PlateHeight, kvp.Key.Spacing))
+                )
                     continue;
 
-                var results = kvp.Value
-                    .Where(r => r.Keep)
+                var results = kvp
+                    .Value.Where(r => r.Keep)
                     .Select(r => new BestFitResultDto
                     {
                         Part1Rotation = r.Candidate.Part1Rotation,
@@ -268,16 +295,19 @@ namespace OpenNest.IO
                         Keep = r.Keep,
                         Reason = r.Reason ?? "",
                         TrueArea = r.TrueArea,
-                        HullAngles = r.HullAngles ?? new List<double>()
-                    }).ToList();
+                        HullAngles = r.HullAngles ?? new List<double>(),
+                    })
+                    .ToList();
 
-                sets.Add(new BestFitSetDto
-                {
-                    PlateWidth = kvp.Key.PlateWidth,
-                    PlateHeight = kvp.Key.PlateHeight,
-                    Spacing = kvp.Key.Spacing,
-                    Results = results
-                });
+                sets.Add(
+                    new BestFitSetDto
+                    {
+                        PlateWidth = kvp.Key.PlateWidth,
+                        PlateHeight = kvp.Key.PlateHeight,
+                        Spacing = kvp.Key.Spacing,
+                        Results = results,
+                    }
+                );
             }
 
             return sets;
@@ -319,7 +349,11 @@ namespace OpenNest.IO
             }
         }
 
-        private void WriteSubPrograms(ZipArchive zipArchive, int drawingId, Dictionary<int, Program> subPrograms)
+        private void WriteSubPrograms(
+            ZipArchive zipArchive,
+            int drawingId,
+            Dictionary<int, Program> subPrograms
+        )
         {
             var entry = zipArchive.CreateEntry($"programs/program-{drawingId}-subs");
             using var entryStream = entry.Open();
@@ -345,7 +379,10 @@ namespace OpenNest.IO
                 if (drawing.SourceEntities == null || drawing.SourceEntities.Count == 0)
                     continue;
 
-                var dto = EntitySerializer.ToDto(drawing.SourceEntities, drawing.SuppressedEntityIds);
+                var dto = EntitySerializer.ToDto(
+                    drawing.SourceEntities,
+                    drawing.SuppressedEntityIds
+                );
                 var json = JsonSerializer.Serialize(dto, JsonOptions);
 
                 var entry = zipArchive.CreateEntry($"entities/entities-{kvp.Key}");
@@ -365,8 +402,10 @@ namespace OpenNest.IO
             foreach (var v in program.Variables.Values)
             {
                 var line = $"{v.Name} = {v.Expression}";
-                if (v.Inline) line += " inline";
-                if (v.Global) line += " global";
+                if (v.Inline)
+                    line += " inline";
+                if (v.Global)
+                    line += " global";
                 writer.WriteLine(line);
             }
 
@@ -381,7 +420,11 @@ namespace OpenNest.IO
             stream.Position = 0;
         }
 
-        private string FormatCoord(double value, string axis, Dictionary<string, string> variableRefs)
+        private string FormatCoord(
+            double value,
+            string axis,
+            Dictionary<string, string> variableRefs
+        )
         {
             if (variableRefs != null && variableRefs.TryGetValue(axis, out var varName))
                 return $"${varName}";
@@ -393,89 +436,100 @@ namespace OpenNest.IO
             switch (code.Type)
             {
                 case CodeType.ArcMove:
-                    {
-                        var sb = new StringBuilder();
-                        var arcMove = (ArcMove)code;
-                        var refs = arcMove.VariableRefs;
+                {
+                    var sb = new StringBuilder();
+                    var arcMove = (ArcMove)code;
+                    var refs = arcMove.VariableRefs;
 
-                        var x = FormatCoord(arcMove.EndPoint.X, "X", refs);
-                        var y = FormatCoord(arcMove.EndPoint.Y, "Y", refs);
-                        var i = FormatCoord(arcMove.CenterPoint.X, "I", refs);
-                        var j = FormatCoord(arcMove.CenterPoint.Y, "J", refs);
+                    var x = FormatCoord(arcMove.EndPoint.X, "X", refs);
+                    var y = FormatCoord(arcMove.EndPoint.Y, "Y", refs);
+                    var i = FormatCoord(arcMove.CenterPoint.X, "I", refs);
+                    var j = FormatCoord(arcMove.CenterPoint.Y, "J", refs);
 
-                        sb.Append(arcMove.Rotation == RotationType.CW
+                    sb.Append(
+                        arcMove.Rotation == RotationType.CW
                             ? $"G02X{x}Y{y}I{i}J{j}"
-                            : $"G03X{x}Y{y}I{i}J{j}");
+                            : $"G03X{x}Y{y}I{i}J{j}"
+                    );
 
-                        if (arcMove.Layer != LayerType.Cut)
-                            sb.Append(GetLayerString(arcMove.Layer));
+                    if (arcMove.Layer != LayerType.Cut)
+                        sb.Append(GetLayerString(arcMove.Layer));
 
-                        if (arcMove.Suppressed)
-                            sb.Append(":SUPPRESSED");
+                    if (arcMove.Suppressed)
+                        sb.Append(":SUPPRESSED");
 
-                        return sb.ToString();
-                    }
+                    return sb.ToString();
+                }
 
                 case CodeType.Comment:
-                    {
-                        var comment = (Comment)code;
-                        return ":" + comment.Value;
-                    }
+                {
+                    var comment = (Comment)code;
+                    return ":" + comment.Value;
+                }
 
                 case CodeType.LinearMove:
-                    {
-                        var sb = new StringBuilder();
-                        var linearMove = (LinearMove)code;
-                        var refs = linearMove.VariableRefs;
+                {
+                    var sb = new StringBuilder();
+                    var linearMove = (LinearMove)code;
+                    var refs = linearMove.VariableRefs;
 
-                        sb.Append($"G01X{FormatCoord(linearMove.EndPoint.X, "X", refs)}Y{FormatCoord(linearMove.EndPoint.Y, "Y", refs)}");
+                    sb.Append(
+                        $"G01X{FormatCoord(linearMove.EndPoint.X, "X", refs)}Y{FormatCoord(linearMove.EndPoint.Y, "Y", refs)}"
+                    );
 
-                        if (linearMove.Layer != LayerType.Cut)
-                            sb.Append(GetLayerString(linearMove.Layer));
+                    if (linearMove.Layer != LayerType.Cut)
+                        sb.Append(GetLayerString(linearMove.Layer));
 
-                        if (linearMove.Suppressed)
-                            sb.Append(":SUPPRESSED");
+                    if (linearMove.Suppressed)
+                        sb.Append(":SUPPRESSED");
 
-                        return sb.ToString();
-                    }
+                    return sb.ToString();
+                }
 
                 case CodeType.RapidMove:
-                    {
-                        var rapidMove = (RapidMove)code;
-                        var refs = rapidMove.VariableRefs;
+                {
+                    var rapidMove = (RapidMove)code;
+                    var refs = rapidMove.VariableRefs;
 
-                        return $"G00X{FormatCoord(rapidMove.EndPoint.X, "X", refs)}Y{FormatCoord(rapidMove.EndPoint.Y, "Y", refs)}";
-                    }
+                    return $"G00X{FormatCoord(rapidMove.EndPoint.X, "X", refs)}Y{FormatCoord(rapidMove.EndPoint.Y, "Y", refs)}";
+                }
 
                 case CodeType.SetFeedrate:
-                    {
-                        var setFeedrate = (Feedrate)code;
-                        if (setFeedrate.VariableRef != null)
-                            return $"F${setFeedrate.VariableRef}";
-                        return "F" + setFeedrate.Value;
-                    }
+                {
+                    var setFeedrate = (Feedrate)code;
+                    if (setFeedrate.VariableRef != null)
+                        return $"F${setFeedrate.VariableRef}";
+                    return "F" + setFeedrate.Value;
+                }
 
                 case CodeType.SetKerf:
+                {
+                    var setKerf = (Kerf)code;
+
+                    switch (setKerf.Value)
                     {
-                        var setKerf = (Kerf)code;
-
-                        switch (setKerf.Value)
-                        {
-                            case KerfType.None: return "G40";
-                            case KerfType.Left: return "G41";
-                            case KerfType.Right: return "G42";
-                        }
-
-                        break;
+                        case KerfType.None:
+                            return "G40";
+                        case KerfType.Left:
+                            return "G41";
+                        case KerfType.Right:
+                            return "G42";
                     }
+
+                    break;
+                }
 
                 case CodeType.SubProgramCall:
-                    {
-                        var subProgramCall = (SubProgramCall)code;
-                        var x = System.Math.Round(subProgramCall.Offset.X, OutputPrecision).ToString(CoordinateFormat);
-                        var y = System.Math.Round(subProgramCall.Offset.Y, OutputPrecision).ToString(CoordinateFormat);
-                        return $"G65P{subProgramCall.Id}X{x}Y{y}";
-                    }
+                {
+                    var subProgramCall = (SubProgramCall)code;
+                    var x = System
+                        .Math.Round(subProgramCall.Offset.X, OutputPrecision)
+                        .ToString(CoordinateFormat);
+                    var y = System
+                        .Math.Round(subProgramCall.Offset.Y, OutputPrecision)
+                        .ToString(CoordinateFormat);
+                    return $"G65P{subProgramCall.Id}X{x}Y{y}";
+                }
             }
 
             return string.Empty;

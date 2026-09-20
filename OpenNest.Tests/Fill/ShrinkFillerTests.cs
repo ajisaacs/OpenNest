@@ -72,8 +72,14 @@ public class ShrinkFillerTests
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
             new List<Part> { TestHelpers.MakePartAt(0, 0, 10) };
 
-        var result = ShrinkFiller.Shrink(fillFunc, item, box, 1.0,
-            ShrinkAxis.Length, token: cts.Token);
+        var result = ShrinkFiller.Shrink(
+            fillFunc,
+            item,
+            box,
+            1.0,
+            ShrinkAxis.Length,
+            token: cts.Token
+        );
 
         Assert.NotNull(result);
         Assert.True(result.Parts.Count > 0);
@@ -84,10 +90,10 @@ public class ShrinkFillerTests
     {
         var parts = new List<Part>
         {
-            TestHelpers.MakePartAt(0, 0, 5),   // Right = 5
-            TestHelpers.MakePartAt(10, 0, 5),  // Right = 15
-            TestHelpers.MakePartAt(20, 0, 5),  // Right = 25
-            TestHelpers.MakePartAt(30, 0, 5),  // Right = 35
+            TestHelpers.MakePartAt(0, 0, 5), // Right = 5
+            TestHelpers.MakePartAt(10, 0, 5), // Right = 15
+            TestHelpers.MakePartAt(20, 0, 5), // Right = 25
+            TestHelpers.MakePartAt(30, 0, 5), // Right = 35
         };
 
         var trimmed = ShrinkFiller.TrimToCount(parts, 2, ShrinkAxis.Width);
@@ -101,10 +107,10 @@ public class ShrinkFillerTests
     {
         var parts = new List<Part>
         {
-            TestHelpers.MakePartAt(0, 0, 5),   // Top = 5
-            TestHelpers.MakePartAt(0, 10, 5),  // Top = 15
-            TestHelpers.MakePartAt(0, 20, 5),  // Top = 25
-            TestHelpers.MakePartAt(0, 30, 5),  // Top = 35
+            TestHelpers.MakePartAt(0, 0, 5), // Top = 5
+            TestHelpers.MakePartAt(0, 10, 5), // Top = 15
+            TestHelpers.MakePartAt(0, 20, 5), // Top = 25
+            TestHelpers.MakePartAt(0, 30, 5), // Top = 35
         };
 
         var trimmed = ShrinkFiller.TrimToCount(parts, 2, ShrinkAxis.Length);

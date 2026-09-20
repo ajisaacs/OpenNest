@@ -1,8 +1,8 @@
-using ClosedXML.Excel;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using ClosedXML.Excel;
 
 namespace OpenNest.IO.Bom
 {
@@ -20,7 +20,9 @@ namespace OpenNest.IO.Bom
         private IXLWorksheet GetPartsWorksheet()
         {
             if (!workbook.TryGetWorksheet("Parts", out var worksheet))
-                throw new InvalidOperationException("BOM file does not contain a 'Parts' worksheet.");
+                throw new InvalidOperationException(
+                    "BOM file does not contain a 'Parts' worksheet."
+                );
             return worksheet;
         }
 
@@ -41,7 +43,8 @@ namespace OpenNest.IO.Bom
                 for (var columnIndex = 1; columnIndex <= lastColumn; columnIndex++)
                 {
                     var cell = worksheet.Cell(1, columnIndex);
-                    if (cell.IsEmpty()) continue;
+                    if (cell.IsEmpty())
+                        continue;
 
                     var excelColumnName = cell.GetString().ToUpper();
                     var isMatch = classColumnNames.Any(n => n == excelColumnName);

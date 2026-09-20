@@ -1,8 +1,8 @@
+using System.Linq;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
 using OpenNest.Geometry;
-using System.Linq;
 
 namespace OpenNest.Tests.CuttingStrategy;
 
@@ -47,7 +47,12 @@ public class HoleSubProgramTests
     [Fact]
     public void SubProgramCall_ToString_IncludesOffsetAndRotation()
     {
-        var call = new SubProgramCall { Id = 1000, Offset = new Vector(1.5, 2.5), Rotation = 30 };
+        var call = new SubProgramCall
+        {
+            Id = 1000,
+            Offset = new Vector(1.5, 2.5),
+            Rotation = 30,
+        };
         var str = call.ToString();
         Assert.Contains("P1000", str);
         Assert.Contains("X1.5", str);
@@ -119,8 +124,8 @@ public class HoleSubProgramTests
             Parameters = new CuttingParameters
             {
                 ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-                ArcCircleLeadOut = new NoLeadOut()
-            }
+                ArcCircleLeadOut = new NoLeadOut(),
+            },
         };
 
         var result = strategy.Apply(pgm, new Vector(10, 10));
@@ -163,8 +168,8 @@ public class HoleSubProgramTests
                 RoundLeadInAngles = true,
                 LeadInAngleIncrement = 5.0,
                 ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-                ArcCircleLeadOut = new NoLeadOut()
-            }
+                ArcCircleLeadOut = new NoLeadOut(),
+            },
         };
 
         var result = strategy.Apply(pgm, new Vector(10, 10));
@@ -196,22 +201,30 @@ public class HoleSubProgramTests
         pgm.Codes.Add(new LinearMove(0, 0));
         // Hole 1 at (3, 3)
         pgm.Codes.Add(new RapidMove(holeCenter1.X + holeRadius, holeCenter1.Y));
-        pgm.Codes.Add(new ArcMove(
-            new Vector(holeCenter1.X + holeRadius, holeCenter1.Y),
-            holeCenter1, RotationType.CW));
+        pgm.Codes.Add(
+            new ArcMove(
+                new Vector(holeCenter1.X + holeRadius, holeCenter1.Y),
+                holeCenter1,
+                RotationType.CW
+            )
+        );
         // Hole 2 at (7, 5)
         pgm.Codes.Add(new RapidMove(holeCenter2.X + holeRadius, holeCenter2.Y));
-        pgm.Codes.Add(new ArcMove(
-            new Vector(holeCenter2.X + holeRadius, holeCenter2.Y),
-            holeCenter2, RotationType.CW));
+        pgm.Codes.Add(
+            new ArcMove(
+                new Vector(holeCenter2.X + holeRadius, holeCenter2.Y),
+                holeCenter2,
+                RotationType.CW
+            )
+        );
 
         var strategy = new ContourCuttingStrategy
         {
             Parameters = new CuttingParameters
             {
                 ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
-                ArcCircleLeadOut = new NoLeadOut()
-            }
+                ArcCircleLeadOut = new NoLeadOut(),
+            },
         };
 
         var result = strategy.Apply(pgm, new Vector(10, 10));
@@ -247,13 +260,21 @@ public class HoleSubProgramTests
         pgm.Codes.Add(new LinearMove(0, 10));
         pgm.Codes.Add(new LinearMove(0, 0));
         pgm.Codes.Add(new RapidMove(holeCenter1.X + holeRadius, holeCenter1.Y));
-        pgm.Codes.Add(new ArcMove(
-            new Vector(holeCenter1.X + holeRadius, holeCenter1.Y),
-            holeCenter1, RotationType.CW));
+        pgm.Codes.Add(
+            new ArcMove(
+                new Vector(holeCenter1.X + holeRadius, holeCenter1.Y),
+                holeCenter1,
+                RotationType.CW
+            )
+        );
         pgm.Codes.Add(new RapidMove(holeCenter2.X + holeRadius, holeCenter2.Y));
-        pgm.Codes.Add(new ArcMove(
-            new Vector(holeCenter2.X + holeRadius, holeCenter2.Y),
-            holeCenter2, RotationType.CW));
+        pgm.Codes.Add(
+            new ArcMove(
+                new Vector(holeCenter2.X + holeRadius, holeCenter2.Y),
+                holeCenter2,
+                RotationType.CW
+            )
+        );
 
         var drawing = new Drawing("TestPart") { Program = pgm };
         var part = new Part(drawing);
@@ -265,7 +286,7 @@ public class HoleSubProgramTests
             ArcCircleLeadIn = new LineLeadIn { Length = 0.125, ApproachAngle = 90 },
             ArcCircleLeadOut = new NoLeadOut(),
             ExternalLeadIn = new LineLeadIn { Length = 0.25, ApproachAngle = 90 },
-            ExternalLeadOut = new NoLeadOut()
+            ExternalLeadOut = new NoLeadOut(),
         };
 
         part.ApplyLeadIns(parameters, new Vector(10, 10));
@@ -289,14 +310,22 @@ public class HoleSubProgramTests
         // by the last hole's position.
         foreach (var line in lines)
         {
-            Assert.True(line.StartPoint.X >= -1 && line.StartPoint.X <= 11,
-                $"Perimeter line start X={line.StartPoint.X} is outside the 10x10 part bounds");
-            Assert.True(line.StartPoint.Y >= -1 && line.StartPoint.Y <= 11,
-                $"Perimeter line start Y={line.StartPoint.Y} is outside the 10x10 part bounds");
-            Assert.True(line.EndPoint.X >= -1 && line.EndPoint.X <= 11,
-                $"Perimeter line end X={line.EndPoint.X} is outside the 10x10 part bounds");
-            Assert.True(line.EndPoint.Y >= -1 && line.EndPoint.Y <= 11,
-                $"Perimeter line end Y={line.EndPoint.Y} is outside the 10x10 part bounds");
+            Assert.True(
+                line.StartPoint.X >= -1 && line.StartPoint.X <= 11,
+                $"Perimeter line start X={line.StartPoint.X} is outside the 10x10 part bounds"
+            );
+            Assert.True(
+                line.StartPoint.Y >= -1 && line.StartPoint.Y <= 11,
+                $"Perimeter line start Y={line.StartPoint.Y} is outside the 10x10 part bounds"
+            );
+            Assert.True(
+                line.EndPoint.X >= -1 && line.EndPoint.X <= 11,
+                $"Perimeter line end X={line.EndPoint.X} is outside the 10x10 part bounds"
+            );
+            Assert.True(
+                line.EndPoint.Y >= -1 && line.EndPoint.Y <= 11,
+                $"Perimeter line end Y={line.EndPoint.Y} is outside the 10x10 part bounds"
+            );
         }
     }
 
@@ -308,7 +337,14 @@ public class HoleSubProgramTests
 
         var main = new Program(Mode.Absolute);
         main.SubPrograms[1] = sub;
-        main.Codes.Add(new SubProgramCall { Id = 1, Program = sub, Offset = new Vector(10, 20) });
+        main.Codes.Add(
+            new SubProgramCall
+            {
+                Id = 1,
+                Program = sub,
+                Offset = new Vector(10, 20),
+            }
+        );
 
         var box = main.BoundingBox();
 
@@ -325,7 +361,14 @@ public class HoleSubProgramTests
 
         var main = new Program(Mode.Absolute);
         main.SubPrograms[1] = sub;
-        main.Codes.Add(new SubProgramCall { Id = 1, Program = sub, Offset = new Vector(10, 0) });
+        main.Codes.Add(
+            new SubProgramCall
+            {
+                Id = 1,
+                Program = sub,
+                Offset = new Vector(10, 0),
+            }
+        );
 
         // Rotate 90 degrees CCW around origin
         main.Rotate(System.Math.PI / 2);

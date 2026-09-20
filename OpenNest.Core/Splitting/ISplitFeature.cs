@@ -18,5 +18,10 @@ public class SplitFeatureResult
 public interface ISplitFeature
 {
     string Name { get; }
-    SplitFeatureResult GenerateFeatures(SplitLine line, double extentStart, double extentEnd, SplitParameters parameters);
+    SplitFeatureResult GenerateFeatures(
+        SplitLine line,
+        double extentStart,
+        double extentEnd,
+        SplitParameters parameters
+    );
 }

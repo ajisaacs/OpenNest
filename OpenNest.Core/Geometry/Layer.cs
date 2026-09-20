@@ -7,7 +7,7 @@ namespace OpenNest.Geometry
         public static readonly Layer Default = new Layer("0")
         {
             Color = Color.White,
-            IsVisible = true
+            IsVisible = true,
         };
 
         public Layer(string name)

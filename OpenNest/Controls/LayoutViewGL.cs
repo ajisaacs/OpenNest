@@ -1,12 +1,12 @@
-﻿using System.Runtime.Remoting.Messaging;
+﻿using System;
+using System.Drawing;
+using System.Runtime.Remoting.Messaging;
+using System.Windows.Forms;
 using libPep;
 using libPep.Codes;
-using OpenTK.Graphics.OpenGL;
-using System;
-using System.Drawing;
-using System.Windows.Forms;
 using OpenNest.Geometry;
 using OpenNest.Math;
+using OpenTK.Graphics.OpenGL;
 
 namespace OpenNest.Controls
 {
@@ -294,14 +294,10 @@ namespace OpenNest.Controls
             }
 
             // start angle in radians
-            var startAngle = System.Math.Atan2(
-                curpos.Y - center.Y,
-                curpos.X - center.X);
+            var startAngle = System.Math.Atan2(curpos.Y - center.Y, curpos.X - center.X);
 
             // end angle in radians
-            var endAngle = System.Math.Atan2(
-                endpt.Y - center.Y,
-                endpt.X - center.X);
+            var endAngle = System.Math.Atan2(endpt.Y - center.Y, endpt.X - center.X);
 
             endAngle = NormalizeAngle(endAngle);
             startAngle = NormalizeAngle(startAngle);
@@ -340,7 +336,8 @@ namespace OpenNest.Controls
             {
                 GL.Vertex2(
                     System.Math.Cos(startAngle + angle * i) * radius + center.X,
-                    System.Math.Sin(startAngle + angle * i) * radius + center.Y);
+                    System.Math.Sin(startAngle + angle * i) * radius + center.Y
+                );
             }
 
             GL.End();
@@ -355,9 +352,9 @@ namespace OpenNest.Controls
             {
                 GL.Vertex2(
                     System.Math.Cos(i) * radius + center.X,
-                    System.Math.Sin(i) * radius + center.Y);
+                    System.Math.Sin(i) * radius + center.Y
+                );
             }
-            
         }
 
         private static double NormalizeAngle(double angle)

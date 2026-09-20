@@ -14,7 +14,11 @@ namespace OpenNest.Tests.CNC
             pgm.Codes.Add(new LinearMove(2, 0));
             pgm.Codes.Add(new RapidMove(3, 3));
 
-            var segments = RapidEnumerator.Enumerate(pgm, basePos: new Vector(100, 200), startPos: new Vector(0, 0));
+            var segments = RapidEnumerator.Enumerate(
+                pgm,
+                basePos: new Vector(100, 200),
+                startPos: new Vector(0, 0)
+            );
 
             // Origin → first pierce, then interior rapid from contour end to next rapid target.
             Assert.Equal(2, segments.Count);
@@ -35,7 +39,11 @@ namespace OpenNest.Tests.CNC
             pgm.Codes.Add(new LinearMove(0, 5));
             pgm.Codes.Add(new RapidMove(1, 1));
 
-            var segments = RapidEnumerator.Enumerate(pgm, basePos: new Vector(100, 200), startPos: new Vector(0, 0));
+            var segments = RapidEnumerator.Enumerate(
+                pgm,
+                basePos: new Vector(100, 200),
+                startPos: new Vector(0, 0)
+            );
 
             Assert.Equal(2, segments.Count);
             // First rapid: plate origin → part pierce at basePos.
@@ -56,16 +64,18 @@ namespace OpenNest.Tests.CNC
             sub.Codes.Add(new LinearMove(0, 0.1));
 
             var pgm = new Program(Mode.Absolute);
-            pgm.Codes.Add(new RapidMove(0.2, 0.3));             // first pierce (perimeter lead-in)
-            pgm.Codes.Add(new LinearMove(1.0, 1.0));             // contour move
-            pgm.Codes.Add(new SubProgramCall
-            {
-                Id = 1,
-                Program = sub,
-                Offset = new Vector(2, 2),                       // hole center (drawing-local)
-            });
+            pgm.Codes.Add(new RapidMove(0.2, 0.3)); // first pierce (perimeter lead-in)
+            pgm.Codes.Add(new LinearMove(1.0, 1.0)); // contour move
+            pgm.Codes.Add(
+                new SubProgramCall
+                {
+                    Id = 1,
+                    Program = sub,
+                    Offset = new Vector(2, 2), // hole center (drawing-local)
+                }
+            );
 
-            var basePos = new Vector(100, 200);                  // part.Location
+            var basePos = new Vector(100, 200); // part.Location
             var segments = RapidEnumerator.Enumerate(pgm, basePos, startPos: new Vector(0, 0));
 
             // Expected rapids:

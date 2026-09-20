@@ -1,8 +1,8 @@
-﻿using OpenNest.Collections;
+﻿using System.Drawing;
+using System.Windows.Forms;
+using OpenNest.Collections;
 using OpenNest.Controls;
 using OpenNest.Geometry;
-using System.Drawing;
-using System.Windows.Forms;
 
 namespace OpenNest.Forms
 {
@@ -41,7 +41,8 @@ namespace OpenNest.Forms
                 control.AddPartFromDrawing(dwg, Vector.Zero);
                 control.MouseDoubleClick += (sender, e) =>
                 {
-                    SelectedDrawing = control.Plate.Parts.Count > 0 ? control.Plate.Parts[0].BaseDrawing : null;
+                    SelectedDrawing =
+                        control.Plate.Parts.Count > 0 ? control.Plate.Parts[0].BaseDrawing : null;
                     Close();
                 };
                 control.Dock = DockStyle.Fill;

@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.RectanglePacking
 {
@@ -8,11 +8,7 @@ namespace OpenNest.RectanglePacking
     {
         public static Bin CreateBin(Box area, double partSpacing)
         {
-            var bin = new Bin
-            {
-                Location = area.Location,
-                Size = area.Size
-            };
+            var bin = new Bin { Location = area.Location, Size = area.Size };
 
             bin.Width += partSpacing;
             bin.Length += partSpacing;
@@ -31,7 +27,7 @@ namespace OpenNest.RectanglePacking
             {
                 Id = id,
                 Location = box.Location,
-                Size = box.Size
+                Size = box.Size,
             };
         }
 

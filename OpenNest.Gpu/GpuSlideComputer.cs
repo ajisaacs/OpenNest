@@ -1,8 +1,8 @@
+using System;
 using ILGPU;
 using ILGPU.Algorithms;
 using ILGPU.Runtime;
 using OpenNest.Engine.BestFit;
-using System;
 
 namespace OpenNest.Gpu
 {
@@ -14,25 +14,34 @@ namespace OpenNest.Gpu
 
         // ── Kernels ──────────────────────────────────────────────────
 
-        private readonly Action<Index1D,
-            ArrayView1D<double, Stride1D.Dense>,   // stationaryPrep
-            ArrayView1D<double, Stride1D.Dense>,   // movingPrep
-            ArrayView1D<double, Stride1D.Dense>,   // offsets
-            ArrayView1D<double, Stride1D.Dense>,   // results
-            int, int, int> _kernel;
+        private readonly Action<
+            Index1D,
+            ArrayView1D<double, Stride1D.Dense>, // stationaryPrep
+            ArrayView1D<double, Stride1D.Dense>, // movingPrep
+            ArrayView1D<double, Stride1D.Dense>, // offsets
+            ArrayView1D<double, Stride1D.Dense>, // results
+            int,
+            int,
+            int
+        > _kernel;
 
-        private readonly Action<Index1D,
-            ArrayView1D<double, Stride1D.Dense>,   // stationaryPrep
-            ArrayView1D<double, Stride1D.Dense>,   // movingPrep
-            ArrayView1D<double, Stride1D.Dense>,   // offsets
-            ArrayView1D<double, Stride1D.Dense>,   // results
-            ArrayView1D<int, Stride1D.Dense>,      // directions
-            int, int> _kernelMultiDir;
+        private readonly Action<
+            Index1D,
+            ArrayView1D<double, Stride1D.Dense>, // stationaryPrep
+            ArrayView1D<double, Stride1D.Dense>, // movingPrep
+            ArrayView1D<double, Stride1D.Dense>, // offsets
+            ArrayView1D<double, Stride1D.Dense>, // results
+            ArrayView1D<int, Stride1D.Dense>, // directions
+            int,
+            int
+        > _kernelMultiDir;
 
-        private readonly Action<Index1D,
-            ArrayView1D<double, Stride1D.Dense>,   // raw
-            ArrayView1D<double, Stride1D.Dense>,   // prepared
-            int> _prepareKernel;
+        private readonly Action<
+            Index1D,
+            ArrayView1D<double, Stride1D.Dense>, // raw
+            ArrayView1D<double, Stride1D.Dense>, // prepared
+            int
+        > _prepareKernel;
 
         // ── Buffers ──────────────────────────────────────────────────
 
@@ -52,7 +61,8 @@ namespace OpenNest.Gpu
         public GpuSlideComputer()
         {
             _context = Context.CreateDefault();
-            _accelerator = _context.GetPreferredDevice(preferCPU: false)
+            _accelerator = _context
+                .GetPreferredDevice(preferCPU: false)
                 .CreateAccelerator(_context);
 
             _kernel = _accelerator.LoadAutoGroupedStreamKernel<
@@ -61,7 +71,10 @@ namespace OpenNest.Gpu
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
-                int, int, int>(SlideKernel);
+                int,
+                int,
+                int
+            >(SlideKernel);
 
             _kernelMultiDir = _accelerator.LoadAutoGroupedStreamKernel<
                 Index1D,
@@ -70,20 +83,27 @@ namespace OpenNest.Gpu
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<int, Stride1D.Dense>,
-                int, int>(SlideKernelMultiDir);
+                int,
+                int
+            >(SlideKernelMultiDir);
 
             _prepareKernel = _accelerator.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
-                int>(PrepareKernel);
+                int
+            >(PrepareKernel);
         }
 
         public double[] ComputeBatch(
-            double[] stationarySegments, int stationaryCount,
-            double[] movingTemplateSegments, int movingCount,
-            double[] offsets, int offsetCount,
-            PushDirection direction)
+            double[] stationarySegments,
+            int stationaryCount,
+            double[] movingTemplateSegments,
+            int movingCount,
+            double[] offsets,
+            int offsetCount,
+            PushDirection direction
+        )
         {
             var results = new double[offsetCount];
             if (offsetCount == 0 || stationaryCount == 0 || movingCount == 0)
@@ -100,10 +120,16 @@ namespace OpenNest.Gpu
 
                 _gpuOffsets!.View.SubView(0, offsetCount * 2).CopyFromCPU(offsets);
 
-                _kernel(offsetCount,
-                    _gpuStationaryPrep!.View, _gpuMovingPrep!.View,
-                    _gpuOffsets.View, _gpuResults!.View,
-                    stationaryCount, movingCount, (int)direction);
+                _kernel(
+                    offsetCount,
+                    _gpuStationaryPrep!.View,
+                    _gpuMovingPrep!.View,
+                    _gpuOffsets.View,
+                    _gpuResults!.View,
+                    stationaryCount,
+                    movingCount,
+                    (int)direction
+                );
 
                 _accelerator.Synchronize();
                 _gpuResults.View.SubView(0, offsetCount).CopyToCPU(results);
@@ -113,10 +139,14 @@ namespace OpenNest.Gpu
         }
 
         public double[] ComputeBatchMultiDir(
-            double[] stationarySegments, int stationaryCount,
-            double[] movingTemplateSegments, int movingCount,
-            double[] offsets, int offsetCount,
-            int[] directions)
+            double[] stationarySegments,
+            int stationaryCount,
+            double[] movingTemplateSegments,
+            int movingCount,
+            double[] offsets,
+            int offsetCount,
+            int[] directions
+        )
         {
             var results = new double[offsetCount];
             if (offsetCount == 0 || stationaryCount == 0 || movingCount == 0)
@@ -134,10 +164,16 @@ namespace OpenNest.Gpu
                 _gpuOffsets!.View.SubView(0, offsetCount * 2).CopyFromCPU(offsets);
                 _gpuDirs!.View.SubView(0, offsetCount).CopyFromCPU(directions);
 
-                _kernelMultiDir(offsetCount,
-                    _gpuStationaryPrep!.View, _gpuMovingPrep!.View,
-                    _gpuOffsets.View, _gpuResults!.View, _gpuDirs.View,
-                    stationaryCount, movingCount);
+                _kernelMultiDir(
+                    offsetCount,
+                    _gpuStationaryPrep!.View,
+                    _gpuMovingPrep!.View,
+                    _gpuOffsets.View,
+                    _gpuResults!.View,
+                    _gpuDirs.View,
+                    stationaryCount,
+                    movingCount
+                );
 
                 _accelerator.Synchronize();
                 _gpuResults.View.SubView(0, offsetCount).CopyToCPU(results);
@@ -147,18 +183,25 @@ namespace OpenNest.Gpu
         }
 
         public void InvalidateStationary() => _lastStationaryData = null;
+
         public void InvalidateMoving() => _lastMovingData = null;
 
         private void EnsureStationary(double[] data, int count)
         {
             // Fast check: if same object or content is identical, skip upload
-            if (_gpuStationaryPrep != null &&
-                _lastStationaryData != null &&
-                _lastStationaryData.Length == data.Length)
+            if (
+                _gpuStationaryPrep != null
+                && _lastStationaryData != null
+                && _lastStationaryData.Length == data.Length
+            )
             {
                 // Reference equality or content equality
-                if (_lastStationaryData == data ||
-                    new ReadOnlySpan<double>(_lastStationaryData).SequenceEqual(new ReadOnlySpan<double>(data)))
+                if (
+                    _lastStationaryData == data
+                    || new ReadOnlySpan<double>(_lastStationaryData).SequenceEqual(
+                        new ReadOnlySpan<double>(data)
+                    )
+                )
                 {
                     return;
                 }
@@ -178,12 +221,18 @@ namespace OpenNest.Gpu
 
         private void EnsureMoving(double[] data, int count)
         {
-            if (_gpuMovingPrep != null &&
-               _lastMovingData != null &&
-               _lastMovingData.Length == data.Length)
+            if (
+                _gpuMovingPrep != null
+                && _lastMovingData != null
+                && _lastMovingData.Length == data.Length
+            )
             {
-                if (_lastMovingData == data ||
-                    new ReadOnlySpan<double>(_lastMovingData).SequenceEqual(new ReadOnlySpan<double>(data)))
+                if (
+                    _lastMovingData == data
+                    || new ReadOnlySpan<double>(_lastMovingData).SequenceEqual(
+                        new ReadOnlySpan<double>(data)
+                    )
+                )
                 {
                     return;
                 }
@@ -225,9 +274,11 @@ namespace OpenNest.Gpu
             Index1D index,
             ArrayView1D<double, Stride1D.Dense> raw,
             ArrayView1D<double, Stride1D.Dense> prepared,
-            int count)
+            int count
+        )
         {
-            if (index >= count) return;
+            if (index >= count)
+                return;
             var x1 = raw[index * 4 + 0];
             var y1 = raw[index * 4 + 1];
             var x2 = raw[index * 4 + 2];
@@ -259,15 +310,26 @@ namespace OpenNest.Gpu
             ArrayView1D<double, Stride1D.Dense> movingPrep,
             ArrayView1D<double, Stride1D.Dense> offsets,
             ArrayView1D<double, Stride1D.Dense> results,
-            int sCount, int mCount, int direction)
+            int sCount,
+            int mCount,
+            int direction
+        )
         {
-            if (index >= results.Length) return;
+            if (index >= results.Length)
+                return;
 
             var dx = offsets[index * 2];
             var dy = offsets[index * 2 + 1];
 
             results[index] = ComputeSlideLean(
-                stationaryPrep, movingPrep, dx, dy, sCount, mCount, direction);
+                stationaryPrep,
+                movingPrep,
+                dx,
+                dy,
+                sCount,
+                mCount,
+                direction
+            );
         }
 
         private static void SlideKernelMultiDir(
@@ -277,22 +339,37 @@ namespace OpenNest.Gpu
             ArrayView1D<double, Stride1D.Dense> offsets,
             ArrayView1D<double, Stride1D.Dense> results,
             ArrayView1D<int, Stride1D.Dense> directions,
-            int sCount, int mCount)
+            int sCount,
+            int mCount
+        )
         {
-            if (index >= results.Length) return;
+            if (index >= results.Length)
+                return;
 
             var dx = offsets[index * 2];
             var dy = offsets[index * 2 + 1];
             var dir = directions[index];
 
             results[index] = ComputeSlideLean(
-                stationaryPrep, movingPrep, dx, dy, sCount, mCount, dir);
+                stationaryPrep,
+                movingPrep,
+                dx,
+                dy,
+                sCount,
+                mCount,
+                dir
+            );
         }
 
         private static double ComputeSlideLean(
             ArrayView1D<double, Stride1D.Dense> sPrep,
             ArrayView1D<double, Stride1D.Dense> mPrep,
-            double dx, double dy, int sCount, int mCount, int direction)
+            double dx,
+            double dy,
+            int sCount,
+            int mCount,
+            int direction
+        )
         {
             const double eps = 0.00001;
             var minDist = double.MaxValue;
@@ -317,7 +394,8 @@ namespace OpenNest.Gpu
                     if (mv1 >= sMin - eps && mv1 <= sMax + eps)
                     {
                         var d = RayEdgeLean(m1x, m1y, sPrep, j, direction, eps);
-                        if (d < minDist) minDist = d;
+                        if (d < minDist)
+                            minDist = d;
                     }
 
                     // Test moving vertex 2 against stationary edge j
@@ -325,7 +403,8 @@ namespace OpenNest.Gpu
                     if (mv2 >= sMin - eps && mv2 <= sMax + eps)
                     {
                         var d = RayEdgeLean(m2x, m2y, sPrep, j, direction, eps);
-                        if (d < minDist) minDist = d;
+                        if (d < minDist)
+                            minDist = d;
                     }
                 }
             }
@@ -348,7 +427,8 @@ namespace OpenNest.Gpu
                     if (sv1 >= mMin - eps && sv1 <= mMax + eps)
                     {
                         var d = RayEdgeLeanMoving(s1x, s1y, mPrep, j, dx, dy, oppDir, eps);
-                        if (d < minDist) minDist = d;
+                        if (d < minDist)
+                            minDist = d;
                     }
 
                     // Test stationary vertex 2 against moving edge j
@@ -356,7 +436,8 @@ namespace OpenNest.Gpu
                     if (sv2 >= mMin - eps && sv2 <= mMax + eps)
                     {
                         var d = RayEdgeLeanMoving(s2x, s2y, mPrep, j, dx, dy, oppDir, eps);
-                        if (d < minDist) minDist = d;
+                        if (d < minDist)
+                            minDist = d;
                     }
                 }
             }
@@ -365,9 +446,13 @@ namespace OpenNest.Gpu
         }
 
         private static double RayEdgeLean(
-            double vx, double vy,
-            ArrayView1D<double, Stride1D.Dense> sPrep, int j,
-            int direction, double eps)
+            double vx,
+            double vy,
+            ArrayView1D<double, Stride1D.Dense> sPrep,
+            int j,
+            int direction,
+            double eps
+        )
         {
             var p1x = sPrep[j * 10 + 0];
             var p1y = sPrep[j * 10 + 1];
@@ -377,37 +462,49 @@ namespace OpenNest.Gpu
             if (direction >= 2) // Horizontal (Left=2, Right=3)
             {
                 var invDy = sPrep[j * 10 + 5];
-                if (invDy == 0) return double.MaxValue;
+                if (invDy == 0)
+                    return double.MaxValue;
 
                 var t = (vy - p1y) * invDy;
-                if (t < -eps || t > 1.0 + eps) return double.MaxValue;
+                if (t < -eps || t > 1.0 + eps)
+                    return double.MaxValue;
 
                 var ix = p1x + t * (p2x - p1x);
                 var dist = (direction == 2) ? (vx - ix) : (ix - vx);
 
-                if (dist > eps) return dist;
+                if (dist > eps)
+                    return dist;
                 return (dist >= -eps) ? 0.0 : double.MaxValue;
             }
             else // Vertical (Up=0, Down=1)
             {
                 var invDx = sPrep[j * 10 + 4];
-                if (invDx == 0) return double.MaxValue;
+                if (invDx == 0)
+                    return double.MaxValue;
 
                 var t = (vx - p1x) * invDx;
-                if (t < -eps || t > 1.0 + eps) return double.MaxValue;
+                if (t < -eps || t > 1.0 + eps)
+                    return double.MaxValue;
 
                 var iy = p1y + t * (p2y - p1y);
                 var dist = (direction == 1) ? (vy - iy) : (iy - vy);
 
-                if (dist > eps) return dist;
+                if (dist > eps)
+                    return dist;
                 return (dist >= -eps) ? 0.0 : double.MaxValue;
             }
         }
 
         private static double RayEdgeLeanMoving(
-            double vx, double vy,
-            ArrayView1D<double, Stride1D.Dense> mPrep, int j,
-            double dx, double dy, int direction, double eps)
+            double vx,
+            double vy,
+            ArrayView1D<double, Stride1D.Dense> mPrep,
+            int j,
+            double dx,
+            double dy,
+            int direction,
+            double eps
+        )
         {
             var p1x = mPrep[j * 10 + 0] + dx;
             var p1y = mPrep[j * 10 + 1] + dy;
@@ -417,29 +514,35 @@ namespace OpenNest.Gpu
             if (direction >= 2) // Horizontal
             {
                 var invDy = mPrep[j * 10 + 5];
-                if (invDy == 0) return double.MaxValue;
+                if (invDy == 0)
+                    return double.MaxValue;
 
                 var t = (vy - p1y) * invDy;
-                if (t < -eps || t > 1.0 + eps) return double.MaxValue;
+                if (t < -eps || t > 1.0 + eps)
+                    return double.MaxValue;
 
                 var ix = p1x + t * (p2x - p1x);
                 var dist = (direction == 2) ? (vx - ix) : (ix - vx);
 
-                if (dist > eps) return dist;
+                if (dist > eps)
+                    return dist;
                 return (dist >= -eps) ? 0.0 : double.MaxValue;
             }
             else // Vertical
             {
                 var invDx = mPrep[j * 10 + 4];
-                if (invDx == 0) return double.MaxValue;
+                if (invDx == 0)
+                    return double.MaxValue;
 
                 var t = (vx - p1x) * invDx;
-                if (t < -eps || t > 1.0 + eps) return double.MaxValue;
+                if (t < -eps || t > 1.0 + eps)
+                    return double.MaxValue;
 
                 var iy = p1y + t * (p2y - p1y);
                 var dist = (direction == 1) ? (vy - iy) : (iy - vy);
 
-                if (dist > eps) return dist;
+                if (dist > eps)
+                    return dist;
                 return (dist >= -eps) ? 0.0 : double.MaxValue;
             }
         }

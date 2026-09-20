@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.IO;
 using ACadSharp;
 using ACadSharp.Entities;
 using ACadSharp.IO;
@@ -6,9 +8,6 @@ using CSMath;
 using OpenNest.Bending;
 using OpenNest.Converters;
 using OpenNest.Geometry;
-using System.Collections.Generic;
-using System.IO;
-
 // Disambiguate Entity — both ACadSharp.Entities and OpenNest.Geometry define it
 using GeoEntity = OpenNest.Geometry.Entity;
 
@@ -50,13 +49,21 @@ namespace OpenNest.IO
             writer.Write();
         }
 
-        private static void WriteProgramEntities(CadDocument doc, CNC.Program program, ACadSharp.Tables.Layer layer)
+        private static void WriteProgramEntities(
+            CadDocument doc,
+            CNC.Program program,
+            ACadSharp.Tables.Layer layer
+        )
         {
             var geometry = ConvertProgram.ToGeometry(program);
             WriteGeometryEntities(doc, geometry, layer);
         }
 
-        private static void WriteGeometryEntities(CadDocument doc, List<GeoEntity> geometry, ACadSharp.Tables.Layer layer)
+        private static void WriteGeometryEntities(
+            CadDocument doc,
+            List<GeoEntity> geometry,
+            ACadSharp.Tables.Layer layer
+        )
         {
             foreach (var entity in geometry)
             {
@@ -67,12 +74,14 @@ namespace OpenNest.IO
                 switch (entity)
                 {
                     case OpenNest.Geometry.Line line:
-                        doc.Entities.Add(new ACadSharp.Entities.Line
-                        {
-                            StartPoint = new XYZ(line.StartPoint.X, line.StartPoint.Y, 0),
-                            EndPoint = new XYZ(line.EndPoint.X, line.EndPoint.Y, 0),
-                            Layer = layer
-                        });
+                        doc.Entities.Add(
+                            new ACadSharp.Entities.Line
+                            {
+                                StartPoint = new XYZ(line.StartPoint.X, line.StartPoint.Y, 0),
+                                EndPoint = new XYZ(line.EndPoint.X, line.EndPoint.Y, 0),
+                                Layer = layer,
+                            }
+                        );
                         break;
 
                     case OpenNest.Geometry.Arc arc:
@@ -81,23 +90,27 @@ namespace OpenNest.IO
                         if (arc.IsReversed)
                             OpenNest.Math.Generic.Swap(ref startAngle, ref endAngle);
 
-                        doc.Entities.Add(new ACadSharp.Entities.Arc
-                        {
-                            Center = new XYZ(arc.Center.X, arc.Center.Y, 0),
-                            Radius = arc.Radius,
-                            StartAngle = startAngle,
-                            EndAngle = endAngle,
-                            Layer = layer
-                        });
+                        doc.Entities.Add(
+                            new ACadSharp.Entities.Arc
+                            {
+                                Center = new XYZ(arc.Center.X, arc.Center.Y, 0),
+                                Radius = arc.Radius,
+                                StartAngle = startAngle,
+                                EndAngle = endAngle,
+                                Layer = layer,
+                            }
+                        );
                         break;
 
                     case OpenNest.Geometry.Circle circle:
-                        doc.Entities.Add(new ACadSharp.Entities.Circle
-                        {
-                            Center = new XYZ(circle.Center.X, circle.Center.Y, 0),
-                            Radius = circle.Radius,
-                            Layer = layer
-                        });
+                        doc.Entities.Add(
+                            new ACadSharp.Entities.Circle
+                            {
+                                Center = new XYZ(circle.Center.X, circle.Center.Y, 0),
+                                Radius = circle.Radius,
+                                Layer = layer,
+                            }
+                        );
                         break;
 
                     case OpenNest.Geometry.Shape shape:
@@ -107,14 +120,19 @@ namespace OpenNest.IO
             }
         }
 
-        private static void WriteBendLine(CadDocument doc, Bend bend, ACadSharp.Tables.Layer layer, LineType lineType)
+        private static void WriteBendLine(
+            CadDocument doc,
+            Bend bend,
+            ACadSharp.Tables.Layer layer,
+            LineType lineType
+        )
         {
             var line = new ACadSharp.Entities.Line
             {
                 StartPoint = new XYZ(bend.StartPoint.X, bend.StartPoint.Y, 0),
                 EndPoint = new XYZ(bend.EndPoint.X, bend.EndPoint.Y, 0),
                 Layer = layer,
-                LineType = lineType
+                LineType = lineType,
             };
             doc.Entities.Add(line);
 
@@ -128,7 +146,7 @@ namespace OpenNest.IO
                     InsertPoint = new XYZ(midX, midY + 0.5, 0),
                     Value = bend.NoteText,
                     Height = 0.1,
-                    Layer = layer
+                    Layer = layer,
                 };
                 doc.Entities.Add(mtext);
             }
@@ -145,12 +163,14 @@ namespace OpenNest.IO
 
             if (length < EtchLength * 3.0)
             {
-                doc.Entities.Add(new ACadSharp.Entities.Line
-                {
-                    StartPoint = new XYZ(start.X, start.Y, 0),
-                    EndPoint = new XYZ(end.X, end.Y, 0),
-                    Layer = layer
-                });
+                doc.Entities.Add(
+                    new ACadSharp.Entities.Line
+                    {
+                        StartPoint = new XYZ(start.X, start.Y, 0),
+                        EndPoint = new XYZ(end.X, end.Y, 0),
+                        Layer = layer,
+                    }
+                );
             }
             else
             {
@@ -158,19 +178,23 @@ namespace OpenNest.IO
                 var dx = System.Math.Cos(angle) * EtchLength;
                 var dy = System.Math.Sin(angle) * EtchLength;
 
-                doc.Entities.Add(new ACadSharp.Entities.Line
-                {
-                    StartPoint = new XYZ(start.X, start.Y, 0),
-                    EndPoint = new XYZ(start.X + dx, start.Y + dy, 0),
-                    Layer = layer
-                });
+                doc.Entities.Add(
+                    new ACadSharp.Entities.Line
+                    {
+                        StartPoint = new XYZ(start.X, start.Y, 0),
+                        EndPoint = new XYZ(start.X + dx, start.Y + dy, 0),
+                        Layer = layer,
+                    }
+                );
 
-                doc.Entities.Add(new ACadSharp.Entities.Line
-                {
-                    StartPoint = new XYZ(end.X, end.Y, 0),
-                    EndPoint = new XYZ(end.X - dx, end.Y - dy, 0),
-                    Layer = layer
-                });
+                doc.Entities.Add(
+                    new ACadSharp.Entities.Line
+                    {
+                        StartPoint = new XYZ(end.X, end.Y, 0),
+                        EndPoint = new XYZ(end.X - dx, end.Y - dy, 0),
+                        Layer = layer,
+                    }
+                );
             }
         }
     }

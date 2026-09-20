@@ -1,6 +1,6 @@
+using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
-using System.Linq;
 
 namespace OpenNest
 {
@@ -44,7 +44,8 @@ namespace OpenNest
             if (drawing?.Program == null)
                 return 0.0;
 
-            var entities = ConvertProgram.ToGeometry(drawing.Program)
+            var entities = ConvertProgram
+                .ToGeometry(drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
 
             var shapes = ShapeBuilder.GetShapes(entities);

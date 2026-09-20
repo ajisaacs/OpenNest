@@ -17,8 +17,7 @@ public class SolidWorksBendDetectorTests
     [Fact]
     public void Registry_ContainsSolidWorksDetector()
     {
-        Assert.Contains(BendDetectorRegistry.Detectors,
-            d => d.Name == "SolidWorks");
+        Assert.Contains(BendDetectorRegistry.Detectors, d => d.Name == "SolidWorks");
     }
 
     [Fact]
@@ -32,7 +31,12 @@ public class SolidWorksBendDetectorTests
     [Fact]
     public void EllipseConverter_ProducesArcsDirectly()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "Bending", "TestData", "4526 A14 PT11 Test.dxf");
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            "Bending",
+            "TestData",
+            "4526 A14 PT11 Test.dxf"
+        );
         Assert.True(File.Exists(path), $"Test DXF not found: {path}");
 
         var result = OpenNest.IO.Dxf.Import(path);
@@ -50,14 +54,21 @@ public class SolidWorksBendDetectorTests
         var simplifier = new OpenNest.Geometry.GeometrySimplifier();
         var candidates = simplifier.Analyze(shape);
 
-        Assert.True(candidates.Count <= 10,
-            $"Expected <=10 simplifier candidates but got {candidates.Count}");
+        Assert.True(
+            candidates.Count <= 10,
+            $"Expected <=10 simplifier candidates but got {candidates.Count}"
+        );
     }
 
     [Fact]
     public void Import_TrimmedEllipse_NoClosingChord()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "Bending", "TestData", "4526 A14 PT11.dxf");
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            "Bending",
+            "TestData",
+            "4526 A14 PT11.dxf"
+        );
         Assert.True(File.Exists(path), $"Test DXF not found: {path}");
 
         var result = OpenNest.IO.Dxf.Import(path);
@@ -78,7 +89,12 @@ public class SolidWorksBendDetectorTests
     [Fact]
     public void DetectBends_SplitBendLine_PropagatesNote()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "Bending", "TestData", "4526 A14 PT23.dxf");
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            "Bending",
+            "TestData",
+            "4526 A14 PT23.dxf"
+        );
         Assert.True(File.Exists(path), $"Test DXF not found: {path}");
 
         using var reader = new DxfReader(path);
@@ -88,22 +104,32 @@ public class SolidWorksBendDetectorTests
         var bends = detector.DetectBends(doc);
 
         Assert.Equal(5, bends.Count);
-        Assert.All(bends, b =>
-        {
-            Assert.NotNull(b.NoteText);
-            Assert.NotNull(b.SourceNoteHandle);
-            Assert.Contains(doc.Entities, e => e.Handle == b.SourceNoteHandle
-                && e is ACadSharp.Entities.MText);
-            Assert.Equal(BendDirection.Up, b.Direction);
-            Assert.Equal(90.0, b.Angle);
-            Assert.Equal(0.125, b.Radius);
-        });
+        Assert.All(
+            bends,
+            b =>
+            {
+                Assert.NotNull(b.NoteText);
+                Assert.NotNull(b.SourceNoteHandle);
+                Assert.Contains(
+                    doc.Entities,
+                    e => e.Handle == b.SourceNoteHandle && e is ACadSharp.Entities.MText
+                );
+                Assert.Equal(BendDirection.Up, b.Direction);
+                Assert.Equal(90.0, b.Angle);
+                Assert.Equal(0.125, b.Radius);
+            }
+        );
     }
 
     [Fact]
     public void DetectBends_RealDxf_ParsesNotesCorrectly()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "Bending", "TestData", "4526 A14 PT45.dxf");
+        var path = Path.Combine(
+            AppContext.BaseDirectory,
+            "Bending",
+            "TestData",
+            "4526 A14 PT45.dxf"
+        );
         Assert.True(File.Exists(path), $"Test DXF not found: {path}");
 
         using var reader = new DxfReader(path);

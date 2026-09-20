@@ -1,4 +1,3 @@
-using OpenNest.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -8,6 +7,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using OpenNest.Shapes;
 
 namespace OpenNest.Forms
 {
@@ -15,7 +15,7 @@ namespace OpenNest.Forms
     {
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
         };
 
         private readonly List<Drawing> addedDrawings = new List<Drawing>();
@@ -28,9 +28,10 @@ namespace OpenNest.Forms
 
         public ShapeLibraryForm(IEnumerable<string> existingDrawingNames = null)
         {
-            existingNames = existingDrawingNames != null
-                ? new HashSet<string>(existingDrawingNames, StringComparer.OrdinalIgnoreCase)
-                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            existingNames =
+                existingDrawingNames != null
+                    ? new HashSet<string>(existingDrawingNames, StringComparer.OrdinalIgnoreCase)
+                    : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             InitializeComponent();
             DiscoverShapes();
@@ -51,7 +52,8 @@ namespace OpenNest.Forms
         private void DiscoverShapes()
         {
             var baseType = typeof(ShapeDefinition);
-            var shapeTypes = baseType.Assembly.GetTypes()
+            var shapeTypes = baseType
+                .Assembly.GetTypes()
                 .Where(t => t.IsClass && !t.IsAbstract && baseType.IsAssignableFrom(t))
                 .OrderBy(t => t.Name)
                 .ToList();
@@ -94,14 +96,16 @@ namespace OpenNest.Forms
 
         private void ShapeListBox_DrawItem(object sender, DrawItemEventArgs e)
         {
-            if (e.Index < 0) return;
+            if (e.Index < 0)
+                return;
 
             e.DrawBackground();
 
             var entry = (ShapeEntry)shapeListBox.Items[e.Index];
-            var textColor = (e.State & DrawItemState.Selected) != 0
-                ? SystemColors.HighlightText
-                : SystemColors.ControlText;
+            var textColor =
+                (e.State & DrawItemState.Selected) != 0
+                    ? SystemColors.HighlightText
+                    : SystemColors.ControlText;
 
             var text = entry.DisplayName;
             if (entry.HasConfigurations)
@@ -119,7 +123,8 @@ namespace OpenNest.Forms
 
         private void ShapeListBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (shapeListBox.SelectedIndex < 0) return;
+            if (shapeListBox.SelectedIndex < 0)
+                return;
 
             selectedEntry = (ShapeEntry)shapeListBox.SelectedItem;
             suppressPreview = true;
@@ -150,7 +155,8 @@ namespace OpenNest.Forms
 
         private void ConfigComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (configComboBox.SelectedIndex < 0 || selectedEntry == null) return;
+            if (configComboBox.SelectedIndex < 0 || selectedEntry == null)
+                return;
 
             var config = selectedEntry.Configurations[configComboBox.SelectedIndex];
             nameTextBox.Text = config.Name;
@@ -167,7 +173,10 @@ namespace OpenNest.Forms
             parametersPanel.Controls.Clear();
             parameterBindings.Clear();
 
-            var props = shapeType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            var props = shapeType
+                .GetProperties(
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly
+                )
                 .Where(p => p.CanRead && p.CanWrite && p.Name != "Name")
                 .ToArray();
 
@@ -180,7 +189,7 @@ namespace OpenNest.Forms
                 {
                     Text = FriendlyName(prop.Name),
                     Location = new Point(parametersPanel.Padding.Left, y),
-                    AutoSize = true
+                    AutoSize = true,
                 };
 
                 y += 18;
@@ -192,7 +201,7 @@ namespace OpenNest.Forms
                     {
                         Location = new Point(parametersPanel.Padding.Left, y),
                         AutoSize = true,
-                        Checked = sourceValues != null && (bool)prop.GetValue(sourceValues)
+                        Checked = sourceValues != null && (bool)prop.GetValue(sourceValues),
                     };
                     cb.CheckedChanged += (s, ev) => UpdatePreview();
                     editor = cb;
@@ -204,7 +213,7 @@ namespace OpenNest.Forms
                         Location = new Point(parametersPanel.Padding.Left, y),
                         Width = panelWidth,
                         Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-                        DropDownStyle = ComboBoxStyle.DropDownList
+                        DropDownStyle = ComboBoxStyle.DropDownList,
                     };
 
                     // Initial population: every entry; the filter runs on first UpdatePreview.
@@ -226,7 +235,7 @@ namespace OpenNest.Forms
                     {
                         Location = new Point(parametersPanel.Padding.Left, y),
                         Width = panelWidth,
-                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                     };
 
                     if (sourceValues != null)
@@ -254,14 +263,16 @@ namespace OpenNest.Forms
 
         private void UpdatePreview()
         {
-            if (suppressPreview || selectedEntry == null) return;
+            if (suppressPreview || selectedEntry == null)
+                return;
 
             UpdatePipeSizeFilter();
 
             try
             {
                 var shape = CreateShapeFromInputs();
-                if (shape == null) return;
+                if (shape == null)
+                    return;
 
                 var drawing = shape.GetDrawing();
                 nameTextBox.Text = shape.GenerateName();
@@ -272,10 +283,12 @@ namespace OpenNest.Forms
                     var bb = drawing.Program.BoundingBox();
                     var info = string.Format("{0:F3} x {1:F3}", bb.Size.Length, bb.Size.Width);
 
-                    if (shape is PipeFlangeShape flange
+                    if (
+                        shape is PipeFlangeShape flange
                         && !flange.Blind
                         && !string.IsNullOrEmpty(flange.PipeSize)
-                        && !PipeSizes.TryGetOD(flange.PipeSize, out _))
+                        && !PipeSizes.TryGetOD(flange.PipeSize, out _)
+                    )
                     {
                         info += "  — Invalid pipe size, no bore cut";
                     }
@@ -293,7 +306,9 @@ namespace OpenNest.Forms
         {
             // Find the PipeSize combo and the numeric inputs it depends on.
             ComboBox pipeCombo = null;
-            double holePattern = 0, holeDia = 0, clearance = 0;
+            double holePattern = 0,
+                holeDia = 0,
+                clearance = 0;
             bool blind = false;
 
             foreach (var binding in parameterBindings)
@@ -408,7 +423,8 @@ namespace OpenNest.Forms
             try
             {
                 var shape = CreateShapeFromInputs();
-                if (shape == null) return;
+                if (shape == null)
+                    return;
 
                 var drawing = shape.GetDrawing();
                 drawing.Name = GetUniqueName(drawing.Name);
@@ -427,7 +443,8 @@ namespace OpenNest.Forms
                     $"Failed to create shape: {ex.Message}",
                     "Error",
                     MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                    MessageBoxIcon.Warning
+                );
             }
         }
 

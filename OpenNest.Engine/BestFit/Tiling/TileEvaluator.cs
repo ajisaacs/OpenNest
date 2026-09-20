@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Engine.BestFit.Tiling
 {
@@ -16,7 +16,12 @@ namespace OpenNest.Engine.BestFit.Tiling
             return result1.PartsNested >= result2.PartsNested ? result1 : result2;
         }
 
-        private TileResult TryTile(BestFitResult bestFit, double plateWidth, double plateHeight, bool rotatePair)
+        private TileResult TryTile(
+            BestFitResult bestFit,
+            double plateWidth,
+            double plateHeight,
+            bool rotatePair
+        )
         {
             var pairWidth = rotatePair ? bestFit.BoundingHeight : bestFit.BoundingWidth;
             var pairHeight = rotatePair ? bestFit.BoundingWidth : bestFit.BoundingHeight;
@@ -36,13 +41,16 @@ namespace OpenNest.Engine.BestFit.Tiling
             {
                 for (var col = 0; col < cols; col++)
                 {
-                    placements.Add(new PairPlacement
-                    {
-                        Position = new Vector(
-                            col * (pairWidth + spacing),
-                            row * (pairHeight + spacing)),
-                        PairRotation = rotatePair ? Angle.HalfPI : 0
-                    });
+                    placements.Add(
+                        new PairPlacement
+                        {
+                            Position = new Vector(
+                                col * (pairWidth + spacing),
+                                row * (pairHeight + spacing)
+                            ),
+                            PairRotation = rotatePair ? Angle.HalfPI : 0,
+                        }
+                    );
                 }
             }
 
@@ -55,7 +63,7 @@ namespace OpenNest.Engine.BestFit.Tiling
                 Columns = cols,
                 Utilization = plateArea > 0 ? usedArea / plateArea : 0,
                 Placements = placements,
-                PairRotated = rotatePair
+                PairRotated = rotatePair,
             };
         }
     }

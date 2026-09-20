@@ -84,8 +84,7 @@ namespace OpenNest.Geometry
         {
             var poly = shape.ToPolygon();
 
-            if (poly != null && poly.Vertices.Count >= 3
-                && poly.RotationDirection() != desired)
+            if (poly != null && poly.Vertices.Count >= 3 && poly.RotationDirection() != desired)
             {
                 shape.Reverse();
             }

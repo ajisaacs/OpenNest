@@ -113,7 +113,7 @@ namespace OpenNest
                 RapidPen = new Pen(value)
                 {
                     DashPattern = new float[] { 10, 10 },
-                    DashCap = DashCap.Flat
+                    DashCap = DashCap.Flat,
                 };
             }
         }
@@ -145,7 +145,7 @@ namespace OpenNest
                 EdgeSpacingPen = new Pen(value)
                 {
                     DashPattern = new float[] { 3, 3 },
-                    DashCap = DashCap.Flat
+                    DashCap = DashCap.Flat,
                 };
             }
         }

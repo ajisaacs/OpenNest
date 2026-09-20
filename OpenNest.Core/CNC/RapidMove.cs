@@ -30,7 +30,8 @@ namespace OpenNest.CNC
             return new RapidMove(EndPoint)
             {
                 Suppressed = Suppressed,
-                VariableRefs = VariableRefs != null ? new Dictionary<string, string>(VariableRefs) : null
+                VariableRefs =
+                    VariableRefs != null ? new Dictionary<string, string>(VariableRefs) : null,
             };
         }
 

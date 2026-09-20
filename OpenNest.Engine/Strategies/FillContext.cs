@@ -1,9 +1,9 @@
-using OpenNest.Engine;
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using OpenNest.Engine;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Strategies
 {
@@ -20,6 +20,7 @@ namespace OpenNest.Engine.Strategies
         public PartType PartType { get; set; }
 
         public List<Part> CurrentBest { get; set; }
+
         /// <summary>For progress reporting only; comparisons use Policy.Comparer.</summary>
         public FillScore CurrentBestScore { get; set; }
         public NestPhase WinnerPhase { get; set; }
@@ -37,7 +38,9 @@ namespace OpenNest.Engine.Strategies
         /// </summary>
         public void ReportProgress(List<Part> parts, string description)
         {
-            var isNewBest = parts != null && parts.Count > 0
+            var isNewBest =
+                parts != null
+                && parts.Count > 0
                 && Policy.Comparer.IsBetter(parts, CurrentBest, WorkArea);
 
             if (isNewBest)
@@ -47,15 +50,18 @@ namespace OpenNest.Engine.Strategies
                 WinnerPhase = ActivePhase;
             }
 
-            NestEngineBase.ReportProgress(Progress, new ProgressReport
-            {
-                Phase = ActivePhase,
-                PlateNumber = PlateNumber,
-                Parts = isNewBest ? parts : CurrentBest,
-                WorkArea = WorkArea,
-                Description = description,
-                IsOverallBest = isNewBest,
-            });
+            NestEngineBase.ReportProgress(
+                Progress,
+                new ProgressReport
+                {
+                    Phase = ActivePhase,
+                    PlateNumber = PlateNumber,
+                    Parts = isNewBest ? parts : CurrentBest,
+                    WorkArea = WorkArea,
+                    Description = description,
+                    IsOverallBest = isNewBest,
+                }
+            );
         }
     }
 }

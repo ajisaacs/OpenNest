@@ -31,9 +31,20 @@ namespace OpenNest
                 Win32.SetWindowLong(c.Handle, Win32.GWL_EXSTYLE, windowLong);
 
                 // Update the non-client area.
-                Win32.SetWindowPos(client.Handle, IntPtr.Zero, 0, 0, 0, 0,
-                    Win32.SWP_NOACTIVATE | Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOZORDER |
-                    Win32.SWP_NOOWNERZORDER | Win32.SWP_FRAMECHANGED);
+                Win32.SetWindowPos(
+                    client.Handle,
+                    IntPtr.Zero,
+                    0,
+                    0,
+                    0,
+                    0,
+                    Win32.SWP_NOACTIVATE
+                        | Win32.SWP_NOMOVE
+                        | Win32.SWP_NOSIZE
+                        | Win32.SWP_NOZORDER
+                        | Win32.SWP_NOOWNERZORDER
+                        | Win32.SWP_FRAMECHANGED
+                );
 
                 return true;
             }

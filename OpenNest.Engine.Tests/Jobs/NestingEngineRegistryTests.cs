@@ -32,7 +32,11 @@ public class NestingEngineRegistryTests
     {
         var before = NestingEngineRegistry.AvailableEngines.Count;
 
-        NestingEngineRegistry.Register("Default", "duplicate", () => new FixedStrategyNestingEngine("Default"));
+        NestingEngineRegistry.Register(
+            "Default",
+            "duplicate",
+            () => new FixedStrategyNestingEngine("Default")
+        );
 
         Assert.Equal(before, NestingEngineRegistry.AvailableEngines.Count);
     }
@@ -42,7 +46,9 @@ public class NestingEngineRegistryTests
     {
         var before = NestingEngineRegistry.AvailableEngines.Count;
 
-        NestingEngineRegistry.LoadPlugins(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()));
+        NestingEngineRegistry.LoadPlugins(
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
+        );
 
         Assert.Equal(before, NestingEngineRegistry.AvailableEngines.Count);
     }

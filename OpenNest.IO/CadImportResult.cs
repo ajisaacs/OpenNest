@@ -24,7 +24,8 @@ namespace OpenNest.IO
         /// </summary>
         public List<Bend> Bends { get; set; } = new List<Bend>();
 
-        public List<Bending.BendRepairReport> BendRepairReports { get; set; } = new List<Bending.BendRepairReport>();
+        public List<Bending.BendRepairReport> BendRepairReports { get; set; } =
+            new List<Bending.BendRepairReport>();
 
         /// <summary>
         /// Bounding box of <see cref="Entities"/> at import time. May be stale

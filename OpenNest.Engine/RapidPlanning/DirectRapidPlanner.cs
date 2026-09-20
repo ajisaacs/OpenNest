@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.RapidPlanning
 {
@@ -13,19 +13,11 @@ namespace OpenNest.Engine.RapidPlanning
             {
                 if (TravelLineIntersectsShape(travelLine, cutArea))
                 {
-                    return new RapidPath
-                    {
-                        HeadUp = true,
-                        Waypoints = new List<Vector>()
-                    };
+                    return new RapidPath { HeadUp = true, Waypoints = new List<Vector>() };
                 }
             }
 
-            return new RapidPath
-            {
-                HeadUp = false,
-                Waypoints = new List<Vector>()
-            };
+            return new RapidPath { HeadUp = false, Waypoints = new List<Vector>() };
         }
 
         private static bool TravelLineIntersectsShape(Line travelLine, Shape shape)

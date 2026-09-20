@@ -5,16 +5,22 @@ namespace OpenNest.CNC
 {
     public class ArcMove : Motion
     {
-        public ArcMove()
-        {
-        }
+        public ArcMove() { }
 
-        public ArcMove(double x, double y, double i, double j, RotationType rotation = RotationType.CCW)
-            : this(new Vector(x, y), new Vector(i, j), rotation)
-        {
-        }
+        public ArcMove(
+            double x,
+            double y,
+            double i,
+            double j,
+            RotationType rotation = RotationType.CCW
+        )
+            : this(new Vector(x, y), new Vector(i, j), rotation) { }
 
-        public ArcMove(Vector endPoint, Vector centerPoint, RotationType rotation = RotationType.CCW)
+        public ArcMove(
+            Vector endPoint,
+            Vector centerPoint,
+            RotationType rotation = RotationType.CCW
+        )
         {
             EndPoint = endPoint;
             CenterPoint = centerPoint;
@@ -68,7 +74,8 @@ namespace OpenNest.CNC
             {
                 Layer = Layer,
                 Suppressed = Suppressed,
-                VariableRefs = VariableRefs != null ? new Dictionary<string, string>(VariableRefs) : null
+                VariableRefs =
+                    VariableRefs != null ? new Dictionary<string, string>(VariableRefs) : null,
             };
         }
 
@@ -85,9 +92,9 @@ namespace OpenNest.CNC
             var i = CenterPoint.X.ToString(dp);
             var j = CenterPoint.Y.ToString(dp);
 
-            return Rotation == RotationType.CW ?
-                string.Format("G02 X{0} Y{1} I{2} J{3}", x, y, i, j) :
-                string.Format("G03 X{0} Y{1} I{2} J{3}", x, y, i, j);
+            return Rotation == RotationType.CW
+                ? string.Format("G02 X{0} Y{1} I{2} J{3}", x, y, i, j)
+                : string.Format("G03 X{0} Y{1} I{2} J{3}", x, y, i, j);
         }
     }
 }

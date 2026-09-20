@@ -20,10 +20,18 @@ public sealed class FixedStrategyNestingEngine : INestingEngine
         this.strategy = strategy;
     }
 
-    public NestJobResult Solve(NestJob job, IProgress<NestJobProgress> progress = null, CancellationToken token = default)
+    public NestJobResult Solve(
+        NestJob job,
+        IProgress<NestJobProgress> progress = null,
+        CancellationToken token = default
+    )
     {
         ArgumentNullException.ThrowIfNull(job);
-        var forced = new NestJob(job.Parts, job.Plates, new NestJobOptions(strategy, job.Options.MaxPlates));
+        var forced = new NestJob(
+            job.Parts,
+            job.Plates,
+            new NestJobOptions(strategy, job.Options.MaxPlates)
+        );
         return runner.Solve(forced, progress, token);
     }
 }

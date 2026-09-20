@@ -1,10 +1,10 @@
-using OpenNest.Engine.Strategies;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using OpenNest.Engine.Strategies;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Fill
 {
@@ -23,9 +23,12 @@ namespace OpenNest.Engine.Fill
             halfSpacing = partSpacing / 2;
         }
 
-        public List<Part> Fill(Drawing drawing, double rotationAngle = 0,
+        public List<Part> Fill(
+            Drawing drawing,
+            double rotationAngle = 0,
             CancellationToken token = default,
-            Action<List<Part>, string> reportProgress = null)
+            Action<List<Part>, string> reportProgress = null
+        )
         {
             var pair = BuildPair(drawing, rotationAngle);
             if (pair == null)
@@ -64,8 +67,10 @@ namespace OpenNest.Engine.Fill
             var part2 = Part.CreateAtOrigin(drawing, rotationAngle + System.Math.PI);
 
             // Check that each part fits in the work area individually.
-            if (part1.BoundingBox.Width > workArea.Width + Tolerance.Epsilon ||
-                part1.BoundingBox.Length > workArea.Length + Tolerance.Epsilon)
+            if (
+                part1.BoundingBox.Width > workArea.Width + Tolerance.Epsilon
+                || part1.BoundingBox.Length > workArea.Length + Tolerance.Epsilon
+            )
                 return null;
 
             // Slide part2 toward part1 from the right using geometry-aware distance.
@@ -80,7 +85,11 @@ namespace OpenNest.Engine.Fill
             // Slide part2 left toward part1.
             var movingLines = boundary2.GetLines(part2.Location, PushDirection.Left);
             var stationaryLines = boundary1.GetLines(part1.Location, PushDirection.Right);
-            var dist = SpatialQuery.DirectionalDistance(movingLines, stationaryLines, PushDirection.Left);
+            var dist = SpatialQuery.DirectionalDistance(
+                movingLines,
+                stationaryLines,
+                PushDirection.Left
+            );
 
             if (dist < double.MaxValue && dist > 0)
             {
@@ -93,8 +102,10 @@ namespace OpenNest.Engine.Fill
                 return null;
 
             // Verify pair fits in work area.
-            if (pair.Value.Bbox.Width > workArea.Width + Tolerance.Epsilon ||
-                pair.Value.Bbox.Length > workArea.Length + Tolerance.Epsilon)
+            if (
+                pair.Value.Bbox.Width > workArea.Width + Tolerance.Epsilon
+                || pair.Value.Bbox.Length > workArea.Length + Tolerance.Epsilon
+            )
                 return null;
 
             return pair;
@@ -121,8 +132,14 @@ namespace OpenNest.Engine.Fill
 
             // Find minimum distance from test pair sliding down toward original pair.
             var copyDistance = FindVerticalCopyDistance(
-                pair.Part1, pair.Part2, testPart1, testPart2,
-                boundary1, boundary2, pairHeight);
+                pair.Part1,
+                pair.Part2,
+                testPart1,
+                testPart2,
+                boundary1,
+                boundary2,
+                pairHeight
+            );
 
             if (copyDistance <= 0)
                 return column;
@@ -144,25 +161,56 @@ namespace OpenNest.Engine.Fill
         }
 
         private double FindVerticalCopyDistance(
-            Part origPart1, Part origPart2,
-            Part testPart1, Part testPart2,
-            PartBoundary boundary1, PartBoundary boundary2,
-            double pairHeight)
+            Part origPart1,
+            Part origPart2,
+            Part testPart1,
+            Part testPart2,
+            PartBoundary boundary1,
+            PartBoundary boundary2,
+            double pairHeight
+        )
         {
             // Check all 4 combinations: test parts sliding down toward original parts.
             var slidePairs = new[]
             {
-                (moving: boundary1, movingLoc: testPart1.Location, stationary: boundary1, stationaryLoc: origPart1.Location),
-                (moving: boundary1, movingLoc: testPart1.Location, stationary: boundary2, stationaryLoc: origPart2.Location),
-                (moving: boundary2, movingLoc: testPart2.Location, stationary: boundary1, stationaryLoc: origPart1.Location),
-                (moving: boundary2, movingLoc: testPart2.Location, stationary: boundary2, stationaryLoc: origPart2.Location),
+                (
+                    moving: boundary1,
+                    movingLoc: testPart1.Location,
+                    stationary: boundary1,
+                    stationaryLoc: origPart1.Location
+                ),
+                (
+                    moving: boundary1,
+                    movingLoc: testPart1.Location,
+                    stationary: boundary2,
+                    stationaryLoc: origPart2.Location
+                ),
+                (
+                    moving: boundary2,
+                    movingLoc: testPart2.Location,
+                    stationary: boundary1,
+                    stationaryLoc: origPart1.Location
+                ),
+                (
+                    moving: boundary2,
+                    movingLoc: testPart2.Location,
+                    stationary: boundary2,
+                    stationaryLoc: origPart2.Location
+                ),
             };
 
             var minSlide = double.MaxValue;
             foreach (var (moving, movingLoc, stationary, stationaryLoc) in slidePairs)
             {
-                var d = SlideDistance(moving, movingLoc, stationary, stationaryLoc, PushDirection.Down);
-                if (d < minSlide) minSlide = d;
+                var d = SlideDistance(
+                    moving,
+                    movingLoc,
+                    stationary,
+                    stationaryLoc,
+                    PushDirection.Down
+                );
+                if (d < minSlide)
+                    minSlide = d;
             }
 
             if (minSlide >= double.MaxValue || minSlide < 0)
@@ -177,18 +225,24 @@ namespace OpenNest.Engine.Fill
         }
 
         private static double SlideDistance(
-            PartBoundary movingBoundary, Vector movingLocation,
-            PartBoundary stationaryBoundary, Vector stationaryLocation,
-            PushDirection direction)
+            PartBoundary movingBoundary,
+            Vector movingLocation,
+            PartBoundary stationaryBoundary,
+            Vector stationaryLocation,
+            PushDirection direction
+        )
         {
             var opposite = SpatialQuery.OppositeDirection(direction);
             var movingEdges = movingBoundary.GetEdges(direction);
             var stationaryEdges = stationaryBoundary.GetEdges(opposite);
 
             return SpatialQuery.DirectionalDistance(
-                movingEdges, movingLocation,
-                stationaryEdges, stationaryLocation,
-                direction);
+                movingEdges,
+                movingLocation,
+                stationaryEdges,
+                stationaryLocation,
+                direction
+            );
         }
 
         // --- Step 3: Iterative Adjustment ---
@@ -249,7 +303,11 @@ namespace OpenNest.Engine.Fill
             return TryShiftDirection(pair, -adjustment, originalPairWidth);
         }
 
-        private PartPair? TryShiftDirection(PartPair pair, double verticalShift, double originalPairWidth)
+        private PartPair? TryShiftDirection(
+            PartPair pair,
+            double verticalShift,
+            double originalPairWidth
+        )
         {
             // Clone parts so we don't mutate the originals.
             var p1 = (Part)pair.Part1.Clone();

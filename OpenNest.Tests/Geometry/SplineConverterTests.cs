@@ -63,7 +63,7 @@ public class SplineConverterTests
         var points = new System.Collections.Generic.List<Vector>
         {
             new Vector(0, 0),
-            new Vector(10, 5)
+            new Vector(10, 5),
         };
 
         var result = SplineConverter.Convert(points, isClosed: false, tolerance: 0.001);
@@ -89,16 +89,18 @@ public class SplineConverterTests
             var endPt = GetEndPoint(result[i]);
             var startPt = GetStartPoint(result[i + 1]);
             var gap = endPt.DistanceTo(startPt);
-            Assert.True(gap < 0.001,
-                $"Gap of {gap:F6} between entity {i} and {i + 1}");
+            Assert.True(gap < 0.001, $"Gap of {gap:F6} between entity {i} and {i + 1}");
         }
     }
 
     [Fact]
     public void Convert_EmptyPoints_ReturnsEmpty()
     {
-        var result = SplineConverter.Convert(new System.Collections.Generic.List<Vector>(),
-            isClosed: false, tolerance: 0.001);
+        var result = SplineConverter.Convert(
+            new System.Collections.Generic.List<Vector>(),
+            isClosed: false,
+            tolerance: 0.001
+        );
         Assert.Empty(result);
     }
 
@@ -116,7 +118,7 @@ public class SplineConverterTests
         {
             Arc a => a.StartPoint(),
             Line l => l.StartPoint,
-            _ => throw new System.Exception("Unexpected entity type")
+            _ => throw new System.Exception("Unexpected entity type"),
         };
     }
 
@@ -126,7 +128,7 @@ public class SplineConverterTests
         {
             Arc a => a.EndPoint(),
             Line l => l.EndPoint,
-            _ => throw new System.Exception("Unexpected entity type")
+            _ => throw new System.Exception("Unexpected entity type"),
         };
     }
 }

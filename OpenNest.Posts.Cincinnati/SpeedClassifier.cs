@@ -8,8 +8,10 @@ namespace OpenNest.Posts.Cincinnati
         public string Classify(double contourLength, double sheetDiagonal)
         {
             var ratio = contourLength / sheetDiagonal;
-            if (ratio >= FastThreshold) return "FAST";
-            if (ratio <= SlowThreshold) return "SLOW";
+            if (ratio >= FastThreshold)
+                return "FAST";
+            if (ratio <= SlowThreshold)
+                return "SLOW";
             return "MEDIUM";
         }
 

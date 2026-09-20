@@ -13,10 +13,7 @@ public class CincinnatiSheetWriterTests
     [Fact]
     public void WriteSheet_EmitsSheetHeader()
     {
-        var config = new CincinnatiPostConfig
-        {
-            PostedAccuracy = 4
-        };
+        var config = new CincinnatiPostConfig { PostedAccuracy = 4 };
         var plate = new Plate(48.0, 96.0);
         plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
 
@@ -42,7 +39,7 @@ public class CincinnatiSheetWriterTests
         var config = new CincinnatiPostConfig
         {
             PalletExchange = PalletMode.EndOfSheet,
-            PostedAccuracy = 4
+            PostedAccuracy = 4,
         };
         var plate = new Plate(48.0, 96.0);
         plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
@@ -147,7 +144,7 @@ public class CincinnatiSheetWriterTests
         var config = new CincinnatiPostConfig
         {
             PalletExchange = PalletMode.StartAndEnd,
-            PostedAccuracy = 4
+            PostedAccuracy = 4,
         };
         var plate = new Plate(48.0, 96.0);
         plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
@@ -168,7 +165,7 @@ public class CincinnatiSheetWriterTests
         var config = new CincinnatiPostConfig
         {
             PalletExchange = PalletMode.None,
-            PostedAccuracy = 4
+            PostedAccuracy = 4,
         };
         var plate = new Plate(48.0, 96.0);
         plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
@@ -189,7 +186,7 @@ public class CincinnatiSheetWriterTests
         var config = new CincinnatiPostConfig
         {
             PalletExchange = PalletMode.EndOfSheet,
-            PostedAccuracy = 4
+            PostedAccuracy = 4,
         };
         var plate = new Plate(48.0, 96.0);
         plate.Parts.Add(new Part(new Drawing("TestPart", CreateSimpleProgram())));
@@ -234,7 +231,10 @@ public class CincinnatiSheetWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(10.0, 20.0),
-            new ArcMove(new Vector(10.0, 20.0), new Vector(15.0, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+            new ArcMove(new Vector(10.0, 20.0), new Vector(15.0, 20.0), RotationType.CW)
+            {
+                Layer = LayerType.Cut,
+            },
         };
         var distance = FeatureUtils.ComputeCutDistance(codes);
 
@@ -249,7 +249,7 @@ public class CincinnatiSheetWriterTests
         {
             new RapidMove(0, 0),
             new LinearMove(1, 0) { Layer = LayerType.Scribe },
-            new LinearMove(1, 1) { Layer = LayerType.Scribe }
+            new LinearMove(1, 1) { Layer = LayerType.Scribe },
         };
 
         Assert.True(FeatureUtils.IsEtch(codes));
@@ -262,7 +262,7 @@ public class CincinnatiSheetWriterTests
         {
             new RapidMove(0, 0),
             new LinearMove(1, 0) { Layer = LayerType.Cut },
-            new LinearMove(1, 1) { Layer = LayerType.Cut }
+            new LinearMove(1, 1) { Layer = LayerType.Cut },
         };
 
         Assert.False(FeatureUtils.IsEtch(codes));
@@ -271,10 +271,7 @@ public class CincinnatiSheetWriterTests
     [Fact]
     public void IsFeatureEtch_ReturnsFalseForRapidsOnly()
     {
-        var codes = new List<ICode>
-        {
-            new RapidMove(0, 0)
-        };
+        var codes = new List<ICode> { new RapidMove(0, 0) };
 
         Assert.False(FeatureUtils.IsEtch(codes));
     }
@@ -303,11 +300,11 @@ public class CincinnatiSheetWriterTests
 
         var output = sb.ToString();
         // Under G90, coordinates must be plate-absolute (part coords + part location)
-        Assert.Contains("G0 X10.5 Y5.25", output);      // rapid to pierce
-        Assert.Contains("G1 X12.5 Y5.25", output);       // (2,0) + (10.5,5.25)
-        Assert.Contains("G1 X12.5 Y7.25", output);       // (2,2) + (10.5,5.25)
-        Assert.Contains("G1 X10.5 Y7.25", output);       // (0,2) + (10.5,5.25)
-        Assert.Contains("G1 X10.5 Y5.25", output);       // (0,0) + (10.5,5.25)
+        Assert.Contains("G0 X10.5 Y5.25", output); // rapid to pierce
+        Assert.Contains("G1 X12.5 Y5.25", output); // (2,0) + (10.5,5.25)
+        Assert.Contains("G1 X12.5 Y7.25", output); // (2,2) + (10.5,5.25)
+        Assert.Contains("G1 X10.5 Y7.25", output); // (0,2) + (10.5,5.25)
+        Assert.Contains("G1 X10.5 Y5.25", output); // (0,0) + (10.5,5.25)
     }
 
     [Fact]

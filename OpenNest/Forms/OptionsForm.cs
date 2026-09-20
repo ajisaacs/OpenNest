@@ -1,9 +1,9 @@
-using OpenNest.Engine.Strategies;
-using OpenNest.Properties;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Engine.Strategies;
+using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
@@ -25,36 +25,44 @@ namespace OpenNest.Forms
         {
             strategyGrid.AutoGenerateColumns = false;
 
-            strategyGrid.Columns.Add(new DataGridViewCheckBoxColumn
-            {
-                Name = "Enabled",
-                HeaderText = "",
-                Width = 30,
-            });
+            strategyGrid.Columns.Add(
+                new DataGridViewCheckBoxColumn
+                {
+                    Name = "Enabled",
+                    HeaderText = "",
+                    Width = 30,
+                }
+            );
 
-            strategyGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = "Name",
-                HeaderText = "Strategy",
-                ReadOnly = true,
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-            });
+            strategyGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    Name = "Name",
+                    HeaderText = "Strategy",
+                    ReadOnly = true,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                }
+            );
 
-            strategyGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = "Phase",
-                HeaderText = "Phase",
-                ReadOnly = true,
-                Width = 100,
-            });
+            strategyGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    Name = "Phase",
+                    HeaderText = "Phase",
+                    ReadOnly = true,
+                    Width = 100,
+                }
+            );
 
-            strategyGrid.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = "Order",
-                HeaderText = "Order",
-                ReadOnly = true,
-                Width = 55,
-            });
+            strategyGrid.Columns.Add(
+                new DataGridViewTextBoxColumn
+                {
+                    Name = "Order",
+                    HeaderText = "Order",
+                    ReadOnly = true,
+                    Width = 55,
+                }
+            );
 
             foreach (var strategy in FillStrategyRegistry.AllStrategies)
             {
@@ -77,7 +85,9 @@ namespace OpenNest.Forms
 
             var disabledNames = ParseDisabledStrategies(Settings.Default.DisabledStrategies);
             foreach (DataGridViewRow row in strategyGrid.Rows)
-                row.Cells["Enabled"].Value = !disabledNames.Contains((string)row.Cells["Name"].Value);
+                row.Cells["Enabled"].Value = !disabledNames.Contains(
+                    (string)row.Cells["Name"].Value
+                );
         }
 
         private void SaveSettings()
@@ -85,7 +95,8 @@ namespace OpenNest.Forms
             Settings.Default.NestTemplatePath = textBox1.Text;
             Settings.Default.CreateNewNestOnOpen = checkBox1.Checked;
             Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
-            Settings.Default.ActiveColorScheme = colorSchemeCombo.SelectedItem as string ?? "Classic";
+            Settings.Default.ActiveColorScheme =
+                colorSchemeCombo.SelectedItem as string ?? "Classic";
 
             var disabledNames = new List<string>();
             foreach (DataGridViewRow row in strategyGrid.Rows)
@@ -125,7 +136,8 @@ namespace OpenNest.Forms
 
             return new HashSet<string>(
                 value.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0),
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.OrdinalIgnoreCase
+            );
         }
 
         private void SaveSettings_Click(object sender, EventArgs e)

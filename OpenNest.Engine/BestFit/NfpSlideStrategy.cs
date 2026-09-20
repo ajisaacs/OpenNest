@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -10,8 +10,14 @@ namespace OpenNest.Engine.BestFit
         private readonly Polygon _stationaryHull;
         private readonly Vector _correction;
 
-        public NfpSlideStrategy(double part2Rotation, int type, string description,
-            Polygon stationaryPerimeter, Polygon stationaryHull, Vector correction)
+        public NfpSlideStrategy(
+            double part2Rotation,
+            int type,
+            string description,
+            Polygon stationaryPerimeter,
+            Polygon stationaryHull,
+            Vector correction
+        )
         {
             _part2Rotation = part2Rotation;
             StrategyIndex = type;
@@ -28,8 +34,13 @@ namespace OpenNest.Engine.BestFit
         /// Creates an NfpSlideStrategy by extracting polygon data from a drawing.
         /// Returns null if the drawing has no valid perimeter.
         /// </summary>
-        public static NfpSlideStrategy Create(Drawing drawing, double part2Rotation,
-            int type, string description, double spacing)
+        public static NfpSlideStrategy Create(
+            Drawing drawing,
+            double part2Rotation,
+            int type,
+            string description,
+            double spacing
+        )
         {
             var result = PolygonHelper.ExtractPerimeterPolygon(drawing, spacing / 2);
 
@@ -38,18 +49,32 @@ namespace OpenNest.Engine.BestFit
 
             var hull = ConvexHull.Compute(result.Polygon.Vertices);
 
-            return new NfpSlideStrategy(part2Rotation, type, description,
-                result.Polygon, hull, result.Correction);
+            return new NfpSlideStrategy(
+                part2Rotation,
+                type,
+                description,
+                result.Polygon,
+                hull,
+                result.Correction
+            );
         }
 
-        public List<PairCandidate> GenerateCandidates(Drawing drawing, double spacing, double stepSize)
+        public List<PairCandidate> GenerateCandidates(
+            Drawing drawing,
+            double spacing,
+            double stepSize
+        )
         {
             var candidates = new List<PairCandidate>();
 
             if (stepSize <= 0)
                 return candidates;
 
-            var orbitingPerimeter = PolygonHelper.RotatePolygon(_stationaryPerimeter, _part2Rotation, reNormalize: true);
+            var orbitingPerimeter = PolygonHelper.RotatePolygon(
+                _stationaryPerimeter,
+                _part2Rotation,
+                reNormalize: true
+            );
             var orbitingPoly = ConvexHull.Compute(orbitingPerimeter.Vertices);
 
             var nfp = NoFitPolygon.ComputeConvex(_stationaryHull, orbitingPoly);
@@ -79,9 +104,7 @@ namespace OpenNest.Engine.BestFit
                     for (var s = 1; s < steps; s++)
                     {
                         var t = (double)s / steps;
-                        var sample = new Vector(
-                            verts[i].X + dx * t,
-                            verts[i].Y + dy * t);
+                        var sample = new Vector(verts[i].X + dx * t, verts[i].Y + dy * t);
                         var sampleOffset = ApplyCorrection(sample, _correction);
                         candidates.Add(MakeCandidate(drawing, sampleOffset, spacing, testNumber++));
                     }
@@ -96,7 +119,12 @@ namespace OpenNest.Engine.BestFit
             return new Vector(nfpVertex.X - correction.X, nfpVertex.Y - correction.Y);
         }
 
-        private PairCandidate MakeCandidate(Drawing drawing, Vector offset, double spacing, int testNumber)
+        private PairCandidate MakeCandidate(
+            Drawing drawing,
+            Vector offset,
+            double spacing,
+            int testNumber
+        )
         {
             return new PairCandidate
             {
@@ -106,7 +134,7 @@ namespace OpenNest.Engine.BestFit
                 Part2Offset = offset,
                 StrategyIndex = StrategyIndex,
                 TestNumber = testNumber,
-                Spacing = spacing
+                Spacing = spacing,
             };
         }
     }

@@ -51,20 +51,26 @@ public class LocalJsonProviderTests : IDisposable
                             Value = 0.250,
                             Kerf = 0.012,
                             AssistGas = "O2",
-                            LeadIn = new LeadConfig { Type = "Arc", Length = 0.25, Angle = 90.0, Radius = 0.125 },
+                            LeadIn = new LeadConfig
+                            {
+                                Type = "Arc",
+                                Length = 0.25,
+                                Angle = 90.0,
+                                Radius = 0.125,
+                            },
                             LeadOut = new LeadConfig { Type = "Line", Length = 0.125 },
                             CutOff = new CutOffConfig
                             {
                                 PartClearance = 0.5,
                                 Overtravel = 0.25,
                                 Direction = "AwayFromOrigin",
-                                MinSegmentLength = 1.0
+                                MinSegmentLength = 1.0,
                             },
-                            PlateSizes = new List<string> { "60x120", "48x96" }
-                        }
-                    }
-                }
-            }
+                            PlateSizes = new List<string> { "60x120", "48x96" },
+                        },
+                    },
+                },
+            },
         };
 
         provider.SaveMachine(machine);

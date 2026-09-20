@@ -1,5 +1,5 @@
-using OpenNest.Math;
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -71,18 +71,24 @@ namespace OpenNest.Geometry
                 var vy = ux;
 
                 // Project all hull vertices onto edge direction (u) and perpendicular (v)
-                double minU = double.MaxValue, maxU = double.MinValue;
-                double minV = double.MaxValue, maxV = double.MinValue;
+                double minU = double.MaxValue,
+                    maxU = double.MinValue;
+                double minV = double.MaxValue,
+                    maxV = double.MinValue;
 
                 for (int j = 0; j < n; j++)
                 {
                     var projU = vertices[j].X * ux + vertices[j].Y * uy;
                     var projV = vertices[j].X * vx + vertices[j].Y * vy;
 
-                    if (projU < minU) minU = projU;
-                    if (projU > maxU) maxU = projU;
-                    if (projV < minV) minV = projV;
-                    if (projV > maxV) maxV = projV;
+                    if (projU < minU)
+                        minU = projU;
+                    if (projU > maxU)
+                        maxU = projU;
+                    if (projV < minV)
+                        minV = projV;
+                    if (projV > maxV)
+                        maxV = projV;
                 }
 
                 var width = maxU - minU;
@@ -99,7 +105,11 @@ namespace OpenNest.Geometry
             return best ?? new BoundingRectangleResult(0, 0, 0);
         }
 
-        public static BoundingRectangleResult MinimumBoundingRectangle(Polygon hull, double startAngle, double endAngle)
+        public static BoundingRectangleResult MinimumBoundingRectangle(
+            Polygon hull,
+            double startAngle,
+            double endAngle
+        )
         {
             var vertices = hull.Vertices;
             int n = hull.IsClosed() ? vertices.Count - 1 : vertices.Count;
@@ -153,23 +163,33 @@ namespace OpenNest.Geometry
             return best ?? new BoundingRectangleResult(startAngle, 0, 0);
         }
 
-        private static BoundingRectangleResult EvaluateAtAngle(IList<Vector> vertices, int n, double angle)
+        private static BoundingRectangleResult EvaluateAtAngle(
+            IList<Vector> vertices,
+            int n,
+            double angle
+        )
         {
             var cos = System.Math.Cos(angle);
             var sin = System.Math.Sin(angle);
 
-            double minU = double.MaxValue, maxU = double.MinValue;
-            double minV = double.MaxValue, maxV = double.MinValue;
+            double minU = double.MaxValue,
+                maxU = double.MinValue;
+            double minV = double.MaxValue,
+                maxV = double.MinValue;
 
             for (int j = 0; j < n; j++)
             {
                 var projU = vertices[j].X * cos + vertices[j].Y * sin;
                 var projV = -vertices[j].X * sin + vertices[j].Y * cos;
 
-                if (projU < minU) minU = projU;
-                if (projU > maxU) maxU = projU;
-                if (projV < minV) minV = projV;
-                if (projV > maxV) maxV = projV;
+                if (projU < minU)
+                    minU = projU;
+                if (projU > maxU)
+                    maxU = projU;
+                if (projV < minV)
+                    minV = projV;
+                if (projV > maxV)
+                    maxV = projV;
             }
 
             var width = maxU - minU;

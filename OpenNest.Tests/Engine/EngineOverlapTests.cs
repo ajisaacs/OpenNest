@@ -44,7 +44,9 @@ public class EngineOverlapTests
         var item = new NestItem { Drawing = drawing };
         var success = engine.Fill(item);
 
-        _output.WriteLine($"Engine: {engine.Name}, Parts: {plate.Parts.Count}, Utilization: {plate.Utilization():P1}");
+        _output.WriteLine(
+            $"Engine: {engine.Name}, Parts: {plate.Parts.Count}, Utilization: {plate.Utilization():P1}"
+        );
 
         if (engine is DefaultNestEngine defaultEngine)
         {
@@ -54,8 +56,8 @@ public class EngineOverlapTests
         }
 
         // Show rotation distribution
-        var rotGroups = plate.Parts
-            .GroupBy(p => System.Math.Round(OpenNest.Math.Angle.ToDegrees(p.Rotation), 1))
+        var rotGroups = plate
+            .Parts.GroupBy(p => System.Math.Round(OpenNest.Math.Angle.ToDegrees(p.Rotation), 1))
             .OrderBy(g => g.Key);
         foreach (var g in rotGroups)
             _output.WriteLine($"  Rotation {g.Key:F1}°: {g.Count()} parts");
@@ -69,20 +71,28 @@ public class EngineOverlapTests
                 _output.WriteLine($"  ({collisionPoints[i].X:F2}, {collisionPoints[i].Y:F2})");
         }
 
-        Assert.False(hasOverlaps,
-            $"Engine '{engineName}' produced {collisionPoints.Count} collision point(s) with {plate.Parts.Count} parts");
+        Assert.False(
+            hasOverlaps,
+            $"Engine '{engineName}' produced {collisionPoints.Count} collision point(s) with {plate.Parts.Count} parts"
+        );
     }
 
     [Fact]
     public void AdjacentParts_ShouldNotOverlap()
     {
-        var plate = TestHelpers.MakePlate(60, 120,
+        var plate = TestHelpers.MakePlate(
+            60,
+            120,
             TestHelpers.MakePartAt(0, 0, 10),
-            TestHelpers.MakePartAt(10, 0, 10));
+            TestHelpers.MakePartAt(10, 0, 10)
+        );
 
         var hasOverlaps = plate.HasOverlappingParts(out var pts);
         _output.WriteLine($"Adjacent squares: overlaps={hasOverlaps}, collision count={pts.Count}");
 
-        Assert.False(hasOverlaps, "Adjacent edge-touching parts should not be reported as overlapping");
+        Assert.False(
+            hasOverlaps,
+            "Adjacent edge-touching parts should not be reported as overlapping"
+        );
     }
 }

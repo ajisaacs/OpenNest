@@ -19,8 +19,11 @@ public sealed class CincinnatiSheetWriter
     private readonly CincinnatiFeatureWriter _featureWriter;
     private readonly Dictionary<int, int> _holeSubprograms;
 
-    public CincinnatiSheetWriter(CincinnatiPostConfig config, ProgramVariableManager vars,
-        Dictionary<int, int> holeSubprograms = null)
+    public CincinnatiSheetWriter(
+        CincinnatiPostConfig config,
+        ProgramVariableManager vars,
+        Dictionary<int, int> holeSubprograms = null
+    )
     {
         _config = config;
         _vars = vars;
@@ -38,10 +41,17 @@ public sealed class CincinnatiSheetWriter
     /// Optional mapping of (drawingId, rotationKey) to sub-program number.
     /// When provided, non-cutoff parts are emitted as M98 calls instead of inline features.
     /// </param>
-    public void Write(TextWriter w, Plate plate, string nestName, int layoutIndex, int subNumber,
-        string cutLibrary, string etchLibrary,
+    public void Write(
+        TextWriter w,
+        Plate plate,
+        string nestName,
+        int layoutIndex,
+        int subNumber,
+        string cutLibrary,
+        string etchLibrary,
         Dictionary<(int, long), int> partSubprograms = null,
-        Dictionary<(int drawingId, string varName), int> userVarMapping = null)
+        Dictionary<(int drawingId, string varName), int> userVarMapping = null
+    )
     {
         if (plate.Parts.Count == 0)
             return;
@@ -59,8 +69,12 @@ public sealed class CincinnatiSheetWriter
         w.WriteLine($"( Layout {layoutIndex} )");
         w.WriteLine($"( SHEET NAME = {_fmt.FormatCoord(width)} X {_fmt.FormatCoord(length)} )");
         w.WriteLine($"( Total parts on sheet = {partCount} )");
-        w.WriteLine($"#{_config.SheetWidthVariable}={_fmt.FormatCoord(width)} (SHEET WIDTH FOR CUTOFFS)");
-        w.WriteLine($"#{_config.SheetLengthVariable}={_fmt.FormatCoord(length)} (SHEET LENGTH FOR CUTOFFS)");
+        w.WriteLine(
+            $"#{_config.SheetWidthVariable}={_fmt.FormatCoord(width)} (SHEET WIDTH FOR CUTOFFS)"
+        );
+        w.WriteLine(
+            $"#{_config.SheetLengthVariable}={_fmt.FormatCoord(length)} (SHEET LENGTH FOR CUTOFFS)"
+        );
 
         // 2. Coordinate setup
         w.WriteLine("M42");
@@ -76,23 +90,40 @@ public sealed class CincinnatiSheetWriter
         w.WriteLine("GOTO1( Goto Feature )");
 
         // 3. Order parts: non-cutoff sorted by Bottom then Left, cutoffs last
-        var nonCutoffParts = plate.Parts
-            .Where(p => !p.BaseDrawing.IsCutOff)
+        var nonCutoffParts = plate
+            .Parts.Where(p => !p.BaseDrawing.IsCutOff)
             .OrderBy(p => p.Bottom)
             .ThenBy(p => p.Left)
             .ToList();
 
-        var cutoffParts = plate.Parts
-            .Where(p => p.BaseDrawing.IsCutOff)
-            .ToList();
+        var cutoffParts = plate.Parts.Where(p => p.BaseDrawing.IsCutOff).ToList();
 
         var allParts = nonCutoffParts.Concat(cutoffParts).ToList();
 
         // 4. Emit parts
         if (partSubprograms != null)
-            WritePartsWithSubprograms(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, width, length, partSubprograms, userVarMapping);
+            WritePartsWithSubprograms(
+                w,
+                allParts,
+                cutLibrary,
+                etchLibrary,
+                sheetDiagonal,
+                width,
+                length,
+                partSubprograms,
+                userVarMapping
+            );
         else
-            WritePartsInline(w, allParts, cutLibrary, etchLibrary, sheetDiagonal, width, length, userVarMapping);
+            WritePartsInline(
+                w,
+                allParts,
+                cutLibrary,
+                etchLibrary,
+                sheetDiagonal,
+                width,
+                length,
+                userVarMapping
+            );
 
         // 5. Footer
         w.WriteLine("M42");
@@ -101,11 +132,17 @@ public sealed class CincinnatiSheetWriter
         w.WriteLine($"M99 (END OF {nestName}.{layoutIndex:D3})");
     }
 
-    private void WritePartsWithSubprograms(TextWriter w, List<Part> allParts,
-        string cutLibrary, string etchLibrary, double sheetDiagonal,
-        double plateWidth, double plateLength,
+    private void WritePartsWithSubprograms(
+        TextWriter w,
+        List<Part> allParts,
+        string cutLibrary,
+        string etchLibrary,
+        double sheetDiagonal,
+        double plateWidth,
+        double plateLength,
         Dictionary<(int, long), int> partSubprograms,
-        Dictionary<(int drawingId, string varName), int> userVarMapping)
+        Dictionary<(int drawingId, string varName), int> userVarMapping
+    )
     {
         var lastPartName = "";
         var featureIndex = 0;
@@ -124,8 +161,15 @@ public sealed class CincinnatiSheetWriter
 
             if (hasSubprogram)
             {
-                WriteSubprogramCall(w, part, subNum, featureIndex, partName,
-                    isSafetyHeadraise, isLastPart);
+                WriteSubprogramCall(
+                    w,
+                    part,
+                    subNum,
+                    featureIndex,
+                    partName,
+                    isSafetyHeadraise,
+                    isLastPart
+                );
                 featureIndex++;
             }
             else
@@ -146,9 +190,10 @@ public sealed class CincinnatiSheetWriter
                         continue;
                     }
 
-                    var featureNumber = featureIndex == 0
-                        ? _config.FeatureLineNumberStart
-                        : 1000 + featureIndex + 1;
+                    var featureNumber =
+                        featureIndex == 0
+                            ? _config.FeatureLineNumberStart
+                            : 1000 + featureIndex + 1;
 
                     var cutDistance = FeatureUtils.ComputeCutDistance(codes);
 
@@ -170,7 +215,7 @@ public sealed class CincinnatiSheetWriter
                         DrawingId = part.BaseDrawing.Id,
                         IsCutOff = part.BaseDrawing.IsCutOff,
                         PlateWidth = plateWidth,
-                        PlateLength = plateLength
+                        PlateLength = plateLength,
                     };
 
                     _featureWriter.Write(w, ctx);
@@ -182,17 +227,23 @@ public sealed class CincinnatiSheetWriter
         }
     }
 
-    private void WriteSubprogramCall(TextWriter w, Part part, int subNum,
-        int featureIndex, string partName, bool isSafetyHeadraise, bool isLastPart)
+    private void WriteSubprogramCall(
+        TextWriter w,
+        Part part,
+        int subNum,
+        int featureIndex,
+        string partName,
+        bool isSafetyHeadraise,
+        bool isLastPart
+    )
     {
         // Safety headraise before rapid to new part
         if (isSafetyHeadraise && _config.SafetyHeadraiseDistance.HasValue)
             w.WriteLine($"M47 P{_config.SafetyHeadraiseDistance.Value} (Safety Headraise)");
 
         // Rapid to part position (bounding box lower-left)
-        var featureNumber = featureIndex == 0
-            ? _config.FeatureLineNumberStart
-            : 1000 + featureIndex + 1;
+        var featureNumber =
+            featureIndex == 0 ? _config.FeatureLineNumberStart : 1000 + featureIndex + 1;
 
         var sb = new StringBuilder();
         if (_config.UseLineNumbers)
@@ -217,14 +268,20 @@ public sealed class CincinnatiSheetWriter
             w.WriteLine("M47");
     }
 
-    private void WriteHoleSubprogramCall(TextWriter w, SubProgramCall call, int featureIndex, bool isLastFeature)
+    private void WriteHoleSubprogramCall(
+        TextWriter w,
+        SubProgramCall call,
+        int featureIndex,
+        bool isLastFeature
+    )
     {
-        var postSubNum = _holeSubprograms != null && _holeSubprograms.TryGetValue(call.Id, out var num)
-            ? num : call.Id;
+        var postSubNum =
+            _holeSubprograms != null && _holeSubprograms.TryGetValue(call.Id, out var num)
+                ? num
+                : call.Id;
 
-        var featureNumber = featureIndex == 0
-            ? _config.FeatureLineNumberStart
-            : 1000 + featureIndex + 1;
+        var featureNumber =
+            featureIndex == 0 ? _config.FeatureLineNumberStart : 1000 + featureIndex + 1;
 
         // Shift the local origin to the hole center via G52 (manual §1.52).
         // G52 does not move the nozzle, so the sub-program's first rapid
@@ -247,10 +304,16 @@ public sealed class CincinnatiSheetWriter
             w.WriteLine("M47");
     }
 
-    private void WritePartsInline(TextWriter w, List<Part> allParts,
-        string cutLibrary, string etchLibrary, double sheetDiagonal,
-        double plateWidth, double plateLength,
-        Dictionary<(int drawingId, string varName), int> userVarMapping)
+    private void WritePartsInline(
+        TextWriter w,
+        List<Part> allParts,
+        string cutLibrary,
+        string etchLibrary,
+        double sheetDiagonal,
+        double plateWidth,
+        double plateLength,
+        Dictionary<(int drawingId, string varName), int> userVarMapping
+    )
     {
         // Split and classify features, ordering etch before cut per part
         var features = new List<(Part part, List<ICode> codes, bool isEtch)>();
@@ -279,9 +342,7 @@ public sealed class CincinnatiSheetWriter
                 continue;
             }
 
-            var featureNumber = i == 0
-                ? _config.FeatureLineNumberStart
-                : 1000 + i + 1;
+            var featureNumber = i == 0 ? _config.FeatureLineNumberStart : 1000 + i + 1;
 
             var cutDistance = FeatureUtils.ComputeCutDistance(codes);
 
@@ -303,12 +364,11 @@ public sealed class CincinnatiSheetWriter
                 DrawingId = part.BaseDrawing.Id,
                 IsCutOff = part.BaseDrawing.IsCutOff,
                 PlateWidth = plateWidth,
-                PlateLength = plateLength
+                PlateLength = plateLength,
             };
 
             _featureWriter.Write(w, ctx);
             lastPartName = partName;
         }
     }
-
 }

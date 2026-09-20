@@ -1,7 +1,7 @@
-using OpenNest.CNC.CuttingStrategy;
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Sequencing
 {
@@ -50,9 +50,7 @@ namespace OpenNest.Engine.Sequencing
         private static List<PartRow> GroupIntoRows(IReadOnlyList<Part> parts, double minDistance)
         {
             // Sort parts by Y center
-            var sorted = parts
-                .OrderBy(p => p.BoundingBox.Center.Y)
-                .ToList();
+            var sorted = parts.OrderBy(p => p.BoundingBox.Center.Y).ToList();
 
             var rows = new List<PartRow>();
 

@@ -1,20 +1,35 @@
+using System.Drawing;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Drawing;
 
 namespace OpenNest.Controls
 {
     internal static class CutDirectionArrows
     {
-        public static void DrawProgram(Graphics g, DrawControl view, Program pgm, ref Vector pos,
-            Pen pen, double spacing, float arrowSize)
+        public static void DrawProgram(
+            Graphics g,
+            DrawControl view,
+            Program pgm,
+            ref Vector pos,
+            Pen pen,
+            double spacing,
+            float arrowSize
+        )
         {
             DrawProgram(g, view, pgm, pos, ref pos, pen, spacing, arrowSize);
         }
 
-        private static void DrawProgram(Graphics g, DrawControl view, Program pgm, Vector basePos, ref Vector pos,
-            Pen pen, double spacing, float arrowSize)
+        private static void DrawProgram(
+            Graphics g,
+            DrawControl view,
+            Program pgm,
+            Vector basePos,
+            ref Vector pos,
+            Pen pen,
+            double spacing,
+            float arrowSize
+        )
         {
             for (var i = 0; i < pgm.Length; ++i)
             {
@@ -27,16 +42,27 @@ namespace OpenNest.Controls
                     {
                         var holeBase = basePos + subpgm.Offset;
                         pos = holeBase;
-                        DrawProgram(g, view, subpgm.Program, holeBase, ref pos, pen, spacing, arrowSize);
+                        DrawProgram(
+                            g,
+                            view,
+                            subpgm.Program,
+                            holeBase,
+                            ref pos,
+                            pen,
+                            spacing,
+                            arrowSize
+                        );
                     }
                     continue;
                 }
 
-                if (code is not Motion motion) continue;
+                if (code is not Motion motion)
+                    continue;
 
-                var endpt = pgm.Mode == Mode.Incremental
-                    ? motion.EndPoint + pos
-                    : motion.EndPoint + basePos;
+                var endpt =
+                    pgm.Mode == Mode.Incremental
+                        ? motion.EndPoint + pos
+                        : motion.EndPoint + basePos;
 
                 if (code.Type == CodeType.LinearMove)
                 {
@@ -49,10 +75,21 @@ namespace OpenNest.Controls
                     var arc = (ArcMove)code;
                     if (!arc.Suppressed)
                     {
-                        var center = pgm.Mode == Mode.Incremental
-                            ? arc.CenterPoint + pos
-                            : arc.CenterPoint + basePos;
-                        DrawArcArrows(g, view, pos, endpt, center, arc.Rotation, pen, spacing, arrowSize);
+                        var center =
+                            pgm.Mode == Mode.Incremental
+                                ? arc.CenterPoint + pos
+                                : arc.CenterPoint + basePos;
+                        DrawArcArrows(
+                            g,
+                            view,
+                            pos,
+                            endpt,
+                            center,
+                            arc.Rotation,
+                            pen,
+                            spacing,
+                            arrowSize
+                        );
                     }
                 }
 
@@ -60,13 +97,21 @@ namespace OpenNest.Controls
             }
         }
 
-        private static void DrawLineArrows(Graphics g, DrawControl view, Vector start, Vector end,
-            Pen pen, double spacing, float arrowSize)
+        private static void DrawLineArrows(
+            Graphics g,
+            DrawControl view,
+            Vector start,
+            Vector end,
+            Pen pen,
+            double spacing,
+            float arrowSize
+        )
         {
             var dx = end.X - start.X;
             var dy = end.Y - start.Y;
             var length = System.Math.Sqrt(dx * dx + dy * dy);
-            if (length < spacing * 0.5) return;
+            if (length < spacing * 0.5)
+                return;
 
             var dirX = dx / length;
             var dirY = dy / length;
@@ -84,11 +129,21 @@ namespace OpenNest.Controls
             }
         }
 
-        private static void DrawArcArrows(Graphics g, DrawControl view, Vector start, Vector end, Vector center,
-            RotationType rotation, Pen pen, double spacing, float arrowSize)
+        private static void DrawArcArrows(
+            Graphics g,
+            DrawControl view,
+            Vector start,
+            Vector end,
+            Vector center,
+            RotationType rotation,
+            Pen pen,
+            double spacing,
+            float arrowSize
+        )
         {
             var radius = center.DistanceTo(start);
-            if (radius < Tolerance.Epsilon) return;
+            if (radius < Tolerance.Epsilon)
+                return;
 
             var startAngle = System.Math.Atan2(start.Y - center.Y, start.X - center.X);
             var endAngle = System.Math.Atan2(end.Y - center.Y, end.X - center.X);
@@ -97,16 +152,19 @@ namespace OpenNest.Controls
             if (rotation == RotationType.CCW)
             {
                 sweep = endAngle - startAngle;
-                if (sweep <= 0) sweep += 2 * System.Math.PI;
+                if (sweep <= 0)
+                    sweep += 2 * System.Math.PI;
             }
             else
             {
                 sweep = startAngle - endAngle;
-                if (sweep <= 0) sweep += 2 * System.Math.PI;
+                if (sweep <= 0)
+                    sweep += 2 * System.Math.PI;
             }
 
             var arcLength = radius * System.Math.Abs(sweep);
-            if (arcLength < spacing * 0.5) return;
+            if (arcLength < spacing * 0.5)
+                return;
 
             var count = System.Math.Max(1, (int)(arcLength / spacing));
             var stepAngle = sweep / (count + 1);
@@ -121,7 +179,8 @@ namespace OpenNest.Controls
 
                 var pt = new Vector(
                     center.X + radius * System.Math.Cos(angle),
-                    center.Y + radius * System.Math.Sin(angle));
+                    center.Y + radius * System.Math.Sin(angle)
+                );
                 var screenPt = view.PointWorldToGraph(pt);
 
                 double tangent;
@@ -130,7 +189,10 @@ namespace OpenNest.Controls
                 else
                     tangent = angle - System.Math.PI / 2;
 
-                var screenAngle = System.Math.Atan2(-System.Math.Sin(tangent), System.Math.Cos(tangent));
+                var screenAngle = System.Math.Atan2(
+                    -System.Math.Sin(tangent),
+                    System.Math.Cos(tangent)
+                );
                 DrawArrowHead(g, pen, screenPt, screenAngle, arrowSize);
             }
         }
@@ -142,10 +204,12 @@ namespace OpenNest.Controls
 
             var left = new PointF(
                 tip.X + size * (float)System.Math.Cos(leftAngle),
-                tip.Y + size * (float)System.Math.Sin(leftAngle));
+                tip.Y + size * (float)System.Math.Sin(leftAngle)
+            );
             var right = new PointF(
                 tip.X + size * (float)System.Math.Cos(rightAngle),
-                tip.Y + size * (float)System.Math.Sin(rightAngle));
+                tip.Y + size * (float)System.Math.Sin(rightAngle)
+            );
 
             g.DrawLine(pen, left, tip);
             g.DrawLine(pen, right, tip);

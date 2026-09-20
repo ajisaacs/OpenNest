@@ -23,8 +23,11 @@ public sealed class LegacyPlateNesterAdapter : IPlateNester
     /// process-global NestEngineRegistry.</summary>
     public static IPlateNester Create(string strategy) => PlateNesterFactory.Create(strategy);
 
-    public PlateCandidate Place(PlatePlacementRequest request, IProgress<NestJobProgress> progress = null,
-        CancellationToken token = default)
+    public PlateCandidate Place(
+        PlatePlacementRequest request,
+        IProgress<NestJobProgress> progress = null,
+        CancellationToken token = default
+    )
     {
         ArgumentNullException.ThrowIfNull(request);
         token.ThrowIfCancellationRequested();
@@ -35,37 +38,50 @@ public sealed class LegacyPlateNesterAdapter : IPlateNester
         {
             var drawing = DrawingJobMapper.CreateDrawing(requirement);
             identities.Add(drawing, requirement.Id);
-            items.Add(new NestItem
-            {
-                Drawing = drawing,
-                Quantity = requirement.Quantity,
-                Priority = requirement.Priority,
-                StepAngle = DrawingJobMapper.LegacyStep(requirement.Rotation),
-                RotationStart = requirement.Rotation.Start,
-                RotationEnd = requirement.Rotation.End
-            });
+            items.Add(
+                new NestItem
+                {
+                    Drawing = drawing,
+                    Quantity = requirement.Quantity,
+                    Priority = requirement.Priority,
+                    StepAngle = DrawingJobMapper.LegacyStep(requirement.Rotation),
+                    RotationStart = requirement.Rotation.Start,
+                    RotationEnd = requirement.Rotation.End,
+                }
+            );
         }
-        var engine = engineFactory(plate) ?? throw new InvalidOperationException("Legacy engine factory returned null.");
-        var legacyProgress = progress == null ? null : new LegacyProgress(progress, request.Stock.Id);
+        var engine =
+            engineFactory(plate)
+            ?? throw new InvalidOperationException("Legacy engine factory returned null.");
+        var legacyProgress =
+            progress == null ? null : new LegacyProgress(progress, request.Stock.Id);
         var parts = engine.Nest(items, legacyProgress, token);
         token.ThrowIfCancellationRequested();
-        if (parts == null) throw new InvalidOperationException("Legacy engine returned null placements.");
+        if (parts == null)
+            throw new InvalidOperationException("Legacy engine returned null placements.");
         var placements = new List<NestJobPlacement>();
         foreach (var part in parts)
         {
             if (part?.BaseDrawing == null || !identities.TryGetValue(part.BaseDrawing, out var id))
-                throw new InvalidOperationException("Legacy placement does not reference a private requirement drawing.");
-            placements.Add(new NestJobPlacement(id, 0, part.Location.X, part.Location.Y, part.Rotation));
+                throw new InvalidOperationException(
+                    "Legacy placement does not reference a private requirement drawing."
+                );
+            placements.Add(
+                new NestJobPlacement(id, 0, part.Location.X, part.Location.Y, part.Rotation)
+            );
         }
         return new PlateCandidate(placements);
     }
 
-    private sealed class LegacyProgress(IProgress<NestJobProgress> progress, string stockId) : IProgress<NestProgress>
+    private sealed class LegacyProgress(IProgress<NestJobProgress> progress, string stockId)
+        : IProgress<NestProgress>
     {
         public void Report(NestProgress value)
         {
             ArgumentNullException.ThrowIfNull(value);
-            progress.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stockId, -1, 0, 0, value));
+            progress.Report(
+                new NestJobProgress(NestJobStage.EvaluatingCandidate, stockId, -1, 0, 0, value)
+            );
         }
     }
 }

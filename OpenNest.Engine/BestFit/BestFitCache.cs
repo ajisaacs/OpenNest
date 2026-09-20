@@ -16,8 +16,11 @@ namespace OpenNest.Engine.BestFit
         public static Func<ISlideComputer> CreateSlideComputer { get; set; }
 
         public static List<BestFitResult> GetOrCompute(
-            Drawing drawing, double plateWidth, double plateHeight,
-            double spacing)
+            Drawing drawing,
+            double plateWidth,
+            double plateHeight,
+            double spacing
+        )
         {
             var key = new CacheKey(drawing, plateWidth, plateHeight, spacing);
 
@@ -34,14 +37,24 @@ namespace OpenNest.Engine.BestFit
             {
                 if (CreateEvaluator != null)
                 {
-                    try { evaluator = CreateEvaluator(canonical, spacing); }
-                    catch { /* fall back to default evaluator */ }
+                    try
+                    {
+                        evaluator = CreateEvaluator(canonical, spacing);
+                    }
+                    catch
+                    { /* fall back to default evaluator */
+                    }
                 }
 
                 if (CreateSlideComputer != null)
                 {
-                    try { slideComputer = CreateSlideComputer(); }
-                    catch { /* fall back to CPU slide computation */ }
+                    try
+                    {
+                        slideComputer = CreateSlideComputer();
+                    }
+                    catch
+                    { /* fall back to CPU slide computation */
+                    }
                 }
 
                 var finder = new BestFitFinder(plateWidth, plateHeight, evaluator, slideComputer);
@@ -58,8 +71,10 @@ namespace OpenNest.Engine.BestFit
         }
 
         public static void ComputeForSizes(
-            Drawing drawing, double spacing,
-            IEnumerable<(double Width, double Height)> plateSizes)
+            Drawing drawing,
+            double spacing,
+            IEnumerable<(double Width, double Height)> plateSizes
+        )
         {
             // Skip sizes that are already cached.
             var needed = new List<(double Width, double Height)>();
@@ -80,8 +95,10 @@ namespace OpenNest.Engine.BestFit
             var maxHeight = 0.0;
             foreach (var size in needed)
             {
-                if (size.Width > maxWidth) maxWidth = size.Width;
-                if (size.Height > maxHeight) maxHeight = size.Height;
+                if (size.Width > maxWidth)
+                    maxWidth = size.Width;
+                if (size.Height > maxHeight)
+                    maxHeight = size.Height;
             }
 
             IPairEvaluator evaluator = null;
@@ -94,14 +111,24 @@ namespace OpenNest.Engine.BestFit
 
                 if (CreateEvaluator != null)
                 {
-                    try { evaluator = CreateEvaluator(canonical, spacing); }
-                    catch { /* fall back to default evaluator */ }
+                    try
+                    {
+                        evaluator = CreateEvaluator(canonical, spacing);
+                    }
+                    catch
+                    { /* fall back to default evaluator */
+                    }
                 }
 
                 if (CreateSlideComputer != null)
                 {
-                    try { slideComputer = CreateSlideComputer(); }
-                    catch { /* fall back to CPU slide computation */ }
+                    try
+                    {
+                        slideComputer = CreateSlideComputer();
+                    }
+                    catch
+                    { /* fall back to CPU slide computation */
+                    }
                 }
 
                 // Compute candidates and evaluate once with the largest plate.
@@ -114,25 +141,27 @@ namespace OpenNest.Engine.BestFit
                     var filter = new BestFitFilter
                     {
                         MaxPlateWidth = size.Width,
-                        MaxPlateHeight = size.Height
+                        MaxPlateHeight = size.Height,
                     };
 
                     var copy = new List<BestFitResult>(baseResults.Count);
                     for (var i = 0; i < baseResults.Count; i++)
                     {
                         var r = baseResults[i];
-                        copy.Add(new BestFitResult
-                        {
-                            Candidate = r.Candidate,
-                            RotatedArea = r.RotatedArea,
-                            BoundingWidth = r.BoundingWidth,
-                            BoundingHeight = r.BoundingHeight,
-                            OptimalRotation = r.OptimalRotation,
-                            TrueArea = r.TrueArea,
-                            HullAngles = r.HullAngles,
-                            Keep = r.Keep,
-                            Reason = r.Reason
-                        });
+                        copy.Add(
+                            new BestFitResult
+                            {
+                                Candidate = r.Candidate,
+                                RotatedArea = r.RotatedArea,
+                                BoundingWidth = r.BoundingWidth,
+                                BoundingHeight = r.BoundingHeight,
+                                OptimalRotation = r.OptimalRotation,
+                                TrueArea = r.TrueArea,
+                                HullAngles = r.HullAngles,
+                                Keep = r.Keep,
+                                Reason = r.Reason,
+                            }
+                        );
                     }
 
                     filter.Apply(copy);
@@ -156,8 +185,13 @@ namespace OpenNest.Engine.BestFit
             }
         }
 
-        public static void Populate(Drawing drawing, double plateWidth, double plateHeight,
-            double spacing, List<BestFitResult> results)
+        public static void Populate(
+            Drawing drawing,
+            double plateWidth,
+            double plateHeight,
+            double spacing,
+            List<BestFitResult> results
+        )
         {
             if (results == null || results.Count == 0)
                 return;
@@ -166,8 +200,10 @@ namespace OpenNest.Engine.BestFit
             _cache.TryAdd(key, results);
         }
 
-        public static Dictionary<(double PlateWidth, double PlateHeight, double Spacing), List<BestFitResult>>
-            GetAllForDrawing(Drawing drawing)
+        public static Dictionary<
+            (double PlateWidth, double PlateHeight, double Spacing),
+            List<BestFitResult>
+        > GetAllForDrawing(Drawing drawing)
         {
             var result = new Dictionary<(double, double, double), List<BestFitResult>>();
             foreach (var kvp in _cache)
@@ -200,10 +236,10 @@ namespace OpenNest.Engine.BestFit
 
             public bool Equals(CacheKey other)
             {
-                return ReferenceEquals(Drawing, other.Drawing) &&
-                       PlateWidth == other.PlateWidth &&
-                       PlateHeight == other.PlateHeight &&
-                       Spacing == other.Spacing;
+                return ReferenceEquals(Drawing, other.Drawing)
+                    && PlateWidth == other.PlateWidth
+                    && PlateHeight == other.PlateHeight
+                    && Spacing == other.Spacing;
             }
 
             public override bool Equals(object obj) => obj is CacheKey other && Equals(other);

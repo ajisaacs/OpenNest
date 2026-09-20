@@ -6,8 +6,16 @@ using OpenNest.CNC;
 namespace OpenNest;
 
 /// <summary>Exact immutable CNC motion values. Rapid moves retain contour/hole boundaries; arcs are not tessellated.</summary>
-public sealed record PartGeometryMotion(CodeType Type, double X, double Y, double CenterX,
-    double CenterY, RotationType Rotation, LayerType Layer, bool Suppressed);
+public sealed record PartGeometryMotion(
+    CodeType Type,
+    double X,
+    double Y,
+    double CenterX,
+    double CenterY,
+    RotationType Rotation,
+    LayerType Layer,
+    bool Suppressed
+);
 
 /// <summary>
 /// Owned geometry only: no Drawing, quantity, events, or mutable CNC references are retained.
@@ -29,16 +37,44 @@ public sealed class PartGeometrySnapshot
     public static PartGeometrySnapshot FromProgram(Program program)
     {
         ArgumentNullException.ThrowIfNull(program);
-        var motions = program.Codes.Select(code => code switch
-        {
-            ArcMove arc => new PartGeometryMotion(arc.Type, arc.EndPoint.X, arc.EndPoint.Y,
-                arc.CenterPoint.X, arc.CenterPoint.Y, arc.Rotation, arc.Layer, arc.Suppressed),
-            LinearMove line => new PartGeometryMotion(line.Type, line.EndPoint.X, line.EndPoint.Y,
-                0, 0, default, line.Layer, line.Suppressed),
-            RapidMove rapid => new PartGeometryMotion(rapid.Type, rapid.EndPoint.X, rapid.EndPoint.Y,
-                0, 0, default, default, rapid.Suppressed),
-            _ => throw new NotSupportedException("Geometry snapshots currently support only flat rapid/linear/arc programs.")
-        });
+        var motions = program.Codes.Select(code =>
+            code switch
+            {
+                ArcMove arc => new PartGeometryMotion(
+                    arc.Type,
+                    arc.EndPoint.X,
+                    arc.EndPoint.Y,
+                    arc.CenterPoint.X,
+                    arc.CenterPoint.Y,
+                    arc.Rotation,
+                    arc.Layer,
+                    arc.Suppressed
+                ),
+                LinearMove line => new PartGeometryMotion(
+                    line.Type,
+                    line.EndPoint.X,
+                    line.EndPoint.Y,
+                    0,
+                    0,
+                    default,
+                    line.Layer,
+                    line.Suppressed
+                ),
+                RapidMove rapid => new PartGeometryMotion(
+                    rapid.Type,
+                    rapid.EndPoint.X,
+                    rapid.EndPoint.Y,
+                    0,
+                    0,
+                    default,
+                    default,
+                    rapid.Suppressed
+                ),
+                _ => throw new NotSupportedException(
+                    "Geometry snapshots currently support only flat rapid/linear/arc programs."
+                ),
+            }
+        );
         return new PartGeometrySnapshot(program.Mode, motions);
     }
 }

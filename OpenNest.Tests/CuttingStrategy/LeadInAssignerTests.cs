@@ -28,7 +28,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(MakeSquarePartAt(30, 30));
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -50,7 +50,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(MakeSquarePartAt(30, 30));
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -66,7 +66,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(MakeSquarePartAt(10, 10));
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -86,13 +86,16 @@ public class LeadInAssignerTests
         plate.Parts.Add(MakeSquarePartAt(10, 10));
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
         assigner.Assign(plate);
 
-        var hasLeadin = plate.Parts[0].Program.Codes.OfType<LinearMove>().Any(m => m.Layer == LayerType.Leadin);
+        var hasLeadin = plate
+            .Parts[0]
+            .Program.Codes.OfType<LinearMove>()
+            .Any(m => m.Layer == LayerType.Leadin);
         Assert.True(hasLeadin);
     }
 
@@ -108,7 +111,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(part);
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -129,7 +132,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(part);
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -152,7 +155,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(part);
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -175,7 +178,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(part);
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -204,7 +207,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(part);
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -213,10 +216,13 @@ public class LeadInAssignerTests
         // The lead-in program should produce geometry that contains the
         // original rotated shape (plus lead-in/out extensions)
         var leadInGeometry = OpenNest.Converters.ConvertProgram.ToGeometry(part.Program);
-        var leadInNonRapid = leadInGeometry.Where(e =>
-            e.Layer != SpecialLayers.Rapid &&
-            e.Layer != SpecialLayers.Leadin &&
-            e.Layer != SpecialLayers.Leadout).ToList();
+        var leadInNonRapid = leadInGeometry
+            .Where(e =>
+                e.Layer != SpecialLayers.Rapid
+                && e.Layer != SpecialLayers.Leadin
+                && e.Layer != SpecialLayers.Leadout
+            )
+            .ToList();
 
         // The bounding box of the cut geometry should be close to original
         var origBbox = GetEntityBounds(originalNonRapid);
@@ -242,7 +248,7 @@ public class LeadInAssignerTests
 
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -264,7 +270,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(part);
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -291,7 +297,7 @@ public class LeadInAssignerTests
         plate.Parts.Add(part);
         plate.CuttingParameters = new CuttingParameters
         {
-            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 }
+            ExternalLeadIn = new LineLeadIn { Length = 0.5, ApproachAngle = 90 },
         };
 
         var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
@@ -329,8 +335,10 @@ public class LeadInAssignerTests
 
     private static Box GetEntityBounds(List<OpenNest.Geometry.Entity> entities)
     {
-        double minX = double.MaxValue, minY = double.MaxValue;
-        double maxX = double.MinValue, maxY = double.MinValue;
+        double minX = double.MaxValue,
+            minY = double.MaxValue;
+        double maxX = double.MinValue,
+            maxY = double.MinValue;
 
         foreach (var entity in entities)
         {
@@ -344,11 +352,21 @@ public class LeadInAssignerTests
         return new Box(minX, minY, maxX - minX, maxY - minY);
     }
 
-    private static void UpdateBounds(Vector pt, ref double minX, ref double minY, ref double maxX, ref double maxY)
+    private static void UpdateBounds(
+        Vector pt,
+        ref double minX,
+        ref double minY,
+        ref double maxX,
+        ref double maxY
+    )
     {
-        if (pt.X < minX) minX = pt.X;
-        if (pt.Y < minY) minY = pt.Y;
-        if (pt.X > maxX) maxX = pt.X;
-        if (pt.Y > maxY) maxY = pt.Y;
+        if (pt.X < minX)
+            minX = pt.X;
+        if (pt.Y < minY)
+            minY = pt.Y;
+        if (pt.X > maxX)
+            maxX = pt.X;
+        if (pt.Y > maxY)
+            maxY = pt.Y;
     }
 }

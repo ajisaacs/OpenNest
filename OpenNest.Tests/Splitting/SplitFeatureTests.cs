@@ -15,7 +15,7 @@ public class SplitFeatureTests
             Type = SplitType.WeldGapTabs,
             TabWidth = 2.0,
             TabHeight = 0.25,
-            TabCount = 2
+            TabCount = 2,
         };
 
         var result = feature.GenerateFeatures(line, 0.0, 100.0, parameters);
@@ -104,7 +104,7 @@ public class SplitFeatureTests
             Type = SplitType.SpikeGroove,
             SpikeDepth = 1.0,
             SpikeAngle = 60.0,
-            SpikePairCount = 2
+            SpikePairCount = 2,
         };
 
         var result = feature.GenerateFeatures(line, 0.0, 100.0, parameters);

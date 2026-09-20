@@ -1,9 +1,8 @@
-﻿
-namespace OpenNest.CNC
+﻿namespace OpenNest.CNC
 {
     public enum Mode
     {
         Absolute,
-        Incremental
+        Incremental,
     }
 }

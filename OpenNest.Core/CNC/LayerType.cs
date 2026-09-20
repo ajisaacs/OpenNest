@@ -1,5 +1,4 @@
-﻿
-namespace OpenNest.CNC
+﻿namespace OpenNest.CNC
 {
     public enum LayerType
     {
@@ -7,6 +6,6 @@ namespace OpenNest.CNC
         Scribe,
         Cut,
         Leadin,
-        Leadout
+        Leadout,
     }
 }

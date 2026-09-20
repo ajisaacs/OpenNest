@@ -1,7 +1,7 @@
-using OpenNest.Bending;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Bending;
 
 namespace OpenNest.Forms
 {
@@ -24,19 +24,31 @@ namespace OpenNest.Forms
             var font = new Font("Segoe UI", 9f);
 
             // Direction
-            var lblDir = new Label { Text = "Direction:", Location = new Point(12, 15), AutoSize = true, Font = font };
+            var lblDir = new Label
+            {
+                Text = "Direction:",
+                Location = new Point(12, 15),
+                AutoSize = true,
+                Font = font,
+            };
             cboDirection = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(100, 12),
                 Width = 130,
-                Font = font
+                Font = font,
             };
             cboDirection.Items.AddRange(new object[] { "Down", "Up" });
             cboDirection.SelectedIndex = 0;
 
             // Angle
-            var lblAngle = new Label { Text = "Angle:", Location = new Point(12, 47), AutoSize = true, Font = font };
+            var lblAngle = new Label
+            {
+                Text = "Angle:",
+                Location = new Point(12, 47),
+                AutoSize = true,
+                Font = font,
+            };
             numAngle = new NumericUpDown
             {
                 Location = new Point(100, 44),
@@ -45,11 +57,17 @@ namespace OpenNest.Forms
                 Minimum = 0,
                 Maximum = 180,
                 DecimalPlaces = 1,
-                Value = 90
+                Value = 90,
             };
 
             // Radius (with checkbox to enable)
-            chkRadius = new CheckBox { Text = "Radius:", Location = new Point(12, 79), AutoSize = true, Font = font };
+            chkRadius = new CheckBox
+            {
+                Text = "Radius:",
+                Location = new Point(12, 79),
+                AutoSize = true,
+                Font = font,
+            };
             numRadius = new NumericUpDown
             {
                 Location = new Point(100, 76),
@@ -59,7 +77,7 @@ namespace OpenNest.Forms
                 Maximum = 25,
                 DecimalPlaces = 3,
                 Increment = 0.0625m,
-                Enabled = false
+                Enabled = false,
             };
             chkRadius.CheckedChanged += (s, e) => numRadius.Enabled = chkRadius.Checked;
 
@@ -70,7 +88,7 @@ namespace OpenNest.Forms
                 DialogResult = DialogResult.OK,
                 Location = new Point(62, 120),
                 Size = new Size(80, 28),
-                Font = font
+                Font = font,
             };
             var btnCancel = new Button
             {
@@ -78,23 +96,29 @@ namespace OpenNest.Forms
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(150, 120),
                 Size = new Size(80, 28),
-                Font = font
+                Font = font,
             };
 
             AcceptButton = btnOk;
             CancelButton = btnCancel;
 
-            Controls.AddRange(new Control[] {
-                lblDir, cboDirection,
-                lblAngle, numAngle,
-                chkRadius, numRadius,
-                btnOk, btnCancel
-            });
+            Controls.AddRange(
+                new Control[]
+                {
+                    lblDir,
+                    cboDirection,
+                    lblAngle,
+                    numAngle,
+                    chkRadius,
+                    numRadius,
+                    btnOk,
+                    btnCancel,
+                }
+            );
         }
 
-        public BendDirection Direction => cboDirection.SelectedIndex == 0
-            ? BendDirection.Down
-            : BendDirection.Up;
+        public BendDirection Direction =>
+            cboDirection.SelectedIndex == 0 ? BendDirection.Down : BendDirection.Up;
 
         public double BendAngle => (double)numAngle.Value;
 

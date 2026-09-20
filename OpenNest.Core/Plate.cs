@@ -1,10 +1,10 @@
-﻿using OpenNest.Collections;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using OpenNest.Collections;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using OpenNest.Shapes;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace OpenNest
 {
@@ -31,14 +31,10 @@ namespace OpenNest
         }
 
         public Plate()
-            : this(60, 120)
-        {
-        }
+            : this(60, 120) { }
 
         public Plate(double width, double length)
-            : this(new Size(width, length))
-        {
-        }
+            : this(new Size(width, length)) { }
 
         public Plate(Size size)
         {
@@ -140,7 +136,8 @@ namespace OpenNest
                 Geometry.Entity perimeter = null;
                 try
                 {
-                    var entities = Converters.ConvertProgram.ToGeometry(part.Program)
+                    var entities = Converters
+                        .ConvertProgram.ToGeometry(part.Program)
                         .Where(e => e.Layer != SpecialLayers.Rapid)
                         .ToList();
 
@@ -413,7 +410,10 @@ namespace OpenNest
             }
 
             foreach (var cutoff in CutOffs)
-                cutoff.Position = new Vector(cutoff.Position.X + voffset.X, cutoff.Position.Y + voffset.Y);
+                cutoff.Position = new Vector(
+                    cutoff.Position.X + voffset.X,
+                    cutoff.Position.Y + voffset.Y
+                );
         }
 
         /// <summary>
@@ -461,21 +461,19 @@ namespace OpenNest
             var boundingBox = new Box();
             var partsBox = Parts.GetBoundingBox();
 
-            boundingBox.X = partsBox.Left < plateBox.Left
-                ? partsBox.Left
-                : plateBox.Left;
+            boundingBox.X = partsBox.Left < plateBox.Left ? partsBox.Left : plateBox.Left;
 
-            boundingBox.Y = partsBox.Bottom < plateBox.Bottom
-                ? partsBox.Bottom
-                : plateBox.Bottom;
+            boundingBox.Y = partsBox.Bottom < plateBox.Bottom ? partsBox.Bottom : plateBox.Bottom;
 
-            boundingBox.Length = partsBox.Right > plateBox.Right
-                ? partsBox.Right - boundingBox.X
-                : plateBox.Right - boundingBox.X;
+            boundingBox.Length =
+                partsBox.Right > plateBox.Right
+                    ? partsBox.Right - boundingBox.X
+                    : plateBox.Right - boundingBox.X;
 
-            boundingBox.Width = partsBox.Top > plateBox.Top
-                ? partsBox.Top - boundingBox.Y
-                : plateBox.Top - boundingBox.Y;
+            boundingBox.Width =
+                partsBox.Top > plateBox.Top
+                    ? partsBox.Top - boundingBox.Y
+                    : plateBox.Top - boundingBox.Y;
 
             return boundingBox;
         }
@@ -546,7 +544,8 @@ namespace OpenNest
 
             Size = new Size(
                 Rounding.RoundUpToNearest(yExtent, roundingFactor),
-                Rounding.RoundUpToNearest(xExtent, roundingFactor));
+                Rounding.RoundUpToNearest(xExtent, roundingFactor)
+            );
         }
 
         /// <summary>
@@ -601,9 +600,9 @@ namespace OpenNest
 
             // Plate convention: Length = X axis, Width = Y axis.
             if (xExtent >= yExtent)
-                Size = new Size(result.Width, result.Length);   // X is the long axis
+                Size = new Size(result.Width, result.Length); // X is the long axis
             else
-                Size = new Size(result.Length, result.Width);   // Y is the long axis
+                Size = new Size(result.Length, result.Width); // Y is the long axis
 
             return result;
         }
@@ -639,7 +638,8 @@ namespace OpenNest
         /// <returns>Returns a number between 0.0 and 1.0</returns>
         public double Utilization()
         {
-            return Parts.Where(p => !p.BaseDrawing.IsCutOff).Sum(part => part.BaseDrawing.Area) / Area();
+            return Parts.Where(p => !p.BaseDrawing.IsCutOff).Sum(part => part.BaseDrawing.Area)
+                / Area();
         }
 
         public bool HasOverlappingParts(out List<Vector> pts)
@@ -661,10 +661,10 @@ namespace OpenNest
                     // Floating-point rounding can produce sub-epsilon overlaps for
                     // parts that are merely edge-touching, so require the overlap
                     // region to exceed Epsilon in both dimensions.
-                    var overlapX = System.Math.Min(b1.Right, b2.Right)
-                                 - System.Math.Max(b1.Left, b2.Left);
-                    var overlapY = System.Math.Min(b1.Top, b2.Top)
-                                 - System.Math.Max(b1.Bottom, b2.Bottom);
+                    var overlapX =
+                        System.Math.Min(b1.Right, b2.Right) - System.Math.Max(b1.Left, b2.Left);
+                    var overlapY =
+                        System.Math.Min(b1.Top, b2.Top) - System.Math.Max(b1.Bottom, b2.Bottom);
 
                     if (overlapX <= Math.Tolerance.Epsilon || overlapY <= Math.Tolerance.Epsilon)
                         continue;
@@ -676,6 +676,5 @@ namespace OpenNest
 
             return pts.Count > 0;
         }
-
     }
 }

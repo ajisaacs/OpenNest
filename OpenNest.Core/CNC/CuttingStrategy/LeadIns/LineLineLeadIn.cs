@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -11,21 +11,25 @@ namespace OpenNest.CNC.CuttingStrategy
         public double Length2 { get; set; }
         public double ApproachAngle2 { get; set; } = 90.0;
 
-        public override List<ICode> Generate(Vector contourStartPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+        public override List<ICode> Generate(
+            Vector contourStartPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
             var piercePoint = GetPiercePoint(contourStartPoint, contourNormalAngle);
 
             var secondAngle = contourNormalAngle - Angle.HalfPI + Angle.ToRadians(ApproachAngle1);
             var midPoint = new Vector(
                 contourStartPoint.X + Length2 * System.Math.Cos(secondAngle),
-                contourStartPoint.Y + Length2 * System.Math.Sin(secondAngle));
+                contourStartPoint.Y + Length2 * System.Math.Sin(secondAngle)
+            );
 
             return new List<ICode>
             {
                 new RapidMove(piercePoint),
                 new LinearMove(midPoint) { Layer = LayerType.Leadin },
-                new LinearMove(contourStartPoint) { Layer = LayerType.Leadin }
+                new LinearMove(contourStartPoint) { Layer = LayerType.Leadin },
             };
         }
 
@@ -38,10 +42,17 @@ namespace OpenNest.CNC.CuttingStrategy
             var firstAngle = secondAngle + Angle.ToRadians(ApproachAngle2);
             return new Vector(
                 midX + Length1 * System.Math.Cos(firstAngle),
-                midY + Length1 * System.Math.Sin(firstAngle));
+                midY + Length1 * System.Math.Sin(firstAngle)
+            );
         }
 
         public override LeadIn Scale(double factor) =>
-            new LineLineLeadIn { Length1 = Length1 * factor, ApproachAngle1 = ApproachAngle1, Length2 = Length2 * factor, ApproachAngle2 = ApproachAngle2 };
+            new LineLineLeadIn
+            {
+                Length1 = Length1 * factor,
+                ApproachAngle1 = ApproachAngle1,
+                Length2 = Length2 * factor,
+                ApproachAngle2 = ApproachAngle2,
+            };
     }
 }

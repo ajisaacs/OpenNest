@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.Shapes
 {
@@ -24,7 +24,7 @@ namespace OpenNest.Shapes
             {
                 new Line(0, 0, Base, 0),
                 new Line(Base, 0, midX, Height),
-                new Line(midX, Height, 0, 0)
+                new Line(midX, Height, 0, 0),
             };
 
             return CreateDrawing(entities);

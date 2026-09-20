@@ -9,7 +9,7 @@ namespace OpenNest.CNC.CuttingStrategy
         BottomSide = 4,
         EdgeStart = 5,
         LeftSide = 7,
-        RightSideAlt = 8
+        RightSideAlt = 8,
     }
 
     public class SequenceParameters

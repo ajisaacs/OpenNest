@@ -1,7 +1,7 @@
-using OpenNest.Converters;
-using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Converters;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Fill
 {
@@ -23,7 +23,8 @@ namespace OpenNest.Engine.Fill
 
         public PartBoundary(Part part, double spacing)
         {
-            var entities = ConvertProgram.ToGeometry(part.Program)
+            var entities = ConvertProgram
+                .ToGeometry(part.Program)
                 .Where(e => e.Layer == SpecialLayers.Cut)
                 .ToList();
 
@@ -39,21 +40,29 @@ namespace OpenNest.Engine.Fill
                 {
                     // Circumscribe arcs so polygon vertices are always outside
                     // the true arc — guarantees the boundary never under-estimates.
-                    var polygon = offsetEntity.ToPolygonWithTolerance(PolygonTolerance, circumscribe: true);
+                    var polygon = offsetEntity.ToPolygonWithTolerance(
+                        PolygonTolerance,
+                        circumscribe: true
+                    );
                     polygon.RemoveSelfIntersections();
                     _polygons.Add(polygon);
                 }
             }
 
             PrecomputeDirectionalEdges(
-                out _leftEdges, out _rightEdges, out _upEdges, out _downEdges);
+                out _leftEdges,
+                out _rightEdges,
+                out _upEdges,
+                out _downEdges
+            );
         }
 
         private void PrecomputeDirectionalEdges(
             out (Vector start, Vector end)[] leftEdges,
             out (Vector start, Vector end)[] rightEdges,
             out (Vector start, Vector end)[] upEdges,
-            out (Vector start, Vector end)[] downEdges)
+            out (Vector start, Vector end)[] downEdges
+        )
         {
             var left = new List<(Vector, Vector)>();
             var right = new List<(Vector, Vector)>();
@@ -86,10 +95,14 @@ namespace OpenNest.Engine.Fill
                     var dy = verts[i].Y - verts[i - 1].Y;
                     var edge = (verts[i - 1], verts[i]);
 
-                    if (-sign * dy > 0) left.Add(edge);
-                    if (sign * dy > 0) right.Add(edge);
-                    if (-sign * dx > 0) up.Add(edge);
-                    if (sign * dx > 0) down.Add(edge);
+                    if (-sign * dy > 0)
+                        left.Add(edge);
+                    if (sign * dy > 0)
+                        right.Add(edge);
+                    if (-sign * dx > 0)
+                        up.Add(edge);
+                    if (sign * dx > 0)
+                        down.Add(edge);
                 }
             }
 
@@ -145,11 +158,16 @@ namespace OpenNest.Engine.Fill
         {
             switch (direction)
             {
-                case PushDirection.Left: return _leftEdges;
-                case PushDirection.Right: return _rightEdges;
-                case PushDirection.Up: return _upEdges;
-                case PushDirection.Down: return _downEdges;
-                default: return _leftEdges;
+                case PushDirection.Left:
+                    return _leftEdges;
+                case PushDirection.Right:
+                    return _rightEdges;
+                case PushDirection.Up:
+                    return _upEdges;
+                case PushDirection.Down:
+                    return _downEdges;
+                default:
+                    return _leftEdges;
             }
         }
 

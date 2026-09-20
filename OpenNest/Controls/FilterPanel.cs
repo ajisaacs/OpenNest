@@ -1,10 +1,10 @@
-using OpenNest.Bending;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Bending;
+using OpenNest.Geometry;
 
 namespace OpenNest.Controls
 {
@@ -41,13 +41,13 @@ namespace OpenNest.Controls
                 HeaderText = "Bend Lines (0)",
                 Dock = DockStyle.Top,
                 ExpandedHeight = 120,
-                IsExpanded = false
+                IsExpanded = false,
             };
             bendLinesList = new ListBox
             {
                 Dock = DockStyle.Fill,
                 BorderStyle = BorderStyle.None,
-                Font = new Font("Segoe UI", 9f)
+                Font = new Font("Segoe UI", 9f),
             };
             bendLinesList.SelectedIndexChanged += (s, e) =>
                 BendLineSelected?.Invoke(this, bendLinesList.SelectedIndex);
@@ -56,7 +56,7 @@ namespace OpenNest.Controls
             {
                 Text = "Edit",
                 AutoSize = true,
-                Font = new Font("Segoe UI", 8f)
+                Font = new Font("Segoe UI", 8f),
             };
             bendEditLink.LinkClicked += (s, e) =>
             {
@@ -68,7 +68,7 @@ namespace OpenNest.Controls
             {
                 Text = "Remove",
                 AutoSize = true,
-                Font = new Font("Segoe UI", 8f)
+                Font = new Font("Segoe UI", 8f),
             };
             bendDeleteLink.LinkClicked += (s, e) =>
             {
@@ -86,17 +86,16 @@ namespace OpenNest.Controls
             {
                 Text = "Add Bend Line",
                 AutoSize = true,
-                Font = new Font("Segoe UI", 8f)
+                Font = new Font("Segoe UI", 8f),
             };
-            bendAddLink.LinkClicked += (s, e) =>
-                AddBendLineClicked?.Invoke(this, EventArgs.Empty);
+            bendAddLink.LinkClicked += (s, e) => AddBendLineClicked?.Invoke(this, EventArgs.Empty);
 
             var bendLinksPanel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
                 Height = 20,
                 FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false
+                WrapContents = false,
             };
             bendLinksPanel.Controls.Add(bendAddLink);
             bendLinksPanel.Controls.Add(bendEditLink);
@@ -111,7 +110,7 @@ namespace OpenNest.Controls
                 HeaderText = "Line Types (0)",
                 Dock = DockStyle.Top,
                 ExpandedHeight = 100,
-                IsExpanded = true
+                IsExpanded = true,
             };
             lineTypesList = CreateCheckedList();
             lineTypesPanel.ContentPanel.Controls.Add(lineTypesList);
@@ -122,7 +121,7 @@ namespace OpenNest.Controls
                 HeaderText = "Colors (0)",
                 Dock = DockStyle.Top,
                 ExpandedHeight = 100,
-                IsExpanded = true
+                IsExpanded = true,
             };
             colorsList = new ListBox
             {
@@ -131,7 +130,7 @@ namespace OpenNest.Controls
                 Font = new Font("Segoe UI", 9f),
                 DrawMode = DrawMode.OwnerDrawFixed,
                 ItemHeight = 20,
-                SelectionMode = SelectionMode.None
+                SelectionMode = SelectionMode.None,
             };
             colorsList.DrawItem += ColorsList_DrawItem;
             colorsList.MouseClick += ColorsList_MouseClick;
@@ -143,12 +142,24 @@ namespace OpenNest.Controls
                 HeaderText = "Layers",
                 Dock = DockStyle.Top,
                 ExpandedHeight = 160,
-                IsExpanded = true
+                IsExpanded = true,
             };
 
             var checkAllPanel = new Panel { Dock = DockStyle.Top, Height = 22 };
-            var checkAll = new LinkLabel { Text = "All", AutoSize = true, Location = new Point(4, 2), Font = new Font("Segoe UI", 8f) };
-            var uncheckAll = new LinkLabel { Text = "None", AutoSize = true, Location = new Point(30, 2), Font = new Font("Segoe UI", 8f) };
+            var checkAll = new LinkLabel
+            {
+                Text = "All",
+                AutoSize = true,
+                Location = new Point(4, 2),
+                Font = new Font("Segoe UI", 8f),
+            };
+            var uncheckAll = new LinkLabel
+            {
+                Text = "None",
+                AutoSize = true,
+                Location = new Point(30, 2),
+                Font = new Font("Segoe UI", 8f),
+            };
             checkAll.LinkClicked += (s, e) => SetAllChecked(layersList, true);
             uncheckAll.LinkClicked += (s, e) => SetAllChecked(layersList, false);
             checkAllPanel.Controls.AddRange(new Control[] { checkAll, uncheckAll });
@@ -171,7 +182,7 @@ namespace OpenNest.Controls
                 Dock = DockStyle.Fill,
                 BorderStyle = BorderStyle.None,
                 CheckOnClick = true,
-                Font = new Font("Segoe UI", 9f)
+                Font = new Font("Segoe UI", 9f),
             };
             list.ItemCheck += (s, e) =>
             {
@@ -258,7 +269,8 @@ namespace OpenNest.Controls
 
             foreach (var entity in entities)
             {
-                var layerVisible = entity.Layer?.Name == null || !hiddenLayers.Contains(entity.Layer.Name);
+                var layerVisible =
+                    entity.Layer?.Name == null || !hiddenLayers.Contains(entity.Layer.Name);
                 var colorVisible = !hiddenColors.Contains(entity.Color.ToArgb());
                 var ltVisible = !hiddenLineTypes.Contains(entity.LineTypeName ?? "Continuous");
 
@@ -277,7 +289,8 @@ namespace OpenNest.Controls
         private void ColorsList_MouseClick(object sender, MouseEventArgs e)
         {
             var index = colorsList.IndexFromPoint(e.Location);
-            if (index < 0) return;
+            if (index < 0)
+                return;
             var item = (ColorItem)colorsList.Items[index];
             item.IsChecked = !item.IsChecked;
             colorsList.Invalidate(colorsList.GetItemRectangle(index));
@@ -286,18 +299,25 @@ namespace OpenNest.Controls
 
         private void ColorsList_DrawItem(object sender, DrawItemEventArgs e)
         {
-            if (e.Index < 0) return;
+            if (e.Index < 0)
+                return;
 
             e.Graphics.FillRectangle(Brushes.White, e.Bounds);
 
             var colorItem = (ColorItem)colorsList.Items[e.Index];
-            var checkSize = CheckBoxRenderer.GetGlyphSize(e.Graphics,
-                System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal);
+            var checkSize = CheckBoxRenderer.GetGlyphSize(
+                e.Graphics,
+                System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal
+            );
             var checkY = e.Bounds.Top + (e.Bounds.Height - checkSize.Height) / 2;
             var checkState = colorItem.IsChecked
                 ? System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal
                 : System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal;
-            CheckBoxRenderer.DrawCheckBox(e.Graphics, new Point(e.Bounds.Left + 2, checkY), checkState);
+            CheckBoxRenderer.DrawCheckBox(
+                e.Graphics,
+                new Point(e.Bounds.Left + 2, checkY),
+                checkState
+            );
 
             var swatchX = e.Bounds.Left + checkSize.Width + 6;
             var swatchRect = new Rectangle(swatchX, e.Bounds.Top + 2, 16, e.Bounds.Height - 4);
@@ -305,8 +325,13 @@ namespace OpenNest.Controls
                 e.Graphics.FillRectangle(brush, swatchRect);
             e.Graphics.DrawRectangle(Pens.Gray, swatchRect);
 
-            TextRenderer.DrawText(e.Graphics, colorItem.ToString(), e.Font,
-                new Point(swatchRect.Right + 4, e.Bounds.Top + 1), SystemColors.WindowText);
+            TextRenderer.DrawText(
+                e.Graphics,
+                colorItem.ToString(),
+                e.Font,
+                new Point(swatchRect.Right + 4, e.Bounds.Top + 1),
+                SystemColors.WindowText
+            );
         }
 
         public void SetPickMode(bool active)
@@ -329,7 +354,9 @@ namespace OpenNest.Controls
         }
 
         public override string ToString() => $"#{Color.R:X2}{Color.G:X2}{Color.B:X2}";
+
         public override bool Equals(object obj) => obj is ColorItem other && Argb == other.Argb;
+
         public override int GetHashCode() => Argb;
     }
 }

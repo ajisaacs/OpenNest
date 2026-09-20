@@ -1,12 +1,12 @@
-using OpenNest.CNC;
-using OpenNest.Converters;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using OpenNest.CNC;
+using OpenNest.Converters;
+using OpenNest.Geometry;
 
 namespace OpenNest.Controls
 {
@@ -107,7 +107,8 @@ namespace OpenNest.Controls
             foreach (var contour in contours)
             {
                 var sub = ConvertGeometry.ToProgram(contour.Shape);
-                if (sub == null) continue;
+                if (sub == null)
+                    continue;
 
                 sb.AppendLine();
                 sb.AppendLine($"; {contour.Label} ({contour.DirectionLabel})");
@@ -120,18 +121,24 @@ namespace OpenNest.Controls
                     {
                         if (!lastWasRapid)
                             sb.AppendLine();
-                        sb.AppendLine($"G00 X{FormatCoord(rapid.EndPoint.X)} Y{FormatCoord(rapid.EndPoint.Y)}");
+                        sb.AppendLine(
+                            $"G00 X{FormatCoord(rapid.EndPoint.X)} Y{FormatCoord(rapid.EndPoint.Y)}"
+                        );
                         lastWasRapid = true;
                     }
                     else if (code is ArcMove arc)
                     {
                         var g = arc.Rotation == RotationType.CW ? "G02" : "G03";
-                        sb.AppendLine($"{g} X{FormatCoord(arc.EndPoint.X)} Y{FormatCoord(arc.EndPoint.Y)} I{FormatCoord(arc.CenterPoint.X)} J{FormatCoord(arc.CenterPoint.Y)}");
+                        sb.AppendLine(
+                            $"{g} X{FormatCoord(arc.EndPoint.X)} Y{FormatCoord(arc.EndPoint.Y)} I{FormatCoord(arc.CenterPoint.X)} J{FormatCoord(arc.CenterPoint.Y)}"
+                        );
                         lastWasRapid = false;
                     }
                     else if (code is LinearMove linear)
                     {
-                        sb.AppendLine($"G01 X{FormatCoord(linear.EndPoint.X)} Y{FormatCoord(linear.EndPoint.Y)}");
+                        sb.AppendLine(
+                            $"G01 X{FormatCoord(linear.EndPoint.X)} Y{FormatCoord(linear.EndPoint.Y)}"
+                        );
                         lastWasRapid = false;
                     }
                 }
@@ -142,13 +149,16 @@ namespace OpenNest.Controls
 
         private static string FormatCoord(double value)
         {
-            return System.Math.Round(value, 4).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+            return System
+                .Math.Round(value, 4)
+                .ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private void ApplyHighlighting()
         {
             var text = gcodeEditor.Text;
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text))
+                return;
 
             gcodeEditor.SuspendLayout();
 
@@ -236,16 +246,17 @@ namespace OpenNest.Controls
 
         private void OnDrawContourItem(object sender, DrawItemEventArgs e)
         {
-            if (e.Index < 0 || e.Index >= contours.Count) return;
+            if (e.Index < 0 || e.Index >= contours.Count)
+                return;
 
             var contour = contours[e.Index];
             var selected = (e.State & DrawItemState.Selected) != 0;
             var bounds = e.Bounds;
 
             // Background
-            using var bgBrush = new SolidBrush(selected
-                ? Color.FromArgb(230, 238, 255)
-                : Color.White);
+            using var bgBrush = new SolidBrush(
+                selected ? Color.FromArgb(230, 238, 255) : Color.White
+            );
             e.Graphics.FillRectangle(bgBrush, bounds);
 
             // Accent bar
@@ -268,7 +279,13 @@ namespace OpenNest.Controls
             // Label
             using var labelFont = new Font("Segoe UI", 9f, FontStyle.Bold);
             using var labelBrush = new SolidBrush(Color.FromArgb(40, 40, 40));
-            e.Graphics.DrawString(contour.Label, labelFont, labelBrush, bounds.X + 32, bounds.Y + 4);
+            e.Graphics.DrawString(
+                contour.Label,
+                labelFont,
+                labelBrush,
+                bounds.X + 32,
+                bounds.Y + 4
+            );
 
             // Info line
             var info = $"{contour.DirectionLabel} \u00B7 {contour.DimensionLabel}";
@@ -278,7 +295,13 @@ namespace OpenNest.Controls
 
             // Separator
             using var sepPen = new Pen(Color.FromArgb(230, 230, 230));
-            e.Graphics.DrawLine(sepPen, bounds.X + 8, bounds.Bottom - 1, bounds.Right - 8, bounds.Bottom - 1);
+            e.Graphics.DrawLine(
+                sepPen,
+                bounds.X + 8,
+                bounds.Bottom - 1,
+                bounds.Right - 8,
+                bounds.Bottom - 1
+            );
         }
 
         private void OnContourSelectionChanged(object sender, EventArgs e)
@@ -288,7 +311,8 @@ namespace OpenNest.Controls
 
         private void OnReverseClicked(object sender, EventArgs e)
         {
-            if (contourList.SelectedIndices.Count == 0) return;
+            if (contourList.SelectedIndices.Count == 0)
+                return;
 
             foreach (int index in contourList.SelectedIndices)
             {
@@ -319,8 +343,10 @@ namespace OpenNest.Controls
         private void OnMoveUpClicked(object sender, EventArgs e)
         {
             var index = contourList.SelectedIndex;
-            if (index <= 0) return;
-            if (contours[index].Type == ContourClassification.Perimeter) return;
+            if (index <= 0)
+                return;
+            if (contours[index].Type == ContourClassification.Perimeter)
+                return;
 
             (contours[index], contours[index - 1]) = (contours[index - 1], contours[index]);
             RebuildAfterReorder(index - 1);
@@ -329,9 +355,12 @@ namespace OpenNest.Controls
         private void OnMoveDownClicked(object sender, EventArgs e)
         {
             var index = contourList.SelectedIndex;
-            if (index < 0 || index >= contours.Count - 1) return;
-            if (contours[index].Type == ContourClassification.Perimeter) return;
-            if (contours[index + 1].Type == ContourClassification.Perimeter) return;
+            if (index < 0 || index >= contours.Count - 1)
+                return;
+            if (contours[index].Type == ContourClassification.Perimeter)
+                return;
+            if (contours[index + 1].Type == ContourClassification.Perimeter)
+                return;
 
             (contours[index], contours[index + 1]) = (contours[index + 1], contours[index]);
             RebuildAfterReorder(index + 1);
@@ -341,10 +370,14 @@ namespace OpenNest.Controls
         {
             // Nearest-neighbor sort for non-perimeter contours
             var perimeterIndex = contours.FindIndex(c => c.Type == ContourClassification.Perimeter);
-            if (perimeterIndex < 0) return;
+            if (perimeterIndex < 0)
+                return;
 
-            var nonPerimeter = contours.Where(c => c.Type != ContourClassification.Perimeter).ToList();
-            if (nonPerimeter.Count <= 1) return;
+            var nonPerimeter = contours
+                .Where(c => c.Type != ContourClassification.Perimeter)
+                .ToList();
+            if (nonPerimeter.Count <= 1)
+                return;
 
             var sorted = new List<ContourInfo>();
             var remaining = new List<ContourInfo>(nonPerimeter);
@@ -444,7 +477,8 @@ namespace OpenNest.Controls
 
         private void OnPreviewPaintOverlay(Graphics g)
         {
-            if (contours.Count == 0) return;
+            if (contours.Count == 0)
+                return;
 
             var spacing = preview.LengthGuiToWorld(60f);
             var arrowSize = 8f;
@@ -453,16 +487,17 @@ namespace OpenNest.Controls
 
             for (var i = 0; i < contours.Count; i++)
             {
-                if (!contourList.SelectedIndices.Contains(i)) continue;
+                if (!contourList.SelectedIndices.Contains(i))
+                    continue;
 
                 var contour = contours[i];
                 var pgm = ConvertGeometry.ToProgram(contour.Shape);
-                if (pgm == null) continue;
+                if (pgm == null)
+                    continue;
 
                 var pos = new Vector();
                 CutDirectionArrows.DrawProgram(g, preview, pgm, ref pos, pen, spacing, arrowSize);
             }
         }
-
     }
 }

@@ -87,7 +87,7 @@ public class ExpressionEvaluatorTests
     {
         var vars = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
         {
-            { "Diameter", 0.3 }
+            { "Diameter", 0.3 },
         };
         Assert.Equal(0.3, ExpressionEvaluator.Evaluate("$diameter", vars));
     }
@@ -95,8 +95,7 @@ public class ExpressionEvaluatorTests
     [Fact]
     public void Evaluate_UndefinedVariable_Throws()
     {
-        Assert.Throws<KeyNotFoundException>(() =>
-            ExpressionEvaluator.Evaluate("$missing", Empty));
+        Assert.Throws<KeyNotFoundException>(() => ExpressionEvaluator.Evaluate("$missing", Empty));
     }
 
     [Fact]

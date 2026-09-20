@@ -1,9 +1,9 @@
+using System.Threading;
 using OpenNest.CNC;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Threading;
 
 namespace OpenNest.Tests.Engine;
 
@@ -31,18 +31,20 @@ public class NestInvarianceTests
         return new Drawing("L", pgm);
     }
 
-    private static Plate MakePlate() => new Plate(new Size(500, 500))
-    {
-        Quadrant = 1,
-        PartSpacing = 2,
-    };
+    private static Plate MakePlate() =>
+        new Plate(new Size(500, 500)) { Quadrant = 1, PartSpacing = 2 };
 
     private static int RunFillCount(Drawing drawing, Plate plate)
     {
         BestFitCache.Clear();
         var engine = new DefaultNestEngine(plate);
         var item = new NestItem { Drawing = drawing };
-        var parts = engine.Fill(item, plate.WorkArea(), progress: null, token: CancellationToken.None);
+        var parts = engine.Fill(
+            item,
+            plate.WorkArea(),
+            progress: null,
+            token: CancellationToken.None
+        );
         return parts?.Count ?? 0;
     }
 

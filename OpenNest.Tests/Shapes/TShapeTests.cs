@@ -30,7 +30,13 @@ public class TShapeTests
     [Fact]
     public void GetDrawing_CustomStemAndBarDimensions()
     {
-        var shape = new TShape { Width = 12, Height = 18, StemWidth = 6, BarHeight = 4 };
+        var shape = new TShape
+        {
+            Width = 12,
+            Height = 18,
+            StemWidth = 6,
+            BarHeight = 4,
+        };
         var drawing = shape.GetDrawing();
 
         // Area = Width * BarHeight + StemWidth * (Height - BarHeight)

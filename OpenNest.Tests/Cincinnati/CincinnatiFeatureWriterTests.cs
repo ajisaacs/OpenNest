@@ -6,39 +6,43 @@ namespace OpenNest.Tests.Cincinnati;
 
 public class CincinnatiFeatureWriterTests
 {
-    private static CincinnatiPostConfig DefaultConfig() => new()
-    {
-        UseLineNumbers = true,
-        FeatureLineNumberStart = 1,
-        UseAntiDive = true,
-        KerfCompensation = KerfMode.ControllerSide,
-        DefaultKerfSide = KerfSide.Left,
-        ProcessParameterMode = G89Mode.LibraryFile,
-        InteriorM47 = M47Mode.Always,
-        ExteriorM47 = M47Mode.Always,
-        UseSpeedGas = false,
-        PostedAccuracy = 4,
-        SafetyHeadraiseDistance = 2000
-    };
-
-    private static FeatureContext SimpleContext(List<ICode>? codes = null) => new()
-    {
-        Codes = codes ?? new List<ICode>
+    private static CincinnatiPostConfig DefaultConfig() =>
+        new()
         {
-            new RapidMove(13.401, 57.4895),
-            new LinearMove(14.0, 57.5) { Layer = LayerType.Leadin },
-            new LinearMove(20.0, 57.5) { Layer = LayerType.Cut }
-        },
-        FeatureNumber = 1,
-        PartName = "BRACKET",
-        IsFirstFeatureOfPart = true,
-        IsLastFeatureOnSheet = false,
-        IsSafetyHeadraise = false,
-        IsExteriorFeature = false,
-        LibraryFile = "MILD10",
-        CutDistance = 18.0,
-        SheetDiagonal = 30.0
-    };
+            UseLineNumbers = true,
+            FeatureLineNumberStart = 1,
+            UseAntiDive = true,
+            KerfCompensation = KerfMode.ControllerSide,
+            DefaultKerfSide = KerfSide.Left,
+            ProcessParameterMode = G89Mode.LibraryFile,
+            InteriorM47 = M47Mode.Always,
+            ExteriorM47 = M47Mode.Always,
+            UseSpeedGas = false,
+            PostedAccuracy = 4,
+            SafetyHeadraiseDistance = 2000,
+        };
+
+    private static FeatureContext SimpleContext(List<ICode>? codes = null) =>
+        new()
+        {
+            Codes =
+                codes
+                ?? new List<ICode>
+                {
+                    new RapidMove(13.401, 57.4895),
+                    new LinearMove(14.0, 57.5) { Layer = LayerType.Leadin },
+                    new LinearMove(20.0, 57.5) { Layer = LayerType.Cut },
+                },
+            FeatureNumber = 1,
+            PartName = "BRACKET",
+            IsFirstFeatureOfPart = true,
+            IsLastFeatureOnSheet = false,
+            IsSafetyHeadraise = false,
+            IsExteriorFeature = false,
+            LibraryFile = "MILD10",
+            CutDistance = 18.0,
+            SheetDiagonal = 30.0,
+        };
 
     private static string WriteFeature(CincinnatiPostConfig config, FeatureContext ctx)
     {
@@ -229,7 +233,10 @@ public class CincinnatiFeatureWriterTests
                 endPoint: new Vector(10.0, 20.0),
                 centerPoint: new Vector(15.0, 20.0),
                 rotation: RotationType.CW
-            ) { Layer = LayerType.Cut }
+            )
+            {
+                Layer = LayerType.Cut,
+            },
         };
 
         var ctx = SimpleContext(codes);
@@ -247,12 +254,18 @@ public class CincinnatiFeatureWriterTests
         var cwCodes = new List<ICode>
         {
             new RapidMove(10.0, 20.0),
-            new ArcMove(new Vector(20.0, 20.0), new Vector(15.0, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+            new ArcMove(new Vector(20.0, 20.0), new Vector(15.0, 20.0), RotationType.CW)
+            {
+                Layer = LayerType.Cut,
+            },
         };
         var ccwCodes = new List<ICode>
         {
             new RapidMove(10.0, 20.0),
-            new ArcMove(new Vector(20.0, 20.0), new Vector(15.0, 20.0), RotationType.CCW) { Layer = LayerType.Cut }
+            new ArcMove(new Vector(20.0, 20.0), new Vector(15.0, 20.0), RotationType.CCW)
+            {
+                Layer = LayerType.Cut,
+            },
         };
 
         var cwOutput = WriteFeature(config, SimpleContext(cwCodes));
@@ -350,7 +363,7 @@ public class CincinnatiFeatureWriterTests
         {
             new RapidMove(1.0, 1.0),
             new LinearMove(2.0, 1.0) { Layer = LayerType.Leadin },
-            new LinearMove(3.0, 1.0) { Layer = LayerType.Cut }
+            new LinearMove(3.0, 1.0) { Layer = LayerType.Cut },
         };
         var ctx = SimpleContext(codes);
         ctx.IsEtch = true;
@@ -372,7 +385,7 @@ public class CincinnatiFeatureWriterTests
             new RapidMove(1.0, 1.0),
             new LinearMove(2.0, 1.0) { Layer = LayerType.Cut },
             new LinearMove(3.0, 1.0) { Layer = LayerType.Cut },
-            new LinearMove(4.0, 1.0) { Layer = LayerType.Cut }
+            new LinearMove(4.0, 1.0) { Layer = LayerType.Cut },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);
@@ -390,7 +403,7 @@ public class CincinnatiFeatureWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(1.0, 1.0),
-            new LinearMove(2.0, 1.0) { Layer = LayerType.Leadin }
+            new LinearMove(2.0, 1.0) { Layer = LayerType.Leadin },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);
@@ -407,7 +420,10 @@ public class CincinnatiFeatureWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(10.0, 20.0),
-            new ArcMove(new Vector(10.0, 20.0), new Vector(15.0, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+            new ArcMove(new Vector(10.0, 20.0), new Vector(15.0, 20.0), RotationType.CW)
+            {
+                Layer = LayerType.Cut,
+            },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);
@@ -478,7 +494,7 @@ public class CincinnatiFeatureWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(1.0, 1.0),
-            new LinearMove(2.0, 1.0) { Layer = LayerType.Leadout }
+            new LinearMove(2.0, 1.0) { Layer = LayerType.Leadout },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);
@@ -494,7 +510,10 @@ public class CincinnatiFeatureWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(10.0, 20.0),
-            new ArcMove(new Vector(12.0, 20.0), new Vector(11.0, 20.0), RotationType.CCW) { Layer = LayerType.Leadin }
+            new ArcMove(new Vector(12.0, 20.0), new Vector(11.0, 20.0), RotationType.CCW)
+            {
+                Layer = LayerType.Leadin,
+            },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);
@@ -512,7 +531,10 @@ public class CincinnatiFeatureWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(10.0, 20.0),
-            new ArcMove(new Vector(11.0, 20.0), new Vector(10.5, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+            new ArcMove(new Vector(11.0, 20.0), new Vector(10.5, 20.0), RotationType.CW)
+            {
+                Layer = LayerType.Cut,
+            },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);
@@ -530,7 +552,10 @@ public class CincinnatiFeatureWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(10.0, 20.0),
-            new ArcMove(new Vector(10.2, 20.0), new Vector(10.1, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+            new ArcMove(new Vector(10.2, 20.0), new Vector(10.1, 20.0), RotationType.CW)
+            {
+                Layer = LayerType.Cut,
+            },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);
@@ -548,7 +573,10 @@ public class CincinnatiFeatureWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(0.0, 0.0),
-            new ArcMove(new Vector(20.0, 0.0), new Vector(10.0, 0.0), RotationType.CCW) { Layer = LayerType.Cut }
+            new ArcMove(new Vector(20.0, 0.0), new Vector(10.0, 0.0), RotationType.CCW)
+            {
+                Layer = LayerType.Cut,
+            },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);
@@ -566,7 +594,10 @@ public class CincinnatiFeatureWriterTests
         var codes = new List<ICode>
         {
             new RapidMove(10.0, 20.0),
-            new ArcMove(new Vector(10.2, 20.0), new Vector(10.1, 20.0), RotationType.CW) { Layer = LayerType.Cut }
+            new ArcMove(new Vector(10.2, 20.0), new Vector(10.1, 20.0), RotationType.CW)
+            {
+                Layer = LayerType.Cut,
+            },
         };
         var ctx = SimpleContext(codes);
         var output = WriteFeature(config, ctx);

@@ -1,13 +1,4 @@
-﻿using OpenNest.Actions;
-using OpenNest.Collections;
-using OpenNest.Data;
-using OpenNest.Engine.BestFit;
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
-using OpenNest.Gpu;
-using OpenNest.IO;
-using OpenNest.Properties;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -16,6 +7,15 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Actions;
+using OpenNest.Collections;
+using OpenNest.Data;
+using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
+using OpenNest.Gpu;
+using OpenNest.IO;
+using OpenNest.Properties;
 
 namespace OpenNest.Forms
 {
@@ -102,7 +102,8 @@ namespace OpenNest.Forms
         private static string ToBase36(int value)
         {
             const string chars = "2345679ACDEFGHJKLMNPQRSTUVWXYZ";
-            if (value == 0) return chars[0].ToString();
+            if (value == 0)
+                return chars[0].ToString();
 
             var result = "";
             while (value > 0)
@@ -135,8 +136,10 @@ namespace OpenNest.Forms
             if (screen.Contains(Settings.Default.MainWindowLocation))
                 Location = Settings.Default.MainWindowLocation;
 
-            if (Settings.Default.MainWindowSize.Width <= screen.Width &&
-                Settings.Default.MainWindowSize.Height <= screen.Height)
+            if (
+                Settings.Default.MainWindowSize.Width <= screen.Width
+                && Settings.Default.MainWindowSize.Height <= screen.Height
+            )
             {
                 Size = Settings.Default.MainWindowSize;
             }
@@ -194,8 +197,10 @@ namespace OpenNest.Forms
             {
                 mnuNestPreviousPlate.Enabled = !activeForm.PlateManager.IsFirst;
                 mnuNestNextPlate.Enabled = !activeForm.PlateManager.IsLast;
-                mnuNestFirstPlate.Enabled = activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsFirst;
-                mnuNestLastPlate.Enabled = activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsLast;
+                mnuNestFirstPlate.Enabled =
+                    activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsFirst;
+                mnuNestLastPlate.Enabled =
+                    activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsLast;
             }
         }
 
@@ -208,10 +213,20 @@ namespace OpenNest.Forms
             mnuPlate.Enabled = !locked;
 
             // Lock plate navigation
-            mnuNestPreviousPlate.Enabled = !locked && activeForm != null && !activeForm.PlateManager.IsFirst;
-            mnuNestNextPlate.Enabled = !locked && activeForm != null && !activeForm.PlateManager.IsLast;
-            mnuNestFirstPlate.Enabled = !locked && activeForm != null && activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsFirst;
-            mnuNestLastPlate.Enabled = !locked && activeForm != null && activeForm.PlateManager.Count > 0 && !activeForm.PlateManager.IsLast;
+            mnuNestPreviousPlate.Enabled =
+                !locked && activeForm != null && !activeForm.PlateManager.IsFirst;
+            mnuNestNextPlate.Enabled =
+                !locked && activeForm != null && !activeForm.PlateManager.IsLast;
+            mnuNestFirstPlate.Enabled =
+                !locked
+                && activeForm != null
+                && activeForm.PlateManager.Count > 0
+                && !activeForm.PlateManager.IsFirst;
+            mnuNestLastPlate.Enabled =
+                !locked
+                && activeForm != null
+                && activeForm.PlateManager.Count > 0
+                && !activeForm.PlateManager.IsLast;
         }
 
         private void UpdateLocationStatus()
@@ -222,9 +237,11 @@ namespace OpenNest.Forms
                 return;
             }
 
-            locationStatusLabel.Text = string.Format("Location: [{0}, {1}]",
+            locationStatusLabel.Text = string.Format(
+                "Location: [{0}, {1}]",
                 activeForm.PlateView.CurrentPoint.X.ToString("n4"),
-                activeForm.PlateView.CurrentPoint.Y.ToString("n4"));
+                activeForm.PlateView.CurrentPoint.Y.ToString("n4")
+            );
         }
 
         private void UpdatePlateStatus()
@@ -241,19 +258,20 @@ namespace OpenNest.Forms
             plateIndexStatusLabel.Text = string.Format(
                 "Plate: {0} of {1}",
                 activeForm.PlateManager.CurrentIndex + 1,
-                activeForm.PlateManager.Count);
+                activeForm.PlateManager.Count
+            );
 
-            plateSizeStatusLabel.Text = string.Format(
-                "Size: {0}",
-                activeForm.PlateView.Plate.Size);
+            plateSizeStatusLabel.Text = string.Format("Size: {0}", activeForm.PlateView.Plate.Size);
 
             plateQtyStatusLabel.Text = string.Format(
                 "Qty: {0}",
-                activeForm.PlateView.Plate.Quantity);
+                activeForm.PlateView.Plate.Quantity
+            );
 
             plateUtilStatusLabel.Text = string.Format(
                 "Util: {0:P1}",
-                activeForm.PlateView.Plate.Utilization());
+                activeForm.PlateView.Plate.Utilization()
+            );
         }
 
         private void UpdateSelectionStatus()
@@ -269,17 +287,25 @@ namespace OpenNest.Forms
             if (selected.Count == 1)
             {
                 var box = selected[0].BoundingBox;
-                selectionStatusLabel.Text = string.Format("Selected: [{0}, {1}] {2} x {3}",
-                    box.X.ToString("n4"), box.Y.ToString("n4"),
-                    box.Width.ToString("n4"), box.Length.ToString("n4"));
+                selectionStatusLabel.Text = string.Format(
+                    "Selected: [{0}, {1}] {2} x {3}",
+                    box.X.ToString("n4"),
+                    box.Y.ToString("n4"),
+                    box.Width.ToString("n4"),
+                    box.Length.ToString("n4")
+                );
             }
             else
             {
                 var bounds = selected.Select(p => p.BasePart).ToList().GetBoundingBox();
-                selectionStatusLabel.Text = string.Format("Selected ({0}): [{1}, {2}] {3} x {4}",
+                selectionStatusLabel.Text = string.Format(
+                    "Selected ({0}): [{1}, {2}] {3} x {4}",
                     selected.Count,
-                    bounds.X.ToString("n4"), bounds.Y.ToString("n4"),
-                    bounds.Width.ToString("n4"), bounds.Length.ToString("n4"));
+                    bounds.X.ToString("n4"),
+                    bounds.Y.ToString("n4"),
+                    bounds.Width.ToString("n4"),
+                    bounds.Length.ToString("n4")
+                );
             }
         }
 
@@ -436,9 +462,8 @@ namespace OpenNest.Forms
 
         private void New_Click(object sender, EventArgs e)
         {
-            var windowState = ActiveMdiChild != null
-                ? ActiveMdiChild.WindowState
-                : FormWindowState.Maximized;
+            var windowState =
+                ActiveMdiChild != null ? ActiveMdiChild.WindowState : FormWindowState.Maximized;
 
             Nest nest;
 
@@ -455,7 +480,8 @@ namespace OpenNest.Forms
                         $"Failed to load nest template:\n{ex.Message}\n\nA default nest will be created instead.",
                         "Template Error",
                         MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
+                        MessageBoxIcon.Warning
+                    );
                     nest = CreateDefaultNest();
                 }
             }
@@ -512,13 +538,15 @@ namespace OpenNest.Forms
 
         private void Export_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.Export();
         }
 
         private void ExportAll_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.ExportAll();
         }
 
@@ -533,7 +561,8 @@ namespace OpenNest.Forms
 
         private void EditCut_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
 
             var selectedParts = activeForm.PlateView.SelectedParts;
 
@@ -547,13 +576,12 @@ namespace OpenNest.Forms
             }
         }
 
-        private void EditPaste_Click(object sender, EventArgs e)
-        {
-        }
+        private void EditPaste_Click(object sender, EventArgs e) { }
 
         private void EditCopy_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
 
             var selectedParts = activeForm.PlateView.SelectedParts;
 
@@ -566,7 +594,8 @@ namespace OpenNest.Forms
 
         private void EditSelectAll_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.SelectAllParts();
         }
 
@@ -576,81 +605,88 @@ namespace OpenNest.Forms
 
         private void ToggleDrawRapids_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.ToggleRapid();
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
         }
 
         private void ToggleDrawPiercePoints_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.TogglePiercePoints();
             mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
         }
 
         private void ToggleDrawBounds_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.ToggleDrawBounds();
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
         }
 
         private void ToggleDrawOffset_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.ToggleDrawOffset();
             mnuViewDrawOffset.Checked = activeForm.PlateView.DrawOffset;
         }
 
         private void ToggleDrawCutDirection_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.ToggleCutDirection();
             mnuViewDrawCutDirection.Checked = activeForm.PlateView.DrawCutDirection;
         }
 
         private void ZoomToArea_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.SetAction(typeof(ActionZoomWindow));
         }
 
         private void ZoomToFit_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.ZoomToFit();
         }
 
         private void ZoomToPlate_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.ZoomToPlate();
         }
 
         private void ZoomToSelected_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.ZoomToSelected();
         }
 
         private void ZoomIn_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
 
-            var pt = new Point(
-                activeForm.PlateView.Width / 2,
-                activeForm.PlateView.Height / 2);
+            var pt = new Point(activeForm.PlateView.Width / 2, activeForm.PlateView.Height / 2);
 
             activeForm.PlateView.ZoomToControlPoint(pt, ZoomInFactor);
         }
 
         private void ZoomOut_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
 
-            var pt = new Point(
-                activeForm.PlateView.Width / 2,
-                activeForm.PlateView.Height / 2);
+            var pt = new Point(activeForm.PlateView.Width / 2, activeForm.PlateView.Height / 2);
 
             activeForm.PlateView.ZoomToControlPoint(pt, ZoomOutFactor);
         }
@@ -677,8 +713,12 @@ namespace OpenNest.Forms
 
             if (drawings.Count == 0)
             {
-                MessageBox.Show("No drawings available.", "Best-Fit Viewer",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "No drawings available.",
+                    "Best-Fit Viewer",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
                 return;
             }
 
@@ -686,7 +726,8 @@ namespace OpenNest.Forms
             {
                 if (form.ShowDialog(this) == DialogResult.OK && form.SelectedResult != null)
                 {
-                    var parts = form.SelectedParts
+                    var parts =
+                        form.SelectedParts
                         ?? form.SelectedResult.BuildSourceParts(form.SelectedDrawing);
                     activeForm.PlateView.SetAction(typeof(ActionClone), parts);
                 }
@@ -700,8 +741,12 @@ namespace OpenNest.Forms
 
             if (activeForm.Nest.Drawings.Count == 0)
             {
-                MessageBox.Show("No drawings available.", "Pattern Tile",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "No drawings available.",
+                    "Pattern Tile",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
                 return;
             }
 
@@ -738,7 +783,8 @@ namespace OpenNest.Forms
 
         private void SetOffsetIncrement_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             var form = new SetValueForm();
             form.Text = "Set Offset Increment";
             form.Value = activeForm.PlateView.OffsetIncrementDistance;
@@ -749,7 +795,8 @@ namespace OpenNest.Forms
 
         private void SetRotationIncrement_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             var form = new SetValueForm();
             form.Text = "Set Rotation Increment";
             form.Value = activeForm.PlateView.RotateIncrementAngle;
@@ -767,7 +814,11 @@ namespace OpenNest.Forms
 
         private void MachineConfig_Click(object sender, EventArgs e)
         {
-            var appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenNest", "Machines");
+            var appDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "OpenNest",
+                "Machines"
+            );
             var provider = new LocalJsonProvider(appDataPath);
             provider.EnsureDefaults();
             using (var form = new MachineConfigForm(provider))
@@ -778,49 +829,57 @@ namespace OpenNest.Forms
 
         private void AlignLeft_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.AlignSelected(AlignType.Left);
         }
 
         private void AlignRight_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.AlignSelected(AlignType.Right);
         }
 
         private void AlignTop_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.AlignSelected(AlignType.Top);
         }
 
         private void AlignBottom_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.AlignSelected(AlignType.Bottom);
         }
 
         private void AlignVertical_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.AlignSelected(AlignType.Vertically);
         }
 
         private void AlignHorizontal_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.AlignSelected(AlignType.Horizontally);
         }
 
         private void EvenlySpaceHorizontally_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.AlignSelected(AlignType.EvenlySpaceHorizontally);
         }
 
         private void EvenlySpaceVertically_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateView.AlignSelected(AlignType.EvenlySpaceVertically);
         }
 
@@ -830,19 +889,22 @@ namespace OpenNest.Forms
 
         private void Import_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.Import();
         }
 
         private void ShapeLibrary_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
 
             var form = new ShapeLibraryForm(activeForm.Nest.Drawings.Select(d => d.Name));
             form.ShowDialog();
 
             var drawings = form.GetDrawings();
-            if (drawings.Count == 0) return;
+            if (drawings.Count == 0)
+                return;
 
             drawings.ForEach(d => activeForm.Nest.Drawings.Add(d));
             activeForm.UpdateDrawingList();
@@ -850,37 +912,43 @@ namespace OpenNest.Forms
 
         private void EditNest_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.ShowNestInfoEditor();
         }
 
         private void RemoveEmptyPlates_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.Nest.Plates.RemoveEmptyPlates();
         }
 
         private void LoadFirstPlate_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateManager.LoadFirst();
         }
 
         private void LoadLastPlate_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateManager.LoadLast();
         }
 
         private void LoadPreviousPlate_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateManager.LoadPrevious();
         }
 
         private void LoadNextPlate_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlateManager.LoadNext();
         }
 
@@ -918,7 +986,8 @@ namespace OpenNest.Forms
                 var screen = Screen.FromControl(this);
                 remnantViewer.Location = new Point(
                     System.Math.Min(Right, screen.WorkingArea.Right - remnantViewer.Width),
-                    Top);
+                    Top
+                );
             }
 
             remnantViewer.LoadRemnants(finder, minDim, activeForm.PlateView);
@@ -982,14 +1051,28 @@ namespace OpenNest.Forms
 
             try
             {
-                await RunAutoNestAsync(items, progressForm, progress, nestingCts.Token,
-                    plateOptions, salvageRate, partFirstMode, sortOrder, minRemnantSize, allowPlateCreation);
+                await RunAutoNestAsync(
+                    items,
+                    progressForm,
+                    progress,
+                    nestingCts.Token,
+                    plateOptions,
+                    salvageRate,
+                    partFirstMode,
+                    sortOrder,
+                    minRemnantSize,
+                    allowPlateCreation
+                );
             }
             catch (Exception ex)
             {
                 activeForm.PlateView.ClearPreviewParts();
-                MessageBox.Show($"Nesting error: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    $"Nesting error: {ex.Message}",
+                    "Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
             }
             finally
             {
@@ -1011,7 +1094,8 @@ namespace OpenNest.Forms
             bool partFirstMode = false,
             PartSortOrder sortOrder = PartSortOrder.BoundingBoxArea,
             double minRemnantSize = 12.0,
-            bool allowPlateCreation = true)
+            bool allowPlateCreation = true
+        )
         {
             if (partFirstMode)
             {
@@ -1036,7 +1120,8 @@ namespace OpenNest.Forms
                 };
 
                 var result = await Task.Run(() =>
-                    MultiPlateNester.Nest(items, nestOptions, existingPlates, progress, token));
+                    MultiPlateNester.Nest(items, nestOptions, existingPlates, progress, token)
+                );
 
                 foreach (var pr in result.Plates)
                 {
@@ -1065,8 +1150,15 @@ namespace OpenNest.Forms
                 var plate = GetOrCreatePlate(progressForm);
 
                 var placed = await NestSinglePlateAsync(
-                    plate, plateIndex, remaining, progressForm, progress, token,
-                    plateOptions, salvageRate);
+                    plate,
+                    plateIndex,
+                    remaining,
+                    progressForm,
+                    progress,
+                    token,
+                    plateOptions,
+                    salvageRate
+                );
 
                 if (!placed)
                     break;
@@ -1092,17 +1184,29 @@ namespace OpenNest.Forms
             IProgress<NestProgress> progress,
             CancellationToken token,
             List<PlateOption> plateOptions = null,
-            double salvageRate = 0.5)
+            double salvageRate = 0.5
+        )
         {
             List<Part> nestParts;
 
             if (plateOptions != null && plateOptions.Count > 0)
             {
                 var result = await Task.Run(() =>
-                    PlateOptimizer.Optimize(items, plateOptions, salvageRate, plate, progress, token));
+                    PlateOptimizer.Optimize(
+                        items,
+                        plateOptions,
+                        salvageRate,
+                        plate,
+                        progress,
+                        token
+                    )
+                );
 
-                if (result == null || result.Parts.Count == 0 ||
-                    (token.IsCancellationRequested && !progressForm.Accepted))
+                if (
+                    result == null
+                    || result.Parts.Count == 0
+                    || (token.IsCancellationRequested && !progressForm.Accepted)
+                )
                     return false;
 
                 plate.Size = new Geometry.Size(result.ChosenSize.Width, result.ChosenSize.Length);
@@ -1121,8 +1225,7 @@ namespace OpenNest.Forms
                 var engine = NestEngineRegistry.Create(plate);
                 engine.PlateNumber = plateIndex;
 
-                nestParts = await Task.Run(() =>
-                    engine.Nest(items, progress, token));
+                nestParts = await Task.Run(() => engine.Nest(items, progress, token));
             }
 
             activeForm.PlateView.ClearPreviewParts();
@@ -1193,13 +1296,15 @@ namespace OpenNest.Forms
 
         private void NestAssignLeadIns_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.AssignLeadInsAllPlates();
         }
 
         private void NestRemoveLeadIns_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.RemoveLeadInsAllPlates();
         }
 
@@ -1209,57 +1314,66 @@ namespace OpenNest.Forms
 
         private void SetAsNestDefault_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.SetCurrentPlateAsNestDefault();
         }
 
         private void AddPlate_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.Nest.CreatePlate();
             NavigationEnableCheck();
         }
 
         private void EditPlate_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.EditPlate();
         }
 
         private void RemovePlate_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.RemoveCurrentPlate();
         }
 
         private void ResizeToFitParts_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.ResizePlateToFitParts();
             UpdatePlateStatus();
         }
 
         private void RotateCw_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.RotateCw();
         }
 
         private void RotateCcw_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.RotateCcw();
         }
 
         private void Rotate180_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.Rotate180();
         }
 
         private void OpenInExternalCad_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.OpenCurrentPlate();
         }
 
@@ -1297,19 +1411,22 @@ namespace OpenNest.Forms
 
         private void PlateAssignLeadIns_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.AssignLeadIns_Click(sender, e);
         }
 
         private void PlatePlaceLeadIn_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.PlaceLeadIn_Click(sender, e);
         }
 
         private void PlateRemoveLeadIns_Click(object sender, EventArgs e)
         {
-            if (activeForm == null) return;
+            if (activeForm == null)
+                return;
             activeForm.RemoveLeadIns_Click(sender, e);
         }
 
@@ -1358,8 +1475,11 @@ namespace OpenNest.Forms
 
         #region PlateView Events
 
-        private void PlateView_PartAdded(object sender, ItemAddedEventArgs<Part> e) => UpdatePlateStatus();
-        private void PlateView_PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => UpdatePlateStatus();
+        private void PlateView_PartAdded(object sender, ItemAddedEventArgs<Part> e) =>
+            UpdatePlateStatus();
+
+        private void PlateView_PartRemoved(object sender, ItemRemovedEventArgs<Part> e) =>
+            UpdatePlateStatus();
 
         private void PlateView_MouseMove(object sender, MouseEventArgs e)
         {

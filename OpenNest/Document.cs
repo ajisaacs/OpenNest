@@ -1,6 +1,6 @@
-using OpenNest.IO;
 using System;
 using System.IO;
+using OpenNest.IO;
 
 namespace OpenNest
 {

@@ -24,7 +24,7 @@ public class AdvancedSequencerTests
         {
             Method = SequenceMethod.Advanced,
             MinDistanceBetweenRowsColumns = 5.0,
-            AlternateRowsColumns = false
+            AlternateRowsColumns = false,
         };
         var sequencer = new AdvancedSequencer(parameters);
         var result = sequencer.Sequence(plate.Parts.ToList(), plate);
@@ -52,7 +52,7 @@ public class AdvancedSequencerTests
         {
             Method = SequenceMethod.Advanced,
             MinDistanceBetweenRowsColumns = 5.0,
-            AlternateRowsColumns = true
+            AlternateRowsColumns = true,
         };
         var sequencer = new AdvancedSequencer(parameters);
         var result = sequencer.Sequence(plate.Parts.ToList(), plate);

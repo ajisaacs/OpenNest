@@ -1,15 +1,19 @@
+using System.Linq;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Linq;
 
 namespace OpenNest.Engine.BestFit
 {
     public static class PolygonHelper
     {
-        public static PolygonExtractionResult ExtractPerimeterPolygon(Drawing drawing, double halfSpacing)
+        public static PolygonExtractionResult ExtractPerimeterPolygon(
+            Drawing drawing,
+            double halfSpacing
+        )
         {
-            var entities = ConvertProgram.ToGeometry(drawing.Program)
+            var entities = ConvertProgram
+                .ToGeometry(drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid)
                 .ToList();
 
@@ -25,9 +29,8 @@ namespace OpenNest.Engine.BestFit
             // Ensure CW winding for correct outward offset direction.
             definedShape.NormalizeWinding();
 
-            var inflated = halfSpacing > 0
-                ? (perimeter.OffsetOutward(halfSpacing) ?? perimeter)
-                : perimeter;
+            var inflated =
+                halfSpacing > 0 ? (perimeter.OffsetOutward(halfSpacing) ?? perimeter) : perimeter;
 
             // Convert to polygon with circumscribed arcs for tight nesting.
             var polygon = inflated.ToPolygonWithTolerance(0.01, circumscribe: true);
@@ -57,9 +60,7 @@ namespace OpenNest.Engine.BestFit
 
             foreach (var v in polygon.Vertices)
             {
-                result.Vertices.Add(new Vector(
-                    v.X * cos - v.Y * sin,
-                    v.X * sin + v.Y * cos));
+                result.Vertices.Add(new Vector(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos));
             }
 
             if (reNormalize)

@@ -3,6 +3,6 @@
     public enum SelectionType
     {
         Intersect,
-        Contains
+        Contains,
     }
 }

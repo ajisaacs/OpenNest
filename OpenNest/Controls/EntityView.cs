@@ -1,12 +1,12 @@
-﻿using OpenNest.Bending;
-using OpenNest.Geometry;
-using OpenNest.Math;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Bending;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Controls
 {
@@ -61,15 +61,18 @@ namespace OpenNest.Controls
             this.Cursor = Cursors.Cross;
 
             SetStyle(
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.UserPaint, true);
+                ControlStyles.AllPaintingInWmPaint
+                    | ControlStyles.OptimizedDoubleBuffer
+                    | ControlStyles.UserPaint,
+                true
+            );
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
-            if (!Focused) Focus();
+            if (!Focused)
+                Focus();
 
             if (IsPickingBendLine && e.Button == MouseButtons.Left)
             {
@@ -109,8 +112,10 @@ namespace OpenNest.Controls
 
             foreach (var entity in Entities)
             {
-                if (IsEtchLayer(entity.Layer)) continue;
-                var isHighlighted = simplifierHighlightSet != null && simplifierHighlightSet.Contains(entity);
+                if (IsEtchLayer(entity.Layer))
+                    continue;
+                var isHighlighted =
+                    simplifierHighlightSet != null && simplifierHighlightSet.Contains(entity);
                 var pen = isHighlighted
                     ? GetEntityPen(Color.FromArgb(60, entity.Color))
                     : GetEntityPen(entity.Color);
@@ -121,7 +126,8 @@ namespace OpenNest.Controls
 
             foreach (var entity in Entities)
             {
-                if (!IsEtchLayer(entity.Layer)) continue;
+                if (!IsEtchLayer(entity.Layer))
+                    continue;
                 var pen = GetEntityPen(entity.Color);
                 DrawEntity(e.Graphics, entity, pen);
             }
@@ -146,7 +152,10 @@ namespace OpenNest.Controls
                 // Draw old geometry (highlighted lines) in orange dashed
                 if (simplifierHighlightSet != null)
                 {
-                    using var oldPen = new Pen(Color.FromArgb(180, 255, 160, 50), 1f / ViewScale) { DashPattern = new float[] { 6, 3 } };
+                    using var oldPen = new Pen(Color.FromArgb(180, 255, 160, 50), 1f / ViewScale)
+                    {
+                        DashPattern = new float[] { 6, 3 },
+                    };
                     foreach (var entity in simplifierHighlightSet)
                         DrawEntity(e.Graphics, entity, oldPen);
                 }
@@ -161,7 +170,9 @@ namespace OpenNest.Controls
             var offsetShape = new Shape();
             offsetShape.Entities.AddRange(Entities);
 
-            foreach (var entity in ((Shape)offsetShape.OffsetEntity(0.25, OffsetSide.Left)).Entities)
+            foreach (
+                var entity in ((Shape)offsetShape.OffsetEntity(0.25, OffsetSide.Left)).Entities
+            )
                 DrawEntity(e.Graphics, entity, Pens.RoyalBlue);
 #endif
 
@@ -237,10 +248,12 @@ namespace OpenNest.Controls
             // Clamp dark colors to ensure visibility on dark background
             var brightness = (color.R * 299 + color.G * 587 + color.B * 114) / 1000;
             if (brightness < 80)
-                color = Color.FromArgb(color.A,
+                color = Color.FromArgb(
+                    color.A,
                     System.Math.Max(color.R, (byte)80),
                     System.Math.Max(color.G, (byte)80),
-                    System.Math.Max(color.B, (byte)80));
+                    System.Math.Max(color.B, (byte)80)
+                );
 
             var argb = color.ToArgb();
             if (!penCache.TryGetValue(argb, out var pen))
@@ -266,13 +279,10 @@ namespace OpenNest.Controls
             if (Bends == null || Bends.Count == 0)
                 return;
 
-            using var bendPen = new Pen(Color.Yellow, 1.5f)
-            {
-                DashPattern = new float[] { 8, 6 }
-            };
+            using var bendPen = new Pen(Color.Yellow, 1.5f) { DashPattern = new float[] { 8, 6 } };
             using var glowPen = new Pen(Color.OrangeRed, 2.0f)
             {
-                DashPattern = new float[] { 6, 4 }
+                DashPattern = new float[] { 6, 4 },
             };
             using var noteFont = new Font("Segoe UI", 9f);
             using var noteBrush = new SolidBrush(Color.FromArgb(220, 255, 255, 200));
@@ -293,18 +303,27 @@ namespace OpenNest.Controls
                 if (!string.IsNullOrEmpty(bend.NoteText))
                 {
                     var mid = new PointF((pt1.X + pt2.X) / 2f, (pt1.Y + pt2.Y) / 2f);
-                    var angle = (float)(System.Math.Atan2(pt2.Y - pt1.Y, pt2.X - pt1.X) * 180.0 / System.Math.PI);
+                    var angle = (float)(
+                        System.Math.Atan2(pt2.Y - pt1.Y, pt2.X - pt1.X) * 180.0 / System.Math.PI
+                    );
 
                     // Keep text readable (not upside-down)
-                    if (angle > 90f) angle -= 180f;
-                    else if (angle < -90f) angle += 180f;
+                    if (angle > 90f)
+                        angle -= 180f;
+                    else if (angle < -90f)
+                        angle += 180f;
 
                     var textSize = g.MeasureString(bend.NoteText, noteFont);
                     var state = g.Save();
                     g.TranslateTransform(mid.X, mid.Y);
                     g.RotateTransform(angle);
-                    g.DrawString(bend.NoteText, noteFont, isSelected ? selectedNoteBrush : noteBrush,
-                        -textSize.Width / 2f, -textSize.Height);
+                    g.DrawString(
+                        bend.NoteText,
+                        noteFont,
+                        isSelected ? selectedNoteBrush : noteBrush,
+                        -textSize.Width / 2f,
+                        -textSize.Height
+                    );
                     g.Restore(state);
                 }
             }
@@ -355,8 +374,12 @@ namespace OpenNest.Controls
                 var minY = text.Position.Y - tolerance;
                 var maxY = text.Position.Y + text.Height + tolerance;
 
-                if (worldPoint.X >= minX && worldPoint.X <= maxX &&
-                    worldPoint.Y >= minY && worldPoint.Y <= maxY)
+                if (
+                    worldPoint.X >= minX
+                    && worldPoint.X <= maxX
+                    && worldPoint.Y >= minY
+                    && worldPoint.Y <= maxY
+                )
                     return text;
             }
 
@@ -380,7 +403,8 @@ namespace OpenNest.Controls
                     continue;
 
                 var mid = GetEntityMidPoint(entity, i);
-                if (!mid.HasValue) continue;
+                if (!mid.HasValue)
+                    continue;
 
                 var screenExtent = GetEntityScreenExtent(entity);
                 var text = i.ToString();
@@ -394,7 +418,13 @@ namespace OpenNest.Controls
                 var pt = PointWorldToGraph(mid.Value);
                 var cx = pt.X - size.Width / 2f;
                 var cy = pt.Y - size.Height / 2f;
-                g.FillEllipse(labelBackBrush, pt.X - radius, pt.Y - radius, radius * 2f, radius * 2f);
+                g.FillEllipse(
+                    labelBackBrush,
+                    pt.X - radius,
+                    pt.Y - radius,
+                    radius * 2f,
+                    radius * 2f
+                );
                 g.DrawString(text, labelFont, labelBrush, cx, cy);
             }
         }
@@ -432,14 +462,16 @@ namespace OpenNest.Controls
                         : arc.StartAngle + arc.SweepAngle() / 2.0;
                     return new Vector(
                         arc.Center.X + arc.Radius * System.Math.Cos(midAngle),
-                        arc.Center.Y + arc.Radius * System.Math.Sin(midAngle));
+                        arc.Center.Y + arc.Radius * System.Math.Sin(midAngle)
+                    );
 
                 case Circle circle:
                     // Use golden angle (~137.5°) per index so concentric circles spread labels apart
                     var circleAngle = index * 2.399;
                     return new Vector(
                         circle.Center.X + circle.Radius * System.Math.Cos(circleAngle),
-                        circle.Center.Y + circle.Radius * System.Math.Sin(circleAngle));
+                        circle.Center.Y + circle.Radius * System.Math.Sin(circleAngle)
+                    );
 
                 default:
                     return null;
@@ -506,7 +538,8 @@ namespace OpenNest.Controls
                 diameter,
                 diameter,
                 startAngle,
-                -(float)Angle.ToDegrees(arc.SweepAngle()));
+                -(float)Angle.ToDegrees(arc.SweepAngle())
+            );
         }
 
         private void DrawCircle(Graphics g, Circle circle, Pen pen)
@@ -515,11 +548,7 @@ namespace OpenNest.Controls
             var radius = LengthWorldToGui(circle.Radius);
             var diameter = radius * 2.0f;
 
-            g.DrawEllipse(pen,
-                center.X - radius,
-                center.Y - radius,
-                diameter,
-                diameter);
+            g.DrawEllipse(pen, center.X - radius, center.Y - radius, diameter, diameter);
         }
 
         private void DrawTexts(Graphics g)
@@ -532,11 +561,13 @@ namespace OpenNest.Controls
             foreach (var text in Texts)
             {
                 // The bend overlay already renders this source annotation.
-                if (text.IsReplacedByBendNote(Bends)) continue;
+                if (text.IsReplacedByBendNote(Bends))
+                    continue;
 
                 var pos = PointWorldToGraph(text.Position);
                 var fontSize = LengthWorldToGui(text.Height);
-                if (fontSize < 2f) continue;
+                if (fontSize < 2f)
+                    continue;
 
                 var state = g.Save();
                 g.TranslateTransform(pos.X, pos.Y);

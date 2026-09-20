@@ -63,14 +63,16 @@ namespace OpenNest.Controls
 
         private void PaintInfo(Graphics g)
         {
-            if (infoLines == null) return;
+            if (infoLines == null)
+                return;
 
             var lineHeight = Font.GetHeight(g) + 1;
             var y = 4f;
 
             foreach (var line in infoLines)
             {
-                if (string.IsNullOrEmpty(line)) continue;
+                if (string.IsNullOrEmpty(line))
+                    continue;
                 g.DrawString(line, Font, Brushes.Black, 4, y);
                 y += lineHeight;
             }

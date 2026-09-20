@@ -16,7 +16,14 @@ public class SubProgramExpansionTests
         // Main program: call sub at offset (10,20)
         var main = new Program(Mode.Absolute);
         main.SubPrograms[1] = sub;
-        main.Codes.Add(new SubProgramCall { Id = 1, Program = sub, Offset = new Vector(10, 20) });
+        main.Codes.Add(
+            new SubProgramCall
+            {
+                Id = 1,
+                Program = sub,
+                Offset = new Vector(10, 20),
+            }
+        );
 
         var geometry = ConvertProgram.ToGeometry(main);
 
@@ -38,8 +45,22 @@ public class SubProgramExpansionTests
 
         var main = new Program(Mode.Absolute);
         main.SubPrograms[1] = sub;
-        main.Codes.Add(new SubProgramCall { Id = 1, Program = sub, Offset = new Vector(0, 0) });
-        main.Codes.Add(new SubProgramCall { Id = 1, Program = sub, Offset = new Vector(5, 5) });
+        main.Codes.Add(
+            new SubProgramCall
+            {
+                Id = 1,
+                Program = sub,
+                Offset = new Vector(0, 0),
+            }
+        );
+        main.Codes.Add(
+            new SubProgramCall
+            {
+                Id = 1,
+                Program = sub,
+                Offset = new Vector(5, 5),
+            }
+        );
 
         var geometry = ConvertProgram.ToGeometry(main);
         var lines = geometry.OfType<Line>().ToList();

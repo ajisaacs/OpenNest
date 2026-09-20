@@ -8,9 +8,7 @@ namespace OpenNest.RectanglePacking
         public Box CenterRemnant { get; private set; }
 
         public FillSpiral(Bin bin)
-            : base(bin)
-        {
-        }
+            : base(bin) { }
 
         public override void Fill(Item item)
         {
@@ -19,7 +17,8 @@ namespace OpenNest.RectanglePacking
 
         public override void Fill(Item item, int maxCount)
         {
-            if (item == null) return;
+            if (item == null)
+                return;
 
             // Width = Y axis, Length = X axis
             var comboY = BestCombination.FindFrom2(item.Width, item.Length, Bin.Width);
@@ -28,15 +27,13 @@ namespace OpenNest.RectanglePacking
             if (!comboY.Found || !comboX.Found)
                 return;
 
-            var q14size = new Size(
-                item.Width * comboY.Count1,
-                item.Length * comboX.Count1);
-            var q23size = new Size(
-                item.Length * comboY.Count2,
-                item.Width * comboX.Count2);
+            var q14size = new Size(item.Width * comboY.Count1, item.Length * comboX.Count1);
+            var q23size = new Size(item.Length * comboY.Count2, item.Width * comboX.Count2);
 
-            if ((q14size.Width > q23size.Width && q14size.Length > q23size.Length) ||
-                (q23size.Width > q14size.Width && q23size.Length > q14size.Length))
+            if (
+                (q14size.Width > q23size.Width && q14size.Length > q23size.Length)
+                || (q23size.Width > q14size.Width && q23size.Length > q14size.Length)
+            )
                 return; // cant do an efficient spiral fill
 
             // Q1: normal orientation at bin origin
@@ -57,9 +54,7 @@ namespace OpenNest.RectanglePacking
 
             // Q4: normal orientation, diagonal from Q1
             item.Rotate();
-            item.Location = new Vector(
-                Bin.X + q23size.Length,
-                Bin.Y + q23size.Width);
+            item.Location = new Vector(Bin.X + q23size.Length, Bin.Y + q23size.Width);
             var q4 = FillGrid(item, comboY.Count1, comboX.Count1, maxCount);
             Bin.Items.AddRange(q4);
 
@@ -69,14 +64,21 @@ namespace OpenNest.RectanglePacking
             var centerW = System.Math.Abs(q14size.Length - q23size.Length);
             var centerH = System.Math.Abs(q14size.Width - q23size.Width);
 
-            if (comboY.Count1 > 0 && comboY.Count2 > 0 && comboX.Count1 > 0 && comboX.Count2 > 0
-                && centerW > Tolerance.Epsilon && centerH > Tolerance.Epsilon)
+            if (
+                comboY.Count1 > 0
+                && comboY.Count2 > 0
+                && comboX.Count1 > 0
+                && comboX.Count2 > 0
+                && centerW > Tolerance.Epsilon
+                && centerH > Tolerance.Epsilon
+            )
             {
                 CenterRemnant = new Box(
                     Bin.X + System.Math.Min(q14size.Length, q23size.Length),
                     Bin.Y + System.Math.Min(q14size.Width, q23size.Width),
                     centerW,
-                    centerH);
+                    centerH
+                );
             }
         }
     }

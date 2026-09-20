@@ -11,11 +11,12 @@ public class CutParameters
     public string PostProcessor { get; set; }
     public Units Units { get; set; }
 
-    public static CutParameters Default => new()
-    {
-        Feedrate = 100,
-        RapidTravelRate = 300,
-        PierceTime = TimeSpan.FromSeconds(0.5),
-        Units = OpenNest.Units.Inches
-    };
+    public static CutParameters Default =>
+        new()
+        {
+            Feedrate = 100,
+            RapidTravelRate = 300,
+            PierceTime = TimeSpan.FromSeconds(0.5),
+            Units = OpenNest.Units.Inches,
+        };
 }

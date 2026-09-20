@@ -10,7 +10,7 @@ namespace OpenNest
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
         public static string Serialize(ColorScheme scheme)
@@ -26,14 +26,15 @@ namespace OpenNest
                 OriginColor = ToHex(scheme.OriginColor),
                 EdgeSpacingColor = ToHex(scheme.EdgeSpacingColor),
                 PreviewPartColor = ToHex(scheme.PreviewPartColor),
-                PartColors = scheme.PartColors.Select(ToHex).ToArray()
+                PartColors = scheme.PartColors.Select(ToHex).ToArray(),
             };
             return JsonSerializer.Serialize(dto, JsonOptions);
         }
 
         public static ColorScheme Deserialize(string json)
         {
-            var dto = JsonSerializer.Deserialize<ColorSchemeDto>(json, JsonOptions)
+            var dto =
+                JsonSerializer.Deserialize<ColorSchemeDto>(json, JsonOptions)
                 ?? throw new JsonException("ColorScheme JSON was null");
 
             return new ColorScheme
@@ -47,7 +48,7 @@ namespace OpenNest
                 OriginColor = FromHex(dto.OriginColor),
                 EdgeSpacingColor = FromHex(dto.EdgeSpacingColor),
                 PreviewPartColor = FromHex(dto.PreviewPartColor),
-                PartColors = (dto.PartColors ?? new string[0]).Select(FromHex).ToArray()
+                PartColors = (dto.PartColors ?? new string[0]).Select(FromHex).ToArray(),
             };
         }
 
@@ -61,9 +62,21 @@ namespace OpenNest
             var h = hex.TrimStart('#');
             if (h.Length < 6)
                 return Color.Black;
-            var r = byte.Parse(h.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-            var g = byte.Parse(h.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-            var b = byte.Parse(h.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            var r = byte.Parse(
+                h.Substring(0, 2),
+                NumberStyles.HexNumber,
+                CultureInfo.InvariantCulture
+            );
+            var g = byte.Parse(
+                h.Substring(2, 2),
+                NumberStyles.HexNumber,
+                CultureInfo.InvariantCulture
+            );
+            var b = byte.Parse(
+                h.Substring(4, 2),
+                NumberStyles.HexNumber,
+                CultureInfo.InvariantCulture
+            );
             return Color.FromArgb(r, g, b);
         }
 

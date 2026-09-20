@@ -1,6 +1,3 @@
-using OpenNest.Collections;
-using OpenNest.Controls;
-using OpenNest.Engine.BestFit;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,6 +7,9 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Collections;
+using OpenNest.Controls;
+using OpenNest.Engine.BestFit;
 
 namespace OpenNest.Forms
 {
@@ -18,7 +18,12 @@ namespace OpenNest.Forms
         private const int WM_SETREDRAW = 0x000B;
 
         [DllImport("user32.dll")]
-        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        private static extern IntPtr SendMessage(
+            IntPtr hWnd,
+            int msg,
+            IntPtr wParam,
+            IntPtr lParam
+        );
 
         private const int Columns = 5;
         private const int Rows = 3;
@@ -47,7 +52,11 @@ namespace OpenNest.Forms
         public Drawing SelectedDrawing => activeDrawing;
         public List<Part> SelectedParts { get; private set; }
 
-        public BestFitViewerForm(DrawingCollection drawings, Plate plate, Units units = Units.Inches)
+        public BestFitViewerForm(
+            DrawingCollection drawings,
+            Plate plate,
+            Units units = Units.Inches
+        )
         {
             this.drawings = drawings.ToList();
             this.plate = plate;
@@ -122,7 +131,10 @@ namespace OpenNest.Forms
                 var width = plate.Size.Width;
                 var spacing = plate.PartSpacing;
 
-                var result = await Task.Run(() => ComputeResults(drawing, length, width, spacing), cts.Token);
+                var result = await Task.Run(
+                    () => ComputeResults(drawing, length, width, spacing),
+                    cts.Token
+                );
 
                 if (cts.Token.IsCancellationRequested)
                     return;
@@ -132,13 +144,14 @@ namespace OpenNest.Forms
                 keptCount = result.KeptCount;
                 computeSeconds = result.ComputeSeconds;
                 totalSeconds = result.TotalSeconds;
-                pageCount = System.Math.Max(1, (int)System.Math.Ceiling(results.Count / (double)ItemsPerPage));
+                pageCount = System.Math.Max(
+                    1,
+                    (int)System.Math.Ceiling(results.Count / (double)ItemsPerPage)
+                );
 
                 ShowPage(0);
             }
-            catch (OperationCanceledException)
-            {
-            }
+            catch (OperationCanceledException) { }
             finally
             {
                 if (cts == computeCts)
@@ -160,7 +173,10 @@ namespace OpenNest.Forms
                 gridPanel.Controls.Clear();
                 lblLoading = null;
                 EnsureLoadingLabel();
-                lblLoading.Text = string.Format("Computing best fits for {0}...", activeDrawing.Name);
+                lblLoading.Text = string.Format(
+                    "Computing best fits for {0}...",
+                    activeDrawing.Name
+                );
                 gridPanel.ResumeLayout(true);
             }
             else
@@ -181,14 +197,19 @@ namespace OpenNest.Forms
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.Gray,
                 Font = new Font(Font.FontFamily, 14f),
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
             };
             gridPanel.Controls.Add(lblLoading, 0, 0);
             gridPanel.SetColumnSpan(lblLoading, Columns);
             gridPanel.SetRowSpan(lblLoading, Rows);
         }
 
-        private static ComputeResult ComputeResults(Drawing drawing, double length, double width, double spacing)
+        private static ComputeResult ComputeResults(
+            Drawing drawing,
+            double length,
+            double width,
+            double spacing
+        )
         {
             var sw = Stopwatch.StartNew();
 
@@ -200,7 +221,8 @@ namespace OpenNest.Forms
 
             foreach (var r in all)
             {
-                if (r.Keep) kept++;
+                if (r.Keep)
+                    kept++;
             }
 
             sw.Stop();
@@ -211,7 +233,7 @@ namespace OpenNest.Forms
                 TotalResults = total,
                 KeptCount = kept,
                 ComputeSeconds = computeMs / 1000.0,
-                TotalSeconds = sw.Elapsed.TotalSeconds
+                TotalSeconds = sw.Elapsed.TotalSeconds,
             };
         }
 
@@ -252,9 +274,16 @@ namespace OpenNest.Forms
             txtPage.Text = (currentPage + 1).ToString();
             lblPageCount.Text = string.Format("/ {0}", pageCount);
 
-            Text = string.Format("Best-Fit Viewer — {0} candidates ({1} kept) | Compute: {2:F1}s | Total: {3:F1}s | Showing {4}-{5} of {6}",
-                totalResults, keptCount, computeSeconds, totalSeconds,
-                start + 1, start + count, results.Count);
+            Text = string.Format(
+                "Best-Fit Viewer — {0} candidates ({1} kept) | Compute: {2:F1}s | Total: {3:F1}s | Showing {4}-{5} of {6}",
+                totalResults,
+                keptCount,
+                computeSeconds,
+                totalSeconds,
+                start + 1,
+                start + count,
+                results.Count
+            );
         }
 
         private void btnPrev_Click(object sender, EventArgs e) => NavigatePage(-1);
@@ -264,7 +293,14 @@ namespace OpenNest.Forms
         private void CenterNavControls()
         {
             var gap = 6;
-            var groupWidth = btnPrev.Width + gap + txtPage.Width + gap + lblPageCount.Width + gap + btnNext.Width;
+            var groupWidth =
+                btnPrev.Width
+                + gap
+                + txtPage.Width
+                + gap
+                + lblPageCount.Width
+                + gap
+                + btnNext.Width;
             var x = (navPanel.Width - groupWidth) / 2;
             var midY = navPanel.Height / 2;
 
@@ -313,7 +349,7 @@ namespace OpenNest.Forms
                 BoundingBoxColor = bgColor,
                 RapidColor = Color.DodgerBlue,
                 OriginColor = bgColor,
-                EdgeSpacingColor = bgColor
+                EdgeSpacingColor = bgColor,
             };
 
             var cell = new BestFitCell(colorScheme);
@@ -321,9 +357,7 @@ namespace OpenNest.Forms
             cell.Dock = DockStyle.Fill;
 
             var parts = result.BuildCanonicalParts();
-            cell.Plate.Size = new Geometry.Size(
-                result.BoundingHeight,
-                result.BoundingWidth);
+            cell.Plate.Size = new Geometry.Size(result.BoundingHeight, result.BoundingWidth);
 
             foreach (var part in parts)
                 cell.Plate.Parts.Add(part);

@@ -17,11 +17,28 @@ public class NestResponsePersistenceTests
         var nest = CreateNest("test-part", new Size(60, 120));
         var request = new NestRequest
         {
-            Parts = [new NestRequestPart { Id = "test-part", DxfPath = "test.dxf", Quantity = 5 }],
-            Plates = [new NestRequestPlate { Id = "sheet", Size = new Size(60, 120), Quantity = 1, PartSpacing = 0.1 }],
+            Parts =
+            [
+                new NestRequestPart
+                {
+                    Id = "test-part",
+                    DxfPath = "test.dxf",
+                    Quantity = 5,
+                },
+            ],
+            Plates =
+            [
+                new NestRequestPlate
+                {
+                    Id = "sheet",
+                    Size = new Size(60, 120),
+                    Quantity = 1,
+                    PartSpacing = 0.1,
+                },
+            ],
             Material = "Steel",
             Thickness = 0.125,
-            Spacing = 0.1
+            Spacing = 0.1,
         };
         var original = new NestResponse
         {
@@ -35,7 +52,7 @@ public class NestResponsePersistenceTests
             StockUsage = [new NestStockUsage("sheet", 1, 0)],
             PlateStockMappings = [new NestPlateStockMapping(0, "sheet")],
             Nest = nest,
-            Request = request
+            Request = request,
         };
         var path = Path.Combine(Path.GetTempPath(), $"test-{Guid.NewGuid()}.nestquote");
 
@@ -118,9 +135,25 @@ public class NestResponsePersistenceTests
             Nest = CreateNest("custom-id", new Size(10, 10)),
             Request = new NestRequest
             {
-                Parts = [new NestRequestPart { Id = "custom-id", DxfPath = dxfPath, Quantity = 3 }],
-                Plates = [new NestRequestPlate { Id = "finite-stock", Size = new Size(10, 10), Quantity = 1 }]
-            }
+                Parts =
+                [
+                    new NestRequestPart
+                    {
+                        Id = "custom-id",
+                        DxfPath = dxfPath,
+                        Quantity = 3,
+                    },
+                ],
+                Plates =
+                [
+                    new NestRequestPlate
+                    {
+                        Id = "finite-stock",
+                        Size = new Size(10, 10),
+                        Quantity = 1,
+                    },
+                ],
+            },
         };
 
         try
@@ -131,9 +164,18 @@ public class NestResponsePersistenceTests
             Assert.False(File.Exists(dxfPath));
             Assert.Equal(NestJobStatus.Incomplete, loaded.Status);
             Assert.Equal(NestJobStopReason.StockExhausted, loaded.StopReason);
-            Assert.Equal(new NestPartFulfillment("custom-id", 3, 1, 2), Assert.Single(loaded.Fulfillment));
-            Assert.Equal(new NestStockUsage("finite-stock", 1, 0), Assert.Single(loaded.StockUsage));
-            Assert.Equal(new NestPlateStockMapping(0, "finite-stock"), Assert.Single(loaded.PlateStockMappings));
+            Assert.Equal(
+                new NestPartFulfillment("custom-id", 3, 1, 2),
+                Assert.Single(loaded.Fulfillment)
+            );
+            Assert.Equal(
+                new NestStockUsage("finite-stock", 1, 0),
+                Assert.Single(loaded.StockUsage)
+            );
+            Assert.Equal(
+                new NestPlateStockMapping(0, "finite-stock"),
+                Assert.Single(loaded.PlateStockMappings)
+            );
             Assert.Equal("custom-id", Assert.Single(loaded.Request.Parts).Id);
             Assert.Equal("finite-stock", Assert.Single(loaded.Request.Plates!).Id);
             Assert.Single(loaded.Nest.Drawings);
@@ -159,12 +201,20 @@ public class NestResponsePersistenceTests
     {
         using var fs = new FileStream(path, FileMode.Create);
         using var zip = new ZipArchive(fs, ZipArchiveMode.Create);
-        await WriteEntryAsync(zip, "request.json", """
+        await WriteEntryAsync(
+            zip,
+            "request.json",
+            """
             {"parts":[{"dxfPath":"legacy-missing.dxf","quantity":2}],"sheetSize":{"width":60,"length":120},"material":"Steel","thickness":0.06,"spacing":0.1,"strategy":0}
-            """);
-        await WriteEntryAsync(zip, "response.json", """
+            """
+        );
+        await WriteEntryAsync(
+            zip,
+            "response.json",
+            """
             {"sheetCount":1,"utilization":0.75,"cutTimeTicks":120000,"elapsedTicks":340000}
-            """);
+            """
+        );
 
         var nestEntry = zip.CreateEntry("nest.nest");
         await using var stream = nestEntry.Open();

@@ -1,11 +1,11 @@
-using OpenNest.Converters;
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using OpenNest.Converters;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -24,10 +24,13 @@ namespace OpenNest.Engine.BestFit
 
             var resultBag = new ConcurrentBag<BestFitResult>();
 
-            Parallel.ForEach(candidates, c =>
-            {
-                resultBag.Add(Evaluate(c, perimeterDrawing));
-            });
+            Parallel.ForEach(
+                candidates,
+                c =>
+                {
+                    resultBag.Add(Evaluate(c, perimeterDrawing));
+                }
+            );
 
             return resultBag.ToList();
         }
@@ -56,7 +59,10 @@ namespace OpenNest.Engine.BestFit
             allPoints.AddRange(GetPartVertices(part2));
 
             // Find optimal bounding rectangle via rotating calipers
-            double bestArea, bestWidth, bestHeight, bestRotation;
+            double bestArea,
+                bestWidth,
+                bestHeight,
+                bestRotation;
             List<double> hullAngles = null;
 
             if (allPoints.Count >= 3)
@@ -71,7 +77,9 @@ namespace OpenNest.Engine.BestFit
             }
             else
             {
-                var combinedBox = ((IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }).GetBoundingBox();
+                var combinedBox = (
+                    (IEnumerable<IBoundable>)new IBoundable[] { part1, part2 }
+                ).GetBoundingBox();
                 bestArea = combinedBox.Area();
                 bestWidth = combinedBox.Width;
                 bestHeight = combinedBox.Length;
@@ -100,14 +108,16 @@ namespace OpenNest.Engine.BestFit
                 TrueArea = trueArea,
                 HullAngles = hullAngles,
                 Keep = !overlaps,
-                Reason = overlaps ? "Overlap detected" : "Valid"
+                Reason = overlaps ? "Overlap detected" : "Valid",
             };
         }
 
         private static Drawing CreatePerimeterDrawing(Drawing source)
         {
-            var entities = ConvertProgram.ToGeometry(source.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var entities = ConvertProgram
+                .ToGeometry(source.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
             var profile = new ShapeProfile(entities);
             var program = ConvertGeometry.ToProgram(profile.Perimeter);
             return new Drawing(source.Name, program);
@@ -115,18 +125,23 @@ namespace OpenNest.Engine.BestFit
 
         private static Shape GetPerimeterShape(Part part)
         {
-            var entities = ConvertProgram.ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var entities = ConvertProgram
+                .ToGeometry(part.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
             var shapes = ShapeBuilder.GetShapes(entities);
-            if (shapes.Count == 0) return null;
+            if (shapes.Count == 0)
+                return null;
             shapes[0].Offset(part.Location);
             return shapes[0];
         }
 
         private static List<Vector> GetPartVertices(Part part)
         {
-            var entities = ConvertProgram.ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var entities = ConvertProgram
+                .ToGeometry(part.Program)
+                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .ToList();
             var shapes = ShapeBuilder.GetShapes(entities);
             var points = new List<Vector>();
 

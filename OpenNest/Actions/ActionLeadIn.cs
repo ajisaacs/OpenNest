@@ -1,22 +1,27 @@
-using OpenNest.CNC.CuttingStrategy;
-using OpenNest.Controls;
-using OpenNest.Converters;
-using OpenNest.Forms;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Controls;
+using OpenNest.Converters;
+using OpenNest.Forms;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Actions
 {
     [DisplayName("Place Lead-in")]
     public class ActionLeadIn : Action
     {
-        private enum SnapType { None, Endpoint, Midpoint }
+        private enum SnapType
+        {
+            None,
+            Endpoint,
+            Midpoint,
+        }
 
         private const double SnapCapturePixels = 10.0;
 
@@ -34,7 +39,9 @@ namespace OpenNest.Actions
         private ShapeInfo lockedContour;
         private ContextMenuStrip contextMenu;
         private CuttingPanel cuttingPanel;
-        private static readonly Brush grayOverlay = new SolidBrush(Color.FromArgb(160, 180, 180, 180));
+        private static readonly Brush grayOverlay = new SolidBrush(
+            Color.FromArgb(160, 180, 180, 180)
+        );
         private static readonly Pen highlightPen = new Pen(Color.Cyan, 2.5f);
         private static readonly Pen lockedPen = new Pen(Color.Yellow, 3.0f);
 
@@ -106,7 +113,9 @@ namespace OpenNest.Actions
                         var saved = CuttingParametersSerializer.Deserialize(json);
                         cuttingPanel.LoadFromParameters(saved);
                     }
-                    catch { /* use defaults */ }
+                    catch
+                    { /* use defaults */
+                    }
                 }
             }
 
@@ -131,7 +140,9 @@ namespace OpenNest.Actions
 
         private CuttingParameters GetCurrentParameters()
         {
-            return cuttingPanel?.BuildParameters() ?? plateView.Plate?.CuttingParameters ?? new CuttingParameters();
+            return cuttingPanel?.BuildParameters()
+                ?? plateView.Plate?.CuttingParameters
+                ?? new CuttingParameters();
         }
 
         private void SaveParameters()
@@ -163,8 +174,10 @@ namespace OpenNest.Actions
             // Transform world point into program-local space by subtracting the
             // part's location. The contour shapes are already in the program's
             // rotated coordinate system, so no additional un-rotation is needed.
-            var localPt = new Vector(worldPt.X - selectedPart.Location.X,
-                                     worldPt.Y - selectedPart.Location.Y);
+            var localPt = new Vector(
+                worldPt.X - selectedPart.Location.X,
+                worldPt.Y - selectedPart.Location.Y
+            );
 
             // Find closest contour and point
             var bestDist = double.MaxValue;
@@ -173,9 +186,8 @@ namespace OpenNest.Actions
             hoveredContour = null;
 
             // When a contour is locked, only snap within that contour
-            var searchContours = lockedContour != null
-                ? new List<ShapeInfo> { lockedContour }
-                : contours;
+            var searchContours =
+                lockedContour != null ? new List<ShapeInfo> { lockedContour } : contours;
 
             foreach (var info in searchContours)
             {
@@ -188,7 +200,12 @@ namespace OpenNest.Actions
                     snapPoint = closest;
                     snapEntity = entity;
                     snapContourType = info.ContourType;
-                    snapNormal = ContourCuttingStrategy.ComputeNormal(closest, entity, info.ContourType, info.Winding);
+                    snapNormal = ContourCuttingStrategy.ComputeNormal(
+                        closest,
+                        entity,
+                        info.ContourType,
+                        info.Winding
+                    );
                     hasSnap = true;
                     hoveredContour = info;
                 }
@@ -353,9 +370,11 @@ namespace OpenNest.Actions
 
         private LeadIn ClampLeadInForCircle(LeadIn leadIn, CuttingParameters parameters)
         {
-            if (snapContourType != ContourType.ArcCircle
+            if (
+                snapContourType != ContourType.ArcCircle
                 || !(snapEntity is Circle snapCircle)
-                || parameters.PierceClearance <= 0)
+                || parameters.PierceClearance <= 0
+            )
                 return leadIn;
 
             var pierceCheck = leadIn.GetPiercePoint(snapPoint, snapNormal);
@@ -412,7 +431,12 @@ namespace OpenNest.Actions
             {
                 snapPoint = bestPoint;
                 snapEntity = bestEntity;
-                snapNormal = ContourCuttingStrategy.ComputeNormal(bestPoint, bestEntity, snapContourType, hoveredContour.Winding);
+                snapNormal = ContourCuttingStrategy.ComputeNormal(
+                    bestPoint,
+                    bestEntity,
+                    snapContourType,
+                    hoveredContour.Winding
+                );
                 activeSnapType = bestType;
             }
 
@@ -472,7 +496,8 @@ namespace OpenNest.Actions
                 cleanProgram = selectedPart.Program;
             }
 
-            var entities = ConvertProgram.ToGeometry(cleanProgram)
+            var entities = ConvertProgram
+                .ToGeometry(cleanProgram)
                 .Where(e => e.Layer == SpecialLayers.Cut)
                 .ToList();
 
@@ -483,23 +508,27 @@ namespace OpenNest.Actions
             // Perimeter is always External
             if (profile.Perimeter != null)
             {
-                contours.Add(new ShapeInfo
-                {
-                    Shape = profile.Perimeter,
-                    ContourType = ContourType.External,
-                    Winding = ContourCuttingStrategy.DetermineWinding(profile.Perimeter)
-                });
+                contours.Add(
+                    new ShapeInfo
+                    {
+                        Shape = profile.Perimeter,
+                        ContourType = ContourType.External,
+                        Winding = ContourCuttingStrategy.DetermineWinding(profile.Perimeter),
+                    }
+                );
             }
 
             // Cutouts
             foreach (var cutout in profile.Cutouts)
             {
-                contours.Add(new ShapeInfo
-                {
-                    Shape = cutout,
-                    ContourType = ContourCuttingStrategy.DetectContourType(cutout),
-                    Winding = ContourCuttingStrategy.DetermineWinding(cutout)
-                });
+                contours.Add(
+                    new ShapeInfo
+                    {
+                        Shape = cutout,
+                        ContourType = ContourCuttingStrategy.DetectContourType(cutout),
+                        Winding = ContourCuttingStrategy.DetermineWinding(cutout),
+                    }
+                );
             }
         }
 
@@ -601,7 +630,7 @@ namespace OpenNest.Actions
                     new PointF(pt.X, pt.Y - size),
                     new PointF(pt.X + size, pt.Y),
                     new PointF(pt.X, pt.Y + size),
-                    new PointF(pt.X - size, pt.Y)
+                    new PointF(pt.X - size, pt.Y),
                 };
                 g.FillPolygon(Brushes.Red, points);
             }
@@ -612,7 +641,7 @@ namespace OpenNest.Actions
                 {
                     new PointF(pt.X, pt.Y - size),
                     new PointF(pt.X + size, pt.Y + size),
-                    new PointF(pt.X - size, pt.Y + size)
+                    new PointF(pt.X - size, pt.Y + size),
                 };
                 g.FillPolygon(Brushes.Red, points);
             }
@@ -622,8 +651,10 @@ namespace OpenNest.Actions
         {
             // The contours are already in rotated local space (we rotated the program
             // before building the profile), so just add the part location offset
-            return new Vector(localPt.X + selectedPart.Location.X,
-                              localPt.Y + selectedPart.Location.Y);
+            return new Vector(
+                localPt.X + selectedPart.Location.X,
+                localPt.Y + selectedPart.Location.Y
+            );
         }
 
         private static LeadIn SelectLeadIn(CuttingParameters parameters, ContourType contourType)
@@ -632,7 +663,7 @@ namespace OpenNest.Actions
             {
                 ContourType.ArcCircle => parameters.ArcCircleLeadIn ?? parameters.InternalLeadIn,
                 ContourType.Internal => parameters.InternalLeadIn,
-                _ => parameters.ExternalLeadIn
+                _ => parameters.ExternalLeadIn,
             };
         }
 

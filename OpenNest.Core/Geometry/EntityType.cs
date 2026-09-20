@@ -1,5 +1,4 @@
-﻿
-namespace OpenNest.Geometry
+﻿namespace OpenNest.Geometry
 {
     public enum EntityType
     {
@@ -7,6 +6,6 @@ namespace OpenNest.Geometry
         Circle,
         Line,
         Shape,
-        Polygon
+        Polygon,
     }
 }

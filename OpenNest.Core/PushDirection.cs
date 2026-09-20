@@ -1,4 +1,3 @@
-
 namespace OpenNest
 {
     public enum PushDirection
@@ -6,6 +5,6 @@ namespace OpenNest
         Up,
         Down,
         Left,
-        Right
+        Right,
     }
 }

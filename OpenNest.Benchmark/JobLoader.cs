@@ -1,9 +1,9 @@
-using OpenNest.Geometry;
-using OpenNest.IO;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using OpenNest.Geometry;
+using OpenNest.IO;
 
 namespace OpenNest.Benchmark
 {
@@ -17,8 +17,11 @@ namespace OpenNest.Benchmark
     /// </summary>
     public static class JobLoader
     {
-        public static List<BenchmarkJob> Load(string inputPath, IReadOnlyList<Size> sheetSizeOverrides = null,
-            double? partSpacingOverride = null)
+        public static List<BenchmarkJob> Load(
+            string inputPath,
+            IReadOnlyList<Size> sheetSizeOverrides = null,
+            double? partSpacingOverride = null
+        )
         {
             var files = ResolveFiles(inputPath);
             var jobs = new List<BenchmarkJob>();
@@ -33,7 +36,9 @@ namespace OpenNest.Benchmark
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"[JobLoader] Skipping '{file}': failed to read ({ex.Message})");
+                    Console.Error.WriteLine(
+                        $"[JobLoader] Skipping '{file}': failed to read ({ex.Message})"
+                    );
                     continue;
                 }
 
@@ -41,24 +46,29 @@ namespace OpenNest.Benchmark
 
                 if (requests.Count == 0)
                 {
-                    Console.Error.WriteLine($"[JobLoader] Skipping '{file}': no drawings with quantity > 0");
+                    Console.Error.WriteLine(
+                        $"[JobLoader] Skipping '{file}': no drawings with quantity > 0"
+                    );
                     continue;
                 }
 
                 var template = ResolvePlateTemplate(nest);
-                var sizes = sheetSizeOverrides != null && sheetSizeOverrides.Count > 0
-                    ? sheetSizeOverrides.ToList()
-                    : ResolveSheetSizes(nest);
+                var sizes =
+                    sheetSizeOverrides != null && sheetSizeOverrides.Count > 0
+                        ? sheetSizeOverrides.ToList()
+                        : ResolveSheetSizes(nest);
 
-                jobs.Add(new BenchmarkJob
-                {
-                    SourceFile = file,
-                    CandidateSizes = sizes,
-                    EdgeSpacing = template.EdgeSpacing,
-                    PartSpacing = partSpacingOverride ?? template.PartSpacing,
-                    Quadrant = template.Quadrant,
-                    Requests = requests,
-                });
+                jobs.Add(
+                    new BenchmarkJob
+                    {
+                        SourceFile = file,
+                        CandidateSizes = sizes,
+                        EdgeSpacing = template.EdgeSpacing,
+                        PartSpacing = partSpacingOverride ?? template.PartSpacing,
+                        Quadrant = template.Quadrant,
+                        Requests = requests,
+                    }
+                );
             }
 
             return jobs;
@@ -68,7 +78,8 @@ namespace OpenNest.Benchmark
         {
             if (Directory.Exists(inputPath))
             {
-                return Directory.GetFiles(inputPath, "*.nest", SearchOption.AllDirectories)
+                return Directory
+                    .GetFiles(inputPath, "*.nest", SearchOption.AllDirectories)
                     .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }
@@ -92,21 +103,25 @@ namespace OpenNest.Benchmark
 
                 var constraints = drawing.Constraints;
 
-                requests.Add(new DrawingRequest
-                {
-                    Drawing = drawing,
-                    Quantity = qty,
-                    Priority = drawing.Priority,
-                    StepAngle = constraints?.StepAngle ?? 0,
-                    RotationStart = constraints?.StartAngle ?? 0,
-                    RotationEnd = constraints?.EndAngle ?? 0,
-                });
+                requests.Add(
+                    new DrawingRequest
+                    {
+                        Drawing = drawing,
+                        Quantity = qty,
+                        Priority = drawing.Priority,
+                        StepAngle = constraints?.StepAngle ?? 0,
+                        RotationStart = constraints?.StartAngle ?? 0,
+                        RotationEnd = constraints?.EndAngle ?? 0,
+                    }
+                );
             }
 
             return requests;
         }
 
-        private static (Spacing EdgeSpacing, double PartSpacing, int Quadrant) ResolvePlateTemplate(Nest nest)
+        private static (Spacing EdgeSpacing, double PartSpacing, int Quadrant) ResolvePlateTemplate(
+            Nest nest
+        )
         {
             var source = nest.Plates?.FirstOrDefault();
 

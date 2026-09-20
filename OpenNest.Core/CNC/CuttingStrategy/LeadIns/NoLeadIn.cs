@@ -1,17 +1,17 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
     public class NoLeadIn : LeadIn
     {
-        public override List<ICode> Generate(Vector contourStartPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+        public override List<ICode> Generate(
+            Vector contourStartPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
-            return new List<ICode>
-            {
-                new RapidMove(contourStartPoint)
-            };
+            return new List<ICode> { new RapidMove(contourStartPoint) };
         }
 
         public override Vector GetPiercePoint(Vector contourStartPoint, double contourNormalAngle)

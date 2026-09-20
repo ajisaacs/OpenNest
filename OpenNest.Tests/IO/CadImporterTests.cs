@@ -7,8 +7,7 @@ namespace OpenNest.Tests.IO
 {
     public class CadImporterTests
     {
-        private static string TestDxf =>
-            Path.Combine("Bending", "TestData", "4526 A14 PT11.dxf");
+        private static string TestDxf => Path.Combine("Bending", "TestData", "4526 A14 PT11.dxf");
 
         [Fact]
         public void Import_LoadsEntitiesAndDetectsBends()
@@ -45,8 +44,10 @@ namespace OpenNest.Tests.IO
             // Exercises the named-detector branch: when BendDetectorName doesn't
             // match any registered detector, bends should be an empty list
             // (not a crash, and no fall-through to auto-detect).
-            var result = CadImporter.Import(TestDxf,
-                new CadImportOptions { BendDetectorName = "__nonexistent__" });
+            var result = CadImporter.Import(
+                TestDxf,
+                new CadImportOptions { BendDetectorName = "__nonexistent__" }
+            );
 
             Assert.Empty(result.Bends);
         }
@@ -62,7 +63,8 @@ namespace OpenNest.Tests.IO
                 result.Bends,
                 quantity: 5,
                 customer: "ACME",
-                editedProgram: null);
+                editedProgram: null
+            );
 
             Assert.NotNull(drawing);
             Assert.Equal("4526 A14 PT11", drawing.Name);
@@ -80,8 +82,14 @@ namespace OpenNest.Tests.IO
         {
             var result = CadImporter.Import(TestDxf);
 
-            var drawing = CadImporter.BuildDrawing(result, result.Entities, result.Bends,
-                quantity: 1, customer: null, editedProgram: null);
+            var drawing = CadImporter.BuildDrawing(
+                result,
+                result.Entities,
+                result.Bends,
+                quantity: 1,
+                customer: null,
+                editedProgram: null
+            );
 
             Assert.NotNull(drawing.Source.Offset);
             // After offset extraction, the program's first rapid must start at origin.
@@ -95,15 +103,21 @@ namespace OpenNest.Tests.IO
         {
             var result = CadImporter.Import(TestDxf);
             // Suppress the first non-bend-source entity
-            var bendSources = result.Bends
-                .Where(b => b.SourceEntity != null)
+            var bendSources = result
+                .Bends.Where(b => b.SourceEntity != null)
                 .Select(b => b.SourceEntity)
                 .ToHashSet();
             var hidden = result.Entities.First(e => !bendSources.Contains(e));
             hidden.IsVisible = false;
 
-            var drawing = CadImporter.BuildDrawing(result, result.Entities, result.Bends,
-                quantity: 1, customer: null, editedProgram: null);
+            var drawing = CadImporter.BuildDrawing(
+                result,
+                result.Entities,
+                result.Bends,
+                quantity: 1,
+                customer: null,
+                editedProgram: null
+            );
 
             Assert.Contains(hidden.Id, drawing.SuppressedEntityIds);
         }
@@ -115,8 +129,14 @@ namespace OpenNest.Tests.IO
             var edited = new OpenNest.CNC.Program();
             edited.MoveTo(new OpenNest.Geometry.Vector(0, 0));
 
-            var drawing = CadImporter.BuildDrawing(result, result.Entities, result.Bends,
-                quantity: 1, customer: null, editedProgram: edited);
+            var drawing = CadImporter.BuildDrawing(
+                result,
+                result.Entities,
+                result.Bends,
+                quantity: 1,
+                customer: null,
+                editedProgram: edited
+            );
 
             Assert.Same(edited, drawing.Program);
         }
@@ -124,8 +144,10 @@ namespace OpenNest.Tests.IO
         [Fact]
         public void ImportDrawing_ComposesImportAndBuild()
         {
-            var drawing = CadImporter.ImportDrawing(TestDxf,
-                new CadImportOptions { Quantity = 3, Customer = "ACME" });
+            var drawing = CadImporter.ImportDrawing(
+                TestDxf,
+                new CadImportOptions { Quantity = 3, Customer = "ACME" }
+            );
 
             Assert.NotNull(drawing);
             Assert.Equal("4526 A14 PT11", drawing.Name);

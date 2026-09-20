@@ -8,8 +8,13 @@ namespace OpenNest.CNC
         public bool Inline { get; }
         public bool Global { get; }
 
-        public VariableDefinition(string name, string expression, double value,
-            bool inline = false, bool global = false)
+        public VariableDefinition(
+            string name,
+            string expression,
+            double value,
+            bool inline = false,
+            bool global = false
+        )
         {
             Name = name;
             Expression = expression;

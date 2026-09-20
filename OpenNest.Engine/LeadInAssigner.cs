@@ -1,8 +1,8 @@
+using System.Collections.Generic;
+using System.Linq;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Engine.Sequencing;
 using OpenNest.Geometry;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace OpenNest.Engine
 {
@@ -26,8 +26,12 @@ namespace OpenNest.Engine
             AssignPass(sequenced, parameters, exitPoint, nextPiercePoints: piercePoints);
         }
 
-        private Vector[] AssignPass(List<SequencedPart> sequenced, CuttingParameters parameters,
-            Vector exitPoint, Vector[] nextPiercePoints)
+        private Vector[] AssignPass(
+            List<SequencedPart> sequenced,
+            CuttingParameters parameters,
+            Vector exitPoint,
+            Vector[] nextPiercePoints
+        )
         {
             var piercePoints = new Vector[sequenced.Count];
             var currentPoint = exitPoint;

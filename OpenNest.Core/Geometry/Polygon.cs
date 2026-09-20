@@ -1,7 +1,7 @@
-﻿using OpenNest.Math;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -107,7 +107,9 @@ namespace OpenNest.Geometry
         public RotationType RotationDirection()
         {
             if (Vertices.Count < 3)
-                throw new Exception("Not enough points to determine direction. Must have at least 3 points.");
+                throw new Exception(
+                    "Not enough points to determine direction. Must have at least 3 points."
+                );
 
             return CalculateArea() > 0 ? RotationType.CCW : RotationType.CW;
         }
@@ -309,11 +311,15 @@ namespace OpenNest.Geometry
             {
                 var vertex = Vertices[i];
 
-                if (vertex.X < minX) minX = vertex.X;
-                else if (vertex.X > maxX) maxX = vertex.X;
+                if (vertex.X < minX)
+                    minX = vertex.X;
+                else if (vertex.X > maxX)
+                    maxX = vertex.X;
 
-                if (vertex.Y < minY) minY = vertex.Y;
-                else if (vertex.Y > maxY) maxY = vertex.Y;
+                if (vertex.Y < minY)
+                    minY = vertex.Y;
+                else if (vertex.Y > maxY)
+                    maxY = vertex.Y;
             }
 
             boundingBox.X = minX;
@@ -354,10 +360,19 @@ namespace OpenNest.Geometry
             {
                 var prev = (i - 1 + count) % count;
 
-                var a1 = new Vector(Vertices[prev].X + normals[prev].X, Vertices[prev].Y + normals[prev].Y);
-                var a2 = new Vector(Vertices[i].X + normals[prev].X, Vertices[i].Y + normals[prev].Y);
+                var a1 = new Vector(
+                    Vertices[prev].X + normals[prev].X,
+                    Vertices[prev].Y + normals[prev].Y
+                );
+                var a2 = new Vector(
+                    Vertices[i].X + normals[prev].X,
+                    Vertices[i].Y + normals[prev].Y
+                );
                 var b1 = new Vector(Vertices[i].X + normals[i].X, Vertices[i].Y + normals[i].Y);
-                var b2 = new Vector(Vertices[(i + 1) % count].X + normals[i].X, Vertices[(i + 1) % count].Y + normals[i].Y);
+                var b2 = new Vector(
+                    Vertices[(i + 1) % count].X + normals[i].X,
+                    Vertices[(i + 1) % count].Y + normals[i].Y
+                );
 
                 var edgeA = new Line(a1, a2);
                 var edgeB = new Line(b1, b2);
@@ -365,7 +380,9 @@ namespace OpenNest.Geometry
                 if (edgeA.Intersects(edgeB, out var pt) && pt.IsValid())
                     result.Vertices.Add(pt);
                 else
-                    result.Vertices.Add(new Vector(Vertices[i].X + normals[i].X, Vertices[i].Y + normals[i].Y));
+                    result.Vertices.Add(
+                        new Vector(Vertices[i].X + normals[i].X, Vertices[i].Y + normals[i].Y)
+                    );
             }
 
             result.Close();
@@ -379,8 +396,10 @@ namespace OpenNest.Geometry
             var left = OffsetEntity(distance, OffsetSide.Left);
             var right = OffsetEntity(distance, OffsetSide.Right);
 
-            if (left == null) return right;
-            if (right == null) return left;
+            if (left == null)
+                return right;
+            if (right == null)
+                return left;
 
             var distLeft = left.ClosestPointTo(pt).DistanceTo(pt);
             var distRight = right.ClosestPointTo(pt).DistanceTo(pt);
@@ -581,13 +600,25 @@ namespace OpenNest.Geometry
                     var bj = edgeBounds[j];
 
                     // Prune with bounding box check.
-                    if (bi.maxX < bj.minX || bj.maxX < bi.minX ||
-                        bi.maxY < bj.minY || bj.maxY < bi.minY)
+                    if (
+                        bi.maxX < bj.minX
+                        || bj.maxX < bi.minX
+                        || bi.maxY < bj.minY
+                        || bj.maxY < bi.minY
+                    )
                     {
                         continue;
                     }
 
-                    if (SegmentsIntersect(Vertices[i], Vertices[i + 1], Vertices[j], Vertices[j + 1], out pt))
+                    if (
+                        SegmentsIntersect(
+                            Vertices[i],
+                            Vertices[i + 1],
+                            Vertices[j],
+                            Vertices[j + 1],
+                            out pt
+                        )
+                    )
                     {
                         edgeI = i;
                         edgeJ = j;
@@ -620,7 +651,13 @@ namespace OpenNest.Geometry
             return areaA >= areaB ? loopA : loopB;
         }
 
-        private static bool SegmentsIntersect(Vector a1, Vector a2, Vector b1, Vector b2, out Vector pt)
+        private static bool SegmentsIntersect(
+            Vector a1,
+            Vector a2,
+            Vector b1,
+            Vector b2,
+            out Vector pt
+        )
         {
             var da = a2 - a1;
             var db = b2 - b1;
@@ -636,8 +673,12 @@ namespace OpenNest.Geometry
             var t = (dc.X * db.Y - dc.Y * db.X) / cross;
             var u = (dc.X * da.Y - dc.Y * da.X) / cross;
 
-            if (t > Tolerance.Epsilon && t < 1.0 - Tolerance.Epsilon &&
-                u > Tolerance.Epsilon && u < 1.0 - Tolerance.Epsilon)
+            if (
+                t > Tolerance.Epsilon
+                && t < 1.0 - Tolerance.Epsilon
+                && u > Tolerance.Epsilon
+                && u < 1.0 - Tolerance.Epsilon
+            )
             {
                 pt = new Vector(a1.X + t * da.X, a1.Y + t * da.Y);
                 return true;
@@ -701,8 +742,10 @@ namespace OpenNest.Geometry
                 var vi = Vertices[i];
                 var vj = Vertices[j];
 
-                if ((vi.Y > pt.Y) != (vj.Y > pt.Y) &&
-                    pt.X < (vj.X - vi.X) * (pt.Y - vi.Y) / (vj.Y - vi.Y) + vi.X)
+                if (
+                    (vi.Y > pt.Y) != (vj.Y > pt.Y)
+                    && pt.X < (vj.X - vi.X) * (pt.Y - vi.Y) / (vj.Y - vi.Y) + vi.X
+                )
                 {
                     inside = !inside;
                 }

@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -7,19 +7,23 @@ namespace OpenNest.CNC.CuttingStrategy
     {
         public double Radius { get; set; }
 
-        public override List<ICode> Generate(Vector contourStartPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+        public override List<ICode> Generate(
+            Vector contourStartPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
             var piercePoint = GetPiercePoint(contourStartPoint, contourNormalAngle);
 
             var arcCenter = new Vector(
                 contourStartPoint.X + Radius * System.Math.Cos(contourNormalAngle),
-                contourStartPoint.Y + Radius * System.Math.Sin(contourNormalAngle));
+                contourStartPoint.Y + Radius * System.Math.Sin(contourNormalAngle)
+            );
 
             return new List<ICode>
             {
                 new RapidMove(piercePoint),
-                new ArcMove(contourStartPoint, arcCenter, winding) { Layer = LayerType.Leadin }
+                new ArcMove(contourStartPoint, arcCenter, winding) { Layer = LayerType.Leadin },
             };
         }
 
@@ -30,10 +34,10 @@ namespace OpenNest.CNC.CuttingStrategy
 
             return new Vector(
                 arcCenterX + Radius * System.Math.Cos(contourNormalAngle),
-                arcCenterY + Radius * System.Math.Sin(contourNormalAngle));
+                arcCenterY + Radius * System.Math.Sin(contourNormalAngle)
+            );
         }
 
-        public override LeadIn Scale(double factor) =>
-            new ArcLeadIn { Radius = Radius * factor };
+        public override LeadIn Scale(double factor) => new ArcLeadIn { Radius = Radius * factor };
     }
 }

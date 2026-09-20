@@ -1,8 +1,8 @@
+using System;
+using System.Diagnostics;
 using ILGPU;
 using ILGPU.Runtime;
 using OpenNest.Engine.BestFit;
-using System;
-using System.Diagnostics;
 
 namespace OpenNest.Gpu
 {
@@ -18,7 +18,8 @@ namespace OpenNest.Gpu
         {
             get
             {
-                if (!_probed) Probe();
+                if (!_probed)
+                    Probe();
                 return _gpuAvailable;
             }
         }
@@ -27,7 +28,8 @@ namespace OpenNest.Gpu
         {
             get
             {
-                if (!_probed) Probe();
+                if (!_probed)
+                    Probe();
                 return _deviceName ?? "None";
             }
         }
@@ -65,7 +67,9 @@ namespace OpenNest.Gpu
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[GpuEvaluatorFactory] GPU slide computer failed: {ex.Message}");
+                    Debug.WriteLine(
+                        $"[GpuEvaluatorFactory] GPU slide computer failed: {ex.Message}"
+                    );
                     return null;
                 }
             }
@@ -80,12 +84,16 @@ namespace OpenNest.Gpu
                 using var context = Context.CreateDefault();
                 foreach (var device in context.Devices)
                 {
-                    if (device.AcceleratorType == AcceleratorType.Cuda ||
-                        device.AcceleratorType == AcceleratorType.OpenCL)
+                    if (
+                        device.AcceleratorType == AcceleratorType.Cuda
+                        || device.AcceleratorType == AcceleratorType.OpenCL
+                    )
                     {
                         _gpuAvailable = true;
                         _deviceName = device.Name;
-                        Debug.WriteLine($"[GpuEvaluatorFactory] GPU found: {device.Name} ({device.AcceleratorType})");
+                        Debug.WriteLine(
+                            $"[GpuEvaluatorFactory] GPU found: {device.Name} ({device.AcceleratorType})"
+                        );
                         return;
                     }
                 }

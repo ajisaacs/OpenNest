@@ -5,6 +5,7 @@ namespace OpenNest.Tests.Sequencing;
 public class DirectionalSequencerTests
 {
     private static Part MakePartAt(double x, double y) => TestHelpers.MakePartAt(x, y);
+
     private static Plate MakePlate(params Part[] parts) => TestHelpers.MakePlate(60, 120, parts);
 
     [Fact]

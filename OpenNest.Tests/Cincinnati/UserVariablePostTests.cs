@@ -67,7 +67,8 @@ public class UserVariablePostTests
         var output = PostToString(post, nest);
 
         // Both should use the same #200 — only one declaration
-        var declarationCount = output.Split('\n')
+        var declarationCount = output
+            .Split('\n')
             .Count(l => l.Contains("#200=") && l.ToUpper().Contains("SHEET WIDTH"));
         Assert.Equal(1, declarationCount);
     }
@@ -112,7 +113,11 @@ public class UserVariablePostTests
     public void CutOff_VerticalCut_UsesSheetWidthVariable()
     {
         // Create a plate with a vertical cutoff
-        var config = new CincinnatiPostConfig { SheetWidthVariable = 110, SheetLengthVariable = 111 };
+        var config = new CincinnatiPostConfig
+        {
+            SheetWidthVariable = 110,
+            SheetLengthVariable = 111,
+        };
         var nest = new Nest { Name = "Test" };
         var plate = new Plate(new Size(48, 96));
 
@@ -158,7 +163,7 @@ public class UserVariablePostTests
         partPgm.Codes.Add(new LinearMove(0, 0));
         var drawing = new Drawing("Part1", partPgm);
         nest.Drawings.Add(drawing);
-        plate.Parts.Add(new Part(drawing, new Vector(15, 20)));  // Part at Y=20-30, should create gap
+        plate.Parts.Add(new Part(drawing, new Vector(15, 20))); // Part at Y=20-30, should create gap
 
         var cutoff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
         plate.CutOffs.Add(cutoff);

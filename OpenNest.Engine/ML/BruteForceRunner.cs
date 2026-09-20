@@ -24,24 +24,32 @@ namespace OpenNest.Engine.ML
 
     public static class BruteForceRunner
     {
-        public static BruteForceResult Run(Drawing drawing, Plate plate, bool forceFullAngleSweep = false)
+        public static BruteForceResult Run(
+            Drawing drawing,
+            Plate plate,
+            bool forceFullAngleSweep = false
+        )
         {
             var engine = new DefaultNestEngine(plate);
             engine.ForceFullAngleSweep = forceFullAngleSweep;
             var item = new NestItem { Drawing = drawing };
 
             var sw = Stopwatch.StartNew();
-            var parts = engine.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
+            var parts = engine.Fill(
+                item,
+                plate.WorkArea(),
+                null,
+                System.Threading.CancellationToken.None
+            );
             sw.Stop();
 
             if (parts == null || parts.Count == 0)
                 return null;
 
             // Rank phase results — winner is explicit, runners-up sorted by count.
-            var winner = engine.PhaseResults
-                .FirstOrDefault(r => r.Phase == engine.WinnerPhase);
-            var runnerUps = engine.PhaseResults
-                .Where(r => r.PartCount > 0 && r.Phase != engine.WinnerPhase)
+            var winner = engine.PhaseResults.FirstOrDefault(r => r.Phase == engine.WinnerPhase);
+            var runnerUps = engine
+                .PhaseResults.Where(r => r.PartCount > 0 && r.Phase != engine.WinnerPhase)
                 .OrderByDescending(r => r.PartCount)
                 .ToList();
 
@@ -60,19 +68,27 @@ namespace OpenNest.Engine.ML
                 ThirdPlaceEngine = runnerUps.Count > 1 ? runnerUps[1].Phase.ToString() : "",
                 ThirdPlacePartCount = runnerUps.Count > 1 ? runnerUps[1].PartCount : 0,
                 ThirdPlaceTimeMs = runnerUps.Count > 1 ? runnerUps[1].TimeMs : 0,
-                AngleResults = engine.AngleResults.ToList()
+                AngleResults = engine.AngleResults.ToList(),
             };
         }
 
         private static string SerializeLayout(List<Part> parts)
         {
-            var data = parts.Select(p => new { X = p.Location.X, Y = p.Location.Y, R = p.Rotation }).ToList();
+            var data = parts
+                .Select(p => new
+                {
+                    X = p.Location.X,
+                    Y = p.Location.Y,
+                    R = p.Rotation,
+                })
+                .ToList();
             return System.Text.Json.JsonSerializer.Serialize(data);
         }
 
         private static double CalculateUtilization(List<Part> parts, double plateArea)
         {
-            if (plateArea <= 0) return 0;
+            if (plateArea <= 0)
+                return 0;
             return parts.Sum(p => p.BaseDrawing.Area) / plateArea;
         }
     }

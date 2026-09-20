@@ -35,7 +35,9 @@ public class StrategyOverlapTests
         if (drawing is null)
             return; // Skip if test DXF not available
 
-        _output.WriteLine($"Drawing bbox: {drawing.Program.BoundingBox().Width:F2} x {drawing.Program.BoundingBox().Length:F2}");
+        _output.WriteLine(
+            $"Drawing bbox: {drawing.Program.BoundingBox().Width:F2} x {drawing.Program.BoundingBox().Length:F2}"
+        );
 
         var strategies = FillStrategyRegistry.Strategies.ToList();
         var item = new NestItem { Drawing = drawing };
@@ -59,12 +61,17 @@ public class StrategyOverlapTests
             context.SharedState["BestRotation"] = classification.PrimaryAngle;
             context.SharedState["Classification"] = classification;
             context.SharedState["AngleCandidates"] = new AngleCandidateBuilder().Build(
-                item, classification, context.WorkArea);
+                item,
+                classification,
+                context.WorkArea
+            );
 
             var parts = strategy.Fill(context);
             var count = parts?.Count ?? 0;
 
-            _output.WriteLine($"\n{strategy.GetType().Name} (Phase: {strategy.Phase}, Order: {strategy.Order}): {count} parts");
+            _output.WriteLine(
+                $"\n{strategy.GetType().Name} (Phase: {strategy.Phase}, Order: {strategy.Order}): {count} parts"
+            );
 
             if (count == 0)
                 continue;
@@ -83,7 +90,9 @@ public class StrategyOverlapTests
 
             if (hasOverlaps)
             {
-                failures.Add($"{strategy.GetType().Name} ({strategy.Phase}): {pts.Count} collision pts, {count} parts");
+                failures.Add(
+                    $"{strategy.GetType().Name} ({strategy.Phase}): {pts.Count} collision pts, {count} parts"
+                );
 
                 // Show overlapping pair details
                 for (var a = 0; a < parts.Count; a++)
@@ -92,16 +101,27 @@ public class StrategyOverlapTests
                     {
                         var ba = parts[a].BoundingBox;
                         var bb = parts[b].BoundingBox;
-                        var oX = System.Math.Min(ba.Right, bb.Right) - System.Math.Max(ba.Left, bb.Left);
-                        var oY = System.Math.Min(ba.Top, bb.Top) - System.Math.Max(ba.Bottom, bb.Bottom);
-                        if (oX <= OpenNest.Math.Tolerance.Epsilon || oY <= OpenNest.Math.Tolerance.Epsilon)
+                        var oX =
+                            System.Math.Min(ba.Right, bb.Right) - System.Math.Max(ba.Left, bb.Left);
+                        var oY =
+                            System.Math.Min(ba.Top, bb.Top) - System.Math.Max(ba.Bottom, bb.Bottom);
+                        if (
+                            oX <= OpenNest.Math.Tolerance.Epsilon
+                            || oY <= OpenNest.Math.Tolerance.Epsilon
+                        )
                             continue;
 
                         if (parts[a].Intersects(parts[b], out var pairPts) && pairPts.Count > 0)
                         {
-                            _output.WriteLine($"    [{a}] vs [{b}]: {pairPts.Count} pts, bbox overlap: {oX:F4} x {oY:F4}");
-                            _output.WriteLine($"      [{a}]: loc=({parts[a].Location.X:F4},{parts[a].Location.Y:F4}) rot={OpenNest.Math.Angle.ToDegrees(parts[a].Rotation):F2}°");
-                            _output.WriteLine($"      [{b}]: loc=({parts[b].Location.X:F4},{parts[b].Location.Y:F4}) rot={OpenNest.Math.Angle.ToDegrees(parts[b].Rotation):F2}°");
+                            _output.WriteLine(
+                                $"    [{a}] vs [{b}]: {pairPts.Count} pts, bbox overlap: {oX:F4} x {oY:F4}"
+                            );
+                            _output.WriteLine(
+                                $"      [{a}]: loc=({parts[a].Location.X:F4},{parts[a].Location.Y:F4}) rot={OpenNest.Math.Angle.ToDegrees(parts[a].Rotation):F2}°"
+                            );
+                            _output.WriteLine(
+                                $"      [{b}]: loc=({parts[b].Location.X:F4},{parts[b].Location.Y:F4}) rot={OpenNest.Math.Angle.ToDegrees(parts[b].Rotation):F2}°"
+                            );
                         }
                     }
                 }
@@ -114,5 +134,4 @@ public class StrategyOverlapTests
 
         Assert.Empty(failures);
     }
-
 }

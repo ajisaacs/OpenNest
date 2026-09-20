@@ -27,7 +27,12 @@ public class RectangleShapeTests
     [Fact]
     public void GetDrawing_CustomName_IsUsed()
     {
-        var shape = new RectangleShape { Name = "Plate1", Length = 10, Width = 5 };
+        var shape = new RectangleShape
+        {
+            Name = "Plate1",
+            Length = 10,
+            Width = 5,
+        };
         var drawing = shape.GetDrawing();
 
         Assert.Equal("Plate1", drawing.Name);

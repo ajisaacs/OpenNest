@@ -1,10 +1,4 @@
-﻿using OpenNest.Actions;
-using OpenNest.Collections;
-using OpenNest.Engine.Fill;
-using OpenNest.Forms;
-using OpenNest.Geometry;
-using OpenNest.Math;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -14,6 +8,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Actions;
+using OpenNest.Collections;
+using OpenNest.Engine.Fill;
+using OpenNest.Forms;
+using OpenNest.Geometry;
+using OpenNest.Math;
 using Timer = System.Timers.Timer;
 
 namespace OpenNest.Controls
@@ -80,9 +80,7 @@ namespace OpenNest.Controls
         }
 
         public PlateView()
-            : this(ColorScheme.Default)
-        {
-        }
+            : this(ColorScheme.Default) { }
 
         public PlateView(ColorScheme colorScheme)
         {
@@ -97,7 +95,7 @@ namespace OpenNest.Controls
             {
                 AutoReset = false,
                 Enabled = true,
-                Interval = 50
+                Interval = 50,
             };
             redrawTimer.Elapsed += redrawTimer_Elapsed;
 
@@ -105,9 +103,11 @@ namespace OpenNest.Controls
             hoverTimer.Elapsed += hoverTimer_Elapsed;
 
             SetStyle(
-                ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.UserPaint, true);
+                ControlStyles.AllPaintingInWmPaint
+                    | ControlStyles.OptimizedDoubleBuffer
+                    | ControlStyles.UserPaint,
+                true
+            );
 
             ViewScale = 1.0f;
             RotateIncrementAngle = 10;
@@ -163,8 +163,7 @@ namespace OpenNest.Controls
         internal Brush PreviewBrush => previewManager.PreviewBrush;
         internal Pen PreviewPen => previewManager.PreviewPen;
 
-        internal RectangleF GetViewBounds() =>
-            new RectangleF(-origin.X, -origin.Y, Width, Height);
+        internal RectangleF GetViewBounds() => new RectangleF(-origin.X, -origin.Y, Width, Height);
 
         internal PlateRenderer Renderer => renderer;
 
@@ -248,7 +247,8 @@ namespace OpenNest.Controls
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            if (!Focused) Focus();
+            if (!Focused)
+                Focus();
 
             if (e.Button == MouseButtons.Middle)
                 middleMouseDownPoint = e.Location;
@@ -304,9 +304,10 @@ namespace OpenNest.Controls
 
             if (SelectedParts.Count > 0 && ((ModifierKeys & Keys.Shift) == Keys.Shift))
             {
-                var increment = (ModifierKeys & Keys.Control) == Keys.Control
-                    ? RotateIncrementAngle * 0.1
-                    : RotateIncrementAngle;
+                var increment =
+                    (ModifierKeys & Keys.Control) == Keys.Control
+                        ? RotateIncrementAngle * 0.1
+                        : RotateIncrementAngle;
 
                 var angle = Angle.ToRadians((e.Delta > 0 ? -increment : increment) * multiplier);
 
@@ -317,9 +318,15 @@ namespace OpenNest.Controls
                 if (AllowZoom)
                 {
                     if (e.Delta > 0)
-                        ZoomToControlPoint(e.Location, (float)System.Math.Pow(ZoomInFactor, multiplier));
+                        ZoomToControlPoint(
+                            e.Location,
+                            (float)System.Math.Pow(ZoomInFactor, multiplier)
+                        );
                     else
-                        ZoomToControlPoint(e.Location, (float)System.Math.Pow(ZoomOutFactor, multiplier));
+                        ZoomToControlPoint(
+                            e.Location,
+                            (float)System.Math.Pow(ZoomOutFactor, multiplier)
+                        );
                 }
             }
 
@@ -519,18 +526,27 @@ namespace OpenNest.Controls
             Invalidate();
         }
 
-        public CutOff GetCutOffAtPoint(Vector point, double tolerance) => cutOffHandler.GetCutOffAtPoint(point, tolerance);
+        public CutOff GetCutOffAtPoint(Vector point, double tolerance) =>
+            cutOffHandler.GetCutOffAtPoint(point, tolerance);
 
         public LayoutPart GetPartAtControlPoint(Point pt) => selection.GetPartAtControlPoint(pt);
+
         public LayoutPart GetPartAtGraphPoint(PointF pt) => selection.GetPartAtGraphPoint(pt);
+
         public LayoutPart GetPartAtPoint(Vector pt) => selection.GetPartAtPoint(pt);
-        public IList<LayoutPart> GetPartsFromWindow(RectangleF rect, SelectionType selectionType) => selection.GetPartsFromWindow(rect, selectionType);
+
+        public IList<LayoutPart> GetPartsFromWindow(RectangleF rect, SelectionType selectionType) =>
+            selection.GetPartsFromWindow(rect, selectionType);
 
         public void SetAction(Type type) => actionManager.SetAction(type);
-        public void SetAction(Type type, params object[] args) => actionManager.SetAction(type, args);
+
+        public void SetAction(Type type, params object[] args) =>
+            actionManager.SetAction(type, args);
 
         public void AlignSelected(AlignType alignType) => selection.AlignSelected(alignType);
-        public void AlignSelected(AlignType alignType, LayoutPart fixedPart) => selection.AlignSelected(alignType, fixedPart);
+
+        public void AlignSelected(AlignType alignType, LayoutPart fixedPart) =>
+            selection.AlignSelected(alignType, fixedPart);
 
         public void AddPartFromDrawing(Drawing dwg, Vector location)
         {
@@ -538,15 +554,21 @@ namespace OpenNest.Controls
 
             part.Offset(
                 part.Location.X - part.BoundingBox.Center.X,
-                part.Location.Y - part.BoundingBox.Center.Y);
+                part.Location.Y - part.BoundingBox.Center.Y
+            );
 
             Plate.Parts.Add(part);
         }
 
-        public void SetStationaryParts(List<Part> parts) => previewManager.SetStationaryParts(parts);
+        public void SetStationaryParts(List<Part> parts) =>
+            previewManager.SetStationaryParts(parts);
+
         public void SetActiveParts(List<Part> parts) => previewManager.SetActiveParts(parts);
+
         public void ClearPreviewParts() => previewManager.ClearPreviewParts();
-        public void AcceptPreviewParts(List<Part> parts) => previewManager.AcceptPreviewParts(parts);
+
+        public void AcceptPreviewParts(List<Part> parts) =>
+            previewManager.AcceptPreviewParts(parts);
 
         public async void FillWithProgress(List<Part> groupParts, Box workArea)
         {
@@ -621,16 +643,17 @@ namespace OpenNest.Controls
 
         public void RemoveSelectedParts() => selection.RemoveSelectedParts();
 
-
         private void redrawTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            if (IsDisposed || !IsHandleCreated) return;
+            if (IsDisposed || !IsHandleCreated)
+                return;
             BeginInvoke(new System.Action(Invalidate));
         }
 
         private void hoverTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            if (IsDisposed || !IsHandleCreated) return;
+            if (IsDisposed || !IsHandleCreated)
+                return;
             BeginInvoke(new System.Action(HoverCheck));
         }
 
@@ -641,8 +664,7 @@ namespace OpenNest.Controls
 
             for (var i = parts.Count - 1; i >= 0; --i)
             {
-                if (parts[i].Path.GetBounds().Contains(graphPt) &&
-                    parts[i].Path.IsVisible(graphPt))
+                if (parts[i].Path.GetBounds().Contains(graphPt) && parts[i].Path.IsVisible(graphPt))
                 {
                     hitPart = parts[i];
                     break;
@@ -674,7 +696,9 @@ namespace OpenNest.Controls
         }
 
         public void DeselectAll() => selection.DeselectAll();
+
         public void SelectAll() => selection.SelectAll();
+
         public void NotifySelectionChanged() => selection.NotifySelectionChanged();
 
         public override void ZoomToPoint(Vector pt, float zoomFactor, bool redraw = true)
@@ -685,7 +709,13 @@ namespace OpenNest.Controls
                 Invalidate();
         }
 
-        public override void ZoomToArea(double x, double y, double width, double height, bool redraw = true)
+        public override void ZoomToArea(
+            double x,
+            double y,
+            double width,
+            double height,
+            bool redraw = true
+        )
         {
             base.ZoomToArea(x, y, width, height, false);
 

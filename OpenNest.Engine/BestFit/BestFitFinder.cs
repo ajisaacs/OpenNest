@@ -1,12 +1,12 @@
-using OpenNest.Converters;
-using OpenNest.Engine.BestFit.Tiling;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using OpenNest.Converters;
+using OpenNest.Engine.BestFit.Tiling;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -16,20 +16,26 @@ namespace OpenNest.Engine.BestFit
         private readonly IDistanceComputer _distanceComputer;
         private readonly BestFitFilter _filter;
 
-        public BestFitFinder(double maxPlateWidth, double maxPlateHeight,
-            IPairEvaluator evaluator = null, ISlideComputer slideComputer = null)
+        public BestFitFinder(
+            double maxPlateWidth,
+            double maxPlateHeight,
+            IPairEvaluator evaluator = null,
+            ISlideComputer slideComputer = null
+        )
         {
             _evaluator = evaluator ?? new PairEvaluator();
-            _distanceComputer = slideComputer != null
-                ? (IDistanceComputer)new GpuDistanceComputer(slideComputer)
-                : new CpuDistanceComputer();
-            var plateAspect = System.Math.Max(maxPlateWidth, maxPlateHeight) /
-                              System.Math.Max(System.Math.Min(maxPlateWidth, maxPlateHeight), 0.001);
+            _distanceComputer =
+                slideComputer != null
+                    ? (IDistanceComputer)new GpuDistanceComputer(slideComputer)
+                    : new CpuDistanceComputer();
+            var plateAspect =
+                System.Math.Max(maxPlateWidth, maxPlateHeight)
+                / System.Math.Max(System.Math.Min(maxPlateWidth, maxPlateHeight), 0.001);
             _filter = new BestFitFilter
             {
                 MaxPlateWidth = maxPlateWidth,
                 MaxPlateHeight = maxPlateHeight,
-                MaxAspectRatio = System.Math.Max(5.0, plateAspect)
+                MaxAspectRatio = System.Math.Max(5.0, plateAspect),
             };
         }
 
@@ -37,20 +43,26 @@ namespace OpenNest.Engine.BestFit
             Drawing drawing,
             double spacing = 0.25,
             double stepSize = 0.25,
-            BestFitSortField sortBy = BestFitSortField.Area)
+            BestFitSortField sortBy = BestFitSortField.Area
+        )
         {
             var strategies = BuildStrategies(drawing, spacing);
 
             var candidateBags = new ConcurrentBag<List<PairCandidate>>();
 
-            Parallel.ForEach(strategies, strategy =>
-            {
-                candidateBags.Add(strategy.GenerateCandidates(drawing, spacing, stepSize));
-            });
+            Parallel.ForEach(
+                strategies,
+                strategy =>
+                {
+                    candidateBags.Add(strategy.GenerateCandidates(drawing, spacing, stepSize));
+                }
+            );
 
             var allCandidates = candidateBags.SelectMany(c => c).ToList();
 
-            Debug.WriteLine($"[BestFitFinder] {strategies.Count} strategies, {allCandidates.Count} candidates");
+            Debug.WriteLine(
+                $"[BestFitFinder] {strategies.Count} strategies, {allCandidates.Count} candidates"
+            );
 
             var results = _evaluator.EvaluateAll(allCandidates);
 
@@ -65,8 +77,12 @@ namespace OpenNest.Engine.BestFit
         }
 
         public List<TileResult> FindAndTile(
-            Drawing drawing, Plate plate,
-            double spacing = 0.25, double stepSize = 0.25, int topN = 10)
+            Drawing drawing,
+            Plate plate,
+            double spacing = 0.25,
+            double stepSize = 0.25,
+            int topN = 10
+        )
         {
             var bestFits = FindBestFits(drawing, spacing, stepSize);
             var tileEvaluator = new TileEvaluator();
@@ -88,7 +104,10 @@ namespace OpenNest.Engine.BestFit
 
             foreach (var angle in angles)
             {
-                var desc = string.Format("{0:F1} deg rotated, offset slide", Angle.ToDegrees(angle));
+                var desc = string.Format(
+                    "{0:F1} deg rotated, offset slide",
+                    Angle.ToDegrees(angle)
+                );
                 strategies.Add(new RotationSlideStrategy(angle, index++, desc, _distanceComputer));
             }
 
@@ -97,13 +116,7 @@ namespace OpenNest.Engine.BestFit
 
         private List<double> GetRotationAngles(Drawing drawing)
         {
-            var angles = new List<double>
-            {
-                0,
-                Angle.HalfPI,
-                System.Math.PI,
-                Angle.HalfPI * 3
-            };
+            var angles = new List<double> { 0, Angle.HalfPI, System.Math.PI, Angle.HalfPI * 3 };
 
             var hullAngles = GetHullEdgeAngles(drawing);
 
@@ -119,7 +132,8 @@ namespace OpenNest.Engine.BestFit
 
         private List<double> GetHullEdgeAngles(Drawing drawing)
         {
-            var entities = ConvertProgram.ToGeometry(drawing.Program)
+            var entities = ConvertProgram
+                .ToGeometry(drawing.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
             var shapes = ShapeBuilder.GetShapes(entities);
 
@@ -220,7 +234,10 @@ namespace OpenNest.Engine.BestFit
             angles.Add(angle);
         }
 
-        private List<BestFitResult> SortResults(List<BestFitResult> results, BestFitSortField sortBy)
+        private List<BestFitResult> SortResults(
+            List<BestFitResult> results,
+            BestFitSortField sortBy
+        )
         {
             switch (sortBy)
             {
@@ -231,16 +248,19 @@ namespace OpenNest.Engine.BestFit
                 case BestFitSortField.ShortestSide:
                     return results.OrderBy(r => r.ShortestSide).ToList();
                 case BestFitSortField.Type:
-                    return results.OrderBy(r => r.Candidate.StrategyIndex)
-                        .ThenBy(r => r.Candidate.TestNumber).ToList();
+                    return results
+                        .OrderBy(r => r.Candidate.StrategyIndex)
+                        .ThenBy(r => r.Candidate.TestNumber)
+                        .ToList();
                 case BestFitSortField.OriginalSequence:
                     return results.OrderBy(r => r.Candidate.TestNumber).ToList();
                 case BestFitSortField.Keep:
-                    return results.OrderByDescending(r => r.Keep)
-                        .ThenBy(r => r.RotatedArea).ToList();
+                    return results
+                        .OrderByDescending(r => r.Keep)
+                        .ThenBy(r => r.RotatedArea)
+                        .ToList();
                 case BestFitSortField.WhyKeepDrop:
-                    return results.OrderBy(r => r.Reason)
-                        .ThenBy(r => r.RotatedArea).ToList();
+                    return results.OrderBy(r => r.Reason).ThenBy(r => r.RotatedArea).ToList();
                 default:
                     return results;
             }

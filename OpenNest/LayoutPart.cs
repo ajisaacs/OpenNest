@@ -1,11 +1,11 @@
-﻿using OpenNest.Controls;
-using OpenNest.Converters;
-using OpenNest.Geometry;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Controls;
+using OpenNest.Converters;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
@@ -111,9 +111,16 @@ namespace OpenNest
             using var sf = new StringFormat
             {
                 Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
+                LineAlignment = StringAlignment.Center,
             };
-            g.DrawString(id, programIdFont, Brushes.Black, _labelScreenPoint.X, _labelScreenPoint.Y, sf);
+            g.DrawString(
+                id,
+                programIdFont,
+                Brushes.Black,
+                _labelScreenPoint.X,
+                _labelScreenPoint.Y,
+                sf
+            );
         }
 
         public GraphicsPath OffsetPath { get; private set; }
@@ -128,7 +135,10 @@ namespace OpenNest
             if (shapes.Count == 0)
             {
                 var bbox = BasePart.BaseDrawing.Program.BoundingBox();
-                return new Vector(bbox.Location.X + bbox.Length / 2, bbox.Location.Y + bbox.Width / 2);
+                return new Vector(
+                    bbox.Location.X + bbox.Length / 2,
+                    bbox.Location.Y + bbox.Width / 2
+                );
             }
 
             var profile = new ShapeProfile(nonRapid);
@@ -150,7 +160,11 @@ namespace OpenNest
         {
             if (BasePart.HasManualLeadIns)
             {
-                BasePart.Program.GetGraphicsPaths(BasePart.Location, out var cutPath, out var leadPath);
+                BasePart.Program.GetGraphicsPaths(
+                    BasePart.Location,
+                    out var cutPath,
+                    out var leadPath
+                );
                 cutPath.Transform(plateView.Matrix);
                 leadPath.Transform(plateView.Matrix);
                 Path = cutPath;
@@ -169,7 +183,8 @@ namespace OpenNest
             var rotatedLabel = _labelPoint.Value.Rotate(BasePart.Rotation);
             var labelPt = new PointF(
                 (float)(rotatedLabel.X + BasePart.Location.X),
-                (float)(rotatedLabel.Y + BasePart.Location.Y));
+                (float)(rotatedLabel.Y + BasePart.Location.Y)
+            );
             var pts = new[] { labelPt };
             plateView.Matrix.TransformPoints(pts);
             _labelScreenPoint = pts[0];
@@ -179,10 +194,12 @@ namespace OpenNest
 
         public void UpdateOffset(double spacing, double tolerance, Matrix matrix)
         {
-            if (_offsetPolygonPoints == null ||
-                spacing != _cachedOffsetSpacing ||
-                tolerance != _cachedOffsetTolerance ||
-                BasePart.Rotation != _cachedOffsetRotation)
+            if (
+                _offsetPolygonPoints == null
+                || spacing != _cachedOffsetSpacing
+                || tolerance != _cachedOffsetTolerance
+                || BasePart.Rotation != _cachedOffsetRotation
+            )
             {
                 _offsetPolygonPoints = ComputeOffsetPolygons(spacing, tolerance);
                 _cachedOffsetSpacing = spacing;
@@ -203,7 +220,8 @@ namespace OpenNest
             var result = new List<PointF[]>();
             var entities = ConvertProgram.ToGeometry(BasePart.Program);
             var profile = new ShapeProfile(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList());
+                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+            );
 
             AddOffsetPolygon(result, profile.Perimeter.OffsetOutward(spacing), tolerance);
 
@@ -213,7 +231,11 @@ namespace OpenNest
             return result;
         }
 
-        private static void AddOffsetPolygon(List<PointF[]> result, Shape offsetEntity, double tolerance)
+        private static void AddOffsetPolygon(
+            List<PointF[]> result,
+            Shape offsetEntity,
+            double tolerance
+        )
         {
             if (offsetEntity == null)
                 return;

@@ -1,5 +1,5 @@
-using OpenNest.CNC.CuttingStrategy;
 using System.Text.Json;
+using OpenNest.CNC.CuttingStrategy;
 
 namespace OpenNest.Forms
 {
@@ -8,7 +8,7 @@ namespace OpenNest.Forms
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = false,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
         public static string Serialize(CuttingParameters p)
@@ -27,7 +27,7 @@ namespace OpenNest.Forms
                 RoundLeadInAngles = p.RoundLeadInAngles,
                 LeadInAngleIncrement = p.LeadInAngleIncrement,
                 AutoTabMinSize = p.AutoTabMinSize,
-                AutoTabMaxSize = p.AutoTabMaxSize
+                AutoTabMaxSize = p.AutoTabMaxSize,
             };
             return JsonSerializer.Serialize(dto, JsonOptions);
         }
@@ -50,9 +50,10 @@ namespace OpenNest.Forms
                 TabConfig = new NormalTab { Size = dto.TabWidth },
                 PierceClearance = dto.PierceClearance,
                 RoundLeadInAngles = dto.RoundLeadInAngles,
-                LeadInAngleIncrement = dto.LeadInAngleIncrement > 0 ? dto.LeadInAngleIncrement : 5.0,
+                LeadInAngleIncrement =
+                    dto.LeadInAngleIncrement > 0 ? dto.LeadInAngleIncrement : 5.0,
                 AutoTabMinSize = dto.AutoTabMinSize,
-                AutoTabMaxSize = dto.AutoTabMaxSize
+                AutoTabMaxSize = dto.AutoTabMaxSize,
             };
         }
 
@@ -60,26 +61,67 @@ namespace OpenNest.Forms
         {
             return leadIn switch
             {
-                LineLeadIn line => new LeadInDto { Type = "Line", Length = line.Length, ApproachAngle = line.ApproachAngle },
+                LineLeadIn line => new LeadInDto
+                {
+                    Type = "Line",
+                    Length = line.Length,
+                    ApproachAngle = line.ApproachAngle,
+                },
                 ArcLeadIn arc => new LeadInDto { Type = "Arc", Radius = arc.Radius },
-                LineArcLeadIn la => new LeadInDto { Type = "LineArc", LineLength = la.LineLength, ArcRadius = la.ArcRadius, ApproachAngle = la.ApproachAngle },
-                CleanHoleLeadIn ch => new LeadInDto { Type = "CleanHole", LineLength = ch.LineLength, ArcRadius = ch.ArcRadius, Kerf = ch.Kerf },
-                LineLineLeadIn ll => new LeadInDto { Type = "LineLine", Length1 = ll.Length1, Angle1 = ll.ApproachAngle1, Length2 = ll.Length2, Angle2 = ll.ApproachAngle2 },
-                _ => new LeadInDto { Type = "None" }
+                LineArcLeadIn la => new LeadInDto
+                {
+                    Type = "LineArc",
+                    LineLength = la.LineLength,
+                    ArcRadius = la.ArcRadius,
+                    ApproachAngle = la.ApproachAngle,
+                },
+                CleanHoleLeadIn ch => new LeadInDto
+                {
+                    Type = "CleanHole",
+                    LineLength = ch.LineLength,
+                    ArcRadius = ch.ArcRadius,
+                    Kerf = ch.Kerf,
+                },
+                LineLineLeadIn ll => new LeadInDto
+                {
+                    Type = "LineLine",
+                    Length1 = ll.Length1,
+                    Angle1 = ll.ApproachAngle1,
+                    Length2 = ll.Length2,
+                    Angle2 = ll.ApproachAngle2,
+                },
+                _ => new LeadInDto { Type = "None" },
             };
         }
 
         private static LeadIn FromDto(LeadInDto dto)
         {
-            if (dto == null) return new NoLeadIn();
+            if (dto == null)
+                return new NoLeadIn();
             return dto.Type switch
             {
                 "Line" => new LineLeadIn { Length = dto.Length, ApproachAngle = dto.ApproachAngle },
                 "Arc" => new ArcLeadIn { Radius = dto.Radius },
-                "LineArc" => new LineArcLeadIn { LineLength = dto.LineLength, ArcRadius = dto.ArcRadius, ApproachAngle = dto.ApproachAngle },
-                "CleanHole" => new CleanHoleLeadIn { LineLength = dto.LineLength, ArcRadius = dto.ArcRadius, Kerf = dto.Kerf },
-                "LineLine" => new LineLineLeadIn { Length1 = dto.Length1, ApproachAngle1 = dto.Angle1, Length2 = dto.Length2, ApproachAngle2 = dto.Angle2 },
-                _ => new NoLeadIn()
+                "LineArc" => new LineArcLeadIn
+                {
+                    LineLength = dto.LineLength,
+                    ArcRadius = dto.ArcRadius,
+                    ApproachAngle = dto.ApproachAngle,
+                },
+                "CleanHole" => new CleanHoleLeadIn
+                {
+                    LineLength = dto.LineLength,
+                    ArcRadius = dto.ArcRadius,
+                    Kerf = dto.Kerf,
+                },
+                "LineLine" => new LineLineLeadIn
+                {
+                    Length1 = dto.Length1,
+                    ApproachAngle1 = dto.Angle1,
+                    Length2 = dto.Length2,
+                    ApproachAngle2 = dto.Angle2,
+                },
+                _ => new NoLeadIn(),
             };
         }
 
@@ -87,20 +129,30 @@ namespace OpenNest.Forms
         {
             return leadOut switch
             {
-                LineLeadOut line => new LeadOutDto { Type = "Line", Length = line.Length, ApproachAngle = line.ApproachAngle },
+                LineLeadOut line => new LeadOutDto
+                {
+                    Type = "Line",
+                    Length = line.Length,
+                    ApproachAngle = line.ApproachAngle,
+                },
                 ArcLeadOut arc => new LeadOutDto { Type = "Arc", Radius = arc.Radius },
-                _ => new LeadOutDto { Type = "None" }
+                _ => new LeadOutDto { Type = "None" },
             };
         }
 
         private static LeadOut FromLeadOutDto(LeadOutDto dto)
         {
-            if (dto == null) return new NoLeadOut();
+            if (dto == null)
+                return new NoLeadOut();
             return dto.Type switch
             {
-                "Line" => new LineLeadOut { Length = dto.Length, ApproachAngle = dto.ApproachAngle },
+                "Line" => new LineLeadOut
+                {
+                    Length = dto.Length,
+                    ApproachAngle = dto.ApproachAngle,
+                },
                 "Arc" => new ArcLeadOut { Radius = dto.Radius },
-                _ => new NoLeadOut()
+                _ => new NoLeadOut(),
             };
         }
 

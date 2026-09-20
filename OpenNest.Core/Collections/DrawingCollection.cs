@@ -2,7 +2,5 @@
 
 namespace OpenNest.Collections
 {
-    public class DrawingCollection : HashSet<Drawing>
-    {
-    }
+    public class DrawingCollection : HashSet<Drawing> { }
 }

@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
+using OpenNest.Geometry;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -7,8 +7,11 @@ namespace OpenNest.CNC.CuttingStrategy
     {
         public double Radius { get; set; }
 
-        public override List<ICode> Generate(Vector contourEndPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+        public override List<ICode> Generate(
+            Vector contourEndPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
             var arcCenterX = contourEndPoint.X + Radius * System.Math.Cos(contourNormalAngle);
             var arcCenterY = contourEndPoint.Y + Radius * System.Math.Sin(contourNormalAngle);
@@ -16,11 +19,12 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var endPoint = new Vector(
                 arcCenterX + Radius * System.Math.Cos(contourNormalAngle + System.Math.PI / 2),
-                arcCenterY + Radius * System.Math.Sin(contourNormalAngle + System.Math.PI / 2));
+                arcCenterY + Radius * System.Math.Sin(contourNormalAngle + System.Math.PI / 2)
+            );
 
             return new List<ICode>
             {
-                new ArcMove(endPoint, arcCenter, winding) { Layer = LayerType.Leadout }
+                new ArcMove(endPoint, arcCenter, winding) { Layer = LayerType.Leadout },
             };
         }
     }

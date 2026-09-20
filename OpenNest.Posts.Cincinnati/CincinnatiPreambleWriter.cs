@@ -23,12 +23,24 @@ public sealed class CincinnatiPreambleWriter
     /// Writes the main program header block.
     /// </summary>
     /// <param name="initialLibrary">Resolved G89 library file for the initial process setup.</param>
-    public void WriteMainProgram(TextWriter w, string nestName, string materialDescription,
-        List<Plate> plates, string initialLibrary)
+    public void WriteMainProgram(
+        TextWriter w,
+        string nestName,
+        string materialDescription,
+        List<Plate> plates,
+        string initialLibrary
+    )
     {
         w.WriteLine(CoordinateFormatter.Comment($"NEST {nestName}"));
         w.WriteLine(CoordinateFormatter.Comment($"CONFIGURATION - {_config.ConfigurationName}"));
-        w.WriteLine(CoordinateFormatter.Comment(DateTime.Now.ToString("MM-dd-yyyy hh:mm:ss tt", System.Globalization.CultureInfo.InvariantCulture)));
+        w.WriteLine(
+            CoordinateFormatter.Comment(
+                DateTime.Now.ToString(
+                    "MM-dd-yyyy hh:mm:ss tt",
+                    System.Globalization.CultureInfo.InvariantCulture
+                )
+            )
+        );
 
         if (!string.IsNullOrEmpty(materialDescription))
             w.WriteLine(CoordinateFormatter.Comment($"Material = {materialDescription}"));
@@ -45,7 +57,10 @@ public sealed class CincinnatiPreambleWriter
 
         w.WriteLine("M42");
 
-        if (_config.ProcessParameterMode == G89Mode.LibraryFile && !string.IsNullOrEmpty(initialLibrary))
+        if (
+            _config.ProcessParameterMode == G89Mode.LibraryFile
+            && !string.IsNullOrEmpty(initialLibrary)
+        )
             w.WriteLine($"G89 P{initialLibrary}");
 
         w.WriteLine($"M98 P{_config.VariableDeclarationSubprogram} (Variable Declaration)");
@@ -61,9 +76,8 @@ public sealed class CincinnatiPreambleWriter
             var subNum = _config.SheetSubprogramStart + i;
             var qty = System.Math.Max(plates[i].Quantity, 1);
             var lParam = qty > 1 ? $" L{qty}" : "";
-            var sheetLabel = qty > 1
-                ? $"LAYOUT {layoutNumber} - {qty} SHEETS"
-                : $"LAYOUT {layoutNumber}";
+            var sheetLabel =
+                qty > 1 ? $"LAYOUT {layoutNumber} - {qty} SHEETS" : $"LAYOUT {layoutNumber}";
             w.WriteLine($"N{layoutNumber} M98 P{subNum}{lParam} ({sheetLabel})");
         }
 

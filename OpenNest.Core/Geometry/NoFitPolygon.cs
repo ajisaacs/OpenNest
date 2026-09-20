@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using Clipper2Lib;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Geometry
 {
@@ -99,14 +99,15 @@ namespace OpenNest.Geometry
             var startB = FindBottomLeft(b);
 
             var result = new Polygon();
-            
-            // The starting point of the Minkowski sum A + B is the sum of the 
-            // starting points of A and B. For NFP = A + (-B), this is 
+
+            // The starting point of the Minkowski sum A + B is the sum of the
+            // starting points of A and B. For NFP = A + (-B), this is
             // startA + startReflectedB.
             var current = new Vector(
                 a.Vertices[startA].X + b.Vertices[startB].X,
-                a.Vertices[startA].Y + b.Vertices[startB].Y);
-            
+                a.Vertices[startA].Y + b.Vertices[startB].Y
+            );
+
             result.Vertices.Add(current);
 
             var ia = 0;
@@ -132,10 +133,12 @@ namespace OpenNest.Geometry
                 else
                 {
                     var angleA = System.Math.Atan2(orderedA[ia].Y, orderedA[ia].X);
-                    if (angleA < 0) angleA += Angle.TwoPI;
+                    if (angleA < 0)
+                        angleA += Angle.TwoPI;
 
                     var angleB = System.Math.Atan2(orderedB[ib].Y, orderedB[ib].X);
-                    if (angleB < 0) angleB += Angle.TwoPI;
+                    if (angleB < 0)
+                        angleB += Angle.TwoPI;
 
                     if (angleA < angleB)
                     {
@@ -149,7 +152,8 @@ namespace OpenNest.Geometry
                     {
                         edge = new Vector(
                             orderedA[ia].X + orderedB[ib].X,
-                            orderedA[ia].Y + orderedB[ib].Y);
+                            orderedA[ia].Y + orderedB[ib].Y
+                        );
                         ia++;
                         ib++;
                     }
@@ -203,8 +207,10 @@ namespace OpenNest.Geometry
 
             for (var i = 1; i < n; i++)
             {
-                if (verts[i].Y < verts[best].Y ||
-                    (verts[i].Y == verts[best].Y && verts[i].X < verts[best].X))
+                if (
+                    verts[i].Y < verts[best].Y
+                    || (verts[i].Y == verts[best].Y && verts[i].X < verts[best].X)
+                )
                     best = i;
             }
 

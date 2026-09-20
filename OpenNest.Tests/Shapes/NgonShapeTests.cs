@@ -31,9 +31,7 @@ public class NgonShapeTests
         var shape = new NgonShape { Sides = sides, Width = 20 };
         var drawing = shape.GetDrawing();
 
-        var moves = drawing.Program.Codes
-            .OfType<OpenNest.CNC.LinearMove>()
-            .Count();
+        var moves = drawing.Program.Codes.OfType<OpenNest.CNC.LinearMove>().Count();
         Assert.Equal(sides, moves);
     }
 
@@ -43,9 +41,7 @@ public class NgonShapeTests
         var shape = new NgonShape { Sides = 2, Width = 20 };
         var drawing = shape.GetDrawing();
 
-        var moves = drawing.Program.Codes
-            .OfType<OpenNest.CNC.LinearMove>()
-            .Count();
+        var moves = drawing.Program.Codes.OfType<OpenNest.CNC.LinearMove>().Count();
         Assert.Equal(3, moves);
     }
 }

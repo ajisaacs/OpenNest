@@ -32,7 +32,9 @@ namespace OpenNest
         private MultiPlateNester(
             MultiPlateNestOptions options,
             List<Plate> existingPlates,
-            IProgress<NestProgress> progress, CancellationToken token)
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             _options = options;
             _template = options.Template;
@@ -49,16 +51,20 @@ namespace OpenNest
 
         public static bool FitsBounds(Box container, Box part)
         {
-            var fitsNormal = container.Width >= part.Width - Tolerance.Epsilon
-                          && container.Length >= part.Length - Tolerance.Epsilon;
-            var fitsRotated = container.Width >= part.Length - Tolerance.Epsilon
-                           && container.Length >= part.Width - Tolerance.Epsilon;
+            var fitsNormal =
+                container.Width >= part.Width - Tolerance.Epsilon
+                && container.Length >= part.Length - Tolerance.Epsilon;
+            var fitsRotated =
+                container.Width >= part.Length - Tolerance.Epsilon
+                && container.Length >= part.Width - Tolerance.Epsilon;
             return fitsNormal || fitsRotated;
         }
 
         public static List<NestItem> SortItems(List<NestItem> items, PartSortOrder sortOrder)
         {
-            var withBounds = items.Select(i => (Item: i, Bounds: i.Drawing.Program.BoundingBox())).ToList();
+            var withBounds = items
+                .Select(i => (Item: i, Bounds: i.Drawing.Program.BoundingBox()))
+                .ToList();
 
             switch (sortOrder)
             {
@@ -151,7 +157,8 @@ namespace OpenNest
             PlateOption upgradeSize,
             PlateOption newPlateSize,
             double salvageRate,
-            double estimatedNewPlateUtilization)
+            double estimatedNewPlateUtilization
+        )
         {
             var upgradeCost = upgradeSize.Cost - currentSize.Cost;
 
@@ -175,7 +182,8 @@ namespace OpenNest
             MultiPlateNestOptions options,
             List<Plate> existingPlates = null,
             IProgress<NestProgress> progress = null,
-            CancellationToken token = default)
+            CancellationToken token = default
+        )
         {
             var nester = new MultiPlateNester(options, existingPlates, progress, token);
             return nester.Run(items, options.SortOrder, options.AllowPlateCreation);
@@ -205,7 +213,8 @@ namespace OpenNest
 
             var zoneAspect = zone.Width / zone.Length;
             var partAspect = partBounds.Width / partBounds.Length;
-            var aspectMatch = System.Math.Min(zoneAspect, partAspect) / System.Math.Max(zoneAspect, partAspect);
+            var aspectMatch =
+                System.Math.Min(zoneAspect, partAspect) / System.Math.Max(zoneAspect, partAspect);
 
             return utilization * 0.7 + aspectMatch * 0.3;
         }
@@ -237,7 +246,8 @@ namespace OpenNest
             if (HasPlateOptions)
             {
                 pr.ChosenSize = _plateOptions.FirstOrDefault(o =>
-                    o.Width.IsEqualTo(plate.Size.Width) && o.Length.IsEqualTo(plate.Size.Length));
+                    o.Width.IsEqualTo(plate.Size.Width) && o.Length.IsEqualTo(plate.Size.Length)
+                );
             }
 
             return pr;
@@ -269,7 +279,11 @@ namespace OpenNest
             return pool;
         }
 
-        private bool TryWithUpgradedSize(PlateResult pr, PlateOption upgradeOption, Func<List<Box>, bool> tryFill)
+        private bool TryWithUpgradedSize(
+            PlateResult pr,
+            PlateOption upgradeOption,
+            Func<List<Box>, bool> tryFill
+        )
         {
             var oldSize = pr.Plate.Size;
             var oldChosenSize = pr.ChosenSize;
@@ -289,12 +303,18 @@ namespace OpenNest
 
         private PlateOption FindSmallestFittingOption(Box partBounds)
         {
-            return _sortedOptions?.FirstOrDefault(o => FitsBounds(OptionWorkArea(o, _template), partBounds));
+            return _sortedOptions?.FirstOrDefault(o =>
+                FitsBounds(OptionWorkArea(o, _template), partBounds)
+            );
         }
 
         // --- Orchestration ---
 
-        private MultiPlateResult Run(List<NestItem> items, PartSortOrder sortOrder, bool allowPlateCreation)
+        private MultiPlateResult Run(
+            List<NestItem> items,
+            PartSortOrder sortOrder,
+            bool allowPlateCreation
+        )
         {
             var result = new MultiPlateResult();
 
@@ -459,9 +479,10 @@ namespace OpenNest
                         var workArea = pr.Plate.WorkArea();
                         var classification = Classify(partBounds, workArea);
 
-                        remnantCache[pr] = classification == PartClass.Small
-                            ? FindRemnants(pr.Plate, _minRemnantSize, scrapOnly: true)
-                            : FindRemnants(pr.Plate, _minRemnantSize, scrapOnly: false);
+                        remnantCache[pr] =
+                            classification == PartClass.Small
+                                ? FindRemnants(pr.Plate, _minRemnantSize, scrapOnly: true)
+                                : FindRemnants(pr.Plate, _minRemnantSize, scrapOnly: false);
                     }
 
                     foreach (var zone in remnantCache[pr])
@@ -522,7 +543,9 @@ namespace OpenNest
             {
                 var currentOption = pr.ChosenSize;
                 var currentIdx = _sortedOptions.FindIndex(o =>
-                    o.Width.IsEqualTo(currentOption.Width) && o.Length.IsEqualTo(currentOption.Length));
+                    o.Width.IsEqualTo(currentOption.Width)
+                    && o.Length.IsEqualTo(currentOption.Length)
+                );
 
                 if (currentIdx < 0 || currentIdx >= _sortedOptions.Count - 1)
                     continue;
@@ -531,8 +554,10 @@ namespace OpenNest
                 {
                     var upgradeOption = _sortedOptions[i];
 
-                    if (upgradeOption.Width < currentOption.Width - Tolerance.Epsilon
-                        || upgradeOption.Length < currentOption.Length - Tolerance.Epsilon)
+                    if (
+                        upgradeOption.Width < currentOption.Width - Tolerance.Epsilon
+                        || upgradeOption.Length < currentOption.Length - Tolerance.Epsilon
+                    )
                         continue;
 
                     var smallestNew = FindSmallestFittingOption(partBounds);
@@ -541,20 +566,29 @@ namespace OpenNest
                         continue;
 
                     var utilEst = pr.Plate.Utilization();
-                    var decision = EvaluateUpgradeVsNew(currentOption, upgradeOption, smallestNew,
-                        _salvageRate, utilEst);
+                    var decision = EvaluateUpgradeVsNew(
+                        currentOption,
+                        upgradeOption,
+                        smallestNew,
+                        _salvageRate,
+                        utilEst
+                    );
 
                     if (decision.ShouldUpgrade)
                     {
-                        var placed = TryWithUpgradedSize(pr, upgradeOption, remnants =>
-                        {
-                            foreach (var remnant in remnants)
+                        var placed = TryWithUpgradedSize(
+                            pr,
+                            upgradeOption,
+                            remnants =>
                             {
-                                if (FillAndPlace(pr, remnant, item) > 0)
-                                    return true;
+                                foreach (var remnant in remnants)
+                                {
+                                    if (FillAndPlace(pr, remnant, item) > 0)
+                                        return true;
+                                }
+                                return false;
                             }
-                            return false;
-                        });
+                        );
 
                         if (placed)
                             return true;
@@ -593,53 +627,69 @@ namespace OpenNest
 
                         var currentOption = target.ChosenSize;
 
-                        foreach (var upgradeOption in _sortedOptions.Where(o =>
-                            o.Width >= currentOption.Width - Tolerance.Epsilon
-                            && o.Length >= currentOption.Length - Tolerance.Epsilon
-                            && (o.Width > currentOption.Width + Tolerance.Epsilon
-                                || o.Length > currentOption.Length + Tolerance.Epsilon)))
+                        foreach (
+                            var upgradeOption in _sortedOptions.Where(o =>
+                                o.Width >= currentOption.Width - Tolerance.Epsilon
+                                && o.Length >= currentOption.Length - Tolerance.Epsilon
+                                && (
+                                    o.Width > currentOption.Width + Tolerance.Epsilon
+                                    || o.Length > currentOption.Length + Tolerance.Epsilon
+                                )
+                            )
+                        )
                         {
-                            absorbed = TryWithUpgradedSize(target, upgradeOption, remnants =>
-                            {
-                                var engine = NestEngineRegistry.Create(target.Plate);
-                                var tempItems = donorParts
-                                    .GroupBy(p => p.BaseDrawing)
-                                    .Select(g => new NestItem
-                                    {
-                                        Drawing = g.Key,
-                                        Quantity = g.Count(),
-                                    })
-                                    .ToList();
-
-                                var totalPlaced = new List<Part>();
-                                foreach (var remnant in remnants)
+                            absorbed = TryWithUpgradedSize(
+                                target,
+                                upgradeOption,
+                                remnants =>
                                 {
-                                    var placed = engine.PackArea(remnant, tempItems, _progress, _token);
-                                    totalPlaced.AddRange(placed);
+                                    var engine = NestEngineRegistry.Create(target.Plate);
+                                    var tempItems = donorParts
+                                        .GroupBy(p => p.BaseDrawing)
+                                        .Select(g => new NestItem
+                                        {
+                                            Drawing = g.Key,
+                                            Quantity = g.Count(),
+                                        })
+                                        .ToList();
 
-                                    foreach (var ti in tempItems)
+                                    var totalPlaced = new List<Part>();
+                                    foreach (var remnant in remnants)
                                     {
-                                        var count = placed.Count(p => p.BaseDrawing == ti.Drawing);
-                                        ti.Quantity = System.Math.Max(0, ti.Quantity - count);
+                                        var placed = engine.PackArea(
+                                            remnant,
+                                            tempItems,
+                                            _progress,
+                                            _token
+                                        );
+                                        totalPlaced.AddRange(placed);
+
+                                        foreach (var ti in tempItems)
+                                        {
+                                            var count = placed.Count(p =>
+                                                p.BaseDrawing == ti.Drawing
+                                            );
+                                            ti.Quantity = System.Math.Max(0, ti.Quantity - count);
+                                        }
+
+                                        if (tempItems.All(ti => ti.Quantity <= 0))
+                                            break;
                                     }
 
-                                    if (tempItems.All(ti => ti.Quantity <= 0))
-                                        break;
+                                    if (totalPlaced.Count >= donorParts.Count)
+                                    {
+                                        target.AddParts(totalPlaced);
+
+                                        foreach (var p in donorParts)
+                                            donor.Plate.Parts.Remove(p);
+                                        donor.Parts.Clear();
+                                        _platePool.Remove(donor);
+                                        return true;
+                                    }
+
+                                    return false;
                                 }
-
-                                if (totalPlaced.Count >= donorParts.Count)
-                                {
-                                    target.AddParts(totalPlaced);
-
-                                    foreach (var p in donorParts)
-                                        donor.Plate.Parts.Remove(p);
-                                    donor.Parts.Clear();
-                                    _platePool.Remove(donor);
-                                    return true;
-                                }
-
-                                return false;
-                            });
+                            );
 
                             if (absorbed)
                                 break;

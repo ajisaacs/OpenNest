@@ -18,8 +18,9 @@ public class NestJobEngineSelectionTests
         var defaultResult = new NestJobRunner(PlateNesterFactory.Create).Solve(job);
         Assert.Equal(NestJobStatus.Complete, defaultResult.Status);
 
-        var stripResult = new NestJobRunner(PlateNesterFactory.Create)
-            .Solve(new NestJob(job.Parts, job.Plates, new NestJobOptions("Strip")));
+        var stripResult = new NestJobRunner(PlateNesterFactory.Create).Solve(
+            new NestJob(job.Parts, job.Plates, new NestJobOptions("Strip"))
+        );
         Assert.Equal(NestJobStatus.Complete, stripResult.Status);
 
         Assert.Equal(original, NestEngineRegistry.ActiveEngineName);
@@ -48,8 +49,10 @@ public class NestJobEngineSelectionTests
         Assert.Throws<NotSupportedException>(() => PlateNesterFactory.Create("Not A Real Engine"));
         var job = FiniteStockJobTests.Job(1);
         Assert.Throws<NotSupportedException>(() =>
-            new NestJobRunner(key => throw new NotSupportedException($"Unknown placement strategy: {key}"))
-                .Solve(new NestJob(job.Parts, job.Plates, new NestJobOptions("Bogus"))));
+            new NestJobRunner(key =>
+                throw new NotSupportedException($"Unknown placement strategy: {key}")
+            ).Solve(new NestJob(job.Parts, job.Plates, new NestJobOptions("Bogus")))
+        );
     }
 
     [Fact]
@@ -57,7 +60,11 @@ public class NestJobEngineSelectionTests
     {
         // A plugin engine registered through the legacy registry must not become selectable
         // through the job factory; the new boundary is independent of registry state.
-        NestEngineRegistry.Register("ProbePlugin", "test plugin", plate => new PluginShapeEngine(plate));
+        NestEngineRegistry.Register(
+            "ProbePlugin",
+            "test plugin",
+            plate => new PluginShapeEngine(plate)
+        );
         Assert.Contains(NestEngineRegistry.AvailableEngines, e => e.Name == "ProbePlugin");
 
         Assert.Throws<NotSupportedException>(() => PlateNesterFactory.Create("ProbePlugin"));
@@ -68,10 +75,13 @@ public class NestJobEngineSelectionTests
     public void StripEngineEndToEndPlacesAndAccounts()
     {
         var drawing = new Drawing("strip part", TestDrawingFactory.Rectangle(30, 30));
-        var job = new NestJob(new[] { DrawingJobMapper.FromDrawing("part", drawing, 2) },
-            new[] { new NestPlateStock("s", new Size(90, 90), 1) });
-        var result = new NestJobRunner(PlateNesterFactory.Create)
-            .Solve(new NestJob(job.Parts, job.Plates, new NestJobOptions("Strip")));
+        var job = new NestJob(
+            new[] { DrawingJobMapper.FromDrawing("part", drawing, 2) },
+            new[] { new NestPlateStock("s", new Size(90, 90), 1) }
+        );
+        var result = new NestJobRunner(PlateNesterFactory.Create).Solve(
+            new NestJob(job.Parts, job.Plates, new NestJobOptions("Strip"))
+        );
 
         Assert.True(result.Plates.SelectMany(p => p.Placements).Count() >= 1);
         foreach (var f in result.Fulfillment)

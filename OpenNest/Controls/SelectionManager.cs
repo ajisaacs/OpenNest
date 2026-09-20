@@ -1,9 +1,9 @@
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 
 namespace OpenNest.Controls
 {
@@ -96,10 +96,16 @@ namespace OpenNest.Controls
             switch (alignType)
             {
                 case AlignType.Bottom:
-                    Align.Bottom(fixedPart.BasePart, selectedParts.Select(p => p.BasePart).ToList());
+                    Align.Bottom(
+                        fixedPart.BasePart,
+                        selectedParts.Select(p => p.BasePart).ToList()
+                    );
                     break;
                 case AlignType.Horizontally:
-                    Align.Horizontally(fixedPart.BasePart, selectedParts.Select(p => p.BasePart).ToList());
+                    Align.Horizontally(
+                        fixedPart.BasePart,
+                        selectedParts.Select(p => p.BasePart).ToList()
+                    );
                     break;
                 case AlignType.Left:
                     Align.Left(fixedPart.BasePart, selectedParts.Select(p => p.BasePart).ToList());
@@ -111,13 +117,20 @@ namespace OpenNest.Controls
                     Align.Top(fixedPart.BasePart, selectedParts.Select(p => p.BasePart).ToList());
                     break;
                 case AlignType.Vertically:
-                    Align.Vertically(fixedPart.BasePart, selectedParts.Select(p => p.BasePart).ToList());
+                    Align.Vertically(
+                        fixedPart.BasePart,
+                        selectedParts.Select(p => p.BasePart).ToList()
+                    );
                     break;
                 case AlignType.EvenlySpaceHorizontally:
-                    Align.EvenlyDistributeHorizontally(selectedParts.Select(p => p.BasePart).ToList());
+                    Align.EvenlyDistributeHorizontally(
+                        selectedParts.Select(p => p.BasePart).ToList()
+                    );
                     break;
                 case AlignType.EvenlySpaceVertically:
-                    Align.EvenlyDistributeVertically(selectedParts.Select(p => p.BasePart).ToList());
+                    Align.EvenlyDistributeVertically(
+                        selectedParts.Select(p => p.BasePart).ToList()
+                    );
                     break;
                 default:
                     return;

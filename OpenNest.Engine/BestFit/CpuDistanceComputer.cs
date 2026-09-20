@@ -1,7 +1,7 @@
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.BestFit
 {
@@ -10,7 +10,8 @@ namespace OpenNest.Engine.BestFit
         public double[] ComputeDistances(
             List<Line> stationaryLines,
             List<Line> movingTemplateLines,
-            SlideOffset[] offsets)
+            SlideOffset[] offsets
+        )
         {
             var count = offsets.Length;
             var results = new double[count];
@@ -18,7 +19,8 @@ namespace OpenNest.Engine.BestFit
             var allMovingVerts = ExtractUniqueVertices(movingTemplateLines);
             var allStationaryVerts = ExtractUniqueVertices(stationaryLines);
 
-            var vertexCache = new Dictionary<(double, double), (Vector[] leading, Vector[] facing)>();
+            var vertexCache =
+                new Dictionary<(double, double), (Vector[] leading, Vector[] facing)>();
 
             foreach (var offset in offsets)
             {
@@ -26,69 +28,101 @@ namespace OpenNest.Engine.BestFit
                 if (vertexCache.ContainsKey(key))
                     continue;
 
-                var leading = FilterVerticesByProjection(allMovingVerts, offset.DirX, offset.DirY, keepHigh: true);
-                var facing = FilterVerticesByProjection(allStationaryVerts, offset.DirX, offset.DirY, keepHigh: false);
+                var leading = FilterVerticesByProjection(
+                    allMovingVerts,
+                    offset.DirX,
+                    offset.DirY,
+                    keepHigh: true
+                );
+                var facing = FilterVerticesByProjection(
+                    allStationaryVerts,
+                    offset.DirX,
+                    offset.DirY,
+                    keepHigh: false
+                );
                 vertexCache[key] = (leading, facing);
             }
 
-            System.Threading.Tasks.Parallel.For(0, count, i =>
-            {
-                var offset = offsets[i];
-                var dirX = offset.DirX;
-                var dirY = offset.DirY;
-                var oppX = -dirX;
-                var oppY = -dirY;
-
-                var (leadingMoving, facingStationary) = vertexCache[(dirX, dirY)];
-
-                var minDist = double.MaxValue;
-
-                for (var v = 0; v < leadingMoving.Length; v++)
+            System.Threading.Tasks.Parallel.For(
+                0,
+                count,
+                i =>
                 {
-                    var vx = leadingMoving[v].X + offset.Dx;
-                    var vy = leadingMoving[v].Y + offset.Dy;
+                    var offset = offsets[i];
+                    var dirX = offset.DirX;
+                    var dirY = offset.DirY;
+                    var oppX = -dirX;
+                    var oppY = -dirY;
 
-                    for (var j = 0; j < stationaryLines.Count; j++)
+                    var (leadingMoving, facingStationary) = vertexCache[(dirX, dirY)];
+
+                    var minDist = double.MaxValue;
+
+                    for (var v = 0; v < leadingMoving.Length; v++)
                     {
-                        var e = stationaryLines[j];
-                        var d = SpatialQuery.RayEdgeDistance(
-                            vx, vy,
-                            e.StartPoint.X, e.StartPoint.Y,
-                            e.EndPoint.X, e.EndPoint.Y,
-                            dirX, dirY);
+                        var vx = leadingMoving[v].X + offset.Dx;
+                        var vy = leadingMoving[v].Y + offset.Dy;
 
-                        if (d < minDist)
+                        for (var j = 0; j < stationaryLines.Count; j++)
                         {
-                            minDist = d;
-                            if (d <= 0) { results[i] = 0; return; }
+                            var e = stationaryLines[j];
+                            var d = SpatialQuery.RayEdgeDistance(
+                                vx,
+                                vy,
+                                e.StartPoint.X,
+                                e.StartPoint.Y,
+                                e.EndPoint.X,
+                                e.EndPoint.Y,
+                                dirX,
+                                dirY
+                            );
+
+                            if (d < minDist)
+                            {
+                                minDist = d;
+                                if (d <= 0)
+                                {
+                                    results[i] = 0;
+                                    return;
+                                }
+                            }
                         }
                     }
-                }
 
-                for (var v = 0; v < facingStationary.Length; v++)
-                {
-                    var svx = facingStationary[v].X;
-                    var svy = facingStationary[v].Y;
-
-                    for (var j = 0; j < movingTemplateLines.Count; j++)
+                    for (var v = 0; v < facingStationary.Length; v++)
                     {
-                        var e = movingTemplateLines[j];
-                        var d = SpatialQuery.RayEdgeDistance(
-                            svx, svy,
-                            e.StartPoint.X + offset.Dx, e.StartPoint.Y + offset.Dy,
-                            e.EndPoint.X + offset.Dx, e.EndPoint.Y + offset.Dy,
-                            oppX, oppY);
+                        var svx = facingStationary[v].X;
+                        var svy = facingStationary[v].Y;
 
-                        if (d < minDist)
+                        for (var j = 0; j < movingTemplateLines.Count; j++)
                         {
-                            minDist = d;
-                            if (d <= 0) { results[i] = 0; return; }
+                            var e = movingTemplateLines[j];
+                            var d = SpatialQuery.RayEdgeDistance(
+                                svx,
+                                svy,
+                                e.StartPoint.X + offset.Dx,
+                                e.StartPoint.Y + offset.Dy,
+                                e.EndPoint.X + offset.Dx,
+                                e.EndPoint.Y + offset.Dy,
+                                oppX,
+                                oppY
+                            );
+
+                            if (d < minDist)
+                            {
+                                minDist = d;
+                                if (d <= 0)
+                                {
+                                    results[i] = 0;
+                                    return;
+                                }
+                            }
                         }
                     }
-                }
 
-                results[i] = minDist;
-            });
+                    results[i] = minDist;
+                }
+            );
 
             return results;
         }
@@ -96,7 +130,8 @@ namespace OpenNest.Engine.BestFit
         public double[] ComputeDistances(
             List<Entity> stationaryEntities,
             List<Entity> movingEntities,
-            SlideOffset[] offsets)
+            SlideOffset[] offsets
+        )
         {
             var count = offsets.Length;
             var results = new double[count];
@@ -107,7 +142,8 @@ namespace OpenNest.Engine.BestFit
             var movingCurves = ExtractCurveParams(movingEntities);
             var stationaryCurves = ExtractCurveParams(stationaryEntities);
 
-            var vertexCache = new Dictionary<(double, double), (Vector[] leading, Vector[] facing)>();
+            var vertexCache =
+                new Dictionary<(double, double), (Vector[] leading, Vector[] facing)>();
 
             foreach (var offset in offsets)
             {
@@ -115,106 +151,169 @@ namespace OpenNest.Engine.BestFit
                 if (vertexCache.ContainsKey(key))
                     continue;
 
-                var leading = FilterVerticesByProjection(allMovingVerts, offset.DirX, offset.DirY, keepHigh: true);
-                var facing = FilterVerticesByProjection(allStationaryVerts, offset.DirX, offset.DirY, keepHigh: false);
+                var leading = FilterVerticesByProjection(
+                    allMovingVerts,
+                    offset.DirX,
+                    offset.DirY,
+                    keepHigh: true
+                );
+                var facing = FilterVerticesByProjection(
+                    allStationaryVerts,
+                    offset.DirX,
+                    offset.DirY,
+                    keepHigh: false
+                );
                 vertexCache[key] = (leading, facing);
             }
 
-            System.Threading.Tasks.Parallel.For(0, count, i =>
-            {
-                var offset = offsets[i];
-                var dirX = offset.DirX;
-                var dirY = offset.DirY;
-                var oppX = -dirX;
-                var oppY = -dirY;
-
-                var (leadingMoving, facingStationary) = vertexCache[(dirX, dirY)];
-
-                var minDist = double.MaxValue;
-
-                // Case 1: Leading moving vertices → stationary entities
-                for (var v = 0; v < leadingMoving.Length; v++)
+            System.Threading.Tasks.Parallel.For(
+                0,
+                count,
+                i =>
                 {
-                    var vx = leadingMoving[v].X + offset.Dx;
-                    var vy = leadingMoving[v].Y + offset.Dy;
+                    var offset = offsets[i];
+                    var dirX = offset.DirX;
+                    var dirY = offset.DirY;
+                    var oppX = -dirX;
+                    var oppY = -dirY;
 
-                    for (var j = 0; j < stationaryEntities.Count; j++)
+                    var (leadingMoving, facingStationary) = vertexCache[(dirX, dirY)];
+
+                    var minDist = double.MaxValue;
+
+                    // Case 1: Leading moving vertices → stationary entities
+                    for (var v = 0; v < leadingMoving.Length; v++)
                     {
-                        var d = RayEntityDistance(vx, vy, stationaryEntities[j], 0, 0, dirX, dirY);
+                        var vx = leadingMoving[v].X + offset.Dx;
+                        var vy = leadingMoving[v].Y + offset.Dy;
 
-                        if (d < minDist)
+                        for (var j = 0; j < stationaryEntities.Count; j++)
                         {
-                            minDist = d;
-                            if (d <= 0) { results[i] = 0; return; }
-                        }
-                    }
-                }
+                            var d = RayEntityDistance(
+                                vx,
+                                vy,
+                                stationaryEntities[j],
+                                0,
+                                0,
+                                dirX,
+                                dirY
+                            );
 
-                // Case 2: Facing stationary vertices → moving entities (opposite direction)
-                for (var v = 0; v < facingStationary.Length; v++)
-                {
-                    var svx = facingStationary[v].X;
-                    var svy = facingStationary[v].Y;
-
-                    for (var j = 0; j < movingEntities.Count; j++)
-                    {
-                        var d = RayEntityDistance(svx, svy, movingEntities[j], offset.Dx, offset.Dy, oppX, oppY);
-
-                        if (d < minDist)
-                        {
-                            minDist = d;
-                            if (d <= 0) { results[i] = 0; return; }
-                        }
-                    }
-                }
-
-                // Phase 3: Curve-to-curve direct distance.
-                // Vertex sampling misses the true contact between two curved entities
-                // when the approach angle doesn't align with a sampled vertex.
-                for (var m = 0; m < movingCurves.Length; m++)
-                {
-                    var mc = movingCurves[m];
-                    var mcx = mc.Cx + offset.Dx;
-                    var mcy = mc.Cy + offset.Dy;
-
-                    for (var s = 0; s < stationaryCurves.Length; s++)
-                    {
-                        var sc = stationaryCurves[s];
-                        var d = SpatialQuery.RayCircleDistance(
-                            mcx, mcy, sc.Cx, sc.Cy, mc.Radius + sc.Radius, dirX, dirY);
-
-                        if (d >= minDist || d == double.MaxValue)
-                            continue;
-
-                        if (mc.Entity is Arc || sc.Entity is Arc)
-                        {
-                            var mx = mcx + d * dirX;
-                            var my = mcy + d * dirY;
-                            var toCx = sc.Cx - mx;
-                            var toCy = sc.Cy - my;
-
-                            if (mc.Entity is Arc mArc)
+                            if (d < minDist)
                             {
-                                var angle = Angle.NormalizeRad(System.Math.Atan2(toCy, toCx));
-                                if (!Angle.IsBetweenRad(angle, mArc.StartAngle, mArc.EndAngle, mArc.IsReversed))
-                                    continue;
-                            }
-
-                            if (sc.Entity is Arc sArc)
-                            {
-                                var angle = Angle.NormalizeRad(System.Math.Atan2(-toCy, -toCx));
-                                if (!Angle.IsBetweenRad(angle, sArc.StartAngle, sArc.EndAngle, sArc.IsReversed))
-                                    continue;
+                                minDist = d;
+                                if (d <= 0)
+                                {
+                                    results[i] = 0;
+                                    return;
+                                }
                             }
                         }
-
-                        minDist = d;
-                        if (d <= 0) { results[i] = 0; return; }
                     }
-                }
 
-                results[i] = minDist;
-            });
+                    // Case 2: Facing stationary vertices → moving entities (opposite direction)
+                    for (var v = 0; v < facingStationary.Length; v++)
+                    {
+                        var svx = facingStationary[v].X;
+                        var svy = facingStationary[v].Y;
+
+                        for (var j = 0; j < movingEntities.Count; j++)
+                        {
+                            var d = RayEntityDistance(
+                                svx,
+                                svy,
+                                movingEntities[j],
+                                offset.Dx,
+                                offset.Dy,
+                                oppX,
+                                oppY
+                            );
+
+                            if (d < minDist)
+                            {
+                                minDist = d;
+                                if (d <= 0)
+                                {
+                                    results[i] = 0;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
+                    // Phase 3: Curve-to-curve direct distance.
+                    // Vertex sampling misses the true contact between two curved entities
+                    // when the approach angle doesn't align with a sampled vertex.
+                    for (var m = 0; m < movingCurves.Length; m++)
+                    {
+                        var mc = movingCurves[m];
+                        var mcx = mc.Cx + offset.Dx;
+                        var mcy = mc.Cy + offset.Dy;
+
+                        for (var s = 0; s < stationaryCurves.Length; s++)
+                        {
+                            var sc = stationaryCurves[s];
+                            var d = SpatialQuery.RayCircleDistance(
+                                mcx,
+                                mcy,
+                                sc.Cx,
+                                sc.Cy,
+                                mc.Radius + sc.Radius,
+                                dirX,
+                                dirY
+                            );
+
+                            if (d >= minDist || d == double.MaxValue)
+                                continue;
+
+                            if (mc.Entity is Arc || sc.Entity is Arc)
+                            {
+                                var mx = mcx + d * dirX;
+                                var my = mcy + d * dirY;
+                                var toCx = sc.Cx - mx;
+                                var toCy = sc.Cy - my;
+
+                                if (mc.Entity is Arc mArc)
+                                {
+                                    var angle = Angle.NormalizeRad(System.Math.Atan2(toCy, toCx));
+                                    if (
+                                        !Angle.IsBetweenRad(
+                                            angle,
+                                            mArc.StartAngle,
+                                            mArc.EndAngle,
+                                            mArc.IsReversed
+                                        )
+                                    )
+                                        continue;
+                                }
+
+                                if (sc.Entity is Arc sArc)
+                                {
+                                    var angle = Angle.NormalizeRad(System.Math.Atan2(-toCy, -toCx));
+                                    if (
+                                        !Angle.IsBetweenRad(
+                                            angle,
+                                            sArc.StartAngle,
+                                            sArc.EndAngle,
+                                            sArc.IsReversed
+                                        )
+                                    )
+                                        continue;
+                                }
+                            }
+
+                            minDist = d;
+                            if (d <= 0)
+                            {
+                                results[i] = 0;
+                                return;
+                            }
+                        }
+                    }
+
+                    results[i] = minDist;
+                }
+            );
 
             return results;
         }
@@ -222,7 +321,9 @@ namespace OpenNest.Engine.BestFit
         private readonly struct CurveParams
         {
             public readonly Entity Entity;
-            public readonly double Cx, Cy, Radius;
+            public readonly double Cx,
+                Cy,
+                Radius;
 
             public CurveParams(Entity entity, double cx, double cy, double radius)
             {
@@ -239,7 +340,9 @@ namespace OpenNest.Engine.BestFit
             for (var i = 0; i < entities.Count; i++)
             {
                 if (entities[i] is Circle circle)
-                    curves.Add(new CurveParams(circle, circle.Center.X, circle.Center.Y, circle.Radius));
+                    curves.Add(
+                        new CurveParams(circle, circle.Center.X, circle.Center.Y, circle.Radius)
+                    );
                 else if (entities[i] is Arc arc)
                     curves.Add(new CurveParams(arc, arc.Center.X, arc.Center.Y, arc.Radius));
             }
@@ -247,36 +350,56 @@ namespace OpenNest.Engine.BestFit
         }
 
         private static double RayEntityDistance(
-            double vx, double vy, Entity entity,
-            double entityOffsetX, double entityOffsetY,
-            double dirX, double dirY)
+            double vx,
+            double vy,
+            Entity entity,
+            double entityOffsetX,
+            double entityOffsetY,
+            double dirX,
+            double dirY
+        )
         {
             if (entity is Line line)
             {
                 return SpatialQuery.RayEdgeDistance(
-                    vx, vy,
-                    line.StartPoint.X + entityOffsetX, line.StartPoint.Y + entityOffsetY,
-                    line.EndPoint.X + entityOffsetX, line.EndPoint.Y + entityOffsetY,
-                    dirX, dirY);
+                    vx,
+                    vy,
+                    line.StartPoint.X + entityOffsetX,
+                    line.StartPoint.Y + entityOffsetY,
+                    line.EndPoint.X + entityOffsetX,
+                    line.EndPoint.Y + entityOffsetY,
+                    dirX,
+                    dirY
+                );
             }
 
             if (entity is Arc arc)
             {
                 return SpatialQuery.RayArcDistance(
-                    vx, vy,
-                    arc.Center.X + entityOffsetX, arc.Center.Y + entityOffsetY,
+                    vx,
+                    vy,
+                    arc.Center.X + entityOffsetX,
+                    arc.Center.Y + entityOffsetY,
                     arc.Radius,
-                    arc.StartAngle, arc.EndAngle, arc.IsReversed,
-                    dirX, dirY);
+                    arc.StartAngle,
+                    arc.EndAngle,
+                    arc.IsReversed,
+                    dirX,
+                    dirY
+                );
             }
 
             if (entity is Circle circle)
             {
                 return SpatialQuery.RayCircleDistance(
-                    vx, vy,
-                    circle.Center.X + entityOffsetX, circle.Center.Y + entityOffsetY,
+                    vx,
+                    vy,
+                    circle.Center.X + entityOffsetX,
+                    circle.Center.Y + entityOffsetY,
                     circle.Radius,
-                    dirX, dirY);
+                    dirX,
+                    dirY
+                );
             }
 
             return double.MaxValue;
@@ -352,7 +475,11 @@ namespace OpenNest.Engine.BestFit
         }
 
         private static Vector[] FilterVerticesByProjection(
-            Vector[] vertices, double dirX, double dirY, bool keepHigh)
+            Vector[] vertices,
+            double dirX,
+            double dirY,
+            bool keepHigh
+        )
         {
             if (vertices.Length == 0)
                 return vertices;
@@ -364,8 +491,10 @@ namespace OpenNest.Engine.BestFit
             for (var i = 0; i < vertices.Length; i++)
             {
                 projections[i] = vertices[i].X * dirX + vertices[i].Y * dirY;
-                if (projections[i] < min) min = projections[i];
-                if (projections[i] > max) max = projections[i];
+                if (projections[i] < min)
+                    min = projections[i];
+                if (projections[i] > max)
+                    max = projections[i];
             }
 
             var midpoint = (min + max) / 2;

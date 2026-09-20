@@ -1,6 +1,6 @@
-﻿using OpenNest.Geometry;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Geometry;
 
 namespace OpenNest.RectanglePacking
 {
@@ -24,7 +24,7 @@ namespace OpenNest.RectanglePacking
             {
                 Location = this.Location,
                 Size = this.Size,
-                Items = new List<Item>(Items)
+                Items = new List<Item>(Items),
             };
         }
     }

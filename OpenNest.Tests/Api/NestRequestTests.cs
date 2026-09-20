@@ -27,7 +27,7 @@ public class NestRequestTests
     {
         var request = new NestRequest
         {
-            Parts = [new NestRequestPart { DxfPath = "test.dxf", Quantity = 5 }]
+            Parts = [new NestRequestPart { DxfPath = "test.dxf", Quantity = 5 }],
         };
 
         Assert.Single(request.Parts);
@@ -60,9 +60,9 @@ public class NestRequestTests
                     Quantity = 3,
                     PartSpacing = 0.2,
                     EdgeSpacing = new Spacing(1, 2, 3, 4),
-                    Quadrant = 3
-                }
-            ]
+                    Quadrant = 3,
+                },
+            ],
         };
 
         var plate = Assert.Single(request.Plates!);

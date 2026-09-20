@@ -1,9 +1,9 @@
-﻿using OpenNest.Api;
+﻿using System;
+using System.Linq;
+using OpenNest.Api;
 using OpenNest.CNC;
 using OpenNest.Converters;
 using OpenNest.Geometry;
-using System;
-using System.Linq;
 
 namespace OpenNest
 {
@@ -12,7 +12,9 @@ namespace OpenNest
         public static TimingInfo GetTimingInfo(Program pgm)
         {
             var entities = ConvertProgram.ToGeometry(pgm);
-            var shapes = ShapeBuilder.GetShapes(entities.Where(entity => entity.Layer != SpecialLayers.Rapid));
+            var shapes = ShapeBuilder.GetShapes(
+                entities.Where(entity => entity.Layer != SpecialLayers.Rapid)
+            );
             var info = new TimingInfo { PierceCount = shapes.Count };
 
             var last = entities[0];
@@ -58,10 +60,12 @@ namespace OpenNest
             {
                 info.CutDistance += entity.Length;
 
-                if (entity.Type == EntityType.Line &&
-                    lastEntity != null &&
-                    lastEntity.Type == EntityType.Line &&
-                    lastEntity.Layer == SpecialLayers.Cut)
+                if (
+                    entity.Type == EntityType.Line
+                    && lastEntity != null
+                    && lastEntity.Type == EntityType.Line
+                    && lastEntity.Layer == SpecialLayers.Cut
+                )
                     info.IntersectionCount++;
             }
             else if (entity.Layer == SpecialLayers.Rapid)

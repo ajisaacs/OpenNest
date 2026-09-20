@@ -3,7 +3,7 @@ namespace OpenNest
     public enum CutDirection
     {
         TowardOrigin,
-        AwayFromOrigin
+        AwayFromOrigin,
     }
 
     public class CutOffSettings

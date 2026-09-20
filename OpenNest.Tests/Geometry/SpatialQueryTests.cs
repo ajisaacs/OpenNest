@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Tests.Geometry;
 
@@ -45,9 +45,19 @@ public class SpatialQueryTests
         foreach (var e in entities)
         {
             if (e is Line line)
-                result.Add(new Line(line.pt1.X + dx, line.pt1.Y + dy, line.pt2.X + dx, line.pt2.Y + dy));
+                result.Add(
+                    new Line(line.pt1.X + dx, line.pt1.Y + dy, line.pt2.X + dx, line.pt2.Y + dy)
+                );
             else if (e is Arc arc)
-                result.Add(new Arc(arc.Center.X + dx, arc.Center.Y + dy, arc.Radius, arc.StartAngle, arc.EndAngle));
+                result.Add(
+                    new Arc(
+                        arc.Center.X + dx,
+                        arc.Center.Y + dy,
+                        arc.Radius,
+                        arc.StartAngle,
+                        arc.EndAngle
+                    )
+                );
             else if (e is Circle circle)
                 result.Add(new Circle(circle.Center.X + dx, circle.Center.Y + dy, circle.Radius));
         }

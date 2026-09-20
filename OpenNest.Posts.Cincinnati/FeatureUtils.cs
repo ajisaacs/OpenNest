@@ -52,7 +52,9 @@ public static class FeatureUtils
     /// <summary>
     /// Classifies features as etch or cut and orders etch features before cut features.
     /// </summary>
-    public static List<(List<ICode> codes, bool isEtch)> ClassifyAndOrder(List<List<ICode>> features)
+    public static List<(List<ICode> codes, bool isEtch)> ClassifyAndOrder(
+        List<List<ICode>> features
+    )
     {
         var result = new List<(List<ICode>, bool)>();
         var etch = new List<List<ICode>>();
@@ -157,27 +159,33 @@ public static class FeatureUtils
             return 0.0;
 
         // Full circle: start ≈ end
-        if (Tolerance.IsEqualTo(startPos.X, arc.EndPoint.X)
-            && Tolerance.IsEqualTo(startPos.Y, arc.EndPoint.Y))
+        if (
+            Tolerance.IsEqualTo(startPos.X, arc.EndPoint.X)
+            && Tolerance.IsEqualTo(startPos.Y, arc.EndPoint.Y)
+        )
             return 2.0 * System.Math.PI * radius;
 
         var startAngle = System.Math.Atan2(
             startPos.Y - arc.CenterPoint.Y,
-            startPos.X - arc.CenterPoint.X);
+            startPos.X - arc.CenterPoint.X
+        );
         var endAngle = System.Math.Atan2(
             arc.EndPoint.Y - arc.CenterPoint.Y,
-            arc.EndPoint.X - arc.CenterPoint.X);
+            arc.EndPoint.X - arc.CenterPoint.X
+        );
 
         double sweep;
         if (arc.Rotation == RotationType.CW)
         {
             sweep = startAngle - endAngle;
-            if (sweep <= 0) sweep += 2.0 * System.Math.PI;
+            if (sweep <= 0)
+                sweep += 2.0 * System.Math.PI;
         }
         else
         {
             sweep = endAngle - startAngle;
-            if (sweep <= 0) sweep += 2.0 * System.Math.PI;
+            if (sweep <= 0)
+                sweep += 2.0 * System.Math.PI;
         }
 
         return radius * sweep;

@@ -67,11 +67,7 @@ public class ContourClassificationTests
     [Fact]
     public void Classify_identifies_etch_layer_shapes()
     {
-        var shapes = new List<Shape>
-        {
-            MakeRectShape(0, 0, 100, 50),
-            MakeEtchShape(),
-        };
+        var shapes = new List<Shape> { MakeRectShape(0, 0, 100, 50), MakeEtchShape() };
 
         var contours = ContourInfo.Classify(shapes);
 
@@ -86,11 +82,7 @@ public class ContourClassificationTests
         openShape.Entities.Add(new Line(new Vector(10, 0), new Vector(10, 5)));
         // Not closed — doesn't return to (0,0)
 
-        var shapes = new List<Shape>
-        {
-            MakeRectShape(0, 0, 100, 50),
-            openShape,
-        };
+        var shapes = new List<Shape> { MakeRectShape(0, 0, 100, 50), openShape };
 
         var contours = ContourInfo.Classify(shapes);
 
@@ -100,11 +92,7 @@ public class ContourClassificationTests
     [Fact]
     public void Classify_orders_holes_first_perimeter_last()
     {
-        var shapes = new List<Shape>
-        {
-            MakeRectShape(0, 0, 100, 50),
-            MakeCircleShape(25, 25, 5),
-        };
+        var shapes = new List<Shape> { MakeRectShape(0, 0, 100, 50), MakeCircleShape(25, 25, 5) };
 
         var contours = ContourInfo.Classify(shapes);
 

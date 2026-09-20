@@ -150,11 +150,7 @@ public class EnvelopeGuardTests
             new[] { new Vector(0, 0), new Vector(0, -2) },
         };
 
-        var opts = new GravographISWriterOptions
-        {
-            WorkEnvelopeXMm = 25.4,
-            WorkEnvelopeYMm = 25.4,
-        };
+        var opts = new GravographISWriterOptions { WorkEnvelopeXMm = 25.4, WorkEnvelopeYMm = 25.4 };
 
         Assert.Throws<System.InvalidOperationException>(() =>
         {

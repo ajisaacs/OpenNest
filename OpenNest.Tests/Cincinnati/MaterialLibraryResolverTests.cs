@@ -4,24 +4,49 @@ namespace OpenNest.Tests.Cincinnati;
 
 public class MaterialLibraryResolverTests
 {
-    private static CincinnatiPostConfig ConfigWithLibraries() => new()
-    {
-        DefaultAssistGas = "O2",
-        DefaultEtchGas = "N2",
-        MaterialLibraries = new()
+    private static CincinnatiPostConfig ConfigWithLibraries() =>
+        new()
         {
-            new MaterialLibraryEntry { Material = "Mild Steel", Thickness = 0.250, Gas = "O2", Library = "MS250O2.lib" },
-            new MaterialLibraryEntry { Material = "Mild Steel", Thickness = 0.250, Gas = "N2", Library = "MS250N2.lib" },
-            new MaterialLibraryEntry { Material = "Aluminum", Thickness = 0.125, Gas = "N2", Library = "AL125N2.lib" },
-            new MaterialLibraryEntry { Material = "Stainless Steel", Thickness = 0.375, Gas = "AIR", Library = "SS375AIR.lib" }
-        },
-        EtchLibraries = new()
-        {
-            new EtchLibraryEntry { Gas = "N2", Library = "EtchN2.lib" },
-            new EtchLibraryEntry { Gas = "O2", Library = "EtchO2.lib" },
-            new EtchLibraryEntry { Gas = "AIR", Library = "EtchAIR.lib" }
-        }
-    };
+            DefaultAssistGas = "O2",
+            DefaultEtchGas = "N2",
+            MaterialLibraries = new()
+            {
+                new MaterialLibraryEntry
+                {
+                    Material = "Mild Steel",
+                    Thickness = 0.250,
+                    Gas = "O2",
+                    Library = "MS250O2.lib",
+                },
+                new MaterialLibraryEntry
+                {
+                    Material = "Mild Steel",
+                    Thickness = 0.250,
+                    Gas = "N2",
+                    Library = "MS250N2.lib",
+                },
+                new MaterialLibraryEntry
+                {
+                    Material = "Aluminum",
+                    Thickness = 0.125,
+                    Gas = "N2",
+                    Library = "AL125N2.lib",
+                },
+                new MaterialLibraryEntry
+                {
+                    Material = "Stainless Steel",
+                    Thickness = 0.375,
+                    Gas = "AIR",
+                    Library = "SS375AIR.lib",
+                },
+            },
+            EtchLibraries = new()
+            {
+                new EtchLibraryEntry { Gas = "N2", Library = "EtchN2.lib" },
+                new EtchLibraryEntry { Gas = "O2", Library = "EtchO2.lib" },
+                new EtchLibraryEntry { Gas = "AIR", Library = "EtchAIR.lib" },
+            },
+        };
 
     [Fact]
     public void ResolveCutLibrary_ExactMatch()

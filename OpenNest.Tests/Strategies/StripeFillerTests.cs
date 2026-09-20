@@ -33,8 +33,7 @@ public class StripeFillerTests
     /// Builds a simple side-by-side pair BestFitResult for a rectangular drawing.
     /// Places two copies next to each other along the X axis with the given spacing.
     /// </summary>
-    private static List<BestFitResult> MakeSideBySideBestFits(
-        Drawing drawing, double spacing)
+    private static List<BestFitResult> MakeSideBySideBestFits(Drawing drawing, double spacing)
     {
         var bb = drawing.Program.BoundingBox();
         var w = bb.Length;
@@ -71,10 +70,15 @@ public class StripeFillerTests
     {
         var pattern = MakeRectPattern(20, 10);
         var angle = StripeFiller.FindAngleForTargetSpan(
-            pattern.Parts, 20.0, NestDirection.Horizontal);
+            pattern.Parts,
+            20.0,
+            NestDirection.Horizontal
+        );
 
-        Assert.True(System.Math.Abs(angle) < 0.05,
-            $"Expected angle near 0, got {OpenNest.Math.Angle.ToDegrees(angle):F1}°");
+        Assert.True(
+            System.Math.Abs(angle) < 0.05,
+            $"Expected angle near 0, got {OpenNest.Math.Angle.ToDegrees(angle):F1}°"
+        );
     }
 
     [Fact]
@@ -82,12 +86,17 @@ public class StripeFillerTests
     {
         var pattern = MakeRectPattern(20, 10);
         var angle = StripeFiller.FindAngleForTargetSpan(
-            pattern.Parts, 22.0, NestDirection.Horizontal);
+            pattern.Parts,
+            22.0,
+            NestDirection.Horizontal
+        );
 
         var rotated = FillHelpers.BuildRotatedPattern(pattern.Parts, angle);
         var span = rotated.BoundingBox.Length;
-        Assert.True(System.Math.Abs(span - 22.0) < 0.5,
-            $"Expected span ~22, got {span:F2} at {OpenNest.Math.Angle.ToDegrees(angle):F1}°");
+        Assert.True(
+            System.Math.Abs(span - 22.0) < 0.5,
+            $"Expected span ~22, got {span:F2} at {OpenNest.Math.Angle.ToDegrees(angle):F1}°"
+        );
     }
 
     [Fact]
@@ -95,7 +104,10 @@ public class StripeFillerTests
     {
         var pattern = MakeRectPattern(20, 10);
         var angle = StripeFiller.FindAngleForTargetSpan(
-            pattern.Parts, 30.0, NestDirection.Horizontal);
+            pattern.Parts,
+            30.0,
+            NestDirection.Horizontal
+        );
 
         Assert.True(angle >= 0 && angle <= System.Math.PI / 2);
     }
@@ -105,7 +117,11 @@ public class StripeFillerTests
     {
         var pattern = MakeRectPattern(20, 10);
         var (angle, waste, count) = StripeFiller.ConvergeStripeAngle(
-            pattern.Parts, 120.0, 0.5, NestDirection.Horizontal);
+            pattern.Parts,
+            120.0,
+            0.5,
+            NestDirection.Horizontal
+        );
 
         Assert.True(count >= 5, $"Expected at least 5 pairs, got {count}");
         Assert.True(waste < 18.0, $"Expected waste < 18, got {waste:F2}");
@@ -117,7 +133,11 @@ public class StripeFillerTests
         // 10x5 pattern: short side (5) oriented along axis, so more pairs fit
         var pattern = MakeRectPattern(10, 5);
         var (angle, waste, count) = StripeFiller.ConvergeStripeAngle(
-            pattern.Parts, 100.0, 0.0, NestDirection.Horizontal);
+            pattern.Parts,
+            100.0,
+            0.0,
+            NestDirection.Horizontal
+        );
 
         Assert.True(count >= 10, $"Expected at least 10 pairs, got {count}");
         Assert.True(waste < 1.0, $"Expected low waste, got {waste:F2}");
@@ -128,7 +148,11 @@ public class StripeFillerTests
     {
         var pattern = MakeRectPattern(10, 20);
         var (angle, waste, count) = StripeFiller.ConvergeStripeAngle(
-            pattern.Parts, 120.0, 0.5, NestDirection.Vertical);
+            pattern.Parts,
+            120.0,
+            0.5,
+            NestDirection.Vertical
+        );
 
         Assert.True(count >= 5, $"Expected at least 5 pairs, got {count}");
     }

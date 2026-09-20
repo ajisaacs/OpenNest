@@ -3,15 +3,32 @@ using System.Collections.Generic;
 
 namespace OpenNest;
 
-public enum NestJobStatus { Complete, Incomplete }
-public enum NestJobStopReason { Completed, StockExhausted, NoPlacementFound, PlateLimitReached }
+public enum NestJobStatus
+{
+    Complete,
+    Incomplete,
+}
+
+public enum NestJobStopReason
+{
+    Completed,
+    StockExhausted,
+    NoPlacementFound,
+    PlateLimitReached,
+}
 
 /// <summary>
 /// Rotate about the snapshot origin, then translate by X/Y into the selected plate quadrant frame.
 /// Rotation is in radians. InstanceIndex is zero-based and unique within a part requirement across the job.
 /// The runner assigns final instance indices when committing a candidate.
 /// </summary>
-public sealed record NestJobPlacement(string PartId, int InstanceIndex, double X, double Y, double Rotation);
+public sealed record NestJobPlacement(
+    string PartId,
+    int InstanceIndex,
+    double X,
+    double Y,
+    double Rotation
+);
 
 /// <summary>Requested = Placed + Unplaced for a requirement ID.</summary>
 public sealed record PartFulfillment(string PartId, int Requested, int Placed, int Unplaced);
@@ -22,7 +39,11 @@ public sealed record StockUsage(string StockId, int Used, int? Remaining);
 /// <summary>One physical sheet, with owned ordered placements and immutable stock/settings snapshot.</summary>
 public sealed class NestJobPlateResult
 {
-    public NestJobPlateResult(int plateIndex, NestPlateStock stock, IEnumerable<NestJobPlacement> placements)
+    public NestJobPlateResult(
+        int plateIndex,
+        NestPlateStock stock,
+        IEnumerable<NestJobPlacement> placements
+    )
     {
         ArgumentNullException.ThrowIfNull(stock);
         PlateIndex = plateIndex;
@@ -39,9 +60,13 @@ public sealed class NestJobPlateResult
 /// <summary>Detached result values in commit/input order; no mutable Drawing, Plate, or NestItem escapes.</summary>
 public sealed class NestJobResult
 {
-    public NestJobResult(NestJobStatus status, NestJobStopReason stopReason,
-        IEnumerable<NestJobPlateResult> plates, IEnumerable<PartFulfillment> fulfillment,
-        IEnumerable<StockUsage> stockUsage)
+    public NestJobResult(
+        NestJobStatus status,
+        NestJobStopReason stopReason,
+        IEnumerable<NestJobPlateResult> plates,
+        IEnumerable<PartFulfillment> fulfillment,
+        IEnumerable<StockUsage> stockUsage
+    )
     {
         Status = status;
         StopReason = stopReason;

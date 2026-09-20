@@ -11,7 +11,8 @@ namespace OpenNest
             string section,
             string key,
             string val,
-            string filePath);
+            string filePath
+        );
 
         [DllImport("kernel32")]
         public static extern int GetPrivateProfileString(
@@ -20,7 +21,8 @@ namespace OpenNest
             string def,
             StringBuilder retVal,
             int size,
-            string filePath);
+            string filePath
+        );
 
         [DllImport("user32.dll")]
         public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
@@ -29,7 +31,15 @@ namespace OpenNest
         public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
         [DllImport("user32.dll", ExactSpelling = true)]
-        public static extern int SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+        public static extern int SetWindowPos(
+            IntPtr hWnd,
+            IntPtr hWndInsertAfter,
+            int X,
+            int Y,
+            int cx,
+            int cy,
+            uint uFlags
+        );
 
         #region Constants
 

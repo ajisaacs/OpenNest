@@ -26,8 +26,10 @@ namespace OpenNest.IO
 
             var dxf = Dxf.Import(path, preserveRepairMarks: options.BendRepair != null);
 
-            var cleanup = options.BendRepair == null ? dxf.Entities : dxf.Entities
-                .Where(e => !IsRepairMark(e)).ToList();
+            var cleanup =
+                options.BendRepair == null
+                    ? dxf.Entities
+                    : dxf.Entities.Where(e => !IsRepairMark(e)).ToList();
             RemoveDuplicateArcs(cleanup);
             RemoveZeroSweepArcs(cleanup);
             if (options.BendRepair != null)
@@ -36,11 +38,13 @@ namespace OpenNest.IO
             var bends = new List<Bend>();
             if (options.DetectBends && dxf.Document != null)
             {
-                bends = options.BendDetectorName == null
-                    ? BendDetectorRegistry.AutoDetect(dxf.Document)
-                    : BendDetectorRegistry.GetByName(options.BendDetectorName)
-                        ?.DetectBends(dxf.Document)
-                      ?? new List<Bend>();
+                bends =
+                    options.BendDetectorName == null
+                        ? BendDetectorRegistry.AutoDetect(dxf.Document)
+                        : BendDetectorRegistry
+                            .GetByName(options.BendDetectorName)
+                            ?.DetectBends(dxf.Document)
+                            ?? new List<Bend>();
             }
 
             var repairReports = new List<BendRepairReport>();
@@ -50,11 +54,23 @@ namespace OpenNest.IO
             {
                 // Unitless DXFs require the explicit caller declaration. Never override a conflicting header.
                 var headerUnits = (int)(dxf.Document?.Header.InsUnits ?? 0);
-                var requestedUnits = options.BendRepair.DrawingUnits == BendRepairUnits.Inches ? 1 : 4;
+                var requestedUnits =
+                    options.BendRepair.DrawingUnits == BendRepairUnits.Inches ? 1 : 4;
                 if (headerUnits != 0 && headerUnits != requestedUnits)
-                    repairReports = bends.Select((b, i) => new BendRepairReport(i, "Skipped",
-                        "DXF insertion units conflict with the declared repair units or are unsupported.",
-                        b.StartPoint, b.EndPoint, b.StartPoint, b.EndPoint)).ToList();
+                    repairReports = bends
+                        .Select(
+                            (b, i) =>
+                                new BendRepairReport(
+                                    i,
+                                    "Skipped",
+                                    "DXF insertion units conflict with the declared repair units or are unsupported.",
+                                    b.StartPoint,
+                                    b.EndPoint,
+                                    b.StartPoint,
+                                    b.EndPoint
+                                )
+                        )
+                        .ToList();
                 else
                     repairReports = BendRepair.Apply(dxf.Entities, bends, options.BendRepair);
             }
@@ -85,7 +101,8 @@ namespace OpenNest.IO
                 result.Bends,
                 options.Quantity,
                 options.Customer,
-                editedProgram: null);
+                editedProgram: null
+            );
         }
 
         /// <summary>
@@ -119,7 +136,8 @@ namespace OpenNest.IO
             IEnumerable<Bend> bends,
             int quantity,
             string customer,
-            OpenNest.CNC.Program editedProgram)
+            OpenNest.CNC.Program editedProgram
+        )
         {
             var visible = entities as IList<Entity> ?? new List<Entity>(entities);
             var bendList = bends as IList<Bend> ?? new List<Bend>(bends);
@@ -128,7 +146,11 @@ namespace OpenNest.IO
             var pgm = ConvertGeometry.ToProgram(normalized);
 
             var offset = Vector.Zero;
-            if (pgm != null && pgm.Codes.Count > 0 && pgm[0].Type == OpenNest.CNC.CodeType.RapidMove)
+            if (
+                pgm != null
+                && pgm.Codes.Count > 0
+                && pgm[0].Type == OpenNest.CNC.CodeType.RapidMove
+            )
             {
                 var rapid = (OpenNest.CNC.RapidMove)pgm[0];
                 offset = rapid.EndPoint;
@@ -147,16 +169,18 @@ namespace OpenNest.IO
             drawing.Program = editedProgram ?? pgm;
 
             var bendSources = new HashSet<Entity>(
-                bendList.Where(b => b.SourceEntity != null).Select(b => b.SourceEntity));
+                bendList.Where(b => b.SourceEntity != null).Select(b => b.SourceEntity)
+            );
 
-            drawing.SourceEntities = result.Entities
-                .Where(e => !bendSources.Contains(e))
-                .ToList();
+            drawing.SourceEntities = result.Entities.Where(e => !bendSources.Contains(e)).ToList();
 
             drawing.SuppressedEntityIds = new HashSet<System.Guid>(
-                drawing.SourceEntities
-                    .Where(e => !(e.Layer != null && e.Layer.IsVisible && e.IsVisible))
-                    .Select(e => e.Id));
+                drawing
+                    .SourceEntities.Where(e =>
+                        !(e.Layer != null && e.Layer.IsVisible && e.IsVisible)
+                    )
+                    .Select(e => e.Id)
+            );
 
             return drawing;
         }
@@ -168,7 +192,8 @@ namespace OpenNest.IO
         internal static void RemoveZeroSweepArcs(List<Entity> entities)
         {
             entities.RemoveAll(e =>
-                e is Arc arc && arc.StartAngle.IsEqualTo(arc.EndAngle, Tolerance.ChainTolerance));
+                e is Arc arc && arc.StartAngle.IsEqualTo(arc.EndAngle, Tolerance.ChainTolerance)
+            );
         }
 
         internal static void RemoveDuplicateArcs(List<Entity> entities)

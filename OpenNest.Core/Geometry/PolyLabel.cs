@@ -4,12 +4,14 @@ namespace OpenNest.Geometry
 {
     public static class PolyLabel
     {
-        public static Vector Find(Polygon outer, IList<Polygon> holes = null, double precision = 0.5)
+        public static Vector Find(
+            Polygon outer,
+            IList<Polygon> holes = null,
+            double precision = 0.5
+        )
         {
             if (outer.Vertices.Count < 3)
-                return outer.Vertices.Count > 0
-                    ? outer.Vertices[0]
-                    : new Vector();
+                return outer.Vertices.Count > 0 ? outer.Vertices[0] : new Vector();
 
             var minX = double.MaxValue;
             var minY = double.MaxValue;
@@ -19,10 +21,14 @@ namespace OpenNest.Geometry
             for (var i = 0; i < outer.Vertices.Count; i++)
             {
                 var v = outer.Vertices[i];
-                if (v.X < minX) minX = v.X;
-                if (v.Y < minY) minY = v.Y;
-                if (v.X > maxX) maxX = v.X;
-                if (v.Y > maxY) maxY = v.Y;
+                if (v.X < minX)
+                    minX = v.X;
+                if (v.Y < minY)
+                    minY = v.Y;
+                if (v.X > maxX)
+                    maxX = v.X;
+                if (v.Y > maxY)
+                    maxY = v.Y;
             }
 
             var width = maxX - minX;
@@ -37,8 +43,8 @@ namespace OpenNest.Geometry
             var queue = new List<Cell>();
 
             for (var x = minX; x < maxX; x += cellSize)
-                for (var y = minY; y < maxY; y += cellSize)
-                    queue.Add(new Cell(x + halfCell, y + halfCell, halfCell, outer, holes));
+            for (var y = minY; y < maxY; y += cellSize)
+                queue.Add(new Cell(x + halfCell, y + halfCell, halfCell, outer, holes));
 
             queue.Sort((a, b) => b.MaxDist.CompareTo(a.MaxDist));
 
@@ -194,7 +200,12 @@ namespace OpenNest.Geometry
             }
         }
 
-        private static double PointToAllEdgesDist(double x, double y, Polygon outer, IList<Polygon> holes)
+        private static double PointToAllEdgesDist(
+            double x,
+            double y,
+            Polygon outer,
+            IList<Polygon> holes
+        )
         {
             var minDist = PointToPolygonDist(x, y, outer);
 

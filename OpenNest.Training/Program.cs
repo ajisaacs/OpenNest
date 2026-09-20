@@ -1,14 +1,14 @@
-using OpenNest;
-using OpenNest.Engine.BestFit;
-using OpenNest.Engine.ML;
-using OpenNest.Gpu;
-using OpenNest.Geometry;
-using OpenNest.IO;
-using OpenNest.Training;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using OpenNest;
+using OpenNest.Engine.BestFit;
+using OpenNest.Engine.ML;
+using OpenNest.Geometry;
+using OpenNest.Gpu;
+using OpenNest.IO;
+using OpenNest.Training;
 using Color = System.Drawing.Color;
 
 // Parse arguments.
@@ -83,21 +83,32 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
 
     var sheetSuite = new[]
     {
-        new Size(96, 48), new Size(120, 48), new Size(144, 48),
-        new Size(96, 60), new Size(120, 60), new Size(144, 60),
-        new Size(96, 72), new Size(120, 72), new Size(144, 72),
-        new Size(48, 24), new Size(120, 10)
+        new Size(96, 48),
+        new Size(120, 48),
+        new Size(144, 48),
+        new Size(96, 60),
+        new Size(120, 60),
+        new Size(144, 60),
+        new Size(96, 72),
+        new Size(120, 72),
+        new Size(144, 72),
+        new Size(48, 24),
+        new Size(120, 10),
     };
 
-    var dxfFiles = Directory.GetFiles(dir, "*.dxf", SearchOption.AllDirectories)
+    var dxfFiles = Directory
+        .GetFiles(dir, "*.dxf", SearchOption.AllDirectories)
         .Concat(Directory.GetFiles(dir, "*.dwg", SearchOption.AllDirectories))
         .ToArray();
     Console.WriteLine($"Found {dxfFiles.Length} CAD files");
-    var resolvedDb = dbPath.EndsWith(".db", StringComparison.OrdinalIgnoreCase) ? dbPath : dbPath + ".db";
+    var resolvedDb = dbPath.EndsWith(".db", StringComparison.OrdinalIgnoreCase)
+        ? dbPath
+        : dbPath + ".db";
     Console.WriteLine($"Database: {Path.GetFullPath(resolvedDb)}");
     Console.WriteLine($"Sheet sizes: {sheetSuite.Length} configurations");
     Console.WriteLine($"Spacing: {s:F2}");
-    if (saveDir != null) Console.WriteLine($"Saving nests to: {saveDir}");
+    if (saveDir != null)
+        Console.WriteLine($"Saving nests to: {saveDir}");
     Console.WriteLine("---");
 
     using var db = new TrainingDatabase(dbPath);
@@ -133,8 +144,10 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
             Drawing drawing;
             try
             {
-                drawing = CadImporter.ImportDrawing(file,
-                    new CadImportOptions { DetectBends = false, Name = Path.GetFileName(file) });
+                drawing = CadImporter.ImportDrawing(
+                    file,
+                    new CadImportOptions { DetectBends = false, Name = Path.GetFileName(file) }
+                );
             }
             catch (System.Exception ex)
             {
@@ -171,7 +184,11 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
             bfSw.Stop();
             Console.WriteLine($"  Best-fits computed in {bfSw.ElapsedMilliseconds}ms");
 
-            var partId = db.GetOrAddPart(Path.GetFileName(file), features, drawing.Program.ToString());
+            var partId = db.GetOrAddPart(
+                Path.GetFileName(file),
+                features,
+                drawing.Program.ToString()
+            );
             var partSw = Stopwatch.StartNew();
             var runsThisPart = 0;
             var bestUtil = 0.0;
@@ -215,17 +232,22 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
 
                 var engineInfo = $"{result.WinnerEngine}({result.WinnerTimeMs}ms)";
                 if (!string.IsNullOrEmpty(result.RunnerUpEngine))
-                    engineInfo += $", 2nd={result.RunnerUpEngine}({result.RunnerUpPartCount}pcs/{result.RunnerUpTimeMs}ms)";
+                    engineInfo +=
+                        $", 2nd={result.RunnerUpEngine}({result.RunnerUpPartCount}pcs/{result.RunnerUpTimeMs}ms)";
                 if (!string.IsNullOrEmpty(result.ThirdPlaceEngine))
-                    engineInfo += $", 3rd={result.ThirdPlaceEngine}({result.ThirdPlacePartCount}pcs/{result.ThirdPlaceTimeMs}ms)";
-                Console.WriteLine($"  {size.Length}x{size.Width} - {result.PartCount}pcs, {result.Utilization:P1}, {sizeSw.ElapsedMilliseconds}ms [{engineInfo}] angles={result.AngleResults.Count}");
+                    engineInfo +=
+                        $", 3rd={result.ThirdPlaceEngine}({result.ThirdPlacePartCount}pcs/{result.ThirdPlaceTimeMs}ms)";
+                Console.WriteLine(
+                    $"  {size.Length}x{size.Width} - {result.PartCount}pcs, {result.Utilization:P1}, {sizeSw.ElapsedMilliseconds}ms [{engineInfo}] angles={result.AngleResults.Count}"
+                );
 
                 string savedFilePath = null;
                 if (saveDir != null)
                 {
                     // Deterministic bucket (00-FF) based on filename hash
                     uint hash = 0;
-                    foreach (char c in partNo) hash = (hash * 31) + c;
+                    foreach (char c in partNo)
+                        hash = (hash * 31) + c;
                     var bucket = (hash % 256).ToString("X2");
 
                     var partDir = Path.Combine(saveDir, bucket, partNo);
@@ -242,13 +264,19 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                         nestObj = new Nest(nestName)
                         {
                             Units = templateNest.Units,
-                            DateCreated = DateTime.Now
+                            DateCreated = DateTime.Now,
                         };
-                        nestObj.PlateDefaults.SetFromExisting(templateNest.PlateDefaults.CreateNew());
+                        nestObj.PlateDefaults.SetFromExisting(
+                            templateNest.PlateDefaults.CreateNew()
+                        );
                     }
                     else
                     {
-                        nestObj = new Nest(nestName) { Units = Units.Inches, DateCreated = DateTime.Now };
+                        nestObj = new Nest(nestName)
+                        {
+                            Units = Units.Inches,
+                            DateCreated = DateTime.Now,
+                        };
                     }
 
                     nestObj.Drawings.Add(drawing);
@@ -261,7 +289,15 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
                     writer.Write(savedFilePath);
                 }
 
-                db.AddRun(partId, size.Width, size.Length, s, result, savedFilePath, result.AngleResults);
+                db.AddRun(
+                    partId,
+                    size.Width,
+                    size.Length,
+                    s,
+                    result,
+                    savedFilePath,
+                    result.AngleResults
+                );
                 runsThisPart++;
                 totalRuns++;
             }
@@ -269,7 +305,9 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
             BestFitCache.Invalidate(drawing);
             partSw.Stop();
             processed++;
-            Console.WriteLine($"  Total: {runsThisPart} runs, best={bestCount}pcs @ {bestUtil:P1}, {partSw.ElapsedMilliseconds}ms");
+            Console.WriteLine(
+                $"  Total: {runsThisPart} runs, best={bestCount}pcs @ {bestUtil:P1}, {partSw.ElapsedMilliseconds}ms"
+            );
         }
         catch (Exception ex)
         {
@@ -281,7 +319,9 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
     totalSw.Stop();
     Console.WriteLine("---");
     Console.WriteLine($"Processed: {processed} parts, {totalRuns} total runs");
-    Console.WriteLine($"Skipped:   {skippedExisting} (existing) + {skippedGeometry} (no geometry) + {skippedFeatures} (no features)");
+    Console.WriteLine(
+        $"Skipped:   {skippedExisting} (existing) + {skippedGeometry} (no geometry) + {skippedFeatures} (no features)"
+    );
     Console.WriteLine($"Time:      {totalSw.Elapsed:h\\:mm\\:ss}");
     Console.WriteLine($"Database:  {Path.GetFullPath(resolvedDb)}");
     return 0;
@@ -296,8 +336,12 @@ void PrintUsage()
     Console.Error.WriteLine();
     Console.Error.WriteLine("Options:");
     Console.Error.WriteLine("  --spacing <value>      Part spacing (default: 0.5)");
-    Console.Error.WriteLine("  --db <path>            SQLite database path (default: OpenNestTraining.db)");
-    Console.Error.WriteLine("  --save-nests <dir>     Directory to save individual .nest nests for each winner");
+    Console.Error.WriteLine(
+        "  --db <path>            SQLite database path (default: OpenNestTraining.db)"
+    );
+    Console.Error.WriteLine(
+        "  --save-nests <dir>     Directory to save individual .nest nests for each winner"
+    );
     Console.Error.WriteLine("  --template <path>      Nest template (.nstdot) for plate defaults");
     Console.Error.WriteLine("  -h, --help             Show this help");
 }

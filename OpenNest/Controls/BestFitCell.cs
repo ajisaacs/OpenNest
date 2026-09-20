@@ -1,8 +1,8 @@
-using OpenNest.Engine.BestFit;
-using OpenNest.Math;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using OpenNest.Engine.BestFit;
+using OpenNest.Math;
 
 namespace OpenNest.Controls
 {
@@ -39,12 +39,19 @@ namespace OpenNest.Controls
 
             metadataLines = new[]
             {
-                string.Format("#{0}  {1:F1}x{2:F1}  Area={3:F1}",
-                    rank, result.BoundingHeight, result.BoundingWidth, result.RotatedArea),
-                string.Format("Util={0:P1}  Rot={1:F1}\u00b0",
+                string.Format(
+                    "#{0}  {1:F1}x{2:F1}  Area={3:F1}",
+                    rank,
+                    result.BoundingHeight,
+                    result.BoundingWidth,
+                    result.RotatedArea
+                ),
+                string.Format(
+                    "Util={0:P1}  Rot={1:F1}\u00b0",
                     result.Utilization,
-                    Angle.ToDegrees(result.OptimalRotation)),
-                result.Keep ? "" : result.Reason
+                    Angle.ToDegrees(result.OptimalRotation)
+                ),
+                result.Keep ? "" : result.Reason,
             };
         }
 

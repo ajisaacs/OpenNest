@@ -10,13 +10,18 @@ namespace OpenNest.Math
     /// </summary>
     public static class ExpressionEvaluator
     {
-        public static double Evaluate(string expression, IReadOnlyDictionary<string, double> variables)
+        public static double Evaluate(
+            string expression,
+            IReadOnlyDictionary<string, double> variables
+        )
         {
             var parser = new Parser(expression, variables);
             var result = parser.ParseExpression();
             parser.SkipWhitespace();
             if (!parser.IsEnd)
-                throw new FormatException($"Unexpected character at position {parser.Position}: '{parser.Current}'");
+                throw new FormatException(
+                    $"Unexpected character at position {parser.Position}: '{parser.Current}'"
+                );
             return result;
         }
 
@@ -52,10 +57,12 @@ namespace OpenNest.Math
                 while (true)
                 {
                     SkipWhitespace();
-                    if (IsEnd) break;
+                    if (IsEnd)
+                        break;
 
                     var op = Current;
-                    if (op != '+' && op != '-') break;
+                    if (op != '+' && op != '-')
+                        break;
 
                     _pos++;
                     SkipWhitespace();
@@ -75,10 +82,12 @@ namespace OpenNest.Math
                 while (true)
                 {
                     SkipWhitespace();
-                    if (IsEnd) break;
+                    if (IsEnd)
+                        break;
 
                     var op = Current;
-                    if (op != '*' && op != '/') break;
+                    if (op != '*' && op != '/')
+                        break;
 
                     _pos++;
                     SkipWhitespace();
@@ -129,7 +138,10 @@ namespace OpenNest.Math
                 {
                     _pos++; // consume '$'
                     var start = _pos;
-                    while (_pos < _input.Length && (char.IsLetterOrDigit(_input[_pos]) || _input[_pos] == '_'))
+                    while (
+                        _pos < _input.Length
+                        && (char.IsLetterOrDigit(_input[_pos]) || _input[_pos] == '_')
+                    )
                         _pos++;
                     if (_pos == start)
                         throw new FormatException("Expected variable name after '$'.");
@@ -145,10 +157,19 @@ namespace OpenNest.Math
                     _pos++;
 
                 if (_pos == numStart)
-                    throw new FormatException($"Unexpected character '{Current}' at position {_pos}.");
+                    throw new FormatException(
+                        $"Unexpected character '{Current}' at position {_pos}."
+                    );
 
                 var numSpan = _input.Slice(numStart, _pos - numStart).ToString();
-                if (!double.TryParse(numSpan, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+                if (
+                    !double.TryParse(
+                        numSpan,
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out var number
+                    )
+                )
                     throw new FormatException($"Invalid number: '{numSpan}'");
 
                 return number;

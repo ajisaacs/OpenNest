@@ -1,27 +1,31 @@
-using OpenNest.Engine.Fill;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 
 namespace OpenNest
 {
     public class StripNestEngine : NestEngineBase
     {
-        public StripNestEngine(Plate plate) : base(plate)
-        {
-        }
+        public StripNestEngine(Plate plate)
+            : base(plate) { }
 
         public override string Name => "Strip";
 
-        public override string Description => "Iterative shrink-fill nesting for mixed-drawing layouts";
+        public override string Description =>
+            "Iterative shrink-fill nesting for mixed-drawing layouts";
 
         /// <summary>
         /// Single-item fill delegates to DefaultNestEngine.
         /// </summary>
-        public override List<Part> Fill(NestItem item, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public override List<Part> Fill(
+            NestItem item,
+            Box workArea,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             var inner = new DefaultNestEngine(Plate);
             return inner.Fill(item, workArea, progress, token);
@@ -30,8 +34,12 @@ namespace OpenNest
         /// <summary>
         /// Group-parts fill delegates to DefaultNestEngine.
         /// </summary>
-        public override List<Part> Fill(List<Part> groupParts, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public override List<Part> Fill(
+            List<Part> groupParts,
+            Box workArea,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             var inner = new DefaultNestEngine(Plate);
             return inner.Fill(groupParts, workArea, progress, token);
@@ -40,8 +48,12 @@ namespace OpenNest
         /// <summary>
         /// Pack delegates to DefaultNestEngine.
         /// </summary>
-        public override List<Part> PackArea(Box box, List<NestItem> items,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public override List<Part> PackArea(
+            Box box,
+            List<NestItem> items,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             var inner = new DefaultNestEngine(Plate);
             return inner.PackArea(box, items, progress, token);
@@ -53,8 +65,11 @@ namespace OpenNest
         /// sub-region using dual-direction selection. Singles and leftovers
         /// are packed at the end.
         /// </summary>
-        public override List<Part> Nest(List<NestItem> items,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public override List<Part> Nest(
+            List<NestItem> items,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             if (items == null || items.Count == 0)
                 return new List<Part>();
@@ -68,9 +83,7 @@ namespace OpenNest
                 .ThenByDescending(i => i.Drawing.Area)
                 .ToList();
 
-            var packItems = items
-                .Where(i => i.Quantity == 1)
-                .ToList();
+            var packItems = items.Where(i => i.Quantity == 1).ToList();
 
             var allParts = new List<Part>();
 
@@ -92,8 +105,15 @@ namespace OpenNest
                 };
 
                 var shrinkResult = IterativeShrinkFiller.Fill(
-                    fillItems, workArea, heightFillFunc, Plate.PartSpacing, token,
-                    progress, PlateNumber, widthFillFunc);
+                    fillItems,
+                    workArea,
+                    heightFillFunc,
+                    Plate.PartSpacing,
+                    token,
+                    progress,
+                    PlateNumber,
+                    widthFillFunc
+                );
 
                 allParts.AddRange(shrinkResult.Parts);
 
@@ -134,8 +154,7 @@ namespace OpenNest
                 if (item.Quantity <= 0)
                     continue;
 
-                var placed = allParts.Count(p =>
-                    ReferenceEquals(p.BaseDrawing, item.Drawing));
+                var placed = allParts.Count(p => ReferenceEquals(p.BaseDrawing, item.Drawing));
                 item.Quantity = System.Math.Max(0, item.Quantity - placed);
             }
 

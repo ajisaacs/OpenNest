@@ -1,6 +1,6 @@
-using OpenNest.Engine.Fill;
 using System.Collections.Generic;
 using System.Threading;
+using OpenNest.Engine.Fill;
 
 namespace OpenNest.Engine.Strategies
 {
@@ -29,8 +29,12 @@ namespace OpenNest.Engine.Strategies
                 var comparer = context.Policy?.Comparer;
                 var dedup = GridDedup.GetOrCreate(context.SharedState);
                 var filler = new PairFiller(context.Plate, comparer, dedup);
-                var result = filler.Fill(context.Item, context.WorkArea,
-                    context.Token, context.ReportProgress);
+                var result = filler.Fill(
+                    context.Item,
+                    context.WorkArea,
+                    context.Token,
+                    context.ReportProgress
+                );
 
                 context.SharedState["BestFits"] = result.BestFits;
 

@@ -28,7 +28,7 @@ namespace OpenNest.Engine.Fill
                 return candExtent < currExtent;
 
             return FillScore.Compute(candidate, workArea).Density
-                 > FillScore.Compute(current, workArea).Density;
+                > FillScore.Compute(current, workArea).Density;
         }
 
         private static double YExtent(List<Part> parts)
@@ -39,8 +39,10 @@ namespace OpenNest.Engine.Fill
             foreach (var part in parts)
             {
                 var bb = part.BoundingBox;
-                if (bb.Bottom < minY) minY = bb.Bottom;
-                if (bb.Top > maxY) maxY = bb.Top;
+                if (bb.Bottom < minY)
+                    minY = bb.Bottom;
+                if (bb.Top > maxY)
+                    maxY = bb.Top;
             }
 
             return maxY - minY;

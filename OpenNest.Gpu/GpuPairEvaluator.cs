@@ -1,12 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using ILGPU;
 using ILGPU.Runtime;
 using OpenNest.Converters;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace OpenNest.Gpu
 {
@@ -18,13 +18,18 @@ namespace OpenNest.Gpu
         private readonly double _spacing;
         private readonly double _cellSize;
 
-        public GpuPairEvaluator(Drawing drawing, double spacing, double cellSize = PartBitmap.DefaultCellSize)
+        public GpuPairEvaluator(
+            Drawing drawing,
+            double spacing,
+            double cellSize = PartBitmap.DefaultCellSize
+        )
         {
             _drawing = drawing;
             _spacing = spacing;
             _cellSize = cellSize;
             _context = Context.CreateDefault();
-            _accelerator = _context.GetPreferredDevice(preferCPU: false)
+            _accelerator = _context
+                .GetPreferredDevice(preferCPU: false)
                 .CreateAccelerator(_context);
         }
 
@@ -91,8 +96,10 @@ namespace OpenNest.Gpu
                     var c = groupItems[i].Candidate;
                     var shiftX = c.Part2Offset.X - locationB.X;
                     var shiftY = c.Part2Offset.Y - locationB.Y;
-                    offsets[i * 2 + 0] = (int)System.Math.Round((shiftX + bitmapB.OriginX - bitmapA.OriginX) / _cellSize);
-                    offsets[i * 2 + 1] = (int)System.Math.Round((shiftY + bitmapB.OriginY - bitmapA.OriginY) / _cellSize);
+                    offsets[i * 2 + 0] = (int)
+                        System.Math.Round((shiftX + bitmapB.OriginX - bitmapA.OriginX) / _cellSize);
+                    offsets[i * 2 + 1] = (int)
+                        System.Math.Round((shiftY + bitmapB.OriginY - bitmapA.OriginY) / _cellSize);
                 }
 
                 var resultScores = new int[candidateCount];
@@ -108,10 +115,19 @@ namespace OpenNest.Gpu
                     ArrayView1D<int, Stride1D.Dense>,
                     ArrayView1D<int, Stride1D.Dense>,
                     ArrayView1D<int, Stride1D.Dense>,
-                    int, int>(OverlapKernel);
+                    int,
+                    int
+                >(OverlapKernel);
 
-                kernel(candidateCount, gpuPaddedA.View, gpuPaddedB.View,
-                    gpuOffsets.View, gpuResults.View, gridWidth, gridHeight);
+                kernel(
+                    candidateCount,
+                    gpuPaddedA.View,
+                    gpuPaddedB.View,
+                    gpuOffsets.View,
+                    gpuResults.View,
+                    gridWidth,
+                    gridHeight
+                );
 
                 _accelerator.Synchronize();
                 gpuResults.CopyToCPU(resultScores);
@@ -119,31 +135,40 @@ namespace OpenNest.Gpu
                 // Process results in parallel — pre-computed vertices avoid
                 // per-candidate Part creation, and Parallel.For matches the
                 // CPU evaluator's Parallel.ForEach concurrency.
-                Parallel.For(0, candidateCount, i =>
-                {
-                    var item = groupItems[i];
-                    var hasOverlap = resultScores[i] > 0;
+                Parallel.For(
+                    0,
+                    candidateCount,
+                    i =>
+                    {
+                        var item = groupItems[i];
+                        var hasOverlap = resultScores[i] > 0;
 
-                    if (hasOverlap)
-                    {
-                        allResults[item.OriginalIndex] = new BestFitResult
+                        if (hasOverlap)
                         {
-                            Candidate = item.Candidate,
-                            RotatedArea = 0,
-                            BoundingWidth = 0,
-                            BoundingHeight = 0,
-                            OptimalRotation = 0,
-                            TrueArea = trueArea,
-                            Keep = false,
-                            Reason = "Overlap detected"
-                        };
+                            allResults[item.OriginalIndex] = new BestFitResult
+                            {
+                                Candidate = item.Candidate,
+                                RotatedArea = 0,
+                                BoundingWidth = 0,
+                                BoundingHeight = 0,
+                                OptimalRotation = 0,
+                                TrueArea = trueArea,
+                                Keep = false,
+                                Reason = "Overlap detected",
+                            };
+                        }
+                        else
+                        {
+                            allResults[item.OriginalIndex] = ComputeBoundingResult(
+                                item.Candidate,
+                                trueArea,
+                                verticesA,
+                                verticesB,
+                                locationB
+                            );
+                        }
                     }
-                    else
-                    {
-                        allResults[item.OriginalIndex] = ComputeBoundingResult(
-                            item.Candidate, trueArea, verticesA, verticesB, locationB);
-                    }
-                });
+                );
             }
 
             return allResults.ToList();
@@ -161,7 +186,8 @@ namespace OpenNest.Gpu
             ArrayView1D<int, Stride1D.Dense> candidateOffsets,
             ArrayView1D<int, Stride1D.Dense> results,
             int gridWidth,
-            int gridHeight)
+            int gridHeight
+        )
         {
             var offsetX = candidateOffsets[index * 2];
             var offsetY = candidateOffsets[index * 2 + 1];
@@ -173,7 +199,8 @@ namespace OpenNest.Gpu
                 for (var x = 0; x < gridWidth; x++)
                 {
                     var cellA = partBitmapA[y * gridWidth + x];
-                    if (cellA != 1) continue;
+                    if (cellA != 1)
+                        continue;
 
                     var bx = x - offsetX;
                     var by = y - offsetY;
@@ -210,8 +237,12 @@ namespace OpenNest.Gpu
         private const double ChordTolerance = 0.01;
 
         private static BestFitResult ComputeBoundingResult(
-            PairCandidate candidate, double trueArea,
-            List<Vector> verticesA, List<Vector> verticesB, Vector locationB)
+            PairCandidate candidate,
+            double trueArea,
+            List<Vector> verticesA,
+            List<Vector> verticesB,
+            Vector locationB
+        )
         {
             var shift = candidate.Part2Offset - locationB;
 
@@ -221,7 +252,10 @@ namespace OpenNest.Gpu
             foreach (var v in verticesB)
                 allPoints.Add(v + shift);
 
-            double bestArea, bestWidth, bestHeight, bestRotation;
+            double bestArea,
+                bestWidth,
+                bestHeight,
+                bestRotation;
 
             if (allPoints.Count >= 3)
             {
@@ -249,13 +283,14 @@ namespace OpenNest.Gpu
                 OptimalRotation = bestRotation,
                 TrueArea = trueArea,
                 Keep = true,
-                Reason = "Valid"
+                Reason = "Valid",
             };
         }
 
         private static List<Vector> GetPartVertices(Part part)
         {
-            var entities = ConvertProgram.ToGeometry(part.Program)
+            var entities = ConvertProgram
+                .ToGeometry(part.Program)
                 .Where(e => e.Layer != SpecialLayers.Rapid);
             var shapes = ShapeBuilder.GetShapes(entities);
             var points = new List<Vector>();
@@ -283,7 +318,7 @@ namespace OpenNest.Gpu
                 OptimalRotation = 0,
                 TrueArea = 0,
                 Keep = false,
-                Reason = "No geometry"
+                Reason = "No geometry",
             };
         }
 

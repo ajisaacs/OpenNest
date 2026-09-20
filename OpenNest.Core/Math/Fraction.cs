@@ -7,8 +7,9 @@ namespace OpenNest.Math
 {
     public static class Fraction
     {
-        public static readonly Regex FractionRegex =
-            new Regex(@"((?<WholeNum>\d+)(\ |-))?(?<Fraction>\d+\/\d+)");
+        public static readonly Regex FractionRegex = new Regex(
+            @"((?<WholeNum>\d+)(\ |-))?(?<Fraction>\d+\/\d+)"
+        );
 
         public static bool IsValid(string s)
         {
@@ -59,7 +60,8 @@ namespace OpenNest.Math
         {
             var sb = new StringBuilder(input);
 
-            var fractionMatches = FractionRegex.Matches(sb.ToString())
+            var fractionMatches = FractionRegex
+                .Matches(sb.ToString())
                 .Cast<Match>()
                 .OrderByDescending(m => m.Index);
 

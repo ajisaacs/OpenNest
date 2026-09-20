@@ -1,6 +1,6 @@
-using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
 namespace OpenNest.Engine.Fill
@@ -14,8 +14,8 @@ namespace OpenNest.Engine.Fill
     {
         public static double Push(List<Part> movingParts, Plate plate, PushDirection direction)
         {
-            var obstacleParts = plate.Parts
-                .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
+            var obstacleParts = plate
+                .Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
             return Push(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, direction);
@@ -26,8 +26,8 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         public static double Push(List<Part> movingParts, Plate plate, double angle)
         {
-            var obstacleParts = plate.Parts
-                .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
+            var obstacleParts = plate
+                .Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
             var direction = new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
@@ -37,8 +37,13 @@ namespace OpenNest.Engine.Fill
         /// <summary>
         /// Pushes movingParts along an arbitrary angle (radians, 0 = right, π/2 = up).
         /// </summary>
-        public static double Push(List<Part> movingParts, List<Part> obstacleParts,
-            Box workArea, double partSpacing, Vector direction)
+        public static double Push(
+            List<Part> movingParts,
+            List<Part> obstacleParts,
+            Box workArea,
+            double partSpacing,
+            Vector direction
+        )
         {
             var opposite = -direction;
 
@@ -84,33 +89,59 @@ namespace OpenNest.Engine.Fill
                 for (var i = 0; i < obstacleBoxes.Length; i++)
                 {
                     var obstacleSpacingBox = obstacleSpacingBoxes[i];
-                    var reverseGap = SpatialQuery.DirectionalGap(movingSpacingBox, obstacleSpacingBox, opposite);
+                    var reverseGap = SpatialQuery.DirectionalGap(
+                        movingSpacingBox,
+                        obstacleSpacingBox,
+                        opposite
+                    );
                     if (reverseGap > 0)
                         continue;
 
-                    var gap = SpatialQuery.DirectionalGap(movingSpacingBox, obstacleSpacingBox, direction);
+                    var gap = SpatialQuery.DirectionalGap(
+                        movingSpacingBox,
+                        obstacleSpacingBox,
+                        direction
+                    );
                     if (gap >= distance)
                         continue;
 
-                    if (!SpatialQuery.PerpendicularOverlap(movingSpacingBox, obstacleSpacingBox, direction))
+                    if (
+                        !SpatialQuery.PerpendicularOverlap(
+                            movingSpacingBox,
+                            obstacleSpacingBox,
+                            direction
+                        )
+                    )
                         continue;
 
-                    movingEntities ??= halfSpacing > 0
-                        ? (needCutouts
-                            ? PartGeometry.GetOffsetPartEntities(moving, halfSpacing)
-                            : PartGeometry.GetOffsetPerimeterEntities(moving, halfSpacing))
-                        : (needCutouts
-                            ? PartGeometry.GetPartEntities(moving)
-                            : PartGeometry.GetPerimeterEntities(moving));
+                    movingEntities ??=
+                        halfSpacing > 0
+                            ? (
+                                needCutouts
+                                    ? PartGeometry.GetOffsetPartEntities(moving, halfSpacing)
+                                    : PartGeometry.GetOffsetPerimeterEntities(moving, halfSpacing)
+                            )
+                            : (
+                                needCutouts
+                                    ? PartGeometry.GetPartEntities(moving)
+                                    : PartGeometry.GetPerimeterEntities(moving)
+                            );
 
-                    obstacleEntities[i] ??= halfSpacing > 0
-                        ? PartGeometry.GetOffsetPerimeterEntities(obstacleParts[i], halfSpacing)
-                        : PartGeometry.GetPerimeterEntities(obstacleParts[i]);
+                    obstacleEntities[i] ??=
+                        halfSpacing > 0
+                            ? PartGeometry.GetOffsetPerimeterEntities(obstacleParts[i], halfSpacing)
+                            : PartGeometry.GetPerimeterEntities(obstacleParts[i]);
 
-                    var d = SpatialQuery.DirectionalDistance(movingEntities, obstacleEntities[i], direction);
-                    if (d <= Tolerance.Epsilon
+                    var d = SpatialQuery.DirectionalDistance(
+                        movingEntities,
+                        obstacleEntities[i],
+                        direction
+                    );
+                    if (
+                        d <= Tolerance.Epsilon
                         && partSpacing <= Tolerance.Epsilon
-                        && CanNudgeWithoutOverlap(moving, obstacleParts[i], direction))
+                        && CanNudgeWithoutOverlap(moving, obstacleParts[i], direction)
+                    )
                     {
                         continue;
                     }
@@ -133,8 +164,12 @@ namespace OpenNest.Engine.Fill
 
         private static Box SpacingBounds(Box box, double spacing)
         {
-            return new Box(box.Left - spacing, box.Bottom - spacing,
-                box.Length + 2 * spacing, box.Width + 2 * spacing);
+            return new Box(
+                box.Left - spacing,
+                box.Bottom - spacing,
+                box.Length + 2 * spacing,
+                box.Width + 2 * spacing
+            );
         }
 
         private static bool IntersectsAny(Part candidate, List<Part> parts)
@@ -162,8 +197,13 @@ namespace OpenNest.Engine.Fill
             }
         }
 
-        public static double Push(List<Part> movingParts, List<Part> obstacleParts,
-            Box workArea, double partSpacing, PushDirection direction)
+        public static double Push(
+            List<Part> movingParts,
+            List<Part> obstacleParts,
+            Box workArea,
+            double partSpacing,
+            PushDirection direction
+        )
         {
             var vector = SpatialQuery.DirectionToOffset(direction, 1.0);
             return Push(movingParts, obstacleParts, workArea, partSpacing, vector);
@@ -174,17 +214,32 @@ namespace OpenNest.Engine.Fill
         /// Much faster but less precise — use as a coarse positioning pass before
         /// a full geometry Push.
         /// </summary>
-        public static double PushBoundingBox(List<Part> movingParts, Plate plate, PushDirection direction)
+        public static double PushBoundingBox(
+            List<Part> movingParts,
+            Plate plate,
+            PushDirection direction
+        )
         {
-            var obstacleParts = plate.Parts
-                .Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
+            var obstacleParts = plate
+                .Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
                 .ToList();
 
-            return PushBoundingBox(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, direction);
+            return PushBoundingBox(
+                movingParts,
+                obstacleParts,
+                plate.WorkArea(),
+                plate.PartSpacing,
+                direction
+            );
         }
 
-        public static double PushBoundingBox(List<Part> movingParts, List<Part> obstacleParts,
-            Box workArea, double partSpacing, PushDirection direction)
+        public static double PushBoundingBox(
+            List<Part> movingParts,
+            List<Part> obstacleParts,
+            Box workArea,
+            double partSpacing,
+            PushDirection direction
+        )
         {
             var obstacleBoxes = new Box[obstacleParts.Count];
             for (var i = 0; i < obstacleParts.Count; i++)
@@ -206,7 +261,11 @@ namespace OpenNest.Engine.Fill
 
                 for (var i = 0; i < obstacleBoxes.Length; i++)
                 {
-                    var reverseGap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], opposite);
+                    var reverseGap = SpatialQuery.DirectionalGap(
+                        movingBox,
+                        obstacleBoxes[i],
+                        opposite
+                    );
                     if (reverseGap > 0)
                         continue;
 
@@ -219,7 +278,8 @@ namespace OpenNest.Engine.Fill
 
                     var gap = SpatialQuery.DirectionalGap(movingBox, obstacleBoxes[i], direction);
                     var d = gap - partSpacing - 0.002;
-                    if (d < 0) d = 0;
+                    if (d < 0)
+                        d = 0;
                     if (d < distance)
                         distance = d;
                 }
@@ -240,8 +300,13 @@ namespace OpenNest.Engine.Fill
         /// Repeatedly pushes parts left then down until total movement per
         /// iteration falls below the given threshold.
         /// </summary>
-        public static void Settle(List<Part> parts, Box workArea, double partSpacing,
-            double threshold = 0.01, int maxIterations = 20)
+        public static void Settle(
+            List<Part> parts,
+            Box workArea,
+            double partSpacing,
+            double threshold = 0.01,
+            int maxIterations = 20
+        )
         {
             if (parts.Count < 2)
                 return;

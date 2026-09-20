@@ -13,12 +13,19 @@ public class FillWithDirectionPreferenceTests
     [Fact]
     public void NullPreference_TriesBothDirections_ReturnsBetter()
     {
-        var hParts = new List<Part> { TestHelpers.MakePartAt(0, 0, 10), TestHelpers.MakePartAt(12, 0, 10) };
+        var hParts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(12, 0, 10),
+        };
         var vParts = new List<Part> { TestHelpers.MakePartAt(0, 0, 10) };
 
         var result = FillHelpers.FillWithDirectionPreference(
             dir => dir == NestDirection.Horizontal ? hParts : vParts,
-            null, comparer, workArea);
+            null,
+            comparer,
+            workArea
+        );
 
         Assert.Equal(2, result.Count);
     }
@@ -26,12 +33,24 @@ public class FillWithDirectionPreferenceTests
     [Fact]
     public void PreferredDirection_UsedFirst_WhenProducesResults()
     {
-        var hParts = new List<Part> { TestHelpers.MakePartAt(0, 0, 10), TestHelpers.MakePartAt(12, 0, 10) };
-        var vParts = new List<Part> { TestHelpers.MakePartAt(0, 0, 10), TestHelpers.MakePartAt(0, 12, 10), TestHelpers.MakePartAt(0, 24, 10) };
+        var hParts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(12, 0, 10),
+        };
+        var vParts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 10),
+            TestHelpers.MakePartAt(0, 12, 10),
+            TestHelpers.MakePartAt(0, 24, 10),
+        };
 
         var result = FillHelpers.FillWithDirectionPreference(
             dir => dir == NestDirection.Horizontal ? hParts : vParts,
-            NestDirection.Horizontal, comparer, workArea);
+            NestDirection.Horizontal,
+            comparer,
+            workArea
+        );
 
         Assert.Equal(2, result.Count); // H has results, so H is returned (preferred)
     }
@@ -43,7 +62,10 @@ public class FillWithDirectionPreferenceTests
 
         var result = FillHelpers.FillWithDirectionPreference(
             dir => dir == NestDirection.Horizontal ? new List<Part>() : vParts,
-            NestDirection.Horizontal, comparer, workArea);
+            NestDirection.Horizontal,
+            comparer,
+            workArea
+        );
 
         Assert.Equal(1, result.Count); // Falls back to V
     }

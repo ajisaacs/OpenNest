@@ -19,8 +19,7 @@ namespace OpenNest.Engine.Strategies
             LoadFrom(typeof(FillStrategyRegistry).Assembly);
         }
 
-        public static IReadOnlyList<IFillStrategy> Strategies =>
-            sorted ??= FilterStrategies();
+        public static IReadOnlyList<IFillStrategy> Strategies => sorted ??= FilterStrategies();
 
         /// <summary>
         /// Returns all registered strategies regardless of enabled/disabled state.
@@ -35,9 +34,10 @@ namespace OpenNest.Engine.Strategies
 
         private static List<IFillStrategy> FilterStrategies()
         {
-            var source = enabledFilter != null
-                ? strategies.Where(s => enabledFilter.Contains(s.Name))
-                : strategies.Where(s => !disabled.Contains(s.Name));
+            var source =
+                enabledFilter != null
+                    ? strategies.Where(s => enabledFilter.Contains(s.Name))
+                    : strategies.Where(s => !disabled.Contains(s.Name));
             return source.OrderBy(s => s.Order).ToList();
         }
 
@@ -68,9 +68,10 @@ namespace OpenNest.Engine.Strategies
         /// </summary>
         public static void SetEnabled(params string[] names)
         {
-            enabledFilter = names != null && names.Length > 0
-                ? new HashSet<string>(names, StringComparer.OrdinalIgnoreCase)
-                : null;
+            enabledFilter =
+                names != null && names.Length > 0
+                    ? new HashSet<string>(names, StringComparer.OrdinalIgnoreCase)
+                    : null;
             sorted = null;
         }
 
@@ -78,13 +79,19 @@ namespace OpenNest.Engine.Strategies
         {
             foreach (var type in assembly.GetTypes())
             {
-                if (type.IsAbstract || type.IsInterface || !typeof(IFillStrategy).IsAssignableFrom(type))
+                if (
+                    type.IsAbstract
+                    || type.IsInterface
+                    || !typeof(IFillStrategy).IsAssignableFrom(type)
+                )
                     continue;
 
                 var ctor = type.GetConstructor(Type.EmptyTypes);
                 if (ctor == null)
                 {
-                    Debug.WriteLine($"[FillStrategyRegistry] Skipping {type.Name}: no parameterless constructor");
+                    Debug.WriteLine(
+                        $"[FillStrategyRegistry] Skipping {type.Name}: no parameterless constructor"
+                    );
                     continue;
                 }
 
@@ -92,18 +99,28 @@ namespace OpenNest.Engine.Strategies
                 {
                     var instance = (IFillStrategy)ctor.Invoke(null);
 
-                    if (strategies.Any(s => s.Name.Equals(instance.Name, StringComparison.OrdinalIgnoreCase)))
+                    if (
+                        strategies.Any(s =>
+                            s.Name.Equals(instance.Name, StringComparison.OrdinalIgnoreCase)
+                        )
+                    )
                     {
-                        Debug.WriteLine($"[FillStrategyRegistry] Duplicate strategy '{instance.Name}' skipped");
+                        Debug.WriteLine(
+                            $"[FillStrategyRegistry] Duplicate strategy '{instance.Name}' skipped"
+                        );
                         continue;
                     }
 
                     strategies.Add(instance);
-                    Debug.WriteLine($"[FillStrategyRegistry] Registered: {instance.Name} (Order={instance.Order})");
+                    Debug.WriteLine(
+                        $"[FillStrategyRegistry] Registered: {instance.Name} (Order={instance.Order})"
+                    );
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[FillStrategyRegistry] Failed to instantiate {type.Name}: {ex.Message}");
+                    Debug.WriteLine(
+                        $"[FillStrategyRegistry] Failed to instantiate {type.Name}: {ex.Message}"
+                    );
                 }
             }
 
@@ -121,11 +138,15 @@ namespace OpenNest.Engine.Strategies
                 {
                     var assembly = Assembly.LoadFrom(dll);
                     LoadFrom(assembly);
-                    Debug.WriteLine($"[FillStrategyRegistry] Loaded plugin assembly: {Path.GetFileName(dll)}");
+                    Debug.WriteLine(
+                        $"[FillStrategyRegistry] Loaded plugin assembly: {Path.GetFileName(dll)}"
+                    );
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[FillStrategyRegistry] Failed to load {Path.GetFileName(dll)}: {ex.Message}");
+                    Debug.WriteLine(
+                        $"[FillStrategyRegistry] Failed to load {Path.GetFileName(dll)}: {ex.Message}"
+                    );
                 }
             }
         }

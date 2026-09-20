@@ -17,7 +17,7 @@ namespace OpenNest
                 CutDistance = info1.CutDistance + info2.CutDistance,
                 IntersectionCount = info1.IntersectionCount + info2.IntersectionCount,
                 TravelDistance = info1.TravelDistance + info2.TravelDistance,
-                PierceCount = info1.PierceCount + info2.PierceCount
+                PierceCount = info1.PierceCount + info2.PierceCount,
             };
         }
 
@@ -28,7 +28,7 @@ namespace OpenNest
                 CutDistance = info1.CutDistance - info2.CutDistance,
                 IntersectionCount = info1.IntersectionCount - info2.IntersectionCount,
                 TravelDistance = info1.TravelDistance - info2.TravelDistance,
-                PierceCount = info1.PierceCount - info2.PierceCount
+                PierceCount = info1.PierceCount - info2.PierceCount,
             };
         }
 
@@ -39,7 +39,7 @@ namespace OpenNest
                 CutDistance = info1.CutDistance * info2.CutDistance,
                 IntersectionCount = info1.IntersectionCount * info2.IntersectionCount,
                 TravelDistance = info1.TravelDistance * info2.TravelDistance,
-                PierceCount = info1.PierceCount * info2.PierceCount
+                PierceCount = info1.PierceCount * info2.PierceCount,
             };
         }
 
@@ -50,7 +50,7 @@ namespace OpenNest
                 CutDistance = info1.CutDistance * factor,
                 IntersectionCount = info1.IntersectionCount * factor,
                 TravelDistance = info1.TravelDistance * factor,
-                PierceCount = info1.PierceCount * factor
+                PierceCount = info1.PierceCount * factor,
             };
         }
     }

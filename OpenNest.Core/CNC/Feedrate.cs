@@ -6,9 +6,7 @@
 
         public const int UseMax = -2;
 
-        public Feedrate()
-        {
-        }
+        public Feedrate() { }
 
         public Feedrate(double value)
         {

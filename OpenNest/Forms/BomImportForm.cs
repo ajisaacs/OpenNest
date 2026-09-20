@@ -1,6 +1,3 @@
-using OpenNest.Geometry;
-using OpenNest.IO;
-using OpenNest.IO.Bom;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -8,6 +5,9 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Geometry;
+using OpenNest.IO;
+using OpenNest.IO.Bom;
 
 namespace OpenNest.Forms
 {
@@ -108,8 +108,12 @@ namespace OpenNest.Forms
         {
             if (!File.Exists(txtBomFile.Text))
             {
-                MessageBox.Show("BOM file does not exist.", "Validation Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    "BOM file does not exist.",
+                    "Validation Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
                 return;
             }
 
@@ -129,8 +133,12 @@ namespace OpenNest.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error reading BOM: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    $"Error reading BOM: {ex.Message}",
+                    "Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
             }
         }
 
@@ -139,9 +147,9 @@ namespace OpenNest.Forms
             var matchedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var group in analysis.Groups)
-                foreach (var part in group.Parts)
-                    if (part.DxfPath != null)
-                        matchedPaths[part.Item.FileName ?? ""] = part.DxfPath;
+            foreach (var part in group.Parts)
+                if (part.DxfPath != null)
+                    matchedPaths[part.Item.FileName ?? ""] = part.DxfPath;
 
             _parts = new List<BomPartRow>();
 
@@ -165,8 +173,10 @@ namespace OpenNest.Forms
                 else
                 {
                     var lookupName = item.FileName;
-                    if (lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-                        || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase))
+                    if (
+                        lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
+                        || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
+                    )
                         lookupName = Path.GetFileNameWithoutExtension(lookupName);
 
                     if (matchedPaths.TryGetValue(lookupName, out var dxfPath))
@@ -278,17 +288,21 @@ namespace OpenNest.Forms
             // Save existing settings before rebuilding
             SaveGroupSettings();
 
-            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var w) ? w : _templateDefaults.Size.Width;
-            var defaultLength = double.TryParse(txtPlateLength.Text, out var l) ? l : _templateDefaults.Size.Length;
+            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var w)
+                ? w
+                : _templateDefaults.Size.Width;
+            var defaultLength = double.TryParse(txtPlateLength.Text, out var l)
+                ? l
+                : _templateDefaults.Size.Length;
 
             var groups = _parts
-                .Where(p => p.IsEditable
-                    && !string.IsNullOrWhiteSpace(p.Material)
-                    && p.Thickness.HasValue)
+                .Where(p =>
+                    p.IsEditable && !string.IsNullOrWhiteSpace(p.Material) && p.Thickness.HasValue
+                )
                 .GroupBy(p => new
                 {
                     Material = p.Material.ToUpperInvariant(),
-                    Thickness = p.Thickness.Value
+                    Thickness = p.Thickness.Value,
                 })
                 .OrderBy(g => g.First().Material)
                 .ThenBy(g => g.Key.Thickness)
@@ -358,19 +372,31 @@ namespace OpenNest.Forms
 
                 _groupSettings[key] = new GroupSettings
                 {
-                    PlateWidth = row["Plate Width"] is double pw ? pw : _templateDefaults.Size.Width,
-                    PlateLength = row["Plate Length"] is double pl ? pl : _templateDefaults.Size.Length,
-                    PartSpacing = row["Part Spacing"] is double ps ? ps : _templateDefaults.PartSpacing,
-                    EdgeLeft = row["Edge Left"] is double el ? el : _templateDefaults.EdgeSpacing.Left,
-                    EdgeBottom = row["Edge Bottom"] is double eb ? eb : _templateDefaults.EdgeSpacing.Bottom,
-                    EdgeRight = row["Edge Right"] is double er ? er : _templateDefaults.EdgeSpacing.Right,
+                    PlateWidth = row["Plate Width"] is double pw
+                        ? pw
+                        : _templateDefaults.Size.Width,
+                    PlateLength = row["Plate Length"] is double pl
+                        ? pl
+                        : _templateDefaults.Size.Length,
+                    PartSpacing = row["Part Spacing"] is double ps
+                        ? ps
+                        : _templateDefaults.PartSpacing,
+                    EdgeLeft = row["Edge Left"] is double el
+                        ? el
+                        : _templateDefaults.EdgeSpacing.Left,
+                    EdgeBottom = row["Edge Bottom"] is double eb
+                        ? eb
+                        : _templateDefaults.EdgeSpacing.Bottom,
+                    EdgeRight = row["Edge Right"] is double er
+                        ? er
+                        : _templateDefaults.EdgeSpacing.Right,
                     EdgeTop = row["Edge Top"] is double et ? et : _templateDefaults.EdgeSpacing.Top,
                 };
             }
         }
 
-        private static string GroupKey(string material, double thickness)
-            => $"{material?.ToUpperInvariant()}|{thickness}";
+        private static string GroupKey(string material, double thickness) =>
+            $"{material?.ToUpperInvariant()}|{thickness}";
 
         #endregion
 
@@ -388,9 +414,10 @@ namespace OpenNest.Forms
             if (noDxf > 0)
                 summaryParts.Add($"{noDxf} no DXF found");
 
-            lblSummary.Text = summaryParts.Count > 0
-                ? string.Join(", ", summaryParts)
-                : $"{matched} parts matched";
+            lblSummary.Text =
+                summaryParts.Count > 0
+                    ? string.Join(", ", summaryParts)
+                    : $"{matched} parts matched";
         }
 
         #endregion
@@ -405,25 +432,35 @@ namespace OpenNest.Forms
             // Save latest group edits
             SaveGroupSettings();
 
-            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var dw) ? dw : _templateDefaults.Size.Width;
-            var defaultLength = double.TryParse(txtPlateLength.Text, out var dl) ? dl : _templateDefaults.Size.Length;
+            var defaultWidth = double.TryParse(txtPlateWidth.Text, out var dw)
+                ? dw
+                : _templateDefaults.Size.Width;
+            var defaultLength = double.TryParse(txtPlateLength.Text, out var dl)
+                ? dl
+                : _templateDefaults.Size.Length;
 
             var groups = _parts
-                .Where(p => p.IsEditable
+                .Where(p =>
+                    p.IsEditable
                     && !string.IsNullOrWhiteSpace(p.Material)
                     && p.Thickness.HasValue
-                    && !string.IsNullOrWhiteSpace(p.DxfPath))
+                    && !string.IsNullOrWhiteSpace(p.DxfPath)
+                )
                 .GroupBy(p => new
                 {
                     Material = p.Material.ToUpperInvariant(),
-                    Thickness = p.Thickness.Value
+                    Thickness = p.Thickness.Value,
                 })
                 .ToList();
 
             if (groups.Count == 0)
             {
-                MessageBox.Show("No groups with matched DXF files to create nests from.", "Nothing to Create",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "No groups with matched DXF files to create nests from.",
+                    "Nothing to Create",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
                 return;
             }
 
@@ -455,7 +492,12 @@ namespace OpenNest.Forms
                 nest.Material = new Material(material);
                 nest.PlateDefaults.Quadrant = _templateDefaults.Quadrant;
                 nest.PlateDefaults.PartSpacing = partSpacing;
-                nest.PlateDefaults.EdgeSpacing = new Spacing(edgeLeft, edgeBottom, edgeRight, edgeTop);
+                nest.PlateDefaults.EdgeSpacing = new Spacing(
+                    edgeLeft,
+                    edgeBottom,
+                    edgeRight,
+                    edgeTop
+                );
 
                 foreach (var part in group)
                 {
@@ -467,8 +509,10 @@ namespace OpenNest.Forms
 
                     try
                     {
-                        var drawing = CadImporter.ImportDrawing(part.DxfPath,
-                            new CadImportOptions { Quantity = part.Qty ?? 1 });
+                        var drawing = CadImporter.ImportDrawing(
+                            part.DxfPath,
+                            new CadImportOptions { Quantity = part.Qty ?? 1 }
+                        );
                         drawing.Material = new Material(material);
                         nest.Drawings.Add(drawing);
                     }
@@ -493,10 +537,16 @@ namespace OpenNest.Forms
 
             var summary = $"{nestsCreated} nest{(nestsCreated != 1 ? "s" : "")} created.";
             if (importErrors.Count > 0)
-                summary += $"\n\n{importErrors.Count} import error(s):\n" + string.Join("\n", importErrors);
+                summary +=
+                    $"\n\n{importErrors.Count} import error(s):\n"
+                    + string.Join("\n", importErrors);
 
-            MessageBox.Show(summary, "Import Complete", MessageBoxButtons.OK,
-                importErrors.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+            MessageBox.Show(
+                summary,
+                "Import Complete",
+                MessageBoxButtons.OK,
+                importErrors.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information
+            );
 
             Close();
         }

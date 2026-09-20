@@ -1,12 +1,12 @@
-using ACadSharp;
-using ACadSharp.Entities;
-using OpenNest.Bending;
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using ACadSharp;
+using ACadSharp.Entities;
+using OpenNest.Bending;
+using OpenNest.Geometry;
 
 namespace OpenNest.IO.Bending
 {
@@ -18,15 +18,18 @@ namespace OpenNest.IO.Bending
 
         private static readonly Regex BendNoteRegex = new Regex(
             @"(?<direction>UP|DOWN|DN)\s+(?<angle>\d+(\.\d+)?)[^A-Z\d]*R\s*(?<radius>\d+(\.\d+)?)",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            RegexOptions.Compiled | RegexOptions.IgnoreCase
+        );
 
         private static readonly Regex MTextFormatRegex = new Regex(
             @"\\[fHCTQWASpOoLlKk][^;]*;|\\P|[{}]|%%[dDpPcC]",
-            RegexOptions.Compiled);
+            RegexOptions.Compiled
+        );
 
         private static readonly Regex UnicodeEscapeRegex = new Regex(
             @"\\U\+([0-9A-Fa-f]{4})",
-            RegexOptions.Compiled);
+            RegexOptions.Compiled
+        );
 
         public List<Bend> DetectBends(CadDocument document)
         {
@@ -47,7 +50,7 @@ namespace OpenNest.IO.Bending
                 {
                     StartPoint = start,
                     EndPoint = end,
-                    Direction = BendDirection.Unknown
+                    Direction = BendDirection.Unknown,
                 };
 
                 var note = FindClosestBendNote(line, bendNotes);
@@ -101,7 +104,12 @@ namespace OpenNest.IO.Bending
             }
         }
 
-        private static bool AreCollinear(Bend a, Bend b, double angleTolerance, double distanceTolerance)
+        private static bool AreCollinear(
+            Bend a,
+            Bend b,
+            double angleTolerance,
+            double distanceTolerance
+        )
         {
             var angleA = a.StartPoint.AngleTo(a.EndPoint);
             var angleB = b.StartPoint.AngleTo(b.EndPoint);
@@ -114,7 +122,8 @@ namespace OpenNest.IO.Bending
             // Perpendicular distance from midpoint of A to the infinite line through B
             var midA = new Vector(
                 (a.StartPoint.X + a.EndPoint.X) / 2.0,
-                (a.StartPoint.Y + a.EndPoint.Y) / 2.0);
+                (a.StartPoint.Y + a.EndPoint.Y) / 2.0
+            );
 
             var dx = b.EndPoint.X - b.StartPoint.X;
             var dy = b.EndPoint.Y - b.StartPoint.Y;
@@ -133,18 +142,22 @@ namespace OpenNest.IO.Bending
 
         private List<ACadSharp.Entities.Line> FindBendLines(CadDocument document)
         {
-            return document.Entities
-                .OfType<ACadSharp.Entities.Line>()
-                .Where(l => (l.Layer?.Name == "BEND" || l.Layer?.Name == "0")
-                    && (l.LineType?.Name?.Contains("CENTER") == true
-                        || l.LineType?.Name == "CENTERX2"))
+            return document
+                .Entities.OfType<ACadSharp.Entities.Line>()
+                .Where(l =>
+                    (l.Layer?.Name == "BEND" || l.Layer?.Name == "0")
+                    && (
+                        l.LineType?.Name?.Contains("CENTER") == true
+                        || l.LineType?.Name == "CENTERX2"
+                    )
+                )
                 .ToList();
         }
 
         private List<MText> FindBendNotes(CadDocument document)
         {
-            return document.Entities
-                .OfType<MText>()
+            return document
+                .Entities.OfType<MText>()
                 .Where(t => GetBendDirection(t.Value) != BendDirection.Unknown)
                 .ToList();
         }
@@ -172,10 +185,24 @@ namespace OpenNest.IO.Bending
 
             if (match.Success)
             {
-                if (double.TryParse(match.Groups["radius"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var radius))
+                if (
+                    double.TryParse(
+                        match.Groups["radius"].Value,
+                        NumberStyles.Any,
+                        CultureInfo.InvariantCulture,
+                        out var radius
+                    )
+                )
                     bend.Radius = radius;
 
-                if (double.TryParse(match.Groups["angle"].Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var angle))
+                if (
+                    double.TryParse(
+                        match.Groups["angle"].Value,
+                        NumberStyles.Any,
+                        CultureInfo.InvariantCulture,
+                        out var angle
+                    )
+                )
                     bend.Angle = angle;
             }
         }
@@ -186,17 +213,27 @@ namespace OpenNest.IO.Bending
                 return text;
 
             // Convert \U+XXXX DXF unicode escapes to actual characters
-            var result = UnicodeEscapeRegex.Replace(text, m =>
-            {
-                var codePoint = int.Parse(m.Groups[1].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-                return char.ConvertFromUtf32(codePoint);
-            });
+            var result = UnicodeEscapeRegex.Replace(
+                text,
+                m =>
+                {
+                    var codePoint = int.Parse(
+                        m.Groups[1].Value,
+                        NumberStyles.HexNumber,
+                        CultureInfo.InvariantCulture
+                    );
+                    return char.ConvertFromUtf32(codePoint);
+                }
+            );
 
             // Replace known DXF special characters
             result = result
-                .Replace("%%d", "°").Replace("%%D", "°")
-                .Replace("%%p", "±").Replace("%%P", "±")
-                .Replace("%%c", "⌀").Replace("%%C", "⌀");
+                .Replace("%%d", "°")
+                .Replace("%%D", "°")
+                .Replace("%%p", "±")
+                .Replace("%%P", "±")
+                .Replace("%%c", "⌀")
+                .Replace("%%C", "⌀");
 
             // Strip MText formatting codes and braces
             result = MTextFormatRegex.Replace(result, " ");
@@ -207,7 +244,8 @@ namespace OpenNest.IO.Bending
 
         private MText FindClosestBendNote(ACadSharp.Entities.Line bendLine, List<MText> notes)
         {
-            if (notes.Count == 0) return null;
+            if (notes.Count == 0)
+                return null;
 
             MText closest = null;
             var closestDist = double.MaxValue;
@@ -223,7 +261,8 @@ namespace OpenNest.IO.Bending
                 var dist = notePos.DistanceTo(perpPoint);
 
                 var maxAcceptable = note.Height * 2.0;
-                if (dist > maxAcceptable) continue;
+                if (dist > maxAcceptable)
+                    continue;
 
                 if (dist < closestDist)
                 {

@@ -1,6 +1,6 @@
-﻿using OpenNest.Geometry;
+﻿using System.Collections.Generic;
+using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.RectanglePacking
 {
@@ -23,7 +23,7 @@ namespace OpenNest.RectanglePacking
                 IsRotated = this.IsRotated,
                 Location = this.Location,
                 Size = this.Size,
-                Id = this.Id
+                Id = this.Id,
             };
         }
     }
@@ -42,10 +42,14 @@ namespace OpenNest.RectanglePacking
 
             foreach (var box in items)
             {
-                if (box.Left < minX) minX = box.Left;
-                if (box.Right > maxX) maxX = box.Right;
-                if (box.Bottom < minY) minY = box.Bottom;
-                if (box.Top > maxY) maxY = box.Top;
+                if (box.Left < minX)
+                    minX = box.Left;
+                if (box.Right > maxX)
+                    maxX = box.Right;
+                if (box.Bottom < minY)
+                    minY = box.Bottom;
+                if (box.Top > maxY)
+                    maxY = box.Top;
             }
 
             return new Box(minX, minY, maxX - minX, maxY - minY);

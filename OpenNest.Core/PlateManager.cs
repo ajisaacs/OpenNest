@@ -1,5 +1,5 @@
-using OpenNest.Collections;
 using System;
+using OpenNest.Collections;
 
 namespace OpenNest
 {
@@ -44,7 +44,8 @@ namespace OpenNest
 
         public bool IsLast => CurrentIndex + 1 >= Count;
 
-        public bool CanRemoveCurrent => Count > 1 && CurrentPlate != null && CurrentPlate.Parts.Count > 0;
+        public bool CanRemoveCurrent =>
+            Count > 1 && CurrentPlate != null && CurrentPlate.Parts.Count > 0;
 
         public void LoadFirst()
         {
@@ -101,9 +102,11 @@ namespace OpenNest
                 if (Count == 0 || nest.Plates[^1].Parts.Count > 0)
                     nest.CreatePlate();
 
-                while (Count > 1
+                while (
+                    Count > 1
                     && nest.Plates[^1].Parts.Count == 0
-                    && nest.Plates[^2].Parts.Count == 0)
+                    && nest.Plates[^2].Parts.Count == 0
+                )
                 {
                     nest.Plates.RemoveAt(Count - 1);
                 }
@@ -226,7 +229,10 @@ namespace OpenNest
 
         private void FireCurrentPlateChanged()
         {
-            CurrentPlateChanged?.Invoke(this, new PlateChangedEventArgs(CurrentPlate, CurrentIndex));
+            CurrentPlateChanged?.Invoke(
+                this,
+                new PlateChangedEventArgs(CurrentPlate, CurrentIndex)
+            );
         }
 
         public void Dispose()

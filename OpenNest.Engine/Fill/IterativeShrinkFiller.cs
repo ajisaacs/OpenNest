@@ -1,9 +1,9 @@
-using OpenNest.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Fill
 {
@@ -33,7 +33,8 @@ namespace OpenNest.Engine.Fill
             CancellationToken token = default,
             IProgress<NestProgress> progress = null,
             int plateNumber = 0,
-            Func<NestItem, Box, List<Part>> widthFillFunc = null)
+            Func<NestItem, Box, List<Part>> widthFillFunc = null
+        )
         {
             if (items == null || items.Count == 0)
                 return new IterativeShrinkResult();
@@ -48,19 +49,20 @@ namespace OpenNest.Engine.Fill
                 if (item.Quantity <= 0)
                 {
                     var bbox = item.Drawing.Program.BoundingBox();
-                    var estimatedMax = bbox.Area() > 0
-                        ? (int)(workArea.Area() / bbox.Area()) * 2
-                        : 1000;
+                    var estimatedMax =
+                        bbox.Area() > 0 ? (int)(workArea.Area() / bbox.Area()) * 2 : 1000;
 
-                    workItems.Add(new NestItem
-                    {
-                        Drawing = item.Drawing,
-                        Quantity = System.Math.Max(1, estimatedMax),
-                        Priority = item.Priority,
-                        StepAngle = item.StepAngle,
-                        RotationStart = item.RotationStart,
-                        RotationEnd = item.RotationEnd
-                    });
+                    workItems.Add(
+                        new NestItem
+                        {
+                            Drawing = item.Drawing,
+                            Quantity = System.Math.Max(1, estimatedMax),
+                            Priority = item.Priority,
+                            StepAngle = item.StepAngle,
+                            RotationStart = item.RotationStart,
+                            RotationEnd = item.RotationEnd,
+                        }
+                    );
                 }
                 else
                 {
@@ -86,10 +88,32 @@ namespace OpenNest.Engine.Fill
                 ShrinkResult widthResult = null;
 
                 Parallel.Invoke(
-                    () => heightResult = ShrinkFiller.Shrink(fillFunc, ni, box, spacing, ShrinkAxis.Length, token,
-                        targetCount: target, progress: progress, plateNumber: plateNumber, placedParts: placedSoFar),
-                    () => widthResult = ShrinkFiller.Shrink(wFillFunc, ni, box, spacing, ShrinkAxis.Width, token,
-                        targetCount: target, progress: progress, plateNumber: plateNumber, placedParts: placedSoFar)
+                    () =>
+                        heightResult = ShrinkFiller.Shrink(
+                            fillFunc,
+                            ni,
+                            box,
+                            spacing,
+                            ShrinkAxis.Length,
+                            token,
+                            targetCount: target,
+                            progress: progress,
+                            plateNumber: plateNumber,
+                            placedParts: placedSoFar
+                        ),
+                    () =>
+                        widthResult = ShrinkFiller.Shrink(
+                            wFillFunc,
+                            ni,
+                            box,
+                            spacing,
+                            ShrinkAxis.Width,
+                            token,
+                            targetCount: target,
+                            progress: progress,
+                            plateNumber: plateNumber,
+                            placedParts: placedSoFar
+                        )
                 );
 
                 var heightScore = FillScore.Compute(heightResult.Parts, box);
@@ -112,15 +136,18 @@ namespace OpenNest.Engine.Fill
                     var allParts = new List<Part>(placedSoFar.Count + best.Count);
                     allParts.AddRange(placedSoFar);
                     allParts.AddRange(best);
-                    NestEngineBase.ReportProgress(progress, new ProgressReport
-                    {
-                        Phase = NestPhase.Custom,
-                        PlateNumber = plateNumber,
-                        Parts = allParts,
-                        WorkArea = box,
-                        Description = $"Shrink: {best.Count} parts placed",
-                        IsOverallBest = true,
-                    });
+                    NestEngineBase.ReportProgress(
+                        progress,
+                        new ProgressReport
+                        {
+                            Phase = NestPhase.Custom,
+                            PlateNumber = plateNumber,
+                            Parts = allParts,
+                            WorkArea = box,
+                            Description = $"Shrink: {best.Count} parts placed",
+                            IsOverallBest = true,
+                        }
+                    );
                 }
 
                 // Accumulate for the next item's progress reports.
@@ -136,8 +163,7 @@ namespace OpenNest.Engine.Fill
             var leftovers = new List<NestItem>();
             foreach (var item in items)
             {
-                var placedCount = placed.Count(p =>
-                    ReferenceEquals(p.BaseDrawing, item.Drawing));
+                var placedCount = placed.Count(p => ReferenceEquals(p.BaseDrawing, item.Drawing));
 
                 if (item.Quantity <= 0)
                     continue; // unlimited items are always "satisfied" — no leftover
@@ -145,15 +171,17 @@ namespace OpenNest.Engine.Fill
                 var remaining = item.Quantity - placedCount;
                 if (remaining > 0)
                 {
-                    leftovers.Add(new NestItem
-                    {
-                        Drawing = item.Drawing,
-                        Quantity = remaining,
-                        Priority = item.Priority,
-                        StepAngle = item.StepAngle,
-                        RotationStart = item.RotationStart,
-                        RotationEnd = item.RotationEnd
-                    });
+                    leftovers.Add(
+                        new NestItem
+                        {
+                            Drawing = item.Drawing,
+                            Quantity = remaining,
+                            Priority = item.Priority,
+                            StepAngle = item.StepAngle,
+                            RotationStart = item.RotationStart,
+                            RotationEnd = item.RotationEnd,
+                        }
+                    );
                 }
             }
 
@@ -165,29 +193,43 @@ namespace OpenNest.Engine.Fill
         /// a staircase profile that maximizes usable remnant area.
         /// </summary>
         internal static void SortColumnsByHeight(List<Part> parts, double spacing) =>
-            SortStrips(parts, spacing,
-                primaryEdge: b => b.Left, extentEdge: b => b.Right,
-                sortMetric: MaxTop, stripMin: MinLeft, stripMax: MaxRight,
-                makeOffset: d => new Vector(d, 0));
+            SortStrips(
+                parts,
+                spacing,
+                primaryEdge: b => b.Left,
+                extentEdge: b => b.Right,
+                sortMetric: MaxTop,
+                stripMin: MinLeft,
+                stripMax: MaxRight,
+                makeOffset: d => new Vector(d, 0)
+            );
 
         /// <summary>
         /// Sorts pair rows by width (narrowest first on the bottom) to create
         /// a staircase profile on the right side that maximizes usable remnant area.
         /// </summary>
         internal static void SortRowsByWidth(List<Part> parts, double spacing) =>
-            SortStrips(parts, spacing,
-                primaryEdge: b => b.Bottom, extentEdge: b => b.Top,
-                sortMetric: MaxRight, stripMin: MinBottom, stripMax: MaxTop,
-                makeOffset: d => new Vector(0, d));
+            SortStrips(
+                parts,
+                spacing,
+                primaryEdge: b => b.Bottom,
+                extentEdge: b => b.Top,
+                sortMetric: MaxRight,
+                stripMin: MinBottom,
+                stripMax: MaxTop,
+                makeOffset: d => new Vector(0, d)
+            );
 
         private static void SortStrips(
-            List<Part> parts, double spacing,
+            List<Part> parts,
+            double spacing,
             Func<Box, double> primaryEdge,
             Func<Box, double> extentEdge,
             Func<List<Part>, double> sortMetric,
             Func<List<Part>, double> stripMin,
             Func<List<Part>, double> stripMax,
-            Func<double, Vector> makeOffset)
+            Func<double, Vector> makeOffset
+        )
         {
             if (parts == null || parts.Count <= 1)
                 return;
@@ -250,7 +292,8 @@ namespace OpenNest.Engine.Fill
         {
             var max = double.MinValue;
             foreach (var p in col)
-                if (p.BoundingBox.Top > max) max = p.BoundingBox.Top;
+                if (p.BoundingBox.Top > max)
+                    max = p.BoundingBox.Top;
             return max;
         }
 
@@ -258,7 +301,8 @@ namespace OpenNest.Engine.Fill
         {
             var max = double.MinValue;
             foreach (var p in col)
-                if (p.BoundingBox.Right > max) max = p.BoundingBox.Right;
+                if (p.BoundingBox.Right > max)
+                    max = p.BoundingBox.Right;
             return max;
         }
 
@@ -266,7 +310,8 @@ namespace OpenNest.Engine.Fill
         {
             var min = double.MaxValue;
             foreach (var p in col)
-                if (p.BoundingBox.Left < min) min = p.BoundingBox.Left;
+                if (p.BoundingBox.Left < min)
+                    min = p.BoundingBox.Left;
             return min;
         }
 
@@ -274,7 +319,8 @@ namespace OpenNest.Engine.Fill
         {
             var min = double.MaxValue;
             foreach (var p in row)
-                if (p.BoundingBox.Bottom < min) min = p.BoundingBox.Bottom;
+                if (p.BoundingBox.Bottom < min)
+                    min = p.BoundingBox.Bottom;
             return min;
         }
     }

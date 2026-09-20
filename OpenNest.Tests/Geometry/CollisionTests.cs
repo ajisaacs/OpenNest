@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.Tests.Geometry;
 
@@ -141,8 +141,8 @@ public class CollisionTests
     public void CheckAll_MultiplePolygons_FindsAllOverlaps()
     {
         var a = MakeSquare(0, 0, 1, 1);
-        var b = MakeSquare(0.5, 0, 1.5, 1);  // overlaps A
-        var c = MakeSquare(5, 5, 6, 6);      // overlaps nobody
+        var b = MakeSquare(0.5, 0, 1.5, 1); // overlaps A
+        var c = MakeSquare(5, 5, 6, 6); // overlaps nobody
 
         var results = Collision.CheckAll(new List<Polygon> { a, b, c });
 

@@ -20,7 +20,10 @@ namespace OpenNest.Geometry
 
             foreach (var p in sorted)
             {
-                while (lower.Count >= 2 && Cross(lower[lower.Count - 2], lower[lower.Count - 1], p) <= 0)
+                while (
+                    lower.Count >= 2
+                    && Cross(lower[lower.Count - 2], lower[lower.Count - 1], p) <= 0
+                )
                     lower.RemoveAt(lower.Count - 1);
 
                 lower.Add(p);
@@ -32,7 +35,10 @@ namespace OpenNest.Geometry
             {
                 var p = sorted[i];
 
-                while (upper.Count >= 2 && Cross(upper[upper.Count - 2], upper[upper.Count - 1], p) <= 0)
+                while (
+                    upper.Count >= 2
+                    && Cross(upper[upper.Count - 2], upper[upper.Count - 1], p) <= 0
+                )
                     upper.RemoveAt(upper.Count - 1);
 
                 upper.Add(p);

@@ -27,8 +27,10 @@ public class DirectRapidPlannerTests
         cutArea.Entities.Add(new Line(new Vector(60, 0), new Vector(50, 0)));
 
         var result = planner.Plan(
-            new Vector(0, 0), new Vector(10, 10),
-            new List<Shape> { cutArea });
+            new Vector(0, 0),
+            new Vector(10, 10),
+            new List<Shape> { cutArea }
+        );
 
         Assert.False(result.HeadUp);
     }
@@ -45,8 +47,10 @@ public class DirectRapidPlannerTests
         cutArea.Entities.Add(new Line(new Vector(6, 0), new Vector(5, 0)));
 
         var result = planner.Plan(
-            new Vector(0, 10), new Vector(10, 10),
-            new List<Shape> { cutArea });
+            new Vector(0, 10),
+            new Vector(10, 10),
+            new List<Shape> { cutArea }
+        );
 
         Assert.True(result.HeadUp);
         Assert.Empty(result.Waypoints);

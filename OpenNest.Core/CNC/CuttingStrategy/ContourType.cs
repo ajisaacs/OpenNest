@@ -4,6 +4,6 @@ namespace OpenNest.CNC.CuttingStrategy
     {
         External,
         Internal,
-        ArcCircle
+        ArcCircle,
     }
 }

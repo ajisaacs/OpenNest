@@ -1,7 +1,7 @@
-using OpenNest.Geometry;
-using OpenNest.IO;
 using System.IO;
 using System.Linq;
+using OpenNest.Geometry;
+using OpenNest.IO;
 using Xunit;
 
 namespace OpenNest.Tests.Geometry;
@@ -251,7 +251,8 @@ public class GeometrySimplifierTests
         foreach (var shape in shapes)
         {
             var candidates = simplifier.Analyze(shape);
-            if (candidates.Count == 0) continue;
+            if (candidates.Count == 0)
+                continue;
 
             var simplified = simplifier.Apply(shape, candidates);
 
@@ -265,20 +266,23 @@ public class GeometrySimplifierTests
                 {
                     Line l => l.EndPoint,
                     Arc a => a.EndPoint(),
-                    _ => Vector.Invalid
+                    _ => Vector.Invalid,
                 };
                 var nextStart = next switch
                 {
                     Line l => l.StartPoint,
                     Arc a => a.StartPoint(),
-                    _ => Vector.Invalid
+                    _ => Vector.Invalid,
                 };
 
-                if (!currentEnd.IsValid() || !nextStart.IsValid()) continue;
+                if (!currentEnd.IsValid() || !nextStart.IsValid())
+                    continue;
 
                 var gap = currentEnd.DistanceTo(nextStart);
-                Assert.True(gap < 0.005,
-                    $"Gap of {gap:F4} between entities {i} ({current.GetType().Name}) and {i + 1} ({next.GetType().Name})");
+                Assert.True(
+                    gap < 0.005,
+                    $"Gap of {gap:F4} between entities {i} ({current.GetType().Name}) and {i + 1} ({next.GetType().Name})"
+                );
             }
         }
     }

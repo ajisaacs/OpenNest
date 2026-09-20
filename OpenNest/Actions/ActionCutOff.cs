@@ -1,11 +1,11 @@
-using OpenNest.CNC;
-using OpenNest.Controls;
-using OpenNest.Geometry;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using OpenNest.CNC;
+using OpenNest.Controls;
+using OpenNest.Geometry;
 
 namespace OpenNest.Actions
 {
@@ -75,9 +75,8 @@ namespace OpenNest.Actions
         {
             if (e.KeyCode == Keys.Space)
             {
-                lockedAxis = lockedAxis == CutOffAxis.Vertical
-                    ? CutOffAxis.Horizontal
-                    : CutOffAxis.Vertical;
+                lockedAxis =
+                    lockedAxis == CutOffAxis.Vertical ? CutOffAxis.Horizontal : CutOffAxis.Vertical;
 
                 if (previewCutOff != null)
                 {
@@ -103,13 +102,15 @@ namespace OpenNest.Actions
 
             using var pen = new Pen(Color.FromArgb(128, 64, 64, 64), 1.5f / plateView.ViewScale)
             {
-                DashStyle = DashStyle.Dash
+                DashStyle = DashStyle.Dash,
             };
 
             for (var i = 0; i < program.Codes.Count - 1; i += 2)
             {
-                if (program.Codes[i] is RapidMove rapid &&
-                    program.Codes[i + 1] is LinearMove linear)
+                if (
+                    program.Codes[i] is RapidMove rapid
+                    && program.Codes[i + 1] is LinearMove linear
+                )
                 {
                     var pt1 = plateView.PointWorldToGraph(rapid.EndPoint);
                     var pt2 = plateView.PointWorldToGraph(linear.EndPoint);

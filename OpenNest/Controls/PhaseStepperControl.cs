@@ -27,7 +27,12 @@ namespace OpenNest.Controls
         public PhaseStepperControl()
         {
             DoubleBuffered = true;
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
+            SetStyle(
+                ControlStyles.OptimizedDoubleBuffer
+                    | ControlStyles.AllPaintingInWmPaint
+                    | ControlStyles.UserPaint,
+                true
+            );
             Height = 60;
         }
 
@@ -67,7 +72,8 @@ namespace OpenNest.Controls
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
             var count = Phases.Length;
-            if (count == 0) return;
+            if (count == 0)
+                return;
 
             var padding = 30;
             var usableWidth = Width - padding * 2;
@@ -102,25 +108,41 @@ namespace OpenNest.Controls
                 if (isActive)
                 {
                     // Glow
-                    g.FillEllipse(glowBrush,
-                        cx - activeRadius - 3, circleY - activeRadius - 3,
-                        (activeRadius + 3) * 2, (activeRadius + 3) * 2);
+                    g.FillEllipse(
+                        glowBrush,
+                        cx - activeRadius - 3,
+                        circleY - activeRadius - 3,
+                        (activeRadius + 3) * 2,
+                        (activeRadius + 3) * 2
+                    );
                     // Filled circle
-                    g.FillEllipse(accentBrush,
-                        cx - activeRadius, circleY - activeRadius,
-                        activeRadius * 2, activeRadius * 2);
+                    g.FillEllipse(
+                        accentBrush,
+                        cx - activeRadius,
+                        circleY - activeRadius,
+                        activeRadius * 2,
+                        activeRadius * 2
+                    );
                 }
                 else if (isVisited)
                 {
-                    g.FillEllipse(accentBrush,
-                        cx - normalRadius, circleY - normalRadius,
-                        normalRadius * 2, normalRadius * 2);
+                    g.FillEllipse(
+                        accentBrush,
+                        cx - normalRadius,
+                        circleY - normalRadius,
+                        normalRadius * 2,
+                        normalRadius * 2
+                    );
                 }
                 else
                 {
-                    g.DrawEllipse(pendingPen,
-                        cx - normalRadius, circleY - normalRadius,
-                        normalRadius * 2, normalRadius * 2);
+                    g.DrawEllipse(
+                        pendingPen,
+                        cx - normalRadius,
+                        circleY - normalRadius,
+                        normalRadius * 2,
+                        normalRadius * 2
+                    );
                 }
 
                 // Label
@@ -128,8 +150,13 @@ namespace OpenNest.Controls
                 var font = isVisited || isActive ? BoldLabelFont : LabelFont;
                 var brush = isVisited || isActive ? activeTextBrush : pendingTextBrush;
                 var labelSize = g.MeasureString(label, font);
-                g.DrawString(label, font, brush,
-                    cx - labelSize.Width / 2, circleY + activeRadius + 5);
+                g.DrawString(
+                    label,
+                    font,
+                    brush,
+                    cx - labelSize.Width / 2,
+                    circleY + activeRadius + 5
+                );
             }
         }
     }

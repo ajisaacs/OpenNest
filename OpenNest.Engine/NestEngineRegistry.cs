@@ -13,21 +13,29 @@ namespace OpenNest
 
         static NestEngineRegistry()
         {
-            Register("Default",
+            Register(
+                "Default",
                 "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)",
-                plate => new DefaultNestEngine(plate));
+                plate => new DefaultNestEngine(plate)
+            );
 
-            Register("Strip",
+            Register(
+                "Strip",
                 "Strip-based nesting for mixed-drawing layouts",
-                plate => new StripNestEngine(plate));
+                plate => new StripNestEngine(plate)
+            );
 
-            Register("Vertical Remnant",
+            Register(
+                "Vertical Remnant",
                 "Optimizes for largest right-side vertical drop",
-                plate => new VerticalRemnantEngine(plate));
+                plate => new VerticalRemnantEngine(plate)
+            );
 
-            Register("Horizontal Remnant",
+            Register(
+                "Horizontal Remnant",
                 "Optimizes for largest top-side horizontal drop",
-                plate => new HorizontalRemnantEngine(plate));
+                plate => new HorizontalRemnantEngine(plate)
+            );
         }
 
         public static IReadOnlyList<NestEngineInfo> AvailableEngines => engines;
@@ -37,18 +45,25 @@ namespace OpenNest
         public static NestEngineBase Create(Plate plate)
         {
             var info = engines.FirstOrDefault(e =>
-                e.Name.Equals(ActiveEngineName, StringComparison.OrdinalIgnoreCase));
+                e.Name.Equals(ActiveEngineName, StringComparison.OrdinalIgnoreCase)
+            );
 
             if (info == null)
             {
-                Debug.WriteLine($"[NestEngineRegistry] Engine '{ActiveEngineName}' not found, falling back to Default");
+                Debug.WriteLine(
+                    $"[NestEngineRegistry] Engine '{ActiveEngineName}' not found, falling back to Default"
+                );
                 info = engines[0];
             }
 
             return info.Factory(plate);
         }
 
-        public static void Register(string name, string description, Func<Plate, NestEngineBase> factory)
+        public static void Register(
+            string name,
+            string description,
+            Func<Plate, NestEngineBase> factory
+        )
         {
             if (engines.Any(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
             {
@@ -79,7 +94,9 @@ namespace OpenNest
 
                         if (ctor == null)
                         {
-                            Debug.WriteLine($"[NestEngineRegistry] Skipping {type.Name}: no Plate constructor");
+                            Debug.WriteLine(
+                                $"[NestEngineRegistry] Skipping {type.Name}: no Plate constructor"
+                            );
                             continue;
                         }
 
@@ -88,19 +105,28 @@ namespace OpenNest
                         {
                             var tempPlate = new Plate();
                             var instance = (NestEngineBase)ctor.Invoke(new object[] { tempPlate });
-                            Register(instance.Name, instance.Description,
-                                plate => (NestEngineBase)ctor.Invoke(new object[] { plate }));
-                            Debug.WriteLine($"[NestEngineRegistry] Loaded plugin engine: {instance.Name}");
+                            Register(
+                                instance.Name,
+                                instance.Description,
+                                plate => (NestEngineBase)ctor.Invoke(new object[] { plate })
+                            );
+                            Debug.WriteLine(
+                                $"[NestEngineRegistry] Loaded plugin engine: {instance.Name}"
+                            );
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"[NestEngineRegistry] Failed to instantiate {type.Name}: {ex.Message}");
+                            Debug.WriteLine(
+                                $"[NestEngineRegistry] Failed to instantiate {type.Name}: {ex.Message}"
+                            );
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[NestEngineRegistry] Failed to load assembly {Path.GetFileName(dll)}: {ex.Message}");
+                    Debug.WriteLine(
+                        $"[NestEngineRegistry] Failed to load assembly {Path.GetFileName(dll)}: {ex.Message}"
+                    );
                 }
             }
         }

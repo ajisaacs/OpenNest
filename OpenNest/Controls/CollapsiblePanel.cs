@@ -23,7 +23,7 @@ namespace OpenNest.Controls
                 Dock = DockStyle.Top,
                 Height = 28,
                 BackColor = Color.FromArgb(240, 240, 240),
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
             };
 
             chevronLabel = new Label
@@ -33,7 +33,7 @@ namespace OpenNest.Controls
                 Size = new Size(20, 28),
                 Dock = DockStyle.Left,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 9f)
+                Font = new Font("Segoe UI", 9f),
             };
 
             headerLabel = new Label
@@ -42,7 +42,7 @@ namespace OpenNest.Controls
                 AutoSize = false,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI", 9f, FontStyle.Bold)
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
             };
 
             headerPanel.Controls.Add(headerLabel);
@@ -51,10 +51,7 @@ namespace OpenNest.Controls
             headerLabel.Click += (s, e) => Toggle();
             chevronLabel.Click += (s, e) => Toggle();
 
-            contentPanel = new Panel
-            {
-                Dock = DockStyle.Fill
-            };
+            contentPanel = new Panel { Dock = DockStyle.Fill };
 
             Controls.Add(contentPanel);
             Controls.Add(headerPanel);
@@ -82,7 +79,8 @@ namespace OpenNest.Controls
             set
             {
                 expandedHeight = value;
-                if (isExpanded) Height = value;
+                if (isExpanded)
+                    Height = value;
             }
         }
 

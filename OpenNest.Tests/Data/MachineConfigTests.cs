@@ -28,7 +28,7 @@ public class MachineConfigTests
                             AssistGas = "O2",
                             LeadIn = new LeadConfig { Type = "Arc", Radius = 0.25 },
                             LeadOut = new LeadConfig { Type = "Line", Length = 0.125 },
-                            PlateSizes = new List<string> { "60x120", "48x96" }
+                            PlateSizes = new List<string> { "60x120", "48x96" },
                         },
                         new()
                         {
@@ -37,9 +37,9 @@ public class MachineConfigTests
                             AssistGas = "O2",
                             LeadIn = new LeadConfig { Type = "Arc", Radius = 0.375 },
                             LeadOut = new LeadConfig { Type = "Line", Length = 0.25 },
-                            PlateSizes = new List<string> { "60x120" }
-                        }
-                    }
+                            PlateSizes = new List<string> { "60x120" },
+                        },
+                    },
                 },
                 new()
                 {
@@ -52,11 +52,11 @@ public class MachineConfigTests
                         {
                             Value = 0.250,
                             Kerf = 0.014,
-                            AssistGas = "N2"
-                        }
-                    }
-                }
-            }
+                            AssistGas = "N2",
+                        },
+                    },
+                },
+            },
         };
     }
 

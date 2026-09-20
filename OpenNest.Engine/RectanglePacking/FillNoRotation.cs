@@ -6,9 +6,7 @@ namespace OpenNest.RectanglePacking
     internal class FillNoRotation : FillEngine
     {
         public FillNoRotation(Bin bin)
-            : base(bin)
-        {
-        }
+            : base(bin) { }
 
         public NestDirection NestDirection { get; set; }
 
@@ -59,7 +57,9 @@ namespace OpenNest.RectanglePacking
                 columns = (int)System.Math.Ceiling((double)maxCount / rows);
             }
 
-            Bin.Items.AddRange(FillGrid(item, rows, columns, maxCount, columnMajor: item.Width > item.Length));
+            Bin.Items.AddRange(
+                FillGrid(item, rows, columns, maxCount, columnMajor: item.Width > item.Length)
+            );
         }
     }
 }

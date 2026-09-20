@@ -14,7 +14,7 @@ public class PipeFlangeShapeTests
             OD = 10,
             HoleDiameter = 1,
             HolePatternDiameter = 7,
-            HoleCount = 4
+            HoleCount = 4,
         };
         var drawing = shape.GetDrawing();
 
@@ -32,7 +32,7 @@ public class PipeFlangeShapeTests
             HoleDiameter = 1,
             HolePatternDiameter = 7,
             HoleCount = 4,
-            Blind = true
+            Blind = true,
         };
         var drawing = shape.GetDrawing();
 
@@ -48,7 +48,7 @@ public class PipeFlangeShapeTests
             OD = 10,
             HoleDiameter = 1,
             HolePatternDiameter = 7,
-            HoleCount = 4
+            HoleCount = 4,
         };
         var drawing = shape.GetDrawing();
 
@@ -64,9 +64,9 @@ public class PipeFlangeShapeTests
             HoleDiameter = 1,
             HolePatternDiameter = 7,
             HoleCount = 4,
-            PipeSize = "2",       // OD = 2.375
+            PipeSize = "2", // OD = 2.375
             PipeClearance = 0.125,
-            Blind = false
+            Blind = false,
         };
         var drawing = shape.GetDrawing();
 
@@ -87,7 +87,7 @@ public class PipeFlangeShapeTests
             HoleCount = 4,
             PipeSize = "2",
             PipeClearance = 0.125,
-            Blind = true
+            Blind = true,
         };
         var drawing = shape.GetDrawing();
 
@@ -107,7 +107,7 @@ public class PipeFlangeShapeTests
             HoleCount = 4,
             PipeSize = "not-a-real-pipe",
             PipeClearance = 0.125,
-            Blind = false
+            Blind = false,
         };
         var drawing = shape.GetDrawing();
 
@@ -128,7 +128,7 @@ public class PipeFlangeShapeTests
             HolePatternDiameter = 7,
             HoleCount = 4,
             PipeSize = pipeSize,
-            PipeClearance = 0.125
+            PipeClearance = 0.125,
         };
         var drawing = shape.GetDrawing();
 
@@ -140,27 +140,27 @@ public class PipeFlangeShapeTests
     public void LoadFromJson_ProducesCorrectDrawing()
     {
         var json = """
-        [
-          {
-            "Name": "2in-150#",
-            "PipeSize": "2",
-            "PipeClearance": 0.0625,
-            "OD": 6.0,
-            "HoleDiameter": 0.75,
-            "HolePatternDiameter": 4.75,
-            "HoleCount": 4
-          },
-          {
-            "Name": "2in-300#",
-            "PipeSize": "2",
-            "PipeClearance": 0.0625,
-            "OD": 6.5,
-            "HoleDiameter": 0.75,
-            "HolePatternDiameter": 5.0,
-            "HoleCount": 8
-          }
-        ]
-        """;
+            [
+              {
+                "Name": "2in-150#",
+                "PipeSize": "2",
+                "PipeClearance": 0.0625,
+                "OD": 6.0,
+                "HoleDiameter": 0.75,
+                "HolePatternDiameter": 4.75,
+                "HoleCount": 4
+              },
+              {
+                "Name": "2in-300#",
+                "PipeSize": "2",
+                "PipeClearance": 0.0625,
+                "OD": 6.5,
+                "HoleDiameter": 0.75,
+                "HolePatternDiameter": 5.0,
+                "HoleCount": 8
+              }
+            ]
+            """;
 
         var tempFile = Path.GetTempFileName();
         try
@@ -208,8 +208,10 @@ public class PipeFlangeShapeTests
         foreach (var f in flanges)
         {
             Assert.False(string.IsNullOrWhiteSpace(f.PipeSize));
-            Assert.True(PipeSizes.TryGetOD(f.PipeSize, out _),
-                $"Unknown PipeSize '{f.PipeSize}' in entry '{f.Name}'");
+            Assert.True(
+                PipeSizes.TryGetOD(f.PipeSize, out _),
+                $"Unknown PipeSize '{f.PipeSize}' in entry '{f.Name}'"
+            );
             Assert.Equal(0.0625, f.PipeClearance, 0.0001);
         }
     }

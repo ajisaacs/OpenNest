@@ -1,12 +1,12 @@
-using OpenNest.Bending;
-using OpenNest.CNC;
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using OpenNest.Bending;
+using OpenNest.CNC;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Controls
 {
@@ -25,13 +25,17 @@ namespace OpenNest.Controls
             var plateRect = new RectangleF
             {
                 Width = view.LengthWorldToGui(plate.Size.Length),
-                Height = view.LengthWorldToGui(plate.Size.Width)
+                Height = view.LengthWorldToGui(plate.Size.Width),
             };
 
             var edgeSpacingRect = new RectangleF
             {
-                Width = view.LengthWorldToGui(plate.Size.Length - plate.EdgeSpacing.Left - plate.EdgeSpacing.Right),
-                Height = view.LengthWorldToGui(plate.Size.Width - plate.EdgeSpacing.Top - plate.EdgeSpacing.Bottom)
+                Width = view.LengthWorldToGui(
+                    plate.Size.Length - plate.EdgeSpacing.Left - plate.EdgeSpacing.Right
+                ),
+                Height = view.LengthWorldToGui(
+                    plate.Size.Width - plate.EdgeSpacing.Top - plate.EdgeSpacing.Bottom
+                ),
             };
 
             switch (plate.Quadrant)
@@ -40,28 +44,35 @@ namespace OpenNest.Controls
                     plateRect.Location = view.PointWorldToGraph(0, 0);
                     edgeSpacingRect.Location = view.PointWorldToGraph(
                         plate.EdgeSpacing.Left,
-                        plate.EdgeSpacing.Bottom);
+                        plate.EdgeSpacing.Bottom
+                    );
                     break;
 
                 case 2:
                     plateRect.Location = view.PointWorldToGraph(-plate.Size.Length, 0);
                     edgeSpacingRect.Location = view.PointWorldToGraph(
                         plate.EdgeSpacing.Left - plate.Size.Length,
-                        plate.EdgeSpacing.Bottom);
+                        plate.EdgeSpacing.Bottom
+                    );
                     break;
 
                 case 3:
-                    plateRect.Location = view.PointWorldToGraph(-plate.Size.Length, -plate.Size.Width);
+                    plateRect.Location = view.PointWorldToGraph(
+                        -plate.Size.Length,
+                        -plate.Size.Width
+                    );
                     edgeSpacingRect.Location = view.PointWorldToGraph(
                         plate.EdgeSpacing.Left - plate.Size.Length,
-                        plate.EdgeSpacing.Bottom - plate.Size.Width);
+                        plate.EdgeSpacing.Bottom - plate.Size.Width
+                    );
                     break;
 
                 case 4:
                     plateRect.Location = view.PointWorldToGraph(0, -plate.Size.Width);
                     edgeSpacingRect.Location = view.PointWorldToGraph(
                         plate.EdgeSpacing.Left,
-                        plate.EdgeSpacing.Bottom - plate.Size.Width);
+                        plate.EdgeSpacing.Bottom - plate.Size.Width
+                    );
                     break;
 
                 default:
@@ -77,18 +88,22 @@ namespace OpenNest.Controls
 
             if (!edgeSpacingRect.Contains(viewBounds))
             {
-                g.DrawRectangle(view.ColorScheme.EdgeSpacingPen,
-                   edgeSpacingRect.X,
-                   edgeSpacingRect.Y,
-                   edgeSpacingRect.Width,
-                   edgeSpacingRect.Height);
+                g.DrawRectangle(
+                    view.ColorScheme.EdgeSpacingPen,
+                    edgeSpacingRect.X,
+                    edgeSpacingRect.Y,
+                    edgeSpacingRect.Width,
+                    edgeSpacingRect.Height
+                );
             }
 
-            g.DrawRectangle(view.ColorScheme.LayoutOutlinePen,
+            g.DrawRectangle(
+                view.ColorScheme.LayoutOutlinePen,
                 plateRect.X,
                 plateRect.Y,
                 plateRect.Width,
-                plateRect.Height);
+                plateRect.Height
+            );
         }
 
         public void DrawParts(Graphics g)
@@ -172,8 +187,10 @@ namespace OpenNest.Controls
 
                 for (var i = 0; i < program.Codes.Count - 1; i += 2)
                 {
-                    if (program.Codes[i] is RapidMove rapid &&
-                        program.Codes[i + 1] is LinearMove linear)
+                    if (
+                        program.Codes[i] is RapidMove rapid
+                        && program.Codes[i + 1] is LinearMove linear
+                    )
                     {
                         DrawLine(g, rapid.EndPoint, linear.EndPoint, activePen);
                     }
@@ -191,14 +208,11 @@ namespace OpenNest.Controls
             {
                 Location = view.PointWorldToGraph(workArea.Location),
                 Width = view.LengthWorldToGui(workArea.Length),
-                Height = view.LengthWorldToGui(workArea.Width)
+                Height = view.LengthWorldToGui(workArea.Width),
             };
             rect.Y -= rect.Height;
 
-            using var pen = new Pen(Color.Red, 1.5f)
-            {
-                DashStyle = DashStyle.Dash
-            };
+            using var pen = new Pen(Color.Red, 1.5f) { DashStyle = DashStyle.Dash };
             g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
         }
 
@@ -230,9 +244,10 @@ namespace OpenNest.Controls
                 var h = view.LengthWorldToGui(box.Width);
                 var rect = new RectangleF(loc.X, loc.Y - h, w, h);
 
-                var priority = view.DebugRemnantPriorities != null && i < view.DebugRemnantPriorities.Count
-                    ? System.Math.Min(view.DebugRemnantPriorities[i], 2)
-                    : 0;
+                var priority =
+                    view.DebugRemnantPriorities != null && i < view.DebugRemnantPriorities.Count
+                        ? System.Math.Min(view.DebugRemnantPriorities[i], 2)
+                        : 0;
 
                 using var brush = new SolidBrush(PriorityFills[priority]);
                 g.FillRectangle(brush, rect);
@@ -242,19 +257,27 @@ namespace OpenNest.Controls
 
                 var label = $"P{priority} {box.Width:F1}x{box.Length:F1}";
                 using var font = new Font("Segoe UI", 8f);
-                using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                using var sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center,
+                };
                 g.DrawString(label, font, Brushes.Black, rect, sf);
             }
         }
 
         private void DrawBendLines(Graphics g, Part part)
         {
-            if (!view.ShowBendLines || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
+            if (
+                !view.ShowBendLines
+                || part.BaseDrawing.Bends == null
+                || part.BaseDrawing.Bends.Count == 0
+            )
                 return;
 
             using var bendPen = new Pen(Color.Yellow, 1.5f)
             {
-                DashStyle = System.Drawing.Drawing2D.DashStyle.Dash
+                DashStyle = System.Drawing.Drawing2D.DashStyle.Dash,
             };
 
             foreach (var bend in part.BaseDrawing.Bends)
@@ -280,7 +303,11 @@ namespace OpenNest.Controls
 
         private void DrawEtchMarks(Graphics g, Part part)
         {
-            if (!view.ShowBendLines || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
+            if (
+                !view.ShowBendLines
+                || part.BaseDrawing.Bends == null
+                || part.BaseDrawing.Bends.Count == 0
+            )
                 return;
 
             using var etchPen = new Pen(Color.Green, 1.5f);
@@ -331,7 +358,12 @@ namespace OpenNest.Controls
         private void DrawGrainWarning(Graphics g, Part part)
         {
             var plate = view.Plate;
-            if (!view.ShowBendLines || plate == null || part.BaseDrawing.Bends == null || part.BaseDrawing.Bends.Count == 0)
+            if (
+                !view.ShowBendLines
+                || plate == null
+                || part.BaseDrawing.Bends == null
+                || part.BaseDrawing.Bends.Count == 0
+            )
                 return;
 
             var grainAngle = plate.GrainAngle;
@@ -341,10 +373,12 @@ namespace OpenNest.Controls
             {
                 var bendAngle = bend.LineAngle + part.Rotation;
                 bendAngle = bendAngle % System.Math.PI;
-                if (bendAngle < 0) bendAngle += System.Math.PI;
+                if (bendAngle < 0)
+                    bendAngle += System.Math.PI;
 
                 var grainNormalized = grainAngle % System.Math.PI;
-                if (grainNormalized < 0) grainNormalized += System.Math.PI;
+                if (grainNormalized < 0)
+                    grainNormalized += System.Math.PI;
 
                 var diff = System.Math.Abs(bendAngle - grainNormalized);
                 diff = System.Math.Min(diff, System.Math.PI - diff);
@@ -354,11 +388,17 @@ namespace OpenNest.Controls
                     var box = part.BaseDrawing.Program.BoundingBox();
                     var location = part.Location;
                     var pt1 = view.PointWorldToGraph(location);
-                    var pt2 = view.PointWorldToGraph(new Vector(
-                        location.X + box.Length, location.Y + box.Width));
+                    var pt2 = view.PointWorldToGraph(
+                        new Vector(location.X + box.Length, location.Y + box.Width)
+                    );
                     using var warnPen = new Pen(Color.FromArgb(180, 255, 140, 0), 2f);
-                    g.DrawRectangle(warnPen, pt1.X, pt2.Y,
-                        System.Math.Abs(pt2.X - pt1.X), System.Math.Abs(pt2.Y - pt1.Y));
+                    g.DrawRectangle(
+                        warnPen,
+                        pt1.X,
+                        pt2.Y,
+                        System.Math.Abs(pt2.X - pt1.X),
+                        System.Math.Abs(pt2.Y - pt1.Y)
+                    );
                     return;
                 }
             }
@@ -415,7 +455,14 @@ namespace OpenNest.Controls
             }
         }
 
-        private void DrawProgramPiercePoints(Graphics g, Program pgm, Vector basePos, ref Vector pos, Brush brush, Pen pen)
+        private void DrawProgramPiercePoints(
+            Graphics g,
+            Program pgm,
+            Vector basePos,
+            ref Vector pos,
+            Brush brush,
+            Pen pen
+        )
         {
             for (var i = 0; i < pgm.Length; ++i)
             {
@@ -434,11 +481,13 @@ namespace OpenNest.Controls
                 else
                 {
                     var motion = code as Motion;
-                    if (motion == null) continue;
+                    if (motion == null)
+                        continue;
 
-                    var endpt = pgm.Mode == Mode.Incremental
-                        ? motion.EndPoint + pos
-                        : motion.EndPoint + basePos;
+                    var endpt =
+                        pgm.Mode == Mode.Incremental
+                            ? motion.EndPoint + pos
+                            : motion.EndPoint + basePos;
 
                     if (code.Type == CodeType.RapidMove)
                     {
@@ -465,7 +514,15 @@ namespace OpenNest.Controls
                 var part = view.Plate.Parts[i];
                 var pgm = part.Program;
                 var pos = part.Location;
-                CutDirectionArrows.DrawProgram(g, view, pgm, ref pos, pen, arrowSpacingWorld, arrowSize);
+                CutDirectionArrows.DrawProgram(
+                    g,
+                    view,
+                    pgm,
+                    ref pos,
+                    pen,
+                    arrowSpacingWorld,
+                    arrowSize
+                );
             }
         }
 
@@ -483,10 +540,16 @@ namespace OpenNest.Controls
             {
                 Location = view.PointWorldToGraph(box.Location),
                 Width = view.LengthWorldToGui(box.Length),
-                Height = view.LengthWorldToGui(box.Width)
+                Height = view.LengthWorldToGui(box.Width),
             };
 
-            g.DrawRectangle(view.ColorScheme.BoundingBoxPen, rect.X, rect.Y - rect.Height, rect.Width, rect.Height);
+            g.DrawRectangle(
+                view.ColorScheme.BoundingBoxPen,
+                rect.X,
+                rect.Y - rect.Height,
+                rect.Width,
+                rect.Height
+            );
         }
     }
 }

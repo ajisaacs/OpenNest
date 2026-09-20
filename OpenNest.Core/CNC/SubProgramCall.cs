@@ -9,9 +9,7 @@ namespace OpenNest.CNC
         private double rotation;
         private Program program;
 
-        public SubProgramCall()
-        {
-        }
+        public SubProgramCall() { }
 
         public SubProgramCall(Program program, double rotation)
         {

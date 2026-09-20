@@ -165,10 +165,7 @@ public class CutOffTests
     {
         var plate = new Plate(100, 50);
         var settings = new CutOffSettings();
-        var cutoff = new CutOff(new Vector(25, 10), CutOffAxis.Vertical)
-        {
-            StartLimit = 20.0
-        };
+        var cutoff = new CutOff(new Vector(25, 10), CutOffAxis.Vertical) { StartLimit = 20.0 };
         cutoff.Regenerate(plate, settings);
 
         // AwayFromOrigin: RapidMove to near end (StartLimit=20), LinearMove to far end (100).
@@ -182,10 +179,7 @@ public class CutOffTests
     {
         var plate = new Plate(100, 50);
         var settings = new CutOffSettings();
-        var cutoff = new CutOff(new Vector(25, 10), CutOffAxis.Vertical)
-        {
-            EndLimit = 80.0
-        };
+        var cutoff = new CutOff(new Vector(25, 10), CutOffAxis.Vertical) { EndLimit = 80.0 };
         cutoff.Regenerate(plate, settings);
 
         // AwayFromOrigin: RapidMove to near end (0), LinearMove to far end (EndLimit=80).
@@ -200,16 +194,10 @@ public class CutOffTests
         var plate = new Plate(60, 120);
         var settings = new CutOffSettings { PartClearance = 0 };
 
-        var hCut = new CutOff(new Vector(85, 30), CutOffAxis.Horizontal)
-        {
-            EndLimit = 85.0
-        };
+        var hCut = new CutOff(new Vector(85, 30), CutOffAxis.Horizontal) { EndLimit = 85.0 };
         hCut.Regenerate(plate, settings);
 
-        var vCut = new CutOff(new Vector(85, 30), CutOffAxis.Vertical)
-        {
-            StartLimit = 30.0
-        };
+        var vCut = new CutOff(new Vector(85, 30), CutOffAxis.Vertical) { StartLimit = 30.0 };
         vCut.Regenerate(plate, settings);
 
         Assert.True(hCut.Drawing.Program.Codes.Count > 0);

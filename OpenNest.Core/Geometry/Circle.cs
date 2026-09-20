@@ -1,5 +1,5 @@
-﻿using OpenNest.Math;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -8,14 +8,10 @@ namespace OpenNest.Geometry
         private Vector center;
         private double radius;
 
-        public Circle()
-        {
-        }
+        public Circle() { }
 
         public Circle(double x, double y, double radius)
-            : this(new Vector(x, y), radius)
-        {
-        }
+            : this(new Vector(x, y), radius) { }
 
         public Circle(Vector center, double radius)
         {
@@ -137,21 +133,22 @@ namespace OpenNest.Geometry
         public List<Vector> ToPoints(int segments = 1000, bool circumscribe = false)
         {
             var points = new List<Vector>();
-            var stepAngle = Rotation == RotationType.CW
-                ? -Angle.TwoPI / segments
-                : Angle.TwoPI / segments;
+            var stepAngle =
+                Rotation == RotationType.CW ? -Angle.TwoPI / segments : Angle.TwoPI / segments;
 
-            var r = circumscribe && segments > 0
-                ? Radius / System.Math.Cos(stepAngle / 2.0)
-                : Radius;
+            var r =
+                circumscribe && segments > 0 ? Radius / System.Math.Cos(stepAngle / 2.0) : Radius;
 
             for (int i = 0; i <= segments; ++i)
             {
                 var angle = stepAngle * i;
 
-                points.Add(new Vector(
-                    System.Math.Cos(angle) * r + Center.X,
-                    System.Math.Sin(angle) * r + Center.Y));
+                points.Add(
+                    new Vector(
+                        System.Math.Cos(angle) * r + Center.X,
+                        System.Math.Sin(angle) * r + Center.Y
+                    )
+                );
             }
 
             return points;
@@ -278,11 +275,9 @@ namespace OpenNest.Geometry
         {
             if (side == OffsetSide.Left && Rotation == RotationType.CCW)
             {
-                return Radius <= distance ? null : new Circle(center, Radius - distance)
-                {
-                    Layer = Layer,
-                    Rotation = Rotation
-                };
+                return Radius <= distance
+                    ? null
+                    : new Circle(center, Radius - distance) { Layer = Layer, Rotation = Rotation };
             }
             else
             {
@@ -294,11 +289,9 @@ namespace OpenNest.Geometry
         {
             if (ContainsPoint(pt))
             {
-                return Radius <= distance ? null : new Circle(center, Radius - distance)
-                {
-                    Layer = Layer,
-                    Rotation = Rotation
-                };
+                return Radius <= distance
+                    ? null
+                    : new Circle(center, Radius - distance) { Layer = Layer, Rotation = Rotation };
             }
             else
             {
@@ -317,7 +310,8 @@ namespace OpenNest.Geometry
 
             return new Vector(
                 System.Math.Cos(angle) * Radius + Center.X,
-                System.Math.Sin(angle) * Radius + Center.Y);
+                System.Math.Sin(angle) * Radius + Center.Y
+            );
         }
 
         /// <summary>
@@ -350,7 +344,9 @@ namespace OpenNest.Geometry
         public override bool Intersects(Circle circle)
         {
             var dist = Center.DistanceTo(circle.Center);
-            return (dist < (Radius + circle.Radius) && dist > System.Math.Abs(Radius - circle.Radius));
+            return (
+                dist < (Radius + circle.Radius) && dist > System.Math.Abs(Radius - circle.Radius)
+            );
         }
 
         /// <summary>

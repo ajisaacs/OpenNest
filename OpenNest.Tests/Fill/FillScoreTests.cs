@@ -1,5 +1,5 @@
-using OpenNest.Geometry;
 using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 
 namespace OpenNest.Tests.Fill;
 
@@ -57,7 +57,10 @@ public class FillScoreTests
     [Fact]
     public void Compute_EmptyParts_ReturnsDefault()
     {
-        var score = FillScore.Compute(new System.Collections.Generic.List<Part>(), new Box(0, 0, 100, 100));
+        var score = FillScore.Compute(
+            new System.Collections.Generic.List<Part>(),
+            new Box(0, 0, 100, 100)
+        );
 
         Assert.Equal(0, score.Count);
     }
@@ -69,7 +72,7 @@ public class FillScoreTests
         {
             TestHelpers.MakePartAt(0, 0, 10),
             TestHelpers.MakePartAt(20, 0, 10),
-            TestHelpers.MakePartAt(40, 0, 10)
+            TestHelpers.MakePartAt(40, 0, 10),
         };
         var score = FillScore.Compute(parts, new Box(0, 0, 100, 100));
 

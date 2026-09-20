@@ -1,11 +1,11 @@
-using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.ML
 {
@@ -16,8 +16,11 @@ namespace OpenNest.Engine.ML
         private static readonly object _lock = new();
 
         public static List<double> PredictAngles(
-            PartFeatures features, double sheetWidth, double sheetHeight,
-            double threshold = 0.3)
+            PartFeatures features,
+            double sheetWidth,
+            double sheetHeight,
+            double threshold = 0.3
+        )
         {
             var session = GetSession();
             if (session == null)
@@ -41,7 +44,7 @@ namespace OpenNest.Engine.ML
                 var tensor = new DenseTensor<float>(input, new[] { 1, 11 });
                 var inputs = new List<NamedOnnxValue>
                 {
-                    NamedOnnxValue.CreateFromTensor("features", tensor)
+                    NamedOnnxValue.CreateFromTensor("features", tensor),
                 };
 
                 using var results = session.Run(inputs);

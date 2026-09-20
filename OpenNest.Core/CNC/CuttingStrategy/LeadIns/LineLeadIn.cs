@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System.Collections.Generic;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -9,15 +9,18 @@ namespace OpenNest.CNC.CuttingStrategy
         public double Length { get; set; }
         public double ApproachAngle { get; set; } = 90.0;
 
-        public override List<ICode> Generate(Vector contourStartPoint, double contourNormalAngle,
-            RotationType winding = RotationType.CW)
+        public override List<ICode> Generate(
+            Vector contourStartPoint,
+            double contourNormalAngle,
+            RotationType winding = RotationType.CW
+        )
         {
             var piercePoint = GetPiercePoint(contourStartPoint, contourNormalAngle);
 
             return new List<ICode>
             {
                 new RapidMove(piercePoint),
-                new LinearMove(contourStartPoint) { Layer = LayerType.Leadin }
+                new LinearMove(contourStartPoint) { Layer = LayerType.Leadin },
             };
         }
 
@@ -26,7 +29,8 @@ namespace OpenNest.CNC.CuttingStrategy
             var approachAngle = contourNormalAngle - Angle.HalfPI + Angle.ToRadians(ApproachAngle);
             return new Vector(
                 contourStartPoint.X + Length * System.Math.Cos(approachAngle),
-                contourStartPoint.Y + Length * System.Math.Sin(approachAngle));
+                contourStartPoint.Y + Length * System.Math.Sin(approachAngle)
+            );
         }
 
         public override LeadIn Scale(double factor) =>

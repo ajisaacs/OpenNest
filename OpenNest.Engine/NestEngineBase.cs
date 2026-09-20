@@ -1,14 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
 
 namespace OpenNest
 {
@@ -47,9 +47,17 @@ namespace OpenNest
 
         public virtual ShrinkAxis TrimAxis => ShrinkAxis.Width;
 
-        public virtual List<double> BuildAngles(NestItem item, ClassificationResult classification, Box workArea)
+        public virtual List<double> BuildAngles(
+            NestItem item,
+            ClassificationResult classification,
+            Box workArea
+        )
         {
-            return new List<double> { classification.PrimaryAngle, classification.PrimaryAngle + OpenNest.Math.Angle.HalfPI };
+            return new List<double>
+            {
+                classification.PrimaryAngle,
+                classification.PrimaryAngle + OpenNest.Math.Angle.HalfPI,
+            };
         }
 
         protected virtual void RecordProductiveAngles(List<AngleResult> angleResults) { }
@@ -58,28 +66,43 @@ namespace OpenNest
 
         // --- Virtual methods (side-effect-free, return parts) ---
 
-        public virtual List<Part> Fill(NestItem item, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public virtual List<Part> Fill(
+            NestItem item,
+            Box workArea,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             return new List<Part>();
         }
 
-        public virtual List<Part> Fill(List<Part> groupParts, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public virtual List<Part> Fill(
+            List<Part> groupParts,
+            Box workArea,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             return new List<Part>();
         }
 
-        public virtual List<Part> PackArea(Box box, List<NestItem> items,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public virtual List<Part> PackArea(
+            Box box,
+            List<NestItem> items,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             return new List<Part>();
         }
 
         // --- Nest: multi-item strategy (virtual, side-effect-free) ---
 
-        public virtual List<Part> Nest(List<NestItem> items,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public virtual List<Part> Nest(
+            List<NestItem> items,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             if (items == null || items.Count == 0)
                 return new List<Part>();
@@ -95,9 +118,7 @@ namespace OpenNest
                 .ThenByDescending(i => i.Drawing.Area)
                 .ToList();
 
-            var packItems = items
-                .Where(i => !ShouldFill(i, plateArea))
-                .ToList();
+            var packItems = items.Where(i => !ShouldFill(i, plateArea)).ToList();
 
             // Phase 1: Fill multi-quantity drawings using RemnantFiller.
             if (fillItems.Count > 0)
@@ -117,12 +138,15 @@ namespace OpenNest
                     foreach (var item in fillItems)
                     {
                         var placed = fillParts.Count(p =>
-                            ReferenceEquals(p.BaseDrawing, item.Drawing));
+                            ReferenceEquals(p.BaseDrawing, item.Drawing)
+                        );
                         item.Quantity = System.Math.Max(0, item.Quantity - placed);
                     }
 
                     // Update workArea for pack phase
-                    var placedObstacles = fillParts.Select(p => p.BoundingBox.Offset(Plate.PartSpacing)).ToList();
+                    var placedObstacles = fillParts
+                        .Select(p => p.BoundingBox.Offset(Plate.PartSpacing))
+                        .ToList();
                     var finder = new RemnantFinder(workArea, placedObstacles);
                     var remnants = finder.FindRemnants();
                     if (remnants.Count > 0)
@@ -138,8 +162,12 @@ namespace OpenNest
             var pairItems = packItems.Where(i => i.Quantity == 2).ToList();
             var regularPackItems = packItems.Where(i => i.Quantity != 2).ToList();
 
-            if (regularPackItems.Count > 0 && workArea.Width > 0 && workArea.Length > 0
-                && !token.IsCancellationRequested)
+            if (
+                regularPackItems.Count > 0
+                && workArea.Width > 0
+                && workArea.Length > 0
+                && !token.IsCancellationRequested
+            )
             {
                 var packParts = PackArea(workArea, regularPackItems, progress, token);
 
@@ -151,7 +179,8 @@ namespace OpenNest
                     foreach (var item in regularPackItems)
                     {
                         var placed = packParts.Count(p =>
-                            ReferenceEquals(p.BaseDrawing, item.Drawing));
+                            ReferenceEquals(p.BaseDrawing, item.Drawing)
+                        );
                         item.Quantity = System.Math.Max(0, item.Quantity - placed);
                     }
                 }
@@ -172,8 +201,12 @@ namespace OpenNest
 
         // --- FillExact (non-virtual, delegates to virtual Fill) ---
 
-        public List<Part> FillExact(NestItem item, Box workArea,
-            IProgress<NestProgress> progress, CancellationToken token)
+        public List<Part> FillExact(
+            NestItem item,
+            Box workArea,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
         {
             return Fill(item, workArea, progress, token);
         }
@@ -226,8 +259,7 @@ namespace OpenNest
 
         // --- Protected utilities ---
 
-        internal static void ReportProgress(
-            IProgress<NestProgress> progress, ProgressReport report)
+        internal static void ReportProgress(IProgress<NestProgress> progress, ProgressReport report)
         {
             if (progress == null || report.Parts == null || report.Parts.Count == 0)
                 return;
@@ -236,18 +268,22 @@ namespace OpenNest
             foreach (var part in report.Parts)
                 clonedParts.Add((Part)part.Clone());
 
-            Debug.WriteLine($"[Progress] Phase={report.Phase}, Plate={report.PlateNumber}, " +
-                            $"Parts={clonedParts.Count} | {report.Description}");
+            Debug.WriteLine(
+                $"[Progress] Phase={report.Phase}, Plate={report.PlateNumber}, "
+                    + $"Parts={clonedParts.Count} | {report.Description}"
+            );
 
-            progress.Report(new NestProgress
-            {
-                Phase = report.Phase,
-                PlateNumber = report.PlateNumber,
-                BestParts = clonedParts,
-                Description = report.Description,
-                ActiveWorkArea = report.WorkArea,
-                IsOverallBest = report.IsOverallBest,
-            });
+            progress.Report(
+                new NestProgress
+                {
+                    Phase = report.Phase,
+                    PlateNumber = report.PlateNumber,
+                    BestParts = clonedParts,
+                    Description = report.Description,
+                    ActiveWorkArea = report.WorkArea,
+                    IsOverallBest = report.IsOverallBest,
+                }
+            );
         }
 
         protected string BuildProgressSummary()
@@ -263,14 +299,20 @@ namespace OpenNest
             return string.Join(" | ", parts);
         }
 
-        protected bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea)
-            => Comparer.IsBetter(candidate, current, workArea);
+        protected bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea) =>
+            Comparer.IsBetter(candidate, current, workArea);
 
         protected bool IsBetterValidFill(List<Part> candidate, List<Part> current, Box workArea)
         {
-            if (candidate != null && candidate.Count > 0 && HasOverlaps(candidate, Plate.PartSpacing))
+            if (
+                candidate != null
+                && candidate.Count > 0
+                && HasOverlaps(candidate, Plate.PartSpacing)
+            )
             {
-                Debug.WriteLine($"[IsBetterValidFill] REJECTED {candidate.Count} parts due to overlaps (current best: {current?.Count ?? 0})");
+                Debug.WriteLine(
+                    $"[IsBetterValidFill] REJECTED {candidate.Count} parts due to overlaps (current best: {current?.Count ?? 0})"
+                );
                 return false;
             }
 
@@ -290,10 +332,12 @@ namespace OpenNest
                 {
                     var box2 = parts[j].BoundingBox;
 
-                    var overlapX = System.Math.Min(box1.Right, box2.Right)
-                                 - System.Math.Max(box1.Left, box2.Left);
-                    var overlapY = System.Math.Min(box1.Top, box2.Top)
-                                 - System.Math.Max(box1.Bottom, box2.Bottom);
+                    var overlapX =
+                        System.Math.Min(box1.Right, box2.Right)
+                        - System.Math.Max(box1.Left, box2.Left);
+                    var overlapY =
+                        System.Math.Min(box1.Top, box2.Top)
+                        - System.Math.Max(box1.Bottom, box2.Bottom);
 
                     if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
                         continue;
@@ -304,9 +348,11 @@ namespace OpenNest
                     {
                         var b1 = parts[i].BoundingBox;
                         var b2 = parts[j].BoundingBox;
-                        Debug.WriteLine($"[HasOverlaps] Overlap: part[{i}] ({parts[i].BaseDrawing?.Name}) @ ({b1.Left:F2},{b1.Bottom:F2})-({b1.Right:F2},{b1.Top:F2}) rot={parts[i].Rotation:F2}" +
-                            $" vs part[{j}] ({parts[j].BaseDrawing?.Name}) @ ({b2.Left:F2},{b2.Bottom:F2})-({b2.Right:F2},{b2.Top:F2}) rot={parts[j].Rotation:F2}" +
-                            $" intersections={pts?.Count ?? 0}");
+                        Debug.WriteLine(
+                            $"[HasOverlaps] Overlap: part[{i}] ({parts[i].BaseDrawing?.Name}) @ ({b1.Left:F2},{b1.Bottom:F2})-({b1.Right:F2},{b1.Top:F2}) rot={parts[i].Rotation:F2}"
+                                + $" vs part[{j}] ({parts[j].BaseDrawing?.Name}) @ ({b2.Left:F2},{b2.Bottom:F2})-({b2.Right:F2},{b2.Top:F2}) rot={parts[j].Rotation:F2}"
+                                + $" intersections={pts?.Count ?? 0}"
+                        );
                         return true;
                     }
                 }
@@ -319,8 +365,11 @@ namespace OpenNest
         /// Places best-fit pairs for qty=2 items into remnant spaces around
         /// already-placed parts. Returns all placed pair parts.
         /// </summary>
-        private List<Part> PlaceBestFitPairs(List<NestItem> pairItems,
-            List<Part> existingParts, Box fullWorkArea)
+        private List<Part> PlaceBestFitPairs(
+            List<NestItem> pairItems,
+            List<Part> existingParts,
+            Box fullWorkArea
+        )
         {
             var result = new List<Part>();
             var obstacles = existingParts
@@ -330,10 +379,15 @@ namespace OpenNest
 
             foreach (var item in pairItems)
             {
-                if (item.Quantity < 2) continue;
+                if (item.Quantity < 2)
+                    continue;
 
                 var bestFits = BestFitCache.GetOrCompute(
-                    item.Drawing, Plate.Size.Length, Plate.Size.Width, Plate.PartSpacing);
+                    item.Drawing,
+                    Plate.Size.Length,
+                    Plate.Size.Width,
+                    Plate.PartSpacing
+                );
 
                 // BestFitCache stores pair coordinates in canonical frame. Build candidates
                 // from a canonical drawing copy so geometry and coords share a frame; rebind
@@ -359,8 +413,10 @@ namespace OpenNest
 
                     foreach (var r in remnants)
                     {
-                        if (pairW <= r.Width + Tolerance.Epsilon &&
-                            pairL <= r.Length + Tolerance.Epsilon)
+                        if (
+                            pairW <= r.Width + Tolerance.Epsilon
+                            && pairL <= r.Length + Tolerance.Epsilon
+                        )
                         {
                             var offset = r.Location - pairBbox.Location;
                             foreach (var p in parts)
@@ -379,7 +435,8 @@ namespace OpenNest
                     }
                 }
 
-                if (bestPlacement == null) continue;
+                if (bestPlacement == null)
+                    continue;
 
                 // Rebind to the original drawing and compose sourceAngle onto rotation so the
                 // final placed parts sit in the user's visible frame.
@@ -391,9 +448,11 @@ namespace OpenNest
                 var envelope = ((IEnumerable<IBoundable>)bestPlacement).GetBoundingBox();
                 finder.AddObstacle(envelope.Offset(Plate.PartSpacing));
 
-                Debug.WriteLine($"[Nest] Placed best-fit pair for {item.Drawing.Name} " +
-                    $"at ({bestTarget.X:F1},{bestTarget.Y:F1}), " +
-                    $"size {envelope.Width:F1}x{envelope.Length:F1}");
+                Debug.WriteLine(
+                    $"[Nest] Placed best-fit pair for {item.Drawing.Name} "
+                        + $"at ({bestTarget.X:F1},{bestTarget.Y:F1}), "
+                        + $"size {envelope.Width:F1}x{envelope.Length:F1}"
+                );
             }
 
             return result;
@@ -405,7 +464,11 @@ namespace OpenNest
         /// the returned list is in the original drawing's visible frame. Mirrors
         /// DefaultNestEngine.RebindAndUnCanonicalize.
         /// </summary>
-        private static List<Part> RebindPairToOriginal(List<Part> parts, Drawing original, double sourceAngle)
+        private static List<Part> RebindPairToOriginal(
+            List<Part> parts,
+            Drawing original,
+            double sourceAngle
+        )
         {
             if (parts == null || parts.Count == 0)
                 return parts;
@@ -444,6 +507,5 @@ namespace OpenNest
             // packing produces better results than grid-filling.
             return totalArea >= plateArea * 0.1;
         }
-
     }
 }

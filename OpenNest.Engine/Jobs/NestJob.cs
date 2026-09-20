@@ -7,13 +7,19 @@ namespace OpenNest;
 /// <summary>One material/unit system's requirements. Collections are copied; all nested values are immutable.</summary>
 public sealed class NestJob
 {
-    public NestJob(IEnumerable<NestJobPart> parts, IEnumerable<NestPlateStock> plates, NestJobOptions options = null)
+    public NestJob(
+        IEnumerable<NestJobPart> parts,
+        IEnumerable<NestPlateStock> plates,
+        NestJobOptions options = null
+    )
     {
         Parts = Own(parts);
         Plates = Own(plates);
         Options = options ?? new NestJobOptions();
-        if (Parts.Select(p => p.Id).Distinct(StringComparer.Ordinal).Count() != Parts.Count ||
-            Plates.Select(p => p.Id).Distinct(StringComparer.Ordinal).Count() != Plates.Count)
+        if (
+            Parts.Select(p => p.Id).Distinct(StringComparer.Ordinal).Count() != Parts.Count
+            || Plates.Select(p => p.Id).Distinct(StringComparer.Ordinal).Count() != Plates.Count
+        )
             throw new ArgumentException("Part and stock IDs must each be unique.");
     }
 

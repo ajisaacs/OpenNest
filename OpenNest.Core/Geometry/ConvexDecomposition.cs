@@ -19,8 +19,11 @@ namespace OpenNest.Geometry
             var verts = new List<Vector>(polygon.Vertices);
 
             // Remove closing vertex if polygon is closed.
-            if (verts.Count > 1 && verts[0].X == verts[verts.Count - 1].X
-                                 && verts[0].Y == verts[verts.Count - 1].Y)
+            if (
+                verts.Count > 1
+                && verts[0].X == verts[verts.Count - 1].X
+                && verts[0].Y == verts[verts.Count - 1].Y
+            )
                 verts.RemoveAt(verts.Count - 1);
 
             if (verts.Count < 3)
@@ -84,8 +87,14 @@ namespace OpenNest.Geometry
         /// Tests whether the vertex at curr forms an ear (a convex vertex whose
         /// triangle contains no other polygon vertices).
         /// </summary>
-        private static bool IsEar(Vector prev, Vector curr, Vector next,
-            List<Vector> verts, List<int> indices, int n)
+        private static bool IsEar(
+            Vector prev,
+            Vector curr,
+            Vector next,
+            List<Vector> verts,
+            List<int> indices,
+            int n
+        )
         {
             // Must be convex (CCW turn).
             if (Cross(prev, curr, next) <= 0)

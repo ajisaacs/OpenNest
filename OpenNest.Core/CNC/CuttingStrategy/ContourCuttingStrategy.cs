@@ -1,7 +1,7 @@
-using OpenNest.Geometry;
-using OpenNest.Math;
 using System;
 using System.Collections.Generic;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.CNC.CuttingStrategy
 {
@@ -48,7 +48,12 @@ namespace OpenNest.CNC.CuttingStrategy
                 for (var iter = 0; iter < 3; iter++)
                 {
                     var lastCutoutPt = cutoutEntries[cutoutEntries.Count - 1].Point;
-                    perimeterSeed = FindPerimeterIntersection(profile.Perimeter, lastCutoutPt, nextPartStart, out _);
+                    perimeterSeed = FindPerimeterIntersection(
+                        profile.Perimeter,
+                        lastCutoutPt,
+                        nextPartStart,
+                        out _
+                    );
 
                     orderedCutouts = SequenceCutouts(profile.Cutouts, perimeterSeed);
                     orderedCutouts.Reverse();
@@ -56,7 +61,12 @@ namespace OpenNest.CNC.CuttingStrategy
                 }
 
                 var finalLastCutout = cutoutEntries[cutoutEntries.Count - 1].Point;
-                perimeterPt = FindPerimeterIntersection(profile.Perimeter, finalLastCutout, nextPartStart, out perimeterEntity);
+                perimeterPt = FindPerimeterIntersection(
+                    profile.Perimeter,
+                    finalLastCutout,
+                    nextPartStart,
+                    out perimeterEntity
+                );
             }
             else
             {
@@ -79,18 +89,25 @@ namespace OpenNest.CNC.CuttingStrategy
             if (!profile.Perimeter.IsClosed())
                 EmitRawContour(result, profile.Perimeter);
             else
-                EmitContour(result, profile.Perimeter, perimeterPt, perimeterEntity, ContourType.External);
+                EmitContour(
+                    result,
+                    profile.Perimeter,
+                    perimeterPt,
+                    perimeterEntity,
+                    ContourType.External
+                );
 
             result.Mode = Mode.Incremental;
 
-            return new CuttingResult
-            {
-                Program = result,
-                LastCutPoint = perimeterPt
-            };
+            return new CuttingResult { Program = result, LastCutPoint = perimeterPt };
         }
 
-        public CuttingResult ApplySingle(Program partProgram, Vector point, Entity entity, ContourType contourType)
+        public CuttingResult ApplySingle(
+            Program partProgram,
+            Vector point,
+            Entity entity,
+            ContourType contourType
+        )
         {
             var entities = partProgram.ToGeometry();
             entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
@@ -141,14 +158,14 @@ namespace OpenNest.CNC.CuttingStrategy
 
             result.Mode = Mode.Incremental;
 
-            return new CuttingResult
-            {
-                Program = result,
-                LastCutPoint = point
-            };
+            return new CuttingResult { Program = result, LastCutPoint = point };
         }
 
-        private static (Shape Shape, Entity Entity) FindTargetShape(ShapeProfile profile, Vector point, Entity clickedEntity)
+        private static (Shape Shape, Entity Entity) FindTargetShape(
+            ShapeProfile profile,
+            Vector point,
+            Entity clickedEntity
+        )
         {
             var matched = FindMatchingEntity(profile.Perimeter, clickedEntity);
             if (matched != null)
@@ -190,20 +207,26 @@ namespace OpenNest.CNC.CuttingStrategy
 
                 if (shapeEntity is Line sLine && clickedEntity is Line cLine)
                 {
-                    if (sLine.StartPoint.DistanceTo(cLine.StartPoint) < Math.Tolerance.Epsilon
-                        && sLine.EndPoint.DistanceTo(cLine.EndPoint) < Math.Tolerance.Epsilon)
+                    if (
+                        sLine.StartPoint.DistanceTo(cLine.StartPoint) < Math.Tolerance.Epsilon
+                        && sLine.EndPoint.DistanceTo(cLine.EndPoint) < Math.Tolerance.Epsilon
+                    )
                         return shapeEntity;
                 }
                 else if (shapeEntity is Arc sArc && clickedEntity is Arc cArc)
                 {
-                    if (System.Math.Abs(sArc.Radius - cArc.Radius) < Math.Tolerance.Epsilon
-                        && sArc.Center.DistanceTo(cArc.Center) < Math.Tolerance.Epsilon)
+                    if (
+                        System.Math.Abs(sArc.Radius - cArc.Radius) < Math.Tolerance.Epsilon
+                        && sArc.Center.DistanceTo(cArc.Center) < Math.Tolerance.Epsilon
+                    )
                         return shapeEntity;
                 }
                 else if (shapeEntity is Circle sCircle && clickedEntity is Circle cCircle)
                 {
-                    if (System.Math.Abs(sCircle.Radius - cCircle.Radius) < Math.Tolerance.Epsilon
-                        && sCircle.Center.DistanceTo(cCircle.Center) < Math.Tolerance.Epsilon)
+                    if (
+                        System.Math.Abs(sCircle.Radius - cCircle.Radius) < Math.Tolerance.Epsilon
+                        && sCircle.Center.DistanceTo(cCircle.Center) < Math.Tolerance.Epsilon
+                    )
                         return shapeEntity;
                 }
             }
@@ -218,7 +241,10 @@ namespace OpenNest.CNC.CuttingStrategy
             program.Codes.AddRange(ConvertShapeToMoves(shape, startPoint));
         }
 
-        private static List<ContourEntry> ResolveLeadInPoints(List<Shape> cutouts, Vector startPoint)
+        private static List<ContourEntry> ResolveLeadInPoints(
+            List<Shape> cutouts,
+            Vector startPoint
+        )
         {
             var entries = new ContourEntry[cutouts.Count];
             var currentPoint = startPoint;
@@ -235,7 +261,12 @@ namespace OpenNest.CNC.CuttingStrategy
             return new List<ContourEntry>(entries);
         }
 
-        private static Vector FindPerimeterIntersection(Shape perimeter, Vector lastCutout, Vector nextPartStart, out Entity entity)
+        private static Vector FindPerimeterIntersection(
+            Shape perimeter,
+            Vector lastCutout,
+            Vector nextPartStart,
+            out Entity entity
+        )
         {
             var ray = new Line(lastCutout, nextPartStart);
 
@@ -269,7 +300,13 @@ namespace OpenNest.CNC.CuttingStrategy
             return HashCode.Combine(r, a);
         }
 
-        private void EmitContour(Program program, Shape shape, Vector point, Entity entity, ContourType? forceType = null)
+        private void EmitContour(
+            Program program,
+            Shape shape,
+            Vector point,
+            Entity entity,
+            ContourType? forceType = null
+        )
         {
             var contourType = forceType ?? DetectContourType(shape);
             var winding = DetermineWinding(shape);
@@ -289,7 +326,8 @@ namespace OpenNest.CNC.CuttingStrategy
                     var outwardAngle = normal - System.Math.PI;
                     point = new Vector(
                         circle.Center.X + circle.Radius * System.Math.Cos(outwardAngle),
-                        circle.Center.Y + circle.Radius * System.Math.Sin(outwardAngle));
+                        circle.Center.Y + circle.Radius * System.Math.Sin(outwardAngle)
+                    );
                 }
 
                 leadIn = ClampLeadInForCircle(leadIn, circle, point, normal);
@@ -297,7 +335,10 @@ namespace OpenNest.CNC.CuttingStrategy
                 // Build hole sub-program relative to (0,0)
                 var holeCenter = circle.Center;
                 var relativePoint = new Vector(point.X - holeCenter.X, point.Y - holeCenter.Y);
-                var relativeCircle = new Circle(new Vector(0, 0), circle.Radius) { Rotation = circle.Rotation };
+                var relativeCircle = new Circle(new Vector(0, 0), circle.Radius)
+                {
+                    Rotation = circle.Rotation,
+                };
                 var relativeShape = new Shape();
                 relativeShape.Entities.Add(relativeCircle);
 
@@ -314,12 +355,14 @@ namespace OpenNest.CNC.CuttingStrategy
                 if (!program.SubPrograms.ContainsKey(key))
                     program.SubPrograms[key] = subPgm;
 
-                program.Codes.Add(new SubProgramCall
-                {
-                    Id = key,
-                    Program = program.SubPrograms[key],
-                    Offset = holeCenter
-                });
+                program.Codes.Add(
+                    new SubProgramCall
+                    {
+                        Id = key,
+                        Program = program.SubPrograms[key],
+                        Offset = holeCenter,
+                    }
+                );
 
                 return;
             }
@@ -328,7 +371,11 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var reindexedShape = shape.ReindexAt(point, entity);
 
-            if (Parameters.TabsEnabled && Parameters.TabConfig != null && contourType == ContourType.External)
+            if (
+                Parameters.TabsEnabled
+                && Parameters.TabConfig != null
+                && contourType == ContourType.External
+            )
                 reindexedShape = TrimShapeForTab(reindexedShape, point, Parameters.TabConfig.Size);
 
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
@@ -337,7 +384,8 @@ namespace OpenNest.CNC.CuttingStrategy
 
         private void EmitScribeContours(Program program, List<Entity> scribeEntities)
         {
-            if (scribeEntities.Count == 0) return;
+            if (scribeEntities.Count == 0)
+                return;
 
             var shapes = ShapeBuilder.GetShapes(scribeEntities);
             foreach (var shape in shapes)
@@ -388,8 +436,12 @@ namespace OpenNest.CNC.CuttingStrategy
             return ContourType.Internal;
         }
 
-        public static double ComputeNormal(Vector point, Entity entity, ContourType contourType,
-            RotationType winding = RotationType.CW)
+        public static double ComputeNormal(
+            Vector point,
+            Entity entity,
+            ContourType contourType,
+            RotationType winding = RotationType.CW
+        )
         {
             double normal;
 
@@ -442,7 +494,12 @@ namespace OpenNest.CNC.CuttingStrategy
             return polygon.RotationDirection();
         }
 
-        private LeadIn ClampLeadInForCircle(LeadIn leadIn, Circle circle, Vector contourPoint, double normalAngle)
+        private LeadIn ClampLeadInForCircle(
+            LeadIn leadIn,
+            Circle circle,
+            Vector contourPoint,
+            double normalAngle
+        )
         {
             if (leadIn is NoLeadIn || Parameters.PierceClearance <= 0)
                 return leadIn;
@@ -492,7 +549,7 @@ namespace OpenNest.CNC.CuttingStrategy
             {
                 ContourType.ArcCircle => Parameters.ArcCircleLeadIn ?? Parameters.InternalLeadIn,
                 ContourType.Internal => Parameters.InternalLeadIn,
-                _ => Parameters.ExternalLeadIn
+                _ => Parameters.ExternalLeadIn,
             };
         }
 
@@ -502,7 +559,7 @@ namespace OpenNest.CNC.CuttingStrategy
             {
                 ContourType.ArcCircle => Parameters.ArcCircleLeadOut ?? Parameters.InternalLeadOut,
                 ContourType.Internal => Parameters.InternalLeadOut,
-                _ => Parameters.ExternalLeadOut
+                _ => Parameters.ExternalLeadOut,
             };
         }
 
@@ -565,12 +622,18 @@ namespace OpenNest.CNC.CuttingStrategy
 
         private static Vector EntityStartPoint(Entity entity)
         {
-            if (entity is Line line) return line.StartPoint;
-            if (entity is Arc arc) return arc.StartPoint();
+            if (entity is Line line)
+                return line.StartPoint;
+            if (entity is Arc arc)
+                return arc.StartPoint();
             return Vector.Zero;
         }
 
-        private List<ICode> ConvertShapeToMoves(Shape shape, Vector startPoint, LayerType layer = LayerType.Display)
+        private List<ICode> ConvertShapeToMoves(
+            Shape shape,
+            Vector startPoint,
+            LayerType layer = LayerType.Display
+        )
         {
             var moves = new List<ICode>();
 
@@ -582,15 +645,28 @@ namespace OpenNest.CNC.CuttingStrategy
                 }
                 else if (entity is Arc arc)
                 {
-                    moves.Add(new ArcMove(arc.EndPoint(), arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW) { Layer = layer });
+                    moves.Add(
+                        new ArcMove(
+                            arc.EndPoint(),
+                            arc.Center,
+                            arc.IsReversed ? RotationType.CW : RotationType.CCW
+                        )
+                        {
+                            Layer = layer,
+                        }
+                    );
                 }
                 else if (entity is Circle circle)
                 {
-                    moves.Add(new ArcMove(startPoint, circle.Center, circle.Rotation) { Layer = layer });
+                    moves.Add(
+                        new ArcMove(startPoint, circle.Center, circle.Rotation) { Layer = layer }
+                    );
                 }
                 else
                 {
-                    throw new System.InvalidOperationException($"Unsupported entity type: {entity.Type}");
+                    throw new System.InvalidOperationException(
+                        $"Unsupported entity type: {entity.Type}"
+                    );
                 }
             }
 
@@ -600,9 +676,12 @@ namespace OpenNest.CNC.CuttingStrategy
         private static Vector GetShapeStartPoint(Shape shape)
         {
             var first = shape.Entities[0];
-            if (first is Line line) return line.StartPoint;
-            if (first is Arc arc) return arc.StartPoint();
-            if (first is Circle circle) return new Vector(circle.Center.X + circle.Radius, circle.Center.Y);
+            if (first is Line line)
+                return line.StartPoint;
+            if (first is Arc arc)
+                return arc.StartPoint();
+            if (first is Circle circle)
+                return new Vector(circle.Center.X + circle.Radius, circle.Center.Y);
             return Vector.Zero;
         }
     }

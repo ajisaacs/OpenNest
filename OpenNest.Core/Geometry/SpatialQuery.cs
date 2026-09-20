@@ -1,6 +1,6 @@
-using OpenNest.Math;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -13,57 +13,72 @@ namespace OpenNest.Geometry
         private static double RayEdgeDistance(Vector vertex, Line edge, PushDirection direction)
         {
             return RayEdgeDistance(
-                vertex.X, vertex.Y,
-                edge.pt1.X, edge.pt1.Y, edge.pt2.X, edge.pt2.Y,
-                direction);
+                vertex.X,
+                vertex.Y,
+                edge.pt1.X,
+                edge.pt1.Y,
+                edge.pt2.X,
+                edge.pt2.Y,
+                direction
+            );
         }
 
         [System.Runtime.CompilerServices.MethodImpl(
-            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
+        )]
         private static double RayEdgeDistance(
-            double vx, double vy,
-            double p1x, double p1y, double p2x, double p2y,
-            PushDirection direction)
+            double vx,
+            double vy,
+            double p1x,
+            double p1y,
+            double p2x,
+            double p2y,
+            PushDirection direction
+        )
         {
             switch (direction)
             {
                 case PushDirection.Left:
                 case PushDirection.Right:
-                    {
-                        var dy = p2y - p1y;
-                        if (System.Math.Abs(dy) < Tolerance.Epsilon)
-                            return double.MaxValue;
-
-                        var t = (vy - p1y) / dy;
-                        if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
-                            return double.MaxValue;
-
-                        var ix = p1x + t * (p2x - p1x);
-                        var dist = direction == PushDirection.Left ? vx - ix : ix - vx;
-
-                        if (dist > Tolerance.Epsilon) return dist;
-                        if (dist >= -Tolerance.Epsilon) return 0;
+                {
+                    var dy = p2y - p1y;
+                    if (System.Math.Abs(dy) < Tolerance.Epsilon)
                         return double.MaxValue;
-                    }
+
+                    var t = (vy - p1y) / dy;
+                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                        return double.MaxValue;
+
+                    var ix = p1x + t * (p2x - p1x);
+                    var dist = direction == PushDirection.Left ? vx - ix : ix - vx;
+
+                    if (dist > Tolerance.Epsilon)
+                        return dist;
+                    if (dist >= -Tolerance.Epsilon)
+                        return 0;
+                    return double.MaxValue;
+                }
 
                 case PushDirection.Down:
                 case PushDirection.Up:
-                    {
-                        var dx = p2x - p1x;
-                        if (System.Math.Abs(dx) < Tolerance.Epsilon)
-                            return double.MaxValue;
-
-                        var t = (vx - p1x) / dx;
-                        if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
-                            return double.MaxValue;
-
-                        var iy = p1y + t * (p2y - p1y);
-                        var dist = direction == PushDirection.Down ? vy - iy : iy - vy;
-
-                        if (dist > Tolerance.Epsilon) return dist;
-                        if (dist >= -Tolerance.Epsilon) return 0;
+                {
+                    var dx = p2x - p1x;
+                    if (System.Math.Abs(dx) < Tolerance.Epsilon)
                         return double.MaxValue;
-                    }
+
+                    var t = (vx - p1x) / dx;
+                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                        return double.MaxValue;
+
+                    var iy = p1y + t * (p2y - p1y);
+                    var dist = direction == PushDirection.Down ? vy - iy : iy - vy;
+
+                    if (dist > Tolerance.Epsilon)
+                        return dist;
+                    if (dist >= -Tolerance.Epsilon)
+                        return 0;
+                    return double.MaxValue;
+                }
 
                 default:
                     return double.MaxValue;
@@ -75,11 +90,18 @@ namespace OpenNest.Geometry
         /// Returns double.MaxValue if the ray does not hit the segment.
         /// </summary>
         [System.Runtime.CompilerServices.MethodImpl(
-            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
+        )]
         public static double RayEdgeDistance(
-            double vx, double vy,
-            double p1x, double p1y, double p2x, double p2y,
-            double dirX, double dirY)
+            double vx,
+            double vy,
+            double p1x,
+            double p1y,
+            double p2x,
+            double p2y,
+            double dirX,
+            double dirY
+        )
         {
             var ex = p2x - p1x;
             var ey = p2y - p1y;
@@ -99,8 +121,10 @@ namespace OpenNest.Geometry
             if (s < -Tolerance.Epsilon || s > 1.0 + Tolerance.Epsilon)
                 return double.MaxValue;
 
-            if (t > Tolerance.Epsilon) return t;
-            if (t >= -Tolerance.Epsilon) return 0;
+            if (t > Tolerance.Epsilon)
+                return t;
+            if (t >= -Tolerance.Epsilon)
+                return 0;
             return double.MaxValue;
         }
 
@@ -109,12 +133,19 @@ namespace OpenNest.Geometry
         /// Returns false if no real intersection exists.
         /// </summary>
         [System.Runtime.CompilerServices.MethodImpl(
-            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
+        )]
         private static bool SolveRayCircle(
-            double vx, double vy,
-            double cx, double cy, double r,
-            double dirX, double dirY,
-            out double t1, out double t2)
+            double vx,
+            double vy,
+            double cx,
+            double cy,
+            double r,
+            double dirX,
+            double dirY,
+            out double t1,
+            out double t2
+        )
         {
             var ox = vx - cx;
             var oy = vy - cy;
@@ -143,12 +174,20 @@ namespace OpenNest.Geometry
         /// angular span. Returns double.MaxValue if no hit.
         /// </summary>
         [System.Runtime.CompilerServices.MethodImpl(
-            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
+        )]
         public static double RayArcDistance(
-            double vx, double vy,
-            double cx, double cy, double r,
-            double startAngle, double endAngle, bool reversed,
-            double dirX, double dirY)
+            double vx,
+            double vy,
+            double cx,
+            double cy,
+            double r,
+            double startAngle,
+            double endAngle,
+            bool reversed,
+            double dirX,
+            double dirY
+        )
         {
             if (!SolveRayCircle(vx, vy, cx, cy, r, dirX, dirY, out var t1, out var t2))
                 return double.MaxValue;
@@ -157,16 +196,18 @@ namespace OpenNest.Geometry
 
             if (t1 > -Tolerance.Epsilon)
             {
-                var hitAngle = Angle.NormalizeRad(System.Math.Atan2(
-                    vy + t1 * dirY - cy, vx + t1 * dirX - cx));
+                var hitAngle = Angle.NormalizeRad(
+                    System.Math.Atan2(vy + t1 * dirY - cy, vx + t1 * dirX - cx)
+                );
                 if (Angle.IsBetweenRad(hitAngle, startAngle, endAngle, reversed))
                     best = t1 > Tolerance.Epsilon ? t1 : 0;
             }
 
             if (t2 > -Tolerance.Epsilon && t2 < best)
             {
-                var hitAngle = Angle.NormalizeRad(System.Math.Atan2(
-                    vy + t2 * dirY - cy, vx + t2 * dirX - cx));
+                var hitAngle = Angle.NormalizeRad(
+                    System.Math.Atan2(vy + t2 * dirY - cy, vx + t2 * dirX - cx)
+                );
                 if (Angle.IsBetweenRad(hitAngle, startAngle, endAngle, reversed))
                     best = t2 > Tolerance.Epsilon ? t2 : 0;
             }
@@ -179,19 +220,29 @@ namespace OpenNest.Geometry
         /// Returns double.MaxValue if no hit.
         /// </summary>
         [System.Runtime.CompilerServices.MethodImpl(
-            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+            System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
+        )]
         public static double RayCircleDistance(
-            double vx, double vy,
-            double cx, double cy, double r,
-            double dirX, double dirY)
+            double vx,
+            double vy,
+            double cx,
+            double cy,
+            double r,
+            double dirX,
+            double dirY
+        )
         {
             if (!SolveRayCircle(vx, vy, cx, cy, r, dirX, dirY, out var t1, out var t2))
                 return double.MaxValue;
 
-            if (t1 > Tolerance.Epsilon) return t1;
-            if (t1 >= -Tolerance.Epsilon) return 0;
-            if (t2 > Tolerance.Epsilon) return t2;
-            if (t2 >= -Tolerance.Epsilon) return 0;
+            if (t1 > Tolerance.Epsilon)
+                return t1;
+            if (t1 >= -Tolerance.Epsilon)
+                return 0;
+            if (t2 > Tolerance.Epsilon)
+                return t2;
+            if (t2 >= -Tolerance.Epsilon)
+                return 0;
 
             return double.MaxValue;
         }
@@ -201,7 +252,11 @@ namespace OpenNest.Geometry
         /// any edge of movingLines contacts any edge of stationaryLines.
         /// Returns double.MaxValue if no collision path exists.
         /// </summary>
-        public static double DirectionalDistance(List<Line> movingLines, List<Line> stationaryLines, PushDirection direction)
+        public static double DirectionalDistance(
+            List<Line> movingLines,
+            List<Line> stationaryLines,
+            PushDirection direction
+        )
         {
             return DirectionalDistance(movingLines, 0, 0, stationaryLines, direction);
         }
@@ -211,8 +266,12 @@ namespace OpenNest.Geometry
         /// by (movingDx, movingDy) without creating new Line objects.
         /// </summary>
         public static double DirectionalDistance(
-            List<Line> movingLines, double movingDx, double movingDy,
-            List<Line> stationaryLines, PushDirection direction)
+            List<Line> movingLines,
+            double movingDx,
+            double movingDy,
+            List<Line> stationaryLines,
+            PushDirection direction
+        )
         {
             var minDist = double.MaxValue;
             var movingOffset = new Vector(movingDx, movingDy);
@@ -226,7 +285,8 @@ namespace OpenNest.Geometry
             foreach (var mv in movingVertices)
             {
                 var d = OneWayDistance(mv, stationaryEdges, Vector.Zero, direction);
-                if (d < minDist) minDist = d;
+                if (d < minDist)
+                    minDist = d;
             }
 
             // Case 2: Each stationary vertex -> each moving edge (opposite direction)
@@ -239,7 +299,8 @@ namespace OpenNest.Geometry
             foreach (var sv in stationaryVertices)
             {
                 var d = OneWayDistance(sv, movingEdges, movingOffset, opposite);
-                if (d < minDist) minDist = d;
+                if (d < minDist)
+                    minDist = d;
             }
 
             return minDist;
@@ -267,9 +328,12 @@ namespace OpenNest.Geometry
         /// to avoid all intermediate object allocations.
         /// </summary>
         public static double DirectionalDistance(
-            (Vector start, Vector end)[] movingEdges, Vector movingOffset,
-            (Vector start, Vector end)[] stationaryEdges, Vector stationaryOffset,
-            PushDirection direction)
+            (Vector start, Vector end)[] movingEdges,
+            Vector movingOffset,
+            (Vector start, Vector end)[] stationaryEdges,
+            Vector stationaryOffset,
+            PushDirection direction
+        )
         {
             var minDist = double.MaxValue;
 
@@ -281,7 +345,8 @@ namespace OpenNest.Geometry
             foreach (var mv in movingVertices)
             {
                 var d = OneWayDistance(mv, stationaryEdges, stationaryOffset, direction);
-                if (d < minDist) minDist = d;
+                if (d < minDist)
+                    minDist = d;
             }
 
             // Case 2: Each stationary vertex -> each moving edge (opposite direction)
@@ -293,15 +358,19 @@ namespace OpenNest.Geometry
             foreach (var sv in stationaryVertices)
             {
                 var d = OneWayDistance(sv, movingEdges, movingOffset, opposite);
-                if (d < minDist) minDist = d;
+                if (d < minDist)
+                    minDist = d;
             }
 
             return minDist;
         }
 
         public static double OneWayDistance(
-            Vector vertex, (Vector start, Vector end)[] edges, Vector edgeOffset,
-            PushDirection direction)
+            Vector vertex,
+            (Vector start, Vector end)[] edges,
+            Vector edgeOffset,
+            PushDirection direction
+        )
         {
             var minDist = double.MaxValue;
             var vx = vertex.X;
@@ -315,7 +384,9 @@ namespace OpenNest.Geometry
                 var e1 = edges[i].start + edgeOffset;
                 var e2 = edges[i].end + edgeOffset;
 
-                double perpValue, edgeMin, edgeMax;
+                double perpValue,
+                    edgeMin,
+                    edgeMax;
                 if (horizontal)
                 {
                     perpValue = vy;
@@ -337,7 +408,8 @@ namespace OpenNest.Geometry
                     continue;
 
                 var d = RayEdgeDistance(vx, vy, e1.X, e1.Y, e2.X, e2.Y, direction);
-                if (d < minDist) minDist = d;
+                if (d < minDist)
+                    minDist = d;
             }
 
             return minDist;
@@ -347,11 +419,16 @@ namespace OpenNest.Geometry
         {
             switch (direction)
             {
-                case PushDirection.Left: return PushDirection.Right;
-                case PushDirection.Right: return PushDirection.Left;
-                case PushDirection.Up: return PushDirection.Down;
-                case PushDirection.Down: return PushDirection.Up;
-                default: return direction;
+                case PushDirection.Left:
+                    return PushDirection.Right;
+                case PushDirection.Right:
+                    return PushDirection.Left;
+                case PushDirection.Up:
+                    return PushDirection.Down;
+                case PushDirection.Down:
+                    return PushDirection.Up;
+                default:
+                    return direction;
             }
         }
 
@@ -364,11 +441,16 @@ namespace OpenNest.Geometry
         {
             switch (direction)
             {
-                case PushDirection.Left: return box.Left - boundary.Left;
-                case PushDirection.Right: return boundary.Right - box.Right;
-                case PushDirection.Up: return boundary.Top - box.Top;
-                case PushDirection.Down: return box.Bottom - boundary.Bottom;
-                default: return double.MaxValue;
+                case PushDirection.Left:
+                    return box.Left - boundary.Left;
+                case PushDirection.Right:
+                    return boundary.Right - box.Right;
+                case PushDirection.Up:
+                    return boundary.Top - box.Top;
+                case PushDirection.Down:
+                    return box.Bottom - boundary.Bottom;
+                default:
+                    return double.MaxValue;
             }
         }
 
@@ -376,11 +458,16 @@ namespace OpenNest.Geometry
         {
             switch (direction)
             {
-                case PushDirection.Left: return new Vector(-distance, 0);
-                case PushDirection.Right: return new Vector(distance, 0);
-                case PushDirection.Up: return new Vector(0, distance);
-                case PushDirection.Down: return new Vector(0, -distance);
-                default: return new Vector();
+                case PushDirection.Left:
+                    return new Vector(-distance, 0);
+                case PushDirection.Right:
+                    return new Vector(distance, 0);
+                case PushDirection.Up:
+                    return new Vector(0, distance);
+                case PushDirection.Down:
+                    return new Vector(0, -distance);
+                default:
+                    return new Vector();
             }
         }
 
@@ -388,11 +475,16 @@ namespace OpenNest.Geometry
         {
             switch (direction)
             {
-                case PushDirection.Left: return from.Left - to.Right;
-                case PushDirection.Right: return to.Left - from.Right;
-                case PushDirection.Up: return to.Bottom - from.Top;
-                case PushDirection.Down: return from.Bottom - to.Top;
-                default: return double.MaxValue;
+                case PushDirection.Left:
+                    return from.Left - to.Right;
+                case PushDirection.Right:
+                    return to.Left - from.Right;
+                case PushDirection.Up:
+                    return to.Bottom - from.Top;
+                case PushDirection.Down:
+                    return from.Bottom - to.Top;
+                default:
+                    return double.MaxValue;
             }
         }
 
@@ -409,23 +501,27 @@ namespace OpenNest.Geometry
             if (direction.X < -Tolerance.Epsilon)
             {
                 var d = (box.Left - boundary.Left) / -direction.X;
-                if (d < dist) dist = d;
+                if (d < dist)
+                    dist = d;
             }
             else if (direction.X > Tolerance.Epsilon)
             {
                 var d = (boundary.Right - box.Right) / direction.X;
-                if (d < dist) dist = d;
+                if (d < dist)
+                    dist = d;
             }
 
             if (direction.Y < -Tolerance.Epsilon)
             {
                 var d = (box.Bottom - boundary.Bottom) / -direction.Y;
-                if (d < dist) dist = d;
+                if (d < dist)
+                    dist = d;
             }
             else if (direction.Y > Tolerance.Epsilon)
             {
                 var d = (boundary.Top - box.Top) / direction.Y;
-                if (d < dist) dist = d;
+                if (d < dist)
+                    dist = d;
             }
 
             return dist < 0 ? 0 : dist;
@@ -463,7 +559,11 @@ namespace OpenNest.Geometry
         /// Computes the minimum translation distance along an arbitrary unit direction
         /// before any edge of movingLines contacts any edge of stationaryLines.
         /// </summary>
-        public static double DirectionalDistance(List<Line> movingLines, List<Line> stationaryLines, Vector direction)
+        public static double DirectionalDistance(
+            List<Line> movingLines,
+            List<Line> stationaryLines,
+            Vector direction
+        )
         {
             var minDist = double.MaxValue;
             var dirX = direction.X;
@@ -476,8 +576,18 @@ namespace OpenNest.Geometry
                 for (var i = 0; i < stationaryLines.Count; i++)
                 {
                     var e = stationaryLines[i];
-                    var d = RayEdgeDistance(mv.X, mv.Y, e.pt1.X, e.pt1.Y, e.pt2.X, e.pt2.Y, dirX, dirY);
-                    if (d < minDist) minDist = d;
+                    var d = RayEdgeDistance(
+                        mv.X,
+                        mv.Y,
+                        e.pt1.X,
+                        e.pt1.Y,
+                        e.pt2.X,
+                        e.pt2.Y,
+                        dirX,
+                        dirY
+                    );
+                    if (d < minDist)
+                        minDist = d;
                 }
             }
 
@@ -491,8 +601,18 @@ namespace OpenNest.Geometry
                 for (var i = 0; i < movingLines.Count; i++)
                 {
                     var e = movingLines[i];
-                    var d = RayEdgeDistance(sv.X, sv.Y, e.pt1.X, e.pt1.Y, e.pt2.X, e.pt2.Y, oppX, oppY);
-                    if (d < minDist) minDist = d;
+                    var d = RayEdgeDistance(
+                        sv.X,
+                        sv.Y,
+                        e.pt1.X,
+                        e.pt1.Y,
+                        e.pt2.X,
+                        e.pt2.Y,
+                        oppX,
+                        oppY
+                    );
+                    if (d < minDist)
+                        minDist = d;
                 }
             }
 
@@ -505,9 +625,16 @@ namespace OpenNest.Geometry
         /// stationaryEntities. Delegates to the Vector-based overload.
         /// </summary>
         public static double DirectionalDistance(
-            List<Entity> movingEntities, List<Entity> stationaryEntities, PushDirection direction)
+            List<Entity> movingEntities,
+            List<Entity> stationaryEntities,
+            PushDirection direction
+        )
         {
-            return DirectionalDistance(movingEntities, stationaryEntities, DirectionToOffset(direction, 1.0));
+            return DirectionalDistance(
+                movingEntities,
+                stationaryEntities,
+                DirectionToOffset(direction, 1.0)
+            );
         }
 
         /// <summary>
@@ -517,7 +644,10 @@ namespace OpenNest.Geometry
         /// without tessellation.
         /// </summary>
         public static double DirectionalDistance(
-            List<Entity> movingEntities, List<Entity> stationaryEntities, Vector direction)
+            List<Entity> movingEntities,
+            List<Entity> stationaryEntities,
+            Vector direction
+        )
         {
             var minDist = double.MaxValue;
             var dirX = direction.X;
@@ -536,7 +666,8 @@ namespace OpenNest.Geometry
                     if (d < minDist)
                     {
                         minDist = d;
-                        if (d <= 0) return 0;
+                        if (d <= 0)
+                            return 0;
                     }
                 }
             }
@@ -557,7 +688,8 @@ namespace OpenNest.Geometry
                     if (d < minDist)
                     {
                         minDist = d;
-                        if (d <= 0) return 0;
+                        if (d <= 0)
+                            return 0;
                     }
                 }
             }
@@ -566,10 +698,24 @@ namespace OpenNest.Geometry
             // Phases 1-2 sample arc endpoints and cardinal extremes, but the actual
             // closest point on a small corner arc to a straight edge may lie between
             // those samples. Use ClosestPointTo to find it and fire a ray from there.
-            minDist = ArcToLineClosestDistance(movingEntities, stationaryEntities, dirX, dirY, minDist);
-            if (minDist <= 0) return 0;
-            minDist = ArcToLineClosestDistance(stationaryEntities, movingEntities, oppX, oppY, minDist);
-            if (minDist <= 0) return 0;
+            minDist = ArcToLineClosestDistance(
+                movingEntities,
+                stationaryEntities,
+                dirX,
+                dirY,
+                minDist
+            );
+            if (minDist <= 0)
+                return 0;
+            minDist = ArcToLineClosestDistance(
+                stationaryEntities,
+                movingEntities,
+                oppX,
+                oppY,
+                minDist
+            );
+            if (minDist <= 0)
+                return 0;
 
             // Phase 4: Curve-to-curve direct distance.
             // The vertex-to-entity approach misses the closest contact between two
@@ -605,20 +751,35 @@ namespace OpenNest.Geometry
                         if (me is Arc mArc)
                         {
                             var angle = Angle.NormalizeRad(System.Math.Atan2(toCy, toCx));
-                            if (!Angle.IsBetweenRad(angle, mArc.StartAngle, mArc.EndAngle, mArc.IsReversed))
+                            if (
+                                !Angle.IsBetweenRad(
+                                    angle,
+                                    mArc.StartAngle,
+                                    mArc.EndAngle,
+                                    mArc.IsReversed
+                                )
+                            )
                                 continue;
                         }
 
                         if (se is Arc sArc)
                         {
                             var angle = Angle.NormalizeRad(System.Math.Atan2(-toCy, -toCx));
-                            if (!Angle.IsBetweenRad(angle, sArc.StartAngle, sArc.EndAngle, sArc.IsReversed))
+                            if (
+                                !Angle.IsBetweenRad(
+                                    angle,
+                                    sArc.StartAngle,
+                                    sArc.EndAngle,
+                                    sArc.IsReversed
+                                )
+                            )
                                 continue;
                         }
                     }
 
                     minDist = d;
-                    if (d <= 0) return 0;
+                    if (d <= 0)
+                        return 0;
                 }
             }
 
@@ -626,8 +787,12 @@ namespace OpenNest.Geometry
         }
 
         private static double ArcToLineClosestDistance(
-            List<Entity> arcEntities, List<Entity> lineEntities,
-            double dirX, double dirY, double minDist)
+            List<Entity> arcEntities,
+            List<Entity> lineEntities,
+            double dirX,
+            double dirY,
+            double minDist
+        )
         {
             for (var i = 0; i < arcEntities.Count; i++)
             {
@@ -662,15 +827,30 @@ namespace OpenNest.Geometry
                     {
                         var theta = k == 0 ? theta1 : theta2;
 
-                        if (!Angle.IsBetweenRad(theta, arc.StartAngle, arc.EndAngle, arc.IsReversed))
+                        if (
+                            !Angle.IsBetweenRad(theta, arc.StartAngle, arc.EndAngle, arc.IsReversed)
+                        )
                             continue;
 
                         var qx = cx + r * System.Math.Cos(theta);
                         var qy = cy + r * System.Math.Sin(theta);
 
-                        var d = RayEdgeDistance(qx, qy, p1x, p1y, line.pt2.X, line.pt2.Y,
-                            dirX, dirY);
-                        if (d < minDist) { minDist = d; if (d <= 0) return 0; }
+                        var d = RayEdgeDistance(
+                            qx,
+                            qy,
+                            p1x,
+                            p1y,
+                            line.pt2.X,
+                            line.pt2.Y,
+                            dirX,
+                            dirY
+                        );
+                        if (d < minDist)
+                        {
+                            minDist = d;
+                            if (d <= 0)
+                                return 0;
+                        }
                     }
                 }
             }
@@ -678,28 +858,54 @@ namespace OpenNest.Geometry
         }
 
         private static double RayEntityDistance(
-            double vx, double vy, Entity entity, double dirX, double dirY)
+            double vx,
+            double vy,
+            Entity entity,
+            double dirX,
+            double dirY
+        )
         {
             if (entity is Line line)
             {
-                return RayEdgeDistance(vx, vy,
-                    line.pt1.X, line.pt1.Y, line.pt2.X, line.pt2.Y,
-                    dirX, dirY);
+                return RayEdgeDistance(
+                    vx,
+                    vy,
+                    line.pt1.X,
+                    line.pt1.Y,
+                    line.pt2.X,
+                    line.pt2.Y,
+                    dirX,
+                    dirY
+                );
             }
 
             if (entity is Arc arc)
             {
-                return RayArcDistance(vx, vy,
-                    arc.Center.X, arc.Center.Y, arc.Radius,
-                    arc.StartAngle, arc.EndAngle, arc.IsReversed,
-                    dirX, dirY);
+                return RayArcDistance(
+                    vx,
+                    vy,
+                    arc.Center.X,
+                    arc.Center.Y,
+                    arc.Radius,
+                    arc.StartAngle,
+                    arc.EndAngle,
+                    arc.IsReversed,
+                    dirX,
+                    dirY
+                );
             }
 
             if (entity is Circle circle)
             {
-                return RayCircleDistance(vx, vy,
-                    circle.Center.X, circle.Center.Y, circle.Radius,
-                    dirX, dirY);
+                return RayCircleDistance(
+                    vx,
+                    vy,
+                    circle.Center.X,
+                    circle.Center.Y,
+                    circle.Radius,
+                    dirX,
+                    dirY
+                );
             }
 
             return double.MaxValue;
@@ -759,7 +965,10 @@ namespace OpenNest.Geometry
             return CollectVertices(ToEdgeArray(lines), offset);
         }
 
-        private static HashSet<Vector> CollectVertices((Vector start, Vector end)[] edges, Vector offset)
+        private static HashSet<Vector> CollectVertices(
+            (Vector start, Vector end)[] edges,
+            Vector offset
+        )
         {
             var vertices = new HashSet<Vector>();
             for (var i = 0; i < edges.Length; i++)
@@ -778,26 +987,48 @@ namespace OpenNest.Geometry
             return edges;
         }
 
-        private static void SortEdgesForPruning((Vector start, Vector end)[] edges, PushDirection direction)
+        private static void SortEdgesForPruning(
+            (Vector start, Vector end)[] edges,
+            PushDirection direction
+        )
         {
             if (direction == PushDirection.Left || direction == PushDirection.Right)
-                System.Array.Sort(edges, (a, b) =>
-                    System.Math.Min(a.start.Y, a.end.Y).CompareTo(System.Math.Min(b.start.Y, b.end.Y)));
+                System.Array.Sort(
+                    edges,
+                    (a, b) =>
+                        System
+                            .Math.Min(a.start.Y, a.end.Y)
+                            .CompareTo(System.Math.Min(b.start.Y, b.end.Y))
+                );
             else
-                System.Array.Sort(edges, (a, b) =>
-                    System.Math.Min(a.start.X, a.end.X).CompareTo(System.Math.Min(b.start.X, b.end.X)));
+                System.Array.Sort(
+                    edges,
+                    (a, b) =>
+                        System
+                            .Math.Min(a.start.X, a.end.X)
+                            .CompareTo(System.Math.Min(b.start.X, b.end.X))
+                );
         }
 
-        private static bool TryGetCurveParams(Entity entity, out double cx, out double cy, out double r)
+        private static bool TryGetCurveParams(
+            Entity entity,
+            out double cx,
+            out double cy,
+            out double r
+        )
         {
             if (entity is Circle circle)
             {
-                cx = circle.Center.X; cy = circle.Center.Y; r = circle.Radius;
+                cx = circle.Center.X;
+                cy = circle.Center.Y;
+                r = circle.Radius;
                 return true;
             }
             if (entity is Arc arc)
             {
-                cx = arc.Center.X; cy = arc.Center.Y; r = arc.Radius;
+                cx = arc.Center.X;
+                cy = arc.Center.Y;
+                r = arc.Radius;
                 return true;
             }
             cx = cy = r = 0;
@@ -850,7 +1081,13 @@ namespace OpenNest.Geometry
             return new Box(lft, btm, rgt - lft, top - btm);
         }
 
-        private static bool FindVerticalLimits(Vector pt, Box bounds, List<Box> boxes, out double top, out double btm)
+        private static bool FindVerticalLimits(
+            Vector pt,
+            Box bounds,
+            List<Box> boxes,
+            out double top,
+            out double btm
+        )
         {
             top = double.MaxValue;
             btm = double.MinValue;
@@ -868,20 +1105,30 @@ namespace OpenNest.Geometry
 
             if (top == double.MaxValue)
             {
-                if (bounds.Top > pt.Y) top = bounds.Top;
-                else return false;
+                if (bounds.Top > pt.Y)
+                    top = bounds.Top;
+                else
+                    return false;
             }
 
             if (btm == double.MinValue)
             {
-                if (bounds.Bottom < pt.Y) btm = bounds.Bottom;
-                else return false;
+                if (bounds.Bottom < pt.Y)
+                    btm = bounds.Bottom;
+                else
+                    return false;
             }
 
             return true;
         }
 
-        private static bool FindHorizontalLimits(Vector pt, Box bounds, List<Box> boxes, out double lft, out double rgt)
+        private static bool FindHorizontalLimits(
+            Vector pt,
+            Box bounds,
+            List<Box> boxes,
+            out double lft,
+            out double rgt
+        )
         {
             lft = double.MinValue;
             rgt = double.MaxValue;
@@ -899,14 +1146,18 @@ namespace OpenNest.Geometry
 
             if (rgt == double.MaxValue)
             {
-                if (bounds.Right > pt.X) rgt = bounds.Right;
-                else return false;
+                if (bounds.Right > pt.X)
+                    rgt = bounds.Right;
+                else
+                    return false;
             }
 
             if (lft == double.MinValue)
             {
-                if (bounds.Left < pt.X) lft = bounds.Left;
-                else return false;
+                if (bounds.Left < pt.X)
+                    lft = bounds.Left;
+                else
+                    return false;
             }
 
             return true;

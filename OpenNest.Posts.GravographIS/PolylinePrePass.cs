@@ -22,9 +22,11 @@ namespace OpenNest.Posts.GravographIS
         /// </summary>
         public static List<List<Vector>> Stitch(
             IEnumerable<IReadOnlyList<Vector>> polylines,
-            double tolerance = DefaultStitchTolerance)
+            double tolerance = DefaultStitchTolerance
+        )
         {
-            if (polylines == null) throw new ArgumentNullException(nameof(polylines));
+            if (polylines == null)
+                throw new ArgumentNullException(nameof(polylines));
 
             var segs = new List<List<Vector>>();
             foreach (var p in polylines)
@@ -44,15 +46,18 @@ namespace OpenNest.Posts.GravographIS
 
                     for (int j = 0; j < segs.Count; j++)
                     {
-                        if (i == j) continue;
+                        if (i == j)
+                            continue;
                         var b = segs[j];
 
                         // a-end ↔ b-start: append b to a (skip duplicated joint)
                         if (Near(a[a.Count - 1], b[0], tolerance))
                         {
-                            for (int k = 1; k < b.Count; k++) a.Add(b[k]);
+                            for (int k = 1; k < b.Count; k++)
+                                a.Add(b[k]);
                             segs.RemoveAt(j);
-                            if (j < i) i--;
+                            if (j < i)
+                                i--;
                             changed = true;
                             break;
                         }
@@ -60,9 +65,11 @@ namespace OpenNest.Posts.GravographIS
                         // a-end ↔ b-end: append reversed b to a
                         if (Near(a[a.Count - 1], b[b.Count - 1], tolerance))
                         {
-                            for (int k = b.Count - 2; k >= 0; k--) a.Add(b[k]);
+                            for (int k = b.Count - 2; k >= 0; k--)
+                                a.Add(b[k]);
                             segs.RemoveAt(j);
-                            if (j < i) i--;
+                            if (j < i)
+                                i--;
                             changed = true;
                             break;
                         }
@@ -72,10 +79,12 @@ namespace OpenNest.Posts.GravographIS
                         {
                             var combined = new List<Vector>(b.Count + a.Count - 1);
                             combined.AddRange(b);
-                            for (int k = 1; k < a.Count; k++) combined.Add(a[k]);
+                            for (int k = 1; k < a.Count; k++)
+                                combined.Add(a[k]);
                             segs[i] = combined;
                             segs.RemoveAt(j);
-                            if (j < i) i--;
+                            if (j < i)
+                                i--;
                             changed = true;
                             break;
                         }
@@ -84,20 +93,23 @@ namespace OpenNest.Posts.GravographIS
                         if (Near(a[0], b[0], tolerance))
                         {
                             var combined = new List<Vector>(b.Count + a.Count - 1);
-                            for (int k = b.Count - 1; k >= 0; k--) combined.Add(b[k]);
-                            for (int k = 1; k < a.Count; k++) combined.Add(a[k]);
+                            for (int k = b.Count - 1; k >= 0; k--)
+                                combined.Add(b[k]);
+                            for (int k = 1; k < a.Count; k++)
+                                combined.Add(a[k]);
                             segs[i] = combined;
                             segs.RemoveAt(j);
-                            if (j < i) i--;
+                            if (j < i)
+                                i--;
                             changed = true;
                             break;
                         }
                     }
 
-                    if (changed) break;
+                    if (changed)
+                        break;
                 }
-            }
-            while (changed);
+            } while (changed);
 
             return segs;
         }
@@ -111,9 +123,11 @@ namespace OpenNest.Posts.GravographIS
         public static List<List<Vector>> Reorder(
             IEnumerable<IReadOnlyList<Vector>> polylines,
             bool allowReverse = true,
-            Vector? origin = null)
+            Vector? origin = null
+        )
         {
-            if (polylines == null) throw new ArgumentNullException(nameof(polylines));
+            if (polylines == null)
+                throw new ArgumentNullException(nameof(polylines));
 
             var pool = new List<List<Vector>>();
             foreach (var p in polylines)
@@ -173,7 +187,8 @@ namespace OpenNest.Posts.GravographIS
             IEnumerable<IReadOnlyList<Vector>> polylines,
             double stitchTolerance = DefaultStitchTolerance,
             bool allowReverse = true,
-            Vector? origin = null)
+            Vector? origin = null
+        )
         {
             var stitched = Stitch(polylines, stitchTolerance);
             return Reorder(stitched, allowReverse, origin);

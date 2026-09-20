@@ -41,10 +41,14 @@ public class FillExtentsTests
 
         foreach (var part in parts)
         {
-            Assert.True(part.BoundingBox.Right <= workArea.Right + 0.01,
-                $"Part right edge {part.BoundingBox.Right} exceeds work area {workArea.Right}");
-            Assert.True(part.BoundingBox.Top <= workArea.Top + 0.01,
-                $"Part top edge {part.BoundingBox.Top} exceeds work area {workArea.Top}");
+            Assert.True(
+                part.BoundingBox.Right <= workArea.Right + 0.01,
+                $"Part right edge {part.BoundingBox.Right} exceeds work area {workArea.Right}"
+            );
+            Assert.True(
+                part.BoundingBox.Top <= workArea.Top + 0.01,
+                $"Part top edge {part.BoundingBox.Top} exceeds work area {workArea.Top}"
+            );
         }
     }
 
@@ -82,8 +86,10 @@ public class FillExtentsTests
 
         // After adjustment, the gap should be small (within one part spacing).
         var gap = workArea.Top - topEdge;
-        Assert.True(gap < 1.0,
-            $"Gap of {gap:F2} is too large — adjustment should fill close to the top");
+        Assert.True(
+            gap < 1.0,
+            $"Gap of {gap:F2} is too large — adjustment should fill close to the top"
+        );
     }
 
     [Fact]
@@ -96,8 +102,10 @@ public class FillExtentsTests
         var parts = filler.Fill(drawing);
 
         // With a 120-wide sheet and ~10-wide parts, we should get multiple columns.
-        Assert.True(parts.Count >= 8,
-            $"Expected multiple columns but got only {parts.Count} parts");
+        Assert.True(
+            parts.Count >= 8,
+            $"Expected multiple columns but got only {parts.Count} parts"
+        );
 
         // Verify all parts are within bounds.
         foreach (var part in parts)
@@ -136,10 +144,14 @@ public class FillExtentsTests
 
         foreach (var part in parts)
         {
-            Assert.True(part.BoundingBox.Left >= workArea.Left - 0.01,
-                $"Part left {part.BoundingBox.Left} below work area left {workArea.Left}");
-            Assert.True(part.BoundingBox.Bottom >= workArea.Bottom - 0.01,
-                $"Part bottom {part.BoundingBox.Bottom} below work area bottom {workArea.Bottom}");
+            Assert.True(
+                part.BoundingBox.Left >= workArea.Left - 0.01,
+                $"Part left {part.BoundingBox.Left} below work area left {workArea.Left}"
+            );
+            Assert.True(
+                part.BoundingBox.Bottom >= workArea.Bottom - 0.01,
+                $"Part bottom {part.BoundingBox.Bottom} below work area bottom {workArea.Bottom}"
+            );
             Assert.True(part.BoundingBox.Right <= workArea.Right + 0.01);
             Assert.True(part.BoundingBox.Top <= workArea.Top + 0.01);
         }
