@@ -65,6 +65,15 @@ cd OpenNest
 dotnet build OpenNest.sln
 ```
 
+### Code formatting
+
+C# sources are formatted with [CSharpier](https://csharpier.com/), pinned in `.config/dotnet-tools.json`; the matching style (4-space indent, Allman braces, System-first usings, 100-column wraps) is mirrored in `.editorconfig` so IDE auto-format agrees. Before committing:
+
+```bash
+dotnet tool restore
+dotnet csharpier format .    # apply; use `check` instead of `format` to verify only
+```
+
 ### Cross-platform engine contract tests
 
 ```bash
