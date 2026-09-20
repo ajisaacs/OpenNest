@@ -286,8 +286,10 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Subtracts hole triangles from a region. Conservative: partial overlaps
-        /// keep the full piece triangle (acceptable for visual shading).
+        /// Subtracts hole triangles from a region. Exact: a piece outside a convex hole
+        /// triangle equals the union of its clips against each triangle edge's outside
+        /// half-space, so overlap confined to a cutout disappears while any material
+        /// sliver outside the hole survives.
         /// </summary>
         private static List<Polygon> SubtractTriangles(Polygon region, List<Polygon> holeTris)
         {
@@ -295,29 +297,25 @@ namespace OpenNest.Geometry
 
             foreach (var holeTri in holeTris)
             {
-                if (!BoundingBoxesOverlap(region.BoundingBox, holeTri.BoundingBox))
-                    continue;
-
                 var next = new List<Polygon>();
 
                 foreach (var piece in current)
                 {
-                    var pieceTris = TriangulateWithBounds(piece);
-
-                    foreach (var pieceTri in pieceTris)
+                    if (!BoundingBoxesOverlap(piece.BoundingBox, holeTri.BoundingBox))
                     {
-                        var inside = ClipConvex(pieceTri, holeTri);
-                        if (inside == null)
-                        {
-                            // No overlap with hole - keep
-                            next.Add(pieceTri);
-                        }
-                        else if (inside.Area() < pieceTri.Area() - Tolerance.Epsilon)
-                        {
-                            // Partial overlap - keep the piece (conservative)
-                            next.Add(pieceTri);
-                        }
-                        // else: fully inside hole - discard
+                        next.Add(piece);
+                        continue;
+                    }
+
+                    foreach (var pieceTri in TriangulateWithBounds(piece))
+                    {
+                        var holeVerts = holeTri.Vertices;
+                        var holeCount = holeTri.IsClosed() ? holeVerts.Count - 1 : holeVerts.Count;
+                        var survived = false;
+                        for (var i = 0; i < holeCount; i++)
+                            survived |= AddIfPositiveArea(next,
+                                ClipOutsideHalfSpace(pieceTri, holeVerts[i], holeVerts[(i + 1) % holeCount]));
+                        if (!survived) continue; // piece lies entirely within the hole
                     }
                 }
 
@@ -325,6 +323,41 @@ namespace OpenNest.Geometry
             }
 
             return current;
+        }
+
+        /// <summary>
+        /// Sutherland-Hodgman clip of a convex polygon to the strict outside of the
+        /// infinite line edgeStart->edgeEnd of a CCW hole edge (Cross &lt; -Epsilon).
+        /// </summary>
+        private static List<Vector> ClipOutsideHalfSpace(Polygon piece, Vector edgeStart, Vector edgeEnd)
+        {
+            var verts = piece.Vertices;
+            var count = piece.IsClosed() ? verts.Count - 1 : verts.Count;
+            var kept = new List<Vector>();
+            for (var i = 0; i < count; i++)
+            {
+                var current = verts[i];
+                var next = verts[(i + 1) % count];
+                var currentInside = Cross(edgeStart, edgeEnd, current) >= -Tolerance.Epsilon;
+                var nextInside = Cross(edgeStart, edgeEnd, next) >= -Tolerance.Epsilon;
+                if (!currentInside) kept.Add(current);
+                if (currentInside == nextInside) continue;
+                var intersection = LineIntersection(edgeStart, edgeEnd, current, next);
+                if (intersection.IsValid()) kept.Add(intersection);
+            }
+            return kept;
+        }
+
+        private static bool AddIfPositiveArea(List<Polygon> polygons, List<Vector> vertices)
+        {
+            if (vertices.Count < 3) return false;
+            var polygon = new Polygon();
+            polygon.Vertices.AddRange(vertices);
+            polygon.Close();
+            polygon.UpdateBounds();
+            if (polygon.Area() <= Tolerance.Epsilon) return false;
+            polygons.Add(polygon);
+            return true;
         }
     }
 }

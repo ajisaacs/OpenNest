@@ -42,6 +42,33 @@ public class NestJobValidationTests
     }
 
     [Fact]
+    public void SmallCornerOverlapIsRejected()
+    {
+        var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(10, 10)), 2);
+        var job = new NestJob(new[] { part }, new[] { new NestPlateStock("stock", new Size(20, 20), 1) });
+
+        Assert.Throws<InvalidOperationException>(() => Solve(job,
+            new NestJobPlacement("part", 0, 0, 0, 0),
+            new NestJobPlacement("part", 1, 9, 9, 0)));
+    }
+
+    [Theory]
+    [InlineData(10.0, 0.0)]
+    [InlineData(10.0, 10.0)]
+    public void BoundaryContactWithZeroSpacingIsAccepted(double x, double y)
+    {
+        var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(10, 10)), 2);
+        var job = new NestJob(new[] { part }, new[] { new NestPlateStock("stock", new Size(20, 20), 1) });
+
+        var result = Solve(job,
+            new NestJobPlacement("part", 0, 0, 0, 0),
+            new NestJobPlacement("part", 1, x, y, 0));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(2, Assert.Single(result.Plates).Placements.Count);
+    }
+
+    [Fact]
     public void UnknownOrOverproducingCandidateFailsBeforeCommitWithoutChangingInput()
     {
         var reports = new List<NestJobProgress>();

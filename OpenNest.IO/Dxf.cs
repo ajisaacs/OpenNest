@@ -25,13 +25,22 @@ namespace OpenNest.IO
         /// for bend detection. The CadDocument is NOT disposed — caller can use it for
         /// additional analysis (e.g., MText extraction for bend notes).
         /// </summary>
-        public static DxfImportResult Import(string path)
+        public static DxfImportResult Import(string path, bool preserveRepairMarks = false)
         {
             var doc = ReadDocument(path);
+            // Isolate marks before optimization, including cross-layer circle/arc deduplication.
+            var entities = preserveRepairMarks
+                ? ConvertEntities(doc, name => IsNonCutLayer(name) || IsRepairMarkLayer(name))
+                : ConvertEntities(doc);
+            if (preserveRepairMarks)
+            {
+                // Keep source marks separate: optimization could merge two ticks or unrelated scribing.
+                entities.AddRange(ConvertEntities(doc, name => !IsRepairMarkLayer(name), optimize: false));
+            }
 
             return new DxfImportResult
             {
-                Entities = ConvertEntities(doc),
+                Entities = entities,
                 Document = doc
             };
         }
@@ -158,7 +167,7 @@ namespace OpenNest.IO
             }
         }
 
-        private static List<Entity> ConvertEntities(CadDocument doc, Func<string, bool> layerFilter = null)
+        private static List<Entity> ConvertEntities(CadDocument doc, Func<string, bool> layerFilter = null, bool optimize = true)
         {
             var entities = new List<Entity>();
             var lines = new List<Line>();
@@ -211,10 +220,13 @@ namespace OpenNest.IO
                 }
             }
 
-            GeometryOptimizer.Optimize(lines);
-            GeometryOptimizer.Optimize(arcs);
-            GeometryOptimizer.Deduplicate(circles);
-            GeometryOptimizer.Deduplicate(circles, arcs);
+            if (optimize)
+            {
+                GeometryOptimizer.Optimize(lines);
+                GeometryOptimizer.Optimize(arcs);
+                GeometryOptimizer.Deduplicate(circles);
+                GeometryOptimizer.Deduplicate(circles, arcs);
+            }
 
             entities.AddRange(circles);
             entities.AddRange(lines);
@@ -223,10 +235,15 @@ namespace OpenNest.IO
             return entities;
         }
 
+        private static bool IsRepairMarkLayer(string name) =>
+            string.Equals(name, "ETCH", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "SCRIBE", StringComparison.OrdinalIgnoreCase);
+
         private static bool IsNonCutLayer(string layerName)
         {
+            // Etch/scribe marks are never cut geometry — drop them on default import.
             return string.Equals(layerName, "BEND", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(layerName, "ETCH", StringComparison.OrdinalIgnoreCase);
+                || IsRepairMarkLayer(layerName);
         }
 
         private class ExportContext

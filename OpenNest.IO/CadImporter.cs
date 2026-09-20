@@ -24,10 +24,14 @@ namespace OpenNest.IO
         {
             options ??= CadImportOptions.Default;
 
-            var dxf = Dxf.Import(path);
+            var dxf = Dxf.Import(path, preserveRepairMarks: options.BendRepair != null);
 
-            RemoveDuplicateArcs(dxf.Entities);
-            RemoveZeroSweepArcs(dxf.Entities);
+            var cleanup = options.BendRepair == null ? dxf.Entities : dxf.Entities
+                .Where(e => !IsRepairMark(e)).ToList();
+            RemoveDuplicateArcs(cleanup);
+            RemoveZeroSweepArcs(cleanup);
+            if (options.BendRepair != null)
+                dxf.Entities.RemoveAll(e => !IsRepairMark(e) && !cleanup.Contains(e));
 
             var bends = new List<Bend>();
             if (options.DetectBends && dxf.Document != null)
@@ -39,12 +43,27 @@ namespace OpenNest.IO
                       ?? new List<Bend>();
             }
 
-            Bend.UpdateEtchEntities(dxf.Entities, bends);
+            var repairReports = new List<BendRepairReport>();
+            if (options.BendRepair == null)
+                Bend.UpdateEtchEntities(dxf.Entities, bends);
+            else
+            {
+                // Unitless DXFs require the explicit caller declaration. Never override a conflicting header.
+                var headerUnits = (int)(dxf.Document?.Header.InsUnits ?? 0);
+                var requestedUnits = options.BendRepair.DrawingUnits == BendRepairUnits.Inches ? 1 : 4;
+                if (headerUnits != 0 && headerUnits != requestedUnits)
+                    repairReports = bends.Select((b, i) => new BendRepairReport(i, "Skipped",
+                        "DXF insertion units conflict with the declared repair units or are unsupported.",
+                        b.StartPoint, b.EndPoint, b.StartPoint, b.EndPoint)).ToList();
+                else
+                    repairReports = BendRepair.Apply(dxf.Entities, bends, options.BendRepair);
+            }
 
             return new CadImportResult
             {
                 Entities = dxf.Entities,
                 Bends = bends,
+                BendRepairReports = repairReports,
                 Bounds = dxf.Entities.GetBoundingBox(),
                 SourcePath = path,
                 Name = options.Name ?? Path.GetFileNameWithoutExtension(path),
@@ -141,6 +160,10 @@ namespace OpenNest.IO
 
             return drawing;
         }
+
+        private static bool IsRepairMark(Entity e) =>
+            string.Equals(e.Layer?.Name, "ETCH", System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(e.Layer?.Name, "SCRIBE", System.StringComparison.OrdinalIgnoreCase);
 
         internal static void RemoveZeroSweepArcs(List<Entity> entities)
         {

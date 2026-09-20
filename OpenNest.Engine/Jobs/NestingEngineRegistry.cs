@@ -20,6 +20,9 @@ public static class NestingEngineRegistry
 
     static NestingEngineRegistry()
     {
+        Register("StockLadder", "Caller-stock constrained-first fill and equivalent-demand area repacking",
+            () => new StockLadderNestingEngine());
+
         Register("Default", "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)",
             () => new FixedStrategyNestingEngine("Default"));
 

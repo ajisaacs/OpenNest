@@ -31,7 +31,7 @@ public static class NestJobValidator
             }
             catch (ArgumentException exception)
             {
-                throw new ArgumentException($"Geometry must contain usable closed edges: {part.Id}.", nameof(job), exception);
+                throw new ArgumentException($"Geometry must contain usable closed edges: {part.Id}. {exception.Message}", nameof(job), exception);
             }
         }
     }

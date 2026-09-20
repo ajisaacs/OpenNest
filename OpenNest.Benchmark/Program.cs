@@ -70,7 +70,7 @@ static class BenchmarkConsole
 
         Console.WriteLine($"Engines: {string.Join(", ", engines.Select(e => e.Name))}");
 
-        var results = BenchmarkRunner.Run(jobs, engines);
+        var results = BenchmarkRunner.Run(jobs, engines, options.SalvageRate, options.MinimumSalvageDimension, options.OutputDirectory);
 
         Report.PrintDetailed(results);
         Report.PrintSummary(results);
@@ -109,6 +109,16 @@ static class BenchmarkConsole
 
                 case "--csv" when i + 1 < args.Length:
                     o.CsvPath = args[++i];
+                    break;
+
+                case "--salvage-rate" when i + 1 < args.Length:
+                    o.SalvageRate = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "--min-salvage-dimension" when i + 1 < args.Length:
+                    o.MinimumSalvageDimension = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "--output" when i + 1 < args.Length:
+                    o.OutputDirectory = args[++i];
                     break;
 
                 case "--help":
@@ -162,6 +172,9 @@ static class BenchmarkConsole
         Console.Error.WriteLine("  --spacing <value>               Override part spacing for every job");
         Console.Error.WriteLine("  --engines Name1,Name2,...       Only benchmark these registered engines (default: all)");
         Console.Error.WriteLine("  --csv <path>                    Write a flat CSV of all results");
+        Console.Error.WriteLine("  --salvage-rate <0..1>           Fraction of eligible offcut area credited (default 0)");
+        Console.Error.WriteLine("  --min-salvage-dimension <value> Both offcut dimensions must qualify; 0 disables credit");
+        Console.Error.WriteLine("  --output <directory>           Save valid layouts as .nest plus detailed JSON reports");
         Console.Error.WriteLine("  --help                          Show this message");
     }
 
@@ -172,5 +185,8 @@ static class BenchmarkConsole
         public double? PartSpacing;
         public List<string> EngineNames = new();
         public string CsvPath;
+        public string OutputDirectory;
+        public double SalvageRate;
+        public double MinimumSalvageDimension;
     }
 }

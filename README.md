@@ -51,7 +51,8 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 
 ## Prerequisites
 
-- **Windows 10 or later**
+- **Windows 10 or later** for the desktop app and Windows-dependent projects
+- The headless console and engine/import test projects target `net8.0` and can be built independently on Linux, macOS, or Windows
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ## Getting Started
@@ -62,6 +63,15 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 git clone https://github.com/ajisaacs/OpenNest.git
 cd OpenNest
 dotnet build OpenNest.sln
+```
+
+### Code formatting
+
+C# sources are formatted with [CSharpier](https://csharpier.com/), pinned in `.config/dotnet-tools.json`; the matching style (4-space indent, Allman braces, System-first usings, 100-column wraps) is mirrored in `.editorconfig` so IDE auto-format agrees. Before committing:
+
+```bash
+dotnet tool restore
+dotnet csharpier format .    # apply; use `check` instead of `format` to verify only
 ```
 
 ### Cross-platform engine contract tests
@@ -183,6 +193,47 @@ An engine's layout is rejected (scoring zero for that job) if any part falls out
 
 Custom competitor engines can be added by dropping a DLL implementing `INestingEngine` with a public parameterless constructor into the `Engines/` directory next to the benchmark executable; each one is registered under its own CLR type name. This is a separate plugin contract from the desktop app's `NestEngineRegistry`/`NestEngineBase` (which requires a `(Plate)` constructor) — a `NestEngineBase` plugin dropped into the benchmark's `Engines/` folder is silently skipped, since the benchmark only ever solves whole jobs.
 
+### Conservative bend endpoint repair (opt-in)
+
+Bend endpoint repair is disabled by default in the shared CAD importer.
+To opt in for newly imported DXFs in the console, add:
+
+```text
+--repair-bends-mm 2 --cad-units inches
+```
+
+Use `--cad-units mm` for millimeter coordinates. The movement limit is always in
+physical millimeters, must be greater than `0.001`, and cannot exceed `3.175`.
+This declares the source units; it does **not** rescale the drawing. A conflicting
+or unsupported DXF insertion-unit header prevents repair. A unitless header requires
+the explicit caller declaration.
+
+Library callers set `CadImportOptions.BendRepair` to a `BendRepairOptions` with
+`DrawingUnits` and `MaxEndpointMovementMillimeters`, then inspect
+`CadImportResult.BendRepairReports` (`Repaired`, `Unchanged`, or `Skipped`, with
+reasons and before/after endpoints). The console prints the same reports.
+
+Repair requires exactly one short, inward, continuous `ETCH`/`SCRIBE` line tick
+collinear with **each original detected bend endpoint** (association tolerance
+`0.001` physical mm, tick length at most one inch). It fits only along the existing
+bend axis to an unambiguous closed material interval on continuous `0`/`CUT`
+boundaries. It never rotates a bend, moves cuts, or creates missing ticks. Missing,
+shared, duplicate, excessive-movement, open-boundary, hole-crossing, and ambiguous
+cases stay unchanged. A successful repair replaces only the two matched ticks,
+keeping their lengths and properties. Reapplying repair is idempotent.
+
+In opt-in mode source marks are preserved separately from geometry optimization;
+the legacy blanket etch regeneration is bypassed, including for skipped bends.
+Unrelated scribing remains intact. This is a narrow import repair, not general
+geometry cleanup or certification of machine-ready output. No desktop toggle or
+saved-nest repair is included.
+
+Run its cross-platform unit and synthetic-DXF integration tests with:
+
+```bash
+dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj
+```
+
 ## Project Structure
 
 ```
@@ -192,6 +243,7 @@ OpenNest.sln
 ├── OpenNest.Engine/            # Nesting algorithms and whole-job contracts
 ├── OpenNest.Engine.Tests/      # Cross-platform whole-job contract tests (net8.0)
 ├── OpenNest.IO/                # File I/O — DXF import/export, nest file format
+├── OpenNest.IO.Tests/          # Cross-platform CAD import and bend repair tests (net8.0)
 ├── OpenNest.Console/           # Command-line interface for batch nesting
 ├── OpenNest.Api/               # Programmatic nesting API (NestRunner pipeline)
 ├── OpenNest.Data/              # Machine configuration and cutting parameters
@@ -217,6 +269,71 @@ OpenNest.sln
 | **OpenNest.Mcp** | MCP (Model Context Protocol) server exposing nesting operations as tools for AI assistants. |
 | **OpenNest.Benchmark** | Runs every registered whole-job nesting engine (`INestingEngine`) against a set of `.nest` files and scores them by material utilization, so competing engines — each owning its own multi-plate strategy — can be compared head-to-head. |
 | **OpenNest.Tests** | 89 test files covering core geometry, fill strategies, splitting, bending, BOM import, post-processing, and the API. |
+
+### StockLadder whole-job baseline
+
+Select `new StockLadderNestingEngine().Solve(job)` or the whole-job registry's
+`StockLadder` engine (benchmark: `--engines StockLadder`). This does not switch the
+legacy desktop single-plate engine. Supply every allowed `NestPlateStock` explicitly;
+no stock sizes are invented. Stock quantity `null` means unlimited, `0` unavailable,
+and a positive quantity is finite inventory. The benchmark's `--sheet-sizes` pool
+uses unlimited quantities; use the job API for finite stock.
+
+```csharp
+var job = new NestJob(parts, callerStocks,
+    new NestJobOptions(maxPlates: 100, salvageRate: 0,
+        minimumSalvageDimension: 0));
+var result = new StockLadderNestingEngine().Solve(job, token: cancellationToken);
+```
+
+Construction orders by priority, then validated stock-fit scarcity, then part area,
+pins an anchor before fillers, and ranks candidate sheets by estimated net sheet
+area per placed part area. Repacking tries single-sheet replacements and adjacent
+pairs into one sheet, accepting only strictly lower estimated net area with exactly
+the same demand. Failed trials leave placements and finite stock accounting intact.
+
+Salvage is an **area estimate**, not price or certified recoverable material.
+`salvageRate` defaults to `0` (allowed range 0–1); `minimumSalvageDimension` defaults
+to `0`, which also disables credit. With both enabled, only the largest qualifying
+full-span edge rectangle outside placed bounding boxes plus part spacing is credited,
+within the usable work area; both dimensions must meet the minimum in job units.
+Holes/scraps are not credited. No cut-off toolpath, kerf, handling, or future-demand
+valuation is modeled. Benchmark ranking still uses gross material utilization.
+
+This is a tested deterministic heuristic baseline, **not an optimal or production-
+certified solver**. Conservative rectangular free-region hints and linear fills can
+miss concave interlocks and feasible layouts. Automatic rotation tries cardinal
+angles plus 5-degree increments below 180 degrees; fixed/range policies are honored.
+Repacking is bounded local search, not a global stock/demand search or fixed-point
+optimality proof. `NoPlacementFound` is not proof of impossibility. Cancellation is
+cooperative (the benchmark requests it after five minutes), not process isolation.
+Geometry acceptance remains strict, including open marks leaving closed material.
+
+Benchmark export example (use a separate output directory):
+
+```bash
+dotnet run --project OpenNest.Benchmark -- input.nest \
+  --engines StockLadder --sheet-sizes 48x96,48x120,48x144,60x96,60x120,60x144,72x96,72x120,72x144 \
+  --salvage-rate 0 --min-salvage-dimension 0 \
+  --output ./stockladder-output --csv ./stockladder.csv
+```
+
+`--output` writes validated layouts as `.nest` plus JSON containing status, stop
+reason, fulfillment, stock usage, poses, and gross/estimated net area. Valid but
+incomplete layouts may be exported: inspect status and fulfillment. Thrown/invalid
+runs do not export layouts. The console can exit zero despite a reported `CRASH`;
+inspect the report, not just the process exit code. Export does not certify cutting
+readiness and must not overwrite the source.
+
+**Known real-input blocker (no successful real-file result):**
+`/srv/shared/P260805-10_dxf/P260805-10.nest` requests 219 pieces from 69 drawings.
+With the nine caller-supplied sizes above, strict validation rejects drawing ID `57`,
+`4980 A01 PT75`: its open mark from `(-5.21875, -1.807287)` to
+`(-4.21875, -1.807287)` starts `0.0001` outside the perimeter's vertical edge at
+`x = -5.21865`. Error: `Geometry must contain usable closed edges: 57. Open geometry
+leaves the closed material region. (Parameter 'job')`. No snapping, clipping, or
+source geometry changes were made. Source SHA-256:
+`9e839fd51072587ec4f3173dc2f39ef1ea8ae460971889c2a3b91fa54b61091d`.
 
 ## Nesting Engines
 

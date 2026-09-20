@@ -16,6 +16,9 @@ namespace OpenNest.IO
         /// </summary>
         public bool DetectBends { get; set; } = true;
 
+        /// <summary>Null (default) disables repair. Explicit units and a small physical limit are required.</summary>
+        public Bending.BendRepairOptions BendRepair { get; set; }
+
         /// <summary>
         /// Override the drawing name. Null = filename without extension.
         /// </summary>
