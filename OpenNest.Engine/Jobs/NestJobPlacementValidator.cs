@@ -262,65 +262,10 @@ internal static class NestJobPlacementValidator
             return false;
         // True material overlap requires shared interior area, not boundary touching.
         // Edge/corner contact (zero clearance) is a valid placement when part spacing is zero.
-        return InteriorOverlap(leftPoly, left, rightPoly, right);
-    }
-
-    private static bool InteriorOverlap(Polygon leftPoly, ShapeTopology left, Polygon rightPoly, ShapeTopology right)
-    {
-        // The intersection of two polygons is either empty, a region of positive area (true overlap),
-        // or a zero-area line/point (boundary contact). Test the interior of the intersection region:
-        // a point strictly inside BOTH perimeters and outside both parts' holes proves shared material.
-        foreach (var point in InteriorWitnessPoints(leftPoly, rightPoly))
-        {
-            if (StrictlyInside(leftPoly, point) && !InAnyHole(left, point) &&
-                StrictlyInside(rightPoly, point) && !InAnyHole(right, point))
-                return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Points that lie in the interior of the perimeter-perimeter intersection when one exists.
-    /// For each pair of crossing edges, the two interior-side vertices (one from each polygon)
-    /// have their midpoint inside both perimeters; that midpoint is a witness of positive-area
-    /// overlap. For containment, an interior vertex of the inner perimeter witnesses it.
-    /// </summary>
-    private static IEnumerable<Vector> InteriorWitnessPoints(Polygon left, Polygon right)
-    {
-        foreach (var l in left.ToLines())
-            foreach (var r in right.ToLines())
-                if (l.Intersects(r, out var pt) && pt.IsValid())
-                {
-                    yield return Midpoint(l, pt);
-                    yield return Midpoint(r, pt);
-                }
-        // Containment: an interior point of one polygon inside the other. Use a point pulled
-        // toward the centroid of each polygon from a vertex (guaranteed interior for simple shapes).
-        foreach (var poly in new[] { left, right })
-        {
-            foreach (var vertex in poly.Vertices)
-            {
-                var centroid = Centroid(poly);
-                yield return (vertex + centroid) * 0.5;
-            }
-        }
-    }
-
-    private static Vector Midpoint(Line line, Vector point)
-    {
-        var other = line.StartPoint.DistanceTo(point) <= line.EndPoint.DistanceTo(point)
-            ? line.EndPoint
-            : line.StartPoint;
-        return (other + point) * 0.5;
-    }
-
-    private static Vector Centroid(Polygon polygon)
-    {
-        var n = polygon.IsClosed() ? polygon.Vertices.Count - 1 : polygon.Vertices.Count;
-        var sum = Vector.Zero;
-        for (var i = 0; i < n; i++)
-            sum += polygon.Vertices[i];
-        return sum / n;
+        // Collision checks this by clipping triangulated polygons and rejecting zero-area
+        // slivers, so it catches containment and small corner intersections that a witness
+        // probe can miss, while contact stays legal; cutouts are subtracted from both sides.
+        return Collision.HasOverlap(leftPoly, rightPoly, ToPolygons(left.Cutouts), ToPolygons(right.Cutouts));
     }
 
     /// <summary>
@@ -359,14 +304,6 @@ internal static class NestJobPlacementValidator
 
     private static double IsLeft(Vector p1, Vector p2, Vector p) =>
         (p2.X - p1.X) * (p.Y - p1.Y) - (p2.Y - p1.Y) * (p.X - p1.X);
-
-    private static bool InAnyHole(ShapeTopology topology, Vector point)
-    {
-        foreach (var cutout in topology.Cutouts)
-            if (ToPolygon(cutout).ContainsPoint(point))
-                return true;
-        return false;
-    }
 
     private static double Distance(ShapeTopology left, ShapeTopology right)
     {
