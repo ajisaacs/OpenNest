@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>OpenNest.Api</RootNamespace>
     <AssemblyName>OpenNest.Api</AssemblyName>
   </PropertyGroup>

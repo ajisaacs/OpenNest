@@ -40,6 +40,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Engine.Tests", "Op
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.IO.Tests", "OpenNest.IO.Tests\OpenNest.IO.Tests.csproj", "{BA93522B-8A93-4689-A850-D042483964B9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.WinForms.Tests", "OpenNest.WinForms.Tests\OpenNest.WinForms.Tests.csproj", "{6A96D511-A633-4892-A6CE-73D0A211454E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -242,6 +244,18 @@ Global
 		{BA93522B-8A93-4689-A850-D042483964B9}.Release|x64.Build.0 = Release|Any CPU
 		{BA93522B-8A93-4689-A850-D042483964B9}.Release|x86.ActiveCfg = Release|Any CPU
 		{BA93522B-8A93-4689-A850-D042483964B9}.Release|x86.Build.0 = Release|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Debug|x64.Build.0 = Debug|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Debug|x86.Build.0 = Debug|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Release|x64.ActiveCfg = Release|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Release|x64.Build.0 = Release|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Release|x86.ActiveCfg = Release|Any CPU
+		{6A96D511-A633-4892-A6CE-73D0A211454E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

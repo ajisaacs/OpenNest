@@ -14,7 +14,9 @@ This is a .NET 8 solution using SDK-style `.csproj` files. The desktop app and W
 dotnet build OpenNest.sln
 ```
 
-Cross-platform whole-job engine tests (net8.0, runs on Linux/macOS/Windows without the desktop project or DXF fixtures): `dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj`. The existing `OpenNest.Tests` suite targets `net8.0-windows` and requires a Windows runner; cross-compiling on Linux is not Windows runtime verification.
+Cross-platform whole-job engine tests (net8.0, runs on Linux/macOS/Windows without the desktop project or DXF fixtures): `dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj`. The main `OpenNest.Tests` suite also targets `net8.0`: run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj` independently on Linux/macOS/Windows. It must not reference the WinForms `OpenNest` project. The API, Data, Cincinnati, and GravographIS libraries target `net8.0`; post-processor build deployment still targets the desktop app's `net8.0-windows/Posts` directory. Optional CHR-font fixtures are configured through `OpenNest.Tests/test-config.json` and skip when absent.
+
+`OpenNest.WinForms.Tests` contains the desktop-assembly-dependent `CadBendNoteTests` (`CadText`) and `CuttingParametersSerializerTests` (`CuttingParametersSerializer`). It targets `net8.0-windows`, references `OpenNest`, and requires a Windows runner: `dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj`. Keep future desktop-dependent tests here rather than in `OpenNest.Tests`. Linux cross-compilation uses `dotnet build OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj -p:EnableWindowsTargeting=true`; cross-compilation is not Windows runtime verification.
 
 Cross-platform CAD import tests: `dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj`. These synthetic-DXF and bend-repair tests target `net8.0`, require no external fixtures, and are included in the solution. Build the headless console independently with `dotnet build OpenNest.Console/OpenNest.Console.csproj`.
 

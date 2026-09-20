@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
@@ -29,7 +29,6 @@
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
     <ProjectReference Include="..\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" />
     <ProjectReference Include="..\OpenNest.Posts.GravographIS\OpenNest.Posts.GravographIS.csproj" />
-    <ProjectReference Include="..\OpenNest\OpenNest.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -52,7 +52,7 @@ OpenNest takes your part drawings, lets you define your sheet (plate) sizes, and
 ## Prerequisites
 
 - **Windows 10 or later** for the desktop app and Windows-dependent projects
-- The headless console and engine/import test projects target `net8.0` and can be built independently on Linux, macOS, or Windows
+- The headless console, API, data and post-processor libraries, and cross-platform test projects target `net8.0` and can be built independently on Linux, macOS, or Windows
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ## Getting Started
@@ -80,7 +80,23 @@ dotnet csharpier format .    # apply; use `check` instead of `format` to verify 
 dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj
 ```
 
-`OpenNest.Engine.Tests` targets `net8.0` and runs on Linux, macOS, and Windows without the desktop project or local DXF fixtures. The existing `OpenNest.Tests` suite still requires Windows.
+`OpenNest.Engine.Tests` targets `net8.0` and runs on Linux, macOS, and Windows without the desktop project or local DXF fixtures.
+
+The main suite also runs independently on Linux, macOS, and Windows, with no reference to the WinForms application:
+
+```bash
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj
+```
+
+`OpenNest.Tests` covers the core, engine, import, API, data, and post-processor libraries. Optional CHR-font tests skip when their local fixtures are unavailable; configure them with `OpenNest.Tests/test-config.json`.
+
+Desktop-assembly tests live separately in `OpenNest.WinForms.Tests` (`net8.0-windows`): `CadBendNoteTests` tests `OpenNest.Controls.CadText`, and `CuttingParametersSerializerTests` tests `OpenNest.Forms.CuttingParametersSerializer`. Run these on Windows:
+
+```bash
+dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
+```
+
+The full solution still requires Windows. Linux can cross-compile the desktop tests with `dotnet build OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj -p:EnableWindowsTargeting=true`, but that does not verify Windows runtime behavior.
 
 The new whole-job contracts in `OpenNest.Engine/Jobs` (`namespace OpenNest`) use owned immutable geometry/settings, explicit part IDs and positive demand, finite or unlimited stock (`null` means unlimited; zero means unavailable), and result ID/pose values rather than mutable desktop models. Callers own their inputs: the job copies everything at entry and the result leaks no mutable `Drawing`, `Plate`, or `NestItem`. One job is one material/thickness/unit system — no cross-material pooling. Rotation is in radians about the geometry origin, followed by translation into the plate quadrant frame. Strategy factories belong to each runner, not the global registry. In the public API, the legacy `SheetSize` request field is the unlimited-stock fallback only when `Plates` is null; an explicit empty `Plates` list means no available stock.
 
@@ -252,7 +268,8 @@ OpenNest.sln
 ├── OpenNest.Benchmark/         # Head-to-head comparison of registered nest engines
 ├── OpenNest.Mcp/               # MCP server for AI tool integration
 ├── OpenNest.Posts.Cincinnati/  # Cincinnati CL-707 laser post-processor plugin
-└── OpenNest.Tests/             # Unit tests (xUnit)
+├── OpenNest.Tests/             # Cross-platform unit tests (net8.0, xUnit)
+└── OpenNest.WinForms.Tests/     # Desktop-assembly tests (Windows only)
 ```
 
 | Project | What it does |
@@ -268,7 +285,8 @@ OpenNest.sln
 | **OpenNest.Posts.Cincinnati** | Post-processor plugin for Cincinnati CL-707/800/900/940/CLX laser cutting machines. Outputs Cincinnati-format G-code with material library, kerf compensation, and pierce logic. |
 | **OpenNest.Mcp** | MCP (Model Context Protocol) server exposing nesting operations as tools for AI assistants. |
 | **OpenNest.Benchmark** | Runs every registered whole-job nesting engine (`INestingEngine`) against a set of `.nest` files and scores them by material utilization, so competing engines — each owning its own multi-plate strategy — can be compared head-to-head. |
-| **OpenNest.Tests** | 89 test files covering core geometry, fill strategies, splitting, bending, BOM import, post-processing, and the API. |
+| **OpenNest.Tests** | Cross-platform tests covering core geometry, fill strategies, splitting, bending, BOM import, post-processing, data, and the API. |
+| **OpenNest.WinForms.Tests** | Windows-only tests for desktop CAD bend-note presentation and cutting-parameter serialization. |
 
 ### StockLadder whole-job baseline
 

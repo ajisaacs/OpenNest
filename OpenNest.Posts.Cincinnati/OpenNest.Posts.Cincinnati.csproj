@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>OpenNest.Posts.Cincinnati</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
@@ -13,7 +13,7 @@
   </ItemGroup>
   <Target Name="CopyToPostsDir" AfterTargets="Build">
     <PropertyGroup>
-      <PostsDir>..\OpenNest\bin\$(Configuration)\$(TargetFramework)\Posts\</PostsDir>
+      <PostsDir>..\OpenNest\bin\$(Configuration)\net8.0-windows\Posts\</PostsDir>
       <ConfigJson>$(MSBuildProjectDirectory)\OpenNest.Posts.Cincinnati.json</ConfigJson>
       <DeployedConfigJson>$(PostsDir)OpenNest.Posts.Cincinnati.json</DeployedConfigJson>
     </PropertyGroup>

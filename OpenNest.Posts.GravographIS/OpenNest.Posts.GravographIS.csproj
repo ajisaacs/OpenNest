@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>OpenNest.Posts.GravographIS</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
@@ -12,7 +12,7 @@
   </ItemGroup>
   <Target Name="CopyToPostsDir" AfterTargets="Build">
     <PropertyGroup>
-      <PostsDir>..\OpenNest\bin\$(Configuration)\$(TargetFramework)\Posts\</PostsDir>
+      <PostsDir>..\OpenNest\bin\$(Configuration)\net8.0-windows\Posts\</PostsDir>
     </PropertyGroup>
     <MakeDir Directories="$(PostsDir)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
