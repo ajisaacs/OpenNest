@@ -7,19 +7,21 @@ namespace OpenNest.Tests.GravographIS;
 
 public class GravographISPostProcessorTests
 {
-    private static LayeredPolyline Poly(LayerType layer, params Vector[] pts)
-        => new LayeredPolyline(new List<Vector>(pts), layer);
+    private static LayeredPolyline Poly(LayerType layer, params Vector[] pts) =>
+        new LayeredPolyline(new List<Vector>(pts), layer);
 
     [Fact]
     public void BuildPasses_EngraveAndCut_OrdersEngraveFirstThenCutWithPause()
     {
         var post = new GravographISPostProcessor();
 
-        var passes = post.BuildPasses(new[]
-        {
-            Poly(LayerType.Cut, new Vector(0, 0), new Vector(1, 0)),
-            Poly(LayerType.Scribe, new Vector(0, 0), new Vector(0, 1)),
-        });
+        var passes = post.BuildPasses(
+            new[]
+            {
+                Poly(LayerType.Cut, new Vector(0, 0), new Vector(1, 0)),
+                Poly(LayerType.Scribe, new Vector(0, 0), new Vector(0, 1)),
+            }
+        );
 
         Assert.Equal(2, passes.Count);
 
@@ -36,10 +38,9 @@ public class GravographISPostProcessorTests
     {
         var post = new GravographISPostProcessor();
 
-        var passes = post.BuildPasses(new[]
-        {
-            Poly(LayerType.Cut, new Vector(0, 0), new Vector(1, 0)),
-        });
+        var passes = post.BuildPasses(
+            new[] { Poly(LayerType.Cut, new Vector(0, 0), new Vector(1, 0)) }
+        );
 
         Assert.Single(passes);
         Assert.Equal(post.Config.Cut.FeedMmPerSec, passes[0].FeedMmPerSec);
@@ -50,11 +51,13 @@ public class GravographISPostProcessorTests
     {
         var post = new GravographISPostProcessor();
 
-        var passes = post.BuildPasses(new[]
-        {
-            Poly(LayerType.Display, new Vector(0, 0), new Vector(1, 0)),
-            Poly(LayerType.Cut, new Vector(0, 0), new Vector(0, 1)),
-        });
+        var passes = post.BuildPasses(
+            new[]
+            {
+                Poly(LayerType.Display, new Vector(0, 0), new Vector(1, 0)),
+                Poly(LayerType.Cut, new Vector(0, 0), new Vector(0, 1)),
+            }
+        );
 
         Assert.Single(passes);
         Assert.Equal(post.Config.Cut.FeedMmPerSec, passes[0].FeedMmPerSec);

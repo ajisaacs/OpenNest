@@ -22,7 +22,7 @@ namespace OpenNest.Posts.GravographIS
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = true,
-            Converters = { new JsonStringEnumConverter() }
+            Converters = { new JsonStringEnumConverter() },
         };
 
         public string Name => "Gravograph IS8000";
@@ -48,7 +48,8 @@ namespace OpenNest.Posts.GravographIS
             if (File.Exists(configPath))
             {
                 var json = File.ReadAllText(configPath);
-                Config = JsonSerializer.Deserialize<GravographISPostConfig>(json, JsonOptions)
+                Config =
+                    JsonSerializer.Deserialize<GravographISPostConfig>(json, JsonOptions)
                     ?? new GravographISPostConfig();
             }
             else
@@ -103,14 +104,16 @@ namespace OpenNest.Posts.GravographIS
         /// </summary>
         public IReadOnlyList<GravographPass> BuildPasses(IEnumerable<LayeredPolyline> polylines)
         {
-            if (polylines == null) throw new ArgumentNullException(nameof(polylines));
+            if (polylines == null)
+                throw new ArgumentNullException(nameof(polylines));
 
             var engrave = new List<IReadOnlyList<Vector>>();
             var cut = new List<IReadOnlyList<Vector>>();
 
             foreach (var poly in polylines)
             {
-                if (poly == null) continue;
+                if (poly == null)
+                    continue;
                 var block = Config.ConfigFor(poly.Layer);
                 if (block == null)
                     continue; // non-cutting (Display) geometry

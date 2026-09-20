@@ -166,8 +166,14 @@ public class GeometrySimplifierTests
         // Arc must be tangent to the adjacent straight edges at its endpoints
         var startDelta = AngleBetweenDeg(ArcTangentAt(arc, arc.StartPoint()), new Vector(1, 0));
         var endDelta = AngleBetweenDeg(ArcTangentAt(arc, arc.EndPoint()), new Vector(0, 1));
-        Assert.True(startDelta < 0.3, $"Arc start not tangent to incoming line: off by {startDelta:F3} deg");
-        Assert.True(endDelta < 0.3, $"Arc end not tangent to outgoing line: off by {endDelta:F3} deg");
+        Assert.True(
+            startDelta < 0.3,
+            $"Arc start not tangent to incoming line: off by {startDelta:F3} deg"
+        );
+        Assert.True(
+            endDelta < 0.3,
+            $"Arc end not tangent to outgoing line: off by {endDelta:F3} deg"
+        );
     }
 
     [Fact]
@@ -184,7 +190,12 @@ public class GeometrySimplifierTests
         {
             var ang = OpenNest.Math.Angle.ToRadians(10 * i);
             var radius = r1 + deltas1[i];
-            pts.Add(new Vector(c1.X + radius * System.Math.Cos(ang), c1.Y + radius * System.Math.Sin(ang)));
+            pts.Add(
+                new Vector(
+                    c1.X + radius * System.Math.Cos(ang),
+                    c1.Y + radius * System.Math.Sin(ang)
+                )
+            );
         }
 
         // Second arc center along the junction radius so tangents match at the junction
@@ -197,7 +208,12 @@ public class GeometrySimplifierTests
         {
             var ang = OpenNest.Math.Angle.ToRadians(60 + 8 * i);
             var radius = r2 + deltas2[i];
-            pts.Add(new Vector(c2.X + radius * System.Math.Cos(ang), c2.Y + radius * System.Math.Sin(ang)));
+            pts.Add(
+                new Vector(
+                    c2.X + radius * System.Math.Cos(ang),
+                    c2.Y + radius * System.Math.Sin(ang)
+                )
+            );
         }
 
         var shape = new Shape();
@@ -215,8 +231,14 @@ public class GeometrySimplifierTests
         Assert.True(arcA.EndPoint().DistanceTo(arcB.StartPoint()) < 1e-6);
 
         // Tangent continuity across the junction
-        var junctionDelta = AngleBetweenDeg(ArcTangentAt(arcA, arcA.EndPoint()), ArcTangentAt(arcB, arcB.StartPoint()));
-        Assert.True(junctionDelta < 0.3, $"Tangent break of {junctionDelta:F3} deg at arc-arc junction");
+        var junctionDelta = AngleBetweenDeg(
+            ArcTangentAt(arcA, arcA.EndPoint()),
+            ArcTangentAt(arcB, arcB.StartPoint())
+        );
+        Assert.True(
+            junctionDelta < 0.3,
+            $"Tangent break of {junctionDelta:F3} deg at arc-arc junction"
+        );
     }
 
     private static Vector ArcTangentAt(Arc arc, Vector pt)

@@ -95,7 +95,16 @@ namespace OpenNest.Converters
             }
             else
             {
-                pgm.Codes.Add(new ArcMove(endpt, arc.Center, arc.IsReversed ? RotationType.CW : RotationType.CCW) { Layer = layer });
+                pgm.Codes.Add(
+                    new ArcMove(
+                        endpt,
+                        arc.Center,
+                        arc.IsReversed ? RotationType.CW : RotationType.CCW
+                    )
+                    {
+                        Layer = layer,
+                    }
+                );
             }
 
             return lastpt;
@@ -108,7 +117,12 @@ namespace OpenNest.Converters
             if (startpt.DistanceTo(lastpt) > Tolerance.ChainTolerance)
                 pgm.MoveTo(startpt);
 
-            pgm.Codes.Add(new ArcMove(startpt, circle.Center, circle.Rotation) { Layer = ClassifyLayer(circle) });
+            pgm.Codes.Add(
+                new ArcMove(startpt, circle.Center, circle.Rotation)
+                {
+                    Layer = ClassifyLayer(circle),
+                }
+            );
 
             lastpt = startpt;
             return lastpt;
@@ -130,8 +144,10 @@ namespace OpenNest.Converters
         private static LayerType ClassifyLayer(Entity geo)
         {
             var name = geo.Layer?.Name;
-            if (string.Equals(name, "ENGRAVE", System.StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(name, "ETCH", System.StringComparison.OrdinalIgnoreCase))
+            if (
+                string.Equals(name, "ENGRAVE", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "ETCH", System.StringComparison.OrdinalIgnoreCase)
+            )
                 return LayerType.Scribe;
 
             return LayerType.Cut;

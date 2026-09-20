@@ -15,18 +15,23 @@ namespace OpenNest.Posts.GravographIS
         public int FeedMmPerSec { get; set; } = 10;
 
         [DisplayName("Depth (inches)")]
-        [Description("Programmed Z plunge (DZ). Note: the spring-floated spindle means this does not set actual cut depth — tool protrusion does.")]
+        [Description(
+            "Programmed Z plunge (DZ). Note: the spring-floated spindle means this does not set actual cut depth — tool protrusion does."
+        )]
         public double Depth { get; set; } = 0.25;
 
         [DisplayName("Pause Before")]
-        [Description("Stop the spindle and prompt the operator before this pass begins, so the tool can be swapped/adjusted.")]
+        [Description(
+            "Stop the spindle and prompt the operator before this pass begins, so the tool can be swapped/adjusted."
+        )]
         public bool PauseBefore { get; set; }
 
         [DisplayName("Pause Message")]
         [Description("Message shown on the controller during the pause.")]
         public string PauseMessage { get; set; } = "";
 
-        public override string ToString() => $"{FeedMmPerSec} mm/s, {Depth:0.###}\"" + (PauseBefore ? ", pause" : "");
+        public override string ToString() =>
+            $"{FeedMmPerSec} mm/s, {Depth:0.###}\"" + (PauseBefore ? ", pause" : "");
     }
 
     /// <summary>
@@ -40,24 +45,28 @@ namespace OpenNest.Posts.GravographIS
         [Category("Engrave (Scribe)")]
         [DisplayName("Engrave")]
         [Description("Parameters for engrave/scribe geometry (text).")]
-        public LayerCutConfig Engrave { get; set; } = new LayerCutConfig
-        {
-            FeedMmPerSec = 10,
-            Depth = 0.25,
-            PauseBefore = false,
-            PauseMessage = "",
-        };
+        public LayerCutConfig Engrave { get; set; } =
+            new LayerCutConfig
+            {
+                FeedMmPerSec = 10,
+                Depth = 0.25,
+                PauseBefore = false,
+                PauseMessage = "",
+            };
 
         [Category("Cut")]
         [DisplayName("Cut")]
-        [Description("Parameters for cut geometry (outlines). Pauses for a tool change by default.")]
-        public LayerCutConfig Cut { get; set; } = new LayerCutConfig
-        {
-            FeedMmPerSec = 3,
-            Depth = 0.25,
-            PauseBefore = true,
-            PauseMessage = "Change tool",
-        };
+        [Description(
+            "Parameters for cut geometry (outlines). Pauses for a tool change by default."
+        )]
+        public LayerCutConfig Cut { get; set; } =
+            new LayerCutConfig
+            {
+                FeedMmPerSec = 3,
+                Depth = 0.25,
+                PauseBefore = true,
+                PauseMessage = "Change tool",
+            };
 
         /// <summary>
         /// Returns the cut config a polyline of the given layer should use, or null

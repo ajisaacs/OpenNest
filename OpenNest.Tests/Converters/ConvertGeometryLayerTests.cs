@@ -37,7 +37,10 @@ public class ConvertGeometryLayerTests
     [Fact]
     public void AddArc_EngraveLayer_TagsScribe()
     {
-        var arc = new Arc(new Vector(0, 0), 1, 0, System.Math.PI / 2) { Layer = new Layer("ENGRAVE") };
+        var arc = new Arc(new Vector(0, 0), 1, 0, System.Math.PI / 2)
+        {
+            Layer = new Layer("ENGRAVE"),
+        };
 
         var pgm = ProgramFor(arc);
 

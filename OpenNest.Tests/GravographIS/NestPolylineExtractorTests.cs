@@ -55,10 +55,16 @@ public class NestPolylineExtractorTests
         Assert.Equal(2, polylines.Count);
 
         Assert.Equal(LayerType.Scribe, polylines[0].Layer);
-        Assert.Equal(new[] { new Vector(0, 0), new Vector(1, 0), new Vector(2, 0) }, polylines[0].Points);
+        Assert.Equal(
+            new[] { new Vector(0, 0), new Vector(1, 0), new Vector(2, 0) },
+            polylines[0].Points
+        );
 
         Assert.Equal(LayerType.Cut, polylines[1].Layer);
-        Assert.Equal(new[] { new Vector(2, 0), new Vector(2, 1), new Vector(3, 1) }, polylines[1].Points);
+        Assert.Equal(
+            new[] { new Vector(2, 0), new Vector(2, 1), new Vector(3, 1) },
+            polylines[1].Points
+        );
     }
 
     [Fact]

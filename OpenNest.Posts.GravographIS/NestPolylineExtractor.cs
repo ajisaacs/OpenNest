@@ -59,7 +59,8 @@ namespace OpenNest.Posts.GravographIS
         /// </summary>
         public List<LayeredPolyline> ExtractLayered(Nest nest)
         {
-            if (nest == null) throw new ArgumentNullException(nameof(nest));
+            if (nest == null)
+                throw new ArgumentNullException(nameof(nest));
 
             var result = new List<LayeredPolyline>();
 
@@ -91,7 +92,8 @@ namespace OpenNest.Posts.GravographIS
         private void ExtractPart(Part part, List<LayeredPolyline> sink)
         {
             var program = part.Program;
-            if (program == null) return;
+            if (program == null)
+                return;
 
             // The walk below treats Motion.EndPoint as absolute. Convert a working
             // copy to absolute mode so G91 programs (the form OpenNest's UI writes)
@@ -123,7 +125,13 @@ namespace OpenNest.Posts.GravographIS
 
                     case LinearMove linear:
                     {
-                        StartOrSplit(sink, ref current, ref currentLayer, linear.Layer, pos + offset);
+                        StartOrSplit(
+                            sink,
+                            ref current,
+                            ref currentLayer,
+                            linear.Layer,
+                            pos + offset
+                        );
                         var end = linear.EndPoint;
                         current.Add(end + offset);
                         pos = end;
@@ -147,8 +155,13 @@ namespace OpenNest.Posts.GravographIS
         // seeded at `seed` (the current pen position). When the layer changes
         // mid-chain the previous polyline is flushed and a new one begins at the
         // shared seam vertex so engrave and cut passes stay geometrically continuous.
-        private static void StartOrSplit(List<LayeredPolyline> sink, ref List<Vector> current,
-            ref LayerType currentLayer, LayerType moveLayer, Vector seed)
+        private static void StartOrSplit(
+            List<LayeredPolyline> sink,
+            ref List<Vector> current,
+            ref LayerType currentLayer,
+            LayerType moveLayer,
+            Vector seed
+        )
         {
             if (current == null)
             {
@@ -163,7 +176,11 @@ namespace OpenNest.Posts.GravographIS
             }
         }
 
-        private static void FlushCurrent(List<LayeredPolyline> sink, ref List<Vector> current, LayerType layer)
+        private static void FlushCurrent(
+            List<LayeredPolyline> sink,
+            ref List<Vector> current,
+            LayerType layer
+        )
         {
             if (current != null && current.Count >= 2)
                 sink.Add(new LayeredPolyline(current, layer));
@@ -175,8 +192,13 @@ namespace OpenNest.Posts.GravographIS
         // (G-code I/J in this codebase are stored as the absolute center), arc.EndPoint
         // is absolute end. The starting point is assumed to already be in the polyline;
         // intermediate samples and the endpoint are appended.
-        private static void TessellateArc(Vector start, ArcMove arc, Vector offset,
-            double chordTol, List<Vector> sink)
+        private static void TessellateArc(
+            Vector start,
+            ArcMove arc,
+            Vector offset,
+            double chordTol,
+            List<Vector> sink
+        )
         {
             var c = arc.CenterPoint;
             var r = c.DistanceTo(start);
@@ -193,18 +215,22 @@ namespace OpenNest.Posts.GravographIS
             if (arc.Rotation == RotationType.CW)
             {
                 sweep = a0 - a1;
-                if (sweep <= 0) sweep += 2 * System.Math.PI;
+                if (sweep <= 0)
+                    sweep += 2 * System.Math.PI;
             }
             else
             {
                 sweep = a1 - a0;
-                if (sweep <= 0) sweep += 2 * System.Math.PI;
+                if (sweep <= 0)
+                    sweep += 2 * System.Math.PI;
             }
 
             // Treat a near-zero sweep with coincident start/end as a full circle.
-            if (sweep < 1e-9 &&
-                System.Math.Abs(start.X - arc.EndPoint.X) < 1e-9 &&
-                System.Math.Abs(start.Y - arc.EndPoint.Y) < 1e-9)
+            if (
+                sweep < 1e-9
+                && System.Math.Abs(start.X - arc.EndPoint.X) < 1e-9
+                && System.Math.Abs(start.Y - arc.EndPoint.Y) < 1e-9
+            )
             {
                 sweep = 2 * System.Math.PI;
             }
@@ -215,7 +241,8 @@ namespace OpenNest.Posts.GravographIS
                 maxAngleStep = System.Math.PI / 32;
 
             var steps = (int)System.Math.Ceiling(sweep / maxAngleStep);
-            if (steps < 1) steps = 1;
+            if (steps < 1)
+                steps = 1;
 
             var direction = arc.Rotation == RotationType.CW ? -1.0 : 1.0;
             for (int i = 1; i < steps; i++)
