@@ -96,6 +96,61 @@ public class CanonicalAngleTests
         var d = new Drawing("empty", new OpenNest.CNC.Program());
         Assert.Equal(0.0, CanonicalAngle.Compute(d), precision: 6);
     }
+
+    private static Drawing MakeL(double rotation)
+    {
+        var pgm = new OpenNest.CNC.Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(100, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(100, 20)));
+        pgm.Codes.Add(new LinearMove(new Vector(50, 20)));
+        pgm.Codes.Add(new LinearMove(new Vector(50, 50)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 50)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        if (!OpenNest.Math.Tolerance.IsEqualTo(rotation, 0))
+            pgm.Rotate(rotation, pgm.BoundingBox().Center);
+        return new Drawing("L", pgm);
+    }
+
+    // Canonical outline, translated to its own corner, as sorted rounded vertices.
+    private static string Signature(Drawing drawing)
+    {
+        var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
+        var entities = ConvertProgram
+            .ToGeometry(canonical.Program)
+            .Where(e => e.Layer != SpecialLayers.Rapid);
+        var vertices = ShapeBuilder
+            .GetShapes(entities)
+            .OrderByDescending(s => s.Area())
+            .First()
+            .ToPolygonWithTolerance(0.1)
+            .Vertices.ToList();
+        var minX = vertices.Min(v => v.X);
+        var minY = vertices.Min(v => v.Y);
+        return string.Join(
+            ";",
+            vertices
+                .Select(v =>
+                    $"{System.Math.Round(v.X - minX, 2):F2},{System.Math.Round(v.Y - minY, 2):F2}"
+                )
+                .Distinct()
+                .OrderBy(x => x)
+        );
+    }
+
+    [Theory]
+    [InlineData(0.3)]
+    [InlineData(0.8)]
+    [InlineData(1.2)]
+    public void AsymmetricShape_CanonicalOrientationIsIndependentOfQuarterTurns(double offset)
+    {
+        // The MBR fixes the frame only modulo 90 degrees; an L-shape must still land in one
+        // deterministic orientation however it was imported.
+        var baseline = Signature(MakeL(offset));
+
+        for (var turns = 1; turns < 4; turns++)
+            Assert.Equal(baseline, Signature(MakeL(offset + turns * System.Math.PI / 2)));
+    }
 }
 
 public class DrawingCanonicalAngleWiringTests

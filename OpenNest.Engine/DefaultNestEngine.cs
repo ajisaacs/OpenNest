@@ -59,7 +59,6 @@ namespace OpenNest
 
             // Replace the item's Drawing with a canonical copy for the duration of this fill.
             // All internal methods see canonical geometry; this wrapper un-canonicalizes the final result.
-            var sourceAngle = item.Drawing?.Source?.Angle ?? 0.0;
             var originalDrawing = item.Drawing;
             var canonicalItem = new NestItem
             {
@@ -81,7 +80,7 @@ namespace OpenNest
                         $"[Fill] Fast path: placed {fast.Count} parts for qty={canonicalItem.Quantity}"
                     );
                     WinnerPhase = NestPhase.Pairs;
-                    fast = RebindAndUnCanonicalize(fast, originalDrawing, sourceAngle);
+                    fast = RebindAndUnCanonicalize(fast, originalDrawing);
                     ReportProgress(
                         progress,
                         new ProgressReport
@@ -129,7 +128,7 @@ namespace OpenNest
             if (canonicalItem.Quantity > 0 && best.Count > canonicalItem.Quantity)
                 best = ShrinkFiller.TrimToCount(best, canonicalItem.Quantity, TrimAxis);
 
-            best = RebindAndUnCanonicalize(best, originalDrawing, sourceAngle);
+            best = RebindAndUnCanonicalize(best, originalDrawing);
 
             ReportProgress(
                 progress,
@@ -150,31 +149,10 @@ namespace OpenNest
         /// <summary>
         /// Single exit point for canonical -> source frame conversion. Rebinds every Part to the
         /// original Drawing (so consumers see the user's drawing identity, not the transient canonical copy)
-        /// and composes sourceAngle onto each Part's rotation via CanonicalFrame.FromCanonical.
+        /// and composes the canonical angle onto each Part's rotation via CanonicalFrame.RebindToOriginal.
         /// </summary>
-        private static List<Part> RebindAndUnCanonicalize(
-            List<Part> parts,
-            Drawing original,
-            double sourceAngle
-        )
-        {
-            if (parts == null || parts.Count == 0)
-                return parts;
-
-            for (var i = 0; i < parts.Count; i++)
-            {
-                var p = parts[i];
-                // Rebind to `original` while preserving world pose. CreateAtOrigin rotates
-                // at the origin (keeping bbox at world (0,0)) then we offset to match p's bbox.
-                var rebound = Part.CreateAtOrigin(original, p.Rotation);
-                var delta = p.BoundingBox.Location - rebound.BoundingBox.Location;
-                rebound.Offset(delta);
-                rebound.UpdateBounds();
-                parts[i] = rebound;
-            }
-
-            return CanonicalFrame.FromCanonical(parts, sourceAngle);
-        }
+        private static List<Part> RebindAndUnCanonicalize(List<Part> parts, Drawing original) =>
+            CanonicalFrame.RebindToOriginal(parts, original);
 
         /// <summary>
         /// Fast path for qty 1-2: place a single part or a best-fit pair

@@ -393,7 +393,6 @@ namespace OpenNest
                 // from a canonical drawing copy so geometry and coords share a frame; rebind
                 // + un-rotate winning pair to the original drawing's frame before returning.
                 var canonicalDrawing = CanonicalFrame.AsCanonicalCopy(item.Drawing);
-                var sourceAngle = item.Drawing?.Source?.Angle ?? 0.0;
 
                 List<Part> bestPlacement = null;
                 Box bestTarget = null;
@@ -438,9 +437,9 @@ namespace OpenNest
                 if (bestPlacement == null)
                     continue;
 
-                // Rebind to the original drawing and compose sourceAngle onto rotation so the
-                // final placed parts sit in the user's visible frame.
-                bestPlacement = RebindPairToOriginal(bestPlacement, item.Drawing, sourceAngle);
+                // Rebind to the original drawing and compose the canonical angle onto rotation so
+                // the final placed parts sit in the user's visible frame.
+                bestPlacement = RebindPairToOriginal(bestPlacement, item.Drawing);
 
                 result.AddRange(bestPlacement);
                 item.Quantity = 0;
@@ -460,31 +459,12 @@ namespace OpenNest
 
         /// <summary>
         /// Rebinds each canonical-frame Part in the pair to the original Drawing at its current
-        /// world pose, then composes sourceAngle onto each via CanonicalFrame.FromCanonical so
-        /// the returned list is in the original drawing's visible frame. Mirrors
-        /// DefaultNestEngine.RebindAndUnCanonicalize.
+        /// world pose, then composes the canonical angle onto each via
+        /// CanonicalFrame.RebindToOriginal so the returned list is in the original drawing's
+        /// visible frame. Mirrors DefaultNestEngine.RebindAndUnCanonicalize.
         /// </summary>
-        private static List<Part> RebindPairToOriginal(
-            List<Part> parts,
-            Drawing original,
-            double sourceAngle
-        )
-        {
-            if (parts == null || parts.Count == 0)
-                return parts;
-
-            for (var i = 0; i < parts.Count; i++)
-            {
-                var p = parts[i];
-                var rebound = Part.CreateAtOrigin(original, p.Rotation);
-                var delta = p.BoundingBox.Location - rebound.BoundingBox.Location;
-                rebound.Offset(delta);
-                rebound.UpdateBounds();
-                parts[i] = rebound;
-            }
-
-            return CanonicalFrame.FromCanonical(parts, sourceAngle);
-        }
+        private static List<Part> RebindPairToOriginal(List<Part> parts, Drawing original) =>
+            CanonicalFrame.RebindToOriginal(parts, original);
 
         /// <summary>
         /// Determines whether a drawing should use grid-fill (true) or bin-pack (false).

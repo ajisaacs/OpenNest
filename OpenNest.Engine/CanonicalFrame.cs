@@ -48,6 +48,38 @@ namespace OpenNest.Engine
         }
 
         /// <summary>
+        /// Rebinds canonical-frame placed parts to the original drawing while preserving each
+        /// part's world footprint.
+        ///
+        /// <see cref="Part.Rotation"/> is cumulative: it includes the rotation already baked into
+        /// the drawing's program. The canonical copy carries original + sourceAngle, so a canonical
+        /// part's rotation minus the original program's rotation is exactly the rotation (engine
+        /// rotation plus sourceAngle) that turns the original into the same shape. Each part is
+        /// rebuilt from the original at that rotation and translated to sit where the canonical
+        /// part did. Rotating a finished part about its Location instead would shift it out of place.
+        /// </summary>
+        public static List<Part> RebindToOriginal(List<Part> canonicalParts, Drawing original)
+        {
+            if (canonicalParts == null || canonicalParts.Count == 0)
+                return canonicalParts;
+
+            var baseRotation = original.Program.Rotation;
+            for (var i = 0; i < canonicalParts.Count; i++)
+            {
+                var canonical = canonicalParts[i];
+                var rebound = Part.CreateAtOrigin(
+                    original,
+                    Angle.NormalizeRad(canonical.Rotation - baseRotation)
+                );
+                rebound.Offset(canonical.BoundingBox.Location - rebound.BoundingBox.Location);
+                rebound.UpdateBounds();
+                canonicalParts[i] = rebound;
+            }
+
+            return canonicalParts;
+        }
+
+        /// <summary>
         /// Composes the source drawing's canonical angle onto each placed part so the
         /// returned list is in the drawing's original (visible) frame.
         ///
