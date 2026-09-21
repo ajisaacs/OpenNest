@@ -305,22 +305,27 @@ namespace OpenNest.CNC
             return new Vector(0, 0);
         }
 
+        /// <summary>
+        /// Bounding box of the geometry the program visits. The tool's starting position is not
+        /// part of the geometry, so the origin only contributes when the program reaches it.
+        /// An empty program returns a zero-size box at the origin.
+        /// </summary>
         public Box BoundingBox()
         {
             var origin = new Vector(0, 0);
-            return BoundingBox(ref origin);
+            return BoundingBox(ref origin, out var box) ? box : new Box(0, 0, 0, 0);
         }
 
-        private Box BoundingBox(ref Vector pos)
+        private bool BoundingBox(ref Vector pos, out Box result)
         {
             // Capture the frame origin at entry. Sub-program Offsets and
             // absolute-mode endpoints are relative to this fixed origin.
             var frameOrigin = pos;
 
-            double minX = 0.0;
-            double minY = 0.0;
-            double maxX = 0.0;
-            double maxY = 0.0;
+            var minX = double.PositiveInfinity;
+            var minY = double.PositiveInfinity;
+            var maxX = double.NegativeInfinity;
+            var maxY = double.NegativeInfinity;
 
             for (int i = 0; i < Codes.Count; ++i)
             {
@@ -338,12 +343,12 @@ namespace OpenNest.CNC
 
                         if (pt.X > maxX)
                             maxX = pt.X;
-                        else if (pt.X < minX)
+                        if (pt.X < minX)
                             minX = pt.X;
 
                         if (pt.Y > maxY)
                             maxY = pt.Y;
-                        else if (pt.Y < minY)
+                        if (pt.Y < minY)
                             minY = pt.Y;
 
                         pos = pt;
@@ -361,12 +366,12 @@ namespace OpenNest.CNC
 
                         if (pt.X > maxX)
                             maxX = pt.X;
-                        else if (pt.X < minX)
+                        if (pt.X < minX)
                             minX = pt.X;
 
                         if (pt.Y > maxY)
                             maxY = pt.Y;
-                        else if (pt.Y < minY)
+                        if (pt.Y < minY)
                             minY = pt.Y;
 
                         pos = pt;
@@ -470,7 +475,8 @@ namespace OpenNest.CNC
                         // Sub-program frame origin in this program's frame
                         // is frameOrigin + Offset, regardless of current pos.
                         pos = frameOrigin + subpgm.Offset;
-                        var box = subpgm.Program.BoundingBox(ref pos);
+                        if (!subpgm.Program.BoundingBox(ref pos, out var box))
+                            break;
 
                         if (box.Left < minX)
                             minX = box.Left;
@@ -489,7 +495,14 @@ namespace OpenNest.CNC
                 }
             }
 
-            return new Box(minX, minY, maxX - minX, maxY - minY);
+            if (minX > maxX || minY > maxY)
+            {
+                result = new Box(0, 0, 0, 0);
+                return false;
+            }
+
+            result = new Box(minX, minY, maxX - minX, maxY - minY);
+            return true;
         }
 
         public object Clone()
