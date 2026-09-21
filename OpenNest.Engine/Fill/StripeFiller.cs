@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -26,13 +25,6 @@ public class StripeFiller
     /// When true, only complete stripes are placed — no partial rows/columns.
     /// </summary>
     public bool CompleteStripesOnly { get; set; }
-
-    /// <summary>
-    /// Factory to create the engine used for filling the remnant strip.
-    /// Defaults to NestEngineRegistry.Create (uses the user's selected engine).
-    /// </summary>
-    public Func<Plate, NestEngineBase> CreateRemnantEngine { get; set; } =
-        NestEngineRegistry.Create;
 
     public StripeFiller(FillContext context, NestDirection primaryAxis)
     {
