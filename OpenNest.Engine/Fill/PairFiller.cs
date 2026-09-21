@@ -97,7 +97,6 @@ namespace OpenNest.Engine.Fill
             var partBox = drawing.Program.BoundingBox();
             var partArea = System.Math.Max(partBox.Width * partBox.Length, 1);
 
-            FillStrategyRegistry.SetEnabled("Pairs", "RectBestFit", "Extents", "Linear");
             try
             {
                 for (var batchStart = 0; batchStart < candidates.Count; batchStart += batchSize)
@@ -164,10 +163,6 @@ namespace OpenNest.Engine.Fill
             catch (OperationCanceledException)
             {
                 Debug.WriteLine("[PairFiller] Cancelled mid-phase, using results so far");
-            }
-            finally
-            {
-                FillStrategyRegistry.SetEnabled(null);
             }
 
             Debug.WriteLine($"[PairFiller] Best pair result: {best?.Count ?? 0} parts");
