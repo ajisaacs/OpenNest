@@ -1,14 +1,13 @@
 using System;
 
-using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
 namespace OpenNest.Engine.Jobs;
 
 /// <summary>
-/// Instance-scoped strategy resolution for the whole-job runner. Default and Strip resolve to the
-/// migrated built-in plate nesters; the remnant strategies still use the legacy adapter during
-/// rollout. The process-global NestEngineRegistry (including plugin registrations and
-/// ActiveEngineName) is neither read nor modified. Unknown keys reject.
+/// Instance-scoped strategy resolution for the whole-job runner. All four built-in strategies
+/// resolve directly to filler-backed plate nesters. The process-global NestEngineRegistry
+/// (including plugin registrations and ActiveEngineName) is neither read nor modified.
+/// Unknown keys reject.
 /// </summary>
 public static class PlateNesterFactory
 {
@@ -19,12 +18,8 @@ public static class PlateNesterFactory
         {
             "Default" => new DefaultPlateNester(),
             "Strip" => new StripPlateNester(),
-            "Vertical Remnant" => new LegacyPlateNesterAdapter(plate => new VerticalRemnantEngine(
-                plate
-            )),
-            "Horizontal Remnant" => new LegacyPlateNesterAdapter(
-                plate => new HorizontalRemnantEngine(plate)
-            ),
+            "Vertical Remnant" => RemnantPlateNester.Vertical(),
+            "Horizontal Remnant" => RemnantPlateNester.Horizontal(),
             _ => throw new NotSupportedException($"Unknown placement strategy: {strategy}."),
         };
     }

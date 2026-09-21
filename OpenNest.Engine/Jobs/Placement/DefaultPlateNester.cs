@@ -3,36 +3,38 @@ using System.Linq;
 using System.Threading;
 
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>
-/// Migrated built-in placement strategy for the whole-job runner. Reuses <see cref="DefaultNestEngine"/>
-/// fill/pack geometry but owns its own run-scoped bookkeeping: remaining demand is read from the
-/// request and placement counts are derived from returned placements, so the engine's private
-/// <see cref="NestItem.Quantity"/> mutations never feed back into job accounting.
+/// Built-in placement strategy for the whole-job runner. Fills each candidate trial with a
+/// <see cref="DefaultPlateFiller"/> on a fresh private plate and owns its own run-scoped
+/// bookkeeping: remaining demand is read from the request and placement counts are derived from
+/// returned placements, so the filler's private <see cref="NestItem.Quantity"/> mutations never
+/// feed back into job accounting.
 /// </summary>
 /// <remarks>
 /// The identity/progress boundary mechanics live in <see cref="CandidatePlacementContext"/>: one
 /// private <see cref="Drawing"/> per requirement is created once per solve and reused across every
 /// candidate trial (the runner reuses one <see cref="IPlateNester"/> instance per job). This is safe
-/// because the engines mutate <see cref="NestItem.Quantity"/> (per-trial) and canonical-frame copies,
+/// because the fillers mutate <see cref="NestItem.Quantity"/> (per-trial) and canonical-frame copies,
 /// never the shared <see cref="Drawing"/> or its <c>Quantity</c>. Identity is by Drawing reference,
 /// never by name. Each trial still gets a fresh private <see cref="Plate"/>.
 /// </remarks>
 public sealed class DefaultPlateNester : IPlateNester
 {
-    private readonly Func<Plate, DefaultNestEngine> engineFactory;
+    private readonly Func<Plate, DefaultPlateFiller> fillerFactory;
     private readonly OrderedPlateNester restrictedRotationNester = new();
     private readonly CandidatePlacementContext context = new();
 
     public DefaultPlateNester()
-        : this(static plate => new DefaultNestEngine(plate)) { }
+        : this(static plate => new DefaultPlateFiller(plate)) { }
 
-    /// <param name="engineFactory">Injectable for tests; defaults to <see cref="DefaultNestEngine"/>.</param>
-    public DefaultPlateNester(Func<Plate, DefaultNestEngine> engineFactory)
+    /// <param name="fillerFactory">Injectable for tests; defaults to <see cref="DefaultPlateFiller"/>.</param>
+    internal DefaultPlateNester(Func<Plate, DefaultPlateFiller> fillerFactory)
     {
-        this.engineFactory =
-            engineFactory ?? throw new ArgumentNullException(nameof(engineFactory));
+        this.fillerFactory =
+            fillerFactory ?? throw new ArgumentNullException(nameof(fillerFactory));
     }
 
     public PlateCandidate Place(
@@ -44,26 +46,26 @@ public sealed class DefaultPlateNester : IPlateNester
         ArgumentNullException.ThrowIfNull(request);
         token.ThrowIfCancellationRequested();
 
-        // The legacy engine cannot express a locked or bounded rotation (start == end == 0 reads
-        // as "unconstrained") and its Pairs/RectBestFit strategies rotate freely, so it can return
-        // poses the requirement's RotationPolicy forbids. Restricted requirements go to the
+        // The Default fill pipeline cannot express a locked or bounded rotation (start == end == 0
+        // reads as "unconstrained") and its Pairs/RectBestFit strategies rotate freely, so it can
+        // return poses the requirement's RotationPolicy forbids. Restricted requirements go to the
         // policy-aware ordered nester, which only proposes allowed angles and validates each pose.
         if (request.Parts.Any(part => part.Rotation.Kind != RotationPolicyKind.Automatic))
             return restrictedRotationNester.Place(request, progress, token);
 
         var plate = DrawingJobMapper.CreatePlate(request.Stock);
-        // Quantity is the request's remaining demand; the engine may mutate these per-trial items,
+        // Quantity is the request's remaining demand; the filler may mutate these per-trial items,
         // and that mutation is deliberately discarded — placement counts come from the result.
         var items = context.CreateItems(request.Parts);
 
-        var engine =
-            engineFactory(plate)
-            ?? throw new InvalidOperationException("Engine factory returned null.");
+        var filler =
+            fillerFactory(plate)
+            ?? throw new InvalidOperationException("Filler factory returned null.");
         var legacyProgress = CandidateProgressBridge.Create(progress, request.Stock.Id);
-        var parts = engine.Nest(items, legacyProgress, token);
+        var parts = filler.Nest(items, legacyProgress, token);
         token.ThrowIfCancellationRequested();
         if (parts == null)
-            throw new InvalidOperationException("Engine returned null placements.");
+            throw new InvalidOperationException("Filler returned null placements.");
 
         return new PlateCandidate(context.MapPlacements(parts));
     }

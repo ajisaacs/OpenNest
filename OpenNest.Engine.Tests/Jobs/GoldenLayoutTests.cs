@@ -9,8 +9,8 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// <summary>
 /// Golden-layout fixtures: the permanent regression net for the legacy-engine removal.
 /// Each test solves a fixed job through the production path
-/// (<see cref="PlateNesterFactory"/> + <see cref="NestJobRunner"/>, which for the remnant
-/// strategies still routes through <see cref="LegacyPlateNesterAdapter"/>) and asserts the
+/// (<see cref="PlateNesterFactory"/> + <see cref="NestJobRunner"/>, all four strategies
+/// filler-backed) and asserts the
 /// exact committed poses captured from the pre-migration code. The extraction phases must
 /// keep these green byte-for-byte (modulo 1e-9 float noise).
 /// </summary>

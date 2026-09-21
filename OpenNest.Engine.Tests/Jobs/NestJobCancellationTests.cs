@@ -1,7 +1,8 @@
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
-using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -84,9 +85,9 @@ public class NestJobCancellationTests
             new[] { part },
             new[] { new NestPlateStock("stock", new Size(20, 30), 1) }
         );
-        var runner = new NestJobRunner(_ => new LegacyPlateNesterAdapter(
-            plate => new ReportingEngine(plate)
-        ));
+        var runner = new NestJobRunner(_ => new DefaultPlateNester(plate => new ReportingFiller(
+            plate
+        )));
 
         var result = runner.Solve(job, new InlineProgress(reports.Add));
 
@@ -134,11 +135,8 @@ public class NestJobCancellationTests
         }
     }
 
-    private sealed class ReportingEngine(Plate plate) : NestEngineBase(plate)
+    private sealed class ReportingFiller(Plate plate) : DefaultPlateFiller(plate)
     {
-        public override string Name => "reporting";
-        public override string Description => "reports progress";
-
         public override List<Part> Nest(
             List<NestItem> items,
             IProgress<NestProgress>? progress,

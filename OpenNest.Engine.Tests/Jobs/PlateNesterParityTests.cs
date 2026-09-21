@@ -2,16 +2,15 @@ using OpenNest.CNC;
 using OpenNest.Geometry;
 using Xunit;
 using OpenNest.Engine.Jobs;
-using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
 /// <summary>
-/// Parity between the legacy adapter and the migrated built-in plate nesters (Default/Strip) on
-/// generated geometry. The runner's placement validator enforces geometric safety on every committed
-/// candidate, so these tests assert fulfillment, status, and — for the deterministic Default/rectangle
-/// case — identical layouts.
+/// Direct filler-backed coverage for the built-in plate nesters (Default/Strip/remnant). The
+/// runner's placement validator enforces geometric safety on every committed candidate, so these
+/// tests assert fulfillment, status, and the identity/rotation safety boundaries; exact committed
+/// layouts are pinned separately by <see cref="GoldenLayoutTests"/>.
 /// </summary>
 public class PlateNesterParityTests
 {
@@ -36,29 +35,6 @@ public class PlateNesterParityTests
     private static Dictionary<string, PartFulfillment> ByPart(NestJobResult result) =>
         result.Fulfillment.ToDictionary(f => f.PartId, StringComparer.Ordinal);
 
-    private static void AssertLayoutsIdentical(NestJobResult left, NestJobResult right)
-    {
-        Assert.Equal(left.Plates.Count, right.Plates.Count);
-        for (var i = 0; i < left.Plates.Count; i++)
-        {
-            var lPlates = left.Plates[i].Placements;
-            var rPlates = right.Plates[i].Placements;
-            Assert.Equal(lPlates.Count, rPlates.Count);
-            var lSorted = lPlates.OrderBy(p => p.PartId).ThenBy(p => p.X).ThenBy(p => p.Y).ToList();
-            var rSorted = rPlates.OrderBy(p => p.PartId).ThenBy(p => p.X).ThenBy(p => p.Y).ToList();
-            for (var j = 0; j < lSorted.Count; j++)
-            {
-                Assert.Equal(lSorted[j].PartId, rSorted[j].PartId);
-                Assert.Equal(lSorted[j].X, rSorted[j].X, 6);
-                Assert.Equal(lSorted[j].Y, rSorted[j].Y, 6);
-                Assert.True(
-                    AnglesEqual(lSorted[j].Rotation, rSorted[j].Rotation),
-                    $"rotation differs: {lSorted[j].Rotation} vs {rSorted[j].Rotation}"
-                );
-            }
-        }
-    }
-
     private static bool AnglesEqual(double left, double right)
     {
         var delta = (left - right) % (System.Math.PI * 2);
@@ -67,7 +43,7 @@ public class PlateNesterParityTests
     }
 
     [Fact]
-    public void DefaultParity_Rectangles_SameFulfillmentAndLayout()
+    public void DefaultDirectFiller_Rectangles_FulfilledAndValid()
     {
         var parts = new[]
         {
@@ -83,26 +59,18 @@ public class PlateNesterParityTests
             ),
         };
 
-        var legacy = Solve(
-            new LegacyPlateNesterAdapter(plate => new DefaultNestEngine(plate)),
-            Job(parts)
-        );
-        var migrated = Solve(new DefaultPlateNester(), Job(parts));
+        var result = Solve(new DefaultPlateNester(), Job(parts));
 
-        Assert.Equal(legacy.Status, migrated.Status);
-        Assert.Equal(NestJobStatus.Complete, migrated.Status);
-        Assert.Equal(ByPart(legacy), ByPart(migrated));
-        foreach (var usage in legacy.StockUsage)
-            Assert.Equal(
-                usage.Used,
-                migrated.StockUsage.First(u => u.StockId == usage.StockId).Used
-            );
-        // Automatic-rotation rectangles on a single stock size are deterministic: identical layouts.
-        AssertLayoutsIdentical(legacy, migrated);
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(4, ByPart(result)["a"].Placed);
+        Assert.Equal(3, ByPart(result)["b"].Placed);
+        var usage = Assert.Single(result.StockUsage);
+        Assert.Equal(1, usage.Used);
+        Assert.Equal(7, result.Plates.SelectMany(p => p.Placements).Count());
     }
 
     [Fact]
-    public void StripParity_Rectangles_SameFulfillmentAndTotalCount()
+    public void StripDirectFiller_Rectangles_FulfilledAndValid()
     {
         var parts = new[]
         {
@@ -118,29 +86,22 @@ public class PlateNesterParityTests
             ),
         };
 
-        var legacy = Solve(
-            new LegacyPlateNesterAdapter(plate => new StripNestEngine(plate)),
-            Job(parts, strategy: "Strip")
-        );
-        var migrated = Solve(new StripPlateNester(), Job(parts, strategy: "Strip"));
+        var result = Solve(new StripPlateNester(), Job(parts, strategy: "Strip"));
 
-        Assert.Equal(legacy.Status, migrated.Status);
-        Assert.Equal(NestJobStatus.Complete, migrated.Status);
-        Assert.Equal(ByPart(legacy), ByPart(migrated));
-        Assert.Equal(
-            legacy.Plates.SelectMany(p => p.Placements).Count(),
-            migrated.Plates.SelectMany(p => p.Placements).Count()
-        );
-        // Shrink-fill ordering can differ between engine instances; do not assert identical coordinates.
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(4, ByPart(result)["a"].Placed);
+        Assert.Equal(3, ByPart(result)["b"].Placed);
+        Assert.Equal(7, result.Plates.SelectMany(p => p.Placements).Count());
     }
 
     [Fact]
-    public void MigratedBuiltins_AreResolvedByProductionFactory()
+    public void Builtins_AreResolvedByProductionFactory()
     {
         Assert.IsType<DefaultPlateNester>(PlateNesterFactory.Create("Default"));
         Assert.IsType<StripPlateNester>(PlateNesterFactory.Create("Strip"));
-        Assert.IsType<LegacyPlateNesterAdapter>(PlateNesterFactory.Create("Vertical Remnant"));
-        Assert.IsType<LegacyPlateNesterAdapter>(PlateNesterFactory.Create("Horizontal Remnant"));
+        Assert.IsType<RemnantPlateNester>(PlateNesterFactory.Create("Vertical Remnant"));
+        Assert.IsType<RemnantPlateNester>(PlateNesterFactory.Create("Horizontal Remnant"));
+        Assert.Throws<NotSupportedException>(() => PlateNesterFactory.Create("not registered"));
     }
 
     [Fact]
@@ -230,6 +191,55 @@ public class PlateNesterParityTests
     }
 
     [Fact]
+    public void DefaultRestrictedRotation_NeverTouchesFiller()
+    {
+        // Safety rule, not layout: any non-automatic rotation must bypass the Default fill
+        // pipeline entirely — its Pairs/RectBestFit strategies rotate freely and would propose
+        // forbidden poses. A throwing filler factory proves the filler is never constructed, and
+        // completion at the locked angle proves OrderedPlateNester handled the request.
+        var part = new NestJobPart(
+            "fixed",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
+            2,
+            rotation: RotationPolicy.Fixed(0)
+        );
+        var nester = new DefaultPlateNester(_ =>
+            throw new InvalidOperationException("filler must not run for restricted rotation")
+        );
+
+        var result = Solve(nester, Job(new[] { part }));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        var placements = result.Plates.SelectMany(p => p.Placements).ToList();
+        Assert.Equal(2, placements.Count);
+        Assert.All(placements, p => Assert.True(AnglesEqual(p.Rotation, 0)));
+    }
+
+    [Fact]
+    public void RemnantRestrictedRotation_NeverTouchesFiller()
+    {
+        // Same safety rule for the remnant nester, whose fillers inherit the Default pipeline's
+        // automatic-rotation limitation. The throwing factory proves the filler is never
+        // constructed; completion at the locked angle proves OrderedPlateNester handled it.
+        var part = new NestJobPart(
+            "fixed",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
+            2,
+            rotation: RotationPolicy.Fixed(0)
+        );
+        var nester = new RemnantPlateNester(_ =>
+            throw new InvalidOperationException("filler must not run for restricted rotation")
+        );
+
+        var result = Solve(nester, Job(new[] { part }, strategy: "Vertical Remnant"));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        var placements = result.Plates.SelectMany(p => p.Placements).ToList();
+        Assert.Equal(2, placements.Count);
+        Assert.All(placements, p => Assert.True(AnglesEqual(p.Rotation, 0)));
+    }
+
+    [Fact]
     public void RepeatedNames_KeepIndependentIdentity()
     {
         // Two distinct requirements sharing identical geometry (and, via the mapper, name) but different IDs.
@@ -294,9 +304,10 @@ public class PlateNesterParityTests
     }
 
     [Fact]
-    public void LegacyRemnantStrategies_StillResolveThroughAdapter()
+    public void DirectRemnantStrategies_FulfillThroughFactory()
     {
-        // Remnant strategies must keep working through the legacy adapter after the factory change.
+        // Remnant strategies resolve to the direct remnant nester and still fulfill after the
+        // legacy adapter was deleted.
         var part = new NestJobPart(
             "p",
             PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(6, 4)),
