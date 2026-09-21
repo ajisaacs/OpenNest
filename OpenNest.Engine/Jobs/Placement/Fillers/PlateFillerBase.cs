@@ -173,7 +173,7 @@ internal abstract class PlateFillerBase
         return new List<Part>();
     }
 
-    public List<Part> Nest(
+    public virtual List<Part> Nest(
         List<NestItem> items,
         IProgress<NestProgress> progress,
         CancellationToken token

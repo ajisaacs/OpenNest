@@ -98,6 +98,74 @@ public class PlateFillerContractTests
     }
 
     [Fact]
+    public void StripPlateFiller_Nest_MatchesCompatibilityFacade()
+    {
+        var directPlate = new Plate(new Size(30, 50));
+        var facadePlate = new Plate(new Size(30, 50));
+        var directItems = new List<NestItem>
+        {
+            new()
+            {
+                Drawing = new Drawing("rect-a", TestDrawingFactory.Rectangle(6, 4)),
+                Quantity = 5,
+            },
+            new()
+            {
+                Drawing = new Drawing("rect-b", TestDrawingFactory.Rectangle(4, 3)),
+                Quantity = 4,
+            },
+            new()
+            {
+                Drawing = new Drawing("rect-c", TestDrawingFactory.Rectangle(2, 7)),
+                Quantity = 3,
+            },
+        };
+        var facadeItems = new List<NestItem>
+        {
+            new()
+            {
+                Drawing = new Drawing("rect-a", TestDrawingFactory.Rectangle(6, 4)),
+                Quantity = 5,
+            },
+            new()
+            {
+                Drawing = new Drawing("rect-b", TestDrawingFactory.Rectangle(4, 3)),
+                Quantity = 4,
+            },
+            new()
+            {
+                Drawing = new Drawing("rect-c", TestDrawingFactory.Rectangle(2, 7)),
+                Quantity = 3,
+            },
+        };
+        var directFiller = new StripPlateFiller(directPlate) { PlateNumber = 7 };
+        var facade = new StripNestEngine(facadePlate) { PlateNumber = 7 };
+
+        var directParts = directFiller.Nest(directItems, null, CancellationToken.None);
+        var facadeParts = facade.Nest(facadeItems, null, CancellationToken.None);
+
+        AssertEquivalentLayouts(facadeParts, directParts);
+        Assert.Equal(facadeItems.Select(item => item.Quantity), directItems.Select(item => item.Quantity));
+    }
+
+    [Fact]
+    public void CompatibilityStripFacade_Nest_UsesOverriddenPackArea()
+    {
+        var plate = new Plate(new Size(100, 100));
+        var drawing = new Drawing("pack", TestDrawingFactory.Rectangle(10, 10));
+        var engine = new PackProbeStripNestEngine(plate, drawing);
+
+        var parts = engine.Nest(
+            new List<NestItem> { new() { Drawing = drawing, Quantity = 1 } },
+            null,
+            CancellationToken.None
+        );
+
+        Assert.Equal(1, engine.PackAreaCalls);
+        Assert.Single(parts);
+    }
+
+    [Fact]
     public void NestProgressReporter_Report_ClonesPartsAndPreservesReportFields()
     {
         var source = new Part(
@@ -299,6 +367,56 @@ public class PlateFillerContractTests
         {
             BuildAnglesCalled = true;
             return base.BuildAngles(item, classification, workArea);
+        }
+    }
+
+    private sealed class PackProbeStripNestEngine : StripNestEngine
+    {
+        private readonly Drawing drawing;
+
+        internal PackProbeStripNestEngine(Plate plate, Drawing drawing)
+            : base(plate)
+        {
+            this.drawing = drawing;
+        }
+
+        internal int PackAreaCalls { get; private set; }
+
+        public override List<Part> PackArea(
+            Box box,
+            List<NestItem> items,
+            IProgress<NestProgress> progress,
+            CancellationToken token
+        )
+        {
+            PackAreaCalls++;
+            Assert.Same(drawing, Assert.Single(items).Drawing);
+            return new List<Part> { new(drawing, new Vector(0, 0)) };
+        }
+    }
+
+    private static void AssertEquivalentLayouts(List<Part> expected, List<Part> actual)
+    {
+        var expectedParts = expected
+            .OrderBy(part => part.BaseDrawing.Name)
+            .ThenBy(part => part.Location.X)
+            .ThenBy(part => part.Location.Y)
+            .ThenBy(part => part.Rotation)
+            .ToList();
+        var actualParts = actual
+            .OrderBy(part => part.BaseDrawing.Name)
+            .ThenBy(part => part.Location.X)
+            .ThenBy(part => part.Location.Y)
+            .ThenBy(part => part.Rotation)
+            .ToList();
+
+        Assert.Equal(expectedParts.Count, actualParts.Count);
+        for (var i = 0; i < expectedParts.Count; i++)
+        {
+            Assert.Equal(expectedParts[i].BaseDrawing.Name, actualParts[i].BaseDrawing.Name);
+            Assert.Equal(expectedParts[i].Location.X, actualParts[i].Location.X, 9);
+            Assert.Equal(expectedParts[i].Location.Y, actualParts[i].Location.Y, 9);
+            Assert.Equal(expectedParts[i].Rotation, actualParts[i].Rotation, 9);
         }
     }
 

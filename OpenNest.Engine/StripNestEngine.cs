@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
-using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine
 {
     public class StripNestEngine : NestEngineBase
     {
+        private StripPlateFiller filler;
+
         public StripNestEngine(Plate plate)
             : base(plate) { }
 
@@ -17,9 +18,24 @@ namespace OpenNest.Engine
         public override string Description =>
             "Iterative shrink-fill nesting for mixed-drawing layouts";
 
-        /// <summary>
-        /// Single-item fill delegates to DefaultNestEngine.
-        /// </summary>
+        private StripPlateFiller Filler
+        {
+            get
+            {
+                if (filler == null || !ReferenceEquals(filler.Plate, Plate))
+                    filler = new LegacyStripPlateFiller(this, Plate);
+                return filler;
+            }
+        }
+
+        private StripPlateFiller PrepareFiller()
+        {
+            var current = Filler;
+            current.PlateNumber = PlateNumber;
+            current.NestDirection = NestDirection;
+            return current;
+        }
+
         public override List<Part> Fill(
             NestItem item,
             Box workArea,
@@ -27,13 +43,10 @@ namespace OpenNest.Engine
             CancellationToken token
         )
         {
-            var inner = new DefaultNestEngine(Plate);
-            return inner.Fill(item, workArea, progress, token);
+            var current = PrepareFiller();
+            return current.Fill(item, workArea, progress, token);
         }
 
-        /// <summary>
-        /// Group-parts fill delegates to DefaultNestEngine.
-        /// </summary>
         public override List<Part> Fill(
             List<Part> groupParts,
             Box workArea,
@@ -41,13 +54,10 @@ namespace OpenNest.Engine
             CancellationToken token
         )
         {
-            var inner = new DefaultNestEngine(Plate);
-            return inner.Fill(groupParts, workArea, progress, token);
+            var current = PrepareFiller();
+            return current.Fill(groupParts, workArea, progress, token);
         }
 
-        /// <summary>
-        /// Pack delegates to DefaultNestEngine.
-        /// </summary>
         public override List<Part> PackArea(
             Box box,
             List<NestItem> items,
@@ -55,110 +65,36 @@ namespace OpenNest.Engine
             CancellationToken token
         )
         {
-            var inner = new DefaultNestEngine(Plate);
-            return inner.PackArea(box, items, progress, token);
+            var current = PrepareFiller();
+            return current.PackAreaCore(box, items, progress, token);
         }
 
-        /// <summary>
-        /// Multi-drawing iterative shrink-fill strategy.
-        /// Each multi-quantity drawing gets shrink-filled into the tightest
-        /// sub-region using dual-direction selection. Singles and leftovers
-        /// are packed at the end.
-        /// </summary>
         public override List<Part> Nest(
             List<NestItem> items,
             IProgress<NestProgress> progress,
             CancellationToken token
         )
         {
-            if (items == null || items.Count == 0)
-                return new List<Part>();
+            var current = PrepareFiller();
+            return current.Nest(items, progress, token);
+        }
 
-            var workArea = Plate.WorkArea();
+        private sealed class LegacyStripPlateFiller : StripPlateFiller
+        {
+            private readonly StripNestEngine engine;
 
-            // Separate multi-quantity from singles.
-            var fillItems = items
-                .Where(i => i.Quantity != 1)
-                .OrderBy(i => i.Priority)
-                .ThenByDescending(i => i.Drawing.Area)
-                .ToList();
-
-            var packItems = items.Where(i => i.Quantity == 1).ToList();
-
-            var allParts = new List<Part>();
-
-            // Phase 1: Iterative shrink-fill for multi-quantity items.
-            if (fillItems.Count > 0)
+            internal LegacyStripPlateFiller(StripNestEngine engine, Plate plate)
+                : base(plate)
             {
-                // Use direction-specific engines: height shrink benefits from
-                // minimizing Y-extent, width shrink from minimizing X-extent.
-                Func<NestItem, Box, List<Part>> heightFillFunc = (ni, b) =>
-                {
-                    var inner = new HorizontalRemnantEngine(Plate);
-                    return inner.Fill(ni, b, progress, token);
-                };
-
-                Func<NestItem, Box, List<Part>> widthFillFunc = (ni, b) =>
-                {
-                    var inner = new VerticalRemnantEngine(Plate);
-                    return inner.Fill(ni, b, progress, token);
-                };
-
-                var shrinkResult = IterativeShrinkFiller.Fill(
-                    fillItems,
-                    workArea,
-                    heightFillFunc,
-                    Plate.PartSpacing,
-                    token,
-                    progress,
-                    PlateNumber,
-                    widthFillFunc
-                );
-
-                allParts.AddRange(shrinkResult.Parts);
-
-                // Compact placed parts toward the origin to close gaps.
-                Compactor.Settle(allParts, workArea, Plate.PartSpacing);
-
-                // Add unfilled items to pack list.
-                packItems.AddRange(shrinkResult.Leftovers);
+                this.engine = engine;
             }
 
-            // Phase 2: Pack singles + leftovers into remaining space.
-            packItems = packItems.Where(i => i.Quantity > 0).ToList();
-
-            if (packItems.Count > 0 && !token.IsCancellationRequested)
-            {
-                // Reconstruct remaining area from placed parts.
-                var packArea = workArea;
-                if (allParts.Count > 0)
-                {
-                    var obstacles = allParts
-                        .Select(p => p.BoundingBox.Offset(Plate.PartSpacing))
-                        .ToList();
-                    var finder = new RemnantFinder(workArea, obstacles);
-                    var remnants = finder.FindRemnants();
-                    packArea = remnants.Count > 0 ? remnants[0] : new Box(0, 0, 0, 0);
-                }
-
-                if (packArea.Width > 0 && packArea.Length > 0)
-                {
-                    var packParts = PackArea(packArea, packItems, progress, token);
-                    allParts.AddRange(packParts);
-                }
-            }
-
-            // Deduct placed quantities from original items by drawing reference.
-            foreach (var item in items)
-            {
-                if (item.Quantity <= 0)
-                    continue;
-
-                var placed = allParts.Count(p => ReferenceEquals(p.BaseDrawing, item.Drawing));
-                item.Quantity = System.Math.Max(0, item.Quantity - placed);
-            }
-
-            return allParts;
+            public override List<Part> PackArea(
+                Box box,
+                List<NestItem> items,
+                IProgress<NestProgress> progress,
+                CancellationToken token
+            ) => engine.PackArea(box, items, progress, token);
         }
     }
 }
