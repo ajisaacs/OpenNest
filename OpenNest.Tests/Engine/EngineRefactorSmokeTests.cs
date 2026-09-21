@@ -115,5 +115,7 @@ public class EngineRefactorSmokeTests
 
         Assert.NotNull(result);
         Assert.True(result.PartCount > 0);
+        Assert.False(string.IsNullOrWhiteSpace(result.WinnerEngine));
+        Assert.NotEmpty(result.AngleResults);
     }
 }

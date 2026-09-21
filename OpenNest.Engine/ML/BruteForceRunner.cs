@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 
 namespace OpenNest.Engine.ML
 {
@@ -30,12 +31,12 @@ namespace OpenNest.Engine.ML
             bool forceFullAngleSweep = false
         )
         {
-            var engine = new DefaultNestEngine(plate);
-            engine.ForceFullAngleSweep = forceFullAngleSweep;
+            var filler = new DefaultPlateFiller(plate);
+            filler.ForceFullAngleSweep = forceFullAngleSweep;
             var item = new NestItem { Drawing = drawing };
 
             var sw = Stopwatch.StartNew();
-            var parts = engine.Fill(
+            var parts = filler.Fill(
                 item,
                 plate.WorkArea(),
                 null,
@@ -47,9 +48,9 @@ namespace OpenNest.Engine.ML
                 return null;
 
             // Rank phase results — winner is explicit, runners-up sorted by count.
-            var winner = engine.PhaseResults.FirstOrDefault(r => r.Phase == engine.WinnerPhase);
-            var runnerUps = engine
-                .PhaseResults.Where(r => r.PartCount > 0 && r.Phase != engine.WinnerPhase)
+            var winner = filler.PhaseResults.FirstOrDefault(r => r.Phase == filler.WinnerPhase);
+            var runnerUps = filler
+                .PhaseResults.Where(r => r.PartCount > 0 && r.Phase != filler.WinnerPhase)
                 .OrderByDescending(r => r.PartCount)
                 .ToList();
 
@@ -60,7 +61,7 @@ namespace OpenNest.Engine.ML
                 TimeMs = sw.ElapsedMilliseconds,
                 LayoutData = SerializeLayout(parts),
                 PlacedParts = parts,
-                WinnerEngine = engine.WinnerPhase.ToString(),
+                WinnerEngine = filler.WinnerPhase.ToString(),
                 WinnerTimeMs = winner?.TimeMs ?? 0,
                 RunnerUpEngine = runnerUps.Count > 0 ? runnerUps[0].Phase.ToString() : "",
                 RunnerUpPartCount = runnerUps.Count > 0 ? runnerUps[0].PartCount : 0,
@@ -68,7 +69,7 @@ namespace OpenNest.Engine.ML
                 ThirdPlaceEngine = runnerUps.Count > 1 ? runnerUps[1].Phase.ToString() : "",
                 ThirdPlacePartCount = runnerUps.Count > 1 ? runnerUps[1].PartCount : 0,
                 ThirdPlaceTimeMs = runnerUps.Count > 1 ? runnerUps[1].TimeMs : 0,
-                AngleResults = engine.AngleResults.ToList(),
+                AngleResults = filler.AngleResults.ToList(),
             };
         }
 
