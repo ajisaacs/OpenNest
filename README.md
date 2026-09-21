@@ -120,6 +120,20 @@ var domainResult = NestResultMaterializer.Materialize(job, result);
 
 **Legacy caller boundaries (not yet migrated):** the desktop UI (`MainForm.RunAutoNestAsync` / `NestSinglePlateAsync`), the CLI (`OpenNest.Console`), and MCP (`NestingTools`) still call the old single-plate `engine.Nest(...)` entry points unchanged. UI adoption needs a separate adapter preserving populated-plate editing, preview routing, and Accept-versus-Cancel semantics. The public API (`OpenNest.Api`, `NestRunner.RunAsync`) already delegates to one `NestJobRunner.Solve` call and reports status, stop reason, part fulfillment, stock usage, and plate-to-stock mapping; `.nestquote` archives carry a schema version and round-trip incomplete jobs.
 
+### Fresh DXF job verification (headless)
+
+`tools/NestDxfJob` imports a complete quantity workbook and runs a registered whole-job engine. It never reuses saved drawing geometry or placements. The workbook must have a `Parts` worksheet with exactly one `Part Name` and `Qty Required` column; names match DXF filename stems exactly. Invalid/fractional/negative quantities, duplicate names, and missing required DXFs fail explicitly. Zero-demand rows are not imported; additional DXFs with no positive workbook demand are listed and not assigned an invented quantity.
+
+```bash
+dotnet run --project tools/NestDxfJob -- \
+  /path/to/dxfs /path/to/parts.xlsx /path/to/settings.nest \
+  /path/to/new-results-directory Strip
+```
+
+The settings nest supplies units, material metadata, per-part rotation constraints/priority where names match, and distinct plate dimensions/clearances/quadrants. Stock is unlimited copies of those settings with a 40-sheet cap, not a claim about physical inventory. DXFs with explicit conflicting units reject; unitless DXFs use the template units without rescaling. `CadImporter` is called with `DetectBends = false`: default DXF filtering removes case-insensitive `ETCH`/`SCRIBE` layers before optimization, and bend detection cannot regenerate marks.
+
+The output directory must not exist. The tool writes `imported-cut-only.nest` and `import-report.json` (including input hashes, excluded marks, and unmatched DXFs), then runs the selected engine with a ten-minute cancellation budget. A complete result must pass quantity, bounds, overlap/spacing and cut-only checks, then save/reload and pass them again before success. `validation-report.json` records per-part fulfillment and placements. A partial or invalid result exits nonzero and is not published as a successful nest. Use `import-only` instead of an engine name to verify and save only the imported job. This verifies nesting geometry, not machine-ready CNC lead-ins or post-processing.
+
 ### Run
 
 ```bash
