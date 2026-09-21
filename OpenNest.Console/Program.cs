@@ -597,7 +597,7 @@ static class NestConsole
             "  --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)"
         );
         Console.Error.WriteLine(
-            "  --autonest             Use NFP-based mixed-part autonesting instead of linear fill"
+            "  --autonest             Use mixed-part autonesting (engine Nest) instead of linear fill"
         );
         Console.Error.WriteLine(
             "  --keep-parts           Don't clear existing parts before filling"

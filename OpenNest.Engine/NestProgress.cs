@@ -24,9 +24,6 @@ namespace OpenNest
         [Description("Trying pairs..."), ShortName("Pairs")]
         Pairs,
 
-        [Description("Trying NFP..."), ShortName("NFP")]
-        Nfp,
-
         [Description("Trying extents..."), ShortName("Extents")]
         Extents,
 
