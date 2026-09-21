@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Read-only stock settings and remaining requirements for a single candidate trial.</summary>
 public sealed class PlatePlacementRequest

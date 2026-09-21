@@ -5,7 +5,7 @@ using System.ComponentModel;
 using System.Reflection;
 using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     [AttributeUsage(AttributeTargets.Field)]
     internal class ShortNameAttribute(string name) : Attribute

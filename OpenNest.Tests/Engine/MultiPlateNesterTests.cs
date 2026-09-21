@@ -7,6 +7,7 @@ using OpenNest.Geometry;
 using OpenNest.IO;
 using Xunit;
 using Xunit.Abstractions;
+using OpenNest.Engine;
 
 namespace OpenNest.Tests.Engine;
 

@@ -6,6 +6,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenNest.IO;
+using OpenNest.Engine;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Api;
 

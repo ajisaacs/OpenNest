@@ -9,9 +9,9 @@ using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using OpenNest.Math;
-using OpenNest.RectanglePacking;
+using OpenNest.Engine.RectanglePacking;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     public class DefaultNestEngine : NestEngineBase
     {

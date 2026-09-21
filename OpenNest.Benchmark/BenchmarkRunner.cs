@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Benchmark
 {

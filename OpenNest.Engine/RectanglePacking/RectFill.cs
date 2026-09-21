@@ -1,6 +1,6 @@
 using OpenNest.Geometry;
 
-namespace OpenNest.RectanglePacking
+namespace OpenNest.Engine.RectanglePacking
 {
     internal static class RectFill
     {

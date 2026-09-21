@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using GeoSize = OpenNest.Geometry.Size;
+using OpenNest.Engine;
 
 namespace OpenNest.Forms
 {

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Controls;
+using OpenNest.Engine;
 
 namespace OpenNest.Actions
 {

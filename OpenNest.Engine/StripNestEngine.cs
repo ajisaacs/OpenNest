@@ -5,7 +5,7 @@ using System.Threading;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     public class StripNestEngine : NestEngineBase
     {

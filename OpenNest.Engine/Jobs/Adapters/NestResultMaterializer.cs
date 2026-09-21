@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using OpenNest.Geometry;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs.Adapters;
 
 /// <summary>A detached mutable domain nest plus explicit requirement identity (never inferred from names).</summary>
 public sealed class MaterializedNestResult

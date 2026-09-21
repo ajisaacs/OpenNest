@@ -1,5 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.Geometry;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Engine.Tests.Jobs;
 

@@ -10,7 +10,7 @@ using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     public abstract class NestEngineBase
     {

@@ -1,7 +1,7 @@
 using System;
 using OpenNest.Geometry;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Immutable stock settings. Size and spacing are copied value types, not caller-owned settings.</summary>
 public sealed class NestPlateStock

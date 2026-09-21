@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using OpenNest.Geometry;
 
-namespace OpenNest.RectanglePacking
+namespace OpenNest.Engine.RectanglePacking
 {
     internal abstract class FillEngine
     {

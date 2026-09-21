@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace OpenNest;
+using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Caller-stock-only allocation followed by bounded adjacent-sheet repacking. All replacements

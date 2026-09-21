@@ -1,5 +1,6 @@
 using OpenNest.Benchmark;
 using OpenNest.Geometry;
+using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Tests.Benchmark;
 

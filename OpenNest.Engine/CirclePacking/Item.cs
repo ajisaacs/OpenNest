@@ -1,6 +1,6 @@
 ﻿using OpenNest.Geometry;
 
-namespace OpenNest.CirclePacking
+namespace OpenNest.Engine.CirclePacking
 {
     internal class Item : Circle
     {

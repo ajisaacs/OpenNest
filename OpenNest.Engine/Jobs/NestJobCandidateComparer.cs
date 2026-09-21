@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Ranks independent plate trials: priority fulfillment, sheet area, placement envelope, then input order.</summary>
 public sealed class NestJobCandidateComparer

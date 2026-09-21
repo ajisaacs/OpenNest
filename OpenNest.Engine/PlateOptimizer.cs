@@ -8,7 +8,7 @@ using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     public static class PlateOptimizer
     {

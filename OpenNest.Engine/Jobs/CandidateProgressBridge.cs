@@ -1,6 +1,6 @@
 using System;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Bridges legacy <see cref="IProgress{NestProgress}"/> reporting into job progress while a candidate

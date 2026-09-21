@@ -1,6 +1,8 @@
 using System;
 
-namespace OpenNest;
+using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Instance-scoped strategy resolution for the whole-job runner. Default and Strip resolve to the

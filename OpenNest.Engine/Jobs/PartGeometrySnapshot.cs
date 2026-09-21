@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Exact immutable CNC motion values. Rapid moves retain contour/hole boundaries; arcs are not tessellated.</summary>
 public sealed record PartGeometryMotion(

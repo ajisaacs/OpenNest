@@ -5,7 +5,7 @@ using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     /// <summary>
     /// Optimizes for the largest top-side horizontal drop.

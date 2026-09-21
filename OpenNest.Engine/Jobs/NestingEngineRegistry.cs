@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Registry of whole-job INestingEngine implementations, parallel to NestEngineRegistry (which is for

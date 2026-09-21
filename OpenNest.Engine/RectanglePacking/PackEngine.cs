@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace OpenNest.RectanglePacking
+namespace OpenNest.Engine.RectanglePacking
 {
     internal abstract class PackEngine
     {

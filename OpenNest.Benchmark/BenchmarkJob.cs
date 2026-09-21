@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using OpenNest.Geometry;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Benchmark
 {

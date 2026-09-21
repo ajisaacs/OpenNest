@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest.RectanglePacking
+namespace OpenNest.Engine.RectanglePacking
 {
     internal static class BinConverter
     {

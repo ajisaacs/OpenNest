@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Physical-sheet allocation. Every available stock entry is tried independently and only the selected

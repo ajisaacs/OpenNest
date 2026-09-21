@@ -2,7 +2,7 @@
 using System.Linq;
 using OpenNest.Geometry;
 
-namespace OpenNest.RectanglePacking
+namespace OpenNest.Engine.RectanglePacking
 {
     internal class FirstFitDecreasing : PackEngine
     {

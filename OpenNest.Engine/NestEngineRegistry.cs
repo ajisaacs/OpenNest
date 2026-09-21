@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     public static class NestEngineRegistry
     {

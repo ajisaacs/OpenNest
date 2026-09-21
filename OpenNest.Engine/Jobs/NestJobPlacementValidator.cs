@@ -4,7 +4,9 @@ using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest;
+using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Validates a trial against immutable job geometry before the runner commits accounting.</summary>
 internal static class NestJobPlacementValidator

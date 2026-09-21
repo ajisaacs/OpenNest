@@ -1,3 +1,4 @@
+using OpenNest.Engine;
 namespace OpenNest.Tests.Engine;
 
 public class NestPhaseExtensionsTests

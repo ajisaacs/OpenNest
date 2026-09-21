@@ -1,4 +1,4 @@
-﻿namespace OpenNest.CirclePacking
+﻿namespace OpenNest.Engine.CirclePacking
 {
     internal abstract class FillEngine
     {

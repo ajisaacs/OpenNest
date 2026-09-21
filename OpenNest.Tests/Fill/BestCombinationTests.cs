@@ -1,3 +1,4 @@
+using OpenNest.Engine.Fill;
 namespace OpenNest.Tests.Fill;
 
 public class BestCombinationTests

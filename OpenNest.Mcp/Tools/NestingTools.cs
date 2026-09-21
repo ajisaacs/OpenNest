@@ -6,6 +6,7 @@ using System.Threading;
 using ModelContextProtocol.Server;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
+using OpenNest.Engine;
 
 namespace OpenNest.Mcp.Tools
 {

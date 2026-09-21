@@ -1,6 +1,6 @@
 using System;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Immutable per-job options; selection never changes the legacy global registry.</summary>
 public sealed class NestJobOptions

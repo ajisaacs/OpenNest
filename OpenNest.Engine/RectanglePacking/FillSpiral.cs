@@ -1,7 +1,8 @@
 using OpenNest.Geometry;
+using OpenNest.Engine.Fill;
 using OpenNest.Math;
 
-namespace OpenNest.RectanglePacking
+namespace OpenNest.Engine.RectanglePacking
 {
     internal class FillSpiral : FillEngine
     {

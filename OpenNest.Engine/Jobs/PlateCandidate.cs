@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Owned candidate poses only; not committed fulfillment or inventory accounting.</summary>
 public sealed class PlateCandidate

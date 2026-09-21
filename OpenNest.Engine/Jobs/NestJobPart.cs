@@ -1,6 +1,6 @@
 using System;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>An immutable requirement, independent of drawing names, UI state, and drawing quantity counters.</summary>
 public sealed class NestJobPart

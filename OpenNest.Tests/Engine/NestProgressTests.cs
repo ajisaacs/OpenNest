@@ -1,4 +1,5 @@
 using OpenNest.Geometry;
+using OpenNest.Engine;
 
 namespace OpenNest.Tests.Engine;
 

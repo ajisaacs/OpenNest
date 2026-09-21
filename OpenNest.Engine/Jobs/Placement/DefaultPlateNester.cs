@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace OpenNest;
+using OpenNest.Engine.Jobs.Adapters;
+namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>
 /// Migrated built-in placement strategy for the whole-job runner. Reuses <see cref="DefaultNestEngine"/>

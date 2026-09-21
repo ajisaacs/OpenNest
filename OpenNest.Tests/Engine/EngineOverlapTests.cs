@@ -2,6 +2,7 @@ using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using Xunit.Abstractions;
+using OpenNest.Engine;
 
 namespace OpenNest.Tests.Engine;
 

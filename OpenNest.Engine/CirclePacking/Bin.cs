@@ -2,7 +2,7 @@
 using System.Linq;
 using OpenNest.Geometry;
 
-namespace OpenNest.CirclePacking
+namespace OpenNest.Engine.CirclePacking
 {
     internal class Bin : Box
     {

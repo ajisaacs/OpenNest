@@ -1,6 +1,6 @@
 using System;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     public class NestEngineInfo
     {

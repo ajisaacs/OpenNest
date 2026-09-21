@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -16,6 +16,7 @@ using OpenNest.Geometry;
 using OpenNest.Gpu;
 using OpenNest.IO;
 using OpenNest.Properties;
+using OpenNest.Engine;
 
 namespace OpenNest.Forms
 {

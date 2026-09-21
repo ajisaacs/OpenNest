@@ -3,7 +3,7 @@ using System.Linq;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest.RectanglePacking
+namespace OpenNest.Engine.RectanglePacking
 {
     internal class PackBottomLeft : PackEngine
     {

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs.Adapters;
 
 /// <summary>
 /// A fresh private legacy plate/drawing/item graph for each call. Only returned poses cross the boundary;

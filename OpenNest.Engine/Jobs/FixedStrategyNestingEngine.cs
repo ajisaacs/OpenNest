@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Adapts one fixed IPlateNester strategy to the whole-job INestingEngine contract, so it can compete

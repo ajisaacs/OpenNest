@@ -1,4 +1,5 @@
 using Xunit;
+using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Engine.Tests.Jobs;
 

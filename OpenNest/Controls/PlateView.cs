@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -15,6 +15,7 @@ using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using Timer = System.Timers.Timer;
+using OpenNest.Engine;
 
 namespace OpenNest.Controls
 {

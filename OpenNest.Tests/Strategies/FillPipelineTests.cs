@@ -1,5 +1,6 @@
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
+using OpenNest.Engine;
 
 namespace OpenNest.Tests.Strategies;
 

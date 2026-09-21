@@ -1,4 +1,4 @@
-﻿namespace OpenNest
+﻿namespace OpenNest.Engine
 {
     public class NestItem
     {

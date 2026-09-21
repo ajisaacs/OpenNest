@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace OpenNest
+namespace OpenNest.Engine
 {
     public class MultiPlateNestOptions
     {

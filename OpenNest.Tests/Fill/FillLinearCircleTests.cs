@@ -8,6 +8,7 @@ using OpenNest.Geometry;
 using OpenNest.Math;
 using Xunit;
 using Xunit.Abstractions;
+using OpenNest.Engine;
 
 namespace OpenNest.Tests.Fill
 {

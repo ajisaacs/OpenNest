@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>One material/unit system's requirements. Collections are copied; all nested values are immutable.</summary>
 public sealed class NestJob

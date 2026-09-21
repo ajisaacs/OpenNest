@@ -2,7 +2,7 @@
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest.CirclePacking
+namespace OpenNest.Engine.CirclePacking
 {
     internal class FillEndEven : FillEngine
     {

@@ -4,6 +4,8 @@ using CSMath;
 using OpenNest.CNC;
 using CadLayer = ACadSharp.Tables.Layer;
 using CadLine = ACadSharp.Entities.Line;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.IO.Tests;
 

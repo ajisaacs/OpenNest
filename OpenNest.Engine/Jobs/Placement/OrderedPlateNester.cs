@@ -5,7 +5,8 @@ using System.Threading;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 
-namespace OpenNest;
+using OpenNest.Engine.Jobs.Adapters;
+namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>Constrained-order linear fills in conservative rectangular free regions.
 /// Regions are only search hints; every accepted pose passes the job geometry validator.</summary>

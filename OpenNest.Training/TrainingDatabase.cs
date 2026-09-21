@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenNest.Engine.ML;
 using OpenNest.IO;
 using OpenNest.Training.Data;
+using OpenNest.Engine;
 
 namespace OpenNest.Training
 {

@@ -1,7 +1,7 @@
 using System;
 using OpenNest.CNC;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs.Adapters;
 
 /// <summary>Explicit-ID input mapping and exact supported-geometry reconstruction. Never retains caller objects.</summary>
 public static class DrawingJobMapper

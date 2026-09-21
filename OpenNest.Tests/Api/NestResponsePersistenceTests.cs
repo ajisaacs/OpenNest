@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using OpenNest.Api;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Tests.Api;
 

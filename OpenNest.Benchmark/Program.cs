@@ -5,6 +5,7 @@ using System.Linq;
 using OpenNest;
 using OpenNest.Benchmark;
 using OpenNest.Geometry;
+using OpenNest.Engine.Jobs;
 
 return BenchmarkConsole.Run(args);
 

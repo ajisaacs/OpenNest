@@ -6,6 +6,7 @@ using OpenNest.Api;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.IO;
+using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Tests.Api;
 

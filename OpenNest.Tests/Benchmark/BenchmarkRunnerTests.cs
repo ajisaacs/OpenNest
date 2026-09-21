@@ -1,4 +1,5 @@
 using OpenNest.Benchmark;
+using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Tests.Benchmark;
 

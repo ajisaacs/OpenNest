@@ -1,6 +1,6 @@
 using System;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Display metadata plus a fresh-instance factory for one registered whole-job engine.</summary>
 public class NestingEngineInfo

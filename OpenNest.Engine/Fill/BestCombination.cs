@@ -1,6 +1,6 @@
 ﻿using OpenNest.Math;
 
-namespace OpenNest
+namespace OpenNest.Engine.Fill
 {
     internal record CombinationResult(bool Found, int Count1, int Count2);
 

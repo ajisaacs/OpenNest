@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 public enum NestJobStatus
 {

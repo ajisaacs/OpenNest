@@ -10,6 +10,7 @@ using OpenNest;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.IO.Bending;
+using OpenNest.Engine;
 
 return NestConsole.Run(args);
 

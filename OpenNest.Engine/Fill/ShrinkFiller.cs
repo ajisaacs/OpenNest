@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.Geometry;
-using OpenNest.RectanglePacking;
+using OpenNest.Engine.RectanglePacking;
 
 namespace OpenNest.Engine.Fill
 {

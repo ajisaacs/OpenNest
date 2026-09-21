@@ -1,7 +1,7 @@
 ﻿using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest.RectanglePacking
+namespace OpenNest.Engine.RectanglePacking
 {
     internal class FillNoRotation : FillEngine
     {

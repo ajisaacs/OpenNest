@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace OpenNest;
+namespace OpenNest.Engine.Jobs;
 
 /// <summary>Basic input and candidate accounting checks, NOT a geometry/clearance safety gate.</summary>
 public static class NestJobValidator
