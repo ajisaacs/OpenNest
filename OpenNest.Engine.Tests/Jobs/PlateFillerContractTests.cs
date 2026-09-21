@@ -1,3 +1,5 @@
+using System.Threading;
+using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 
@@ -61,6 +63,87 @@ public class PlateFillerContractTests
         NestProgressReporter.Report(progress, new ProgressReport { Parts = new List<Part>() });
 
         Assert.Empty(progress.Reports);
+    }
+
+    [Fact]
+    public void PlateFillOrchestrator_Nest_UsesThresholdIdentityAndCallerDelegates()
+    {
+        var plate = new Plate(new Size(100, 100));
+        var fillDrawing = new Drawing("duplicate", TestDrawingFactory.Rectangle(10, 10));
+        var packDrawing = new Drawing("duplicate", TestDrawingFactory.Rectangle(10, 10));
+        var items = new List<NestItem>
+        {
+            new() { Drawing = fillDrawing, Quantity = 10 },
+            new() { Drawing = packDrawing, Quantity = 1 },
+        };
+        var calls = new List<string>();
+        var progress = new CapturingProgress();
+        var token = CancellationToken.None;
+
+        var parts = PlateFillOrchestrator.Nest(
+            plate,
+            items,
+            new DefaultFillComparer(),
+            (item, workArea, receivedProgress, receivedToken) =>
+            {
+                calls.Add("fill");
+                Assert.Same(progress, receivedProgress);
+                Assert.Equal(token, receivedToken);
+                Assert.Same(fillDrawing, item.Drawing);
+                var placed = new List<Part>();
+                for (var i = 0; i < item.Quantity; i++)
+                {
+                    var part = new Part(item.Drawing);
+                    part.Offset(new Vector(i * 10, 0));
+                    placed.Add(part);
+                }
+                return placed;
+            },
+            (workArea, packItems, receivedProgress, receivedToken) =>
+            {
+                calls.Add("pack");
+                Assert.Same(progress, receivedProgress);
+                Assert.Equal(token, receivedToken);
+                var packItem = Assert.Single(packItems);
+                Assert.Same(packDrawing, packItem.Drawing);
+                return new List<Part> { new(packItem.Drawing, new Vector(0, 20)) };
+            },
+            progress,
+            token
+        );
+
+        Assert.Equal(new[] { "fill", "pack" }, calls);
+        Assert.Equal(11, parts.Count);
+        Assert.Equal(10, parts.Count(part => ReferenceEquals(part.BaseDrawing, fillDrawing)));
+        Assert.Single(parts.Where(part => ReferenceEquals(part.BaseDrawing, packDrawing)));
+        Assert.Equal(0, items[0].Quantity);
+        Assert.Equal(0, items[1].Quantity);
+    }
+
+    [Fact]
+    public void PlateFillOrchestrator_Nest_DoesNotInvokeDelegatesAfterCancellation()
+    {
+        var plate = new Plate(new Size(100, 100));
+        var item = new NestItem
+        {
+            Drawing = new Drawing("part", TestDrawingFactory.Rectangle(10, 10)),
+            Quantity = 10,
+        };
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var parts = PlateFillOrchestrator.Nest(
+            plate,
+            new List<NestItem> { item },
+            new DefaultFillComparer(),
+            (_, _, _, _) => throw new Xunit.Sdk.XunitException("Fill must not run after cancellation"),
+            (_, _, _, _) => throw new Xunit.Sdk.XunitException("Pack must not run after cancellation"),
+            null,
+            cancellation.Token
+        );
+
+        Assert.Empty(parts);
+        Assert.Equal(10, item.Quantity);
     }
 
     private sealed class CapturingProgress : IProgress<NestProgress>

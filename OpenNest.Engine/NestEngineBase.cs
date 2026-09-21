@@ -97,7 +97,7 @@ namespace OpenNest.Engine
             return new List<Part>();
         }
 
-        // --- Nest: multi-item strategy (virtual, side-effect-free) ---
+        // --- Nest: compatibility façade over shared single-plate orchestration ---
 
         public virtual List<Part> Nest(
             List<NestItem> items,
@@ -105,99 +105,17 @@ namespace OpenNest.Engine
             CancellationToken token
         )
         {
-            if (items == null || items.Count == 0)
-                return new List<Part>();
-
-            var workArea = Plate.WorkArea();
-            var allParts = new List<Part>();
-
-            var plateArea = workArea.Width * workArea.Length;
-
-            var fillItems = items
-                .Where(i => ShouldFill(i, plateArea))
-                .OrderBy(i => i.Priority)
-                .ThenByDescending(i => i.Drawing.Area)
-                .ToList();
-
-            var packItems = items.Where(i => !ShouldFill(i, plateArea)).ToList();
-
-            // Phase 1: Fill multi-quantity drawings using RemnantFiller.
-            if (fillItems.Count > 0)
-            {
-                var remnantFiller = new RemnantFiller(workArea, Plate.PartSpacing);
-
-                Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
-                    FillExact(ni, b, progress, token);
-
-                var fillParts = remnantFiller.FillItems(fillItems, fillFunc, token, progress);
-
-                if (fillParts.Count > 0)
-                {
-                    allParts.AddRange(fillParts);
-
-                    // Deduct placed quantities by drawing reference, not name.
-                    foreach (var item in fillItems)
-                    {
-                        var placed = fillParts.Count(p =>
-                            ReferenceEquals(p.BaseDrawing, item.Drawing)
-                        );
-                        item.Quantity = System.Math.Max(0, item.Quantity - placed);
-                    }
-
-                    // Update workArea for pack phase
-                    var placedObstacles = fillParts
-                        .Select(p => p.BoundingBox.Offset(Plate.PartSpacing))
-                        .ToList();
-                    var finder = new RemnantFinder(workArea, placedObstacles);
-                    var remnants = finder.FindRemnants();
-                    if (remnants.Count > 0)
-                        workArea = remnants[0];
-                    else
-                        workArea = new Box(0, 0, 0, 0);
-                }
-            }
-
-            // Phase 2: Pack low-quantity items into remaining space.
-            // Separate qty=2 items — they'll be placed as best-fit pairs after packing.
-            packItems = packItems.Where(i => i.Quantity > 0).ToList();
-            var pairItems = packItems.Where(i => i.Quantity == 2).ToList();
-            var regularPackItems = packItems.Where(i => i.Quantity != 2).ToList();
-
-            if (
-                regularPackItems.Count > 0
-                && workArea.Width > 0
-                && workArea.Length > 0
-                && !token.IsCancellationRequested
-            )
-            {
-                var packParts = PackArea(workArea, regularPackItems, progress, token);
-
-                if (packParts.Count > 0)
-                {
-                    allParts.AddRange(packParts);
-
-                    // Deduct placed quantities by drawing reference, not name.
-                    foreach (var item in regularPackItems)
-                    {
-                        var placed = packParts.Count(p =>
-                            ReferenceEquals(p.BaseDrawing, item.Drawing)
-                        );
-                        item.Quantity = System.Math.Max(0, item.Quantity - placed);
-                    }
-                }
-            }
-
-            // Phase 3: Place best-fit pairs for qty=2 items in remaining space.
-            if (pairItems.Count > 0 && !token.IsCancellationRequested)
-            {
-                var placed = PlaceBestFitPairs(pairItems, allParts, Plate.WorkArea());
-                allParts.AddRange(placed);
-            }
-
-            // Compact placed parts toward the origin to close gaps.
-            Compactor.Settle(allParts, Plate.WorkArea(), Plate.PartSpacing);
-
-            return allParts;
+            return PlateFillOrchestrator.Nest(
+                Plate,
+                items,
+                Comparer,
+                (item, workArea, sink, cancellation) =>
+                    FillExact(item, workArea, sink, cancellation),
+                (workArea, packItems, sink, cancellation) =>
+                    PackArea(workArea, packItems, sink, cancellation),
+                progress,
+                token
+            );
         }
 
         // --- FillExact (non-virtual, delegates to virtual Fill) ---
@@ -340,131 +258,5 @@ namespace OpenNest.Engine
             return false;
         }
 
-        /// <summary>
-        /// Places best-fit pairs for qty=2 items into remnant spaces around
-        /// already-placed parts. Returns all placed pair parts.
-        /// </summary>
-        private List<Part> PlaceBestFitPairs(
-            List<NestItem> pairItems,
-            List<Part> existingParts,
-            Box fullWorkArea
-        )
-        {
-            var result = new List<Part>();
-            var obstacles = existingParts
-                .Select(p => p.BoundingBox.Offset(Plate.PartSpacing))
-                .ToList();
-            var finder = new RemnantFinder(fullWorkArea, obstacles);
-
-            foreach (var item in pairItems)
-            {
-                if (item.Quantity < 2)
-                    continue;
-
-                var bestFits = BestFitCache.GetOrCompute(
-                    item.Drawing,
-                    Plate.Size.Length,
-                    Plate.Size.Width,
-                    Plate.PartSpacing
-                );
-
-                // BestFitCache stores pair coordinates in canonical frame. Build candidates
-                // from a canonical drawing copy so geometry and coords share a frame; rebind
-                // + un-rotate winning pair to the original drawing's frame before returning.
-                var canonicalDrawing = CanonicalFrame.AsCanonicalCopy(item.Drawing);
-
-                List<Part> bestPlacement = null;
-                Box bestTarget = null;
-
-                foreach (var fit in bestFits)
-                {
-                    if (!fit.Keep)
-                        continue;
-
-                    var parts = fit.BuildParts(canonicalDrawing);
-                    var pairBbox = ((IEnumerable<IBoundable>)parts).GetBoundingBox();
-                    var pairW = pairBbox.Width;
-                    var pairL = pairBbox.Length;
-                    var minDim = System.Math.Min(pairW, pairL);
-
-                    var remnants = finder.FindRemnants(minDim);
-
-                    foreach (var r in remnants)
-                    {
-                        if (
-                            pairW <= r.Width + Tolerance.Epsilon
-                            && pairL <= r.Length + Tolerance.Epsilon
-                        )
-                        {
-                            var offset = r.Location - pairBbox.Location;
-                            foreach (var p in parts)
-                            {
-                                p.Offset(offset);
-                                p.UpdateBounds();
-                            }
-
-                            if (bestPlacement == null || IsBetterFill(parts, bestPlacement, r))
-                            {
-                                bestPlacement = parts;
-                                bestTarget = r;
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                if (bestPlacement == null)
-                    continue;
-
-                // Rebind to the original drawing and compose the canonical angle onto rotation so
-                // the final placed parts sit in the user's visible frame.
-                bestPlacement = RebindPairToOriginal(bestPlacement, item.Drawing);
-
-                result.AddRange(bestPlacement);
-                item.Quantity = 0;
-
-                var envelope = ((IEnumerable<IBoundable>)bestPlacement).GetBoundingBox();
-                finder.AddObstacle(envelope.Offset(Plate.PartSpacing));
-
-                Debug.WriteLine(
-                    $"[Nest] Placed best-fit pair for {item.Drawing.Name} "
-                        + $"at ({bestTarget.X:F1},{bestTarget.Y:F1}), "
-                        + $"size {envelope.Width:F1}x{envelope.Length:F1}"
-                );
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Rebinds each canonical-frame Part in the pair to the original Drawing at its current
-        /// world pose, then composes the canonical angle onto each via
-        /// CanonicalFrame.RebindToOriginal so the returned list is in the original drawing's
-        /// visible frame. Mirrors DefaultNestEngine.RebindAndUnCanonicalize.
-        /// </summary>
-        private static List<Part> RebindPairToOriginal(List<Part> parts, Drawing original) =>
-            CanonicalFrame.RebindToOriginal(parts, original);
-
-        /// <summary>
-        /// Determines whether a drawing should use grid-fill (true) or bin-pack (false).
-        /// Low-quantity items whose total area is a small fraction of the plate are
-        /// better off being packed alongside other parts rather than filling first.
-        /// </summary>
-        private bool ShouldFill(NestItem item, double plateArea)
-        {
-            if (item.Quantity <= 1)
-                return false;
-
-            var bbox = item.Drawing.Program.BoundingBox();
-            var partArea = (bbox.Width + Plate.PartSpacing) * (bbox.Length + Plate.PartSpacing);
-            if (partArea <= 0)
-                return false;
-
-            var totalArea = partArea * item.Quantity;
-
-            // If the total area of all copies is less than 10% of the plate,
-            // packing produces better results than grid-filling.
-            return totalArea >= plateArea * 0.1;
-        }
     }
 }
