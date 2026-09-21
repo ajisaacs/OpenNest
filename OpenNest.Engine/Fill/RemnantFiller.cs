@@ -114,7 +114,10 @@ namespace OpenNest.Engine.Fill
                 // rectangular obstacle boundary. Without this, gaps between
                 // individual bounding boxes cause the next drawing to fill
                 // into inter-row spaces, producing an interleaved layout.
-                if (placed.Count > 2)
+                // Only worthwhile while another drawing is still waiting for
+                // space; otherwise the removed part's slot is walled off by the
+                // envelope below and the part is lost for nothing.
+                if (placed.Count > 2 && HasOtherDemand(items, item, localQty))
                     RemoveTopmostPart(placed);
 
                 allParts.AddRange(placed);
@@ -127,6 +130,23 @@ namespace OpenNest.Engine.Fill
                 finder.AddObstacle(envelope);
 
                 return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasOtherDemand(
+            List<NestItem> items,
+            NestItem current,
+            Dictionary<Drawing, int> localQty
+        )
+        {
+            foreach (var other in items)
+            {
+                if (ReferenceEquals(other.Drawing, current.Drawing))
+                    continue;
+                if (localQty[other.Drawing] > 0)
+                    return true;
             }
 
             return false;

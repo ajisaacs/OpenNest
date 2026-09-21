@@ -103,4 +103,30 @@ public class RemnantFillerTests2
         // Should not throw, returns whatever was placed
         Assert.NotNull(result);
     }
+
+    [Fact]
+    public void FillItems_SingleDrawing_KeepsEveryPlacedPart()
+    {
+        // With no other drawing waiting for space there is nothing to keep clear, so a full
+        // grid fill must not lose its topmost part.
+        var workArea = new Box(0, 0, 100, 100);
+        var filler = new RemnantFiller(workArea, 0);
+        var items = new List<NestItem>
+        {
+            new NestItem { Drawing = MakeSquareDrawing(10), Quantity = 4 },
+        };
+
+        Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
+            new List<Part>
+            {
+                TestHelpers.MakePartAt(0, 0, 10),
+                TestHelpers.MakePartAt(10, 0, 10),
+                TestHelpers.MakePartAt(0, 10, 10),
+                TestHelpers.MakePartAt(10, 10, 10),
+            };
+
+        var placed = filler.FillItems(items, fillFunc);
+
+        Assert.Equal(4, placed.Count);
+    }
 }

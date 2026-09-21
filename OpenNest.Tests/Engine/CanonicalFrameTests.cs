@@ -81,4 +81,35 @@ public class CanonicalFrameTests
         Assert.Equal(originalBbox.Width, placed[0].BoundingBox.Width, precision: 2);
         Assert.Equal(originalBbox.Length, placed[0].BoundingBox.Length, precision: 2);
     }
+
+    [Fact]
+    public void RebindToOriginal_PreservesWorldFootprint_ForRotatedImport()
+    {
+        // An L-shape imported at an angle: the canonical copy is rotated, so a canonical part and
+        // the rebound part must cover exactly the same footprint even though their programs differ.
+        var pgm = new OpenNest.CNC.Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(100, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(100, 20)));
+        pgm.Codes.Add(new LinearMove(new Vector(50, 20)));
+        pgm.Codes.Add(new LinearMove(new Vector(50, 50)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 50)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        pgm.Rotate(0.8, pgm.BoundingBox().Center);
+        var original = new Drawing("L", pgm);
+        var canonical = CanonicalFrame.AsCanonicalCopy(original);
+
+        var placed = Part.CreateAtOrigin(canonical, 0.35);
+        placed.Offset(new Vector(40, 25));
+        placed.UpdateBounds();
+        var expected = placed.BoundingBox;
+
+        var rebound = CanonicalFrame.RebindToOriginal(new List<Part> { placed }, original);
+
+        Assert.Same(original, rebound[0].BaseDrawing);
+        Assert.Equal(expected.Left, rebound[0].BoundingBox.Left, precision: 6);
+        Assert.Equal(expected.Bottom, rebound[0].BoundingBox.Bottom, precision: 6);
+        Assert.Equal(expected.Right, rebound[0].BoundingBox.Right, precision: 6);
+        Assert.Equal(expected.Top, rebound[0].BoundingBox.Top, precision: 6);
+    }
 }

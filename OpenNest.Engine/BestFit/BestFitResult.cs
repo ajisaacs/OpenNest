@@ -70,19 +70,8 @@ namespace OpenNest.Engine.BestFit
         public List<Part> BuildSourceParts(Drawing drawing)
         {
             var parts = BuildCanonicalParts();
-            var sourceAngle = drawing?.Source?.Angle ?? 0.0;
 
-            for (var i = 0; i < parts.Count; i++)
-            {
-                var p = parts[i];
-                var rebound = Part.CreateAtOrigin(drawing, p.Rotation);
-                var delta = p.BoundingBox.Location - rebound.BoundingBox.Location;
-                rebound.Offset(delta);
-                rebound.UpdateBounds();
-                parts[i] = rebound;
-            }
-
-            return NormalizeToCutOrigin(CanonicalFrame.FromCanonical(parts, sourceAngle));
+            return NormalizeToCutOrigin(CanonicalFrame.RebindToOriginal(parts, drawing));
         }
 
         public Box GetCutBounds(List<Part> parts)
