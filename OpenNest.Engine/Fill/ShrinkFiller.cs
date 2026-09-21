@@ -120,7 +120,9 @@ namespace OpenNest.Engine.Fill
             if (bbox.Width <= 0 || bbox.Length <= 0)
                 return box;
 
-            var maxDim = axis == ShrinkAxis.Length ? box.Length : box.Width;
+            // Match MeasureDimension/TrimToCount: Length shrinks Y, Width shrinks X.
+            // Box's constructor takes X extent (Length), then Y extent (Width).
+            var maxDim = axis == ShrinkAxis.Length ? box.Width : box.Length;
 
             // Use FillBestFit for a fast, accurate rectangle count on the full box.
             var bin = new Bin { Size = new Size(box.Width, box.Length) };
@@ -144,8 +146,8 @@ namespace OpenNest.Engine.Fill
                 return box;
 
             return axis == ShrinkAxis.Length
-                ? new Box(box.X, box.Y, box.Width, estimate)
-                : new Box(box.X, box.Y, estimate, box.Length);
+                ? new Box(box.X, box.Y, box.Length, estimate)
+                : new Box(box.X, box.Y, estimate, box.Width);
         }
 
         private static double MeasureDimension(List<Part> parts, Box box, ShrinkAxis axis)
