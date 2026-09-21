@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace OpenNest;
@@ -20,6 +21,7 @@ namespace OpenNest;
 public sealed class DefaultPlateNester : IPlateNester
 {
     private readonly Func<Plate, DefaultNestEngine> engineFactory;
+    private readonly OrderedPlateNester restrictedRotationNester = new();
     private readonly Dictionary<string, Drawing> drawingsById = new(StringComparer.Ordinal);
     private readonly Dictionary<Drawing, string> idByDrawing = new(
         ReferenceEqualityComparer.Instance
@@ -43,6 +45,13 @@ public sealed class DefaultPlateNester : IPlateNester
     {
         ArgumentNullException.ThrowIfNull(request);
         token.ThrowIfCancellationRequested();
+
+        // The legacy engine cannot express a locked or bounded rotation (start == end == 0 reads
+        // as "unconstrained") and its Pairs/RectBestFit strategies rotate freely, so it can return
+        // poses the requirement's RotationPolicy forbids. Restricted requirements go to the
+        // policy-aware ordered nester, which only proposes allowed angles and validates each pose.
+        if (request.Parts.Any(part => part.Rotation.Kind != RotationPolicyKind.Automatic))
+            return restrictedRotationNester.Place(request, progress, token);
 
         var plate = DrawingJobMapper.CreatePlate(request.Stock);
         var items = new List<NestItem>(request.Parts.Count);
