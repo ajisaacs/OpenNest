@@ -28,6 +28,13 @@ namespace OpenNest.Benchmark
 
             foreach (var file in files)
             {
+                if (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Hand-written manifests fail loudly rather than being skipped like unreadable .nest files.
+                    jobs.Add(DxfManifestLoader.Load(file, sheetSizeOverrides, partSpacingOverride));
+                    continue;
+                }
+
                 Nest nest;
 
                 try
@@ -79,7 +86,14 @@ namespace OpenNest.Benchmark
             if (Directory.Exists(inputPath))
             {
                 return Directory
-                    .GetFiles(inputPath, "*.nest", SearchOption.AllDirectories)
+                    .EnumerateFiles(inputPath, "*", SearchOption.AllDirectories)
+                    .Where(f =>
+                        f.EndsWith(".nest", StringComparison.OrdinalIgnoreCase)
+                        || f.EndsWith(
+                            DxfManifestLoader.FolderSuffix,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    )
                     .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }

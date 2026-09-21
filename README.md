@@ -205,6 +205,29 @@ dotnet run --project OpenNest.Benchmark/OpenNest.Benchmark.csproj -- job.nest \
   --sheet-sizes 48x96,60x96,60x120,72x120,72x144 --engines Default,Astra,Claude --csv results.csv
 ```
 
+To benchmark straight from DXF files without building a `.nest` first, pass a JSON manifest listing each DXF and its quantity:
+
+```json
+{
+  "sheetSizes": ["48x96", "60x120"],
+  "spacing": 0.25,
+  "edgeSpacing": 0.25,
+  "quadrant": 1,
+  "parts": [
+    { "dxf": "parts/bracket.dxf", "quantity": 12 },
+    { "dxf": "parts/plate.dxf", "quantity": 4, "allowRotation": false }
+  ]
+}
+```
+
+```bash
+dotnet run --project OpenNest.Benchmark/OpenNest.Benchmark.csproj -- job.json --csv results.csv
+```
+
+DXF paths resolve relative to the manifest. Sheet sizes are required (from the manifest or `--sheet-sizes`, which overrides it) and must use the same units as the DXFs; `--spacing` likewise overrides `spacing`. `spacing`, `edgeSpacing` and `quadrant` default to 0, 0 and 1, and rotation is unconstrained unless a part sets `allowRotation: false`. A folder input is scanned for `*.nest` and `*.manifest.json` files. Unlike an unreadable `.nest`, an invalid manifest (missing DXF, bad quantity, no sheet sizes) stops the run with an error naming the problem.
+
+Each engine-on-job solve is independent, so `--parallel <n>` (default 3) runs up to `n` at once; `--parallel 1` is strictly sequential. Results and their order in the report are the same either way. The catch is timing: some solves use one core, others spread across many, and when concurrent solves compete for cores `Time(ms)` goes up (a short multi-threaded job showed 2–4× inflation at `--parallel 3`). Scores (utilization, plates, validity) are unaffected, so use `--parallel 1` when comparing speed. The 5-minute per-solve timeout is wall-clock, so contention can also push a slow engine over it.
+
 An engine's layout is rejected (scoring zero for that job) if any part falls outside the work area, any two parts are closer than the required spacing, or a drawing gets more parts placed than requested. A run that doesn't finish within its time budget also scores zero, as a timeout.
 
 Custom competitor engines can be added by dropping a DLL implementing `INestingEngine` with a public parameterless constructor into the `Engines/` directory next to the benchmark executable; each one is registered under its own CLR type name. This is a separate plugin contract from the desktop app's `NestEngineRegistry`/`NestEngineBase` (which requires a `(Plate)` constructor) — a `NestEngineBase` plugin dropped into the benchmark's `Engines/` folder is silently skipped, since the benchmark only ever solves whole jobs.

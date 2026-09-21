@@ -38,7 +38,7 @@ static class BenchmarkConsole
         if (jobs.Count == 0)
         {
             Console.Error.WriteLine(
-                "No benchmark jobs found (no .nest files with any drawing quantity > 0)."
+                "No benchmark jobs found (no .nest files with any drawing quantity > 0, or *.manifest.json files)."
             );
             return 1;
         }
@@ -83,12 +83,23 @@ static class BenchmarkConsole
 
         Console.WriteLine($"Engines: {string.Join(", ", engines.Select(e => e.Name))}");
 
+        var solves = jobs.Count * engines.Count;
+
+        if (options.Parallel > 1 && solves > 1)
+        {
+            Console.WriteLine(
+                $"Running up to {options.Parallel} solves at a time; Time(ms) is measured under that "
+                    + "concurrent load. Use --parallel 1 for strictly isolated timings."
+            );
+        }
+
         var results = BenchmarkRunner.Run(
             jobs,
             engines,
             options.SalvageRate,
             options.MinimumSalvageDimension,
-            options.OutputDirectory
+            options.OutputDirectory,
+            options.Parallel
         );
 
         Report.PrintDetailed(results);
@@ -147,6 +158,15 @@ static class BenchmarkConsole
                     break;
                 case "--output" when i + 1 < args.Length:
                     o.OutputDirectory = args[++i];
+                    break;
+
+                case "--parallel" when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var parallel) && parallel >= 1)
+                        o.Parallel = parallel;
+                    else
+                        Console.Error.WriteLine(
+                            $"Warning: --parallel needs a whole number >= 1, using {o.Parallel}"
+                        );
                     break;
 
                 case "--help":
@@ -215,7 +235,25 @@ static class BenchmarkConsole
         );
         Console.Error.WriteLine();
         Console.Error.WriteLine("Usage:");
-        Console.Error.WriteLine("  OpenNest.Benchmark <file.nest | folder> [options]");
+        Console.Error.WriteLine(
+            "  OpenNest.Benchmark <file.nest | manifest.json | folder> [options]"
+        );
+        Console.Error.WriteLine();
+        Console.Error.WriteLine(
+            "A manifest.json builds a job straight from DXF files (paths relative to the manifest):"
+        );
+        Console.Error.WriteLine(
+            "  { \"sheetSizes\": [\"48x96\"], \"spacing\": 0.25, \"edgeSpacing\": 0.25, \"quadrant\": 1,"
+        );
+        Console.Error.WriteLine(
+            "    \"parts\": [ { \"dxf\": \"a.dxf\", \"quantity\": 12 }, { \"dxf\": \"b.dxf\", \"quantity\": 4, \"allowRotation\": false } ] }"
+        );
+        Console.Error.WriteLine(
+            "Sheet sizes must use the same units as the DXFs. A folder is scanned for *.nest and"
+        );
+        Console.Error.WriteLine(
+            "*.manifest.json files. --sheet-sizes and --spacing override the manifest."
+        );
         Console.Error.WriteLine();
         Console.Error.WriteLine("Options:");
         Console.Error.WriteLine(
@@ -242,6 +280,12 @@ static class BenchmarkConsole
         Console.Error.WriteLine(
             "  --output <directory>           Save valid layouts as .nest plus detailed JSON reports"
         );
+        Console.Error.WriteLine(
+            "  --parallel <n>                  Solves to run at once (default 3; 1 = strictly sequential,"
+        );
+        Console.Error.WriteLine(
+            "                                 which gives the cleanest per-engine timings)"
+        );
         Console.Error.WriteLine("  --help                          Show this message");
     }
 
@@ -255,5 +299,6 @@ static class BenchmarkConsole
         public string OutputDirectory;
         public double SalvageRate;
         public double MinimumSalvageDimension;
+        public int Parallel = 3;
     }
 }

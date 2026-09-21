@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace OpenNest.Benchmark
 {
@@ -28,28 +30,38 @@ namespace OpenNest.Benchmark
             IReadOnlyList<NestingEngineInfo> engines,
             double salvageRate = 0,
             double minimumSalvageDimension = 0,
-            string outputDirectory = null
+            string outputDirectory = null,
+            int maxParallelism = 1
         )
         {
-            var results = new List<JobResult>(jobs.Count * engines.Count);
-
-            foreach (var job in jobs)
+            var pairs = jobs.SelectMany(job => engines.Select(engine => (Job: job, Engine: engine)))
+                .ToList();
+            var results = new JobResult[pairs.Count];
+            var options = new ParallelOptions
             {
-                foreach (var engineInfo in engines)
-                {
-                    results.Add(
-                        RunOne(
-                            job,
-                            engineInfo,
-                            salvageRate,
-                            minimumSalvageDimension,
-                            outputDirectory
-                        )
-                    );
-                }
-            }
+                MaxDegreeOfParallelism = System.Math.Max(1, maxParallelism),
+            };
 
-            return results;
+            // NoBuffering hands out one pair at a time: solves run for seconds to minutes,
+            // so chunked partitioning would leave workers idle behind a slow engine.
+            Parallel.ForEach(
+                Partitioner.Create(
+                    Enumerable.Range(0, pairs.Count),
+                    EnumerablePartitionerOptions.NoBuffering
+                ),
+                options,
+                i =>
+                    results[i] = RunOne(
+                        pairs[i].Job,
+                        pairs[i].Engine,
+                        salvageRate,
+                        minimumSalvageDimension,
+                        outputDirectory
+                    )
+            );
+
+            // Indexed writes keep the report in job-then-engine order whatever finishes first.
+            return results.ToList();
         }
 
         private static JobResult RunOne(
@@ -101,11 +113,19 @@ namespace OpenNest.Benchmark
                 {
                     System.IO.Directory.CreateDirectory(outputDirectory);
                     // Keep names and job metadata for a useful inspectable output; never modify source.
-                    var source = new OpenNest.IO.NestReader(job.SourceFile).Read();
-                    materialized.Nest.Name = source.Name;
-                    materialized.Nest.Units = source.Units;
-                    materialized.Nest.Material = source.Material;
-                    materialized.Nest.Thickness = source.Thickness;
+                    // Manifest jobs have no source nest to copy from, so they keep the job's name.
+                    if (job.SourceFile.EndsWith(".nest", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var source = new OpenNest.IO.NestReader(job.SourceFile).Read();
+                        materialized.Nest.Name = source.Name;
+                        materialized.Nest.Units = source.Units;
+                        materialized.Nest.Material = source.Material;
+                        materialized.Nest.Thickness = source.Thickness;
+                    }
+                    else
+                    {
+                        materialized.Nest.Name = job.Name;
+                    }
                     materialized.Nest.SalvageRate = salvageRate;
                     foreach (var request in job.Requests)
                         materialized.DrawingsByPartId[request.Drawing.Id.ToString()].Name = request
