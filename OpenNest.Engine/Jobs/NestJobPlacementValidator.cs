@@ -53,6 +53,11 @@ internal static class NestJobPlacementValidator
                 );
             foreach (var other in placed)
             {
+                // Analytic contour bounds give a conservative lower bound on clearance.
+                // Do not polygonize or compare every hole edge for distant placements.
+                if (BoundsDistance(shape.Perimeter.BoundingBox, other.Perimeter.BoundingBox)
+                    >= stock.PartSpacing && !shape.Perimeter.BoundingBox.Intersects(other.Perimeter.BoundingBox))
+                    continue;
                 if (Overlaps(shape, other))
                     throw new InvalidOperationException("Candidate placements overlap.");
                 if (stock.PartSpacing > 0 && Distance(shape, other) < stock.PartSpacing - Epsilon)
@@ -367,15 +372,23 @@ internal static class NestJobPlacementValidator
     private static double IsLeft(Vector p1, Vector p2, Vector p) =>
         (p2.X - p1.X) * (p.Y - p1.Y) - (p2.Y - p1.Y) * (p.X - p1.X);
 
+    private static double BoundsDistance(Box left, Box right)
+    {
+        var x = System.Math.Max(0, System.Math.Max(left.Left - right.Right, right.Left - left.Right));
+        var y = System.Math.Max(0, System.Math.Max(left.Bottom - right.Top, right.Bottom - left.Top));
+        return System.Math.Sqrt(x * x + y * y);
+    }
+
     private static double Distance(ShapeTopology left, ShapeTopology right)
     {
         var result = double.PositiveInfinity;
         foreach (var leftContour in AllContours(left))
         foreach (var rightContour in AllContours(right))
-            result = System.Math.Min(
-                result,
-                BoundaryDistance(ToPolygon(leftContour), ToPolygon(rightContour))
-            );
+            if (BoundsDistance(leftContour.BoundingBox, rightContour.BoundingBox) < result)
+                result = System.Math.Min(
+                    result,
+                    BoundaryDistance(ToPolygon(leftContour), ToPolygon(rightContour))
+                );
         return result;
     }
 
