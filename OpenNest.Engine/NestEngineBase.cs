@@ -26,11 +26,14 @@ namespace OpenNest.Engine
 
         public NestDirection NestDirection { get; set; }
 
-        public NestPhase WinnerPhase { get; protected set; }
+        private readonly List<PhaseResult> phaseResults = new();
+        private readonly List<AngleResult> angleResults = new();
 
-        public List<PhaseResult> PhaseResults { get; } = new();
+        public virtual NestPhase WinnerPhase { get; protected set; }
 
-        public List<AngleResult> AngleResults { get; } = new();
+        public virtual List<PhaseResult> PhaseResults => phaseResults;
+
+        public virtual List<AngleResult> AngleResults => angleResults;
 
         public abstract string Name { get; }
 
@@ -183,21 +186,11 @@ namespace OpenNest.Engine
             NestProgressReporter.Report(progress, report);
         }
 
-        protected string BuildProgressSummary()
-        {
-            if (PhaseResults.Count == 0)
-                return null;
-
-            var parts = new List<string>(PhaseResults.Count);
-
-            foreach (var r in PhaseResults)
-                parts.Add($"{r.Phase.ShortName()}: {r.PartCount}");
-
-            return string.Join(" | ", parts);
-        }
+        protected string BuildProgressSummary() =>
+            PlateFillerBase.BuildProgressSummary(PhaseResults);
 
         protected bool IsBetterFill(List<Part> candidate, List<Part> current, Box workArea) =>
-            Comparer.IsBetter(candidate, current, workArea);
+            PlateFillerBase.IsBetterFill(Comparer, candidate, current, workArea);
 
         protected bool IsBetterValidFill(List<Part> candidate, List<Part> current, Box workArea)
         {
@@ -216,47 +209,8 @@ namespace OpenNest.Engine
             return IsBetterFill(candidate, current, workArea);
         }
 
-        protected static bool HasOverlaps(List<Part> parts, double spacing)
-        {
-            if (parts == null || parts.Count <= 1)
-                return false;
-
-            for (var i = 0; i < parts.Count; i++)
-            {
-                var box1 = parts[i].BoundingBox;
-
-                for (var j = i + 1; j < parts.Count; j++)
-                {
-                    var box2 = parts[j].BoundingBox;
-
-                    var overlapX =
-                        System.Math.Min(box1.Right, box2.Right)
-                        - System.Math.Max(box1.Left, box2.Left);
-                    var overlapY =
-                        System.Math.Min(box1.Top, box2.Top)
-                        - System.Math.Max(box1.Bottom, box2.Bottom);
-
-                    if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
-                        continue;
-
-                    List<Vector> pts;
-
-                    if (parts[i].Intersects(parts[j], out pts))
-                    {
-                        var b1 = parts[i].BoundingBox;
-                        var b2 = parts[j].BoundingBox;
-                        Debug.WriteLine(
-                            $"[HasOverlaps] Overlap: part[{i}] ({parts[i].BaseDrawing?.Name}) @ ({b1.Left:F2},{b1.Bottom:F2})-({b1.Right:F2},{b1.Top:F2}) rot={parts[i].Rotation:F2}"
-                                + $" vs part[{j}] ({parts[j].BaseDrawing?.Name}) @ ({b2.Left:F2},{b2.Bottom:F2})-({b2.Right:F2},{b2.Top:F2}) rot={parts[j].Rotation:F2}"
-                                + $" intersections={pts?.Count ?? 0}"
-                        );
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
+        protected static bool HasOverlaps(List<Part> parts, double spacing) =>
+            PlateFillerBase.HasOverlaps(parts, spacing);
 
     }
 }
