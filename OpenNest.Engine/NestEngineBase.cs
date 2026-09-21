@@ -6,6 +6,7 @@ using System.Threading;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -261,29 +262,7 @@ namespace OpenNest.Engine
 
         internal static void ReportProgress(IProgress<NestProgress> progress, ProgressReport report)
         {
-            if (progress == null || report.Parts == null || report.Parts.Count == 0)
-                return;
-
-            var clonedParts = new List<Part>(report.Parts.Count);
-            foreach (var part in report.Parts)
-                clonedParts.Add((Part)part.Clone());
-
-            Debug.WriteLine(
-                $"[Progress] Phase={report.Phase}, Plate={report.PlateNumber}, "
-                    + $"Parts={clonedParts.Count} | {report.Description}"
-            );
-
-            progress.Report(
-                new NestProgress
-                {
-                    Phase = report.Phase,
-                    PlateNumber = report.PlateNumber,
-                    BestParts = clonedParts,
-                    Description = report.Description,
-                    ActiveWorkArea = report.WorkArea,
-                    IsOverallBest = report.IsOverallBest,
-                }
-            );
+            NestProgressReporter.Report(progress, report);
         }
 
         protected string BuildProgressSummary()

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using OpenNest.Engine;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Strategies
@@ -50,7 +51,7 @@ namespace OpenNest.Engine.Strategies
                 WinnerPhase = ActivePhase;
             }
 
-            NestEngineBase.ReportProgress(
+            NestProgressReporter.Report(
                 Progress,
                 new ProgressReport
                 {

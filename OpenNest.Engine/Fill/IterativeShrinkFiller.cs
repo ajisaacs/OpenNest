@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Fill
@@ -136,7 +137,7 @@ namespace OpenNest.Engine.Fill
                     var allParts = new List<Part>(placedSoFar.Count + best.Count);
                     allParts.AddRange(placedSoFar);
                     allParts.AddRange(best);
-                    NestEngineBase.ReportProgress(
+                    NestProgressReporter.Report(
                         progress,
                         new ProgressReport
                         {

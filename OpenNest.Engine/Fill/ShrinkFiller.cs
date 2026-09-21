@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.Geometry;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Engine.RectanglePacking;
 
 namespace OpenNest.Engine.Fill
@@ -89,7 +90,7 @@ namespace OpenNest.Engine.Fill
 
             var desc = $"Shrink {axis}: {bestParts.Count} parts, dim={dim:F1}";
 
-            NestEngineBase.ReportProgress(
+            NestProgressReporter.Report(
                 progress,
                 new ProgressReport
                 {
