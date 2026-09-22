@@ -81,6 +81,29 @@ namespace OpenNest.Benchmark
             return jobs;
         }
 
+        /// <summary>Parses "WxL" with invariant-culture numbers, so "48.5x96" means the
+        /// same thing on every machine (Size.Parse follows the current culture).</summary>
+        public static bool TryParseSheetSize(string text, out Size size)
+        {
+            size = default;
+            var dims = text?.Split('x', 'X');
+
+            if (dims == null || dims.Length != 2)
+                return false;
+
+            var style = System.Globalization.NumberStyles.Float;
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+
+            if (
+                !double.TryParse(dims[0].Trim(), style, culture, out var width)
+                || !double.TryParse(dims[1].Trim(), style, culture, out var length)
+            )
+                return false;
+
+            size = new Size(width, length);
+            return true;
+        }
+
         private static List<string> ResolveFiles(string inputPath)
         {
             if (Directory.Exists(inputPath))

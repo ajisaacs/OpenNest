@@ -43,7 +43,7 @@ internal static class NestJobPlacementValidator
             counts.TryGetValue(placement.PartId, out var count);
             if (count >= available)
                 throw new InvalidOperationException("Candidate overproduces a requirement.");
-            if (!RotationIsAllowed(part.Rotation, placement.Rotation))
+            if (!part.Rotation.Allows(placement.Rotation))
                 throw new InvalidOperationException(
                     "Candidate rotation is not allowed for the requirement."
                 );
@@ -76,25 +76,6 @@ internal static class NestJobPlacementValidator
     internal static void ValidateGeometry(PartGeometrySnapshot geometry)
     {
         _ = CreateShape(geometry);
-    }
-
-    private static bool RotationIsAllowed(RotationPolicy policy, double rotation)
-    {
-        if (policy.Kind == RotationPolicyKind.Automatic)
-            return true;
-        if (policy.Kind == RotationPolicyKind.Fixed)
-            return AnglesEqual(rotation, policy.Start);
-        if (rotation < policy.Start - Epsilon || rotation > policy.End + Epsilon)
-            return false;
-        var steps = (rotation - policy.Start) / policy.Step;
-        return System.Math.Abs(steps - System.Math.Round(steps)) <= Epsilon;
-    }
-
-    private static bool AnglesEqual(double left, double right)
-    {
-        var delta = (left - right) % (System.Math.PI * 2);
-        return System.Math.Abs(delta) <= Epsilon
-            || System.Math.Abs(System.Math.Abs(delta) - System.Math.PI * 2) <= Epsilon;
     }
 
     private static ShapeTopology CreateShape(PartGeometrySnapshot geometry)

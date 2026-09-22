@@ -44,4 +44,25 @@ public sealed class RotationPolicy
         double rotationStart,
         double rotationEnd
     ) => stepAngle == 0 ? Automatic : BoundedSweep(rotationStart, rotationEnd, stepAngle);
+
+    /// <summary>True when a placement rotation (radians) satisfies this policy: anything for
+    /// Automatic, the fixed angle modulo a full turn, or an exact step inside a bounded sweep.</summary>
+    public bool Allows(double rotation)
+    {
+        const double epsilon = 0.0000001;
+        if (!double.IsFinite(rotation))
+            return false;
+        if (Kind == RotationPolicyKind.Automatic)
+            return true;
+        if (Kind == RotationPolicyKind.Fixed)
+        {
+            var delta = (rotation - Start) % (System.Math.PI * 2);
+            return System.Math.Abs(delta) <= epsilon
+                || System.Math.Abs(System.Math.Abs(delta) - System.Math.PI * 2) <= epsilon;
+        }
+        if (rotation < Start - epsilon || rotation > End + epsilon)
+            return false;
+        var steps = (rotation - Start) / Step;
+        return System.Math.Abs(steps - System.Math.Round(steps)) <= epsilon;
+    }
 }

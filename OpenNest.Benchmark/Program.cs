@@ -82,6 +82,18 @@ static class BenchmarkConsole
             );
         }
 
+        if (
+            options.SheetSizes.Count == 0
+            && jobs.Any(j => j.SourceFile.EndsWith(".nest", StringComparison.OrdinalIgnoreCase))
+        )
+        {
+            Console.Error.WriteLine(
+                "Warning: no --sheet-sizes given, so each .nest job only offers the sheet sizes its "
+                    + "original layout used - a hint toward that answer. Pass --sheet-sizes with the "
+                    + "sizes you actually stock for an unbiased comparison."
+            );
+        }
+
         Console.WriteLine($"Engines: {string.Join(", ", engines.Select(e => e.Name))}");
 
         var solves = jobs.Count * engines.Count;
@@ -129,7 +141,10 @@ static class BenchmarkConsole
                     break;
 
                 case "--spacing" when i + 1 < args.Length:
-                    o.PartSpacing = double.Parse(args[++i]);
+                    o.PartSpacing = double.Parse(
+                        args[++i],
+                        System.Globalization.CultureInfo.InvariantCulture
+                    );
                     break;
 
                 case "--engines" when i + 1 < args.Length:
@@ -195,7 +210,7 @@ static class BenchmarkConsole
             )
         )
         {
-            if (Size.TryParse(token, out var size))
+            if (JobLoader.TryParseSheetSize(token, out var size))
                 sizes.Add(size);
             else
                 Console.Error.WriteLine($"Warning: could not parse sheet size '{token}', skipping");
@@ -223,16 +238,19 @@ static class BenchmarkConsole
             "multi-plate/size strategy: how many plates it uses, of which sizes, and how"
         );
         Console.Error.WriteLine(
-            "demand splits across them. Scoring: aggregate material utilization across every"
+            "demand splits across them. Ranking: a run that places every requested part beats"
         );
         Console.Error.WriteLine(
-            "plate used, then (if everything requested was placed) fewer plates as the"
+            "one that does not; then lower cost = sheet area consumed (minus salvage credit for a"
         );
         Console.Error.WriteLine(
-            "tie-break. An invalid layout (out of bounds, overlapping, or over-quantity), a"
+            "usable offcut) + the largest candidate sheet's area per unplaced part; then fewer"
         );
         Console.Error.WriteLine(
-            "thrown exception, or a run exceeding its time budget all score zero."
+            "plates. An invalid layout (out of bounds, overlapping, over-quantity, off-stock, or"
+        );
+        Console.Error.WriteLine(
+            "breaking a rotation constraint), a thrown exception, or a timeout places nothing."
         );
         Console.Error.WriteLine();
         Console.Error.WriteLine("Usage:");
@@ -261,7 +279,10 @@ static class BenchmarkConsole
             "  --sheet-sizes W1xL1,W2xL2,...  Candidate sheet-size pool for the whole nest"
         );
         Console.Error.WriteLine(
-            "                                 (default: the distinct sizes already in each file)"
+            "                                 (default: the distinct sizes already in each file,"
+        );
+        Console.Error.WriteLine(
+            "                                 which hints engines toward the original layout)"
         );
         Console.Error.WriteLine(
             "  --spacing <value>               Override part spacing for every job"
@@ -273,7 +294,10 @@ static class BenchmarkConsole
             "  --csv <path>                    Write a flat CSV of all results"
         );
         Console.Error.WriteLine(
-            "  --salvage-rate <0..1>           Fraction of eligible offcut area credited (default 0)"
+            "  --salvage-rate <0..1>           Fraction of the usable offcut credited back in the"
+        );
+        Console.Error.WriteLine(
+            "                                 score (default 0; needs --min-salvage-dimension)"
         );
         Console.Error.WriteLine(
             "  --min-salvage-dimension <value> Both offcut dimensions must qualify; 0 disables credit"

@@ -42,6 +42,12 @@ namespace OpenNest.Benchmark
 
         public int TotalRequestedQuantity => Requests.Sum(r => r.Quantity);
 
+        /// <summary>Sheet area charged per unplaced part: the largest candidate
+        /// sheet. Any single part that fits the stock at all fits on one such
+        /// sheet, so placing a part is never scored worse than leaving it out.</summary>
+        public double UnplacedPartPenalty =>
+            CandidateSizes.Count == 0 ? 0 : CandidateSizes.Max(s => s.Width * s.Length);
+
         /// <summary>
         /// Builds the whole-job request this job represents: one NestJobPart per
         /// requested drawing, and one NestPlateStock per candidate sheet size

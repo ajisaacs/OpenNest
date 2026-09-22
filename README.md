@@ -208,7 +208,7 @@ dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- project.zip ext
 
 ## Benchmarking Nest Engines
 
-`OpenNest.Benchmark` compares every registered `INestingEngine` implementation against each other on a set of `.nest` files, scoring by material utilization. Each engine owns its own multi-plate/size strategy for the whole job — how many plates it uses, of which sizes, and how demand splits across them:
+`OpenNest.Benchmark` compares every registered `INestingEngine` implementation against each other on a set of `.nest` files, scoring by the sheet area each one consumes to place the whole job. Each engine owns its own multi-plate/size strategy for the whole job — how many plates it uses, of which sizes, and how demand splits across them:
 
 ```bash
 # Benchmark all registered engines against every .nest file in a folder
@@ -242,7 +242,11 @@ DXF paths resolve relative to the manifest. Sheet sizes are required (from the m
 
 Each engine-on-job solve is independent, so `--parallel <n>` (default 3) runs up to `n` at once; `--parallel 1` is strictly sequential. Results and their order in the report are the same either way. The catch is timing: some solves use one core, others spread across many, and when concurrent solves compete for cores `Time(ms)` goes up (a short multi-threaded job showed 2–4× inflation at `--parallel 3`). Scores (utilization, plates, validity) are unaffected, so use `--parallel 1` when comparing speed. The 5-minute per-solve timeout is wall-clock, so contention can also push a slow engine over it.
 
-An engine's layout is rejected (scoring zero for that job) if any part falls outside the work area, any two parts are closer than the required spacing, or a drawing gets more parts placed than requested. A run that doesn't finish within its time budget also scores zero, as a timeout.
+Ranking per job: a valid layout beats an invalid one, placing every requested part beats not, then lower **cost** wins, then fewer plates. Cost is the sheet area consumed, less `--salvage-rate` × the usable offcut on each sheet (the same `EstimateNetArea` estimate `StockLadder` optimizes; recomputed from the job geometry, not taken from the engine), plus the largest candidate sheet's area for every unplaced part. The penalty means leaving awkward parts out can never buy a better score. The summary sums cost and areas across jobs rather than averaging per-job percentages, so a 200-part job outweighs a 3-part one. That only makes sense when every job uses the same units. `Util%` is placed area / sheet area, and `Net%` is placed area / salvage-credited sheet area.
+
+When no `--sheet-sizes` is given, a `.nest` job only offers the sizes its original layout used, which hints engines toward that answer. The benchmark warns about this; pass the sizes you actually stock for an unbiased comparison.
+
+An engine's layout is rejected (it places nothing and pays the penalty on every requested part) if any part falls outside the work area, any two parts are closer than the required spacing, a drawing gets more parts placed than requested, a placement breaks its drawing's rotation constraint, or a sheet doesn't match a stock entry the job offered (different size, spacing, edge spacing, or quadrant, or finite stock overdrawn). Part-in-part is allowed: a part may sit inside another part's cutout if it clears the cutout edge by the part spacing. A run that doesn't finish within its time budget also counts as rejected, as a timeout.
 
 Custom competitor engines can be added by dropping a DLL implementing `INestingEngine` with a public parameterless constructor into the `Engines/` directory next to the benchmark executable; each one is registered under its own CLR type name. This is a separate plugin contract from the desktop app's `NestEngineRegistry`/`NestEngineBase` (which requires a `(Plate)` constructor) — a `NestEngineBase` plugin dropped into the benchmark's `Engines/` folder is silently skipped, since the benchmark only ever solves whole jobs.
 
@@ -321,7 +325,7 @@ OpenNest.sln
 | **OpenNest.Gpu** | GPU-accelerated bitmap overlap detection for best-fit pair evaluation using ILGPU. |
 | **OpenNest.Posts.Cincinnati** | Post-processor plugin for Cincinnati CL-707/800/900/940/CLX laser cutting machines. Outputs Cincinnati-format G-code with material library, kerf compensation, and pierce logic. |
 | **OpenNest.Mcp** | MCP (Model Context Protocol) server exposing nesting operations as tools for AI assistants. |
-| **OpenNest.Benchmark** | Runs every registered whole-job nesting engine (`INestingEngine`) against a set of `.nest` files and scores them by material utilization, so competing engines — each owning its own multi-plate strategy — can be compared head-to-head. |
+| **OpenNest.Benchmark** | Runs every registered whole-job nesting engine (`INestingEngine`) against a set of `.nest` files and scores them by salvage-credited sheet area consumed (with a penalty for unplaced parts), so competing engines — each owning its own multi-plate strategy — can be compared head-to-head. |
 | **OpenNest.Tests** | Cross-platform tests covering core geometry, fill strategies, splitting, bending, BOM import, post-processing, data, and the API. |
 | **OpenNest.WinForms.Tests** | Windows-only tests for desktop CAD bend-note presentation and cutting-parameter serialization. |
 
@@ -353,7 +357,7 @@ to `0`, which also disables credit. With both enabled, only the largest qualifyi
 full-span edge rectangle outside placed bounding boxes plus part spacing is credited,
 within the usable work area; both dimensions must meet the minimum in job units.
 Holes/scraps are not credited. No cut-off toolpath, kerf, handling, or future-demand
-valuation is modeled. Benchmark ranking still uses gross material utilization.
+valuation is modeled. Benchmark ranking credits the same estimate (see Benchmarking Nest Engines).
 
 This is a tested deterministic heuristic baseline, **not an optimal or production-
 certified solver**. Conservative rectangular free-region hints and linear fills can
