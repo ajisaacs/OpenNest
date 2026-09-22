@@ -298,6 +298,7 @@ namespace OpenNest.Geometry
 
             polygon.Close();
             polygon.Cleanup();
+            polygon.UpdateBounds();
 
             return polygon;
         }
@@ -341,6 +342,7 @@ namespace OpenNest.Geometry
 
             polygon.Close();
             polygon.Cleanup();
+            polygon.UpdateBounds();
 
             return polygon;
         }

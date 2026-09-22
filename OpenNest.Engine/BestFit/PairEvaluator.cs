@@ -13,6 +13,15 @@ namespace OpenNest.Engine.BestFit
     {
         private const double ChordTolerance = 0.01;
 
+        /// <summary>
+        /// Tighter chord tolerance for the overlap check only. Rounded-corner arcs
+        /// polygonized at the coarser <see cref="ChordTolerance"/> can "cut the corner"
+        /// enough to hide a genuine but tiny sliver overlap between two candidates —
+        /// this needs to match the precision Part.Intersects uses elsewhere so BestFit's
+        /// Keep decision agrees with the same overlap check callers rely on downstream.
+        /// </summary>
+        private const double OverlapChordTolerance = 0.001;
+
         public List<BestFitResult> EvaluateAll(List<PairCandidate> candidates)
         {
             if (candidates.Count == 0)
@@ -49,10 +58,18 @@ namespace OpenNest.Engine.BestFit
             part2.Location = candidate.Part2Offset;
             part2.UpdateBounds();
 
-            // Overlap check — perimeter vs perimeter
+            // Overlap check — perimeter vs perimeter. Uses Collision.HasOverlap (full polygon
+            // clip) rather than Shape.Intersects (edge-crossing only), which misses containment-
+            // style overlaps where one perimeter's boundary never crosses the other's.
             var shape1 = GetPerimeterShape(part1);
             var shape2 = GetPerimeterShape(part2);
-            var overlaps = shape1 != null && shape2 != null && shape1.Intersects(shape2, out _);
+            var overlaps =
+                shape1 != null
+                && shape2 != null
+                && Collision.HasOverlap(
+                    shape1.ToPolygonWithTolerance(OverlapChordTolerance),
+                    shape2.ToPolygonWithTolerance(OverlapChordTolerance)
+                );
 
             // Convex hull vertices from perimeter polygons only
             var allPoints = GetPartVertices(part1);

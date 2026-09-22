@@ -20,6 +20,13 @@ namespace OpenNest
 
     public class Part : IPart, IBoundable
     {
+        /// <summary>
+        /// Chord tolerance used to polygonize arcs/circles for overlap testing in
+        /// <see cref="Intersects"/>. Matches the tolerance used elsewhere for
+        /// geometry-sensitive checks (e.g. <see cref="PartGeometry"/>).
+        /// </summary>
+        private const double IntersectsChordTolerance = 0.001;
+
         private Vector location;
         private bool ownsProgram;
         private double preLeadInRotation;
@@ -247,8 +254,8 @@ namespace OpenNest
             if (perimeter1 == null || perimeter2 == null)
                 return false;
 
-            var polygon1 = perimeter1.ToPolygon();
-            var polygon2 = perimeter2.ToPolygon();
+            var polygon1 = perimeter1.ToPolygonWithTolerance(IntersectsChordTolerance);
+            var polygon2 = perimeter2.ToPolygonWithTolerance(IntersectsChordTolerance);
 
             if (polygon1 == null || polygon2 == null)
                 return false;
