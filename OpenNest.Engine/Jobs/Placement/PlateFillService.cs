@@ -33,8 +33,7 @@ public static class PlateFillService
         CancellationToken token
     )
     {
-        var filler = CreateFiller(strategy, plate);
-        return filler.Fill(item, workArea, progress, token);
+        return RequireFiller(strategy, plate).Fill(item, workArea, progress, token);
     }
 
     public static List<Part> FillGroup(
@@ -46,8 +45,7 @@ public static class PlateFillService
         CancellationToken token
     )
     {
-        var filler = CreateFiller(strategy, plate);
-        return filler.Fill(groupParts, workArea, progress, token);
+        return RequireFiller(strategy, plate).Fill(groupParts, workArea, progress, token);
     }
 
     public static List<Part> PackArea(
@@ -59,33 +57,71 @@ public static class PlateFillService
         CancellationToken token
     )
     {
-        var filler = CreateFiller(strategy, plate);
-        return filler.PackArea(box, items, progress, token);
+        return RequireFiller(strategy, plate).PackArea(box, items, progress, token);
     }
 
-    private static PlateFillerBase CreateFiller(string strategy, Plate plate)
+    public static List<Part> Nest(
+        string strategy,
+        Plate plate,
+        List<NestItem> items,
+        IProgress<NestProgress> progress,
+        CancellationToken token
+    )
     {
-        ArgumentNullException.ThrowIfNull(strategy);
-        ArgumentNullException.ThrowIfNull(plate);
+        return RequireFiller(strategy, plate).Nest(items, progress, token);
+    }
 
-        // OrdinalIgnoreCase mirrors the legacy registry's ActiveEngineName matching so the
-        // interactive callers keep their tolerant name handling while moving off global state.
+    /// <summary>
+    /// Resolves a caller-supplied strategy name: null or empty means "Default"; otherwise the name
+    /// must match a built-in strategy, matched case-insensitively like the legacy registry's
+    /// ActiveEngineName so tolerant interactive callers keep working. Returns the canonical name;
+    /// unknown names throw <see cref="NotSupportedException"/>.
+    /// </summary>
+    internal static string ResolveStrategy(string strategy, bool allowEmpty = true)
+    {
+        if (string.IsNullOrWhiteSpace(strategy))
+        {
+            if (allowEmpty)
+                return "Default";
+            throw new NotSupportedException(
+                $"Unknown placement strategy: '{strategy}'. Known strategies: {string.Join(", ", BuiltInStrategies)}."
+            );
+        }
+
         foreach (var candidate in BuiltInStrategies)
         {
             if (candidate.Equals(strategy, StringComparison.OrdinalIgnoreCase))
-            {
-                return candidate switch
-                {
-                    "Default" => new DefaultPlateFiller(plate),
-                    "Strip" => new StripPlateFiller(plate),
-                    "Vertical Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical),
-                    _ => new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal),
-                };
-            }
+                return candidate;
         }
 
         throw new NotSupportedException(
             $"Unknown placement strategy: {strategy}. Known strategies: {string.Join(", ", BuiltInStrategies)}."
         );
+    }
+
+    /// <summary>
+    /// Builds the filler for an optional strategy (null/empty = Default). Internal so the
+    /// engine-side multi-plate orchestrators share one resolution/rejection contract.
+    /// </summary>
+    internal static PlateFillerBase CreateFiller(string strategy, Plate plate)
+    {
+        ArgumentNullException.ThrowIfNull(plate);
+        return ResolveStrategy(strategy) switch
+        {
+            "Default" => new DefaultPlateFiller(plate),
+            "Strip" => new StripPlateFiller(plate),
+            "Vertical Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical),
+            _ => new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal),
+        };
+    }
+
+    /// <summary>Public operations require an explicit strategy name (null is an argument error).</summary>
+    private static PlateFillerBase RequireFiller(string strategy, Plate plate)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        // An explicit empty string is an unknown strategy, not the orchestrator's
+        // null-means-Default defaulting; only the orchestrator boundary may default.
+        ResolveStrategy(strategy, allowEmpty: false);
+        return CreateFiller(strategy, plate);
     }
 }

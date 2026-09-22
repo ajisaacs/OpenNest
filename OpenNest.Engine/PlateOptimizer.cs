@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -18,7 +19,8 @@ namespace OpenNest.Engine
             double salvageRate,
             Plate templatePlate,
             IProgress<NestProgress> progress = null,
-            CancellationToken token = default
+            CancellationToken token = default,
+            string strategy = null
         )
         {
             if (
@@ -28,6 +30,10 @@ namespace OpenNest.Engine
                 || plateOptions.Count == 0
             )
                 return null;
+
+            // Explicit strategy at the top-level boundary (null/empty = Default, unknown = throw);
+            // the size search never consults the process-global engine registry.
+            var resolvedStrategy = PlateFillService.ResolveStrategy(strategy);
 
             // Find the minimum dimension needed to fit the largest part,
             // skipping items that are too large for every plate option.
@@ -94,7 +100,8 @@ namespace OpenNest.Engine
                     salvageRate,
                     templatePlate,
                     progress,
-                    token
+                    token,
+                    resolvedStrategy
                 );
                 if (result == null)
                     continue;
@@ -149,7 +156,8 @@ namespace OpenNest.Engine
             double salvageRate,
             Plate templatePlate,
             IProgress<NestProgress> progress,
-            CancellationToken token
+            CancellationToken token,
+            string strategy
         )
         {
             // Create a temporary plate with candidate size + settings from template.
@@ -178,8 +186,7 @@ namespace OpenNest.Engine
                 })
                 .ToList();
 
-            var engine = NestEngineRegistry.Create(tempPlate);
-            var parts = engine.Nest(clonedItems, progress, token);
+            var parts = PlateFillService.Nest(strategy, tempPlate, clonedItems, progress, token);
 
             if (parts == null || parts.Count == 0)
                 return null;

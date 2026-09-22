@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -26,6 +28,7 @@ namespace OpenNest.Engine
         private readonly IProgress<NestProgress> _progress;
         private readonly CancellationToken _token;
         private readonly MultiPlateNestOptions _options;
+        private readonly string _strategy;
 
         private bool HasPlateOptions => _plateOptions != null && _plateOptions.Count > 0;
 
@@ -45,7 +48,11 @@ namespace OpenNest.Engine
             _platePool = InitializePlatePool(existingPlates);
             _progress = progress;
             _token = token;
+            _strategy = PlateFillService.ResolveStrategy(options.Strategy);
         }
+
+        private PlateFillerBase CreateFiller(Plate plate) =>
+            PlateFillService.CreateFiller(_strategy, plate);
 
         // --- Static Utility Methods ---
 
@@ -226,7 +233,7 @@ namespace OpenNest.Engine
 
         private int FillAndPlace(PlateResult pr, Box zone, NestItem item)
         {
-            var engine = NestEngineRegistry.Create(pr.Plate);
+            var engine = CreateFiller(pr.Plate);
             var clonedItem = CloneItem(item);
             var parts = engine.Fill(clonedItem, zone, _progress, _token);
 
@@ -381,7 +388,7 @@ namespace OpenNest.Engine
                     if (remnants.Count == 0)
                         break;
 
-                    var engine = NestEngineRegistry.Create(pr.Plate);
+                    var engine = CreateFiller(pr.Plate);
 
                     foreach (var remnant in remnants)
                     {
@@ -430,7 +437,7 @@ namespace OpenNest.Engine
                     if (remnants.Count == 0)
                         break;
 
-                    var engine = NestEngineRegistry.Create(plate);
+                    var engine = CreateFiller(plate);
 
                     foreach (var remnant in remnants)
                     {
@@ -643,7 +650,7 @@ namespace OpenNest.Engine
                                 upgradeOption,
                                 remnants =>
                                 {
-                                    var engine = NestEngineRegistry.Create(target.Plate);
+                                    var engine = CreateFiller(target.Plate);
                                     var tempItems = donorParts
                                         .GroupBy(p => p.BaseDrawing)
                                         .Select(g => new NestItem

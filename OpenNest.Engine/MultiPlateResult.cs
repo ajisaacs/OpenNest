@@ -10,6 +10,14 @@ namespace OpenNest.Engine
         public PartSortOrder SortOrder { get; set; } = PartSortOrder.BoundingBoxArea;
         public double MinRemnantSize { get; set; } = 12.0;
         public bool AllowPlateCreation { get; set; } = true;
+
+        /// <summary>
+        /// Explicit placement strategy for every single-plate fill/pack this run performs
+        /// ("Default", "Strip", "Vertical Remnant", "Horizontal Remnant"). Null or empty means
+        /// "Default"; unknown names are rejected up front. This replaces reading the
+        /// process-global engine registry.
+        /// </summary>
+        public string Strategy { get; set; }
     }
 
     public class MultiPlateResult
