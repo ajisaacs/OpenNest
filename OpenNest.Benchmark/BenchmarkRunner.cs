@@ -30,8 +30,8 @@ namespace OpenNest.Benchmark
         public static List<JobResult> Run(
             List<BenchmarkJob> jobs,
             IReadOnlyList<NestingEngineInfo> engines,
-            double salvageRate = 0,
-            double minimumSalvageDimension = 0,
+            double? salvageRate = null,
+            double? minimumSalvageDimension = null,
             string outputDirectory = null,
             int maxParallelism = 1
         )
@@ -43,6 +43,16 @@ namespace OpenNest.Benchmark
             {
                 MaxDegreeOfParallelism = System.Math.Max(1, maxParallelism),
             };
+
+            var baselineResults = new JobResult[jobs.Count];
+            Parallel.ForEach(
+                Partitioner.Create(
+                    Enumerable.Range(0, jobs.Count),
+                    EnumerablePartitionerOptions.NoBuffering
+                ),
+                options,
+                i => baselineResults[i] = RunBaseline(jobs[i], salvageRate, minimumSalvageDimension)
+            );
 
             // NoBuffering hands out one pair at a time: solves run for seconds to minutes,
             // so chunked partitioning would leave workers idle behind a slow engine.
@@ -63,14 +73,156 @@ namespace OpenNest.Benchmark
             );
 
             // Indexed writes keep the report in job-then-engine order whatever finishes first.
-            return results.ToList();
+            var ordered = new List<JobResult>(
+                results.Length + baselineResults.Count(result => result != null)
+            );
+            for (var jobIndex = 0; jobIndex < jobs.Count; jobIndex++)
+            {
+                if (baselineResults[jobIndex] != null)
+                    ordered.Add(baselineResults[jobIndex]);
+                var firstResult = jobIndex * engines.Count;
+                for (var engineIndex = 0; engineIndex < engines.Count; engineIndex++)
+                    ordered.Add(results[firstResult + engineIndex]);
+            }
+            return ordered;
+        }
+
+        private static JobResult RunBaseline(
+            BenchmarkJob job,
+            double? salvageRate,
+            double? minimumSalvageDimension
+        )
+        {
+            if (job.BaselinePlateRuns == null)
+                return null;
+            var requested = job.TotalRequestedQuantity;
+            try
+            {
+                var requirements = job.Requests.ToDictionary<
+                    DrawingRequest,
+                    Drawing,
+                    (string Name, int Quantity)
+                >(
+                    request => request.Drawing,
+                    request => (request.Drawing.Name, request.Quantity),
+                    ReferenceEqualityComparer.Instance
+                );
+                var partIds = job.Requests.ToDictionary<DrawingRequest, Drawing, string>(
+                    request => request.Drawing,
+                    request => request.Drawing.Id.ToString(),
+                    ReferenceEqualityComparer.Instance
+                );
+                var validation = NestValidator.Validate(job.BaselinePlateRuns, requirements);
+                var benchmarkJob = job.BuildNestJob(
+                    MaxPlates,
+                    salvageRate,
+                    minimumSalvageDimension
+                );
+                var instanceIndices = new Dictionary<string, int>(StringComparer.Ordinal);
+                var plateResults = job
+                    .BaselinePlateRuns.Select(
+                        (run, index) =>
+                        {
+                            var stock = new NestPlateStock(
+                                $"baseline-{index}",
+                                run.Plate.Size,
+                                1,
+                                run.Plate.PartSpacing,
+                                run.Plate.EdgeSpacing,
+                                run.Plate.Quadrant
+                            );
+                            var placements = run
+                                .Parts.Select(part =>
+                                {
+                                    var partId = partIds[part.BaseDrawing];
+                                    instanceIndices.TryGetValue(partId, out var instanceIndex);
+                                    instanceIndices[partId] = instanceIndex + 1;
+                                    return new NestJobPlacement(
+                                        partId,
+                                        instanceIndex,
+                                        part.Location.X,
+                                        part.Location.Y,
+                                        part.Rotation
+                                    );
+                                })
+                                .ToList();
+                            return new NestJobPlateResult(index, stock, placements);
+                        }
+                    )
+                    .ToList();
+                var baselineJob = new NestJob(
+                    benchmarkJob.Parts,
+                    plateResults.Select(result => result.Stock),
+                    benchmarkJob.Options
+                );
+                var baselineJobResult = new NestJobResult(
+                    NestJobStatus.Complete,
+                    NestJobStopReason.Completed,
+                    plateResults,
+                    Array.Empty<PartFulfillment>(),
+                    Array.Empty<StockUsage>()
+                );
+                NestValidator.ValidateAgainstJob(
+                    baselineJob,
+                    baselineJobResult,
+                    job.Requests.ToDictionary(
+                        request => request.Drawing.Id.ToString(),
+                        request => request.Drawing.Name
+                    ),
+                    validation
+                );
+
+                var plateRuns = job.BaselinePlateRuns;
+                var placedArea = validation.Valid
+                    ? plateRuns.Sum(run => run.Parts.Sum(part => part.BaseDrawing.Area))
+                    : 0;
+                var plateArea = plateRuns.Sum(run => run.Plate.Area());
+                var netSheetArea = validation.Valid
+                    ? plateResults.Sum(result =>
+                        StockLadderNestingEngine.EstimateNetArea(baselineJob, result)
+                    )
+                    : 0;
+                var sizeBreakdown = plateRuns
+                    .GroupBy(run => run.Plate.Size.ToString(1))
+                    .OrderByDescending(group => group.Count())
+                    .ToDictionary(group => group.Key, group => group.Count());
+
+                return new JobResult
+                {
+                    EngineName = "Baseline",
+                    JobName = job.Name,
+                    Valid = validation.Valid,
+                    Violations = validation.Violations,
+                    PartsPlaced = plateRuns.Sum(run => run.Parts.Count),
+                    PartsRequested = requested,
+                    PlacedArea = placedArea,
+                    PlateArea = plateArea,
+                    NetSheetArea = netSheetArea,
+                    UnplacedPartPenalty = job.UnplacedPartPenalty,
+                    PlatesUsed = plateRuns.Count,
+                    SizeBreakdown = sizeBreakdown,
+                    ElapsedMs = 0,
+                };
+            }
+            catch (Exception ex)
+            {
+                return new JobResult
+                {
+                    EngineName = "Baseline",
+                    JobName = job.Name,
+                    Valid = false,
+                    PartsRequested = requested,
+                    UnplacedPartPenalty = job.UnplacedPartPenalty,
+                    Error = $"{ex.GetType().Name}: {ex.Message}",
+                };
+            }
         }
 
         private static JobResult RunOne(
             BenchmarkJob job,
             NestingEngineInfo engineInfo,
-            double salvageRate,
-            double minimumSalvageDimension,
+            double? salvageRate,
+            double? minimumSalvageDimension,
             string outputDirectory
         )
         {
@@ -113,7 +265,9 @@ namespace OpenNest.Benchmark
                 var plateArea = plateRuns.Sum(pr => pr.Plate.Area());
                 // Salvage credit is recomputed from the job's own geometry, never taken from the engine.
                 var netSheetArea = validation.Valid
-                    ? jobResult.Plates.Sum(p => StockLadderNestingEngine.EstimateNetArea(nestJob, p))
+                    ? jobResult.Plates.Sum(p =>
+                        StockLadderNestingEngine.EstimateNetArea(nestJob, p)
+                    )
                     : 0;
 
                 var sizeBreakdown = plateRuns
@@ -138,7 +292,7 @@ namespace OpenNest.Benchmark
                     {
                         materialized.Nest.Name = job.Name;
                     }
-                    materialized.Nest.SalvageRate = salvageRate;
+                    materialized.Nest.SalvageRate = nestJob.Options.SalvageRate;
                     foreach (var request in job.Requests)
                         materialized.DrawingsByPartId[request.Drawing.Id.ToString()].Name = request
                             .Drawing
@@ -165,8 +319,8 @@ namespace OpenNest.Benchmark
                         Placed = totalPlaced,
                         SheetArea = plateArea,
                         PlacedArea = placedArea,
-                        SalvageRate = salvageRate,
-                        MinimumSalvageDimension = minimumSalvageDimension,
+                        SalvageRate = nestJob.Options.SalvageRate,
+                        MinimumSalvageDimension = nestJob.Options.MinimumSalvageDimension,
                         EstimatedNetArea = netSheetArea,
                         Fulfillment = jobResult.Fulfillment,
                         StockUsage = jobResult.StockUsage,

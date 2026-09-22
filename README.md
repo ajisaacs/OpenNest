@@ -357,7 +357,11 @@ to `0`, which also disables credit. With both enabled, only the largest qualifyi
 full-span edge rectangle outside placed bounding boxes plus part spacing is credited,
 within the usable work area; both dimensions must meet the minimum in job units.
 Holes/scraps are not credited. No cut-off toolpath, kerf, handling, or future-demand
-valuation is modeled. Benchmark ranking credits the same estimate (see Benchmarking Nest Engines).
+valuation is modeled. Benchmark ranking credits the same estimate (see Benchmarking Nest
+Engines). For a `.nest` benchmark input, the saved `Nest.SalvageRate` is the benchmark
+default unless `--salvage-rate` overrides it; manifests default to `0`. A positive
+`--min-salvage-dimension` is still required for any credit, and the console warns when a
+nonzero rate would otherwise be disabled.
 
 This is a tested deterministic heuristic baseline, **not an optimal or production-
 certified solver**. Conservative rectangular free-region hints and linear fills can
@@ -369,6 +373,13 @@ cooperative (the benchmark requests it after five minutes), not process isolatio
 Geometry acceptance remains strict, including open marks leaving closed material.
 
 Benchmark export example (use a separate output directory):
+
+For `.nest` inputs the report includes a `Baseline` row before the engine rows. It validates
+the saved authored plates (including positive plate repeat quantities) with the same
+bounds, spacing, quantity, and rotation checks as generated layouts; it is not timed as
+an engine solve. Its score uses the same salvage-credit and unplaced-part-cost calculation,
+with `--spacing` and salvage CLI overrides applied without mutating the source. Manifest
+inputs have no baseline row.
 
 ```bash
 dotnet run --project OpenNest.Benchmark -- input.nest \

@@ -73,6 +73,8 @@ namespace OpenNest.Benchmark
                         EdgeSpacing = template.EdgeSpacing,
                         PartSpacing = partSpacingOverride ?? template.PartSpacing,
                         Quadrant = template.Quadrant,
+                        SalvageRate = nest.SalvageRate,
+                        BaselinePlateRuns = BuildBaselinePlateRuns(nest, partSpacingOverride),
                         Requests = requests,
                     }
                 );
@@ -154,6 +156,35 @@ namespace OpenNest.Benchmark
             }
 
             return requests;
+        }
+
+        private static List<(Plate Plate, List<Part> Parts)> BuildBaselinePlateRuns(
+            Nest nest,
+            double? partSpacingOverride
+        )
+        {
+            var runs = new List<(Plate Plate, List<Part> Parts)>();
+            foreach (var plate in nest.Plates ?? Enumerable.Empty<Plate>())
+            {
+                var parts = plate.Parts.Where(part => !part.BaseDrawing.IsCutOff).ToList();
+                if (parts.Count == 0)
+                    continue;
+                var validationPlate = new Plate(new Size(plate.Size.Width, plate.Size.Length))
+                {
+                    Quantity = 1,
+                    Quadrant = plate.Quadrant,
+                    PartSpacing = partSpacingOverride ?? plate.PartSpacing,
+                    EdgeSpacing = new Spacing(
+                        plate.EdgeSpacing.Left,
+                        plate.EdgeSpacing.Bottom,
+                        plate.EdgeSpacing.Right,
+                        plate.EdgeSpacing.Top
+                    ),
+                };
+                for (var copy = 0; copy < plate.Quantity; copy++)
+                    runs.Add((validationPlate, parts));
+            }
+            return runs.Count > 0 ? runs : null;
         }
 
         private static (Spacing EdgeSpacing, double PartSpacing, int Quadrant) ResolvePlateTemplate(

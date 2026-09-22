@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;
 
-using OpenNest.Engine.Jobs.Adapters;
 namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>Constrained-order linear fills in conservative rectangular free regions.
@@ -105,6 +105,8 @@ internal sealed class OrderedPlateNester : IPlateNester
         if (policy.Kind == RotationPolicyKind.Fixed)
         {
             yield return policy.Start;
+            if (policy.Allow180Equivalent)
+                yield return policy.Start + System.Math.PI;
             yield break;
         }
         // A bounded deterministic search, not a proof that an unplaced part cannot fit.
@@ -125,6 +127,8 @@ internal sealed class OrderedPlateNester : IPlateNester
             if (angle > policy.End + 1e-9)
                 yield break;
             yield return angle;
+            if (policy.Allow180Equivalent)
+                yield return angle + System.Math.PI;
         }
     }
 }

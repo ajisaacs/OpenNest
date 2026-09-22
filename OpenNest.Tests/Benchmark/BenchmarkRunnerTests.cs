@@ -1,5 +1,7 @@
 using OpenNest.Benchmark;
+using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
+using OpenNest.IO;
 
 namespace OpenNest.Tests.Benchmark;
 
@@ -41,6 +43,51 @@ public sealed class BenchmarkRunnerTests : IDisposable
         return JobLoader.Load(manifest);
     }
 
+    private string WriteBaselineNest(
+        string name,
+        double salvageRate = 0.5,
+        bool outsideWorkArea = false,
+        int plateQuantity = 1,
+        int requiredQuantity = 1,
+        int partCount = 1,
+        double partSpacing = 0,
+        double partRotation = 0
+    )
+    {
+        var path = Path.Combine(_dir, name + ".nest");
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.LineTo(2, 0);
+        program.LineTo(2, 2);
+        program.LineTo(0, 2);
+        program.LineTo(0, 0);
+        var drawing = new Drawing("part", program);
+        if (partRotation != 0)
+        {
+            drawing.Constraints.StepAngle = System.Math.PI / 2;
+            drawing.Constraints.StartAngle = 0;
+            drawing.Constraints.EndAngle = 0;
+        }
+        drawing.Quantity.Required = requiredQuantity;
+        var nest = new Nest(name) { SalvageRate = salvageRate };
+        nest.Drawings.Add(drawing);
+        var plate = new Plate(10, 10) { Quantity = plateQuantity, PartSpacing = partSpacing };
+        for (var index = 0; index < partCount; index++)
+        {
+            var part = Part.CreateAtOrigin(drawing);
+            if (partRotation != 0)
+                part.Rotate(partRotation);
+            part.Location =
+                outsideWorkArea ? new OpenNest.Geometry.Vector(9, 0)
+                : partRotation == 0 ? new OpenNest.Geometry.Vector(index * 2, 0)
+                : new OpenNest.Geometry.Vector(2 + index * 2, 2);
+            plate.Parts.Add(part);
+        }
+        nest.Plates.Add(plate);
+        new NestWriter(nest).Write(path);
+        return path;
+    }
+
     private static List<NestingEngineInfo> FakeEngines(
         ConcurrencyProbe probe,
         params int[] delaysMs
@@ -55,6 +102,137 @@ public sealed class BenchmarkRunnerTests : IDisposable
                     )
             )
             .ToList();
+
+    [Fact]
+    public void NestJobUsesSalvageRateStoredInSourceNest()
+    {
+        var job = Assert.Single(JobLoader.Load(WriteBaselineNest("salvage", salvageRate: 0.5)));
+
+        var nestJob = job.BuildNestJob(maxPlates: 1);
+
+        Assert.Equal(0.5, nestJob.Options.SalvageRate);
+        Assert.Equal(0, nestJob.Options.MinimumSalvageDimension);
+    }
+
+    [Fact]
+    public void Run_ScoresTheOriginalBaselineLayoutAlongsideEngines()
+    {
+        var results = BenchmarkRunner.Run(
+            JobLoader.Load(WriteBaselineNest("baseline")),
+            FakeEngines(new ConcurrencyProbe(), 0),
+            maxParallelism: 1
+        );
+
+        var baseline = Assert.Single(results.Where(result => result.EngineName == "Baseline"));
+        Assert.True(baseline.Valid);
+        Assert.Equal(1, baseline.PartsPlaced);
+        Assert.Equal(1, baseline.PartsRequested);
+        Assert.Equal(4, baseline.PlacedArea);
+        Assert.Equal(100, baseline.PlateArea);
+        Assert.Equal(1, baseline.PlatesUsed);
+        Assert.Equal(0.04, baseline.Utilization, 6);
+        Assert.Equal(100, baseline.NetSheetArea);
+        Assert.Equal(100, baseline.Cost);
+    }
+
+    [Fact]
+    public void Run_BaselineUsesSourceSalvageRateUnlessCliOverridesIt()
+    {
+        var jobs = JobLoader.Load(WriteBaselineNest("baseline-salvage", salvageRate: 0.5));
+        var sourceRate = BenchmarkRunner.Run(
+            jobs,
+            FakeEngines(new ConcurrencyProbe(), 0),
+            minimumSalvageDimension: 5,
+            maxParallelism: 1
+        );
+        var overriddenRate = BenchmarkRunner.Run(
+            jobs,
+            FakeEngines(new ConcurrencyProbe(), 0),
+            salvageRate: 0,
+            minimumSalvageDimension: 5,
+            maxParallelism: 1
+        );
+
+        Assert.Equal(
+            60,
+            Assert.Single(sourceRate.Where(result => result.EngineName == "Baseline")).NetSheetArea
+        );
+        Assert.Equal(
+            100,
+            Assert
+                .Single(overriddenRate.Where(result => result.EngineName == "Baseline"))
+                .NetSheetArea
+        );
+    }
+
+    [Fact]
+    public void Run_RejectsBaselineLayoutOutsideRotationConstraint()
+    {
+        var results = BenchmarkRunner.Run(
+            JobLoader.Load(
+                WriteBaselineNest("invalid-baseline-rotation", partRotation: System.Math.PI)
+            ),
+            FakeEngines(new ConcurrencyProbe(), 0),
+            maxParallelism: 1
+        );
+
+        var baseline = Assert.Single(results.Where(result => result.EngineName == "Baseline"));
+        Assert.False(baseline.Valid);
+        Assert.Contains(
+            baseline.Violations,
+            violation => violation.Contains("outside its rotation constraint")
+        );
+    }
+
+    [Fact]
+    public void Run_RejectsAnInvalidBaselineLayout()
+    {
+        var results = BenchmarkRunner.Run(
+            JobLoader.Load(WriteBaselineNest("invalid-baseline", outsideWorkArea: true)),
+            FakeEngines(new ConcurrencyProbe(), 0),
+            maxParallelism: 1
+        );
+
+        var baseline = Assert.Single(results.Where(result => result.EngineName == "Baseline"));
+        Assert.False(baseline.Valid);
+        Assert.Equal(0, baseline.Utilization);
+        Assert.Contains(
+            baseline.Violations,
+            violation => violation.Contains("outside the work area")
+        );
+    }
+
+    [Fact]
+    public void Run_DoesNotScoreZeroQuantityBaselinePlate()
+    {
+        var results = BenchmarkRunner.Run(
+            JobLoader.Load(WriteBaselineNest("zero-quantity", plateQuantity: 0)),
+            FakeEngines(new ConcurrencyProbe(), 0),
+            maxParallelism: 1
+        );
+
+        Assert.DoesNotContain(results, result => result.EngineName == "Baseline");
+    }
+
+    [Fact]
+    public void Run_AppliesSpacingOverrideToBaseline()
+    {
+        var results = BenchmarkRunner.Run(
+            JobLoader.Load(
+                WriteBaselineNest("spacing-override", requiredQuantity: 2, partCount: 2),
+                partSpacingOverride: 0.25
+            ),
+            FakeEngines(new ConcurrencyProbe(), 0),
+            maxParallelism: 1
+        );
+
+        var baseline = Assert.Single(results.Where(result => result.EngineName == "Baseline"));
+        Assert.False(baseline.Valid);
+        Assert.Contains(
+            baseline.Violations,
+            violation => violation.Contains("closer than the required spacing")
+        );
+    }
 
     [Fact]
     public void Run_NeverExceedsMaxParallelism_ButReachesIt()

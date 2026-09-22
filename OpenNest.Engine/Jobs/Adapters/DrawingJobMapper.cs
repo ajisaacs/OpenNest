@@ -20,7 +20,8 @@ public static class DrawingJobMapper
                 : RotationPolicy.FromLegacy(
                     constraints.StepAngle,
                     constraints.StartAngle,
-                    constraints.EndAngle
+                    constraints.EndAngle,
+                    constraints.Allow180Equivalent
                 )
         );
     }
@@ -34,7 +35,12 @@ public static class DrawingJobMapper
             PartGeometrySnapshot.FromProgram(item.Drawing.Program),
             item.Quantity,
             item.Priority,
-            RotationPolicy.FromLegacy(item.StepAngle, item.RotationStart, item.RotationEnd)
+            RotationPolicy.FromLegacy(
+                item.StepAngle,
+                item.RotationStart,
+                item.RotationEnd,
+                item.Drawing.Constraints?.Allow180Equivalent ?? false
+            )
         );
     }
 
@@ -89,6 +95,7 @@ public static class DrawingJobMapper
             StepAngle = LegacyStep(part.Rotation),
             StartAngle = part.Rotation.Start,
             EndAngle = part.Rotation.End,
+            Allow180Equivalent = part.Rotation.Allow180Equivalent,
         };
         return drawing;
     }

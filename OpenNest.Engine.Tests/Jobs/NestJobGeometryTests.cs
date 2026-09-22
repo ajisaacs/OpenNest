@@ -1,6 +1,6 @@
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -99,6 +99,94 @@ public class NestJobGeometryTests
             new NestJobPlacement("part", 0, 2, 0, System.Math.PI / 4)
         );
         Assert.Equal(NestJobStatus.Complete, boundedResult.Status);
+    }
+
+    [Fact]
+    public void LegacyAllow180EquivalentPermitsFlippedCandidate()
+    {
+        var drawing = new Drawing("grain-aligned", TestDrawingFactory.Rectangle(4, 2));
+        drawing.Constraints.StepAngle = System.Math.PI / 2;
+        drawing.Constraints.StartAngle = 0;
+        drawing.Constraints.EndAngle = 0;
+        drawing.Constraints.Allow180Equivalent = true;
+        var job = new NestJob(
+            new[] { DrawingJobMapper.FromDrawing("part", drawing, 1) },
+            new[] { new NestPlateStock("stock", new Size(10, 10), 1) }
+        );
+
+        var result = Solve(job, new NestJobPlacement("part", 0, 4, 2, System.Math.PI));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+    }
+
+    [Fact]
+    public void LegacyItemAllow180EquivalentPermitsFlippedCandidate()
+    {
+        var drawing = new Drawing("grain-aligned", TestDrawingFactory.Rectangle(4, 2));
+        drawing.Constraints.Allow180Equivalent = true;
+        var item = new NestItem
+        {
+            Drawing = drawing,
+            Quantity = 1,
+            StepAngle = System.Math.PI / 2,
+            RotationStart = 0,
+            RotationEnd = 0,
+        };
+        var job = new NestJob(
+            new[] { DrawingJobMapper.FromItem("part", item) },
+            new[] { new NestPlateStock("stock", new Size(10, 10), 1) }
+        );
+
+        var result = Solve(job, new NestJobPlacement("part", 0, 4, 2, System.Math.PI));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+    }
+
+    [Fact]
+    public void BoundedRotationPolicyAcceptsAnEquivalentFullTurn()
+    {
+        var part = new NestJobPart(
+            "part",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 2)),
+            1,
+            rotation: RotationPolicy.BoundedSweep(
+                -System.Math.PI / 2,
+                System.Math.PI / 2,
+                System.Math.PI / 2
+            )
+        );
+        var job = new NestJob(
+            new[] { part },
+            new[] { new NestPlateStock("stock", new Size(10, 10), 1) }
+        );
+
+        var result = Solve(job, new NestJobPlacement("part", 0, 0, 4, 3 * System.Math.PI / 2));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+    }
+
+    [Fact]
+    public void BoundedRotationSpanningFullTurnAcceptsGridAngleAndEquivalent()
+    {
+        var part = new NestJobPart(
+            "part",
+            PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 2)),
+            1,
+            rotation: RotationPolicy.BoundedSweep(0, 7, 1)
+        );
+        var job = new NestJob(
+            new[] { part },
+            new[] { new NestPlateStock("stock", new Size(10, 10), 1) }
+        );
+
+        Assert.Equal(
+            NestJobStatus.Complete,
+            Solve(job, new NestJobPlacement("part", 0, 0, 0, 0)).Status
+        );
+        Assert.Equal(
+            NestJobStatus.Complete,
+            Solve(job, new NestJobPlacement("part", 0, 0, 0, System.Math.PI * 2)).Status
+        );
     }
 
     [Fact]

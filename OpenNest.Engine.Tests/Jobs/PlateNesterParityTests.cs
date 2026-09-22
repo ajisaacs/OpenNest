@@ -1,8 +1,8 @@
 using OpenNest.CNC;
-using OpenNest.Geometry;
-using Xunit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Geometry;
+using Xunit;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -167,6 +167,22 @@ public class PlateNesterParityTests
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(2, ByPart(result)["holed"].Placed);
         Assert.Equal(2, ByPart(result)["arc"].Placed);
+    }
+
+    [Fact]
+    public void RestrictedRotation_Enumerates180EquivalentFlip()
+    {
+        var anglesMethod = typeof(OrderedPlateNester).GetMethod(
+            "Angles",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static
+        );
+        var policy = RotationPolicy.BoundedSweep(0, 0, System.Math.PI / 2, true);
+
+        var angles = (
+            (IEnumerable<double>)anglesMethod!.Invoke(null, new object[] { policy })!
+        ).ToList();
+
+        Assert.Equal(new[] { 0.0, System.Math.PI }, angles);
     }
 
     [Fact]

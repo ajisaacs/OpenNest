@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Geometry;
 
 namespace OpenNest.Benchmark
 {
@@ -36,6 +36,12 @@ namespace OpenNest.Benchmark
         public Spacing EdgeSpacing { get; init; }
         public double PartSpacing { get; init; }
         public int Quadrant { get; init; }
+
+        /// <summary>Saved source-nest setting; manifests have no saved salvage rate and use zero.</summary>
+        public double SalvageRate { get; init; }
+
+        /// <summary>Original hand-authored placements, if the source was a .nest with any real parts.</summary>
+        public List<(Plate Plate, List<Part> Parts)> BaselinePlateRuns { get; init; }
         public List<DrawingRequest> Requests { get; init; }
 
         public string Name => Path.GetFileNameWithoutExtension(SourceFile);
@@ -58,8 +64,8 @@ namespace OpenNest.Benchmark
         /// </summary>
         public NestJob BuildNestJob(
             int maxPlates,
-            double salvageRate = 0,
-            double minimumSalvageDimension = 0
+            double? salvageRate = null,
+            double? minimumSalvageDimension = null
         )
         {
             var parts = Requests.Select(r =>
@@ -76,7 +82,12 @@ namespace OpenNest.Benchmark
             return new NestJob(
                 parts,
                 stock,
-                new NestJobOptions("Default", maxPlates, salvageRate, minimumSalvageDimension)
+                new NestJobOptions(
+                    "Default",
+                    maxPlates,
+                    salvageRate ?? SalvageRate,
+                    minimumSalvageDimension ?? 0
+                )
             );
         }
     }

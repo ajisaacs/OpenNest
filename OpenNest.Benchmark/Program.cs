@@ -4,8 +4,8 @@ using System.IO;
 using System.Linq;
 using OpenNest;
 using OpenNest.Benchmark;
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
+using OpenNest.Geometry;
 
 return BenchmarkConsole.Run(args);
 
@@ -95,6 +95,17 @@ static class BenchmarkConsole
         }
 
         Console.WriteLine($"Engines: {string.Join(", ", engines.Select(e => e.Name))}");
+
+        var effectiveSalvageRates = jobs.Select(job => options.SalvageRate ?? job.SalvageRate);
+        if (
+            effectiveSalvageRates.Any(rate => rate > 0)
+            && (options.MinimumSalvageDimension ?? 0) <= 0
+        )
+        {
+            Console.Error.WriteLine(
+                "Warning: salvage credit is disabled because --min-salvage-dimension was not set to a positive value."
+            );
+        }
 
         var solves = jobs.Count * engines.Count;
 
@@ -294,13 +305,13 @@ static class BenchmarkConsole
             "  --csv <path>                    Write a flat CSV of all results"
         );
         Console.Error.WriteLine(
-            "  --salvage-rate <0..1>           Fraction of the usable offcut credited back in the"
+            "  --salvage-rate <0..1>           Fraction of eligible offcut area credited (default: saved .nest rate;"
         );
         Console.Error.WriteLine(
-            "                                 score (default 0; needs --min-salvage-dimension)"
+            "                                 manifests 0; needs positive --min-salvage-dimension)"
         );
         Console.Error.WriteLine(
-            "  --min-salvage-dimension <value> Both offcut dimensions must qualify; 0 disables credit"
+            "  --min-salvage-dimension <value> Both offcut dimensions must qualify; positive value enables credit (default 0)"
         );
         Console.Error.WriteLine(
             "  --output <directory>           Save valid layouts as .nest plus detailed JSON reports"
@@ -322,8 +333,8 @@ static class BenchmarkConsole
         public List<string> EngineNames = new();
         public string CsvPath;
         public string OutputDirectory;
-        public double SalvageRate;
-        public double MinimumSalvageDimension;
+        public double? SalvageRate;
+        public double? MinimumSalvageDimension;
         public int Parallel = 3;
     }
 }
