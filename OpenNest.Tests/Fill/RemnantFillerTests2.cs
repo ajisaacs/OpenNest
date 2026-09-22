@@ -1,4 +1,5 @@
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 using OpenNest.Engine;
 
@@ -35,8 +36,8 @@ public class RemnantFillerTests2
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
         {
             var plate = new Plate(b.Width, b.Length);
-            var engine = new DefaultNestEngine(plate);
-            return engine.Fill(ni, b, null, System.Threading.CancellationToken.None);
+            var filler = new DefaultPlateFiller(plate);
+            return filler.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
         var placed = filler.FillItems(items, fillFunc);
@@ -59,8 +60,8 @@ public class RemnantFillerTests2
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
         {
             var plate = new Plate(b.Width, b.Length);
-            var engine = new DefaultNestEngine(plate);
-            return engine.Fill(ni, b, null, System.Threading.CancellationToken.None);
+            var filler = new DefaultPlateFiller(plate);
+            return filler.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
         filler.FillItems(items, fillFunc);

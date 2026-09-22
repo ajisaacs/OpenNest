@@ -102,7 +102,7 @@ The new whole-job contracts in `OpenNest.Engine/Jobs` (`namespace OpenNest`) use
 
 `NestJobRunner.Solve` allocates a job across physical sheets from the full stock inventory: every available stock entry is trialled independently each iteration, and only the winning candidate consumes a sheet or reduces demand. Selection is a documented deterministic greedy policy — lexicographic placed-count vector by ascending part priority, then lower consumed sheet area, then smaller placement envelope, then original stock input order (see `NestJobCandidateComparer`). It is a tie policy, not a guarantee of global-minimum material or plate count. Finite stock is never exceeded; `MaxPlates` caps sheet count; empty parts complete without consuming stock; empty or fully exhausted stock returns `Incomplete/StockExhausted`; a zero-placement candidate stops with `NoPlacementFound` and consumes no sheet.
 
-`DrawingJobMapper` snapshots caller drawings/items under explicit requirement IDs. The built-in plate nesters create fresh private drawings, items, and plates for each trial through `CandidatePlacementContext` and map returned drawings **by reference**, never by name. Mutable legacy quantities never drive the fulfillment ledger. `PlateNesterFactory` resolves the built-in strategy names (`Default`, `Strip`, `Vertical Remnant`, `Horizontal Remnant`) to instance-scoped placement strategies; it neither reads nor changes the process-global `NestEngineRegistry`, and unknown keys reject. Quantity deduction in the engine paths the runner reaches (base-class fill/pack, strip deduction, remnant-fill ledger, shrink-leftover counting) is keyed by drawing reference, not display name, so same-name drawings and repeated requirements stay independent. `NestResultMaterializer` returns a detached domain nest and `DrawingsByPartId` identity map. Each output plate represents one physical sheet (`Quantity = 1`), and each placement is attached exactly once so domain quantity events do not double count.
+`DrawingJobMapper` snapshots caller drawings/items under explicit requirement IDs. The built-in plate nesters create fresh private drawings, items, and plates for each trial through `CandidatePlacementContext` and map returned drawings **by reference**, never by name. Per-trial `NestItem` quantities never drive the fulfillment ledger. `PlateNesterFactory` resolves the built-in strategy names (`Default`, `Strip`, `Vertical Remnant`, `Horizontal Remnant`) to instance-scoped placement strategies and rejects unknown keys. Quantity deduction inside a filler run (fill/pack, strip deduction, remnant-fill ledger, shrink-leftover counting) is keyed by drawing reference, not display name, so same-name drawings and repeated requirements stay independent. `NestResultMaterializer` returns a detached domain nest and `DrawingsByPartId` identity map. Each output plate represents one physical sheet (`Quantity = 1`), and each placement is attached exactly once so domain quantity events do not double count.
 
 ```csharp
 var job = new NestJob(
@@ -118,7 +118,7 @@ var domainResult = NestResultMaterializer.Materialize(job, result);
 
 **Placement strategies:** `Default`, `Strip`, `Vertical Remnant`, and `Horizontal Remnant` are filler-backed built-ins (`OpenNest.Engine/Jobs/Placement/DefaultPlateNester.cs`, `StripPlateNester.cs`, `RemnantPlateNester.cs`) that run the internal `Jobs/Placement/Fillers` geometry while keeping demand read-only. A runnable end-to-end example — multiple requirements, mixed finite/unlimited stock, full plate/leftover enumeration — lives in `OpenNest.Engine.Tests/Jobs/NestJobExampleTests.cs`.
 
-**Legacy caller boundaries (not yet migrated):** the desktop UI (`MainForm.RunAutoNestAsync` / `NestSinglePlateAsync`), the CLI (`OpenNest.Console`), and MCP (`NestingTools`) still call the old single-plate `engine.Nest(...)` entry points unchanged. UI adoption needs a separate adapter preserving populated-plate editing, preview routing, and Accept-versus-Cancel semantics. The public API (`OpenNest.Api`, `NestRunner.RunAsync`) already delegates to one `NestJobRunner.Solve` call and reports status, stop reason, part fulfillment, stock usage, and plate-to-stock mapping; `.nestquote` archives carry a schema version and round-trip incomplete jobs.
+**Single-plate placement:** interactive fills use `PlateFillService`, which explicitly selects one of `Default`, `Strip`, `Vertical Remnant`, or `Horizontal Remnant` and returns proposed parts without mutating the caller's plate. The caller remains responsible for preview accept/cancel and attachment. Whole-job work in the desktop app, console, MCP server, and public API resolves a named `INestingEngine`, solves one `NestJob`, and materializes committed results. `NestRunner.RunAsync` reports status, stop reason, part fulfillment, stock usage, and plate-to-stock mapping; `.nestquote` archives carry a schema version and round-trip incomplete jobs.
 
 ### Fresh DXF job verification (headless)
 
@@ -244,7 +244,7 @@ Each engine-on-job solve is independent, so `--parallel <n>` (default 3) runs up
 
 An engine's layout is rejected (scoring zero for that job) if any part falls outside the work area, any two parts are closer than the required spacing, or a drawing gets more parts placed than requested. A run that doesn't finish within its time budget also scores zero, as a timeout.
 
-Custom competitor engines can be added by dropping a DLL implementing `INestingEngine` with a public parameterless constructor into the `Engines/` directory next to the benchmark executable; each one is registered under its own CLR type name. This is a separate plugin contract from the desktop app's `NestEngineRegistry`/`NestEngineBase` (which requires a `(Plate)` constructor) — a `NestEngineBase` plugin dropped into the benchmark's `Engines/` folder is silently skipped, since the benchmark only ever solves whole jobs.
+Custom competitor engines can be added by dropping a DLL that implements `INestingEngine` with a public parameterless constructor into the `Engines/` directory next to the benchmark executable; each one is registered under its own CLR type name. This jobs plug-in contract is also the supported extension point for new nesting engines. Plugins built for the removed single-plate inheritance API are not binary compatible and must be migrated to `INestingEngine`.
 
 ### Conservative bend endpoint repair (opt-in)
 
@@ -392,15 +392,17 @@ source geometry changes were made. Source SHA-256:
 
 ## Nesting Engines
 
-OpenNest uses a pluggable engine architecture. The active engine can be selected at runtime.
+OpenNest uses jobs-only nesting engines. `NestingEngineRegistry` resolves each engine by explicit name; `NestJobRunner` is the only component that commits demand and stock. Interactive single-plate operations use `PlateFillService` and return proposed parts for the caller to accept or discard.
 
 | Engine | Description |
 |--------|-------------|
-| **Default** | Multi-phase strategy: linear fill, pair fill, rect best-fit, then remainder. Balances density and speed. |
+| **Default** | Multi-phase strategy: linear fill, pair fill, rect best-fit, then extents. Balances density and speed. |
+| **Strip** | Iterative shrink-fill strategy for mixed-drawing layouts. |
 | **Vertical Remnant** | Optimizes for a clean vertical drop on the right side of the plate. |
 | **Horizontal Remnant** | Optimizes for a clean horizontal drop on the top of the plate. |
+| **StockLadder** | Whole-job stock-constrained strategy; available to named job callers but not the desktop's four-choice combo. |
 
-Custom engines can be built by subclassing `NestEngineBase` and registering via `NestEngineRegistry` or dropping a plugin DLL in the `Engines/` directory.
+Custom nesting plugins must implement `INestingEngine` with a public parameterless constructor and can be loaded from the `Engines/` directory. Plugins built for the removed single-plate inheritance API are not binary compatible.
 
 ### Fill Strategies
 

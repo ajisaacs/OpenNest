@@ -84,7 +84,7 @@ namespace OpenNest.Engine.Strategies
         /// the canonical drawing's baked source angle whenever it's non-zero. No-op when
         /// <see cref="OriginalDrawing"/> isn't set. Internal so callers that build their own
         /// <see cref="ProgressReport"/> outside <see cref="ReportProgress"/> (e.g. the fallback
-        /// report in <c>DefaultPlateFiller.RunPipelineCore</c> for strategies that don't self-report)
+        /// report in <c>DefaultPlateFiller.RunPipeline</c> for strategies that don't self-report)
         /// can apply the same rebind before reaching the UI.
         /// </summary>
         internal List<Part> ToOriginalFrame(List<Part> parts)

@@ -11,55 +11,31 @@ public class PlateFillerContractTests
     [InlineData("Default")]
     [InlineData("Vertical Remnant")]
     [InlineData("Horizontal Remnant")]
-    public void StandardPlateFiller_Fill_MatchesCompatibilityFacade(string strategy)
+    public void StandardPlateFiller_Fill_ReturnsPartsBoundToInputDrawing(string strategy)
     {
-        var directPlate = new Plate(new Size(30, 50));
-        var facadePlate = new Plate(new Size(30, 50));
-        var directDrawing = new Drawing("part", TestDrawingFactory.Rectangle(6, 4));
-        var facadeDrawing = new Drawing("part", TestDrawingFactory.Rectangle(6, 4));
-        var directFiller = CreateFiller(strategy, directPlate);
-        var facade = CreateFacade(strategy, facadePlate);
+        var plate = new Plate(new Size(30, 50));
+        var drawing = new Drawing("part", TestDrawingFactory.Rectangle(6, 4));
+        var filler = CreateFiller(strategy, plate);
 
-        var directParts = directFiller.Fill(
-            new NestItem { Drawing = directDrawing, Quantity = 4 },
-            directPlate.WorkArea(),
-            null,
-            CancellationToken.None
-        );
-        var facadeParts = facade.Fill(
-            new NestItem { Drawing = facadeDrawing, Quantity = 4 },
-            facadePlate.WorkArea(),
+        var parts = filler.Fill(
+            new NestItem { Drawing = drawing, Quantity = 4 },
+            plate.WorkArea(),
             null,
             CancellationToken.None
         );
 
-        Assert.Equal(facade.WinnerPhase, directFiller.WinnerPhase);
-        Assert.Equal(
-            facade.PhaseResults.Select(result => (result.Phase, result.PartCount)),
-            directFiller.PhaseResults.Select(result => (result.Phase, result.PartCount))
-        );
-        Assert.Equal(
-            facade.AngleResults.Select(result => (result.AngleDeg, result.Direction, result.PartCount)),
-            directFiller.AngleResults.Select(result => (result.AngleDeg, result.Direction, result.PartCount))
-        );
-        Assert.Equal(facadeParts.Count, directParts.Count);
-        for (var i = 0; i < directParts.Count; i++)
-        {
-            Assert.Same(directDrawing, directParts[i].BaseDrawing);
-            Assert.Same(facadeDrawing, facadeParts[i].BaseDrawing);
-            Assert.Equal(facadeParts[i].Location.X, directParts[i].Location.X, 9);
-            Assert.Equal(facadeParts[i].Location.Y, directParts[i].Location.Y, 9);
-            Assert.Equal(facadeParts[i].Rotation, directParts[i].Rotation, 9);
-        }
+        Assert.NotEmpty(parts);
+        Assert.All(parts, part => Assert.Same(drawing, part.BaseDrawing));
+        Assert.NotEmpty(filler.PhaseResults);
     }
 
     [Fact]
-    public void CompatibilityDefaultFacade_UsesOverriddenAngleSelection()
+    public void DefaultPlateFiller_UsesOverriddenAngleSelection()
     {
         var plate = new Plate(new Size(30, 50));
-        var engine = new AngleProbeDefaultNestEngine(plate);
+        var filler = new AngleProbeDefaultPlateFiller(plate);
 
-        var parts = engine.Fill(
+        var parts = filler.Fill(
             new NestItem
             {
                 Drawing = new Drawing("part", TestDrawingFactory.Rectangle(6, 4)),
@@ -71,18 +47,18 @@ public class PlateFillerContractTests
         );
 
         Assert.NotEmpty(parts);
-        Assert.True(engine.BuildAnglesCalled);
+        Assert.True(filler.BuildAnglesCalled);
     }
 
     [Fact]
-    public void CompatibilityDefaultFacade_Nest_UsesOverriddenFillAndPackArea()
+    public void DefaultPlateFiller_Nest_UsesOverriddenFillAndPackArea()
     {
         var plate = new Plate(new Size(100, 100));
         var fillDrawing = new Drawing("fill", TestDrawingFactory.Rectangle(10, 10));
         var packDrawing = new Drawing("pack", TestDrawingFactory.Rectangle(10, 10));
-        var engine = new FillAndPackProbeDefaultNestEngine(plate, fillDrawing, packDrawing);
+        var filler = new FillAndPackProbeDefaultPlateFiller(plate, fillDrawing, packDrawing);
 
-        var parts = engine.Nest(
+        var parts = filler.Nest(
             new List<NestItem>
             {
                 new() { Drawing = fillDrawing, Quantity = 10 },
@@ -92,17 +68,16 @@ public class PlateFillerContractTests
             CancellationToken.None
         );
 
-        Assert.Equal(1, engine.FillCalls);
-        Assert.Equal(1, engine.PackAreaCalls);
+        Assert.Equal(1, filler.FillCalls);
+        Assert.Equal(1, filler.PackAreaCalls);
         Assert.Equal(11, parts.Count);
     }
 
     [Fact]
-    public void StripPlateFiller_Nest_MatchesCompatibilityFacade()
+    public void StripPlateFiller_Nest_ReturnsPlacedPartsAndDeductsInput()
     {
-        var directPlate = new Plate(new Size(30, 50));
-        var facadePlate = new Plate(new Size(30, 50));
-        var directItems = new List<NestItem>
+        var plate = new Plate(new Size(30, 50));
+        var items = new List<NestItem>
         {
             new()
             {
@@ -120,48 +95,29 @@ public class PlateFillerContractTests
                 Quantity = 3,
             },
         };
-        var facadeItems = new List<NestItem>
-        {
-            new()
-            {
-                Drawing = new Drawing("rect-a", TestDrawingFactory.Rectangle(6, 4)),
-                Quantity = 5,
-            },
-            new()
-            {
-                Drawing = new Drawing("rect-b", TestDrawingFactory.Rectangle(4, 3)),
-                Quantity = 4,
-            },
-            new()
-            {
-                Drawing = new Drawing("rect-c", TestDrawingFactory.Rectangle(2, 7)),
-                Quantity = 3,
-            },
-        };
-        var directFiller = new StripPlateFiller(directPlate) { PlateNumber = 7 };
-        var facade = new StripNestEngine(facadePlate) { PlateNumber = 7 };
+        var filler = new StripPlateFiller(plate) { PlateNumber = 7 };
 
-        var directParts = directFiller.Nest(directItems, null, CancellationToken.None);
-        var facadeParts = facade.Nest(facadeItems, null, CancellationToken.None);
+        var parts = filler.Nest(items, null, CancellationToken.None);
 
-        AssertEquivalentLayouts(facadeParts, directParts);
-        Assert.Equal(facadeItems.Select(item => item.Quantity), directItems.Select(item => item.Quantity));
+        Assert.NotEmpty(parts);
+        Assert.All(parts, part => Assert.Contains(items, item => ReferenceEquals(item.Drawing, part.BaseDrawing)));
+        Assert.All(items, item => Assert.InRange(item.Quantity, 0, 5));
     }
 
     [Fact]
-    public void CompatibilityStripFacade_Nest_UsesOverriddenPackArea()
+    public void StripPlateFiller_Nest_UsesOverriddenPackArea()
     {
         var plate = new Plate(new Size(100, 100));
         var drawing = new Drawing("pack", TestDrawingFactory.Rectangle(10, 10));
-        var engine = new PackProbeStripNestEngine(plate, drawing);
+        var filler = new PackProbeStripPlateFiller(plate, drawing);
 
-        var parts = engine.Nest(
+        var parts = filler.Nest(
             new List<NestItem> { new() { Drawing = drawing, Quantity = 1 } },
             null,
             CancellationToken.None
         );
 
-        Assert.Equal(1, engine.PackAreaCalls);
+        Assert.Equal(1, filler.PackAreaCalls);
         Assert.Single(parts);
     }
 
@@ -304,12 +260,12 @@ public class PlateFillerContractTests
         Assert.Equal(10, item.Quantity);
     }
 
-    private sealed class FillAndPackProbeDefaultNestEngine : DefaultNestEngine
+    private sealed class FillAndPackProbeDefaultPlateFiller : DefaultPlateFiller
     {
         private readonly Drawing fillDrawing;
         private readonly Drawing packDrawing;
 
-        internal FillAndPackProbeDefaultNestEngine(
+        internal FillAndPackProbeDefaultPlateFiller(
             Plate plate,
             Drawing fillDrawing,
             Drawing packDrawing
@@ -352,9 +308,9 @@ public class PlateFillerContractTests
         }
     }
 
-    private sealed class AngleProbeDefaultNestEngine : DefaultNestEngine
+    private sealed class AngleProbeDefaultPlateFiller : DefaultPlateFiller
     {
-        internal AngleProbeDefaultNestEngine(Plate plate)
+        internal AngleProbeDefaultPlateFiller(Plate plate)
             : base(plate) { }
 
         internal bool BuildAnglesCalled { get; private set; }
@@ -370,11 +326,11 @@ public class PlateFillerContractTests
         }
     }
 
-    private sealed class PackProbeStripNestEngine : StripNestEngine
+    private sealed class PackProbeStripPlateFiller : StripPlateFiller
     {
         private readonly Drawing drawing;
 
-        internal PackProbeStripNestEngine(Plate plate, Drawing drawing)
+        internal PackProbeStripPlateFiller(Plate plate, Drawing drawing)
             : base(plate)
         {
             this.drawing = drawing;
@@ -395,44 +351,11 @@ public class PlateFillerContractTests
         }
     }
 
-    private static void AssertEquivalentLayouts(List<Part> expected, List<Part> actual)
-    {
-        var expectedParts = expected
-            .OrderBy(part => part.BaseDrawing.Name)
-            .ThenBy(part => part.Location.X)
-            .ThenBy(part => part.Location.Y)
-            .ThenBy(part => part.Rotation)
-            .ToList();
-        var actualParts = actual
-            .OrderBy(part => part.BaseDrawing.Name)
-            .ThenBy(part => part.Location.X)
-            .ThenBy(part => part.Location.Y)
-            .ThenBy(part => part.Rotation)
-            .ToList();
-
-        Assert.Equal(expectedParts.Count, actualParts.Count);
-        for (var i = 0; i < expectedParts.Count; i++)
-        {
-            Assert.Equal(expectedParts[i].BaseDrawing.Name, actualParts[i].BaseDrawing.Name);
-            Assert.Equal(expectedParts[i].Location.X, actualParts[i].Location.X, 9);
-            Assert.Equal(expectedParts[i].Location.Y, actualParts[i].Location.Y, 9);
-            Assert.Equal(expectedParts[i].Rotation, actualParts[i].Rotation, 9);
-        }
-    }
-
     private static PlateFillerBase CreateFiller(string strategy, Plate plate) => strategy switch
     {
         "Default" => new DefaultPlateFiller(plate),
         "Vertical Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical),
         "Horizontal Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal),
-        _ => throw new ArgumentOutOfRangeException(nameof(strategy)),
-    };
-
-    private static NestEngineBase CreateFacade(string strategy, Plate plate) => strategy switch
-    {
-        "Default" => new DefaultNestEngine(plate),
-        "Vertical Remnant" => new VerticalRemnantEngine(plate),
-        "Horizontal Remnant" => new HorizontalRemnantEngine(plate),
         _ => throw new ArgumentOutOfRangeException(nameof(strategy)),
     };
 

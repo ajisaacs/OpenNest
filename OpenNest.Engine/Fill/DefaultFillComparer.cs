@@ -5,7 +5,7 @@ namespace OpenNest.Engine.Fill
 {
     /// <summary>
     /// Ranks fill results by count first, then density.
-    /// This is the original scoring logic used by DefaultNestEngine.
+    /// This is the original scoring logic used by the Default plate filler.
     /// </summary>
     public class DefaultFillComparer : IFillComparer
     {

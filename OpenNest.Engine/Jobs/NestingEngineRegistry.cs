@@ -8,11 +8,10 @@ using System.Reflection;
 namespace OpenNest.Engine.Jobs;
 
 /// <summary>
-/// Registry of whole-job INestingEngine implementations, parallel to NestEngineRegistry (which is for
-/// the legacy single-plate NestEngineBase). The four production strategies are exposed here through
-/// FixedStrategyNestingEngine so they compete on equal footing with model-submitted engines. Unlike
-/// NestEngineRegistry, this has no ActiveEngineName/global-selection concept — callers choose an engine
-/// explicitly from AvailableEngines.
+/// Registry of whole-job <see cref="INestingEngine"/> implementations. The four production
+/// strategies are exposed through <see cref="FixedStrategyNestingEngine"/> so they compete on
+/// equal footing with model-submitted engines. Callers choose an engine explicitly from
+/// <see cref="AvailableEngines"/>; there is no process-global active selection.
 /// </summary>
 public static class NestingEngineRegistry
 {
@@ -55,8 +54,7 @@ public static class NestingEngineRegistry
 
     /// <summary>
     /// Creates the engine registered under <paramref name="name"/> (case-insensitive). The caller's
-    /// explicit choice is the whole selection mechanism: unlike the legacy registry there is no
-    /// process-global active name to consult or mutate. Unknown names throw.
+    /// explicit choice is the whole selection mechanism; unknown names throw.
     /// </summary>
     public static INestingEngine Create(string name)
     {
@@ -81,9 +79,8 @@ public static class NestingEngineRegistry
     }
 
     /// <summary>Scans *.dll in directory for non-abstract INestingEngine types with a public
-    /// parameterless constructor, registering each under its CLR type name. Mirrors
-    /// NestEngineRegistry.LoadPlugins's per-assembly/per-type isolation: one bad plugin never
-    /// prevents the rest from loading.</summary>
+    /// parameterless constructor, registering each under its CLR type name. Per-assembly and per-type
+    /// isolation ensures one bad plugin never prevents the rest from loading.</summary>
     public static void LoadPlugins(string directory)
     {
         if (!Directory.Exists(directory))

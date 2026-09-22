@@ -2,6 +2,7 @@ using System.Threading;
 using OpenNest.CNC;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -37,9 +38,9 @@ public class NestInvarianceTests
     private static int RunFillCount(Drawing drawing, Plate plate)
     {
         BestFitCache.Clear();
-        var engine = new DefaultNestEngine(plate);
+        var filler = new DefaultPlateFiller(plate);
         var item = new NestItem { Drawing = drawing };
-        var parts = engine.Fill(
+        var parts = filler.Fill(
             item,
             plate.WorkArea(),
             progress: null,
@@ -71,9 +72,9 @@ public class NestInvarianceTests
         foreach (var theta in new[] { 0.0, 0.3, 0.8, 1.2 })
         {
             BestFitCache.Clear();
-            var engine = new DefaultNestEngine(plate);
+            var filler = new DefaultPlateFiller(plate);
             var item = new NestItem { Drawing = MakeImportedAt(theta) };
-            var parts = engine.Fill(item, workArea, progress: null, token: CancellationToken.None);
+            var parts = filler.Fill(item, workArea, progress: null, token: CancellationToken.None);
 
             Assert.NotNull(parts);
             foreach (var p in parts)

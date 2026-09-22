@@ -40,13 +40,6 @@ internal class StripPlateFiller : PlateFillerBase
         List<NestItem> items,
         IProgress<NestProgress> progress,
         CancellationToken token
-    ) => PackAreaCore(box, items, progress, token);
-
-    internal List<Part> PackAreaCore(
-        Box box,
-        List<NestItem> items,
-        IProgress<NestProgress> progress,
-        CancellationToken token
     )
     {
         var inner = new DefaultPlateFiller(Plate);

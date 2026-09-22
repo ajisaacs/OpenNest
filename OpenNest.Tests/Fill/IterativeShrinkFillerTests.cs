@@ -1,4 +1,5 @@
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 using OpenNest.Engine;
 
@@ -54,8 +55,8 @@ public class IterativeShrinkFillerTests
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
         {
             var plate = new Plate(b.Width, b.Length);
-            var engine = new DefaultNestEngine(plate);
-            return engine.Fill(ni, b, null, System.Threading.CancellationToken.None);
+            var filler = new DefaultPlateFiller(plate);
+            return filler.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
         var result = IterativeShrinkFiller.Fill(items, new Box(0, 0, 120, 60), fillFunc, 1.0);
@@ -75,8 +76,8 @@ public class IterativeShrinkFillerTests
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
         {
             var plate = new Plate(b.Width, b.Length);
-            var engine = new DefaultNestEngine(plate);
-            return engine.Fill(ni, b, null, System.Threading.CancellationToken.None);
+            var filler = new DefaultPlateFiller(plate);
+            return filler.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
         var result = IterativeShrinkFiller.Fill(items, new Box(0, 0, 120, 60), fillFunc, 1.0);
@@ -100,8 +101,8 @@ public class IterativeShrinkFillerTests
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
         {
             var plate = new Plate(b.Width, b.Length);
-            var engine = new DefaultNestEngine(plate);
-            return engine.Fill(ni, b, null, System.Threading.CancellationToken.None);
+            var filler = new DefaultPlateFiller(plate);
+            return filler.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
         var result = IterativeShrinkFiller.Fill(items, new Box(0, 0, 60, 30), fillFunc, 1.0);
@@ -122,8 +123,8 @@ public class IterativeShrinkFillerTests
         Func<NestItem, Box, List<Part>> fillFunc = (ni, b) =>
         {
             var plate = new Plate(b.Width, b.Length);
-            var engine = new DefaultNestEngine(plate);
-            return engine.Fill(ni, b, null, System.Threading.CancellationToken.None);
+            var filler = new DefaultPlateFiller(plate);
+            return filler.Fill(ni, b, null, System.Threading.CancellationToken.None);
         };
 
         var result = IterativeShrinkFiller.Fill(items, new Box(0, 0, 120, 60), fillFunc, 1.0);

@@ -1,5 +1,7 @@
 using OpenNest.Engine;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests.Engine;
@@ -18,82 +20,79 @@ public class RemnantEngineTests
     }
 
     [Fact]
-    public void VerticalRemnantEngine_UsesVerticalRemnantComparer()
+    public void VerticalRemnantPlateFiller_UsesHorizontalPreferredDirection()
     {
         var plate = new Plate(60, 120);
-        var engine = new VerticalRemnantEngine(plate);
-        Assert.Equal("Vertical Remnant", engine.Name);
-        Assert.Equal(NestDirection.Horizontal, engine.PreferredDirection);
+        var filler = new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical);
+        Assert.Equal(NestDirection.Horizontal, filler.PreferredDirection);
     }
 
     [Fact]
-    public void HorizontalRemnantEngine_UsesHorizontalRemnantComparer()
+    public void HorizontalRemnantPlateFiller_UsesVerticalPreferredDirection()
     {
         var plate = new Plate(60, 120);
-        var engine = new HorizontalRemnantEngine(plate);
-        Assert.Equal("Horizontal Remnant", engine.Name);
-        Assert.Equal(NestDirection.Vertical, engine.PreferredDirection);
+        var filler = new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal);
+        Assert.Equal(NestDirection.Vertical, filler.PreferredDirection);
     }
 
     [Fact]
-    public void VerticalRemnantEngine_Fill_ProducesResults()
+    public void VerticalRemnantPlateFiller_Fill_ProducesResults()
     {
         var plate = new Plate(60, 120);
-        var engine = new VerticalRemnantEngine(plate);
+        var filler = new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
-        var parts = engine.Fill(
+        var parts = filler.Fill(
             item,
             plate.WorkArea(),
             null,
             System.Threading.CancellationToken.None
         );
 
-        Assert.True(parts.Count > 0, "VerticalRemnantEngine should fill parts");
+        Assert.True(parts.Count > 0, "VerticalRemnantPlateFiller should fill parts");
     }
 
     [Fact]
-    public void HorizontalRemnantEngine_Fill_ProducesResults()
+    public void HorizontalRemnantPlateFiller_Fill_ProducesResults()
     {
         var plate = new Plate(60, 120);
-        var engine = new HorizontalRemnantEngine(plate);
+        var filler = new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
-        var parts = engine.Fill(
+        var parts = filler.Fill(
             item,
             plate.WorkArea(),
             null,
             System.Threading.CancellationToken.None
         );
 
-        Assert.True(parts.Count > 0, "HorizontalRemnantEngine should fill parts");
+        Assert.True(parts.Count > 0, "HorizontalRemnantPlateFiller should fill parts");
     }
 
     [Fact]
-    public void Registry_ContainsBothRemnantEngines()
+    public void PlateFillService_ListsBothRemnantStrategies()
     {
-        var names = NestEngineRegistry.AvailableEngines.Select(e => e.Name).ToList();
-        Assert.Contains("Vertical Remnant", names);
-        Assert.Contains("Horizontal Remnant", names);
+        Assert.Contains("Vertical Remnant", PlateFillService.BuiltInStrategies);
+        Assert.Contains("Horizontal Remnant", PlateFillService.BuiltInStrategies);
     }
 
     [Fact]
-    public void VerticalRemnantEngine_ProducesTighterXExtent_ThanDefault()
+    public void VerticalRemnantPlateFiller_ProducesTighterXExtent_ThanDefault()
     {
         var plate = new Plate(60, 120);
         var drawing = MakeRectDrawing(20, 10);
         var item = new NestItem { Drawing = drawing };
 
-        var defaultEngine = new DefaultNestEngine(plate);
-        var remnantEngine = new VerticalRemnantEngine(plate);
+        var defaultFiller = new DefaultPlateFiller(plate);
+        var remnantFiller = new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical);
 
-        var defaultParts = defaultEngine.Fill(
+        var defaultParts = defaultFiller.Fill(
             item,
             plate.WorkArea(),
             null,
             System.Threading.CancellationToken.None
         );
-        var remnantParts = remnantEngine.Fill(
+        var remnantParts = remnantFiller.Fill(
             item,
             plate.WorkArea(),
             null,
@@ -110,7 +109,7 @@ public class RemnantEngineTests
 
         Assert.True(
             remnantXExtent <= defaultXExtent + 0.01,
-            $"Remnant X-extent ({remnantXExtent:F1}) should be <= default ({defaultXExtent:F1})"
+            $"Remnant X-extent ({remnantXExtent:F1}) should be <= default filler ({defaultXExtent:F1})"
         );
     }
 }

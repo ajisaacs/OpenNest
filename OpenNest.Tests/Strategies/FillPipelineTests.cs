@@ -1,4 +1,5 @@
 using OpenNest.Engine.Strategies;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 using OpenNest.Engine;
 
@@ -21,14 +22,14 @@ public class FillPipelineTests
     public void Pipeline_PopulatesPhaseResults()
     {
         var plate = new Plate(60, 120);
-        var engine = new DefaultNestEngine(plate);
+        var filler = new DefaultPlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
-        engine.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
+        filler.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
 
         Assert.True(
-            engine.PhaseResults.Count >= FillStrategyRegistry.Strategies.Count,
-            $"Expected phase results from all active strategies, got {engine.PhaseResults.Count}"
+            filler.PhaseResults.Count >= FillStrategyRegistry.Strategies.Count,
+            $"Expected phase results from all active strategies, got {filler.PhaseResults.Count}"
         );
     }
 
@@ -36,10 +37,10 @@ public class FillPipelineTests
     public void Pipeline_SetsWinnerPhase()
     {
         var plate = new Plate(60, 120);
-        var engine = new DefaultNestEngine(plate);
+        var filler = new DefaultPlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
 
-        var parts = engine.Fill(
+        var parts = filler.Fill(
             item,
             plate.WorkArea(),
             null,
@@ -48,11 +49,11 @@ public class FillPipelineTests
 
         Assert.True(parts.Count > 0);
         Assert.True(
-            engine.WinnerPhase == NestPhase.Pairs
-                || engine.WinnerPhase == NestPhase.Linear
-                || engine.WinnerPhase == NestPhase.RectBestFit
-                || engine.WinnerPhase == NestPhase.Extents
-                || engine.WinnerPhase == NestPhase.Custom
+            filler.WinnerPhase == NestPhase.Pairs
+                || filler.WinnerPhase == NestPhase.Linear
+                || filler.WinnerPhase == NestPhase.RectBestFit
+                || filler.WinnerPhase == NestPhase.Extents
+                || filler.WinnerPhase == NestPhase.Custom
         );
     }
 
@@ -60,13 +61,13 @@ public class FillPipelineTests
     public void Pipeline_RespectsCancellation()
     {
         var plate = new Plate(60, 120);
-        var engine = new DefaultNestEngine(plate);
+        var filler = new DefaultPlateFiller(plate);
         var item = new NestItem { Drawing = MakeRectDrawing(20, 10) };
         var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
 
         // Pre-cancelled token should return empty or partial results without throwing
-        var parts = engine.Fill(item, plate.WorkArea(), null, cts.Token);
+        var parts = filler.Fill(item, plate.WorkArea(), null, cts.Token);
 
         // Should not throw — graceful degradation
         Assert.NotNull(parts);

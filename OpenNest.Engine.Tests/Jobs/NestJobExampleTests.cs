@@ -2,13 +2,14 @@ using OpenNest.CNC;
 using OpenNest.Geometry;
 using Xunit;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
 /// <summary>
 /// Runnable end-to-end example of the whole-job engine API: multiple part requirements, multiple plate
 /// sizes, and an enumeration of every returned plate, placement, leftover, and stock line. Also the
-/// documentation checkpoint for the legacy caller boundaries that have not been migrated (task 8).
+/// documentation checkpoint for the public single-plate placement service used by interactive flows.
 /// </summary>
 public class NestJobExampleTests
 {
@@ -160,36 +161,27 @@ public class NestJobExampleTests
     }
 
     /// <summary>
-    /// Legacy caller boundaries documented for task 8 — these paths still use the old single-plate
-    /// engine entry points and are deliberately NOT migrated in this slice. Verified against source at
-    /// the time of writing:
-    /// - Desktop UI: OpenNest/Forms/MainForm.cs RunAutoNestAsync (~line 1004) and NestSinglePlateAsync
-    ///   (~line 1087) orchestrate plate-first and part-first fills directly against NestEngineRegistry
-    ///   engines. Migration requires preserving populated-plate editing, preview routing, and
-    ///   Accept-versus-Cancel semantics — a separate adapter design (documented follow-on).
-    /// - CLI: OpenNest.Console/Program.cs calls engine.Nest(...) (~line 316) on one plate. Migration
-    ///   point: build a NestJob from imported drawings plus CLI plate options and call Solve once.
-    /// - MCP: OpenNest.Mcp/Tools/NestingTools.cs calls engine.Nest(...) (~line 239) on the session
-    ///   plate. Migration point: same single job call, materialized through NestResultMaterializer.
-    /// The public API (OpenNest.Api NestRunner) already delegates to NestJobRunner.Solve (task 6).
-    /// This test exercises the legacy compatibility signature so an accidental removal of that entry
-    /// point breaks the documented contract.
+    /// The public placement service is the single-plate contract for preview-driven flows. It proposes
+    /// parts without mutating the caller's plate, so the UI can accept or discard them explicitly.
     /// </summary>
     [Fact]
-    public void LegacyCompatibilityEntryPointsStillExist()
+    public void PlateFillService_ProposesSinglePlatePartsWithoutMutatingPlate()
     {
         var plate = new Plate { Size = new Size(300.0, 200.0), Quadrant = 1 };
-        var drawing = new Drawing("legacy", TestDrawingFactory.Rectangle(50.0, 50.0));
+        var drawing = new Drawing("preview", TestDrawingFactory.Rectangle(50.0, 50.0));
         var item = new NestItem { Drawing = drawing, Quantity = 1 };
 
-        // MainForm/Console/MCP still reach the legacy single-plate signature unchanged; the engine
-        // returns placed Parts for the caller to attach (legacy paths do not attach on their own).
-        var engine = NestEngineRegistry.Create(plate);
-        var parts = engine.Nest(new List<NestItem> { item }, null, CancellationToken.None);
+        var parts = PlateFillService.Nest(
+            "Default",
+            plate,
+            new List<NestItem> { item },
+            progress: null,
+            token: CancellationToken.None
+        );
 
-        Assert.NotNull(engine);
         var placed = Assert.Single(parts);
         Assert.Same(drawing, placed.BaseDrawing);
+        Assert.Empty(plate.Parts);
     }
 
     private static NestJobPart Part(

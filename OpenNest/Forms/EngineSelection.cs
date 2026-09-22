@@ -7,8 +7,7 @@ using OpenNest.Engine.Jobs.Placement;
 namespace OpenNest.Forms
 {
     /// <summary>
-    /// App-scoped nesting-engine selection — the desktop replacement for the process-global
-    /// NestEngineRegistry.ActiveEngineName. The selected name addresses a whole-job
+    /// App-scoped nesting-engine selection. The selected name addresses a whole-job
     /// INestingEngine resolved through NestingEngineRegistry at call time; single-plate
     /// interactive fill uses FillStrategy, which maps a built-in engine to its placement
     /// strategy and falls back to Default for jobs-only engines (StockLadder, plug-ins).

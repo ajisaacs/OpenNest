@@ -1,4 +1,3 @@
-using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
@@ -6,15 +5,14 @@ using OpenNest.Engine.Jobs.Adapters;
 namespace OpenNest.Engine.Tests.Jobs;
 
 /// <summary>
-/// Strategy selection must be instance-scoped: explicit engine choices work without touching the
-/// process-global NestEngineRegistry.ActiveEngineName, and unknown strategies are rejected.
+/// Strategy selection is instance-scoped: explicit engine choices complete independently,
+/// and unknown strategies are rejected.
 /// </summary>
 public class NestJobEngineSelectionTests
 {
     [Fact]
-    public void ExplicitDefaultAndStripSelectionsDoNotTouchGlobalRegistry()
+    public void ExplicitDefaultAndStripSelectionsCompleteIndependently()
     {
-        var original = NestEngineRegistry.ActiveEngineName;
         var job = FiniteStockJobTests.Job(1);
 
         var defaultResult = new NestJobRunner(PlateNesterFactory.Create).Solve(job);
@@ -24,14 +22,11 @@ public class NestJobEngineSelectionTests
             new NestJob(job.Parts, job.Plates, new NestJobOptions("Strip"))
         );
         Assert.Equal(NestJobStatus.Complete, stripResult.Status);
-
-        Assert.Equal(original, NestEngineRegistry.ActiveEngineName);
     }
 
     [Fact]
-    public void FactoryResolvesNamedEnginesWithoutGlobalState()
+    public void FactoryResolvesEachNamedBuiltInStrategy()
     {
-        var original = NestEngineRegistry.ActiveEngineName;
         var defaultNester = PlateNesterFactory.Create("Default");
         var stripNester = PlateNesterFactory.Create("Strip");
         var verticalNester = PlateNesterFactory.Create("Vertical Remnant");
@@ -42,7 +37,6 @@ public class NestJobEngineSelectionTests
         Assert.NotNull(verticalNester);
         Assert.NotNull(horizontalNester);
         Assert.NotSame(defaultNester, stripNester);
-        Assert.Equal(original, NestEngineRegistry.ActiveEngineName);
     }
 
     [Fact]
@@ -55,22 +49,6 @@ public class NestJobEngineSelectionTests
                 throw new NotSupportedException($"Unknown placement strategy: {key}")
             ).Solve(new NestJob(job.Parts, job.Plates, new NestJobOptions("Bogus")))
         );
-    }
-
-    [Fact]
-    public void LegacyRegistryPluginsDoNotLeakIntoJobSelection()
-    {
-        // A plugin engine registered through the legacy registry must not become selectable
-        // through the job factory; the new boundary is independent of registry state.
-        NestEngineRegistry.Register(
-            "ProbePlugin",
-            "test plugin",
-            plate => new PluginShapeEngine(plate)
-        );
-        Assert.Contains(NestEngineRegistry.AvailableEngines, e => e.Name == "ProbePlugin");
-
-        Assert.Throws<NotSupportedException>(() => PlateNesterFactory.Create("ProbePlugin"));
-        Assert.NotNull(PlateNesterFactory.Create("Default"));
     }
 
     [Fact]
@@ -88,11 +66,5 @@ public class NestJobEngineSelectionTests
         Assert.True(result.Plates.SelectMany(p => p.Placements).Count() >= 1);
         foreach (var f in result.Fulfillment)
             Assert.Equal(f.Requested, f.Placed + f.Unplaced);
-    }
-
-    private sealed class PluginShapeEngine(Plate plate) : NestEngineBase(plate)
-    {
-        public override string Name => "ProbePlugin";
-        public override string Description => "registered via legacy registry only";
     }
 }

@@ -20,9 +20,7 @@ internal class DefaultPlateFiller : PlateFillerBase
     internal DefaultPlateFiller(Plate plate)
         : base(plate) { }
 
-    protected override IFillComparer CreateComparer() => CreateComparerCore();
-
-    internal IFillComparer CreateComparerCore() => new DefaultFillComparer();
+    protected override IFillComparer CreateComparer() => new DefaultFillComparer();
 
     internal bool ForceFullAngleSweep
     {
@@ -34,18 +32,9 @@ internal class DefaultPlateFiller : PlateFillerBase
         NestItem item,
         ClassificationResult classification,
         Box workArea
-    ) => BuildAnglesCore(item, classification, workArea);
-
-    internal List<double> BuildAnglesCore(
-        NestItem item,
-        ClassificationResult classification,
-        Box workArea
     ) => angleBuilder.Build(item, classification, workArea);
 
-    protected override void RecordProductiveAngles(List<AngleResult> angleResults) =>
-        RecordProductiveAnglesCore(angleResults);
-
-    internal void RecordProductiveAnglesCore(List<AngleResult> angleResults)
+    protected override void RecordProductiveAngles(List<AngleResult> angleResults)
     {
         angleBuilder.RecordProductive(angleResults);
     }
@@ -419,9 +408,7 @@ internal class DefaultPlateFiller : PlateFillerBase
         return BinConverter.ToParts(bin, items);
     }
 
-    protected virtual void RunPipeline(FillContext context) => RunPipelineCore(context);
-
-    internal void RunPipelineCore(FillContext context)
+    protected virtual void RunPipeline(FillContext context)
     {
         var classification = PartClassifier.Classify(context.Item.Drawing);
         context.PartType = classification.Type;

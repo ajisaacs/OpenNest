@@ -72,8 +72,8 @@ namespace OpenNest.Forms
             //    BestFitCache.CreateSlideComputer = () => GpuEvaluatorFactory.CreateSlideComputer();
 
             // Jobs-side plug-in discovery: INestingEngine implementations are registered per
-            // assembly/type with the same per-DLL isolation as before. Binary plug-ins derived
-            // from the legacy NestEngineBase no longer load here after the Phase-4 removal.
+            // assembly/type with per-DLL isolation. Existing plug-ins must implement the jobs
+            // contract and expose a public parameterless constructor.
             var enginesDir = Path.Combine(Application.StartupPath, "Engines");
             NestingEngineRegistry.LoadPlugins(enginesDir);
 

@@ -3,6 +3,7 @@ using OpenNest.Geometry;
 using OpenNest.IO;
 using Xunit.Abstractions;
 using OpenNest.Engine;
+using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Tests.Engine;
 
@@ -31,7 +32,7 @@ public class EngineOverlapTests
     [InlineData("Strip")]
     [InlineData("Vertical Remnant")]
     [InlineData("Horizontal Remnant")]
-    public void FillPlate_NoOverlaps(string engineName)
+    public void FillPlate_NoOverlaps(string strategy)
     {
         var drawing = ImportDxf();
         if (drawing is null)
@@ -39,22 +40,20 @@ public class EngineOverlapTests
 
         var plate = new Plate(60, 120);
 
-        NestEngineRegistry.ActiveEngineName = engineName;
-        var engine = NestEngineRegistry.Create(plate);
-
         var item = new NestItem { Drawing = drawing };
-        var success = engine.Fill(item);
+        var parts = PlateFillService.FillItem(
+            strategy,
+            plate,
+            item,
+            plate.WorkArea(),
+            progress: null,
+            token: CancellationToken.None
+        );
+        plate.Parts.AddRange(parts);
 
         _output.WriteLine(
-            $"Engine: {engine.Name}, Parts: {plate.Parts.Count}, Utilization: {plate.Utilization():P1}"
+            $"Strategy: {strategy}, Parts: {plate.Parts.Count}, Utilization: {plate.Utilization():P1}"
         );
-
-        if (engine is DefaultNestEngine defaultEngine)
-        {
-            _output.WriteLine($"Winner phase: {defaultEngine.WinnerPhase}");
-            foreach (var pr in defaultEngine.PhaseResults)
-                _output.WriteLine($"  Phase {pr.Phase}: {pr.PartCount} parts in {pr.TimeMs}ms");
-        }
 
         // Show rotation distribution
         var rotGroups = plate
@@ -74,7 +73,7 @@ public class EngineOverlapTests
 
         Assert.False(
             hasOverlaps,
-            $"Engine '{engineName}' produced {collisionPoints.Count} collision point(s) with {plate.Parts.Count} parts"
+            $"Strategy '{strategy}' produced {collisionPoints.Count} collision point(s) with {plate.Parts.Count} parts"
         );
     }
 

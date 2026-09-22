@@ -7,7 +7,7 @@ namespace OpenNest.Tests.Engine;
 
 /// <summary>
 /// Phase 3.2: MultiPlateNester and PlateOptimizer take an explicit placement strategy at their
-/// top-level call boundary instead of consulting the process-global NestEngineRegistry.
+/// top-level call boundary instead of consulting process-global selection state.
 /// </summary>
 public class ExplicitPlacementStrategyTests
 {

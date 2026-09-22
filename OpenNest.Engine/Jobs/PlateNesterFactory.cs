@@ -5,9 +5,8 @@ namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Instance-scoped strategy resolution for the whole-job runner. All four built-in strategies
-/// resolve directly to filler-backed plate nesters. The process-global NestEngineRegistry
-/// (including plugin registrations and ActiveEngineName) is neither read nor modified.
-/// Unknown keys reject.
+/// resolve directly to filler-backed plate nesters. Selection is explicit per job; no shared
+/// mutable strategy setting is read or modified. Unknown keys reject.
 /// </summary>
 public static class PlateNesterFactory
 {
