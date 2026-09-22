@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "opennest": {
-      "command": "cmd",
-      "args": ["/c", "C:/Users/AJ/.claude/mcp/OpenNest.Mcp/run.cmd"]
+      "command": "${USERPROFILE}/.claude/mcp/OpenNest.Mcp/OpenNest.Mcp.exe",
+      "args": []
     }
   }
 }
