@@ -102,6 +102,33 @@ public class PlateFillServiceTests
         Assert.All(parts, part => Assert.Same(drawing, part.BaseDrawing));
     }
 
+    [Fact]
+    public void Nest_RejectsUnknownStrategy_AndReportsPlateNumberInDetail()
+    {
+        var plate = new Plate(new Size(60, 80));
+        // Big enough (240 area x4 >= 10% of the 4800-area plate) to route through the fill
+        // pipeline, which is where progress detail is emitted.
+        var drawing = new Drawing("part", TestDrawingFactory.Rectangle(20, 12));
+        var items = new List<NestItem> { new() { Drawing = drawing, Quantity = 4 } };
+
+        Assert.Throws<NotSupportedException>(() =>
+            PlateFillService.Nest("StockLadder", plate, items, null, CancellationToken.None)
+        );
+        Assert.Throws<ArgumentNullException>(() =>
+            PlateFillService.Nest(null!, plate, items, null, CancellationToken.None)
+        );
+
+        // The plateNumber overload reports the caller's plate index like the legacy
+        // engine's PlateNumber did for interactive multi-plate loops.
+        var progress = new CapturingProgress();
+        var parts = PlateFillService.Nest("Default", plate, items, 3, progress, CancellationToken.None);
+
+        Assert.NotEmpty(parts);
+        Assert.NotEmpty(progress.Reports);
+        Assert.All(progress.Reports, report => Assert.Equal(3, report.PlateNumber));
+        Assert.Empty(plate.Parts); // proposed parts only; committing stays with the caller
+    }
+
     [Theory]
     [MemberData(nameof(StrategiesData))]
     public void FillItem_ReturnsNoParts_WhenTokenIsAlreadyCancelled(string strategy)

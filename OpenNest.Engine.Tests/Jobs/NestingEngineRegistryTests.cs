@@ -43,6 +43,27 @@ public class NestingEngineRegistryTests
     }
 
     [Fact]
+    public void CreateResolvesKnownNamesCaseInsensitivelyAndRejectsUnknown()
+    {
+        Assert.NotNull(NestingEngineRegistry.Create("default"));
+        Assert.NotNull(NestingEngineRegistry.Create("Vertical Remnant"));
+        Assert.NotNull(NestingEngineRegistry.Create("stockladder"));
+
+        Assert.Throws<NotSupportedException>(() => NestingEngineRegistry.Create("Mystery Engine"));
+        Assert.Throws<ArgumentException>(() => NestingEngineRegistry.Create("  "));
+        Assert.Throws<ArgumentNullException>(() => NestingEngineRegistry.Create(null!));
+    }
+
+    [Fact]
+    public void CreateProducesAWorkingEngine()
+    {
+        var engine = NestingEngineRegistry.Create("Strip");
+        var result = engine.Solve(FiniteStockJobTests.Job(1));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+    }
+
+    [Fact]
     public void LoadPluginsAgainstMissingDirectoryIsANoOp()
     {
         var before = NestingEngineRegistry.AvailableEngines.Count;

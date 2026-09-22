@@ -193,7 +193,7 @@ dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- project.zip ext
 | Option | Description |
 |--------|-------------|
 | `--size <WxL>` | Plate size (e.g. `60x120`). Required for DXF-only mode. |
-| `--autonest` | Use mixed-part nesting instead of linear fill (experimental) |
+| `--autonest` | Whole-job nesting via the jobs engine named by `--engine` (default: Default) instead of single-plate fill |
 | `--drawing <name>` | Select which drawing to fill with (default: first) |
 | `--quantity <n>` | Max parts to place (default: unlimited) |
 | `--spacing <value>` | Override part spacing |
@@ -201,7 +201,7 @@ dotnet run --project OpenNest.Console/OpenNest.Console.csproj -- project.zip ext
 | `--output <path>` | Output file path (default: `<input>-result.zip`) |
 | `--keep-parts` | Keep existing parts instead of clearing before fill |
 | `--check-overlaps` | Run overlap detection after fill (exits with code 1 if found) |
-| `--engine <name>` | Select a registered nesting engine |
+| `--engine <name>` | With `--autonest`: jobs engine (`Default`, `Strip`, `Vertical Remnant`, `Horizontal Remnant`, `StockLadder`). Without: single-plate fill strategy (the four built-ins) |
 | `--post <name>` | Post-process the result with the named post-processor plugin |
 | `--no-save` | Skip saving the output file |
 | `--no-log` | Skip writing the debug log |

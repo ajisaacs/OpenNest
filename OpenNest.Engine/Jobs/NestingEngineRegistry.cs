@@ -53,6 +53,22 @@ public static class NestingEngineRegistry
 
     public static IReadOnlyList<NestingEngineInfo> AvailableEngines => engines;
 
+    /// <summary>
+    /// Creates the engine registered under <paramref name="name"/> (case-insensitive). The caller's
+    /// explicit choice is the whole selection mechanism: unlike the legacy registry there is no
+    /// process-global active name to consult or mutate. Unknown names throw.
+    /// </summary>
+    public static INestingEngine Create(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var info = engines.FirstOrDefault(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (info == null)
+            throw new NotSupportedException(
+                $"Unknown nesting engine: {name}. Available: {string.Join(", ", engines.Select(e => e.Name))}."
+            );
+        return info.Factory();
+    }
+
     public static void Register(string name, string description, Func<INestingEngine> factory)
     {
         if (engines.Any(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))

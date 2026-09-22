@@ -11,6 +11,9 @@ using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.IO.Bending;
 using OpenNest.Engine;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
 
 return NestConsole.Run(args);
 
@@ -43,6 +46,36 @@ static class NestConsole
         {
             ListPostProcessors(options);
             return 0;
+        }
+
+        // Validate --engine up front: autonest names a jobs engine, plain fill names a
+        // single-plate placement strategy. Unknown names exit with the valid choices.
+        if (options.AutoNest)
+        {
+            var isJobsEngine = NestingEngineRegistry.AvailableEngines.Any(e =>
+                e.Name.Equals(options.Engine, StringComparison.OrdinalIgnoreCase)
+            );
+            if (!isJobsEngine)
+            {
+                Console.Error.WriteLine(
+                    $"Error: unknown engine '{options.Engine}'. Jobs engines: {string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name))}"
+                );
+                return 1;
+            }
+        }
+        else
+        {
+            try
+            {
+                PlateFillService.ResolveStrategy(options.Engine);
+            }
+            catch (NotSupportedException)
+            {
+                Console.Error.WriteLine(
+                    $"Error: unknown engine '{options.Engine}'. Fill strategies: {string.Join(", ", PlateFillService.BuiltInStrategies)} (jobs engines such as StockLadder require --autonest)"
+                );
+                return 1;
+            }
         }
 
         if (options.InputFiles.Count == 0)
@@ -156,7 +189,7 @@ static class NestConsole
                     o.AutoNest = true;
                     break;
                 case "--engine" when i + 1 < args.Length:
-                    NestEngineRegistry.ActiveEngineName = args[++i];
+                    o.Engine = args[++i];
                     break;
                 case "--post" when i + 1 < args.Length:
                     o.PostName = args[++i];
@@ -397,20 +430,96 @@ static class NestConsole
                 $"AutoNest: {nestItems.Count} drawing(s), {nestItems.Sum(i => i.Quantity)} total parts"
             );
 
-            var engine = NestEngineRegistry.Create(plate);
-            var nestParts = engine.Nest(nestItems, null, CancellationToken.None);
-            plate.Parts.AddRange(nestParts);
-            success = nestParts.Count > 0;
+            success = AutoNestJob(plate, nestItems, options.Engine);
         }
         else
         {
-            var engine = NestEngineRegistry.Create(plate);
+            // Single-plate fill: explicit placement strategy through the public service;
+            // the process-global engine registry is never consulted.
+            var strategy = ResolveFillStrategy(options.Engine);
             var item = new NestItem { Drawing = drawing, Quantity = options.Quantity };
-            success = engine.Fill(item);
+            var parts = PlateFillService.FillItem(
+                strategy,
+                plate,
+                item,
+                plate.WorkArea(),
+                null,
+                CancellationToken.None
+            );
+
+            if (parts.Count > 0)
+                plate.Parts.AddRange(parts);
+            success = parts.Count > 0;
         }
 
         sw.Stop();
         return (success, sw.ElapsedMilliseconds);
+    }
+
+    /// <summary>
+    /// Solves the drawings as one whole job against this single plate using the named jobs
+    /// engine, then commits the returned placements onto the plate. Placements are mapped back
+    /// onto the caller's original drawings (same pose semantics as NestResultMaterializer), so
+    /// the saved nest keeps its existing drawing identities.
+    /// </summary>
+    static bool AutoNestJob(Plate plate, List<NestItem> nestItems, string engineName)
+    {
+        var engine = NestingEngineRegistry.Create(engineName);
+
+        var parts = new List<NestJobPart>(nestItems.Count);
+        var drawingsByPartId = new Dictionary<string, Drawing>(StringComparer.Ordinal);
+        for (var i = 0; i < nestItems.Count; i++)
+        {
+            var partId = $"part-{i}";
+            parts.Add(DrawingJobMapper.FromItem(partId, nestItems[i]));
+            drawingsByPartId[partId] = nestItems[i].Drawing;
+        }
+
+        // One physical sheet: this plate, this solve — the runner owns stock accounting.
+        var stock = DrawingJobMapper.FromPlate("plate-0", plate, 1);
+        var job = new NestJob(parts, [stock]);
+
+        var result = engine.Solve(job, null, CancellationToken.None);
+
+        var committed = 0;
+        foreach (var plateResult in result.Plates)
+        {
+            foreach (var pose in plateResult.Placements)
+            {
+                if (!drawingsByPartId.TryGetValue(pose.PartId, out var drawing))
+                    continue;
+                var part = new Part(drawing);
+                part.Rotate(pose.Rotation);
+                part.Location = new Vector(pose.X, pose.Y);
+                part.UpdateBounds();
+                plate.Parts.Add(part);
+                committed++;
+            }
+        }
+
+        Console.WriteLine($"Engine: {engineName} — committed {committed} placements");
+        return committed > 0;
+    }
+
+    static string ResolveFillStrategy(string engineName)
+    {
+        try
+        {
+            return PlateFillService.ResolveStrategy(engineName);
+        }
+        catch (NotSupportedException)
+        {
+            var isJobEngine = NestingEngineRegistry.AvailableEngines.Any(e =>
+                e.Name.Equals(engineName, StringComparison.OrdinalIgnoreCase)
+            );
+            Console.Error.WriteLine(
+                isJobEngine
+                    ? $"Error: engine '{engineName}' is a whole-job engine; single-plate fill supports: {string.Join(", ", PlateFillService.BuiltInStrategies)}. Use --autonest for whole-job engines."
+                    : $"Error: unknown engine '{engineName}'. Engines: {string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name))}"
+            );
+            Environment.Exit(1);
+            throw; // unreachable
+        }
     }
 
     static int CheckOverlaps(Plate plate, Options options)
@@ -598,7 +707,13 @@ static class NestConsole
             "  --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)"
         );
         Console.Error.WriteLine(
-            "  --autonest             Use mixed-part autonesting (engine Nest) instead of linear fill"
+            "  --autonest             Whole-job nesting via the jobs engine (--engine) instead of single-plate fill"
+        );
+        Console.Error.WriteLine(
+            "  --engine <name>        With --autonest: jobs engine (default: Default; also StockLadder, Strip, ...)."
+        );
+        Console.Error.WriteLine(
+            "                         Without --autonest: fill strategy (Default, Strip, Vertical Remnant, Horizontal Remnant)"
         );
         Console.Error.WriteLine(
             "  --keep-parts           Don't clear existing parts before filling"
@@ -631,6 +746,7 @@ static class NestConsole
         public bool NoSave;
         public bool KeepParts;
         public bool AutoNest;
+        public string Engine = "Default";
         public string TemplateFile;
         public string PostName;
         public string PostOutput;

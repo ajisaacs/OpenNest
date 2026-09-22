@@ -8,6 +8,13 @@ namespace OpenNest.Mcp
         public List<Plate> Plates { get; } = new();
         public List<Drawing> Drawings { get; } = new();
 
+        /// <summary>
+        /// Session-default engine/strategy name used by nesting tools when a call does not pass
+        /// an explicit <c>engine</c> argument. Instance state only — the process-global legacy
+        /// registry is never read or written.
+        /// </summary>
+        public string DefaultEngineName { get; set; } = "Default";
+
         public Plate GetPlate(int index)
         {
             if (Nest != null && index < Nest.Plates.Count)

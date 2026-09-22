@@ -66,9 +66,28 @@ public static class PlateFillService
         List<NestItem> items,
         IProgress<NestProgress> progress,
         CancellationToken token
+    ) => Nest(strategy, plate, items, 0, progress, token);
+
+    /// <summary>
+    /// Whole-plate fill with the strategy's orchestration (fill-vs-pack, compaction). Returns
+    /// proposed parts only; committing them to <paramref name="plate"/> stays with the caller.
+    /// </summary>
+    /// <param name="plateNumber">Plate index reported with progress, as the legacy engine's
+    /// <c>PlateNumber</c> was by interactive multi-plate loops.</param>
+    public static List<Part> Nest(
+        string strategy,
+        Plate plate,
+        List<NestItem> items,
+        int plateNumber,
+        IProgress<NestProgress> progress,
+        CancellationToken token
     )
     {
-        return RequireFiller(strategy, plate).Nest(items, progress, token);
+        ArgumentNullException.ThrowIfNull(strategy);
+        ResolveStrategy(strategy, allowEmpty: false);
+        var filler = CreateFiller(strategy, plate);
+        filler.PlateNumber = plateNumber;
+        return filler.Nest(items, progress, token);
     }
 
     /// <summary>
@@ -77,7 +96,11 @@ public static class PlateFillService
     /// ActiveEngineName so tolerant interactive callers keep working. Returns the canonical name;
     /// unknown names throw <see cref="NotSupportedException"/>.
     /// </summary>
-    internal static string ResolveStrategy(string strategy, bool allowEmpty = true)
+    public static string ResolveStrategy(string strategy) => ResolveStrategy(strategy, true);
+
+    /// <inheritdoc cref="ResolveStrategy(string)"/>
+    /// <param name="allowEmpty">False rejects null/empty instead of defaulting (explicit service calls).</param>
+    internal static string ResolveStrategy(string strategy, bool allowEmpty)
     {
         if (string.IsNullOrWhiteSpace(strategy))
         {
