@@ -7,7 +7,6 @@ using ACadSharp.Tables;
 using CSMath;
 using OpenNest.Bending;
 using OpenNest.Converters;
-using OpenNest.Geometry;
 // Disambiguate Entity — both ACadSharp.Entities and OpenNest.Geometry define it
 using GeoEntity = OpenNest.Geometry.Entity;
 

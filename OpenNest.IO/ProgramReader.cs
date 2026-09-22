@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -257,36 +257,36 @@ namespace OpenNest.IO
                         break;
 
                     case ':':
-                    {
-                        var tags = code.Value.Trim().ToUpper().Split(':');
-
-                        foreach (var tag in tags)
                         {
-                            switch (tag)
+                            var tags = code.Value.Trim().ToUpper().Split(':');
+
+                            foreach (var tag in tags)
                             {
-                                case "DISPLAY":
-                                    layer = LayerType.Display;
-                                    break;
+                                switch (tag)
+                                {
+                                    case "DISPLAY":
+                                        layer = LayerType.Display;
+                                        break;
 
-                                case "LEADIN":
-                                    layer = LayerType.Leadin;
-                                    break;
+                                    case "LEADIN":
+                                        layer = LayerType.Leadin;
+                                        break;
 
-                                case "LEADOUT":
-                                    layer = LayerType.Leadout;
-                                    break;
+                                    case "LEADOUT":
+                                        layer = LayerType.Leadout;
+                                        break;
 
-                                case "SCRIBE":
-                                    layer = LayerType.Scribe;
-                                    break;
+                                    case "SCRIBE":
+                                        layer = LayerType.Scribe;
+                                        break;
 
-                                case "SUPPRESSED":
-                                    suppressed = true;
-                                    break;
+                                    case "SUPPRESSED":
+                                        suppressed = true;
+                                        break;
+                                }
                             }
+                            break;
                         }
-                        break;
-                    }
 
                     default:
                         section = CodeSection.Unknown;
@@ -355,36 +355,36 @@ namespace OpenNest.IO
                         break;
 
                     case ':':
-                    {
-                        var tags = code.Value.Trim().ToUpper().Split(':');
-
-                        foreach (var tag in tags)
                         {
-                            switch (tag)
+                            var tags = code.Value.Trim().ToUpper().Split(':');
+
+                            foreach (var tag in tags)
                             {
-                                case "DISPLAY":
-                                    layer = LayerType.Display;
-                                    break;
+                                switch (tag)
+                                {
+                                    case "DISPLAY":
+                                        layer = LayerType.Display;
+                                        break;
 
-                                case "LEADIN":
-                                    layer = LayerType.Leadin;
-                                    break;
+                                    case "LEADIN":
+                                        layer = LayerType.Leadin;
+                                        break;
 
-                                case "LEADOUT":
-                                    layer = LayerType.Leadout;
-                                    break;
+                                    case "LEADOUT":
+                                        layer = LayerType.Leadout;
+                                        break;
 
-                                case "SCRIBE":
-                                    layer = LayerType.Scribe;
-                                    break;
+                                    case "SCRIBE":
+                                        layer = LayerType.Scribe;
+                                        break;
 
-                                case "SUPPRESSED":
-                                    suppressed = true;
-                                    break;
+                                    case "SUPPRESSED":
+                                        suppressed = true;
+                                        break;
+                                }
                             }
+                            break;
                         }
-                        break;
-                    }
 
                     default:
                         section = CodeSection.Unknown;

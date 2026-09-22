@@ -5,7 +5,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.Engine.BestFit;
 using static OpenNest.IO.NestFormat;
@@ -92,11 +91,11 @@ namespace OpenNest.IO
                 Plates = BuildPlateDtos(),
                 PlateOptions =
                     nest.PlateOptions?.Select(o => new PlateOptionDto
-                        {
-                            Width = o.Width,
-                            Length = o.Length,
-                            Cost = o.Cost,
-                        })
+                    {
+                        Width = o.Width,
+                        Length = o.Length,
+                        Cost = o.Cost,
+                    })
                         .ToList()
                     ?? new(),
                 SalvageRate = nest.SalvageRate,
@@ -169,16 +168,16 @@ namespace OpenNest.IO
                         },
                         Bends =
                             d.Bends?.Select(b => new BendDto
-                                {
-                                    StartX = b.StartPoint.X,
-                                    StartY = b.StartPoint.Y,
-                                    EndX = b.EndPoint.X,
-                                    EndY = b.EndPoint.Y,
-                                    Direction = b.Direction.ToString(),
-                                    Angle = b.Angle,
-                                    Radius = b.Radius,
-                                    NoteText = b.NoteText ?? "",
-                                })
+                            {
+                                StartX = b.StartPoint.X,
+                                StartY = b.StartPoint.Y,
+                                EndX = b.EndPoint.X,
+                                EndY = b.EndPoint.Y,
+                                Direction = b.Direction.ToString(),
+                                Angle = b.Angle,
+                                Radius = b.Radius,
+                                NoteText = b.NoteText ?? "",
+                            })
                                 .ToList()
                             ?? new List<BendDto>(),
                     }
@@ -436,100 +435,100 @@ namespace OpenNest.IO
             switch (code.Type)
             {
                 case CodeType.ArcMove:
-                {
-                    var sb = new StringBuilder();
-                    var arcMove = (ArcMove)code;
-                    var refs = arcMove.VariableRefs;
-
-                    var x = FormatCoord(arcMove.EndPoint.X, "X", refs);
-                    var y = FormatCoord(arcMove.EndPoint.Y, "Y", refs);
-                    var i = FormatCoord(arcMove.CenterPoint.X, "I", refs);
-                    var j = FormatCoord(arcMove.CenterPoint.Y, "J", refs);
-
-                    sb.Append(
-                        arcMove.Rotation == RotationType.CW
-                            ? $"G02X{x}Y{y}I{i}J{j}"
-                            : $"G03X{x}Y{y}I{i}J{j}"
-                    );
-
-                    if (arcMove.Layer != LayerType.Cut)
-                        sb.Append(GetLayerString(arcMove.Layer));
-
-                    if (arcMove.Suppressed)
-                        sb.Append(":SUPPRESSED");
-
-                    return sb.ToString();
-                }
-
-                case CodeType.Comment:
-                {
-                    var comment = (Comment)code;
-                    return ":" + comment.Value;
-                }
-
-                case CodeType.LinearMove:
-                {
-                    var sb = new StringBuilder();
-                    var linearMove = (LinearMove)code;
-                    var refs = linearMove.VariableRefs;
-
-                    sb.Append(
-                        $"G01X{FormatCoord(linearMove.EndPoint.X, "X", refs)}Y{FormatCoord(linearMove.EndPoint.Y, "Y", refs)}"
-                    );
-
-                    if (linearMove.Layer != LayerType.Cut)
-                        sb.Append(GetLayerString(linearMove.Layer));
-
-                    if (linearMove.Suppressed)
-                        sb.Append(":SUPPRESSED");
-
-                    return sb.ToString();
-                }
-
-                case CodeType.RapidMove:
-                {
-                    var rapidMove = (RapidMove)code;
-                    var refs = rapidMove.VariableRefs;
-
-                    return $"G00X{FormatCoord(rapidMove.EndPoint.X, "X", refs)}Y{FormatCoord(rapidMove.EndPoint.Y, "Y", refs)}";
-                }
-
-                case CodeType.SetFeedrate:
-                {
-                    var setFeedrate = (Feedrate)code;
-                    if (setFeedrate.VariableRef != null)
-                        return $"F${setFeedrate.VariableRef}";
-                    return "F" + setFeedrate.Value;
-                }
-
-                case CodeType.SetKerf:
-                {
-                    var setKerf = (Kerf)code;
-
-                    switch (setKerf.Value)
                     {
-                        case KerfType.None:
-                            return "G40";
-                        case KerfType.Left:
-                            return "G41";
-                        case KerfType.Right:
-                            return "G42";
+                        var sb = new StringBuilder();
+                        var arcMove = (ArcMove)code;
+                        var refs = arcMove.VariableRefs;
+
+                        var x = FormatCoord(arcMove.EndPoint.X, "X", refs);
+                        var y = FormatCoord(arcMove.EndPoint.Y, "Y", refs);
+                        var i = FormatCoord(arcMove.CenterPoint.X, "I", refs);
+                        var j = FormatCoord(arcMove.CenterPoint.Y, "J", refs);
+
+                        sb.Append(
+                            arcMove.Rotation == RotationType.CW
+                                ? $"G02X{x}Y{y}I{i}J{j}"
+                                : $"G03X{x}Y{y}I{i}J{j}"
+                        );
+
+                        if (arcMove.Layer != LayerType.Cut)
+                            sb.Append(GetLayerString(arcMove.Layer));
+
+                        if (arcMove.Suppressed)
+                            sb.Append(":SUPPRESSED");
+
+                        return sb.ToString();
                     }
 
-                    break;
-                }
+                case CodeType.Comment:
+                    {
+                        var comment = (Comment)code;
+                        return ":" + comment.Value;
+                    }
+
+                case CodeType.LinearMove:
+                    {
+                        var sb = new StringBuilder();
+                        var linearMove = (LinearMove)code;
+                        var refs = linearMove.VariableRefs;
+
+                        sb.Append(
+                            $"G01X{FormatCoord(linearMove.EndPoint.X, "X", refs)}Y{FormatCoord(linearMove.EndPoint.Y, "Y", refs)}"
+                        );
+
+                        if (linearMove.Layer != LayerType.Cut)
+                            sb.Append(GetLayerString(linearMove.Layer));
+
+                        if (linearMove.Suppressed)
+                            sb.Append(":SUPPRESSED");
+
+                        return sb.ToString();
+                    }
+
+                case CodeType.RapidMove:
+                    {
+                        var rapidMove = (RapidMove)code;
+                        var refs = rapidMove.VariableRefs;
+
+                        return $"G00X{FormatCoord(rapidMove.EndPoint.X, "X", refs)}Y{FormatCoord(rapidMove.EndPoint.Y, "Y", refs)}";
+                    }
+
+                case CodeType.SetFeedrate:
+                    {
+                        var setFeedrate = (Feedrate)code;
+                        if (setFeedrate.VariableRef != null)
+                            return $"F${setFeedrate.VariableRef}";
+                        return "F" + setFeedrate.Value;
+                    }
+
+                case CodeType.SetKerf:
+                    {
+                        var setKerf = (Kerf)code;
+
+                        switch (setKerf.Value)
+                        {
+                            case KerfType.None:
+                                return "G40";
+                            case KerfType.Left:
+                                return "G41";
+                            case KerfType.Right:
+                                return "G42";
+                        }
+
+                        break;
+                    }
 
                 case CodeType.SubProgramCall:
-                {
-                    var subProgramCall = (SubProgramCall)code;
-                    var x = System
-                        .Math.Round(subProgramCall.Offset.X, OutputPrecision)
-                        .ToString(CoordinateFormat);
-                    var y = System
-                        .Math.Round(subProgramCall.Offset.Y, OutputPrecision)
-                        .ToString(CoordinateFormat);
-                    return $"G65P{subProgramCall.Id}X{x}Y{y}";
-                }
+                    {
+                        var subProgramCall = (SubProgramCall)code;
+                        var x = System
+                            .Math.Round(subProgramCall.Offset.X, OutputPrecision)
+                            .ToString(CoordinateFormat);
+                        var y = System
+                            .Math.Round(subProgramCall.Offset.Y, OutputPrecision)
+                            .ToString(CoordinateFormat);
+                        return $"G65P{subProgramCall.Id}X{x}Y{y}";
+                    }
             }
 
             return string.Empty;
