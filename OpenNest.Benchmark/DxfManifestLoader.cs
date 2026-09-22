@@ -86,7 +86,7 @@ namespace OpenNest.Benchmark
 
             foreach (var text in manifest.SheetSizes ?? new List<string>())
             {
-                if (!Size.TryParse(text, out var size))
+                if (!JobLoader.TryParseSheetSize(text, out var size))
                     throw new InvalidOperationException(
                         $"Manifest '{manifestPath}': could not parse sheet size '{text}' (expected e.g. \"48x96\")."
                     );

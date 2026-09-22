@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Converters;
+using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -56,6 +57,92 @@ namespace OpenNest.Benchmark
 
             return result;
         }
+
+        /// <summary>
+        /// Checks what the materialized layout cannot show: every sheet must be
+        /// one of the job's own stock entries (an engine may not invent a sheet
+        /// size or loosen its spacing/edge settings, which the layout checks
+        /// would otherwise trust), finite stock may not be overdrawn, and every
+        /// placement's rotation must satisfy its part's RotationPolicy.
+        /// </summary>
+        public static void ValidateAgainstJob(
+            NestJob job,
+            NestJobResult jobResult,
+            IReadOnlyDictionary<string, string> displayNames,
+            ValidationResult result
+        )
+        {
+            var stockById = job.Plates.ToDictionary(s => s.Id);
+            var partsById = job.Parts.ToDictionary(p => p.Id);
+            var sheetsUsed = new Dictionary<string, int>();
+
+            foreach (var sheet in jobResult.Plates)
+            {
+                if (
+                    !stockById.TryGetValue(sheet.Stock.Id, out var stock)
+                    || !SameSettings(stock, sheet.Stock)
+                )
+                {
+                    result.Violations.Add(
+                        $"Plate {sheet.PlateIndex} uses stock '{sheet.Stock.Id}' ({sheet.Stock.Size}) that does not match any stock offered by the job"
+                    );
+                    continue;
+                }
+
+                sheetsUsed[stock.Id] = sheetsUsed.GetValueOrDefault(stock.Id) + 1;
+            }
+
+            foreach (var (stockId, used) in sheetsUsed)
+            {
+                var available = stockById[stockId].Quantity;
+
+                if (available.HasValue && used > available.Value)
+                {
+                    result.Violations.Add(
+                        $"Used {used} sheet(s) of stock '{stockId}' but only {available.Value} are available"
+                    );
+                }
+            }
+
+            foreach (var sheet in jobResult.Plates)
+            {
+                foreach (var placement in sheet.Placements)
+                {
+                    if (!partsById.TryGetValue(placement.PartId, out var part))
+                        continue; // reported by ValidateQuantities
+
+                    if (!part.Rotation.Allows(placement.Rotation))
+                    {
+                        var name = displayNames.TryGetValue(part.Id, out var n) ? n : part.Id;
+                        result.Violations.Add(
+                            $"'{name}' placed at {Angle.ToDegrees(placement.Rotation):F3}° on plate {sheet.PlateIndex}, "
+                                + $"outside its rotation constraint ({Describe(part.Rotation)})"
+                        );
+                    }
+                }
+            }
+        }
+
+        private static bool SameSettings(NestPlateStock expected, NestPlateStock actual) =>
+            ReferenceEquals(expected, actual)
+            || (
+                expected.Size.Equals(actual.Size)
+                && expected.PartSpacing.IsEqualTo(actual.PartSpacing)
+                && expected.EdgeSpacing.Left.IsEqualTo(actual.EdgeSpacing.Left)
+                && expected.EdgeSpacing.Right.IsEqualTo(actual.EdgeSpacing.Right)
+                && expected.EdgeSpacing.Top.IsEqualTo(actual.EdgeSpacing.Top)
+                && expected.EdgeSpacing.Bottom.IsEqualTo(actual.EdgeSpacing.Bottom)
+                && expected.Quadrant == actual.Quadrant
+            );
+
+        private static string Describe(RotationPolicy policy) =>
+            policy.Kind switch
+            {
+                RotationPolicyKind.Fixed => $"fixed at {Angle.ToDegrees(policy.Start):F3}°",
+                RotationPolicyKind.BoundedSweep =>
+                    $"{Angle.ToDegrees(policy.Start):F3}° to {Angle.ToDegrees(policy.End):F3}° in {Angle.ToDegrees(policy.Step):F3}° steps",
+                _ => "any",
+            };
 
         private static void ValidateQuantities(
             List<Part> parts,
@@ -142,6 +229,16 @@ namespace OpenNest.Benchmark
             }
         }
 
+        /// <summary>
+        /// Every pair of parts must be at least <paramref name="spacing"/> apart.
+        /// Each part's material is inflated by the spacing (perimeter offset
+        /// outward, holes shrunk inward) and tested against the other part's raw
+        /// material, with holes subtracted on both sides - so a small part
+        /// nested inside another part's cutout (part-in-part) is legal as long as
+        /// it clears the cutout's edge by the spacing. Pairs are pruned with an
+        /// X-sorted sweep over bounding boxes so only neighbours reach the
+        /// polygon clipper.
+        /// </summary>
         private static void ValidateSpacing(
             List<Part> parts,
             double spacing,
@@ -149,29 +246,49 @@ namespace OpenNest.Benchmark
             ValidationResult result
         )
         {
-            var worldPolygons = new Polygon[parts.Count];
-            var inflatedPolygons = new Polygon[parts.Count];
+            var raw = new PartOutline[parts.Count];
+            var inflated = new PartOutline[parts.Count];
 
             for (var i = 0; i < parts.Count; i++)
             {
-                worldPolygons[i] = WorldPolygon(parts[i], 0);
-                inflatedPolygons[i] =
-                    spacing > Tolerance.Epsilon
-                        ? WorldPolygon(parts[i], spacing)
-                        : worldPolygons[i];
+                raw[i] = Outline(parts[i], 0);
+                inflated[i] = spacing > Tolerance.Epsilon ? Outline(parts[i], spacing) : raw[i];
             }
 
-            for (var i = 0; i < parts.Count; i++)
-            {
-                if (worldPolygons[i] == null || inflatedPolygons[i] == null)
-                    continue;
+            var order = Enumerable
+                .Range(0, parts.Count)
+                .Where(i => raw[i] != null && inflated[i] != null)
+                .OrderBy(i => raw[i].Perimeter.BoundingBox.Left)
+                .ToList();
 
-                for (var j = i + 1; j < parts.Count; j++)
+            for (var a = 0; a < order.Count; a++)
+            {
+                var i = order[a];
+                var reach = inflated[i].Perimeter.BoundingBox;
+
+                for (var b = a + 1; b < order.Count; b++)
                 {
-                    if (worldPolygons[j] == null)
+                    var j = order[b];
+                    var other = raw[j].Perimeter.BoundingBox;
+
+                    // Sorted by Left, so nothing further along can reach part i either.
+                    if (other.Left > reach.Right + Tolerance.Epsilon)
+                        break;
+
+                    if (!BoxesTouch(reach, other))
                         continue;
 
-                    if (Collision.HasOverlap(inflatedPolygons[i], worldPolygons[j]))
+                    // Inflating one side by the full spacing covers both cases: part j
+                    // inside part i's (shrunk) cutout, or part i's inflated outline
+                    // inside part j's raw cutout.
+                    if (
+                        Collision.HasOverlap(
+                            inflated[i].Perimeter,
+                            raw[j].Perimeter,
+                            inflated[i].Holes,
+                            raw[j].Holes
+                        )
+                    )
                     {
                         result.Violations.Add(
                             $"'{DisplayName(parts[i], requirements)}' and '{DisplayName(parts[j], requirements)}' are closer than the required spacing ({spacing:F3})"
@@ -180,6 +297,12 @@ namespace OpenNest.Benchmark
                 }
             }
         }
+
+        private static bool BoxesTouch(Box a, Box b) =>
+            a.Left <= b.Right + Tolerance.Epsilon
+            && b.Left <= a.Right + Tolerance.Epsilon
+            && a.Bottom <= b.Top + Tolerance.Epsilon
+            && b.Bottom <= a.Top + Tolerance.Epsilon;
 
         /// <summary>Friendly name for a violation message, falling back to the materialized
         /// Drawing's own Name (the raw partId string) if this part wasn't in requirements at all -
@@ -192,12 +315,21 @@ namespace OpenNest.Benchmark
                 ? requirement.Name
                 : part.BaseDrawing.Name;
 
+        private sealed class PartOutline
+        {
+            public Polygon Perimeter { get; init; }
+            public List<Polygon> Holes { get; init; }
+        }
+
         /// <summary>
-        /// Extracts a part's perimeter as a world-space polygon, optionally inflated
-        /// outward by the given spacing, mirroring Part.Intersects' own geometry
-        /// extraction (part.Program is already rotated; only a Location offset is needed).
+        /// Extracts a part's material as world-space polygons - the perimeter and
+        /// its cutouts - grown by <paramref name="inflateBy"/> (perimeter offset
+        /// outward, cutouts offset inward). A cutout that closes up under the
+        /// offset is dropped, which treats it as solid: conservative, since it
+        /// has no room for another part at the required spacing anyway.
+        /// part.Program is already rotated; only a Location offset is needed.
         /// </summary>
-        private static Polygon WorldPolygon(Part part, double inflateBy)
+        private static PartOutline Outline(Part part, double inflateBy)
         {
             var entities = ConvertProgram
                 .ToGeometry(part.Program)
@@ -207,23 +339,61 @@ namespace OpenNest.Benchmark
             if (entities.Count == 0)
                 return null;
 
-            var perimeter = new ShapeProfile(entities).Perimeter;
+            var profile = new ShapeProfile(entities);
 
-            if (perimeter == null)
+            if (profile.Perimeter == null)
                 return null;
+
+            var perimeter = profile.Perimeter;
 
             if (inflateBy > Tolerance.Epsilon)
                 perimeter = perimeter.OffsetOutward(inflateBy) ?? perimeter;
 
-            // Adaptive tolerance instead of Shape.ToPolygon()'s default (up to 1000
-            // segments per arc) - arc-heavy real parts otherwise produce thousands
-            // of vertices, which is needlessly slow for a spacing check.
-            var polygon = perimeter.ToPolygonWithTolerance(0.01, circumscribe: true);
+            var polygon = ToWorldPolygon(perimeter, part.Location);
 
             if (polygon == null)
                 return null;
 
-            polygon.Offset(part.Location);
+            var holes = new List<Polygon>();
+
+            foreach (var cutout in profile.Cutouts)
+            {
+                var hole = cutout;
+
+                if (inflateBy > Tolerance.Epsilon)
+                {
+                    hole = cutout.OffsetInward(inflateBy);
+
+                    // An offset that collapsed or flipped inside-out leaves no usable room.
+                    if (
+                        hole == null
+                        || hole.Area() <= Tolerance.Epsilon
+                        || hole.Area() >= cutout.Area()
+                    )
+                        continue;
+                }
+
+                var holePolygon = ToWorldPolygon(hole, part.Location);
+
+                if (holePolygon != null)
+                    holes.Add(holePolygon);
+            }
+
+            return new PartOutline { Perimeter = polygon, Holes = holes };
+        }
+
+        private static Polygon ToWorldPolygon(Shape shape, Vector location)
+        {
+            // Adaptive tolerance instead of Shape.ToPolygon()'s default (up to 1000
+            // segments per arc) - arc-heavy real parts otherwise produce thousands
+            // of vertices, which is needlessly slow for a spacing check.
+            var polygon = shape.ToPolygonWithTolerance(0.01, circumscribe: true);
+
+            if (polygon == null)
+                return null;
+
+            polygon.Offset(location);
+            polygon.UpdateBounds();
             return polygon;
         }
     }

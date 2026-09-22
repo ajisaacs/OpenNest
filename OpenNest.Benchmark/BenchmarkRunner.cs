@@ -100,11 +100,21 @@ namespace OpenNest.Benchmark
                 );
 
                 var validation = NestValidator.Validate(plateRuns, requirements);
+                NestValidator.ValidateAgainstJob(
+                    nestJob,
+                    jobResult,
+                    job.Requests.ToDictionary(r => r.Drawing.Id.ToString(), r => r.Drawing.Name),
+                    validation
+                );
                 var totalPlaced = plateRuns.Sum(pr => pr.Parts.Count);
                 var placedArea = validation.Valid
                     ? plateRuns.Sum(pr => pr.Parts.Sum(p => p.BaseDrawing.Area))
                     : 0;
                 var plateArea = plateRuns.Sum(pr => pr.Plate.Area());
+                // Salvage credit is recomputed from the job's own geometry, never taken from the engine.
+                var netSheetArea = validation.Valid
+                    ? jobResult.Plates.Sum(p => StockLadderNestingEngine.EstimateNetArea(nestJob, p))
+                    : 0;
 
                 var sizeBreakdown = plateRuns
                     .GroupBy(pr => pr.Plate.Size.ToString(1))
@@ -157,9 +167,7 @@ namespace OpenNest.Benchmark
                         PlacedArea = placedArea,
                         SalvageRate = salvageRate,
                         MinimumSalvageDimension = minimumSalvageDimension,
-                        EstimatedNetArea = jobResult.Plates.Sum(p =>
-                            StockLadderNestingEngine.EstimateNetArea(nestJob, p)
-                        ),
+                        EstimatedNetArea = netSheetArea,
                         Fulfillment = jobResult.Fulfillment,
                         StockUsage = jobResult.StockUsage,
                         Plates = jobResult.Plates,
@@ -185,6 +193,8 @@ namespace OpenNest.Benchmark
                     PartsRequested = requested,
                     PlacedArea = placedArea,
                     PlateArea = plateArea,
+                    NetSheetArea = netSheetArea,
+                    UnplacedPartPenalty = job.UnplacedPartPenalty,
                     PlatesUsed = plateRuns.Count,
                     SizeBreakdown = sizeBreakdown,
                     ElapsedMs = sw.ElapsedMilliseconds,
@@ -199,6 +209,7 @@ namespace OpenNest.Benchmark
                     JobName = job.Name,
                     Valid = false,
                     PartsRequested = requested,
+                    UnplacedPartPenalty = job.UnplacedPartPenalty,
                     ElapsedMs = sw.ElapsedMilliseconds,
                     Error = $"Timed out after {SolveTimeout.TotalMinutes:F0} minute(s)",
                 };
@@ -212,6 +223,7 @@ namespace OpenNest.Benchmark
                     JobName = job.Name,
                     Valid = false,
                     PartsRequested = requested,
+                    UnplacedPartPenalty = job.UnplacedPartPenalty,
                     ElapsedMs = sw.ElapsedMilliseconds,
                     Error = $"{ex.GetType().Name}: {ex.Message}",
                 };
