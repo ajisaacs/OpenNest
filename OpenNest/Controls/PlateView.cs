@@ -16,6 +16,7 @@ using OpenNest.Geometry;
 using OpenNest.Math;
 using Timer = System.Timers.Timer;
 using OpenNest.Engine;
+using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Controls
 {
@@ -602,11 +603,18 @@ namespace OpenNest.Controls
 
             try
             {
-                var engine = NestEngineRegistry.Create(Plate);
+                var strategy = EngineSelection.FillStrategy;
                 var spacing = Plate.PartSpacing;
                 var parts = await Task.Run(() =>
                 {
-                    var result = engine.Fill(groupParts, workArea, progress, cts.Token);
+                    var result = PlateFillService.FillGroup(
+                        strategy,
+                        Plate,
+                        groupParts,
+                        workArea,
+                        progress,
+                        cts.Token
+                    );
                     Compactor.Settle(result, workArea, spacing);
                     return result;
                 });

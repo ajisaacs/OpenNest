@@ -17,6 +17,9 @@ using OpenNest.Gpu;
 using OpenNest.IO;
 using OpenNest.Properties;
 using OpenNest.Engine;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Forms
 {
@@ -68,16 +71,19 @@ namespace OpenNest.Forms
             //if (GpuEvaluatorFactory.GpuAvailable)
             //    BestFitCache.CreateSlideComputer = () => GpuEvaluatorFactory.CreateSlideComputer();
 
+            // Jobs-side plug-in discovery: INestingEngine implementations are registered per
+            // assembly/type with the same per-DLL isolation as before. Binary plug-ins derived
+            // from the legacy NestEngineBase no longer load here after the Phase-4 removal.
             var enginesDir = Path.Combine(Application.StartupPath, "Engines");
-            NestEngineRegistry.LoadPlugins(enginesDir);
+            NestingEngineRegistry.LoadPlugins(enginesDir);
 
             OptionsForm.ApplyDisabledStrategies();
             ColorSchemeRegistry.ApplyActiveFromSettings();
 
-            foreach (var engine in NestEngineRegistry.AvailableEngines)
-                engineComboBox.Items.Add(engine.Name);
+            foreach (var name in EngineSelection.UiEngineNames)
+                engineComboBox.Items.Add(name);
 
-            engineComboBox.SelectedItem = NestEngineRegistry.ActiveEngineName;
+            engineComboBox.SelectedItem = EngineSelection.EngineName;
             engineComboBox.SelectedIndexChanged += EngineComboBox_SelectedIndexChanged;
         }
 
@@ -334,7 +340,7 @@ namespace OpenNest.Forms
         private void EngineComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (engineComboBox.SelectedItem is string name)
-                NestEngineRegistry.ActiveEngineName = name;
+                EngineSelection.EngineName = name;
         }
 
         private void UpdateLocationMode()
@@ -1009,7 +1015,7 @@ namespace OpenNest.Forms
 
             if (form.EngineName != null)
             {
-                NestEngineRegistry.ActiveEngineName = form.EngineName;
+                EngineSelection.EngineName = form.EngineName;
                 engineComboBox.SelectedItem = form.EngineName;
             }
 
@@ -1118,6 +1124,7 @@ namespace OpenNest.Forms
                     SortOrder = sortOrder,
                     MinRemnantSize = minRemnantSize,
                     AllowPlateCreation = allowPlateCreation,
+                    Strategy = EngineSelection.FillStrategy,
                 };
 
                 var result = await Task.Run(() =>
@@ -1199,7 +1206,8 @@ namespace OpenNest.Forms
                         salvageRate,
                         plate,
                         progress,
-                        token
+                        token,
+                        EngineSelection.FillStrategy
                     )
                 );
 
@@ -1223,10 +1231,19 @@ namespace OpenNest.Forms
             }
             else
             {
-                var engine = NestEngineRegistry.Create(plate);
-                engine.PlateNumber = plateIndex;
-
-                nestParts = await Task.Run(() => engine.Nest(items, progress, token));
+                // Same preview flow as before: fill the current plate's remaining demand with the
+                // selected strategy, then commit the returned parts. App-scoped selection — the
+                // process-global engine registry is never consulted.
+                nestParts = await Task.Run(() =>
+                    PlateFillService.Nest(
+                        EngineSelection.FillStrategy,
+                        plate,
+                        items,
+                        plateIndex,
+                        progress,
+                        token
+                    )
+                );
             }
 
             activeForm.PlateView.ClearPreviewParts();

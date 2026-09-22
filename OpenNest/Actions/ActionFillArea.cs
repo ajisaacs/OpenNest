@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Engine;
+using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Forms;
 
 namespace OpenNest.Actions
 {
@@ -46,13 +48,15 @@ namespace OpenNest.Actions
 
         private async void FillArea()
         {
+            var strategy = EngineSelection.FillStrategy;
             if (progress != null && cts != null)
             {
                 try
                 {
-                    var engine = NestEngineRegistry.Create(plateView.Plate);
                     var parts = await Task.Run(() =>
-                        engine.Fill(
+                        PlateFillService.FillItem(
+                            strategy,
+                            plateView.Plate,
                             new NestItem { Drawing = drawing },
                             SelectedArea,
                             progress,
@@ -69,8 +73,15 @@ namespace OpenNest.Actions
             }
             else
             {
-                var engine = NestEngineRegistry.Create(plateView.Plate);
-                engine.Fill(new NestItem { Drawing = drawing }, SelectedArea);
+                var parts = PlateFillService.FillItem(
+                    strategy,
+                    plateView.Plate,
+                    new NestItem { Drawing = drawing },
+                    SelectedArea,
+                    null,
+                    CancellationToken.None
+                );
+                plateView.Plate.Parts.AddRange(parts);
                 plateView.Invalidate();
             }
 

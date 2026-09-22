@@ -87,9 +87,9 @@ namespace OpenNest.Forms
 
         private void LoadEngines()
         {
-            foreach (var engine in NestEngineRegistry.AvailableEngines)
-                engineComboBox.Items.Add(engine.Name);
-            engineComboBox.SelectedItem = NestEngineRegistry.ActiveEngineName;
+            foreach (var name in EngineSelection.UiEngineNames)
+                engineComboBox.Items.Add(name);
+            engineComboBox.SelectedItem = EngineSelection.EngineName;
         }
 
         private void SetupPartsGrid()
