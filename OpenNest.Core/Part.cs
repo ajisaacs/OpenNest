@@ -294,9 +294,18 @@ namespace OpenNest
         /// <returns></returns>
         public object Clone()
         {
-            var part = new Part(BaseDrawing);
-            part.Rotate(Rotation);
-            part.Location = Location;
+            // Clone the current Program directly rather than rebuilding from BaseDrawing and
+            // re-rotating by the absolute Rotation: when BaseDrawing.Program.Rotation is nonzero
+            // (e.g. a canonical-frame copy used internally during fill), `new Part(BaseDrawing)`
+            // already carries that baked rotation, so re-applying the full absolute Rotation on
+            // top of it double-counts the baseline and corrupts the clone's orientation.
+            var part = new Part(
+                BaseDrawing,
+                (Program)Program.Clone(),
+                Location,
+                new Box(BoundingBox.X, BoundingBox.Y, BoundingBox.Length, BoundingBox.Width)
+            );
+            part.ownsProgram = true;
 
             return part;
         }
