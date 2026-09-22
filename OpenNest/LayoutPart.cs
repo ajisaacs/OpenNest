@@ -179,8 +179,14 @@ namespace OpenNest
                 LeadInPath = null;
             }
 
+            // _labelPoint is computed from BaseDrawing.Program's current geometry, which already
+            // carries BaseDrawing.Program.Rotation (nonzero for canonical-frame drawings, e.g. in
+            // BestFitViewerForm). BasePart.Rotation is cumulative from that same baseline, so it
+            // must be re-applied net of the baseline already baked into _labelPoint — otherwise
+            // the baseline rotation is counted twice. Mirrors CanonicalFrame.RebindToOriginal.
             _labelPoint ??= ComputeLabelPoint();
-            var rotatedLabel = _labelPoint.Value.Rotate(BasePart.Rotation);
+            var baseRotation = BasePart.BaseDrawing.Program.Rotation;
+            var rotatedLabel = _labelPoint.Value.Rotate(BasePart.Rotation - baseRotation);
             var labelPt = new PointF(
                 (float)(rotatedLabel.X + BasePart.Location.X),
                 (float)(rotatedLabel.Y + BasePart.Location.Y)
