@@ -1,10 +1,10 @@
 # Unified code style for OpenNest.
-# Canonical formatter: CSharpier (see .config/dotnet-tools.json).
-#   dotnet tool restore
-#   dotnet csharpier check .    # verify before committing
-#   dotnet csharpier format .   # fix
-# These settings match CSharpier's conventions so IDE auto-formatting
-# (VS / Rider / VS Code) stays consistent with the formatter.
+# Canonical formatter: dotnet format.
+# Format only the files or directories being changed:
+#   dotnet format OpenNest.sln --include path/to/changed-file.cs
+#   dotnet format OpenNest.sln --include path/to/changed-file.cs --verify-no-changes
+# These settings are used by dotnet format and IDE auto-formatting
+# (VS / Rider / VS Code).
 
 root = true
 
@@ -25,8 +25,8 @@ indent_size = 2
 [*.{cs,csx}]
 indent_style = space
 indent_size = 4
-# CSharpier wraps code at 100 columns; dotnet format cannot re-wrap, but
-# IDEs surface a visual guide and analyzers can flag hard violations.
+# dotnet format cannot re-wrap source to this limit, but IDEs can surface it
+# as a visual guide and analyzers can flag hard violations.
 max_line_length = 100
 
 # --- Using directives (System first, outside the namespace) ---
