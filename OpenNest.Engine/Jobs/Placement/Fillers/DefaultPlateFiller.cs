@@ -112,7 +112,7 @@ internal class DefaultPlateFiller : PlateFillerBase
                 );
         }
 
-        var best = RunFillPipeline(canonicalItem, effectiveWorkArea, progress, token);
+        var best = RunFillPipeline(canonicalItem, originalDrawing, effectiveWorkArea, progress, token);
 
         if (
             canonicalItem.Quantity > 0
@@ -125,7 +125,7 @@ internal class DefaultPlateFiller : PlateFillerBase
             );
             PhaseResults.Clear();
             AngleResults.Clear();
-            best = RunFillPipeline(canonicalItem, workArea, progress, token);
+            best = RunFillPipeline(canonicalItem, originalDrawing, workArea, progress, token);
         }
 
         if (canonicalItem.Quantity > 0 && best.Count > canonicalItem.Quantity)
@@ -333,6 +333,7 @@ internal class DefaultPlateFiller : PlateFillerBase
 
     private List<Part> RunFillPipeline(
         NestItem item,
+        Drawing originalDrawing,
         Box workArea,
         IProgress<NestProgress> progress,
         CancellationToken token
@@ -341,6 +342,7 @@ internal class DefaultPlateFiller : PlateFillerBase
         var context = new FillContext
         {
             Item = item,
+            OriginalDrawing = originalDrawing,
             WorkArea = workArea,
             Plate = Plate,
             PlateNumber = PlateNumber,
@@ -474,7 +476,7 @@ internal class DefaultPlateFiller : PlateFillerBase
                         {
                             Phase = context.WinnerPhase,
                             PlateNumber = PlateNumber,
-                            Parts = context.CurrentBest,
+                            Parts = context.ToOriginalFrame(context.CurrentBest),
                             WorkArea = context.WorkArea,
                             Description = BuildProgressSummary(),
                             IsOverallBest = true,
