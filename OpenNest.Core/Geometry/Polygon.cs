@@ -328,66 +328,29 @@ namespace OpenNest.Geometry
             boundingBox.Width = maxY - minY;
         }
 
+        /// <summary>
+        /// Miter-offsets the closed polygon to the given side, keeping its winding.
+        /// Corners sharper than the miter limit are squared off, and features that
+        /// collapse under the offset are dropped. When the offset splits the polygon,
+        /// the largest piece is returned.
+        /// </summary>
         public override Entity OffsetEntity(double distance, OffsetSide side)
         {
             if (Vertices.Count < 3)
                 return null;
 
-            var isClosed = IsClosed();
-            var count = isClosed ? Vertices.Count - 1 : Vertices.Count;
-            if (count < 3)
-                return null;
-
             var ccw = CalculateArea() > 0;
             var outward = ccw ? OffsetSide.Left : OffsetSide.Right;
-            var sign = side == outward ? 1.0 : -1.0;
-            var d = distance * sign;
+            var delta = side == outward ? distance : -distance;
 
-            var normals = new Vector[count];
-            for (var i = 0; i < count; i++)
-            {
-                var next = (i + 1) % count;
-                var dx = Vertices[next].X - Vertices[i].X;
-                var dy = Vertices[next].Y - Vertices[i].Y;
-                var len = System.Math.Sqrt(dx * dx + dy * dy);
-                if (len < Tolerance.Epsilon)
-                    return null;
-                normals[i] = new Vector(-dy / len * d, dx / len * d);
-            }
+            var result = ClipperBridge.OffsetMiter(this, delta);
 
-            var result = new Polygon();
-            for (var i = 0; i < count; i++)
-            {
-                var prev = (i - 1 + count) % count;
+            if (result == null)
+                return null;
 
-                var a1 = new Vector(
-                    Vertices[prev].X + normals[prev].X,
-                    Vertices[prev].Y + normals[prev].Y
-                );
-                var a2 = new Vector(
-                    Vertices[i].X + normals[prev].X,
-                    Vertices[i].Y + normals[prev].Y
-                );
-                var b1 = new Vector(Vertices[i].X + normals[i].X, Vertices[i].Y + normals[i].Y);
-                var b2 = new Vector(
-                    Vertices[(i + 1) % count].X + normals[i].X,
-                    Vertices[(i + 1) % count].Y + normals[i].Y
-                );
+            if (!ccw)
+                result.Reverse();
 
-                var edgeA = new Line(a1, a2);
-                var edgeB = new Line(b1, b2);
-
-                if (edgeA.Intersects(edgeB, out var pt) && pt.IsValid())
-                    result.Vertices.Add(pt);
-                else
-                    result.Vertices.Add(
-                        new Vector(Vertices[i].X + normals[i].X, Vertices[i].Y + normals[i].Y)
-                    );
-            }
-
-            result.Close();
-            result.RemoveSelfIntersections();
-            result.UpdateBounds();
             return result;
         }
 
@@ -554,155 +517,6 @@ namespace OpenNest.Geometry
         public override EntityType Type
         {
             get { return EntityType.Polygon; }
-        }
-
-        /// <summary>
-        /// Removes self-intersecting loops from the polygon by finding non-adjacent
-        /// edge crossings and keeping the larger contour at each crossing.
-        /// </summary>
-        public void RemoveSelfIntersections()
-        {
-            if (!IsClosed() || Vertices.Count < 5)
-                return;
-
-            while (FindCrossing(out var edgeI, out var edgeJ, out var pt))
-            {
-                Vertices = SplitAtCrossing(edgeI, edgeJ, pt);
-            }
-        }
-
-        private bool FindCrossing(out int edgeI, out int edgeJ, out Vector pt)
-        {
-            var n = Vertices.Count - 1;
-
-            // Pre-calculate edge bounding boxes to speed up intersection checks.
-            var edgeBounds = new (double minX, double maxX, double minY, double maxY)[n];
-            for (var i = 0; i < n; i++)
-            {
-                var v1 = Vertices[i];
-                var v2 = Vertices[i + 1];
-                edgeBounds[i] = (
-                    System.Math.Min(v1.X, v2.X) - Tolerance.Epsilon,
-                    System.Math.Max(v1.X, v2.X) + Tolerance.Epsilon,
-                    System.Math.Min(v1.Y, v2.Y) - Tolerance.Epsilon,
-                    System.Math.Max(v1.Y, v2.Y) + Tolerance.Epsilon
-                );
-            }
-
-            for (var i = 0; i < n; i++)
-            {
-                var bi = edgeBounds[i];
-                for (var j = i + 2; j < n; j++)
-                {
-                    if (i == 0 && j == n - 1)
-                        continue;
-
-                    var bj = edgeBounds[j];
-
-                    // Prune with bounding box check.
-                    if (
-                        bi.maxX < bj.minX
-                        || bj.maxX < bi.minX
-                        || bi.maxY < bj.minY
-                        || bj.maxY < bi.minY
-                    )
-                    {
-                        continue;
-                    }
-
-                    if (
-                        SegmentsIntersect(
-                            Vertices[i],
-                            Vertices[i + 1],
-                            Vertices[j],
-                            Vertices[j + 1],
-                            out pt
-                        )
-                    )
-                    {
-                        edgeI = i;
-                        edgeJ = j;
-                        return true;
-                    }
-                }
-            }
-
-            edgeI = edgeJ = -1;
-            pt = Vector.Zero;
-            return false;
-        }
-
-        private List<Vector> SplitAtCrossing(int edgeI, int edgeJ, Vector pt)
-        {
-            var n = Vertices.Count - 1;
-
-            var loopA = Vertices.GetRange(0, edgeI + 1);
-            loopA.Add(pt);
-            loopA.AddRange(Vertices.GetRange(edgeJ + 1, n - edgeJ - 1));
-            loopA.Add(loopA[0]);
-
-            var loopB = new List<Vector> { pt };
-            loopB.AddRange(Vertices.GetRange(edgeI + 1, edgeJ - edgeI));
-            loopB.Add(pt);
-
-            var areaA = System.Math.Abs(CalculateArea(loopA));
-            var areaB = System.Math.Abs(CalculateArea(loopB));
-
-            return areaA >= areaB ? loopA : loopB;
-        }
-
-        private static bool SegmentsIntersect(
-            Vector a1,
-            Vector a2,
-            Vector b1,
-            Vector b2,
-            out Vector pt
-        )
-        {
-            var da = a2 - a1;
-            var db = b2 - b1;
-            var cross = da.X * db.Y - da.Y * db.X;
-
-            if (cross.IsEqualTo(0.0))
-            {
-                pt = Vector.Zero;
-                return false;
-            }
-
-            var dc = b1 - a1;
-            var t = (dc.X * db.Y - dc.Y * db.X) / cross;
-            var u = (dc.X * da.Y - dc.Y * da.X) / cross;
-
-            if (
-                t > Tolerance.Epsilon
-                && t < 1.0 - Tolerance.Epsilon
-                && u > Tolerance.Epsilon
-                && u < 1.0 - Tolerance.Epsilon
-            )
-            {
-                pt = new Vector(a1.X + t * da.X, a1.Y + t * da.Y);
-                return true;
-            }
-
-            pt = Vector.Zero;
-            return false;
-        }
-
-        private static double CalculateArea(List<Vector> vertices)
-        {
-            double xsum = 0;
-            double ysum = 0;
-
-            for (int i = 0; i < vertices.Count - 1; i++)
-            {
-                var current = vertices[i];
-                var next = vertices[i + 1];
-
-                xsum += current.X * next.Y;
-                ysum += current.Y * next.X;
-            }
-
-            return (xsum - ysum) * 0.5;
         }
 
         internal void Cleanup()

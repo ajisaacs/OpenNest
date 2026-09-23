@@ -49,7 +49,7 @@ namespace OpenNest
 
         /// <summary>
         /// Returns the perimeter entities (Line, Arc, Circle) with spacing offset applied,
-        /// without tessellation. Much faster than GetOffsetPartLines for parts with many arcs.
+        /// without tessellation, which keeps arc-heavy parts fast in directional-distance loops.
         /// </summary>
         public static List<Entity> GetOffsetPerimeterEntities(Part part, double spacing)
         {
@@ -149,75 +149,6 @@ namespace OpenNest
             return result;
         }
 
-        public static List<Line> GetOffsetPartLines(
-            Part part,
-            double spacing,
-            double chordTolerance = 0.001,
-            bool perimeterOnly = false
-        )
-        {
-            var entities = ConvertProgram.ToGeometry(part.Program);
-            var profile = new ShapeProfile(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
-            );
-            var lines = new List<Line>();
-            var totalSpacing = spacing;
-
-            AddOffsetLines(
-                lines,
-                profile.Perimeter.OffsetOutward(totalSpacing),
-                chordTolerance,
-                part.Location
-            );
-
-            if (!perimeterOnly)
-            {
-                foreach (var cutout in profile.Cutouts)
-                    AddOffsetLines(
-                        lines,
-                        cutout.OffsetInward(totalSpacing),
-                        chordTolerance,
-                        part.Location
-                    );
-            }
-
-            return lines;
-        }
-
-        public static List<Line> GetOffsetPartLines(
-            Part part,
-            double spacing,
-            PushDirection facingDirection,
-            double chordTolerance = 0.001
-        )
-        {
-            var entities = ConvertProgram.ToGeometry(part.Program);
-            var profile = new ShapeProfile(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
-            );
-            var lines = new List<Line>();
-            var totalSpacing = spacing;
-
-            AddOffsetDirectionalLines(
-                lines,
-                profile.Perimeter.OffsetOutward(totalSpacing),
-                chordTolerance,
-                part.Location,
-                facingDirection
-            );
-
-            foreach (var cutout in profile.Cutouts)
-                AddOffsetDirectionalLines(
-                    lines,
-                    cutout.OffsetInward(totalSpacing),
-                    chordTolerance,
-                    part.Location,
-                    facingDirection
-                );
-
-            return lines;
-        }
-
         public static List<Line> GetPartLines(
             Part part,
             Vector facingDirection,
@@ -236,40 +167,6 @@ namespace OpenNest
                 polygon.Offset(part.Location);
                 lines.AddRange(GetDirectionalLines(polygon, facingDirection));
             }
-
-            return lines;
-        }
-
-        public static List<Line> GetOffsetPartLines(
-            Part part,
-            double spacing,
-            Vector facingDirection,
-            double chordTolerance = 0.001
-        )
-        {
-            var entities = ConvertProgram.ToGeometry(part.Program);
-            var profile = new ShapeProfile(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
-            );
-            var lines = new List<Line>();
-            var totalSpacing = spacing;
-
-            AddOffsetDirectionalLines(
-                lines,
-                profile.Perimeter.OffsetOutward(totalSpacing),
-                chordTolerance,
-                part.Location,
-                facingDirection
-            );
-
-            foreach (var cutout in profile.Cutouts)
-                AddOffsetDirectionalLines(
-                    lines,
-                    cutout.OffsetInward(totalSpacing),
-                    chordTolerance,
-                    part.Location,
-                    facingDirection
-                );
 
             return lines;
         }
@@ -352,56 +249,6 @@ namespace OpenNest
             }
 
             return lines;
-        }
-
-        private static void AddOffsetLines(
-            List<Line> lines,
-            Shape offsetEntity,
-            double chordTolerance,
-            Vector location
-        )
-        {
-            if (offsetEntity == null)
-                return;
-
-            var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
-            polygon.RemoveSelfIntersections();
-            polygon.Offset(location);
-            lines.AddRange(polygon.ToLines());
-        }
-
-        private static void AddOffsetDirectionalLines(
-            List<Line> lines,
-            Shape offsetEntity,
-            double chordTolerance,
-            Vector location,
-            PushDirection facingDirection
-        )
-        {
-            if (offsetEntity == null)
-                return;
-
-            var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
-            polygon.RemoveSelfIntersections();
-            polygon.Offset(location);
-            lines.AddRange(GetDirectionalLines(polygon, facingDirection));
-        }
-
-        private static void AddOffsetDirectionalLines(
-            List<Line> lines,
-            Shape offsetEntity,
-            double chordTolerance,
-            Vector location,
-            Vector facingDirection
-        )
-        {
-            if (offsetEntity == null)
-                return;
-
-            var polygon = offsetEntity.ToPolygonWithTolerance(chordTolerance);
-            polygon.RemoveSelfIntersections();
-            polygon.Offset(location);
-            lines.AddRange(GetDirectionalLines(polygon, facingDirection));
         }
     }
 }

@@ -13,6 +13,8 @@ namespace OpenNest
 
     public class CutOff
     {
+        private const double OffsetTolerance = 0.001;
+
         public Vector Position { get; set; }
         public CutOffAxis Axis { get; set; }
         public double? StartLimit { get; set; }
@@ -163,14 +165,23 @@ namespace OpenNest
             double clearance
         )
         {
-            var target = OffsetOutward(perimeter, clearance) ?? perimeter;
-            var usedOffset = target != perimeter;
+            var offset = OffsetOutward(perimeter, clearance);
+            var usedOffset = offset != null;
+            var targets = offset ?? new List<Entity> { perimeter };
             var cutLine = new Line(
                 MakePoint(cutPosition, lineStart),
                 MakePoint(cutPosition, lineEnd)
             );
 
-            if (!target.Intersects(cutLine, out var pts) || pts.Count < 2)
+            var pts = new List<Vector>();
+
+            foreach (var target in targets)
+            {
+                if (target.Intersects(cutLine, out var targetPts))
+                    pts.AddRange(targetPts);
+            }
+
+            if (pts.Count < 2)
                 return null;
 
             var coords = pts.Select(pt => Axis == CutOffAxis.Vertical ? pt.Y : pt.X)
@@ -188,21 +199,37 @@ namespace OpenNest
             return result;
         }
 
-        private static Entity OffsetOutward(Entity perimeter, double clearance)
+        /// <summary>
+        /// Grows the perimeter by the clearance as one Clipper region offset, so slots
+        /// narrower than twice the clearance close up instead of leaving a gap the cut
+        /// could run into. Holes appear only where the perimeter curls back on itself.
+        /// </summary>
+        private static List<Entity> OffsetOutward(Entity perimeter, double clearance)
         {
             if (clearance <= 0)
                 return null;
 
-            try
+            var offset = perimeter switch
             {
-                var offset = perimeter.OffsetEntity(clearance, OffsetSide.Left);
-                offset?.UpdateBounds();
-                return offset;
-            }
-            catch
-            {
+                Shape shape => ClipperBridge.OffsetPerimeter(
+                    shape,
+                    clearance,
+                    OffsetTolerance,
+                    circumscribe: true
+                ),
+                Polygon polygon => ClipperBridge.OffsetPerimeter(
+                    polygon,
+                    clearance,
+                    OffsetTolerance,
+                    circumscribe: true
+                ),
+                _ => null,
+            };
+
+            if (offset == null || offset.Outers.Count == 0)
                 return null;
-            }
+
+            return offset.Outers.Concat(offset.Holes).Cast<Entity>().ToList();
         }
 
         private Vector MakePoint(double cutCoord, double lineCoord) =>

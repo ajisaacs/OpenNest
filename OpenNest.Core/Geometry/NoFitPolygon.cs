@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Clipper2Lib;
 using OpenNest.Math;
 
 namespace OpenNest.Geometry
@@ -11,21 +10,9 @@ namespace OpenNest.Geometry
     /// </summary>
     public static class NoFitPolygon
     {
-        private const double ClipperScale = 1000.0;
-
         /// <summary>
-        /// Computes the NFP between a stationary polygon A and an orbiting polygon B.
-        /// NFP(A, B) = Minkowski sum of A and -B (B reflected through its reference point).
-        /// </summary>
-        public static Polygon Compute(Polygon stationary, Polygon orbiting)
-        {
-            var reflected = Reflect(orbiting);
-            return MinkowskiSum(stationary, reflected);
-        }
-
-        /// <summary>
-        /// Optimized version of Compute for polygons known to be convex.
-        /// Bypasses expensive triangulation and Clipper unions.
+        /// Computes the NFP between a convex stationary polygon A and a convex orbiting
+        /// polygon B: the Minkowski sum of A and -B (B reflected through its reference point).
         /// </summary>
         public static Polygon ComputeConvex(Polygon stationary, Polygon orbiting)
         {
@@ -46,42 +33,6 @@ namespace OpenNest.Geometry
                 result.Vertices.Add(new Vector(-v.X, -v.Y));
 
             return result;
-        }
-
-        /// <summary>
-        /// Computes the Minkowski sum of two polygons using convex decomposition.
-        /// For convex polygons, uses the direct O(n+m) merge-sort of edge vectors.
-        /// For concave polygons, decomposes into triangles, computes pairwise
-        /// convex Minkowski sums, and unions the results with Clipper2.
-        /// </summary>
-        private static Polygon MinkowskiSum(Polygon a, Polygon b)
-        {
-            var trisA = ConvexDecomposition.Triangulate(a);
-            var trisB = ConvexDecomposition.Triangulate(b);
-
-            if (trisA.Count == 0 || trisB.Count == 0)
-                return new Polygon();
-
-            var partialSums = new List<Polygon>();
-
-            foreach (var ta in trisA)
-            {
-                foreach (var tb in trisB)
-                {
-                    var sum = ConvexMinkowskiSum(ta, tb);
-
-                    if (sum.Vertices.Count >= 3)
-                        partialSums.Add(sum);
-                }
-            }
-
-            if (partialSums.Count == 0)
-                return new Polygon();
-
-            if (partialSums.Count == 1)
-                return partialSums[0];
-
-            return UnionPolygons(partialSums);
         }
 
         /// <summary>
@@ -229,82 +180,6 @@ namespace OpenNest.Geometry
                 result.Add(edges[(startIndex + i) % n]);
 
             return result;
-        }
-
-        /// <summary>
-        /// Unions multiple polygons using Clipper2.
-        /// Returns the outer boundary of the union as a single polygon.
-        /// </summary>
-        internal static Polygon UnionPolygons(List<Polygon> polygons)
-        {
-            var paths = new PathsD();
-
-            foreach (var poly in polygons)
-            {
-                var path = ToClipperPath(poly);
-
-                if (path.Count >= 3)
-                    paths.Add(path);
-            }
-
-            if (paths.Count == 0)
-                return new Polygon();
-
-            var result = Clipper.Union(paths, FillRule.NonZero);
-
-            if (result.Count == 0)
-                return new Polygon();
-
-            // Find the largest polygon (by area) as the outer boundary.
-            var largest = result[0];
-            var largestArea = System.Math.Abs(Clipper.Area(largest));
-
-            for (var i = 1; i < result.Count; i++)
-            {
-                var area = System.Math.Abs(Clipper.Area(result[i]));
-
-                if (area > largestArea)
-                {
-                    largest = result[i];
-                    largestArea = area;
-                }
-            }
-
-            return FromClipperPath(largest);
-        }
-
-        /// <summary>
-        /// Converts an OpenNest Polygon to a Clipper2 PathD, with an optional offset.
-        /// </summary>
-        public static PathD ToClipperPath(Polygon polygon, Vector offset = default)
-        {
-            var path = new PathD();
-            var verts = polygon.Vertices;
-            var n = verts.Count;
-
-            // Skip closing vertex if present.
-            if (n > 1 && verts[0].X == verts[n - 1].X && verts[0].Y == verts[n - 1].Y)
-                n--;
-
-            for (var i = 0; i < n; i++)
-                path.Add(new PointD(verts[i].X + offset.X, verts[i].Y + offset.Y));
-
-            return path;
-        }
-
-        /// <summary>
-        /// Converts a Clipper2 PathD to an OpenNest Polygon.
-        /// </summary>
-        public static Polygon FromClipperPath(PathD path)
-        {
-            var polygon = new Polygon();
-
-            foreach (var pt in path)
-                polygon.Vertices.Add(new Vector(pt.x, pt.y));
-
-            polygon.Close();
-            polygon.UpdateBounds();
-            return polygon;
         }
     }
 }

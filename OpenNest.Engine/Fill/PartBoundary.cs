@@ -34,19 +34,16 @@ namespace OpenNest.Engine.Fill
 
             if (perimeter != null)
             {
-                var offsetEntity = perimeter.OffsetOutward(spacing);
-
-                if (offsetEntity != null)
-                {
-                    // Circumscribe arcs so polygon vertices are always outside
-                    // the true arc — guarantees the boundary never under-estimates.
-                    var polygon = offsetEntity.ToPolygonWithTolerance(
-                        PolygonTolerance,
-                        circumscribe: true
-                    );
-                    polygon.RemoveSelfIntersections();
-                    _polygons.Add(polygon);
-                }
+                // Conservative offset: the boundary never under-estimates the spacing.
+                // Holes appear only where the perimeter curls back on itself.
+                var offset = ClipperBridge.OffsetPerimeter(
+                    perimeter,
+                    spacing,
+                    PolygonTolerance,
+                    circumscribe: true
+                );
+                _polygons.AddRange(offset.Outers);
+                _polygons.AddRange(offset.Holes);
             }
 
             PrecomputeDirectionalEdges(

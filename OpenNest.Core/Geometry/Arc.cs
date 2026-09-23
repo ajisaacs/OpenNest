@@ -443,19 +443,23 @@ namespace OpenNest.Geometry
             boundingBox.Width = maxY - minY;
         }
 
+        /// <summary>
+        /// Offsets the arc to the given side of its travel direction. The center lies to
+        /// the left of a CCW arc and to the right of a CW (reversed) one, so the arc grows
+        /// on the other side and shrinks toward its center. Returns null when it shrinks
+        /// to nothing.
+        /// </summary>
         public override Entity OffsetEntity(double distance, OffsetSide side)
         {
-            if (side == OffsetSide.Left && reversed)
-            {
-                return new Arc(center, radius + distance, startAngle, endAngle, reversed);
-            }
-            else
-            {
-                if (distance >= radius)
-                    return null;
+            var grows = (side == OffsetSide.Left) == reversed;
 
-                return new Arc(center, radius - distance, startAngle, endAngle, reversed);
-            }
+            if (grows)
+                return new Arc(center, radius + distance, startAngle, endAngle, reversed);
+
+            if (distance >= radius)
+                return null;
+
+            return new Arc(center, radius - distance, startAngle, endAngle, reversed);
         }
 
         public override Entity OffsetEntity(double distance, Vector pt)

@@ -121,6 +121,8 @@ namespace OpenNest.Converters
                 center += curpos;
             }
 
+            center = FitCenterToEndpoints(center, curpos, endpt);
+
             var startAngle = center.AngleTo(curpos);
             var endAngle = center.AngleTo(endpt);
 
@@ -155,6 +157,35 @@ namespace OpenNest.Converters
                 );
 
             curpos = endpt;
+        }
+
+        /// <summary>
+        /// Programs can carry arc centers that are not quite equidistant from the
+        /// start and end points (e.g. I0.03 on a 0.0598 chord). Building the arc from
+        /// the end radius alone then leaves its start point off the previous move's
+        /// end, which breaks contour chaining. Project the center onto the chord's
+        /// perpendicular bisector so the arc passes through both endpoints exactly.
+        /// </summary>
+        private static Vector FitCenterToEndpoints(Vector center, Vector start, Vector end)
+        {
+            var startRadius = center.DistanceTo(start);
+            var endRadius = center.DistanceTo(end);
+
+            if (startRadius.IsEqualTo(endRadius))
+                return center;
+
+            var chord = end - start;
+            var chordLengthSq = chord.X * chord.X + chord.Y * chord.Y;
+
+            // Full circle (start == end): no chord to fit against.
+            if (chordLengthSq < Tolerance.Epsilon * Tolerance.Epsilon)
+                return center;
+
+            var mid = new Vector((start.X + end.X) * 0.5, (start.Y + end.Y) * 0.5);
+            var normal = new Vector(-chord.Y, chord.X);
+            var t = ((center.X - mid.X) * normal.X + (center.Y - mid.Y) * normal.Y) / chordLengthSq;
+
+            return new Vector(mid.X + normal.X * t, mid.Y + normal.Y * t);
         }
 
         private static Layer ConvertLayer(LayerType layer)

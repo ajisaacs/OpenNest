@@ -165,17 +165,6 @@ namespace OpenNest.Controls
                 DrawArc(e.Graphics, SimplifierPreview, previewPen);
             }
 
-#if DRAW_OFFSET
-
-            var offsetShape = new Shape();
-            offsetShape.Entities.AddRange(Entities);
-
-            foreach (
-                var entity in ((Shape)offsetShape.OffsetEntity(0.25, OffsetSide.Left)).Entities
-            )
-                DrawEntity(e.Graphics, entity, Pens.RoyalBlue);
-#endif
-
             PaintOverlay?.Invoke(e.Graphics);
         }
 

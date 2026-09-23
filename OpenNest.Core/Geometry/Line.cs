@@ -398,11 +398,9 @@ namespace OpenNest.Geometry
             var x = System.Math.Cos(angle) * distance;
             var y = System.Math.Sin(angle) * distance;
 
-            var pt = new Vector(x, y);
+            var pt = side == OffsetSide.Left ? new Vector(x, y) : new Vector(-x, -y);
 
-            return side == OffsetSide.Left
-                ? new Line(StartPoint + pt, EndPoint + pt)
-                : new Line(EndPoint + pt, StartPoint + pt);
+            return new Line(StartPoint + pt, EndPoint + pt);
         }
 
         public override Entity OffsetEntity(double distance, Vector pt)

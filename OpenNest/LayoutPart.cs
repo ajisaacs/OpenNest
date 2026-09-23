@@ -223,41 +223,25 @@ namespace OpenNest
 
         private List<PointF[]> ComputeOffsetPolygons(double spacing, double tolerance)
         {
-            var result = new List<PointF[]>();
             var entities = ConvertProgram.ToGeometry(BasePart.Program);
             var profile = new ShapeProfile(
                 entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
             );
 
-            AddOffsetPolygon(result, profile.Perimeter.OffsetOutward(spacing), tolerance);
+            var offset = ClipperBridge.Offset(profile, spacing, tolerance);
+            var result = new List<PointF[]>(offset.Outers.Count + offset.Holes.Count);
 
-            foreach (var cutout in profile.Cutouts)
-                AddOffsetPolygon(result, cutout.OffsetInward(spacing), tolerance);
+            foreach (var polygon in offset.Outers.Concat(offset.Holes))
+            {
+                var pts = new PointF[polygon.Vertices.Count];
+
+                for (var j = 0; j < pts.Length; j++)
+                    pts[j] = new PointF((float)polygon.Vertices[j].X, (float)polygon.Vertices[j].Y);
+
+                result.Add(pts);
+            }
 
             return result;
-        }
-
-        private static void AddOffsetPolygon(
-            List<PointF[]> result,
-            Shape offsetEntity,
-            double tolerance
-        )
-        {
-            if (offsetEntity == null)
-                return;
-
-            var polygon = offsetEntity.ToPolygonWithTolerance(tolerance);
-            polygon.RemoveSelfIntersections();
-
-            if (polygon.Vertices.Count < 2)
-                return;
-
-            var pts = new PointF[polygon.Vertices.Count];
-
-            for (var j = 0; j < pts.Length; j++)
-                pts[j] = new PointF((float)polygon.Vertices[j].X, (float)polygon.Vertices[j].Y);
-
-            result.Add(pts);
         }
 
         private void RebuildOffsetPath(Matrix matrix)

@@ -317,7 +317,7 @@ OpenNest.sln
 |---------|-------------|
 | **OpenNest** | The app you run. WinForms MDI interface with plate viewer, drawing list, CAD converter, and dialogs. |
 | **OpenNest.Console** | Command-line interface for batch nesting, scripting, and automation. |
-| **OpenNest.Core** | The building blocks — parts, plates, drawings, geometry, G-code representation, bend lines, cut-offs, and drawing splitting. |
+| **OpenNest.Core** | The building blocks — parts, plates, drawings, geometry, G-code representation, bend lines, cut-offs, and drawing splitting. Spacing offsets use Clipper2 (`ClipperBridge`) for CPU-side preparation; the per-pair `Collision` test stays hand-rolled so it can move to the GPU. |
 | **OpenNest.Engine** | The brains — fill strategies (linear, pairs, rect best-fit, extents), NFP-based pair evaluation, gravity compaction, and a pluggable engine registry. |
 | **OpenNest.IO** | Reads and writes files — DXF/DWG (via ACadSharp), G-code, the `.nest` ZIP format, BOM spreadsheets (via ClosedXML), and bend detection from CAD files. |
 | **OpenNest.Api** | High-level API for running the full nesting pipeline programmatically (import, nest, export). |
