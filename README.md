@@ -134,6 +134,21 @@ The settings nest supplies units, material metadata, per-part rotation constrain
 
 The output directory must not exist. The tool writes `imported-cut-only.nest` and `import-report.json` (including input hashes, excluded marks, and unmatched DXFs), then runs the selected engine with a ten-minute cancellation budget. A complete result must pass quantity, bounds, overlap/spacing and cut-only checks, then save/reload and pass them again before success. `validation-report.json` records per-part fulfillment and placements. A partial or invalid result exits nonzero and is not published as a successful nest. Use `import-only` instead of an engine name to verify and save only the imported job. This verifies nesting geometry, not machine-ready CNC lead-ins or post-processing.
 
+### PEP nest export (benchmark against PEP)
+
+`tools/PepNestExport` converts a year of PEP nests into `.nest` files for `OpenNest.Benchmark`. It lists nests from PepApi (`/nests/{year}`), downloads each `.pep` file (`/nests/{year}/{name}/download`), and reads it with `PepLib.Core` from the sibling `PepApi.Core` repo. Override the path with `-p:PepLibProject=<path>` if that repo is cloned elsewhere.
+
+```bash
+dotnet run --project tools/PepNestExport -c Release -- "/path/to/PEP 2026 nests" --year 2026
+dotnet OpenNest.Benchmark/bin/Release/net8.0/OpenNest.Benchmark.dll "/path/to/PEP 2026 nests" --engines Opus55NestingEngine --csv results.csv
+```
+
+Each `.nest` keeps PEP's own layout: plate sizes and duplicate counts, part spacing, edge spacing, quadrant and every placement. The benchmark therefore scores PEP as its `Baseline` row and offers engines only the sheet sizes PEP used, unless you pass `--sheet-sizes`. Drawing geometry comes from PEP's loops, flattened with sub-loop (hole) calls continuing the incremental position. Lead-ins, lead-outs, scribe, display and `DESTRUCT CUT` moves are dropped, and uncut micro-joint tabs of 0.25 or less are closed: open cut runs are chained end to start across the tab and bridged with a cut line, but only where they form a closed loop, so separate contours that happen to lie close together are never merged. The tabs themselves are not kept. Skeleton and display-only parts are excluded.
+
+By default `--quantity nested` sets demand to what PEP actually nested; `--quantity required` uses PEP's required counts instead. Other options: `--nests`, `--status` (default: every status except `Deleted`), `--parallel` and `--force`.
+
+The tool writes `pep-baseline.csv` (sheets, sheet area, part area and utilization per nest) and a `<nest>.violations.txt` when PEP's layout fails validation. PEP places parts at exactly the nominal spacing and rounds coordinates to about 4 decimals, so the strict benchmark validator usually rejects the PEP baseline. Its sheet count and area still show in the report. `RelaxedValid` repeats the check allowing 0.025 on spacing and 0.001 on edges; a failure there means a real overlap or a genuinely tight manual placement. Validation runs on the saved file and is capped at 60 seconds per nest: `NestValidator` can take minutes on parts with hundreds of outline segments and many holes, and those rows report `timeout`. Programs are stored incremental, like CAD-imported drawings, because the desktop renderer only applies part locations to incremental programs.
+
 ### Run
 
 ```bash
