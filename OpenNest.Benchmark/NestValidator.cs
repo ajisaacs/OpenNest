@@ -315,7 +315,7 @@ namespace OpenNest.Benchmark
                 ? requirement.Name
                 : part.BaseDrawing.Name;
 
-        private const double OutlineTolerance = 0.01;
+        private const double OutlineTolerance = 0.001;
 
         private sealed class PartOutline
         {
