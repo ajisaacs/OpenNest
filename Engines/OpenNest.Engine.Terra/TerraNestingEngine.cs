@@ -21,10 +21,10 @@ public sealed class TerraNestingEngine : INestingEngine
 
         // TODO: implement independent placement logic here.
         //
-        // Do NOT call NestingEngineRegistry.Create(...), PlateNesterFactory, or any
-        // FixedStrategyNestingEngine / StockLadderNestingEngine instance from inside this
-        // method. Decide placements yourself using OpenNest.Core / OpenNest.Geometry
-        // primitives (Polygon, NoFitPolygon, Collision, ConvexHull, RotatingCalipers, etc).
+        // Do NOT call NestingEngineRegistry.Create(...), PlateNesterFactory, PlateFillService,
+        // or any built-in INestingEngine, and do not run several and keep the best. The
+        // Fill/ and pattern components (FillLinear, PairFiller, PatternTiler, Compactor, ...)
+        // and OpenNest.Core geometry ARE fair game as tools; the decisions are yours.
         //
         // job.Parts        -> requested parts (PartGeometrySnapshot geometry, quantity, priority, rotation policy)
         // job.Plates        -> candidate stock sheets (size, spacing, quadrant, quantity)
