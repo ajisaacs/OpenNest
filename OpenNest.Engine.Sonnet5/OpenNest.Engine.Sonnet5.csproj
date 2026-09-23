@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>OpenNest.Engine.Sonnet5</RootNamespace>
+    <AssemblyName>OpenNest.Engine.Sonnet5</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+    <ProjectReference Include="../OpenNest.Engine/OpenNest.Engine.csproj" />
+  </ItemGroup>
+</Project>

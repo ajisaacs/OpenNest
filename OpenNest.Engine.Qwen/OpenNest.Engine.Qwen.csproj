@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>OpenNest.Engine.Qwen</RootNamespace>
+    <AssemblyName>OpenNest.Engine.Qwen</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+    <ProjectReference Include="../OpenNest.Engine/OpenNest.Engine.csproj" />
+  </ItemGroup>
+</Project>
