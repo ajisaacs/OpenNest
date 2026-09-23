@@ -2,15 +2,23 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace OpenNest.Engine.BestFit
 {
+    /// <summary>
+    /// Best-fit pair results per drawing. Entries are keyed weakly by the source drawing (canonical
+    /// copies resolve through <see cref="CanonicalFrame.SourceOf"/>), so every fill of one drawing
+    /// shares them and closed nests or finished solves release theirs. Candidates are computed once
+    /// per spacing and filtered per plate size. An entry is dropped when the drawing's
+    /// <see cref="Drawing.Program"/> instance or canonical angle changes.
+    /// </summary>
     public static class BestFitCache
     {
         private const double StepSize = 0.25;
 
-        private static readonly ConcurrentDictionary<CacheKey, List<BestFitResult>> _cache =
-            new ConcurrentDictionary<CacheKey, List<BestFitResult>>();
+        private static readonly ConditionalWeakTable<Drawing, Entry> _entries = new();
+        private static readonly object _entriesLock = new();
 
         public static Func<Drawing, double, IPairEvaluator> CreateEvaluator { get; set; }
         public static Func<ISlideComputer> CreateSlideComputer { get; set; }
@@ -22,11 +30,111 @@ namespace OpenNest.Engine.BestFit
             double spacing
         )
         {
-            var key = new CacheKey(drawing, plateWidth, plateHeight, spacing);
+            var entry = GetEntry(drawing);
+            var key = (plateWidth, plateHeight, spacing);
 
-            if (_cache.TryGetValue(key, out var cached))
+            if (entry.Filtered.TryGetValue(key, out var cached))
                 return cached;
 
+            var candidates = GetCandidates(entry, drawing, spacing);
+            return entry.Filtered.GetOrAdd(key, _ => FilterForSize(candidates, plateWidth, plateHeight));
+        }
+
+        public static void ComputeForSizes(
+            Drawing drawing,
+            double spacing,
+            IEnumerable<(double Width, double Height)> plateSizes
+        )
+        {
+            foreach (var size in plateSizes)
+                GetOrCompute(drawing, size.Width, size.Height, spacing);
+        }
+
+        public static void Invalidate(Drawing drawing)
+        {
+            lock (_entriesLock)
+                _entries.Remove(CanonicalFrame.SourceOf(drawing));
+        }
+
+        public static void Populate(
+            Drawing drawing,
+            double plateWidth,
+            double plateHeight,
+            double spacing,
+            List<BestFitResult> results
+        )
+        {
+            if (results == null || results.Count == 0)
+                return;
+
+            GetEntry(drawing).Filtered.TryAdd((plateWidth, plateHeight, spacing), results);
+        }
+
+        public static Dictionary<
+            (double PlateWidth, double PlateHeight, double Spacing),
+            List<BestFitResult>
+        > GetAllForDrawing(Drawing drawing)
+        {
+            var result = new Dictionary<(double, double, double), List<BestFitResult>>();
+            var source = CanonicalFrame.SourceOf(drawing);
+
+            if (_entries.TryGetValue(source, out var entry) && entry.IsCurrentFor(source))
+            {
+                foreach (var kvp in entry.Filtered)
+                    result[kvp.Key] = kvp.Value;
+            }
+
+            return result;
+        }
+
+        public static void Clear()
+        {
+            lock (_entriesLock)
+                _entries.Clear();
+        }
+
+        private static Entry GetEntry(Drawing drawing)
+        {
+            var source = CanonicalFrame.SourceOf(drawing);
+
+            if (_entries.TryGetValue(source, out var entry) && entry.IsCurrentFor(source))
+                return entry;
+
+            lock (_entriesLock)
+            {
+                if (_entries.TryGetValue(source, out entry) && entry.IsCurrentFor(source))
+                    return entry;
+
+                entry = new Entry(source);
+                _entries.AddOrUpdate(source, entry);
+                return entry;
+            }
+        }
+
+        private static List<BestFitResult> GetCandidates(Entry entry, Drawing drawing, double spacing)
+        {
+            var lazy = entry.Unfiltered.GetOrAdd(
+                spacing,
+                _ => new Lazy<List<BestFitResult>>(
+                    () => ComputeCandidates(drawing, spacing),
+                    LazyThreadSafetyMode.ExecutionAndPublication
+                )
+            );
+
+            try
+            {
+                return lazy.Value;
+            }
+            catch
+            {
+                // Don't cache the failure; the next caller retries.
+                entry.Unfiltered.TryRemove(new KeyValuePair<double, Lazy<List<BestFitResult>>>(spacing, lazy));
+                throw;
+            }
+        }
+
+        private static List<BestFitResult> ComputeCandidates(Drawing drawing, double spacing)
+        {
             // Operate on the canonical frame so cached pair positions are orientation-invariant.
             var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
 
@@ -57,11 +165,9 @@ namespace OpenNest.Engine.BestFit
                     }
                 }
 
-                var finder = new BestFitFinder(plateWidth, plateHeight, evaluator, slideComputer);
-                var results = finder.FindBestFits(canonical, spacing, StepSize);
-
-                _cache.TryAdd(key, results);
-                return results;
+                // The plate size only feeds the filter, which FindCandidates skips.
+                var finder = new BestFitFinder(0, 0, evaluator, slideComputer);
+                return finder.FindCandidates(canonical, spacing, StepSize);
             }
             finally
             {
@@ -70,191 +176,57 @@ namespace OpenNest.Engine.BestFit
             }
         }
 
-        public static void ComputeForSizes(
-            Drawing drawing,
-            double spacing,
-            IEnumerable<(double Width, double Height)> plateSizes
-        )
-        {
-            // Skip sizes that are already cached.
-            var needed = new List<(double Width, double Height)>();
-            foreach (var size in plateSizes)
-            {
-                var key = new CacheKey(drawing, size.Width, size.Height, spacing);
-                if (!_cache.ContainsKey(key))
-                    needed.Add(size);
-            }
-
-            if (needed.Count == 0)
-                return;
-
-            // Find the largest plate to use for the initial computation — this
-            // keeps the filter maximally permissive so we don't discard results
-            // that a smaller plate might still use after re-filtering.
-            var maxWidth = 0.0;
-            var maxHeight = 0.0;
-            foreach (var size in needed)
-            {
-                if (size.Width > maxWidth)
-                    maxWidth = size.Width;
-                if (size.Height > maxHeight)
-                    maxHeight = size.Height;
-            }
-
-            IPairEvaluator evaluator = null;
-            ISlideComputer slideComputer = null;
-
-            try
-            {
-                // Operate on the canonical frame so cached pair positions are orientation-invariant.
-                var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
-
-                if (CreateEvaluator != null)
-                {
-                    try
-                    {
-                        evaluator = CreateEvaluator(canonical, spacing);
-                    }
-                    catch
-                    { /* fall back to default evaluator */
-                    }
-                }
-
-                if (CreateSlideComputer != null)
-                {
-                    try
-                    {
-                        slideComputer = CreateSlideComputer();
-                    }
-                    catch
-                    { /* fall back to CPU slide computation */
-                    }
-                }
-
-                // Compute candidates and evaluate once with the largest plate.
-                var finder = new BestFitFinder(maxWidth, maxHeight, evaluator, slideComputer);
-                var baseResults = finder.FindBestFits(canonical, spacing, StepSize);
-
-                // Cache a filtered copy for each plate size.
-                foreach (var size in needed)
-                {
-                    var filter = new BestFitFilter
-                    {
-                        MaxPlateWidth = size.Width,
-                        MaxPlateHeight = size.Height,
-                    };
-
-                    var copy = new List<BestFitResult>(baseResults.Count);
-                    for (var i = 0; i < baseResults.Count; i++)
-                    {
-                        var r = baseResults[i];
-                        copy.Add(
-                            new BestFitResult
-                            {
-                                Candidate = r.Candidate,
-                                RotatedArea = r.RotatedArea,
-                                BoundingWidth = r.BoundingWidth,
-                                BoundingHeight = r.BoundingHeight,
-                                OptimalRotation = r.OptimalRotation,
-                                TrueArea = r.TrueArea,
-                                HullAngles = r.HullAngles,
-                                Keep = r.Keep,
-                                Reason = r.Reason,
-                            }
-                        );
-                    }
-
-                    filter.Apply(copy);
-
-                    var key = new CacheKey(drawing, size.Width, size.Height, spacing);
-                    _cache.TryAdd(key, copy);
-                }
-            }
-            finally
-            {
-                (evaluator as IDisposable)?.Dispose();
-            }
-        }
-
-        public static void Invalidate(Drawing drawing)
-        {
-            foreach (var key in _cache.Keys)
-            {
-                if (ReferenceEquals(key.Drawing, drawing))
-                    _cache.TryRemove(key, out _);
-            }
-        }
-
-        public static void Populate(
-            Drawing drawing,
+        private static List<BestFitResult> FilterForSize(
+            List<BestFitResult> candidates,
             double plateWidth,
-            double plateHeight,
-            double spacing,
-            List<BestFitResult> results
+            double plateHeight
         )
         {
-            if (results == null || results.Count == 0)
-                return;
+            var copy = new List<BestFitResult>(candidates.Count);
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                var r = candidates[i];
+                copy.Add(
+                    new BestFitResult
+                    {
+                        Candidate = r.Candidate,
+                        RotatedArea = r.RotatedArea,
+                        BoundingWidth = r.BoundingWidth,
+                        BoundingHeight = r.BoundingHeight,
+                        OptimalRotation = r.OptimalRotation,
+                        TrueArea = r.TrueArea,
+                        HullAngles = r.HullAngles,
+                        Keep = r.Keep,
+                        Reason = r.Reason,
+                    }
+                );
+            }
 
-            var key = new CacheKey(drawing, plateWidth, plateHeight, spacing);
-            _cache.TryAdd(key, results);
+            BestFitFinder.CreateFilter(plateWidth, plateHeight).Apply(copy);
+            return copy;
         }
 
-        public static Dictionary<
-            (double PlateWidth, double PlateHeight, double Spacing),
-            List<BestFitResult>
-        > GetAllForDrawing(Drawing drawing)
+        private sealed class Entry
         {
-            var result = new Dictionary<(double, double, double), List<BestFitResult>>();
-            foreach (var kvp in _cache)
+            private readonly CNC.Program _program;
+            private readonly double _sourceAngle;
+
+            public readonly ConcurrentDictionary<double, Lazy<List<BestFitResult>>> Unfiltered = new();
+
+            public readonly ConcurrentDictionary<
+                (double PlateWidth, double PlateHeight, double Spacing),
+                List<BestFitResult>
+            > Filtered = new();
+
+            public Entry(Drawing source)
             {
-                if (ReferenceEquals(kvp.Key.Drawing, drawing))
-                    result[(kvp.Key.PlateWidth, kvp.Key.PlateHeight, kvp.Key.Spacing)] = kvp.Value;
-            }
-            return result;
-        }
-
-        public static void Clear()
-        {
-            _cache.Clear();
-        }
-
-        private readonly struct CacheKey : IEquatable<CacheKey>
-        {
-            public readonly Drawing Drawing;
-            public readonly double PlateWidth;
-            public readonly double PlateHeight;
-            public readonly double Spacing;
-
-            public CacheKey(Drawing drawing, double plateWidth, double plateHeight, double spacing)
-            {
-                Drawing = drawing;
-                PlateWidth = plateWidth;
-                PlateHeight = plateHeight;
-                Spacing = spacing;
+                _program = source.Program;
+                _sourceAngle = source.Source?.Angle ?? 0.0;
             }
 
-            public bool Equals(CacheKey other)
-            {
-                return ReferenceEquals(Drawing, other.Drawing)
-                    && PlateWidth == other.PlateWidth
-                    && PlateHeight == other.PlateHeight
-                    && Spacing == other.Spacing;
-            }
-
-            public override bool Equals(object obj) => obj is CacheKey other && Equals(other);
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    var hash = RuntimeHelpers.GetHashCode(Drawing);
-                    hash = hash * 397 ^ PlateWidth.GetHashCode();
-                    hash = hash * 397 ^ PlateHeight.GetHashCode();
-                    hash = hash * 397 ^ Spacing.GetHashCode();
-                    return hash;
-                }
-            }
+            public bool IsCurrentFor(Drawing source) =>
+                ReferenceEquals(_program, source.Program)
+                && _sourceAngle == (source.Source?.Angle ?? 0.0);
         }
     }
 }

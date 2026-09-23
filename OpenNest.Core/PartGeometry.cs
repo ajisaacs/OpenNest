@@ -53,6 +53,7 @@ namespace OpenNest
         /// </summary>
         public static List<Entity> GetOffsetPerimeterEntities(Part part, double spacing)
         {
+            PerfCounters.CountOffsetPerimeterEntities();
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
                 geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()

@@ -28,10 +28,19 @@ namespace OpenNest.Engine.BestFit
                 slideComputer != null
                     ? (IDistanceComputer)new GpuDistanceComputer(slideComputer)
                     : new CpuDistanceComputer();
+            _filter = CreateFilter(maxPlateWidth, maxPlateHeight);
+        }
+
+        /// <summary>
+        /// The filter <see cref="FindBestFits"/> applies for a plate of the given size. The
+        /// aspect-ratio limit widens with the plate's own aspect.
+        /// </summary>
+        public static BestFitFilter CreateFilter(double maxPlateWidth, double maxPlateHeight)
+        {
             var plateAspect =
                 System.Math.Max(maxPlateWidth, maxPlateHeight)
                 / System.Math.Max(System.Math.Min(maxPlateWidth, maxPlateHeight), 0.001);
-            _filter = new BestFitFilter
+            return new BestFitFilter
             {
                 MaxPlateWidth = maxPlateWidth,
                 MaxPlateHeight = maxPlateHeight,
@@ -46,6 +55,39 @@ namespace OpenNest.Engine.BestFit
             BestFitSortField sortBy = BestFitSortField.Area
         )
         {
+            var results = Evaluate(drawing, spacing, stepSize);
+
+            _filter.Apply(results);
+
+            return Number(SortResults(results, sortBy));
+        }
+
+        /// <summary>
+        /// Evaluates every pair candidate without the plate-size filter, sorted by area. Applying
+        /// <see cref="CreateFilter"/> for a plate size to shallow copies of these results gives
+        /// the same results <see cref="FindBestFits"/> returns for that size, so one run can
+        /// serve several sizes.
+        /// </summary>
+        public List<BestFitResult> FindCandidates(
+            Drawing drawing,
+            double spacing = 0.25,
+            double stepSize = 0.25
+        )
+        {
+            return Number(SortResults(Evaluate(drawing, spacing, stepSize), BestFitSortField.Area));
+        }
+
+        private static List<BestFitResult> Number(List<BestFitResult> results)
+        {
+            for (var i = 0; i < results.Count; i++)
+                results[i].Candidate.TestNumber = i;
+
+            return results;
+        }
+
+        private List<BestFitResult> Evaluate(Drawing drawing, double spacing, double stepSize)
+        {
+            PerfCounters.CountFindBestFits();
             var strategies = BuildStrategies(drawing, spacing);
 
             var candidateBags = new ConcurrentBag<List<PairCandidate>>();
@@ -64,16 +106,7 @@ namespace OpenNest.Engine.BestFit
                 $"[BestFitFinder] {strategies.Count} strategies, {allCandidates.Count} candidates"
             );
 
-            var results = _evaluator.EvaluateAll(allCandidates);
-
-            _filter.Apply(results);
-
-            results = SortResults(results, sortBy);
-
-            for (var i = 0; i < results.Count; i++)
-                results[i].Candidate.TestNumber = i;
-
-            return results;
+            return _evaluator.EvaluateAll(allCandidates);
         }
 
         public List<TileResult> FindAndTile(
