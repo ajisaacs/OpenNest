@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using Clipper2Lib;
 using OpenNest.Controls;
 using OpenNest.Converters;
 using OpenNest.Geometry;
@@ -20,6 +21,8 @@ namespace OpenNest
         private Color color;
         private Brush brush;
         private Pen pen;
+
+        private const int OffsetPrecision = 4;
 
         private List<PointF[]> _offsetPolygonPoints;
         private double _cachedOffsetSpacing;
@@ -223,41 +226,66 @@ namespace OpenNest
 
         private List<PointF[]> ComputeOffsetPolygons(double spacing, double tolerance)
         {
-            var result = new List<PointF[]>();
             var entities = ConvertProgram.ToGeometry(BasePart.Program);
             var profile = new ShapeProfile(
                 entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
             );
 
-            AddOffsetPolygon(result, profile.Perimeter.OffsetOutward(spacing), tolerance);
+            // Inflate the flattened part region (perimeter positive, holes negative) in
+            // one Clipper pass. Offsetting entity-by-entity leaves spikes and inverted
+            // loops wherever a feature is narrower than the spacing; Clipper collapses
+            // those features and drops holes that close up entirely.
+            var paths = new PathsD();
+            AddRegionPath(paths, profile.Perimeter, tolerance, positive: true);
 
             foreach (var cutout in profile.Cutouts)
-                AddOffsetPolygon(result, cutout.OffsetInward(spacing), tolerance);
+                AddRegionPath(paths, cutout, tolerance, positive: false);
+
+            var inflated = Clipper.InflatePaths(
+                paths,
+                spacing,
+                JoinType.Round,
+                EndType.Polygon,
+                2.0,
+                OffsetPrecision,
+                tolerance
+            );
+
+            var result = new List<PointF[]>(inflated.Count);
+
+            foreach (var path in inflated)
+            {
+                if (path.Count < 3)
+                    continue;
+
+                var pts = new PointF[path.Count + 1];
+
+                for (var j = 0; j < path.Count; j++)
+                    pts[j] = new PointF((float)path[j].x, (float)path[j].y);
+
+                pts[path.Count] = pts[0];
+                result.Add(pts);
+            }
 
             return result;
         }
 
-        private static void AddOffsetPolygon(
-            List<PointF[]> result,
-            Shape offsetEntity,
-            double tolerance
-        )
+        private static void AddRegionPath(PathsD paths, Shape shape, double tolerance, bool positive)
         {
-            if (offsetEntity == null)
+            var polygon = shape.ToPolygonWithTolerance(tolerance);
+
+            if (polygon.Vertices.Count < 3)
                 return;
 
-            var polygon = offsetEntity.ToPolygonWithTolerance(tolerance);
-            polygon.RemoveSelfIntersections();
+            var path = new PathD(polygon.Vertices.Count);
 
-            if (polygon.Vertices.Count < 2)
-                return;
+            foreach (var v in polygon.Vertices)
+                path.Add(new PointD(v.X, v.Y));
 
-            var pts = new PointF[polygon.Vertices.Count];
+            if (Clipper.IsPositive(path) != positive)
+                path.Reverse();
 
-            for (var j = 0; j < pts.Length; j++)
-                pts[j] = new PointF((float)polygon.Vertices[j].X, (float)polygon.Vertices[j].Y);
-
-            result.Add(pts);
+            paths.Add(path);
         }
 
         private void RebuildOffsetPath(Matrix matrix)
