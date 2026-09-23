@@ -273,7 +273,10 @@ namespace OpenNest.Geometry
 
         public override Entity OffsetEntity(double distance, OffsetSide side)
         {
-            if (side == OffsetSide.Left && Rotation == RotationType.CCW)
+            // The center lies to the left of a CCW circle and to the right of a CW one.
+            var shrinks = (side == OffsetSide.Left) == (Rotation == RotationType.CCW);
+
+            if (shrinks)
             {
                 return Radius <= distance
                     ? null
@@ -281,7 +284,7 @@ namespace OpenNest.Geometry
             }
             else
             {
-                return new Circle(center, Radius + distance) { Layer = Layer };
+                return new Circle(center, Radius + distance) { Layer = Layer, Rotation = Rotation };
             }
         }
 

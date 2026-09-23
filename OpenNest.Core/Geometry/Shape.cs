@@ -463,80 +463,60 @@ namespace OpenNest.Geometry
             boundingBox = Entities.Select(geo => geo.BoundingBox).ToList().GetBoundingBox();
         }
 
+        /// <summary>
+        /// Offsets each perimeter entity to the given side and joins the pieces into a
+        /// closed chain: line-line corners get a round join (convex) or a miter (concave),
+        /// other convex corners get a round join, and any remaining gap (a concave corner
+        /// involving an arc, or an entity that collapsed under the offset) is bridged
+        /// with a line. Cutouts are offset the same way.
+        /// <para>
+        /// Where a feature is narrower than twice the distance, the result keeps zero-area
+        /// spikes and inverted loops. They lie inside the true offset envelope, so they are
+        /// harmless to directional-distance queries, which only need a closed boundary
+        /// that never falls inside the envelope. Use <see cref="ClipperBridge"/> when a
+        /// clean region is needed.
+        /// </para>
+        /// </summary>
         public override Entity OffsetEntity(double distance, OffsetSide side)
         {
             var offsetShape = new Shape();
             var definedShape = new ShapeProfile(this);
 
-            Entity firstEntity = null;
-            Entity firstOffsetEntity = null;
-            Entity lastEntity = null;
-            Entity lastOffsetEntity = null;
+            var pieces = new List<OffsetPiece>();
+            var collapsed = false;
 
             foreach (var entity in definedShape.Perimeter.Entities)
             {
                 var offsetEntity = entity.OffsetEntity(distance, side);
 
                 if (offsetEntity == null)
+                {
+                    collapsed = true;
                     continue;
-
-                if (firstEntity == null)
-                {
-                    firstEntity = entity;
-                    firstOffsetEntity = offsetEntity;
                 }
 
-                switch (entity.Type)
-                {
-                    case EntityType.Line:
-                    {
-                        var line = (Line)entity;
-                        var offsetLine = (Line)offsetEntity;
-
-                        if (lastOffsetEntity != null && lastOffsetEntity.Type == EntityType.Line)
-                        {
-                            JoinOffsetLines(
-                                (Line)lastEntity,
-                                (Line)lastOffsetEntity,
-                                line,
-                                offsetLine,
-                                distance,
-                                side,
-                                offsetShape
-                            );
-                        }
-
-                        offsetShape.Entities.Add(offsetLine);
-                        break;
-                    }
-
-                    default:
-                        offsetShape.Entities.Add(offsetEntity);
-                        break;
-                }
-
-                lastOffsetEntity = offsetEntity;
-                lastEntity = entity;
+                pieces.Add(new OffsetPiece(entity, offsetEntity, collapsed));
+                collapsed = false;
             }
 
-            // Close the shape: join last offset entity back to first
-            if (
-                lastOffsetEntity != null
-                && firstOffsetEntity != null
-                && lastOffsetEntity != firstOffsetEntity
-                && lastOffsetEntity.Type == EntityType.Line
-                && firstOffsetEntity.Type == EntityType.Line
-            )
+            // Entities that collapsed at the end of the loop sit before the first piece.
+            if (collapsed && pieces.Count > 0)
+                pieces[0] = pieces[0] with { CollapsedBefore = true };
+
+            for (var i = 0; i < pieces.Count; i++)
             {
-                JoinOffsetLines(
-                    (Line)lastEntity,
-                    (Line)lastOffsetEntity,
-                    (Line)firstEntity,
-                    (Line)firstOffsetEntity,
-                    distance,
-                    side,
-                    offsetShape
-                );
+                offsetShape.Entities.Add(pieces[i].Offset);
+
+                if (pieces.Count > 1)
+                {
+                    JoinOffsetPieces(
+                        pieces[i],
+                        pieces[(i + 1) % pieces.Count],
+                        distance,
+                        side,
+                        offsetShape
+                    );
+                }
             }
 
             foreach (var cutout in definedShape.Cutouts)
@@ -545,6 +525,151 @@ namespace OpenNest.Geometry
                 );
 
             return offsetShape;
+        }
+
+        private readonly record struct OffsetPiece(
+            Entity Source,
+            Entity Offset,
+            bool CollapsedBefore
+        );
+
+        private static void JoinOffsetPieces(
+            OffsetPiece last,
+            OffsetPiece next,
+            double distance,
+            OffsetSide side,
+            Shape offsetShape
+        )
+        {
+            // Lines meeting across a collapsed fillet are concave, so a miter trims both at
+            // their intersection. Parallel ones (a round-bottomed slot) fall through to
+            // the bridge below.
+            if (
+                next.CollapsedBefore
+                && last.Offset is Line lastOffsetLine
+                && next.Offset is Line nextOffsetLine
+                && Intersect.IntersectsUnbounded(nextOffsetLine, lastOffsetLine, out var miter)
+            )
+            {
+                lastOffsetLine.EndPoint = miter;
+                nextOffsetLine.StartPoint = miter;
+                return;
+            }
+
+            if (!next.CollapsedBefore && last.Source is Line lastLine && next.Source is Line nextLine)
+            {
+                JoinOffsetLines(
+                    lastLine,
+                    (Line)last.Offset,
+                    nextLine,
+                    (Line)next.Offset,
+                    distance,
+                    side,
+                    offsetShape
+                );
+                return;
+            }
+
+            if (
+                !TryGetEnds(last.Offset, out _, out var gapStart)
+                || !TryGetEnds(next.Offset, out var gapEnd, out _)
+            )
+                return;
+
+            if (gapStart.DistanceTo(gapEnd) <= OpenNest.Math.Tolerance.Epsilon)
+                return;
+
+            if (
+                !next.CollapsedBefore
+                && IsConvexCorner(last.Source, next.Source, side, out var corner)
+            )
+            {
+                offsetShape.Entities.Add(
+                    new Arc(
+                        corner,
+                        distance,
+                        corner.AngleTo(gapStart),
+                        corner.AngleTo(gapEnd),
+                        side == OffsetSide.Left
+                    )
+                );
+                return;
+            }
+
+            // Concave corner or collapsed entity: the neighbors' offsets overlap, so a
+            // straight bridge stays inside the offset envelope and closes the chain.
+            offsetShape.Entities.Add(new Line(gapStart, gapEnd));
+        }
+
+        private static bool IsConvexCorner(
+            Entity last,
+            Entity next,
+            OffsetSide side,
+            out Vector corner
+        )
+        {
+            corner = default;
+
+            if (
+                !TryGetEnds(last, out _, out corner)
+                || !TryGetTangents(last, out _, out var d1)
+                || !TryGetTangents(next, out var d2, out _)
+            )
+                return false;
+
+            var cross = d1.X * d2.Y - d1.Y * d2.X;
+
+            return (side == OffsetSide.Left && cross < -OpenNest.Math.Tolerance.Epsilon)
+                || (side == OffsetSide.Right && cross > OpenNest.Math.Tolerance.Epsilon);
+        }
+
+        private static bool TryGetEnds(Entity entity, out Vector start, out Vector end)
+        {
+            switch (entity)
+            {
+                case Line line:
+                    start = line.StartPoint;
+                    end = line.EndPoint;
+                    return true;
+
+                case Arc arc:
+                    start = arc.StartPoint();
+                    end = arc.EndPoint();
+                    return true;
+
+                default:
+                    start = end = default;
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Direction of travel at the start and end of a line or arc.
+        /// </summary>
+        private static bool TryGetTangents(Entity entity, out Vector start, out Vector end)
+        {
+            switch (entity)
+            {
+                case Line line:
+                    start = end = line.EndPoint - line.StartPoint;
+                    return true;
+
+                case Arc arc:
+                    start = ArcTangent(arc, arc.StartAngle);
+                    end = ArcTangent(arc, arc.EndAngle);
+                    return true;
+
+                default:
+                    start = end = default;
+                    return false;
+            }
+        }
+
+        private static Vector ArcTangent(Arc arc, double angle)
+        {
+            var sin = System.Math.Sin(angle);
+            var cos = System.Math.Cos(angle);
+            return arc.IsReversed ? new Vector(sin, -cos) : new Vector(-sin, cos);
         }
 
         private static void JoinOffsetLines(
@@ -611,7 +736,7 @@ namespace OpenNest.Geometry
         /// Normalizes to CW winding before offsetting Left (which is outward for CW),
         /// making the method independent of the original contour winding direction.
         /// </summary>
-        public Shape OffsetOutward(double distance)
+        internal Shape OffsetOutward(double distance)
         {
             var poly = ToPolygon();
 
@@ -660,7 +785,7 @@ namespace OpenNest.Geometry
         /// Normalizes to CCW winding before offsetting Left (which is inward for CCW),
         /// making the method independent of the original contour winding direction.
         /// </summary>
-        public Shape OffsetInward(double distance)
+        internal Shape OffsetInward(double distance)
         {
             var poly = ToPolygon();
 
