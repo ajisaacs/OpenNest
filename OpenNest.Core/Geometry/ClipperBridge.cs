@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Clipper2Lib;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -19,6 +20,8 @@ namespace OpenNest.Geometry
         private const double MiterLimit = 2.0;
 
         private const double ConservativeJoinFactor = 0.25;
+
+        private const double ValidationJoinFactor = 0.1;
 
         /// <summary>
         /// Converts a polygon to a Clipper path, dropping the closing vertex and
@@ -118,7 +121,7 @@ namespace OpenNest.Geometry
             bool circumscribe = false
         )
         {
-            var polygon = perimeter.ToPolygonWithTolerance(tolerance, circumscribe);
+            var polygon = Flatten(perimeter, tolerance, circumscribe);
             return OffsetPerimeter(polygon, distance, tolerance, circumscribe);
         }
 
@@ -160,6 +163,28 @@ namespace OpenNest.Geometry
                 delta += joinTolerance + 0.5 * System.Math.Pow(10, -Precision);
             }
 
+            return Inflate(region, delta, joinTolerance);
+        }
+
+        /// <summary>
+        /// Offset for checking a finished layout against its spacing. Arcs are flattened
+        /// as in conservative mode (perimeter arcs circumscribed, cutout arcs inscribed),
+        /// but round joins use a tenth of the tolerance and nothing is padded, so a layout
+        /// exactly at the spacing passes. The only under-estimate is the join chord error
+        /// at convex corners, at most a tenth of <paramref name="tolerance"/>.
+        /// </summary>
+        public static OffsetRegion OffsetForValidation(
+            ShapeProfile profile,
+            double distance,
+            double tolerance
+        )
+        {
+            var region = ToRegion(profile, tolerance, circumscribe: true);
+            return Inflate(region, distance, tolerance * ValidationJoinFactor);
+        }
+
+        private static OffsetRegion Inflate(PathsD region, double delta, double joinTolerance)
+        {
             var inflated =
                 delta <= 0
                     ? Union(region)
@@ -227,6 +252,113 @@ namespace OpenNest.Geometry
             return largest == null ? null : ToPolygon(largest);
         }
 
+        /// <summary>
+        /// Flattens a closed shape to a polygon whose chords stay within
+        /// <paramref name="tolerance"/> of every arc. Inscribed, the vertices lie on the
+        /// arcs. Circumscribed, arc endpoints stay on the arc and the interior vertices sit
+        /// on tangent intersections, so the polygon never falls inside the curve and never
+        /// pokes past the straight edges an arc meets.
+        /// </summary>
+        public static Polygon Flatten(Shape shape, double tolerance, bool circumscribe)
+        {
+            var polygon = new Polygon();
+
+            foreach (var entity in shape.Entities)
+            {
+                switch (entity)
+                {
+                    case Line line:
+                        polygon.Vertices.Add(line.StartPoint);
+                        polygon.Vertices.Add(line.EndPoint);
+                        break;
+
+                    case Arc arc:
+                        AddArc(polygon.Vertices, arc, tolerance, circumscribe);
+                        break;
+
+                    case Circle circle:
+                        AddCircle(polygon.Vertices, circle, tolerance, circumscribe);
+                        break;
+                }
+            }
+
+            polygon.Close();
+            polygon.Cleanup();
+            polygon.UpdateBounds();
+            return polygon;
+        }
+
+        private static void AddArc(List<Vector> points, Arc arc, double tolerance, bool circumscribe)
+        {
+            if (!circumscribe)
+            {
+                points.AddRange(arc.ToPoints(arc.SegmentsForTolerance(tolerance)));
+                return;
+            }
+
+            var sweep = arc.SweepAngle();
+            var segments = CircumscribedSegments(arc.Radius, sweep, tolerance);
+            var step = (arc.IsReversed ? -sweep : sweep) / segments;
+            var r = arc.Radius / System.Math.Cos(System.Math.Abs(step) / 2);
+
+            points.Add(arc.StartPoint());
+
+            for (var i = 0; i < segments; i++)
+            {
+                var angle = arc.StartAngle + step * (i + 0.5);
+                points.Add(
+                    new Vector(
+                        arc.Center.X + r * System.Math.Cos(angle),
+                        arc.Center.Y + r * System.Math.Sin(angle)
+                    )
+                );
+            }
+
+            points.Add(arc.EndPoint());
+        }
+
+        private static void AddCircle(
+            List<Vector> points,
+            Circle circle,
+            double tolerance,
+            bool circumscribe
+        )
+        {
+            if (!circumscribe)
+            {
+                points.AddRange(circle.ToPoints(circle.SegmentsForTolerance(tolerance)));
+                return;
+            }
+
+            var segments = CircumscribedSegments(circle.Radius, Angle.TwoPI, tolerance);
+            var step = Angle.TwoPI / segments;
+            var r = circle.Radius / System.Math.Cos(step / 2);
+
+            for (var i = 0; i < segments; i++)
+            {
+                points.Add(
+                    new Vector(
+                        circle.Center.X + r * System.Math.Cos(step * i),
+                        circle.Center.Y + r * System.Math.Sin(step * i)
+                    )
+                );
+            }
+        }
+
+        /// <summary>
+        /// Segments for a circumscribed arc: a tangent-intersection vertex sits
+        /// radius / cos(step / 2) from the center, so keep that within the tolerance, and
+        /// keep each step at 90 degrees or less so the tangents meet close to the arc.
+        /// </summary>
+        private static int CircumscribedSegments(double radius, double sweep, double tolerance)
+        {
+            var maxHalfStep = System.Math.Acos(radius / (radius + tolerance));
+            var segments = (int)System.Math.Ceiling(System.Math.Abs(sweep) / (2 * maxHalfStep));
+            var quarters = (int)System.Math.Ceiling(System.Math.Abs(sweep) / Angle.HalfPI);
+
+            return System.Math.Max(1, System.Math.Max(segments, quarters));
+        }
+
         private static PathsD Union(PathsD region)
         {
             var clipper = new ClipperD(Precision);
@@ -245,7 +377,7 @@ namespace OpenNest.Geometry
             bool positive
         )
         {
-            AddPolygon(region, shape.ToPolygonWithTolerance(tolerance, circumscribe), positive);
+            AddPolygon(region, Flatten(shape, tolerance, circumscribe), positive);
         }
 
         private static void AddPolygon(PathsD region, Polygon polygon, bool positive)

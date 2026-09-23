@@ -329,9 +329,10 @@ namespace OpenNest.Benchmark
         /// outward, cutouts offset inward, in one Clipper region offset). A cutout
         /// that closes up under the offset is dropped, which treats it as solid:
         /// conservative, since it has no room for another part at the required
-        /// spacing anyway. The flattening is conservative too (perimeter arcs
-        /// circumscribed, cutout arcs inscribed), so the check never passes a
-        /// layout that is closer than the spacing.
+        /// spacing anyway. Arcs are flattened conservatively (perimeter arcs
+        /// circumscribed, cutout arcs inscribed) but nothing is padded, so a layout
+        /// exactly at the spacing passes; the only leniency is the round-join chord
+        /// error at convex corners (OutlineTolerance / 10).
         /// part.Program is already rotated; only a Location offset is needed.
         /// </summary>
         private static PartOutline Outline(Part part, double inflateBy)
@@ -352,11 +353,10 @@ namespace OpenNest.Benchmark
             // Adaptive tolerance instead of Shape.ToPolygon()'s default (up to 1000
             // segments per arc) - arc-heavy real parts otherwise produce thousands
             // of vertices, which is needlessly slow for a spacing check.
-            var region = ClipperBridge.Offset(
+            var region = ClipperBridge.OffsetForValidation(
                 profile,
                 inflateBy > Tolerance.Epsilon ? inflateBy : 0,
-                OutlineTolerance,
-                circumscribe: true
+                OutlineTolerance
             );
 
             var perimeter = region.LargestOuter();
