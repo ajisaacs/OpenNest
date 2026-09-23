@@ -315,6 +315,8 @@ namespace OpenNest.Benchmark
                 ? requirement.Name
                 : part.BaseDrawing.Name;
 
+        private const double OutlineTolerance = 0.01;
+
         private sealed class PartOutline
         {
             public Polygon Perimeter { get; init; }
@@ -324,9 +326,12 @@ namespace OpenNest.Benchmark
         /// <summary>
         /// Extracts a part's material as world-space polygons - the perimeter and
         /// its cutouts - grown by <paramref name="inflateBy"/> (perimeter offset
-        /// outward, cutouts offset inward). A cutout that closes up under the
-        /// offset is dropped, which treats it as solid: conservative, since it
-        /// has no room for another part at the required spacing anyway.
+        /// outward, cutouts offset inward, in one Clipper region offset). A cutout
+        /// that closes up under the offset is dropped, which treats it as solid:
+        /// conservative, since it has no room for another part at the required
+        /// spacing anyway. The flattening is conservative too (perimeter arcs
+        /// circumscribed, cutout arcs inscribed), so the check never passes a
+        /// layout that is closer than the spacing.
         /// part.Program is already rotated; only a Location offset is needed.
         /// </summary>
         private static PartOutline Outline(Part part, double inflateBy)
@@ -344,57 +349,33 @@ namespace OpenNest.Benchmark
             if (profile.Perimeter == null)
                 return null;
 
-            var perimeter = profile.Perimeter;
-
-            if (inflateBy > Tolerance.Epsilon)
-                perimeter = perimeter.OffsetOutward(inflateBy) ?? perimeter;
-
-            var polygon = ToWorldPolygon(perimeter, part.Location);
-
-            if (polygon == null)
-                return null;
-
-            var holes = new List<Polygon>();
-
-            foreach (var cutout in profile.Cutouts)
-            {
-                var hole = cutout;
-
-                if (inflateBy > Tolerance.Epsilon)
-                {
-                    hole = cutout.OffsetInward(inflateBy);
-
-                    // An offset that collapsed or flipped inside-out leaves no usable room.
-                    if (
-                        hole == null
-                        || hole.Area() <= Tolerance.Epsilon
-                        || hole.Area() >= cutout.Area()
-                    )
-                        continue;
-                }
-
-                var holePolygon = ToWorldPolygon(hole, part.Location);
-
-                if (holePolygon != null)
-                    holes.Add(holePolygon);
-            }
-
-            return new PartOutline { Perimeter = polygon, Holes = holes };
-        }
-
-        private static Polygon ToWorldPolygon(Shape shape, Vector location)
-        {
             // Adaptive tolerance instead of Shape.ToPolygon()'s default (up to 1000
             // segments per arc) - arc-heavy real parts otherwise produce thousands
             // of vertices, which is needlessly slow for a spacing check.
-            var polygon = shape.ToPolygonWithTolerance(0.01, circumscribe: true);
+            var region = ClipperBridge.Offset(
+                profile,
+                inflateBy > Tolerance.Epsilon ? inflateBy : 0,
+                OutlineTolerance,
+                circumscribe: true
+            );
 
-            if (polygon == null)
+            var perimeter = region.LargestOuter();
+
+            if (perimeter == null)
                 return null;
 
+            ToWorld(perimeter, part.Location);
+
+            foreach (var hole in region.Holes)
+                ToWorld(hole, part.Location);
+
+            return new PartOutline { Perimeter = perimeter, Holes = region.Holes };
+        }
+
+        private static void ToWorld(Polygon polygon, Vector location)
+        {
             polygon.Offset(location);
             polygon.UpdateBounds();
-            return polygon;
         }
     }
 }

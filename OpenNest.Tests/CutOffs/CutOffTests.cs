@@ -121,6 +121,49 @@ public class CutOffTests
         Assert.Equal(4, codes.Count);
     }
 
+    [Theory]
+    [InlineData(0.3, 19.0)] // Narrower than twice the clearance: the slot closes up.
+    [InlineData(4.0, 24.0)] // Wide slot: the cut runs in to 1 short of the slot's end.
+    public void CutOff_UpASlot_KeepsClearanceFromPart(double slotWidth, double firstEnd)
+    {
+        // 10x10 part at (20,20) with a 5-deep slot up from the bottom edge, centered
+        // on the cut line.
+        var h = slotWidth / 2;
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(5 - h, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(5 - h, 5)));
+        pgm.Codes.Add(new LinearMove(new Vector(5 + h, 5)));
+        pgm.Codes.Add(new LinearMove(new Vector(5 + h, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(10, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 10)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+
+        var plate = new Plate(50, 50);
+        var part = Part.CreateAtOrigin(new Drawing("slot", pgm));
+        part.Location = new Vector(20, 20);
+        plate.Parts.Add(part);
+
+        var settings = new CutOffSettings { PartClearance = 1.0 };
+        var cutoff = new CutOff(new Vector(25, 10), CutOffAxis.Vertical);
+        cutoff.Regenerate(plate, settings, Plate.BuildPerimeterCache(plate));
+
+        var ys = cutoff
+            .Drawing.Program.Codes.OfType<Motion>()
+            .Select(m => m.EndPoint.Y)
+            .OrderBy(y => y)
+            .ToList();
+
+        Assert.Equal(4, ys.Count);
+        Assert.Equal(0, ys[0], 6);
+        // A closed slot leaves a shallow dent at its mouth: the cut stops 1 from the
+        // mouth corners, at 20 - sqrt(1 - 0.15^2) = 19.011.
+        Assert.InRange(ys[1], firstEnd - 0.02, firstEnd + 0.02);
+        Assert.InRange(ys[2], 30.999, 31.02);
+        Assert.Equal(50, ys[3], 6);
+    }
+
     [Fact]
     public void CutOff_ShortSegment_FilteredByMinLength()
     {

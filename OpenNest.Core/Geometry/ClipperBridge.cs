@@ -18,6 +18,8 @@ namespace OpenNest.Geometry
 
         private const double MiterLimit = 2.0;
 
+        private const double ConservativeJoinFactor = 0.25;
+
         /// <summary>
         /// Converts a polygon to a Clipper path, dropping the closing vertex and
         /// orienting it positive (CCW) or negative (CW).
@@ -90,9 +92,9 @@ namespace OpenNest.Geometry
         /// no more than <paramref name="tolerance"/> from the true arc.
         /// </summary>
         /// <param name="circumscribe">
-        /// When true, the result never under-estimates the offset: arcs are flattened
-        /// outside the true curve and the inflation is padded by the chord tolerance
-        /// and Clipper's rounding.
+        /// When true, the result never under-estimates the offset: perimeter arcs are
+        /// flattened outside the true curve, cutout arcs inside it, and the inflation is
+        /// padded by the round-join chord error and Clipper's rounding.
         /// </param>
         public static OffsetRegion Offset(
             ShapeProfile profile,
@@ -106,7 +108,38 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Offsets a single closed shape outward, ignoring any cutouts. A perimeter that
+        /// curls back on itself (a C shape with a narrow mouth) can gain holes.
+        /// </summary>
+        public static OffsetRegion OffsetPerimeter(
+            Shape perimeter,
+            double distance,
+            double tolerance,
+            bool circumscribe = false
+        )
+        {
+            var polygon = perimeter.ToPolygonWithTolerance(tolerance, circumscribe);
+            return OffsetPerimeter(polygon, distance, tolerance, circumscribe);
+        }
+
+        /// <summary>
+        /// Offsets a closed polygon outward, whatever its winding.
+        /// </summary>
+        public static OffsetRegion OffsetPerimeter(
+            Polygon perimeter,
+            double distance,
+            double tolerance,
+            bool circumscribe = false
+        )
+        {
+            var region = new PathsD(1);
+            AddPolygon(region, perimeter, positive: true);
+            return Offset(region, distance, tolerance, circumscribe);
+        }
+
+        /// <summary>
         /// Offsets an already-flattened region (outers positive, holes negative).
+        /// A distance of zero only unions the region, with no conservative padding.
         /// </summary>
         public static OffsetRegion Offset(
             PathsD region,
@@ -115,13 +148,20 @@ namespace OpenNest.Geometry
             bool circumscribe = false
         )
         {
+            // Round joins put their vertices on the true arc, so each chord sits inside
+            // it by up to the join tolerance. In conservative mode, joins use a finer
+            // tolerance and the inflation is padded by it (plus Clipper's rounding).
             var delta = distance;
+            var joinTolerance = tolerance;
 
-            if (circumscribe)
-                delta += tolerance + 0.5 * System.Math.Pow(10, -Precision);
+            if (circumscribe && distance > 0)
+            {
+                joinTolerance = tolerance * ConservativeJoinFactor;
+                delta += joinTolerance + 0.5 * System.Math.Pow(10, -Precision);
+            }
 
             var inflated =
-                delta == 0
+                delta <= 0
                     ? Union(region)
                     : Clipper.InflatePaths(
                         region,
@@ -130,7 +170,7 @@ namespace OpenNest.Geometry
                         EndType.Polygon,
                         MiterLimit,
                         Precision,
-                        tolerance
+                        joinTolerance
                     );
 
             var result = new OffsetRegion(new List<Polygon>(), new List<Polygon>());
@@ -167,9 +207,12 @@ namespace OpenNest.Geometry
             bool positive
         )
         {
-            var polygon = shape.ToPolygonWithTolerance(tolerance, circumscribe);
+            AddPolygon(region, shape.ToPolygonWithTolerance(tolerance, circumscribe), positive);
+        }
 
-            if (polygon.Vertices.Count < 4)
+        private static void AddPolygon(PathsD region, Polygon polygon, bool positive)
+        {
+            if (polygon.Vertices.Count < 3)
                 return;
 
             var path = ToPath(polygon, positive);

@@ -26,16 +26,15 @@ namespace OpenNest.Engine.BestFit
             if (perimeter == null)
                 return new PolygonExtractionResult(null, Vector.Zero);
 
-            // Ensure CW winding for correct outward offset direction.
-            definedShape.NormalizeWinding();
+            // Circumscribe so the polygon never under-estimates the part (or its offset).
+            var polygon =
+                halfSpacing > 0
+                    ? ClipperBridge
+                        .OffsetPerimeter(perimeter, halfSpacing, 0.01, circumscribe: true)
+                        .LargestOuter()
+                    : perimeter.ToPolygonWithTolerance(0.01, circumscribe: true);
 
-            var inflated =
-                halfSpacing > 0 ? (perimeter.OffsetOutward(halfSpacing) ?? perimeter) : perimeter;
-
-            // Convert to polygon with circumscribed arcs for tight nesting.
-            var polygon = inflated.ToPolygonWithTolerance(0.01, circumscribe: true);
-
-            if (polygon.Vertices.Count < 3)
+            if (polygon == null || polygon.Vertices.Count < 3)
                 return new PolygonExtractionResult(null, Vector.Zero);
 
             // Normalize: move polygon to origin.
