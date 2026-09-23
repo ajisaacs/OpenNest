@@ -265,6 +265,8 @@ An engine's layout is rejected (it places nothing and pays the penalty on every 
 
 Custom competitor engines can be added by dropping a DLL that implements `INestingEngine` with a public parameterless constructor into the `Engines/` directory next to the benchmark executable; each one is registered under its own CLR type name. This jobs plug-in contract is also the supported extension point for new nesting engines. Plugins built for the removed single-plate inheritance API are not binary compatible and must be migrated to `INestingEngine`.
 
+In-repo plugin engines live in the top-level `Engines/` source folder, one `Engines/OpenNest.Engine.<Name>/` project each with an optional `tests/` subproject. They are outside `OpenNest.sln` and share their build settings and `OpenNest.Engine` reference through `Engines/Directory.Build.props`. `./Engines/Build-Engines.ps1` builds the benchmark and every engine, then copies the engine DLLs into the benchmark's runtime `Engines/` folder; pass `-Engines Opus55,Terra` to build a subset.
+
 ### Conservative bend endpoint repair (opt-in)
 
 Bend endpoint repair is disabled by default in the shared CAD importer.
@@ -314,6 +316,7 @@ OpenNest.sln
 ├── OpenNest.Core/              # Domain model, geometry, and CNC primitives
 ├── OpenNest.Engine/            # Nesting algorithms and whole-job contracts
 ├── OpenNest.Engine.Tests/      # Cross-platform whole-job contract tests (net8.0)
+├── Engines/                    # Out-of-solution plugin engines (OpenNest.Engine.<Name>/)
 ├── OpenNest.IO/                # File I/O — DXF import/export, nest file format
 ├── OpenNest.IO.Tests/          # Cross-platform CAD import and bend repair tests (net8.0)
 ├── OpenNest.Console/           # Command-line interface for batch nesting

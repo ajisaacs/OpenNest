@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared settings and the OpenNest.Engine reference come from Engines/Directory.Build.props. -->
+</Project>

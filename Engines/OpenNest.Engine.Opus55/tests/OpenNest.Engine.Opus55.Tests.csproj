@@ -1,8 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -14,8 +11,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="../OpenNest.Engine.Opus55.csproj" />
-    <ProjectReference Include="../../OpenNest.Engine/OpenNest.Engine.csproj" />
     <!-- The benchmark's NestValidator is the arbiter the engine is scored by. -->
-    <ProjectReference Include="../../OpenNest.Benchmark/OpenNest.Benchmark.csproj" />
+    <ProjectReference Include="../../../OpenNest.Benchmark/OpenNest.Benchmark.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-# OpenNest.Engine.Qwen
+# OpenNest.Engine.Terra
 
 An independent `INestingEngine` implementation — **not** a wrapper, ensemble, or
 selector over OpenNest's built-in engines (`StockLadderNestingEngine`,
@@ -22,7 +22,7 @@ strategies:
 
 ## What to fill in
 
-`QwenNestingEngine.cs` — implement `Solve()`. Pick and document an actual
+`TerraNestingEngine.cs` — implement `Solve()`. Pick and document an actual
 placement strategy (NFP-based sliding placement, skyline/shelf packer,
 simulated-annealing/genetic layout search, guillotine-cut packer,
 physics/gravity-settling, etc). It's fine to be simpler or worse than the built-in
@@ -31,7 +31,7 @@ engines to start; it must not be the same algorithm re-derived through indirecti
 ## Build
 
 ```bash
-dotnet build OpenNest.Engine.Qwen/OpenNest.Engine.Qwen.csproj
+dotnet build Engines/OpenNest.Engine.Terra/OpenNest.Engine.Terra.csproj
 ```
 
 This project is intentionally **outside** `OpenNest.sln` (same pattern as the
@@ -44,14 +44,16 @@ as part of the main solution.
 own build output:
 
 ```bash
-dotnet build OpenNest.Engine.Qwen/OpenNest.Engine.Qwen.csproj -c Release
+dotnet build Engines/OpenNest.Engine.Terra/OpenNest.Engine.Terra.csproj -c Release
 dotnet build OpenNest.Benchmark/OpenNest.Benchmark.csproj -c Release
 
 mkdir -p OpenNest.Benchmark/bin/Release/net8.0/Engines
-cp OpenNest.Engine.Qwen/bin/Release/net8.0/OpenNest.Engine.Qwen.dll    OpenNest.Benchmark/bin/Release/net8.0/Engines/
+cp Engines/OpenNest.Engine.Terra/bin/Release/net8.0/OpenNest.Engine.Terra.dll    OpenNest.Benchmark/bin/Release/net8.0/Engines/
 
 dotnet OpenNest.Benchmark/bin/Release/net8.0/OpenNest.Benchmark.dll <path-to-.nest-or-folder>
 ```
 
-Your engine will show up in the report under its CLR type name (`QwenNestingEngine`),
+Or build and deploy in one step with `./Engines/Build-Engines.ps1 -Engines Terra`.
+
+Your engine will show up in the report under its CLR type name (`TerraNestingEngine`),
 competing on equal footing against the built-in engines.

@@ -61,8 +61,8 @@ Every placement decision (which part, which rotation, where, on which sheet) com
 ## Build / test
 
 ```bash
-dotnet build OpenNest.Engine.Opus55/OpenNest.Engine.Opus55.csproj -c Release
-dotnet test  OpenNest.Engine.Opus55/tests/OpenNest.Engine.Opus55.Tests.csproj
+dotnet build Engines/OpenNest.Engine.Opus55/OpenNest.Engine.Opus55.csproj -c Release
+dotnet test  Engines/OpenNest.Engine.Opus55/tests/OpenNest.Engine.Opus55.Tests.csproj
 ```
 
 This project is intentionally **outside** `OpenNest.sln`, the same pattern as the
@@ -73,9 +73,11 @@ This project is intentionally **outside** `OpenNest.sln`, the same pattern as th
 ```bash
 dotnet build OpenNest.Benchmark/OpenNest.Benchmark.csproj -c Release
 mkdir -p OpenNest.Benchmark/bin/Release/net8.0/Engines
-cp OpenNest.Engine.Opus55/bin/Release/net8.0/OpenNest.Engine.Opus55.dll OpenNest.Benchmark/bin/Release/net8.0/Engines/
+cp Engines/OpenNest.Engine.Opus55/bin/Release/net8.0/OpenNest.Engine.Opus55.dll OpenNest.Benchmark/bin/Release/net8.0/Engines/
 dotnet OpenNest.Benchmark/bin/Release/net8.0/OpenNest.Benchmark.dll <path-to-.nest-or-manifest-or-folder>
 ```
+
+Or build and deploy in one step with `./Engines/Build-Engines.ps1 -Engines Opus55`.
 
 The engine reports as `Opus55NestingEngine`.
 
