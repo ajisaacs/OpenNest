@@ -3,6 +3,22 @@ using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
+    /// <summary>
+    /// Polygon overlap test with hole subtraction. This is the reference implementation
+    /// for a future GPU kernel, so it deliberately stays hand-rolled instead of using
+    /// Clipper (which is CPU-only and allocation-heavy; see <see cref="ClipperBridge"/>
+    /// for the CPU preparation that feeds it).
+    /// <para>
+    /// GPU-port contract. Per-polygon preparation, done once per drawing and rotation,
+    /// then cached and uploaded: the spacing offset (<see cref="ClipperBridge"/>),
+    /// triangulation (<see cref="ConvexDecomposition.Triangulate"/>) of the outline and
+    /// each hole, and the bounding box of every polygon and triangle. Per-pair work,
+    /// kernel-shaped (fixed-size, loop-only, no recursion): the bounding-box rejects,
+    /// Sutherland-Hodgman clipping of convex triangle pairs (<c>ClipConvex</c>), and
+    /// subtraction of hole triangles from the clipped regions (<c>SubtractTriangles</c>).
+    /// Inputs are closed, lines-only polygons; winding is normalized by triangulation.
+    /// </para>
+    /// </summary>
     public static class Collision
     {
         public static CollisionResult Check(

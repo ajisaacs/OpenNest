@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -203,6 +204,84 @@ public class CollisionTests
     {
         Assert.False(Collision.HasAnyOverlap(new List<Polygon>()));
     }
+
+    // The cases below feed Collision with ClipperBridge offsets, the way the spacing
+    // checks prepare their inputs: lines only, round joins, 1e-4 precision.
+
+    [Theory]
+    [InlineData(4.9, 5.1, true)] // Inside the collapsed slot: 0.05 from its walls.
+    [InlineData(10.3, 12, false)] // Beside the part, 0.3 away.
+    public void HasOverlap_NeighborOfPartWithCollapsedSlot(
+        double left,
+        double right,
+        bool expected
+    )
+    {
+        // 10x10 part with a 0.3-wide slot down from the top, inflated by 0.25.
+        var part = MakeProfile(
+            MakePolygon((0, 0), (10, 0), (10, 10), (5.15, 10), (5.15, 7), (4.85, 7), (4.85, 10), (0, 10))
+        );
+        var inflated = ClipperBridge.Offset(part, 0.25, 0.001);
+        var neighbor = MakeSquare(left, 8, right, 10);
+
+        Assert.Equal(
+            expected,
+            Collision.HasOverlap(inflated.LargestOuter(), neighbor, inflated.Holes)
+        );
+    }
+
+    [Theory]
+    [InlineData(5.5, 14.5, false)] // 0.5 from the hole's edges.
+    [InlineData(5.1, 14.9, true)] // 0.1 from the hole's edges.
+    public void HasOverlap_PartInsideHoleShrunkBySpacing(double min, double max, bool expected)
+    {
+        var part = MakeProfile(
+            MakePolygon((0, 0), (20, 0), (20, 20), (0, 20)),
+            MakePolygon((5, 5), (15, 5), (15, 15), (5, 15))
+        );
+        var inflated = ClipperBridge.Offset(part, 0.25, 0.001);
+        var inner = MakeSquare(min, min, max, max);
+
+        Assert.Single(inflated.Holes);
+        Assert.Equal(
+            expected,
+            Collision.HasOverlap(inflated.LargestOuter(), inner, inflated.Holes)
+        );
+    }
+
+    [Fact]
+    public void HasOverlap_ZeroSpacingEdgeContact_ReturnsFalse()
+    {
+        var a = ClipperBridge.Offset(
+            MakeProfile(MakePolygon((0, 0), (10, 0), (10, 10), (0, 10))),
+            0,
+            0.001
+        );
+        var b = ClipperBridge.Offset(
+            MakeProfile(MakePolygon((10, 0), (20, 0), (20, 10), (10, 10))),
+            0,
+            0.001
+        );
+
+        Assert.False(Collision.HasOverlap(a.LargestOuter(), b.LargestOuter()));
+    }
+
+    private static Shape MakePolygon(params (double X, double Y)[] pts)
+    {
+        var shape = new Shape();
+
+        for (var i = 0; i < pts.Length; i++)
+        {
+            var from = pts[i];
+            var to = pts[(i + 1) % pts.Length];
+            shape.Entities.Add(new Line(from.X, from.Y, to.X, to.Y));
+        }
+
+        return shape;
+    }
+
+    private static ShapeProfile MakeProfile(params Shape[] shapes) =>
+        new(shapes.SelectMany(s => s.Entities).ToList());
 
     private static Polygon MakeSquare(double left, double bottom, double right, double top)
     {
