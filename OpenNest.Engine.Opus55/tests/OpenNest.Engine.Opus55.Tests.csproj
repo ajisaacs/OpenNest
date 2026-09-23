@@ -13,7 +13,9 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
-    <ProjectReference Include="../OpenNest.Engine.Sonnet5.csproj" />
+    <ProjectReference Include="../OpenNest.Engine.Opus55.csproj" />
     <ProjectReference Include="../../OpenNest.Engine/OpenNest.Engine.csproj" />
+    <!-- The benchmark's NestValidator is the arbiter the engine is scored by. -->
+    <ProjectReference Include="../../OpenNest.Benchmark/OpenNest.Benchmark.csproj" />
   </ItemGroup>
 </Project>
