@@ -189,6 +189,44 @@ namespace OpenNest.Geometry
             return result;
         }
 
+        /// <summary>
+        /// Miter-offsets a closed polygon by <paramref name="delta"/> (positive grows it,
+        /// negative shrinks it). Returns the largest resulting polygon (CCW), or null
+        /// when the polygon collapses.
+        /// </summary>
+        public static Polygon OffsetMiter(Polygon polygon, double delta)
+        {
+            var path = ToPath(polygon, positive: true);
+
+            if (path.Count < 3)
+                return null;
+
+            var inflated = Clipper.InflatePaths(
+                new PathsD { path },
+                delta,
+                JoinType.Miter,
+                EndType.Polygon,
+                MiterLimit,
+                Precision
+            );
+
+            PathD largest = null;
+            var largestArea = 0.0;
+
+            foreach (var candidate in inflated)
+            {
+                var area = Clipper.Area(candidate);
+
+                if (area > largestArea)
+                {
+                    largest = candidate;
+                    largestArea = area;
+                }
+            }
+
+            return largest == null ? null : ToPolygon(largest);
+        }
+
         private static PathsD Union(PathsD region)
         {
             var clipper = new ClipperD(Precision);

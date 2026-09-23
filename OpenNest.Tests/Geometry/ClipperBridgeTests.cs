@@ -174,6 +174,31 @@ public class ClipperBridgeTests
         }
     }
 
+    [Theory]
+    [InlineData(true, OffsetSide.Left, 12 * 12)]
+    [InlineData(true, OffsetSide.Right, 8 * 8)]
+    [InlineData(false, OffsetSide.Left, 8 * 8)]
+    [InlineData(false, OffsetSide.Right, 12 * 12)]
+    public void PolygonOffsetEntity_MitersToSideAndKeepsWinding(
+        bool ccw,
+        OffsetSide side,
+        double expectedArea
+    )
+    {
+        var square = new Polygon();
+        square.Vertices.AddRange(new[] { new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(0, 10) });
+
+        if (!ccw)
+            square.Vertices.Reverse();
+
+        square.Close();
+
+        var result = (Polygon)square.OffsetEntity(1, side);
+
+        Assert.Equal(expectedArea, result.Area(), 6);
+        Assert.Equal(square.RotationDirection(), result.RotationDirection());
+    }
+
     private static bool SegmentsCross(Vector a, Vector b, Vector c, Vector d)
     {
         static double Cross(Vector o, Vector p, Vector q) =>
