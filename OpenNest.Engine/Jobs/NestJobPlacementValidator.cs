@@ -12,6 +12,10 @@ namespace OpenNest.Engine.Jobs;
 internal static class NestJobPlacementValidator
 {
     private const double Epsilon = 0.0000001;
+    // Flattening for placement overlap/spacing checks: the same 0.001 the benchmark's
+    // NestValidator and Part.Intersects use. Arcs are inscribed, so a layout placed exactly at
+    // the spacing passes; outward arcs may come up to this much closer than the spacing.
+    private const double PlacementChordTolerance = 0.001;
 
     internal static void ValidateCandidate(
         PlateCandidate candidate,
@@ -24,6 +28,7 @@ internal static class NestJobPlacementValidator
             throw new InvalidOperationException("The plate nester returned a null candidate.");
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         var placed = new List<ShapeTopology>();
+        var sources = new Dictionary<string, ShapeTopology>(StringComparer.Ordinal);
         foreach (var placement in candidate.Placements)
         {
             if (
@@ -48,7 +53,9 @@ internal static class NestJobPlacementValidator
                     "Candidate rotation is not allowed for the requirement."
                 );
 
-            var shape = Transform(CreateShape(part.Geometry), placement);
+            if (!sources.TryGetValue(placement.PartId, out var source))
+                sources[placement.PartId] = source = CreateShape(part.Geometry);
+            var shape = Transform(source, placement);
             if (!FitsWorkArea(shape, stock))
                 throw new InvalidOperationException(
                     "Candidate placement falls outside the usable stock area."
@@ -296,8 +303,8 @@ internal static class NestJobPlacementValidator
 
     private static bool Overlaps(ShapeTopology left, ShapeTopology right)
     {
-        var leftPoly = ToPolygon(left.Perimeter);
-        var rightPoly = ToPolygon(right.Perimeter);
+        var leftPoly = left.Contours[0].Polygon;
+        var rightPoly = right.Contours[0].Polygon;
         if (!leftPoly.BoundingBox.Intersects(rightPoly.BoundingBox))
             return false;
         // True material overlap requires shared interior area, not boundary touching.
@@ -308,8 +315,8 @@ internal static class NestJobPlacementValidator
         return Collision.HasOverlap(
             leftPoly,
             rightPoly,
-            ToPolygons(left.Cutouts),
-            ToPolygons(right.Cutouts)
+            left.CutoutPolygons,
+            right.CutoutPolygons
         );
     }
 
@@ -365,44 +372,22 @@ internal static class NestJobPlacementValidator
     private static double Distance(ShapeTopology left, ShapeTopology right)
     {
         var result = double.PositiveInfinity;
-        foreach (var leftContour in AllContours(left))
-        foreach (var rightContour in AllContours(right))
-            if (BoundsDistance(leftContour.BoundingBox, rightContour.BoundingBox) < result)
+        foreach (var leftContour in left.Contours)
+        foreach (var rightContour in right.Contours)
+            if (BoundsDistance(leftContour.Bounds, rightContour.Bounds) < result)
                 result = System.Math.Min(
                     result,
-                    BoundaryDistance(ToPolygon(leftContour), ToPolygon(rightContour))
+                    BoundaryDistance(leftContour.Lines, rightContour.Lines)
                 );
         return result;
     }
 
-    private static IEnumerable<Shape> AllContours(ShapeTopology shape)
-    {
-        yield return shape.Perimeter;
-        foreach (var cutout in shape.Cutouts)
-            yield return cutout;
-    }
-
-    private static List<Polygon> ToPolygons(List<Shape> contours)
-    {
-        var polygons = new List<Polygon>(contours.Count);
-        foreach (var contour in contours)
-            polygons.Add(ToPolygon(contour));
-        return polygons;
-    }
-
-    private static Polygon ToPolygon(Shape contour)
-    {
-        var polygon = contour.ToPolygon();
-        polygon.UpdateBounds();
-        return polygon;
-    }
-
-    private static double BoundaryDistance(Polygon left, Polygon right)
+    private static double BoundaryDistance(List<Line> left, List<Line> right)
     {
         var result = double.PositiveInfinity;
-        foreach (var leftLine in left.ToLines())
+        foreach (var leftLine in left)
         {
-            foreach (var rightLine in right.ToLines())
+            foreach (var rightLine in right)
             {
                 if (leftLine.Intersects(rightLine))
                     return 0;
@@ -429,7 +414,56 @@ internal static class NestJobPlacementValidator
 
     private sealed class ShapeTopology(Shape perimeter, List<Shape> cutouts)
     {
+        private Contour[] contours;
+        private List<Polygon> cutoutPolygons;
+
         internal Shape Perimeter { get; } = perimeter;
         internal List<Shape> Cutouts { get; } = cutouts;
+
+        /// <summary>The perimeter first, then the cutouts, each flattened once on first use.</summary>
+        internal Contour[] Contours
+        {
+            get
+            {
+                if (contours != null)
+                    return contours;
+                var result = new Contour[Cutouts.Count + 1];
+                result[0] = new Contour(Perimeter);
+                for (var i = 0; i < Cutouts.Count; i++)
+                    result[i + 1] = new Contour(Cutouts[i]);
+                return contours = result;
+            }
+        }
+
+        internal List<Polygon> CutoutPolygons
+        {
+            get
+            {
+                if (cutoutPolygons != null)
+                    return cutoutPolygons;
+                var result = new List<Polygon>(Cutouts.Count);
+                for (var i = 1; i < Contours.Length; i++)
+                    result.Add(Contours[i].Polygon);
+                return cutoutPolygons = result;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A contour flattened once, at <see cref="PlacementChordTolerance"/>, for the overlap and
+    /// spacing checks against every other placement.
+    /// </summary>
+    private sealed class Contour
+    {
+        internal Contour(Shape shape)
+        {
+            Polygon = shape.ToPolygonWithTolerance(PlacementChordTolerance);
+            Bounds = Polygon.BoundingBox;
+            Lines = Polygon.ToLines();
+        }
+
+        internal Box Bounds { get; }
+        internal Polygon Polygon { get; }
+        internal List<Line> Lines { get; }
     }
 }

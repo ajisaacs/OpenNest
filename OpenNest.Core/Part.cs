@@ -234,6 +234,7 @@ namespace OpenNest
 
         public bool Intersects(Part part, out List<Vector> pts)
         {
+            PerfCounters.CountPartIntersects();
             pts = new List<Vector>();
 
             var entities1 = ConvertProgram

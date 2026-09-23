@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using OpenNest.CNC;
 using OpenNest.Geometry;
 using OpenNest.Math;
@@ -11,6 +12,22 @@ namespace OpenNest.Engine
     /// </summary>
     public static class CanonicalFrame
     {
+        // Maps each canonical copy to the drawing it was ultimately copied from, so caches keyed
+        // by drawing identity hit across the transient copies each fill makes.
+        private static readonly ConditionalWeakTable<Drawing, Drawing> sourceOf = new();
+
+        /// <summary>
+        /// Returns the drawing a canonical copy was made from (following copies of copies back to
+        /// the root), or <paramref name="drawing"/> itself when it is not a canonical copy.
+        /// </summary>
+        internal static Drawing SourceOf(Drawing drawing)
+        {
+            if (drawing == null)
+                return null;
+
+            return sourceOf.TryGetValue(drawing, out var root) ? root : drawing;
+        }
+
         /// <summary>
         /// Returns a new Drawing whose Program geometry is rotated to the canonical frame.
         /// The source drawing is not mutated.
@@ -44,6 +61,7 @@ namespace OpenNest.Engine
                     Angle = 0.0,
                 },
             };
+            sourceOf.AddOrUpdate(copy, SourceOf(drawing));
             return copy;
         }
 
