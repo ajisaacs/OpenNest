@@ -184,73 +184,14 @@ namespace OpenNest.Geometry
         /// </summary>
         private static Polygon ClipConvex(Polygon subject, Polygon clip)
         {
-            var output = new List<Vector>(subject.Vertices);
-
-            // Remove closing vertex if present
-            if (
-                output.Count > 1
-                && output[0].X == output[output.Count - 1].X
-                && output[0].Y == output[output.Count - 1].Y
-            )
-                output.RemoveAt(output.Count - 1);
-
-            var clipVerts = new List<Vector>(clip.Vertices);
-            if (
-                clipVerts.Count > 1
-                && clipVerts[0].X == clipVerts[clipVerts.Count - 1].X
-                && clipVerts[0].Y == clipVerts[clipVerts.Count - 1].Y
-            )
-                clipVerts.RemoveAt(clipVerts.Count - 1);
-
-            for (var i = 0; i < clipVerts.Count; i++)
+            var output = OpenVertices(subject);
+            var clipVerts = OpenVertices(clip);
+            for (var i = 0; i < clipVerts.Count && output.Count >= 3; i++)
             {
-                if (output.Count == 0)
-                    return null;
-
-                var edgeStart = clipVerts[i];
-                var edgeEnd = clipVerts[(i + 1) % clipVerts.Count];
-                var input = output;
-                output = new List<Vector>();
-
-                for (var j = 0; j < input.Count; j++)
-                {
-                    var current = input[j];
-                    var next = input[(j + 1) % input.Count];
-                    var currentInside = Cross(edgeStart, edgeEnd, current) >= -Tolerance.Epsilon;
-                    var nextInside = Cross(edgeStart, edgeEnd, next) >= -Tolerance.Epsilon;
-
-                    if (currentInside)
-                    {
-                        output.Add(current);
-                        if (!nextInside)
-                        {
-                            var ix = LineIntersection(edgeStart, edgeEnd, current, next);
-                            if (ix.IsValid())
-                                output.Add(ix);
-                        }
-                    }
-                    else if (nextInside)
-                    {
-                        var ix = LineIntersection(edgeStart, edgeEnd, current, next);
-                        if (ix.IsValid())
-                            output.Add(ix);
-                    }
-                }
+                output = ClipHalfSpace(output, clipVerts[i], clipVerts[(i + 1) % clipVerts.Count], true);
             }
 
-            if (output.Count < 3)
-                return null;
-
-            var result = new Polygon();
-            result.Vertices.AddRange(output);
-            result.Close();
-            result.UpdateBounds();
-
-            // Reject degenerate slivers
-            if (result.Area() < Tolerance.Epsilon)
-                return null;
-
-            return result;
+            return PositiveAreaPolygon(output);
         }
 
         /// <summary>
@@ -261,24 +202,6 @@ namespace OpenNest.Geometry
         {
             return (edgeEnd.X - edgeStart.X) * (point.Y - edgeStart.Y)
                 - (edgeEnd.Y - edgeStart.Y) * (point.X - edgeStart.X);
-        }
-
-        /// <summary>
-        /// Intersection of lines (a1->a2) and (b1->b2). Returns Vector.Invalid if parallel.
-        /// </summary>
-        private static Vector LineIntersection(Vector a1, Vector a2, Vector b1, Vector b2)
-        {
-            var d1x = a2.X - a1.X;
-            var d1y = a2.Y - a1.Y;
-            var d2x = b2.X - b1.X;
-            var d2y = b2.Y - b1.Y;
-            var cross = d1x * d2y - d1y * d2x;
-
-            if (System.Math.Abs(cross) < Tolerance.Epsilon)
-                return Vector.Invalid;
-
-            var t = ((b1.X - a1.X) * d2y - (b1.Y - a1.Y) * d2x) / cross;
-            return new Vector(a1.X + t * d1x, a1.Y + t * d1y);
         }
 
         /// <summary>
@@ -320,10 +243,9 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Subtracts hole triangles from a region. Exact: a piece outside a convex hole
-        /// triangle equals the union of its clips against each triangle edge's outside
-        /// half-space, so overlap confined to a cutout disappears while any material
-        /// sliver outside the hole survives.
+        /// Subtracts hole triangles from a convex region. At each edge, emit the outside
+        /// portion and carry only the inside remainder to the next edge. The emitted
+        /// pieces are disjoint and convex, so no repeated triangulation is needed.
         /// </summary>
         private static List<Polygon> SubtractTriangles(Polygon region, List<Polygon> holeTris)
         {
@@ -335,79 +257,113 @@ namespace OpenNest.Geometry
 
                 foreach (var piece in current)
                 {
-                    if (!BoundingBoxesOverlap(piece.BoundingBox, holeTri.BoundingBox))
+                    // Subtraction must also remove thin fragments created by clipping.
+                    // The pair-level length tolerance would skip some of these even
+                    // when their area is large enough to count as an overlap.
+                    var a = piece.BoundingBox;
+                    var b = holeTri.BoundingBox;
+                    if (a.Right <= b.Left || b.Right <= a.Left || a.Top <= b.Bottom || b.Top <= a.Bottom)
                     {
                         next.Add(piece);
                         continue;
                     }
 
-                    foreach (var pieceTri in TriangulateWithBounds(piece))
+                    var remainder = OpenVertices(piece);
+                    var holeVerts = OpenVertices(holeTri);
+                    for (var i = 0; i < holeVerts.Count && remainder.Count >= 3; i++)
                     {
-                        var holeVerts = holeTri.Vertices;
-                        var holeCount = holeTri.IsClosed() ? holeVerts.Count - 1 : holeVerts.Count;
-                        var survived = false;
-                        for (var i = 0; i < holeCount; i++)
-                            survived |= AddIfPositiveArea(
-                                next,
-                                ClipOutsideHalfSpace(
-                                    pieceTri,
-                                    holeVerts[i],
-                                    holeVerts[(i + 1) % holeCount]
-                                )
-                            );
-                        if (!survived)
-                            continue; // piece lies entirely within the hole
+                        var start = holeVerts[i];
+                        var end = holeVerts[(i + 1) % holeVerts.Count];
+                        var outside = PositiveAreaPolygon(ClipHalfSpace(remainder, start, end, false));
+                        if (outside != null)
+                            next.Add(outside);
+                        remainder = ClipHalfSpace(remainder, start, end, true);
                     }
                 }
 
                 current = next;
+                if (current.Count == 0)
+                    break;
             }
 
             return current;
         }
 
         /// <summary>
-        /// Sutherland-Hodgman clip of a convex polygon to the strict outside of the
-        /// infinite line edgeStart->edgeEnd of a CCW hole edge (Cross &lt; -Epsilon).
+        /// Clips an open vertex list against one half-space. Classification and
+        /// interpolation use the same signed cross products: intersections always
+        /// lie on the input segment. An epsilon-shifted inside test combined with
+        /// intersections on the unshifted line can extrapolate and create material.
+        /// Apply the area tolerance only to the resulting polygons, not to edge signs.
         /// </summary>
-        private static List<Vector> ClipOutsideHalfSpace(
-            Polygon piece,
+        private static List<Vector> ClipHalfSpace(
+            List<Vector> vertices,
             Vector edgeStart,
-            Vector edgeEnd
+            Vector edgeEnd,
+            bool inside
         )
         {
-            var verts = piece.Vertices;
-            var count = piece.IsClosed() ? verts.Count - 1 : verts.Count;
             var kept = new List<Vector>();
-            for (var i = 0; i < count; i++)
+            for (var i = 0; i < vertices.Count; i++)
             {
-                var current = verts[i];
-                var next = verts[(i + 1) % count];
-                var currentInside = Cross(edgeStart, edgeEnd, current) >= -Tolerance.Epsilon;
-                var nextInside = Cross(edgeStart, edgeEnd, next) >= -Tolerance.Epsilon;
-                if (!currentInside)
-                    kept.Add(current);
-                if (currentInside == nextInside)
-                    continue;
-                var intersection = LineIntersection(edgeStart, edgeEnd, current, next);
-                if (intersection.IsValid())
-                    kept.Add(intersection);
+                var current = vertices[i];
+                var next = vertices[(i + 1) % vertices.Count];
+                var currentDistance = Cross(edgeStart, edgeEnd, current);
+                var nextDistance = Cross(edgeStart, edgeEnd, next);
+                if (inside ? currentDistance >= 0 : currentDistance <= 0)
+                    AddDistinct(kept, current);
+
+                // Only strict opposite signs cross the line. Boundary endpoints
+                // are already kept, and near-parallel crossings need no cutoff.
+                if ((currentDistance < 0 && nextDistance > 0) || (currentDistance > 0 && nextDistance < 0))
+                {
+                    var t = currentDistance / (currentDistance - nextDistance);
+                    AddDistinct(kept, new Vector(
+                        current.X + t * (next.X - current.X),
+                        current.Y + t * (next.Y - current.Y)));
+                }
             }
+            if (kept.Count > 1 && SamePoint(kept[0], kept[kept.Count - 1]))
+                kept.RemoveAt(kept.Count - 1);
             return kept;
         }
 
-        private static bool AddIfPositiveArea(List<Polygon> polygons, List<Vector> vertices)
+        private static bool SamePoint(Vector a, Vector b) => a.X == b.X && a.Y == b.Y;
+
+        private static void AddDistinct(List<Vector> vertices, Vector point)
+        {
+            if (vertices.Count == 0 || !SamePoint(vertices[vertices.Count - 1], point))
+                vertices.Add(point);
+        }
+
+        private static List<Vector> OpenVertices(Polygon polygon)
+        {
+            var vertices = new List<Vector>(polygon.Vertices);
+            if (vertices.Count > 1 && SamePoint(vertices[0], vertices[vertices.Count - 1]))
+                vertices.RemoveAt(vertices.Count - 1);
+            return vertices;
+        }
+
+        private static Polygon PositiveAreaPolygon(List<Vector> vertices)
         {
             if (vertices.Count < 3)
-                return false;
+                return null;
+
+            // Measure relative to a vertex to avoid cancellation of world-coordinate
+            // products when a small clipped fragment is far from the origin.
+            var twiceArea = 0.0;
+            for (var i = 1; i + 1 < vertices.Count; i++)
+                twiceArea += Cross(vertices[0], vertices[i], vertices[i + 1]);
+            if (System.Math.Abs(twiceArea) <= 2 * Tolerance.Epsilon)
+                return null;
+
             var polygon = new Polygon();
             polygon.Vertices.AddRange(vertices);
-            polygon.Close();
+            // Polygon.Close uses fuzzy Vector equality; clipping needs an exact
+            // closing vertex even when the last edge is shorter than Epsilon.
+            polygon.Vertices.Add(vertices[0]);
             polygon.UpdateBounds();
-            if (polygon.Area() <= Tolerance.Epsilon)
-                return false;
-            polygons.Add(polygon);
-            return true;
+            return polygon;
         }
     }
 }

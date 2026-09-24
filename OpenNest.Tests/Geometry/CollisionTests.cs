@@ -120,9 +120,8 @@ public class CollisionTests
 
         var result = Collision.Check(a, b, holesA: holeA);
 
-        // Hole subtraction uses a conservative approach (keeps partial overlaps),
-        // so we only verify that a collision is still detected for solid material.
         Assert.True(result.Overlaps);
+        Assert.Equal(3, result.OverlapArea, 6);
     }
 
     /// <summary>

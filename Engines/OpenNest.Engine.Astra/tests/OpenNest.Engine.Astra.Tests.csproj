@@ -10,6 +10,7 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
-    <ProjectReference Include="../OpenNest.Engine.Terra.csproj" />
+    <Compile Include="../../../OpenNest.Benchmark/NestValidator.cs" Link="NestValidator.cs" />
+    <ProjectReference Include="../OpenNest.Engine.Astra.csproj" />
   </ItemGroup>
 </Project>

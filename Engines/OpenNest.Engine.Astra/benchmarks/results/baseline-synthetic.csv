@@ -1,0 +1,12 @@
+case,valid,placed,requested,sheets,area,milliseconds
+triangles,True,60,60,4,8064,30
+circles,True,90,90,3,3456,4
+circles-dense,True,80,80,3,3456,0
+concave-L,True,60,60,2,5760,0
+mixed,True,105,105,4,4608,1
+holes,True,16,16,2,2304,2
+rectangles,True,96,96,3,3456,1
+grain,True,60,60,4,4608,0
+scarce-stock,True,9,9,5,228,0
+tail,True,17,17,1,600,0
+plate-cap,True,4,10,1,100,0

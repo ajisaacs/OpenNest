@@ -1,0 +1,9 @@
+{
+  "sheetSizes": ["120x240", "240x480"],
+  "spacing": 0.25,
+  "edgeSpacing": 0.5,
+  "parts": [
+    { "dxf": "../../../OpenNest.Tests/Bending/TestData/4526 A14 PT45.dxf", "quantity": 8 },
+    { "dxf": "../../../OpenNest.Tests/Bending/TestData/4526 A14 PT23.dxf", "quantity": 4 }
+  ]
+}
