@@ -1,5 +1,0 @@
-Job,Engine,Valid,Crashed,FullyPlaced,PartsPlaced,PartsRequested,Utilization,NetUtilization,PlateArea,NetSheetArea,Cost,PlatesUsed,SizeBreakdown,ElapsedMs,Notes
-locked.manifest,AstraNestingEngine,True,False,True,12,12,0.6481,0.6481,115200.00,115200.00,115200.00,1,240 x 480×1,83,
-mixed.manifest,AstraNestingEngine,True,False,True,15,15,0.5983,0.5983,144000.00,144000.00,144000.00,5,120 x 240×5,298,
-original.manifest,AstraNestingEngine,True,False,True,12,12,0.6481,0.6481,115200.00,115200.00,115200.00,4,120 x 240×4,21,
-volume.manifest,AstraNestingEngine,True,False,True,48,48,0.7977,0.7977,374400.00,374400.00,374400.00,4,240 x 480×3; 120 x 240×1,51,

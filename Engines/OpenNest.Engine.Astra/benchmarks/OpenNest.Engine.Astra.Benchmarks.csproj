@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><Nullable>disable</Nullable></PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../OpenNest.Engine.Astra.csproj" />
-    <Compile Include="../../../OpenNest.Benchmark/NestValidator.cs" Link="NestValidator.cs" />
-  </ItemGroup>
-</Project>

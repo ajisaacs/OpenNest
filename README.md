@@ -59,7 +59,7 @@ dotnet run --project OpenNest.Benchmark -- ./benchmark-jobs \
   --sheet-sizes 48x96,60x120,72x120 --engines Default,StockLadder --csv results.csv
 ```
 
-Layouts are validated (bounds, spacing, quantity, rotation, stock match); invalid runs place nothing and pay the penalty. `--parallel` (default 3) speeds up scoring but inflates `Time(ms)` — use `--parallel 1` when comparing speed. Pass `--sheet-sizes` for an unbiased run; otherwise only each file's original sizes are offered. Custom engines drop in as DLLs implementing `INestingEngine` (public parameterless constructor) in an `Engines/` folder next to the benchmark; in-repo plugin engines live in the top-level `Engines/` source folder and build with `./Engines/Build-Engines.ps1`.
+Layouts are validated (bounds, spacing, quantity, rotation, stock match); invalid runs place nothing and pay the penalty. `--parallel` (default 3) speeds up scoring but inflates `Time(ms)` — use `--parallel 1` when comparing speed. Pass `--sheet-sizes` for an unbiased run; otherwise only each file's original sizes are offered. Custom engines drop in as DLLs implementing `INestingEngine` (public parameterless constructor) in an `Engines/` folder next to the benchmark. Community engines live in [OpenNest-Engines](https://git.thecozycat.net/aj/OpenNest-Engines).
 
 ## Project Structure
 
@@ -75,7 +75,6 @@ Layouts are validated (bounds, spacing, quantity, rotation, stock match); invali
 | **OpenNest.Benchmark** | Head-to-head engine comparison |
 | **OpenNest.Mcp** | MCP server for AI tool integration |
 | **OpenNest.Posts.Cincinnati** | Cincinnati laser post-processor plugin |
-| **Engines/** | Out-of-solution plugin engines (`OpenNest.Engine.<Name>/`) |
 | **\*.Tests** | Cross-platform suites; WinForms tests are Windows-only |
 
 ## Nesting Engines

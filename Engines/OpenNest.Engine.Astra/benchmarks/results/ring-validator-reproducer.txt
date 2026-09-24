@@ -1,8 +1,0 @@
-q=1 offset=0 valid=False: 'ring' and 'insert' are closer than the required spacing (0.175)
-q=1 offset=0.0003 valid=False: 'ring' and 'insert' are closer than the required spacing (0.175)
-q=1 offset=0.05 valid=True:
-q=1 offset=0.1 valid=True:
-q=2 offset=0 valid=False: 'ring' and 'insert' are closer than the required spacing (0.175)
-q=2 offset=0.0003 valid=False: 'ring' and 'insert' are closer than the required spacing (0.175)
-q=2 offset=0.05 valid=False: 'ring' and 'insert' are closer than the required spacing (0.175)
-q=2 offset=0.1 valid=False: 'ring' and 'insert' are closer than the required spacing (0.175)

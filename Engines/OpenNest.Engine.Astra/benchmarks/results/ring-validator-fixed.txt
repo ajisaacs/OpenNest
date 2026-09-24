@@ -1,8 +1,0 @@
-q=1 offset=0 valid=True:
-q=1 offset=0.0003 valid=True:
-q=1 offset=0.05 valid=True:
-q=1 offset=0.1 valid=True:
-q=2 offset=0 valid=True:
-q=2 offset=0.0003 valid=True:
-q=2 offset=0.05 valid=True:
-q=2 offset=0.1 valid=True:

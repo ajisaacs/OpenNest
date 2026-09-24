@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <Compile Remove="tests/**/*.cs;benchmarks/**/*.cs" />
-    <ProjectReference Include="../../OpenNest.Core/OpenNest.Core.csproj" />
-  </ItemGroup>
-</Project>
