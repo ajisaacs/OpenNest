@@ -1,3 +1,4 @@
+using Clipper2Lib;
 using System.Collections.Generic;
 using OpenNest.Math;
 
@@ -10,6 +11,68 @@ namespace OpenNest.Geometry
     /// </summary>
     public static class NoFitPolygon
     {
+        /// <summary>
+        /// Computes forbidden translations of moving around stationary. Interior means
+        /// overlap and boundary means touch, subject to Clipper rounding at precision.
+        /// Inputs are simple filled perimeters, with either winding and optional closing
+        /// vertices. Cutouts are not supported: use Collision for hole-aware decisions.
+        /// The moving reference point is the origin, not its first vertex. Cache this
+        /// CPU preparation result. Rings with fewer than three vertices produce no region.
+        /// </summary>
+        public static PathsD Compute(PathD stationary, PathD moving, int precision = ClipperBridge.Precision)
+        {
+            var a = Normalize(stationary);
+            var b = Normalize(moving);
+            if (a.Count < 3 || b.Count < 3)
+                return new PathsD();
+
+            if (IsConvex(a) && IsConvex(b))
+                return new PathsD { ClipperBridge.ToPath(ComputeConvex(
+                    ClipperBridge.ToPolygon(a), ClipperBridge.ToPolygon(b)), true) };
+
+            var negB = new PathD(b.Count);
+            foreach (var point in b)
+                negB.Add(new PointD(-point.x, -point.y));
+            // The boundary sweep alone misses both kinds of containment.
+            var sweep = Minkowski.Sum(negB, a, true, precision);
+            sweep.Add(Clipper.TranslatePath(a, negB[0].x, negB[0].y));
+            sweep.Add(Clipper.TranslatePath(negB, a[0].x, a[0].y));
+            return Clipper.Union(sweep, new PathsD(), FillRule.NonZero, precision);
+        }
+
+        /// <summary>
+        /// Computes forbidden origin translations for two filled, lines-only perimeters.
+        /// Cutouts are not supported; use Collision for hole-aware decisions.
+        /// </summary>
+        public static PathsD Compute(Polygon stationary, Polygon moving) =>
+            Compute(ClipperBridge.ToPath(stationary, true), ClipperBridge.ToPath(moving, true));
+
+        private static PathD Normalize(PathD source)
+        {
+            var path = new PathD();
+            foreach (var point in source)
+                if (path.Count == 0 || path[path.Count - 1].x != point.x || path[path.Count - 1].y != point.y)
+                    path.Add(point);
+            if (path.Count > 1 && path[0].x == path[path.Count - 1].x && path[0].y == path[path.Count - 1].y)
+                path.RemoveAt(path.Count - 1);
+            if (!Clipper.IsPositive(path))
+                path.Reverse();
+            return path;
+        }
+
+        private static bool IsConvex(PathD path)
+        {
+            for (var i = 0; i < path.Count; i++)
+            {
+                var a = path[i];
+                var b = path[(i + 1) % path.Count];
+                var c = path[(i + 2) % path.Count];
+                if ((b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x) < 0)
+                    return false;
+            }
+            return true;
+        }
+
         /// <summary>
         /// Computes the NFP between a convex stationary polygon A and a convex orbiting
         /// polygon B: the Minkowski sum of A and -B (B reflected through its reference point).
