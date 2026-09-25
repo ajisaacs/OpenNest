@@ -5,6 +5,23 @@ namespace OpenNest.Engine.Tests.Jobs;
 
 public class StockLadderTests
 {
+    [Fact]
+    public void LowerPriorityNumberWinsScarceStock()
+    {
+        var geometry = PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(4, 4));
+        var high = new NestJobPart("high", geometry, 1);
+        var job = new NestJob(
+            new[] { new NestJobPart("low", geometry, 1, priority: 9), high },
+            new[] { new NestPlateStock("only", new Size(4, 4), 1) }
+        );
+
+        var result = new StockLadderNestingEngine().Solve(job);
+
+        Assert.Equal(0, high.Priority);
+        Assert.Equal("high", Assert.Single(Assert.Single(result.Plates).Placements).PartId);
+        Assert.Equal(0, result.Fulfillment.Single(f => f.PartId == "low").Placed);
+    }
+
     private static NestJobPart Rectangle(
         string id,
         int quantity,
