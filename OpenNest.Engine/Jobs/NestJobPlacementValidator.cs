@@ -271,25 +271,13 @@ internal static class NestJobPlacementValidator
 
     private static bool FitsWorkArea(ShapeTopology shape, NestPlateStock stock)
     {
-        var workArea = WorkArea(stock);
+        var workArea = stock.WorkArea;
         if (!FitsWorkArea(shape.Perimeter, workArea))
             return false;
         foreach (var cutout in shape.Cutouts)
             if (!FitsWorkArea(cutout, workArea))
                 return false;
         return true;
-    }
-
-    private static Box WorkArea(NestPlateStock stock)
-    {
-        var left = stock.Quadrant is 1 or 4 ? 0 : -stock.Size.Length;
-        var bottom = stock.Quadrant is 1 or 2 ? 0 : -stock.Size.Width;
-        return new Box(
-            left + stock.EdgeSpacing.Left,
-            bottom + stock.EdgeSpacing.Bottom,
-            stock.Size.Length - stock.EdgeSpacing.Left - stock.EdgeSpacing.Right,
-            stock.Size.Width - stock.EdgeSpacing.Bottom - stock.EdgeSpacing.Top
-        );
     }
 
     private static bool FitsWorkArea(Shape contour, Box workArea)
