@@ -23,7 +23,7 @@ namespace OpenNest.Benchmark
         public double PlateArea { get; init; }
 
         /// <summary>Sheet area consumed after crediting salvageable offcuts
-        /// (StockLadderNestingEngine.EstimateNetArea summed over every plate).
+        /// (NestJobCost.NetSheetArea summed over every plate).
         /// Equals PlateArea when salvage credit is disabled.</summary>
         public double NetSheetArea { get; init; }
 

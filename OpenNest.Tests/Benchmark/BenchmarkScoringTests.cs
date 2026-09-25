@@ -8,6 +8,45 @@ namespace OpenNest.Tests.Benchmark;
 
 public class BenchmarkScoringTests
 {
+    [Theory]
+    [InlineData(0, 43, 43, 4080)]
+    [InlineData(0.5, 43, 43, 4080)]
+    [InlineData(0, 43, 0, 4080)]
+    [InlineData(0.5, 43, 0, 4080)]
+    [InlineData(0, 86, 21, 4104)]
+    [InlineData(0.5, 86, 21, 4104)]
+    [InlineData(0, 0, 21, 4104)]
+    [InlineData(0.5, 0, 21, 4104)]
+    public void SharedCostEqualsBenchmarkRunForEveryEdgeAndUnplacedParts(
+        double rate, double x, double y, double salvage)
+    {
+        var benchmarkJob = Job(0.5, (Rect(10, 5), 3));
+        NestJob? capturedJob = null;
+        NestJobResult? capturedResult = null;
+        var engine = Engine("Shared cost parity", job =>
+        {
+            capturedJob = job;
+            var builder = new NestJobResultBuilder(job);
+            builder.AddSheet(job.Plates[0], new[] { (job.Parts[0].Id, x, y, 0.0) });
+            capturedResult = builder.Build(NestJobStopReason.NoPlacementFound);
+            return capturedResult.Plates;
+        });
+
+        var scored = Assert.Single(BenchmarkRunner.Run(new List<BenchmarkJob> { benchmarkJob }, new[] { engine },
+            salvageRate: rate, minimumSalvageDimension: 10));
+
+        Assert.True(scored.Valid, string.Join("; ", scored.Violations));
+        Assert.NotNull(capturedJob);
+        Assert.NotNull(capturedResult);
+        Assert.Equal(2, scored.PartsUnplaced);
+        Assert.Equal(4608 - rate * salvage, scored.NetSheetArea);
+        Assert.Equal(scored.NetSheetArea,
+            capturedResult.Plates.Sum(sheet => NestJobCost.NetSheetArea(capturedJob, sheet)));
+        Assert.Equal(benchmarkJob.UnplacedPartPenalty, NestJobCost.UnplacedPartPenalty(capturedJob));
+        Assert.Equal(scored.NetSheetArea + 2 * 4608, scored.Cost);
+        Assert.Equal(scored.Cost, NestJobCost.Evaluate(capturedJob, capturedResult));
+    }
+
     // ── ranking ──────────────────────────────────────────────────────────────
 
     [Fact]

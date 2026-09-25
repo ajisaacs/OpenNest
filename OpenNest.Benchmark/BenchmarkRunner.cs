@@ -179,7 +179,7 @@ namespace OpenNest.Benchmark
                 var plateArea = plateRuns.Sum(run => run.Plate.Area());
                 var netSheetArea = validation.Valid
                     ? plateResults.Sum(result =>
-                        StockLadderNestingEngine.EstimateNetArea(baselineJob, result)
+                        NestJobCost.NetSheetArea(baselineJob, result)
                     )
                     : 0;
                 var sizeBreakdown = plateRuns
@@ -266,7 +266,7 @@ namespace OpenNest.Benchmark
                 // Salvage credit is recomputed from the job's own geometry, never taken from the engine.
                 var netSheetArea = validation.Valid
                     ? jobResult.Plates.Sum(p =>
-                        StockLadderNestingEngine.EstimateNetArea(nestJob, p)
+                        NestJobCost.NetSheetArea(nestJob, p)
                     )
                     : 0;
 

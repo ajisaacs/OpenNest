@@ -97,7 +97,7 @@ public sealed class StockLadderNestingEngine : INestingEngine
                 // Initial construction only: material area, never raw part counts. Repacking below
                 // compares EXACTLY equivalent demand, and never replaces a sheet by a partial fill.
                 var value =
-                    EstimateNetArea(job, sheet) / candidate.Placements.Sum(p => areas[p.PartId]);
+                    NestJobCost.NetSheetArea(job, sheet) / candidate.Placements.Sum(p => areas[p.PartId]);
                 if (value < score - 1e-9)
                 {
                     winner = sheet;
@@ -188,7 +188,7 @@ public sealed class StockLadderNestingEngine : INestingEngine
                 var demand = old.SelectMany(s => s.Placements)
                     .GroupBy(p => p.PartId)
                     .ToDictionary(g => g.Key, g => g.Count());
-                var baseline = old.Sum(s => EstimateNetArea(job, s));
+                var baseline = old.Sum(s => NestJobCost.NetSheetArea(job, s));
                 NestJobPlateResult replacement = null;
                 foreach (var stock in job.Plates)
                 {
@@ -215,7 +215,7 @@ public sealed class StockLadderNestingEngine : INestingEngine
                     if (demand.Any(kv => !actual.TryGetValue(kv.Key, out var n) || n != kv.Value))
                         continue;
                     var trial = new NestJobPlateResult(index, stock, candidate.Placements);
-                    var cost = EstimateNetArea(job, trial);
+                    var cost = NestJobCost.NetSheetArea(job, trial);
                     if (cost >= baseline - 1e-9)
                         continue;
                     baseline = cost;
@@ -242,37 +242,7 @@ public sealed class StockLadderNestingEngine : INestingEngine
     /// empty full-span edge rectangle outside every placed bounding box plus part clearance, within
     /// the usable work area, and meeting the caller's minimum in both dimensions. Not a certified
     /// remnant: no cut-off toolpath, kerf, handling, or future-demand valuation is modelled.</summary>
-    public static double EstimateNetArea(NestJob job, NestJobPlateResult sheet)
-    {
-        var area = sheet.Stock.Size.Width * sheet.Stock.Size.Length;
-        var minimum = job.Options.MinimumSalvageDimension;
-        if (job.Options.SalvageRate == 0 || minimum <= 0 || sheet.Placements.Count == 0)
-            return area;
-        var work = DrawingJobMapper.CreatePlate(sheet.Stock).WorkArea();
-        var parts = job.Parts.ToDictionary(p => p.Id);
-        var boxes = sheet
-            .Placements.Select(p =>
-            {
-                var part = new Part(DrawingJobMapper.CreateDrawing(parts[p.PartId]));
-                part.Rotate(p.Rotation);
-                part.Location = new OpenNest.Geometry.Vector(p.X, p.Y);
-                part.UpdateBounds();
-                return part.BoundingBox;
-            })
-            .ToList();
-        var gap = sheet.Stock.PartSpacing;
-        var candidates = new[]
-        {
-            (work.Length, boxes.Min(b => b.Bottom) - work.Bottom - gap),
-            (work.Length, work.Top - boxes.Max(b => b.Top) - gap),
-            (boxes.Min(b => b.Left) - work.Left - gap, work.Width),
-            (work.Right - boxes.Max(b => b.Right) - gap, work.Width),
-        };
-        var salvage = candidates
-            .Where(c => c.Item1 >= minimum && c.Item2 >= minimum)
-            .Select(c => c.Item1 * c.Item2)
-            .DefaultIfEmpty(0)
-            .Max();
-        return area - job.Options.SalvageRate * salvage;
-    }
+    [Obsolete("Use NestJobCost.NetSheetArea instead.")]
+    public static double EstimateNetArea(NestJob job, NestJobPlateResult sheet) =>
+        NestJobCost.NetSheetArea(job, sheet);
 }
