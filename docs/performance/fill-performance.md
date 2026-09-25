@@ -1,5 +1,7 @@
 # Fill performance measurements
 
+Documentation follow-up — 2026-09-25: the user explicitly approved the previously blocked `CLAUDE.md` update. It now documents the delivered comparer/group/extents workflow, Debug work counters, measurement limitations, and compatibility safeguards already reflected in README. The instruction-document sync blocker is resolved; references to it in the historical slice records below describe their delivery-time status. No production code or measured results changed.
+
 ## Count-first comparer slice — 2026-09-25
 
 This historical Task 1 section covers only the count-first `DefaultFillComparer` change. Geometry, custom-comparer score elimination, ML work, and whole-job optimization had not been implemented or measured in that slice. Task 1b is reported separately below.
