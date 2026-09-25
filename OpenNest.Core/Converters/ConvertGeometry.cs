@@ -139,14 +139,17 @@ namespace OpenNest.Converters
             return lastpt;
         }
 
-        // Engrave/etch geometry maps to Scribe so the post processor can treat it as a
-        // separate tool pass; everything else keeps the move's default Cut layer.
+        // Engrave/etch/scribe geometry maps to Scribe so the post processor can treat it as a
+        // separate tool pass; everything else keeps the move's default Cut layer. SCRIBE is the
+        // name marks carry once saved (SpecialLayers.Scribe), so drawings rebuilt from stored
+        // entities must map it too or their marks silently become cut moves.
         private static LayerType ClassifyLayer(Entity geo)
         {
             var name = geo.Layer?.Name;
             if (
                 string.Equals(name, "ENGRAVE", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(name, "ETCH", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, SpecialLayers.Scribe.Name, System.StringComparison.OrdinalIgnoreCase)
             )
                 return LayerType.Scribe;
 

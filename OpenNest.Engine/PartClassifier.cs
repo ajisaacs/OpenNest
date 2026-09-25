@@ -34,7 +34,7 @@ namespace OpenNest.Engine
 
             var entities = ConvertProgram
                 .ToGeometry(drawing.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid);
+                .Where(e => SpecialLayers.IsMaterial(e.Layer));
 
             var shapes = ShapeBuilder.GetShapes(entities);
 

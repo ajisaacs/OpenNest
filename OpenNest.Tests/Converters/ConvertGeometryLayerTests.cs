@@ -35,6 +35,18 @@ public class ConvertGeometryLayerTests
     }
 
     [Fact]
+    public void AddLine_SavedScribeLayer_TagsScribe()
+    {
+        // Marks are stored on the SCRIBE layer; rebuilding a program from stored entities
+        // must keep them marks rather than turning them into cut moves.
+        var line = new Line(0, 0, 1, 0) { Layer = SpecialLayers.Scribe };
+
+        var pgm = ProgramFor(line);
+
+        Assert.All(pgm.Codes.OfType<LinearMove>(), m => Assert.Equal(LayerType.Scribe, m.Layer));
+    }
+
+    [Fact]
     public void AddArc_EngraveLayer_TagsScribe()
     {
         var arc = new Arc(new Vector(0, 0), 1, 0, System.Math.PI / 2)

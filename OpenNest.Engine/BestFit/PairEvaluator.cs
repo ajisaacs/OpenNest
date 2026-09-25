@@ -149,7 +149,7 @@ namespace OpenNest.Engine.BestFit
         {
             var entities = ConvertProgram
                 .ToGeometry(source.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
                 .ToList();
             var profile = new ShapeProfile(entities);
             var program = ConvertGeometry.ToProgram(profile.Perimeter);
@@ -160,7 +160,7 @@ namespace OpenNest.Engine.BestFit
         {
             var entities = ConvertProgram
                 .ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
                 .ToList();
             var shapes = ShapeBuilder.GetShapes(entities);
             if (shapes.Count == 0)
@@ -173,7 +173,7 @@ namespace OpenNest.Engine.BestFit
         {
             var entities = ConvertProgram
                 .ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
                 .ToList();
             var shapes = ShapeBuilder.GetShapes(entities);
             var points = new List<Vector>();

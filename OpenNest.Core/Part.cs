@@ -239,11 +239,11 @@ namespace OpenNest
 
             var entities1 = ConvertProgram
                 .ToGeometry(Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
                 .ToList();
             var entities2 = ConvertProgram
                 .ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
                 .ToList();
 
             if (entities1.Count == 0 || entities2.Count == 0)

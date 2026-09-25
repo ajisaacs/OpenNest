@@ -56,7 +56,7 @@ namespace OpenNest.Gpu
         {
             var entities = ConvertProgram
                 .ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid);
+                .Where(e => SpecialLayers.IsMaterial(e.Layer));
             var shapes = ShapeBuilder.GetShapes(entities);
 
             var polygons = new List<Polygon>();
@@ -167,7 +167,7 @@ namespace OpenNest.Gpu
         {
             var entities = ConvertProgram
                 .ToGeometry(drawing.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid);
+                .Where(e => SpecialLayers.IsMaterial(e.Layer));
             var shapes = ShapeBuilder.GetShapes(entities);
 
             var polygons = new List<Polygon>();

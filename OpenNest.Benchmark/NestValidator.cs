@@ -339,7 +339,7 @@ namespace OpenNest.Benchmark
         {
             var entities = ConvertProgram
                 .ToGeometry(part.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
                 .ToList();
 
             if (entities.Count == 0)

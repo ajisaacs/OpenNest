@@ -32,7 +32,7 @@ namespace OpenNest.Engine.ML
 
             var entities = OpenNest
                 .Converters.ConvertProgram.ToGeometry(canonical.Program)
-                .Where(e => e.Layer != SpecialLayers.Rapid)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
                 .ToList();
 
             var profile = new ShapeProfile(entities);

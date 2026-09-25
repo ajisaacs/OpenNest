@@ -90,7 +90,7 @@ internal static class NestJobPlacementValidator
         var entities = ConvertProgram.ToGeometry(DrawingJobMapper.ToProgram(geometry));
         var cutEntities = new List<Entity>();
         foreach (var entity in entities)
-            if (!ReferenceEquals(entity.Layer, SpecialLayers.Rapid))
+            if (SpecialLayers.IsMaterial(entity.Layer))
                 cutEntities.Add(entity);
 
         var contours = ShapeBuilder.GetShapes(cutEntities);

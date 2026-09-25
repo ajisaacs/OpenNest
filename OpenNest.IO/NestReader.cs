@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using OpenNest.Bending;
 using OpenNest.CNC;
+using OpenNest.Converters;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using static OpenNest.IO.NestFormat;
@@ -215,6 +216,17 @@ namespace OpenNest.IO
                 {
                     drawing.SourceEntities = entitySet.entities;
                     drawing.SuppressedEntityIds = entitySet.suppressed;
+
+                    // Older files saved etch marks as cut moves; restore their Scribe layer so
+                    // nesting ignores them. The program was mutated in place, so refresh.
+                    if (
+                        drawing.Program != null
+                        && ScribeLayerRepair.Apply(drawing.Program, drawing.SourceEntities, drawing.Source.Offset) > 0
+                    )
+                    {
+                        drawing.UpdateArea();
+                        drawing.RecomputeCanonicalAngle();
+                    }
                 }
 
                 map[d.Id] = drawing;

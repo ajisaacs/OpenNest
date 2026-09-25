@@ -18,5 +18,12 @@ namespace OpenNest
         public static readonly Layer Leadout = new Layer("LEADOUT") { Color = Color.Brown };
 
         public static readonly Layer Scribe = new Layer("SCRIBE") { Color = Color.Magenta };
+
+        /// <summary>
+        /// True when an entity converted from a part program describes part material. Rapids
+        /// and scribe/etch marks are excluded: marks are only on the surface, so they never
+        /// bound material and must not affect nesting, collision, area, or validation.
+        /// </summary>
+        public static bool IsMaterial(Layer layer) => layer != Rapid && layer != Scribe;
     }
 }

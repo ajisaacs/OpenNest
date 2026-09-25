@@ -125,7 +125,7 @@ namespace OpenNest
         {
             var geometry = ConvertProgram
                 .ToGeometry(Program)
-                .Where(entity => entity.Layer != SpecialLayers.Rapid);
+                .Where(entity => SpecialLayers.IsMaterial(entity.Layer));
             var shapes = ShapeBuilder.GetShapes(geometry);
 
             if (shapes.Count == 0)

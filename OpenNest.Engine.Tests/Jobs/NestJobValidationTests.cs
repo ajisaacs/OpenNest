@@ -179,6 +179,41 @@ public class NestJobValidationTests
         );
     }
 
+    [Fact]
+    public void EtchMarksAreLeftOutOfNestingGeometry()
+    {
+        // The etch tick sticks 0.5 past the right edge. As material it would be open geometry
+        // leaving the part and would overlap the neighbour placed 0.2 away; as a mark it is ignored.
+        var job = new NestJob(
+            new[] { new NestJobPart("part", PartGeometrySnapshot.FromProgram(RectangleWithEtch(LayerType.Scribe)), 2) },
+            new[] { new NestPlateStock("stock", new Size(30, 30), 1) }
+        );
+
+        var result = Solve(job, new NestJobPlacement("part", 0, 0, 0, 0), new NestJobPlacement("part", 1, 10.2, 0, 0));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(new PartFulfillment("part", 2, 2, 0), Assert.Single(result.Fulfillment));
+    }
+
+    [Fact]
+    public void OpenCutGeometryLeavingThePartIsStillRejected()
+    {
+        var job = new NestJob(
+            new[] { new NestJobPart("part", PartGeometrySnapshot.FromProgram(RectangleWithEtch(LayerType.Cut)), 1) },
+            new[] { new NestPlateStock("stock", new Size(30, 30), 1) }
+        );
+
+        Assert.Throws<ArgumentException>(() => Solve(job, new NestJobPlacement("part", 0, 0, 0, 0)));
+    }
+
+    private static Program RectangleWithEtch(LayerType etchLayer)
+    {
+        var program = TestDrawingFactory.Rectangle(10, 10);
+        program.MoveTo(9.5, 5);
+        program.Codes.Add(new LinearMove(10.5, 5) { Layer = etchLayer });
+        return program;
+    }
+
     private static NestJobResult Solve(NestJob job, params NestJobPlacement[] placements) =>
         new NestJobRunner(_ => new CandidateNester(placements)).Solve(job);
 

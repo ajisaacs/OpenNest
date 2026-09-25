@@ -11,7 +11,7 @@ namespace OpenNest
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = ShapeBuilder.GetShapes(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid)
+                entities.Where(e => SpecialLayers.IsMaterial(e.Layer))
             );
             var lines = new List<Line>();
 
@@ -33,7 +33,7 @@ namespace OpenNest
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = ShapeBuilder.GetShapes(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid)
+                entities.Where(e => SpecialLayers.IsMaterial(e.Layer))
             );
             var lines = new List<Line>();
 
@@ -56,7 +56,7 @@ namespace OpenNest
             PerfCounters.CountOffsetPerimeterEntities();
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+                geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
             );
 
             var offsetShape = profile.Perimeter.OffsetOutward(spacing);
@@ -79,7 +79,7 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+                geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
             );
             var entities = new List<Entity>();
 
@@ -112,7 +112,7 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+                geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
             );
 
             return CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
@@ -126,7 +126,7 @@ namespace OpenNest
         {
             var geoEntities = ConvertProgram.ToGeometry(part.Program);
             var profile = new ShapeProfile(
-                geoEntities.Where(e => e.Layer != SpecialLayers.Rapid).ToList()
+                geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
             );
             var entities = CopyEntitiesAtLocation(profile.Perimeter.Entities, part.Location);
 
@@ -158,7 +158,7 @@ namespace OpenNest
         {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = ShapeBuilder.GetShapes(
-                entities.Where(e => e.Layer != SpecialLayers.Rapid)
+                entities.Where(e => SpecialLayers.IsMaterial(e.Layer))
             );
             var lines = new List<Line>();
 
