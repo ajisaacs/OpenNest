@@ -37,7 +37,8 @@ public class NestJobSpacingValidationTests
         );
 
         var bounds = program.BoundingBox();
-        var random = new Random(name.GetHashCode(StringComparison.Ordinal) & 0x7fff);
+        // string.GetHashCode is randomized per process; a stable seed keeps the sampling reproducible.
+        var random = new Random(name.Aggregate(17, (hash, c) => unchecked(hash * 31 + c)) & 0x7fff);
         var accepted = 0;
         var rejected = 0;
 
