@@ -48,7 +48,7 @@ public static class NestJobValidator
                 );
             try
             {
-                NestJobPlacementValidator.ValidateGeometry(part.Geometry);
+                _ = JobPartGeometry.Read(part.Geometry);
             }
             catch (ArgumentException exception)
             {
