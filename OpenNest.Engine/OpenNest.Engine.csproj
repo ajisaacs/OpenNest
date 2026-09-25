@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="OpenNest.Tests" />
+    <InternalsVisibleTo Include="OpenNest.Benchmark" />
     <InternalsVisibleTo Include="OpenNest.Engine.Tests" />
   </ItemGroup>
   <ItemGroup>

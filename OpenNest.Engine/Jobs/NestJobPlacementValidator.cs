@@ -12,7 +12,7 @@ internal static class NestJobPlacementValidator
     // Flattening for placement overlap/spacing checks: the same 0.001 the benchmark's
     // NestValidator and Part.Intersects use. Arcs are inscribed, so a layout placed exactly at
     // the spacing passes; outward arcs may come up to this much closer than the spacing.
-    private const double PlacementChordTolerance = 0.001;
+    private const double PlacementChordTolerance = NestTolerances.ValidationOutline;
 
     internal static void ValidateCandidate(
         PlateCandidate candidate,
