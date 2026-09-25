@@ -2,7 +2,7 @@
 
 ## Count-first comparer slice — 2026-09-25
 
-This report covers only the count-first `DefaultFillComparer` change. Geometry, custom-comparer score elimination, ML work, and whole-job optimization have not been implemented or measured here.
+This historical Task 1 section covers only the count-first `DefaultFillComparer` change. Geometry, custom-comparer score elimination, ML work, and whole-job optimization had not been implemented or measured in that slice. Task 1b is reported separately below.
 
 ### Source and environment
 
@@ -113,3 +113,120 @@ Times in milliseconds; allocations were 0 bytes for every actual/reference batch
 | post | equal-count-control | 5 | 126.665891 | 125.683547 |
 | post | equal-count-control | 6 | 118.822360 | 126.622891 |
 | post | equal-count-control | 7 | 118.744694 | 117.368968 |
+
+## Task 1b — skip unused group-pattern scores — 2026-09-25
+
+### Scope and provenance
+
+Only the two candidate additions in `FillHelpers.FillPattern` changed: horizontal and vertical results compute `FillScore` when `comparer == null`, otherwise store `default`. The `ConcurrentBag`, angle scheduling, fill calls, result iteration, strict default-score comparison, and custom-comparer calls are unchanged. No geometry, bounds, scoring formula, ML, or Tasks 2+ optimization is included.
+
+- Before source: `master` HEAD `b318950a543d2a6c4fd0b305e5e3ae2bbee3c6d9`, already containing Task 1. `FillHelpers.cs` was confirmed unchanged against HEAD before measurement. The actual unchanged production method was measured, not a reference approximation.
+- Before `OpenNest.Engine/Strategies/FillHelpers.cs` SHA-256: `3f01f15b673d33626e49e06f4a381dc7331b33ec0b8850acf56dff4aa71e9198`.
+- After `OpenNest.Engine/Strategies/FillHelpers.cs` SHA-256: `a1c8a1bc155dbe62439f8345a3a54e06147a5404a6a46835a30b66d52cceccfa`.
+- Identical before/after `OpenNest.Tests/Fill/FillPerformanceTests.cs` SHA-256: `a5594148a2b11e37f5d47925c96774855eb622befb54b6736e98112ae8662873`. This extends the historical Task 1 harness; it does not replace its measurements above.
+- Identical red/green `OpenNest.Tests/Strategies/FillHelpersTests.cs` SHA-256: `35fee6661bd23091708041b0dc7e3b0517ad859bbf05e3ead95082fe7025fed9`.
+- Tracked C# source/project manifests before and after differ only in `FillHelpers.cs`; the new, untracked test file is covered separately by the hash above. There was no temporary production restoration or alternate implementation during these measurements.
+- Host `hermes`: Ubuntu 24.04.5 LTS x64, Linux 6.8.0-142-generic, KVM guest, four vCPUs presented as AMD Ryzen 9 5900X. No CPU pinning or host isolation. SDK 10.0.112; test-emitted runtime .NET 8.0.31, Release, stopwatch frequency 1,000,000,000 ticks/second.
+
+### Workload and method
+
+The opt-in `GroupPattern_ReportsDefaultAndCustomComparer` test uses two finite, nonoverlapping synthetic rectangles: 2×1 at `(11,13)` and 1×2 at `(13.5,14.5)`. Work area is `(3,5,5,9)`, part spacing 0.25, and the only candidate angle is 0 radians. Horizontal fill returns eight parts; vertical returns seven. The default path selects horizontal. A custom comparer deliberately prefers fewer parts, selecting vertical against `FillScore`.
+
+Each mode gets two warmup batches of 2,000 calls and seven measured batches of 20,000 calls. Default/custom order alternates in both warmup and measured repetitions. Before and after run in separate test processes using the same harness and inputs, with the two-line production change between them. Both run the real `Parallel.ForEach`/fill/bag/selection path. One angle avoids cross-worker bag tie-order ambiguity; it does not represent multi-angle parallel scaling.
+
+Setup, correctness/layout assertions, and output are outside timing. Fill geometry, candidate construction, scheduling, garbage collection, scoring/selection, delegate/loop overhead, and result-count consumption are included. Each batch consumes every result count (160,000 default or 140,000 custom parts); its last result is checked for exact drawing identity, part order, locations, and rotations against direct horizontal/vertical fills. Preflight and batch checks establish finite, positive-area, in-bounds, nonoverlapping layouts. Behavioral tests separately check input non-mutation. No cache reset or forced collection is inserted between batches; JIT paths and source drawing data are warm, but each call still constructs its candidates.
+
+**Allocation measurement is omitted for this parallel workload.** The current-thread allocation probe in the older synchronous comparer benchmark above would not measure all fill workers and must not be interpreted as total group-fill allocations.
+
+### Results and limitations
+
+Minimum / median / maximum over seven batches, calculated from raw TRX rows with Python `statistics.median`:
+
+| Mode | Before batch ms | After batch ms | Before µs/call | After µs/call |
+| --- | --- | --- | --- | --- |
+| Default scoring | 12349.821045 / 12588.985384 / 12798.229355 | 12373.077829 / 12613.732653 / 12696.177150 | 617.491 / 629.449 / 639.911 | 618.654 / 630.687 / 634.809 |
+| Custom fewer-parts comparer | 12430.689835 / 12733.580886 / 12944.521123 | 12537.190933 / 12624.207441 / 12905.258236 | 621.534 / 636.679 / 647.226 | 626.860 / 631.210 / 645.263 |
+
+The custom-comparer median decreased **0.86%**, while the default control increased **0.20%**. Before/after ranges overlap. These sequential process measurements on a shared VM do **not** establish a reliable fill-time speedup. The benchmark includes geometry and scheduling, not isolated score latency, and its small candidate lists limit the amount of removed work. The concrete result is removal of two unused score computations per successful single-angle custom-comparer call, established by Debug diagnostics below. A custom comparer may still compute any scores it requires.
+
+This is a local group-fill microbenchmark, not a whole-job speedup estimate, production-corpus result, multi-angle throughput test, Windows UI runtime test, or ONNX inference test. There are no timing gates. The full main/engine-suite counts in the historical section above belong to Task 1; the independent Task 1b full-suite results are recorded below.
+
+### Behavior and real red/green evidence
+
+`FillHelpersTests` adds 17 behavior cases in both configurations and four Debug-only work cases:
+
+- Valid staggered rectangle groups exercise higher-count wins in both directions and equal-count density wins in both directions. The deliberately reversed-score comparer must select the opposite layout, even against count or density.
+- Recording comparers assert exactly one call, horizontal candidate versus vertical current, the original work-area object, and the exact selected list reference. One angle keeps both writes on a single bag queue. Tie cases verify default selection retains the first bag result and custom comparison still executes, with both accept and reject outcomes.
+- Layout comparisons preserve count, drawing reference identity, order, positions, rotations, and bounds. Input snapshots cover part/drawing/program/code identities, poses, bounds values, drawing area, and motion endpoints; a nonzero rotation case checks cloning without changing caller programs. Input angle lists and work areas are also checked where applicable.
+- Empty angle lists, empty groups, and valid groups too large for the work area return null, make no comparer calls, and compute no scores. No invalid or null parts are used.
+- Existing process-wide `PerfCounters.FillScoreComputations` is reused, with the existing nonparallel `FillCacheCollection` and reset in `finally`. No new production diagnostic or testing seam was added.
+
+Before changing production, all characterization passed. Three new work assertions genuinely failed:
+
+| Debug case | Expected | Before actual | After actual |
+| --- | ---: | ---: | ---: |
+| Non-scoring custom comparer, area 5×9 | 0 | 2 | 0 |
+| Non-scoring custom comparer, area 10×4 | 0 | 2 | 0 |
+| Custom comparer explicitly computes two scores | 2 | 4 | 2 |
+| No comparer, default-score control | 2 | 2 | 2 |
+
+The scoring-comparer control proves the helper does not bypass the supplied comparer or its score work. Release counter increments compile away; zero Release counters are not used as evidence of work removal.
+
+| Run | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Before targeted Release | 47 | 0 | 0 |
+| Before targeted Debug (intentional RED) | 48 | 0 | 3 |
+| After targeted Release | 47 | 0 | 0 |
+| After targeted Debug (GREEN) | 51 | 0 | 0 |
+| Existing `DefaultFillComparerWorkTests`, Debug, after | 5 | 0 | 0 |
+| Group-pattern measurement, Release, before | 1 | 0 | 0 |
+| Group-pattern measurement, Release, after | 1 | 0 | 0 |
+| Group-pattern gate, environment unset | 0 | 1 | 0 |
+| Group-pattern gate, environment `0` | 0 | 1 | 0 |
+| Parent full main suite, Release | 1,171 | 14 | 0 |
+| Parent full main suite, Debug | 1,180 | 14 | 0 |
+| Parent full engine suite, Release | 300 | 0 | 0 |
+
+The targeted filter is `FillHelpersTests|FillPipelineTests|FillComparerTests|FillScoreTests` using `FullyQualifiedName~` for each term. The five older Debug comparer-work cases have a different class-name suffix, so they were run separately. Existing compiler warnings remain outside the changed code; no warnings were emitted for the new test/harness or changed helper. `git diff --check` passed. The parent independently reconciled all 14 raw timing rows against TRX and console output, verified source snapshots/hashes and the sole production-source difference, and reran the full suites. The 14 skips are the 12 existing optional CHR-font tests plus both opt-in benchmarks. README now documents the group-pattern filter, parallel-allocation limitation, and helper checks. The previously denied `CLAUDE.md` workflow sync remains blocked pending explicit approval; no retry or alternate write was attempted.
+
+### Raw measured batches
+
+Times in milliseconds for 20,000 actual production calls per mode per batch. Odd batches run default first; even batches run custom first.
+
+| State | Batch | Default ms | Custom ms |
+| --- | ---: | ---: | ---: |
+| before | 1 | 12798.229355 | 12733.580886 |
+| before | 2 | 12446.484280 | 12838.273225 |
+| before | 3 | 12349.821045 | 12543.308696 |
+| before | 4 | 12638.532022 | 12944.521123 |
+| before | 5 | 12588.985384 | 12547.909410 |
+| before | 6 | 12475.834989 | 12430.689835 |
+| before | 7 | 12603.474398 | 12883.844997 |
+| after | 1 | 12613.732653 | 12795.834020 |
+| after | 2 | 12659.052180 | 12624.207441 |
+| after | 3 | 12696.177150 | 12537.190933 |
+| after | 4 | 12476.409124 | 12611.963585 |
+| after | 5 | 12683.978429 | 12905.258236 |
+| after | 6 | 12373.077829 | 12553.051166 |
+| after | 7 | 12462.758852 | 12731.211633 |
+
+### Evidence files and reproduction
+
+Raw test/measurement logs, TRX, source snapshots/manifests, and exploratory artifacts were retained under `/home/aj/.hermes/cache/scratch/opennest-fill-1b-20260925/` through independent spec and subsequent quality/integration review. Both reviews passed with no findings and reconciled the source hashes, genuine red/green failures, raw timings, and full-suite outcomes. The parent verified the same evidence and formatting checks. Temporary artifacts were then removed before commit; all measured batch rows, source hashes, environment details, and test summaries needed for this report are preserved above.
+
+Run the current group-pattern benchmark alone (the category filter also runs the historical comparer benchmark):
+
+```bash
+OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~GroupPattern_ReportsDefaultAndCustomComparer' \
+  --logger 'console;verbosity=detailed'
+
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~FillHelpersTests|FullyQualifiedName~FillPipelineTests|FullyQualifiedName~FillComparerTests|FullyQualifiedName~FillScoreTests'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
+  --filter 'FullyQualifiedName~FillHelpersTests|FullyQualifiedName~FillPipelineTests|FullyQualifiedName~FillComparerTests|FullyQualifiedName~FillScoreTests'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
+  --filter 'FullyQualifiedName~DefaultFillComparerWorkTests'
+```
+
+To reproduce before/after independently, use separate disposable worktrees at the baseline revision and the delivered revision, copy the identical measured harness/tests into both, and verify their hashes before rebuilding and running. Do not substitute a test-only approximation for the before production path or mix measurements from changed harnesses.

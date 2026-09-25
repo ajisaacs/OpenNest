@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
 using OpenNest.Shapes;
 using OpenNest.Tests.BestFit;
@@ -54,6 +56,136 @@ public class FillPerformanceTests
         ReportCase("unequal-counts", larger, smaller, workArea, 500_000);
         ReportCase("equal-count-control", equalCountCompact, larger, workArea, 10_000);
     }
+
+    [SkippableFact]
+    public void GroupPattern_ReportsDefaultAndCustomComparer()
+    {
+        Skip.IfNot(Environment.GetEnvironmentVariable("OPENNEST_RUN_FILL_PERF") == "1",
+            "Set OPENNEST_RUN_FILL_PERF=1 to run opt-in fill microbenchmarks.");
+
+        var group = new List<Part>
+        {
+            new(new RectangleShape { Length = 2, Width = 1 }.GetDrawing(), new Vector(11, 13)),
+            new(new RectangleShape { Length = 1, Width = 2 }.GetDrawing(), new Vector(13.5, 14.5)),
+        };
+        var workArea = new Box(3, 5, 5, 9);
+        var engine = new FillLinear(workArea, 0.25);
+        // One angle avoids cross-worker ConcurrentBag tie-order ambiguity, while still
+        // exercising the real Parallel.ForEach, both fills, bag and selection path.
+        var angles = new List<double> { 0 };
+        var customComparer = new FewerPartsComparer();
+        var pattern = FillHelpers.BuildRotatedPattern(group, 0);
+        var h = engine.Fill(pattern, NestDirection.Horizontal);
+        var v = engine.Fill(pattern, NestDirection.Vertical);
+        Assert.Equal(8, h.Count);
+        Assert.Equal(7, v.Count);
+        Assert.True(FillScore.Compute(h, workArea) > FillScore.Compute(v, workArea));
+        Assert.True(customComparer.IsBetter(v, h, workArea));
+        AssertGroupLayout(h, FillHelpers.FillPattern(engine, group, angles, workArea), workArea);
+        AssertGroupLayout(v, FillHelpers.FillPattern(engine, group, angles, workArea, customComparer), workArea);
+        var defaultFill = new Func<List<Part>>(() => FillHelpers.FillPattern(engine, group, angles, workArea));
+        var customFill = new Func<List<Part>>(() => FillHelpers.FillPattern(engine, group, angles, workArea, customComparer));
+        var warmupCalls = 2_000;
+        var callsPerBatch = 20_000;
+        var repetitions = 7;
+#if DEBUG
+        output.WriteLine("Configuration=Debug (diagnostic only; use Release for measurements).");
+#else
+        output.WriteLine("Configuration=Release.");
+#endif
+        output.WriteLine($"Runtime={RuntimeInformation.FrameworkDescription}; OS={RuntimeInformation.OSDescription}; "
+            + $"architecture={RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}; "
+            + $"Stopwatch.Frequency={Stopwatch.Frequency} ticks/s.");
+        output.WriteLine("group-pattern: synthetic 2x1 at (11,13) and 1x2 at (13.5,14.5); "
+            + "work area=(3,5,5,9); spacing=0.25; angle=0 radians; horizontal=8, vertical=7 parts. "
+            + "Default scoring selects horizontal; custom fewer-parts comparer selects vertical.");
+        output.WriteLine($"group-pattern: warmup=2 batches x {warmupCalls} calls per mode; "
+            + $"measured={repetitions} batches x {callsPerBatch} calls per mode; "
+            + "default/custom batch order alternates, including warmup. "
+            + "Actual production FillPattern only; no reference/approximation inside timing. "
+            + "Setup, correctness/layout checks and output excluded; fill geometry, scheduling, "
+            + "result construction, selection, GC, delegate/loop and count consumption included. "
+            + "Allocation measurement omitted: fills use parallel workers, so current-thread bytes would be incomplete. "
+            + "Not a timing gate or a whole-job benchmark.");
+
+        for (var i = 0; i < 2; i++)
+        {
+            MeasureGroupPattern(i % 2 == 0 ? defaultFill : customFill, warmupCalls);
+            MeasureGroupPattern(i % 2 == 0 ? customFill : defaultFill, warmupCalls);
+        }
+
+        var defaultSamples = new GroupPatternSample[repetitions];
+        var customSamples = new GroupPatternSample[repetitions];
+        for (var i = 0; i < repetitions; i++)
+        {
+            if (i % 2 == 0)
+            {
+                defaultSamples[i] = MeasureGroupPattern(defaultFill, callsPerBatch);
+                customSamples[i] = MeasureGroupPattern(customFill, callsPerBatch);
+            }
+            else
+            {
+                customSamples[i] = MeasureGroupPattern(customFill, callsPerBatch);
+                defaultSamples[i] = MeasureGroupPattern(defaultFill, callsPerBatch);
+            }
+            Assert.Equal((long)callsPerBatch * h.Count, defaultSamples[i].PartCount);
+            Assert.Equal((long)callsPerBatch * v.Count, customSamples[i].PartCount);
+            AssertGroupLayout(h, defaultSamples[i].LastResult, workArea);
+            AssertGroupLayout(v, customSamples[i].LastResult, workArea);
+            output.WriteLine(FormattableString.Invariant(
+                $"group-pattern batch {i + 1}: default={defaultSamples[i].Milliseconds:F6} ms; custom={customSamples[i].Milliseconds:F6} ms; default parts={defaultSamples[i].PartCount}; custom parts={customSamples[i].PartCount}."));
+        }
+        ReportGroupSummary("default", defaultSamples, callsPerBatch);
+        ReportGroupSummary("custom", customSamples, callsPerBatch);
+    }
+
+    private static GroupPatternSample MeasureGroupPattern(Func<List<Part>> fill, int calls)
+    {
+        var partCount = 0L;
+        var last = new List<Part>();
+        var start = Stopwatch.GetTimestamp();
+        for (var i = 0; i < calls; i++)
+        {
+            last = fill();
+            partCount += last.Count;
+        }
+        var elapsed = Stopwatch.GetTimestamp() - start;
+        return new GroupPatternSample(elapsed * 1000.0 / Stopwatch.Frequency, partCount, last);
+    }
+
+    private void ReportGroupSummary(string mode, GroupPatternSample[] samples, int callsPerBatch)
+    {
+        var times = samples.Select(s => s.Milliseconds).OrderBy(t => t).ToArray();
+        var median = samples.Length / 2;
+        output.WriteLine(FormattableString.Invariant(
+            $"group-pattern {mode}: batch ms min/median/max={times[0]:F6}/{times[median]:F6}/{times[^1]:F6}; us/call min/median/max={times[0] * 1000 / callsPerBatch:F3}/{times[median] * 1000 / callsPerBatch:F3}/{times[^1] * 1000 / callsPerBatch:F3}."));
+    }
+
+    private static void AssertGroupLayout(List<Part> expected, List<Part> actual, Box workArea)
+    {
+        Assert.Equal(expected.Count, actual.Count);
+        for (var i = 0; i < actual.Count; i++)
+        {
+            var part = actual[i];
+            Assert.Same(expected[i].BaseDrawing, part.BaseDrawing);
+            Assert.Equal(expected[i].Location, part.Location);
+            Assert.Equal(expected[i].Rotation, part.Rotation);
+            Assert.Equal(2.0, part.BaseDrawing.Area);
+            Assert.True(workArea.Contains(part.BoundingBox));
+            foreach (var value in new[] { part.Left, part.Right, part.Bottom, part.Top, part.Rotation })
+                Assert.True(double.IsFinite(value));
+            for (var j = 0; j < i; j++)
+                Assert.False(part.BoundingBox.Intersects(actual[j].BoundingBox));
+        }
+    }
+
+    private sealed class FewerPartsComparer : IFillComparer
+    {
+        public bool IsBetter(List<Part> candidate, List<Part> current, Box workArea) =>
+            candidate.Count < current.Count;
+    }
+
+    private readonly record struct GroupPatternSample(double Milliseconds, long PartCount, List<Part> LastResult);
 
     private void ReportCase(string name, List<Part> candidate, List<Part> current, Box workArea, int callsPerBatch)
     {

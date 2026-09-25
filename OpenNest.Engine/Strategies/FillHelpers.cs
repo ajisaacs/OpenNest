@@ -51,11 +51,11 @@ namespace OpenNest.Engine.Strategies
 
                     var h = engine.Fill(pattern, NestDirection.Horizontal);
                     if (h != null && h.Count > 0)
-                        results.Add((h, FillScore.Compute(h, workArea)));
+                        results.Add((h, comparer == null ? FillScore.Compute(h, workArea) : default));
 
                     var v = engine.Fill(pattern, NestDirection.Vertical);
                     if (v != null && v.Count > 0)
-                        results.Add((v, FillScore.Compute(v, workArea)));
+                        results.Add((v, comparer == null ? FillScore.Compute(v, workArea) : default));
                 }
             );
 

@@ -43,6 +43,8 @@ For PowerShell, set `$env:OPENNEST_RUN_FILL_PERF = '1'` before the `dotnet test`
 
 The comparer microbenchmark uses deterministic, valid nonoverlapping rectangles, warmup, seven interleaved actual/reference batches, both argument orders, and an equal-count control. It reports min/median/max duration and synchronous current-thread allocations, both per batch and per call; construction and correctness assertions are outside the timed region. Keep inputs and batch sizes fixed when comparing changes. These measurements are not timing-threshold tests and do not establish whole-job speedups. Debug-only skipped-score work checks run with `dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --filter "FullyQualifiedName~DefaultFillComparerWorkTests"`.
 
+The group-pattern measurement also compares default scoring with a custom comparer on a valid two-part group. It includes the real fill and scheduling work and omits allocation totals because fills can use worker threads. Run only that case with `--filter "FullyQualifiedName~GroupPattern_ReportsDefaultAndCustomComparer"`; helper behavior and Debug score-work checks use `--filter "FullyQualifiedName~FillHelpersTests"`. Workload details and measured limitations are in [the fill performance report](docs/performance/fill-performance.md).
+
 ### Quick start
 
 1. File > New Nest
