@@ -15,7 +15,6 @@ namespace OpenNest.Engine.Tests.Jobs;
 public class NestJobSpacingValidationTests
 {
     private const double Spacing = 0.25;
-    private const double Epsilon = 0.0000001;
     private const double Origin = 50;
 
     public static IEnumerable<object[]> Shapes() =>
@@ -98,6 +97,27 @@ public class NestJobSpacingValidationTests
         ));
     }
 
+    [Theory]
+    [InlineData(0.0001, true)]
+    [InlineData(0.0004, true)]
+    [InlineData(0.0010, false)]
+    public void GapsJustUnderSpacingPassWithinTheSlack(double shortfall, bool expected)
+    {
+        // A layout placed at the spacing can land ~1e-4 short once rotated and rounded.
+        var program = TestDrawingFactory.Rectangle(4, 3);
+        var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(program), 2);
+        var job = new NestJob(
+            new[] { part },
+            new[] { new NestPlateStock("stock", new Size(200, 200), 1, Spacing) }
+        );
+        var first = new NestJobPlacement("part", 0, Origin, Origin, 0);
+        var second = new NestJobPlacement("part", 1, Origin + 4 + Spacing - shortfall, Origin, 0);
+
+        Assert.Equal(expected, IsValid(job, first, second));
+        var geometry = JobPartGeometry.Read(part.Geometry);
+        Assert.Equal(expected, NestLayoutCheck.Clears(geometry, first, geometry, second, Spacing));
+    }
+
     private static bool IsValid(NestJob job, params NestJobPlacement[] placements)
     {
         try
@@ -123,7 +143,7 @@ public class NestJobSpacingValidationTests
         if (Collision.HasOverlap(a[0], b[0], a.Skip(1).ToList(), b.Skip(1).ToList()))
             return true;
 
-        var limit = Spacing - Epsilon;
+        var limit = Spacing - NestTolerances.SpacingSlack;
         foreach (var left in a)
         {
             var leftLines = left.ToLines();

@@ -52,7 +52,8 @@ public static class NestLayoutCheck
             (al, bl) = (bl, al);
             (ar, br) = (br, ar);
         }
-        var inflated = spacing > Tolerance.Epsilon ? Outline(ap, al, spacing) : ar;
+        var inflateBy = InflationFor(spacing);
+        var inflated = inflateBy > Tolerance.Epsilon ? Outline(ap, al, inflateBy) : ar;
         return !BoxesTouch(inflated.Perimeter.BoundingBox, br.Perimeter.BoundingBox)
             || !Overlaps(inflated, br);
     }
@@ -289,11 +290,12 @@ public static class NestLayoutCheck
     {
         var raw = new PartOutline[parts.Count];
         var inflated = new PartOutline[parts.Count];
+        var inflateBy = InflationFor(spacing);
 
         for (var i = 0; i < parts.Count; i++)
         {
             raw[i] = Outline(parts[i], 0);
-            inflated[i] = spacing > Tolerance.Epsilon ? Outline(parts[i], spacing) : raw[i];
+            inflated[i] = inflateBy > Tolerance.Epsilon ? Outline(parts[i], inflateBy) : raw[i];
         }
 
         var order = Enumerable
@@ -338,6 +340,10 @@ public static class NestLayoutCheck
             .Where(e => SpecialLayers.IsMaterial(e.Layer))
             .GetBoundingBox()
             .Translate(part.Location);
+
+    /// <summary>Inflation that enforces <paramref name="spacing"/> less the shared slack.</summary>
+    private static double InflationFor(double spacing) =>
+        System.Math.Max(0, spacing - NestTolerances.SpacingSlack);
 
     private static bool BoxesTouch(Box a, Box b) =>
         a.Left <= b.Right + Tolerance.Epsilon
@@ -398,9 +404,10 @@ public static class NestLayoutCheck
     /// that closes up under the offset is dropped, which treats it as solid:
     /// conservative, since it has no room for another part at the required
     /// spacing anyway. Arcs are flattened conservatively (perimeter arcs
-    /// circumscribed, cutout arcs inscribed) but nothing is padded, so a layout
-    /// exactly at the spacing passes; the only leniency is the round-join chord
-    /// error at convex corners (OutlineTolerance / 10).
+    /// circumscribed, cutout arcs inscribed) but nothing is padded. Callers inflate
+    /// by the spacing less NestTolerances.SpacingSlack, so a layout exactly at the
+    /// spacing passes despite rounding; the only other leniency is the round-join
+    /// chord error at convex corners (OutlineTolerance / 10).
     /// part.Program is already rotated; only a Location offset is needed.
     /// </summary>
     private static PartOutline Outline(Part part, double inflateBy)

@@ -251,10 +251,13 @@ namespace OpenNest.Tests.Benchmark
             var raw = new PartOutline[parts.Count];
             var inflated = new PartOutline[parts.Count];
 
+            // The one intended rule change since the freeze: the shared spacing slack.
+            var inflateBy = System.Math.Max(0, spacing - NestTolerances.SpacingSlack);
+
             for (var i = 0; i < parts.Count; i++)
             {
                 raw[i] = Outline(parts[i], 0);
-                inflated[i] = spacing > Tolerance.Epsilon ? Outline(parts[i], spacing) : raw[i];
+                inflated[i] = inflateBy > Tolerance.Epsilon ? Outline(parts[i], inflateBy) : raw[i];
             }
 
             var order = Enumerable

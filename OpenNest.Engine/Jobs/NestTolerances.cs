@@ -12,6 +12,12 @@ public static class NestTolerances
     /// perimeter arcs and inscribes cutouts; the placement validator uses inscribed arcs.</summary>
     public const double ValidationOutline = 0.001;
 
+    /// <summary>How far under the part spacing a gap may fall and still pass both validators.
+    /// Layouts placed exactly at the spacing land up to ~1e-4 short once rotated, rounded
+    /// coordinates (e.g. PEP's 4-decimal exports) meet the Clipper grid; 0.0005 covers that
+    /// with margin and is far below anything a cutting machine can resolve.</summary>
+    public const double SpacingSlack = 0.0005;
+
     /// <summary>Clipper decimal precision (a 1e-4 coordinate grid).</summary>
     public const int ClipperPrecision = ClipperBridge.Precision;
 

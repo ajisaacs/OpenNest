@@ -66,7 +66,8 @@ internal static class NestJobPlacementValidator
                     continue;
                 if (Overlaps(shape, other))
                     throw new InvalidOperationException("Candidate placements overlap.");
-                if (stock.PartSpacing > 0 && Distance(shape, other) < stock.PartSpacing - Epsilon)
+                if (stock.PartSpacing > 0
+                    && Distance(shape, other) < stock.PartSpacing - NestTolerances.SpacingSlack)
                     throw new InvalidOperationException(
                         "Candidate placements violate required part spacing."
                     );
