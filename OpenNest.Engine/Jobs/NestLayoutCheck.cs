@@ -54,7 +54,7 @@ public static class NestLayoutCheck
         }
         var inflated = spacing > Tolerance.Epsilon ? Outline(ap, al, spacing) : ar;
         return !BoxesTouch(inflated.Perimeter.BoundingBox, br.Perimeter.BoundingBox)
-            || !Collision.HasOverlap(inflated.Perimeter, br.Perimeter, inflated.Holes, br.Holes);
+            || !Overlaps(inflated, br);
     }
 
     private static ShapeProfile Transform(JobPartGeometry geometry, double rotation)
@@ -322,14 +322,7 @@ public static class NestLayoutCheck
                 // Inflating one side by the full spacing covers both cases: part j
                 // inside part i's (shrunk) cutout, or part i's inflated outline
                 // inside part j's raw cutout.
-                if (
-                    Collision.HasOverlap(
-                        inflated[i].Perimeter,
-                        raw[j].Perimeter,
-                        inflated[i].Holes,
-                        raw[j].Holes
-                    )
-                )
+                if (Overlaps(inflated[i], raw[j]))
                 {
                     result.Add(
                         $"'{DisplayName(parts[i], requirements)}' and '{DisplayName(parts[j], requirements)}' are closer than the required spacing ({spacing:F3})"
@@ -365,10 +358,37 @@ public static class NestLayoutCheck
 
     private const double OutlineTolerance = NestTolerances.ValidationOutline;
 
+    private static bool Overlaps(PartOutline a, PartOutline b)
+    {
+        var at = a.Triangles;
+        var bt = b.Triangles;
+        // Cache the same world-space triangulation the reference would build. Keeping
+        // translations at zero also preserves its floating-point operation order.
+        return (at != null && bt != null ? at.Overlaps(bt, 0, 0, 0, 0) : null)
+            ?? Collision.HasOverlap(a.Perimeter, b.Perimeter, a.Holes, b.Holes);
+    }
+
     private sealed class PartOutline
     {
         public Polygon Perimeter { get; init; }
         public List<Polygon> Holes { get; init; }
+
+        private bool prepared;
+        private TriangulatedRegion triangles;
+
+        /// <summary>Prepared on the first candidate pair; null preparation is cached too.</summary>
+        public TriangulatedRegion Triangles
+        {
+            get
+            {
+                if (!prepared)
+                {
+                    triangles = TriangulatedRegion.Build(Perimeter, Holes);
+                    prepared = true;
+                }
+                return triangles;
+            }
+        }
     }
 
     /// <summary>
