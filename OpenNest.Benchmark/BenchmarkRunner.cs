@@ -33,7 +33,8 @@ namespace OpenNest.Benchmark
             double? salvageRate = null,
             double? minimumSalvageDimension = null,
             string outputDirectory = null,
-            int maxParallelism = 1
+            int maxParallelism = 1,
+            System.IO.TextWriter progressLog = null
         )
         {
             var pairs = jobs.SelectMany(job => engines.Select(engine => (Job: job, Engine: engine)))
@@ -68,7 +69,8 @@ namespace OpenNest.Benchmark
                         pairs[i].Engine,
                         salvageRate,
                         minimumSalvageDimension,
-                        outputDirectory
+                        outputDirectory,
+                        progressLog
                     )
             );
 
@@ -223,10 +225,15 @@ namespace OpenNest.Benchmark
             NestingEngineInfo engineInfo,
             double? salvageRate,
             double? minimumSalvageDimension,
-            string outputDirectory
+            string outputDirectory,
+            System.IO.TextWriter progressLog
         )
         {
             var requested = job.TotalRequestedQuantity;
+            var log = progressLog == null
+                ? null
+                : new JobProgressLog(progressLog, $"{job.Name}/{engineInfo.Name}");
+            log?.Started();
             var sw = Stopwatch.StartNew();
 
             try
@@ -234,7 +241,8 @@ namespace OpenNest.Benchmark
                 var nestJob = job.BuildNestJob(MaxPlates, salvageRate, minimumSalvageDimension);
                 var engine = engineInfo.Factory();
                 using var cts = new CancellationTokenSource(SolveTimeout);
-                var jobResult = engine.Solve(nestJob, null, cts.Token);
+                var jobResult = engine.Solve(nestJob, log, cts.Token);
+                log?.Finished(jobResult, sw.ElapsedMilliseconds);
 
                 var materialized = NestResultMaterializer.Materialize(nestJob, jobResult);
                 var plateRuns = materialized
@@ -357,6 +365,7 @@ namespace OpenNest.Benchmark
             catch (OperationCanceledException)
             {
                 sw.Stop();
+                log?.Failed("timed out", sw.ElapsedMilliseconds);
                 return new JobResult
                 {
                     EngineName = engineInfo.Name,
@@ -371,6 +380,7 @@ namespace OpenNest.Benchmark
             catch (Exception ex)
             {
                 sw.Stop();
+                log?.Failed($"{ex.GetType().Name}: {ex.Message}", sw.ElapsedMilliseconds);
                 return new JobResult
                 {
                     EngineName = engineInfo.Name,

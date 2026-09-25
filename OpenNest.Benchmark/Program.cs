@@ -123,7 +123,8 @@ static class BenchmarkConsole
             options.SalvageRate,
             options.MinimumSalvageDimension,
             options.OutputDirectory,
-            options.Parallel
+            options.Parallel,
+            options.Progress ? Console.Out : null
         );
 
         Report.PrintDetailed(results);
@@ -194,6 +195,10 @@ static class BenchmarkConsole
                         Console.Error.WriteLine(
                             $"Warning: --parallel needs a whole number >= 1, using {o.Parallel}"
                         );
+                    break;
+
+                case "--progress":
+                    o.Progress = true;
                     break;
 
                 case "--help":
@@ -322,6 +327,9 @@ static class BenchmarkConsole
         Console.Error.WriteLine(
             "                                 which gives the cleanest per-engine timings)"
         );
+        Console.Error.WriteLine(
+            "  --progress                      Log each solve's start, engine progress and finish"
+        );
         Console.Error.WriteLine("  --help                          Show this message");
     }
 
@@ -336,5 +344,6 @@ static class BenchmarkConsole
         public double? SalvageRate;
         public double? MinimumSalvageDimension;
         public int Parallel = 3;
+        public bool Progress;
     }
 }

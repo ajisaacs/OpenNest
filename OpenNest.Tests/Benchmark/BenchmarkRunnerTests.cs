@@ -296,6 +296,40 @@ public sealed class BenchmarkRunnerTests : IDisposable
         Assert.True(File.Exists(Path.Combine(output, "job-Engine0.json")));
     }
 
+    [Fact]
+    public void Run_WithProgressLog_ForwardsEngineProgress()
+    {
+        var writer = new StringWriter();
+        var engines = new List<NestingEngineInfo>
+        {
+            new("Reporter", "test double", () => new ReportingEngine()),
+        };
+
+        BenchmarkRunner.Run(LoadJob(), engines, maxParallelism: 1, progressLog: writer);
+
+        var log = writer.ToString();
+        Assert.Contains("[job/Reporter] started", log);
+        Assert.Contains("[job/Reporter] evaluating plate 1 on stock", log);
+        Assert.Contains("[job/Reporter] finished in", log);
+    }
+
+    private sealed class ReportingEngine : INestingEngine
+    {
+        public NestJobResult Solve(
+            NestJob job,
+            IProgress<NestJobProgress>? progress = null,
+            CancellationToken token = default
+        )
+        {
+            progress?.Report(
+                new NestJobProgress(NestJobStage.EvaluatingCandidate, job.Plates[0].Id, 0, 0, 0)
+            );
+            return new NestJobResultBuilder(job, progress).Build(
+                NestJobStopReason.NoPlacementFound
+            );
+        }
+    }
+
     private sealed class ConcurrencyProbe
     {
         private int _current;
