@@ -26,6 +26,8 @@ namespace OpenNest.Engine.Fill
             if (parts == null || parts.Count == 0)
                 return default;
 
+            PerfCounters.CountFillScoreComputation();
+
             var totalPartArea = 0.0;
             var minX = double.MaxValue;
             var minY = double.MaxValue;

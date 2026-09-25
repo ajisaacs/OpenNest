@@ -17,6 +17,9 @@ namespace OpenNest.Engine.Fill
             if (current == null || current.Count == 0)
                 return true;
 
+            if (candidate.Count != current.Count)
+                return candidate.Count > current.Count;
+
             return FillScore.Compute(candidate, workArea) > FillScore.Compute(current, workArea);
         }
     }

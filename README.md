@@ -32,6 +32,17 @@ dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (W
 
 `OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only. Format changed files with `dotnet format OpenNest.sln --include <path>`.
 
+### Opt-in fill performance measurements
+
+```bash
+OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter "Category=FillPerformance" --logger "console;verbosity=detailed"
+```
+
+For PowerShell, set `$env:OPENNEST_RUN_FILL_PERF = '1'` before the `dotnet test` command and remove it afterward with `Remove-Item Env:OPENNEST_RUN_FILL_PERF`. Without the exact value `1`, these tests skip, including during normal suite runs.
+
+The comparer microbenchmark uses deterministic, valid nonoverlapping rectangles, warmup, seven interleaved actual/reference batches, both argument orders, and an equal-count control. It reports min/median/max duration and synchronous current-thread allocations, both per batch and per call; construction and correctness assertions are outside the timed region. Keep inputs and batch sizes fixed when comparing changes. These measurements are not timing-threshold tests and do not establish whole-job speedups. Debug-only skipped-score work checks run with `dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --filter "FullyQualifiedName~DefaultFillComparerWorkTests"`.
+
 ### Quick start
 
 1. File > New Nest
