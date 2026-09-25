@@ -8,7 +8,7 @@ using OpenNest.Math;
 
 namespace OpenNest.Engine.Fill
 {
-    public class FillExtents
+    internal class LegacyFillExtents
     {
         private const int MaxIterations = 10;
 
@@ -16,7 +16,7 @@ namespace OpenNest.Engine.Fill
         private readonly double partSpacing;
         private readonly double halfSpacing;
 
-        public FillExtents(Box workArea, double partSpacing)
+        public LegacyFillExtents(Box workArea, double partSpacing)
         {
             this.workArea = workArea;
             this.partSpacing = partSpacing;
@@ -117,32 +117,29 @@ namespace OpenNest.Engine.Fill
         {
             var column = new List<Part> { (Part)pair.Part1.Clone(), (Part)pair.Part2.Clone() };
 
+            // Find geometry-aware copy distance for the pair vertically.
+            var boundary1 = new PartBoundary(pair.Part1, halfSpacing);
+            var boundary2 = new PartBoundary(pair.Part2, halfSpacing);
+
+            // Compute vertical copy distance using bounding boxes as starting point,
+            // then slide down to find true geometry distance.
             var pairHeight = pair.Bbox.Width;
-            var copyDistance = pairHeight + partSpacing;
+            var testOffset = new Vector(0, pairHeight);
 
-            // For finite valid geometry and nonnegative spacing, the legacy helper returns
-            // pairHeight + partSpacing on negative/no-hit slides. Otherwise minSlide >= 0,
-            // so Max(pairHeight - minSlide, pairHeight + partSpacing) is the same pitch.
-            // Public callers do not validate spacing; retain legacy work/behavior outside
-            // that domain rather than changing its results or exceptions.
-            if (!double.IsFinite(partSpacing) || partSpacing < 0 || !double.IsFinite(pairHeight))
-            {
-                var boundary1 = new PartBoundary(pair.Part1, halfSpacing);
-                var boundary2 = new PartBoundary(pair.Part2, halfSpacing);
-                var testOffset = new Vector(0, pairHeight);
-                var testPart1 = pair.Part1.CloneAtOffset(testOffset);
-                var testPart2 = pair.Part2.CloneAtOffset(testOffset);
+            // Create test parts for slide distance measurement.
+            var testPart1 = pair.Part1.CloneAtOffset(testOffset);
+            var testPart2 = pair.Part2.CloneAtOffset(testOffset);
 
-                copyDistance = FindVerticalCopyDistance(
-                    pair.Part1,
-                    pair.Part2,
-                    testPart1,
-                    testPart2,
-                    boundary1,
-                    boundary2,
-                    pairHeight
-                );
-            }
+            // Find minimum distance from test pair sliding down toward original pair.
+            var copyDistance = FindVerticalCopyDistance(
+                pair.Part1,
+                pair.Part2,
+                testPart1,
+                testPart2,
+                boundary1,
+                boundary2,
+                pairHeight
+            );
 
             if (copyDistance <= 0)
                 return column;

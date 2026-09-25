@@ -139,6 +139,101 @@ public class FillPerformanceTests
         ReportGroupSummary("custom", customSamples, callsPerBatch);
     }
 
+    [SkippableFact]
+    public void Extents_ReportsRepeatedColumnRebuilds()
+    {
+        Skip.IfNot(Environment.GetEnvironmentVariable("OPENNEST_RUN_FILL_PERF") == "1",
+            "Set OPENNEST_RUN_FILL_PERF=1 to run opt-in fill microbenchmarks.");
+
+        var area = new Box(3, 5, 45, 27);
+        var drawing = FillExtentsTests.MakeFixture("triangle");
+        var spacings = new[] { 0.0, 0.5 };
+        var fills = spacings.Select(spacing =>
+        {
+            var filler = new FillExtents(area, spacing);
+            return new Func<List<Part>>(() => filler.Fill(drawing));
+        }).ToArray();
+        var expected = spacings.Select(spacing => new LegacyFillExtents(area, spacing).Fill(drawing)).ToArray();
+        for (var i = 0; i < fills.Length; i++)
+        {
+            Assert.Equal(24, expected[i].Count);
+            FillExtentsTests.AssertSameLayout(expected[i], fills[i]());
+            FillExtentsTests.AssertValidLayout(expected[i], area);
+        }
+        var warmupCalls = 50;
+        var callsPerBatch = 200;
+        var repetitions = 7;
+#if DEBUG
+        output.WriteLine("Configuration=Debug (diagnostic only; use Release for measurements).");
+#else
+        output.WriteLine("Configuration=Release.");
+#endif
+        output.WriteLine($"Runtime={RuntimeInformation.FrameworkDescription}; OS={RuntimeInformation.OSDescription}; "
+            + $"architecture={RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}; "
+            + $"Stopwatch.Frequency={Stopwatch.Frequency} ticks/s.");
+        output.WriteLine("extents: synthetic closed right triangle (0,0)-(10,0)-(0,8)-(0,0); "
+            + "area=(3,5,45,27); angle=0; spacing=0 or 0.5; 24 parts/fill. "
+            + "The matching Debug work test proves 2 BuildColumn calls/fill (initial + adjustment). "
+            + "Real synchronous production Fill, no reflection/reference inside timing. "
+            + "Setup, assertions and output excluded; geometry, tiling, adjustment, overlap fallback, GC, "
+            + "delegate/loop/count consumption included. Allocations=GC.GetAllocatedBytesForCurrentThread "
+            + "around synchronous calls, not RSS. Warm source drawing/JIT, no forced GC or cache reset. "
+            + "Not a timing gate, isolated BuildColumn latency, or whole-job benchmark.");
+        output.WriteLine($"extents: warmup=2 batches x {warmupCalls} calls per spacing; "
+            + $"measured={repetitions} batches x {callsPerBatch} calls per spacing; "
+            + "spacing order alternates in warmup and measurement.");
+
+        for (var batch = 0; batch < 2; batch++)
+            for (var slot = 0; slot < fills.Length; slot++)
+                MeasureExtents(fills[(slot + batch) % fills.Length], warmupCalls);
+
+        var samples = spacings.Select(_ => new ExtentsSample[repetitions]).ToArray();
+        for (var batch = 0; batch < repetitions; batch++)
+        {
+            for (var slot = 0; slot < fills.Length; slot++)
+            {
+                var mode = (slot + batch) % fills.Length;
+                samples[mode][batch] = MeasureExtents(fills[mode], callsPerBatch);
+            }
+            for (var mode = 0; mode < fills.Length; mode++)
+            {
+                var sample = samples[mode][batch];
+                Assert.Equal((long)callsPerBatch * expected[mode].Count, sample.PartCount);
+                FillExtentsTests.AssertSameLayout(expected[mode], sample.LastResult);
+                FillExtentsTests.AssertValidLayout(sample.LastResult, area);
+                output.WriteLine(FormattableString.Invariant(
+                    $"extents spacing={spacings[mode]} batch={batch + 1}: ms={sample.Milliseconds:F6}; bytes={sample.AllocatedBytes}; parts={sample.PartCount}."));
+            }
+        }
+        for (var mode = 0; mode < fills.Length; mode++)
+        {
+            var times = samples[mode].Select(s => s.Milliseconds).OrderBy(t => t).ToArray();
+            var bytes = samples[mode].Select(s => s.AllocatedBytes).OrderBy(b => b).ToArray();
+            var median = repetitions / 2;
+            output.WriteLine(FormattableString.Invariant(
+                $"extents spacing={spacings[mode]}: batch ms min/median/max={times[0]:F6}/{times[median]:F6}/{times[^1]:F6}; us/call min/median/max={times[0] * 1000 / callsPerBatch:F3}/{times[median] * 1000 / callsPerBatch:F3}/{times[^1] * 1000 / callsPerBatch:F3}; batch bytes min/median/max={bytes[0]}/{bytes[median]}/{bytes[^1]}; B/call min/median/max={(double)bytes[0] / callsPerBatch:F3}/{(double)bytes[median] / callsPerBatch:F3}/{(double)bytes[^1] / callsPerBatch:F3}."));
+        }
+    }
+
+    private static ExtentsSample MeasureExtents(Func<List<Part>> fill, int calls)
+    {
+        var partCount = 0L;
+        var last = new List<Part>();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var start = Stopwatch.GetTimestamp();
+        for (var i = 0; i < calls; i++)
+        {
+            last = fill();
+            partCount += last.Count;
+        }
+        var elapsed = Stopwatch.GetTimestamp() - start;
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        return new ExtentsSample(elapsed * 1000.0 / Stopwatch.Frequency, allocated, partCount, last);
+    }
+
+    private readonly record struct ExtentsSample(double Milliseconds, long AllocatedBytes,
+        long PartCount, List<Part> LastResult);
+
     private static GroupPatternSample MeasureGroupPattern(Func<List<Part>> fill, int calls)
     {
         var partCount = 0L;

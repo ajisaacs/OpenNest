@@ -23,6 +23,7 @@ namespace OpenNest.Engine.Fill
 
         public PartBoundary(Part part, double spacing)
         {
+            PerfCounters.CountPartBoundaryPreparation();
             var entities = ConvertProgram
                 .ToGeometry(part.Program)
                 .Where(e => e.Layer == SpecialLayers.Cut)

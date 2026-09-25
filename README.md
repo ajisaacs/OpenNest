@@ -45,6 +45,8 @@ The comparer microbenchmark uses deterministic, valid nonoverlapping rectangles,
 
 The group-pattern measurement also compares default scoring with a custom comparer on a valid two-part group. It includes the real fill and scheduling work and omits allocation totals because fills can use worker threads. Run only that case with `--filter "FullyQualifiedName~GroupPattern_ReportsDefaultAndCustomComparer"`; helper behavior and Debug score-work checks use `--filter "FullyQualifiedName~FillHelpersTests"`. Workload details and measured limitations are in [the fill performance report](docs/performance/fill-performance.md).
 
+The extents measurement exercises repeated column rebuilding with a closed triangle at zero and positive spacing. It times the synchronous production fill and reports current-thread allocations; the frozen legacy implementation is used only for correctness checks outside timing. Run only that case with `--filter "FullyQualifiedName~Extents_ReportsRepeatedColumnRebuilds"`. Extents behavior, overlap-fallback, and Debug boundary-preparation checks use `--filter "FullyQualifiedName~FillExtentsTests|FullyQualifiedName~StrategyOverlapTests"`. Finite nonnegative spacing uses the equivalent bounding-box pitch without discarded vertical boundary preparation; negative/nonfinite spacing retains the legacy calculation rather than adding validation.
+
 ### Quick start
 
 1. File > New Nest

@@ -13,11 +13,13 @@ namespace OpenNest
         private static long offsetPerimeterEntities;
         private static long partIntersects;
         private static long fillScoreComputations;
+        private static long partBoundaryPreparations;
 
         public static long FindBestFits => Interlocked.Read(ref findBestFits);
         public static long OffsetPerimeterEntities => Interlocked.Read(ref offsetPerimeterEntities);
         public static long PartIntersects => Interlocked.Read(ref partIntersects);
         public static long FillScoreComputations => Interlocked.Read(ref fillScoreComputations);
+        public static long PartBoundaryPreparations => Interlocked.Read(ref partBoundaryPreparations);
 
         [Conditional("DEBUG")]
         public static void CountFindBestFits() => Interlocked.Increment(ref findBestFits);
@@ -32,12 +34,16 @@ namespace OpenNest
         [Conditional("DEBUG")]
         public static void CountFillScoreComputation() => Interlocked.Increment(ref fillScoreComputations);
 
+        [Conditional("DEBUG")]
+        public static void CountPartBoundaryPreparation() => Interlocked.Increment(ref partBoundaryPreparations);
+
         public static void Reset()
         {
             Interlocked.Exchange(ref findBestFits, 0);
             Interlocked.Exchange(ref offsetPerimeterEntities, 0);
             Interlocked.Exchange(ref partIntersects, 0);
             Interlocked.Exchange(ref fillScoreComputations, 0);
+            Interlocked.Exchange(ref partBoundaryPreparations, 0);
         }
     }
 }
