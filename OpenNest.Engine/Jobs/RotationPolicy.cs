@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace OpenNest.Engine.Jobs;
 
@@ -70,6 +71,72 @@ public sealed class RotationPolicy
         stepAngle == 0
             ? Automatic
             : BoundedSweep(rotationStart, rotationEnd, stepAngle, allow180Equivalent);
+
+    /// <summary>
+    /// Enumerates legal radians in stable order, normalized to [0, 2π) and deduplicated
+    /// with a circular tolerance of 1e-7 radians (zero and a full turn are equivalent).
+    /// Fixed returns the start; Automatic returns 0, π/2, π, 3π/2.
+    /// Sweeps follow the step grid from Start through the last grid point at or before End.
+    /// If necessary, grid indices are evenly subsampled (rounded to the nearest index),
+    /// including both grid endpoints when maxSamples is at least two; a cap of one returns
+    /// Start alone. An off-grid End is not legal and is not included.
+    /// Allowed 180-degree equivalents immediately follow each base angle and do not count
+    /// toward maxSamples. Every returned angle satisfies <see cref="Allows"/>.
+    /// </summary>
+    /// <param name="maxSamples">Positive cap on base sweep samples, before deduplication.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The sample cap is not positive.</exception>
+    /// <exception cref="InvalidOperationException">The sweep grid exceeds finite numeric range.</exception>
+    public IReadOnlyList<double> EnumerateAngles(int maxSamples = 720)
+    {
+        if (maxSamples < 1)
+            throw new ArgumentOutOfRangeException(nameof(maxSamples));
+
+        var angles = new List<double>();
+        if (Kind == RotationPolicyKind.Automatic)
+        {
+            for (var turn = 0; turn < 4; turn++)
+                AddAngle(angles, turn * (System.Math.PI / 2));
+        }
+        else if (Kind == RotationPolicyKind.Fixed)
+            AddBase(Start);
+        else
+        {
+            var lastIndex = System.Math.Floor((End - Start) / Step + 1e-7);
+            if (!double.IsFinite(lastIndex))
+                throw new InvalidOperationException("The sweep grid exceeds finite numeric range.");
+            var count = (int)System.Math.Min(lastIndex + 1, maxSamples);
+            for (var sample = 0; sample < count; sample++)
+            {
+                var index = count == 1 ? 0
+                    : System.Math.Round(lastIndex * (sample / (double)(count - 1)));
+                AddBase(Start + index * Step);
+            }
+        }
+        return angles;
+
+        void AddBase(double angle)
+        {
+            AddAngle(angles, angle);
+            if (Allow180Equivalent)
+                AddAngle(angles, angle + System.Math.PI);
+        }
+    }
+
+    internal void AddAngle(List<double> angles, double angle)
+    {
+        var fullTurn = 2 * System.Math.PI;
+        angle %= fullTurn;
+        if (angle < 0)
+            angle += fullTurn;
+        if (angle >= fullTurn)
+            angle = 0;
+        if (!Allows(angle))
+            return;
+        foreach (var existing in angles)
+            if (AnglesEqual(existing, angle, 1e-7))
+                return;
+        angles.Add(angle);
+    }
 
     /// <summary>True when a placement rotation satisfies this policy. Fixed and bounded
     /// policies compare orientations modulo full turns; an allowed 180° equivalent is included.</summary>
