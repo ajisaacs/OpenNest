@@ -59,13 +59,18 @@ public class NestJobCostTests
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(0.5)]
-    public void RotatedMarksAndMultipleSheetsKeepExactLegacyCost(double rate)
+    [InlineData(0, false)]
+    [InlineData(0.5, false)]
+    [InlineData(0, true)]
+    [InlineData(0.5, true)]
+    public void RotatedPartsAndMultipleSheetsUseMaterialCost(double rate, bool marked)
     {
         var program = TestDrawingFactory.Rectangle(4, 3);
-        program.MoveTo(2, 2);
-        program.Codes.Add(new LinearMove(9, 2) { Layer = LayerType.Scribe });
+        if (marked)
+        {
+            program.MoveTo(2, 2);
+            program.Codes.Add(new LinearMove(9, 2) { Layer = LayerType.Scribe });
+        }
         var part = new NestJobPart("part", PartGeometrySnapshot.FromProgram(program), 5);
         var stock = new NestPlateStock("sheet", new Size(30, 40));
         var other = new NestPlateStock("large", new Size(50, 50));
@@ -75,15 +80,18 @@ public class NestJobCostTests
         builder.AddSheet(stock, new[] { ("part", 10.123, 8.456, 0.37), ("part", 25.789, 17.321, 1.12) });
         builder.AddSheet(other, new[] { ("part", 12.345, 19.876, 2.13) });
         var result = builder.Build(NestJobStopReason.NoPlacementFound);
+        var cleanPart = new NestJobPart("part", PartGeometrySnapshot.FromProgram(
+            TestDrawingFactory.Rectangle(4, 3)), 5);
+        var cleanJob = new NestJob(new[] { cleanPart }, job.Plates, job.Options);
         foreach (var sheet in result.Plates)
-            Assert.Equal(LegacyNestJobCost.EstimateNetArea(job, sheet), NestJobCost.NetSheetArea(job, sheet));
+            Assert.Equal(LegacyNestJobCost.EstimateNetArea(cleanJob, sheet), NestJobCost.NetSheetArea(job, sheet));
         Assert.Equal(2500, NestJobCost.UnplacedPartPenalty(job));
-        Assert.Equal(result.Plates.Sum(sheet => LegacyNestJobCost.EstimateNetArea(job, sheet)) + 5000,
+        Assert.Equal(result.Plates.Sum(sheet => LegacyNestJobCost.EstimateNetArea(cleanJob, sheet)) + 5000,
             NestJobCost.Evaluate(job, result));
     }
 
     [Fact]
-    public void ScoringKeepsEtchBoundsEvenThoughMaterialGeometryExcludesThem()
+    public void EtchBeyondMaterialDoesNotShrinkSalvageOffcut()
     {
         var program = TestDrawingFactory.Rectangle(4, 3);
         program.MoveTo(2, 2);
@@ -95,7 +103,7 @@ public class NestJobCostTests
         var sheet = new NestJobPlateResult(0, stock, new[] { new NestJobPlacement("part", 0, 0, 0, 0) });
 
         Assert.Equal(130, LegacyNestJobCost.EstimateNetArea(job, sheet));
-        Assert.Equal(130, NestJobCost.NetSheetArea(job, sheet));
+        Assert.Equal(120, NestJobCost.NetSheetArea(job, sheet));
         Assert.Equal(120, NestJobCost.NetSheetArea(job.Options, stock, JobPartGeometry.Read(part.Geometry).Bounds));
     }
 

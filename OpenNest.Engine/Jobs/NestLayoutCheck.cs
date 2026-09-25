@@ -225,7 +225,7 @@ public static class NestLayoutCheck
 
         foreach (var part in parts)
         {
-            var bb = part.BoundingBox;
+            var bb = MaterialBounds(part);
 
             var outLeft = bb.Left < workArea.X - Tolerance.Epsilon;
             var outBottom = bb.Bottom < workArea.Y - Tolerance.Epsilon;
@@ -338,6 +338,13 @@ public static class NestLayoutCheck
             }
         }
     }
+
+    /// <summary>Analytic world-space material bounds; surface marks never bound material.</summary>
+    internal static Box MaterialBounds(Part part) =>
+        ConvertProgram.ToGeometry(part.Program)
+            .Where(e => SpecialLayers.IsMaterial(e.Layer))
+            .GetBoundingBox()
+            .Translate(part.Location);
 
     private static bool BoxesTouch(Box a, Box b) =>
         a.Left <= b.Right + Tolerance.Epsilon

@@ -3,7 +3,9 @@ using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs;
 
-/// <summary>Shared numerical contract for layout validation.</summary>
+/// <summary>Shared numerical contract for layout validation.
+/// Only material contours (SpecialLayers.IsMaterial) count for bounds, clearance and scoring.
+/// Scribe/etch marks never affect these checks or salvage envelopes, even outside the sheet.</summary>
 public static class NestTolerances
 {
     /// <summary>Arc chord tolerance used by both validators. The layout check circumscribes

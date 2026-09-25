@@ -10,7 +10,7 @@ public static class NestJobCost
     /// <summary>
     /// Sheet area less SalvageRate times the largest usable full-width/full-length edge offcut.
     /// Both offcut dimensions must meet MinimumSalvageDimension, which must be positive.
-    /// Bounds intentionally use Part.BoundingBox (including marks) to preserve benchmark scores.
+    /// Bounds use rotated material contours only; scribe/etch marks never shrink salvage offcuts.
     /// </summary>
     public static double NetSheetArea(NestJob job, NestJobPlateResult sheet)
     {
@@ -26,7 +26,7 @@ public static class NestJobCost
                 part.Rotate(p.Rotation);
                 part.Location = new OpenNest.Geometry.Vector(p.X, p.Y);
                 part.UpdateBounds();
-                return part.BoundingBox;
+                return NestLayoutCheck.MaterialBounds(part);
             })
             .ToList();
         return NetSheetArea(job.Options, sheet.Stock, boxes.Min(b => b.Left),
@@ -35,7 +35,7 @@ public static class NestJobCost
 
     /// <summary>
     /// Computes net area from an existing placed-parts envelope without rebuilding geometry.
-    /// For benchmark parity the envelope must include the same marks as Part.BoundingBox.
+    /// The envelope must contain material only; exclude scribe/etch marks.
     /// Empty sheets should use the sheet overload, which returns their full area.
     /// </summary>
     public static double NetSheetArea(NestJobOptions options, NestPlateStock stock, Box partsEnvelope) =>
