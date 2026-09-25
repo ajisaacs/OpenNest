@@ -102,6 +102,7 @@ MCP server for Claude Code integration. Exposes nesting operations as MCP tools 
 ### OpenNest (WinForms WinExe, depends on Core + Engine + IO)
 The UI application with MDI interface.
 
+- **Auto Nest engine routing**: when the selected engine is not a built-in fill strategy (`EngineSelection.IsFillStrategy` is false, i.e. StockLadder or an `Engines/` plug-in), `MainForm.RunJobEngineAsync` solves the whole job through `INestingEngine.Solve`. `JobEngineNest` builds the `NestJob` from the auto-nest items and either the plate options or the current plate, and it converts `NestJobProgress` for `NestProgressForm`: an engine's `LegacyProgress` passes through, and otherwise the stage and committed counts become the description. It then binds the result poses back onto the nest's own drawings. Whole-job engines throw on cancel, so the progress form hides Accept (`AllowAccept = false`) and Stop discards the run. Built-in strategies keep the existing per-plate fill path.
 - **Forms/**: `MainForm` (MDI parent), `EditNestForm` (MDI child per nest), `SplitDrawingForm` (split oversized drawings into smaller pieces, launched from CadConverterForm), plus dialogs for plate editing, auto-nesting, DXF conversion, cut parameters, etc.
 - **Controls/**: `PlateView` (2D plate renderer with zoom/pan, supports temporary preview parts), `DrawingListBox`, `DrawControl`, `QuadrantSelect`.
 - **Actions/**: User interaction modes — `ActionSelect`, `ActionClone`, `ActionFillArea`, `ActionSelectArea`, `ActionZoomWindow`, `ActionSetSequence`, `ActionCutOff`.

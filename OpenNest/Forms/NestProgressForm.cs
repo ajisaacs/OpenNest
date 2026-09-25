@@ -28,6 +28,16 @@ namespace OpenNest.Forms
 
         public bool Accepted { get; private set; }
 
+        /// <summary>
+        /// False hides "Accept" for solvers that cannot return a partial result on cancellation
+        /// (whole-job engines throw instead).
+        /// </summary>
+        public bool AllowAccept
+        {
+            get => acceptButton.Visible;
+            set => acceptButton.Visible = value;
+        }
+
         public Plate PreviewPlate
         {
             get => previewPlateView.Plate;

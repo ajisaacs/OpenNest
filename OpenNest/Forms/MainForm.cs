@@ -1042,6 +1042,11 @@ namespace OpenNest.Forms
             var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
             progressForm.PreviewPlate = CreatePreviewPlate(activeForm.PlateView.Plate);
 
+            var jobEngineName = EngineSelection.IsFillStrategy(EngineSelection.EngineName)
+                ? null
+                : EngineSelection.EngineName;
+            progressForm.AllowAccept = jobEngineName == null;
+
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
@@ -1058,18 +1063,30 @@ namespace OpenNest.Forms
 
             try
             {
-                await RunAutoNestAsync(
-                    items,
-                    progressForm,
-                    progress,
-                    nestingCts.Token,
-                    plateOptions,
-                    salvageRate,
-                    partFirstMode,
-                    sortOrder,
-                    minRemnantSize,
-                    allowPlateCreation
-                );
+                if (jobEngineName != null)
+                    await RunJobEngineAsync(
+                        jobEngineName,
+                        items,
+                        progressForm,
+                        progress,
+                        nestingCts.Token,
+                        plateOptions,
+                        salvageRate,
+                        minRemnantSize
+                    );
+                else
+                    await RunAutoNestAsync(
+                        items,
+                        progressForm,
+                        progress,
+                        nestingCts.Token,
+                        plateOptions,
+                        salvageRate,
+                        partFirstMode,
+                        sortOrder,
+                        minRemnantSize,
+                        allowPlateCreation
+                    );
             }
             catch (Exception ex)
             {
@@ -1174,6 +1191,73 @@ namespace OpenNest.Forms
 
             activeForm.Nest.UpdateDrawingQuantities();
             progressForm.ShowCompleted();
+        }
+
+        /// <summary>
+        /// Whole-job path for StockLadder and Engines/ plug-ins: the engine owns plate count and
+        /// size selection, reports NestJobProgress into the progress form, and its result is
+        /// committed onto empty or new plates. Cancellation discards the run (engines throw).
+        /// </summary>
+        private async Task RunJobEngineAsync(
+            string engineName,
+            List<NestItem> items,
+            NestProgressForm progressForm,
+            IProgress<NestProgress> progress,
+            CancellationToken token,
+            List<PlateOption> plateOptions,
+            double salvageRate,
+            double minRemnantSize
+        )
+        {
+            const int maxPlates = 100;
+
+            var engine = NestingEngineRegistry.Create(engineName);
+            var job = JobEngineNest.BuildJob(
+                items,
+                activeForm.PlateView.Plate,
+                plateOptions,
+                salvageRate,
+                minRemnantSize,
+                maxPlates,
+                out var drawingsByPartId
+            );
+            var jobProgress = JobEngineNest.CreateProgress(engineName, progress);
+
+            NestJobResult result;
+            try
+            {
+                result = await Task.Run(() => engine.Solve(job, jobProgress, token));
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                activeForm.PlateView.ClearPreviewParts();
+                return;
+            }
+
+            activeForm.PlateView.ClearPreviewParts();
+
+            foreach (var sheet in result.Plates)
+            {
+                var parts = JobEngineNest.CreateParts(sheet, drawingsByPartId);
+                if (parts.Count == 0)
+                    continue;
+
+                var plate = GetOrCreatePlate(progressForm);
+                plate.Size = sheet.Stock.Size;
+                plate.Parts.AddRange(parts);
+            }
+
+            activeForm.PlateView.Invalidate();
+            activeForm.Nest.UpdateDrawingQuantities();
+            progressForm.ShowCompleted();
+
+            if (result.Status != NestJobStatus.Complete)
+                MessageBox.Show(
+                    $"{engineName} could not place every part ({result.StopReason}).",
+                    "Auto Nest",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
         }
 
         private Plate GetOrCreatePlate(NestProgressForm progressForm)
