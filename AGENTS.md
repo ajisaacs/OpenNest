@@ -33,7 +33,7 @@ OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Rel
 
 Only the exact value `1` enables these tests; otherwise they skip. PowerShell: set `$env:OPENNEST_RUN_FILL_PERF = '1'`, run `dotnet test`, then `Remove-Item Env:OPENNEST_RUN_FILL_PERF`.
 
-The category covers comparer, group-pattern, and extents-column workloads. Individual filters: `FullyQualifiedName~GroupPattern_ReportsDefaultAndCustomComparer` or `FullyQualifiedName~Extents_ReportsRepeatedColumnRebuilds`. Keep harness, inputs, warmups and batches identical before/after; exclude setup/assertions from timing. Comparer/extents allocations are synchronous and current-thread only; parallel group fills omit allocation totals. No timing CI gates or whole-job speedup claims. Preserve evidence in [the measured report](docs/performance/fill-performance.md).
+The category covers comparer, group-pattern, rotated-pattern, and extents-column workloads; individual filters match benchmark method names in `FillPerformanceTests.cs`. Keep harness, inputs, warmups and batches identical before/after; exclude setup/assertions from timing. Comparer/extents allocations are synchronous and current-thread only; parallel group fills omit allocation totals. No timing CI gates or whole-job speedup claims. Preserve evidence in [the measured report](docs/performance/fill-performance.md).
 
 Debug behavior/skipped-work checks:
 
@@ -42,7 +42,7 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
   --filter 'FullyQualifiedName~DefaultFillComparerWorkTests|FullyQualifiedName~FillHelpersTests|FullyQualifiedName~FillExtentsTests|FullyQualifiedName~StrategyOverlapTests'
 ```
 
-`PerfCounters.FillScoreComputations` and `PartBoundaryPreparations` increments compile away in Release: zero Release counters prove nothing. Serialize counter assertions in `FillCacheCollection` and reset in `finally`. Keep `OpenNest.Tests/Fill/LegacyFillExtents.cs` frozen for differential tests, not production or before timings; measure the actual baseline production code.
+`PerfCounters.FillScoreComputations`, `PartBoundaryPreparations`, and `PartBoundsUpdates` increments compile away in Release: zero Release counters prove nothing. Serialize counter assertions in `FillCacheCollection` and reset in `finally`. Keep `OpenNest.Tests/Fill/LegacyFillExtents.cs` frozen for differential tests, not production or before timings; measure the actual baseline production code.
 
 ## Architecture
 

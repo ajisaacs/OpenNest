@@ -140,6 +140,66 @@ public class FillPerformanceTests
     }
 
     [SkippableFact]
+    public void RotatedPattern_ReportsBoundsConstruction()
+    {
+        Skip.IfNot(Environment.GetEnvironmentVariable("OPENNEST_RUN_FILL_PERF") == "1",
+            "Set OPENNEST_RUN_FILL_PERF=1 to run opt-in fill microbenchmarks.");
+        var drawing = FillExtentsTests.MakeFixture("arc");
+        var group = Enumerable.Range(0, 32).Select(i =>
+            new Part(drawing, new Vector(11.25 + i % 8 * 12, 13.5 + i / 8 * 10))).ToList();
+        var angles = new[] { 0.0, 0.37 };
+        var builds = angles.Select(angle => new Func<List<Part>>(() =>
+            FillHelpers.BuildRotatedPattern(group, angle).Parts)).ToArray();
+        var expected = angles.Select(angle =>
+            OpenNest.Tests.Strategies.FillHelpersTests.PreChangeRotatedPattern(group, angle).Parts).ToArray();
+        var warmupCalls = 1_000;
+        var callsPerBatch = 5_000;
+        var repetitions = 7;
+#if DEBUG
+        output.WriteLine("Configuration=Debug (diagnostic only; use Release for measurements).");
+#else
+        output.WriteLine("Configuration=Release.");
+#endif
+        output.WriteLine($"Runtime={RuntimeInformation.FrameworkDescription}; OS={RuntimeInformation.OSDescription}; "
+            + $"architecture={RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}; "
+            + $"Stopwatch.Frequency={Stopwatch.Frequency} ticks/s.");
+        output.WriteLine($"rotated-pattern: 32 native-arc parts on an 8-column 12x10 grid from (11.25,13.5); "
+            + $"angle=0 or 0.37; warmup=2 x {warmupCalls}; measured={repetitions} x {callsPerBatch}; "
+            + "angle batch order alternates. Real synchronous production construction only; setup, reference, "
+            + "assertions/output excluded; clone/rotation/aggregate bounds, GC and count consumption included. "
+            + "Warm drawing/JIT; no forced GC/cache reset. Current-thread allocations, not RSS or a whole-job benchmark.");
+        for (var mode = 0; mode < builds.Length; mode++)
+            FillExtentsTests.AssertSameLayout(expected[mode], builds[mode]());
+        for (var batch = 0; batch < 2; batch++)
+            for (var slot = 0; slot < builds.Length; slot++)
+                MeasureExtents(builds[(slot + batch) % builds.Length], warmupCalls);
+        var samples = angles.Select(_ => new ExtentsSample[repetitions]).ToArray();
+        for (var batch = 0; batch < repetitions; batch++)
+        {
+            for (var slot = 0; slot < builds.Length; slot++)
+            {
+                var mode = (slot + batch) % builds.Length;
+                samples[mode][batch] = MeasureExtents(builds[mode], callsPerBatch);
+            }
+            for (var mode = 0; mode < builds.Length; mode++)
+            {
+                var sample = samples[mode][batch];
+                Assert.Equal((long)callsPerBatch * group.Count, sample.PartCount);
+                FillExtentsTests.AssertSameLayout(expected[mode], sample.LastResult);
+                output.WriteLine(FormattableString.Invariant(
+                    $"rotated-pattern angle={angles[mode]} batch={batch + 1}: ms={sample.Milliseconds:F6}; bytes={sample.AllocatedBytes}; parts={sample.PartCount}."));
+            }
+        }
+        for (var mode = 0; mode < builds.Length; mode++)
+        {
+            var times = samples[mode].Select(s => s.Milliseconds).OrderBy(t => t).ToArray();
+            var bytes = samples[mode].Select(s => s.AllocatedBytes).OrderBy(b => b).ToArray();
+            output.WriteLine(FormattableString.Invariant(
+                $"rotated-pattern angle={angles[mode]}: batch ms min/median/max={times[0]:F6}/{times[repetitions / 2]:F6}/{times[^1]:F6}; us/call min/median/max={times[0] * 1000 / callsPerBatch:F3}/{times[repetitions / 2] * 1000 / callsPerBatch:F3}/{times[^1] * 1000 / callsPerBatch:F3}; batch bytes min/median/max={bytes[0]}/{bytes[repetitions / 2]}/{bytes[^1]}; B/call={(double)bytes[repetitions / 2] / callsPerBatch:F3}."));
+        }
+    }
+
+    [SkippableFact]
     public void Extents_ReportsRepeatedColumnRebuilds()
     {
         Skip.IfNot(Environment.GetEnvironmentVariable("OPENNEST_RUN_FILL_PERF") == "1",

@@ -65,6 +65,160 @@ public class FillExtentsTests
     }
 
     [Theory]
+    [MemberData(nameof(DifferentialCases))]
+    public void Fill_Thresholds_MatchPreChangePairFitAndColumnBranches(string shape, double spacing, bool rotated)
+    {
+        var drawing = MakeFixture(shape);
+        var angle = rotated ? System.Math.PI / 6 : 0;
+        var before = Snapshot(drawing);
+        var roomy = new Box(3.1, 5.3, 100, 100);
+        var seed = Invoke(new LegacyFillExtents(roomy, spacing), "BuildPair", drawing, angle);
+        var bbox = PairBounds(seed);
+        // The reference BuildPair is identical to pre-Task-3 production. Task 2's
+        // finite/nonnegative pitch shortcut gives the same column, not different poses.
+        foreach (var axis in new[] { "length", "width", "column" })
+        {
+            foreach (var fits in new[] { false, true })
+            {
+                var delta = fits ? 1e-9 : -1e-9;
+                var length = axis == "length" ? bbox.Length - OpenNest.Math.Tolerance.Epsilon + delta : 100;
+                var width = axis == "width" ? bbox.Width - OpenNest.Math.Tolerance.Epsilon + delta
+                    : axis == "column" ? 2 * bbox.Width + spacing - OpenNest.Math.Tolerance.Epsilon + delta : 100;
+                var area = new Box(roomy.X, roomy.Y, length, width);
+                var areaBefore = Bounds(area);
+                var legacy = new LegacyFillExtents(area, spacing);
+                var filler = new FillExtents(area, spacing);
+                var expectedPair = Invoke(legacy, "BuildPair", drawing, angle);
+                var actualPair = Invoke(filler, "BuildPair", drawing, angle);
+                Assert.Equal(axis == "column" || fits, expectedPair != null);
+                Assert.Equal(expectedPair == null, actualPair == null);
+                if (expectedPair != null)
+                {
+                    AssertPairEqual(expectedPair, actualPair!);
+                    var expectedColumn = (List<Part>)Invoke(legacy, "BuildColumn", expectedPair);
+                    var actualColumn = (List<Part>)Invoke(filler, "BuildColumn", actualPair!);
+                    if (axis == "column")
+                        Assert.Equal(fits ? 4 : 2, expectedColumn.Count);
+                    AssertSameLayout(expectedColumn, actualColumn);
+                }
+                var expectedProgress = new List<List<Part>>();
+                var actualProgress = new List<List<Part>>();
+                var expected = legacy.Fill(drawing, angle, reportProgress: (parts, _) => expectedProgress.Add(parts));
+                var actual = filler.Fill(drawing, angle, reportProgress: (parts, _) => actualProgress.Add(parts));
+                AssertSameLayout(expected, actual);
+                Assert.Equal(expectedProgress.Count, actualProgress.Count);
+                for (var i = 0; i < expectedProgress.Count; i++)
+                    AssertSameLayout(expectedProgress[i], actualProgress[i]);
+                Assert.Equal(areaBefore, Bounds(area));
+                Assert.Equal(before, Snapshot(drawing));
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(DifferentialCases))]
+    public void Fill_AdjacentDoubleThresholds_PreservePairAndColumnDecisions(string shape, double spacing, bool rotated)
+    {
+        var drawing = MakeFixture(shape);
+        var angle = rotated ? System.Math.PI / 6 : 0;
+        var roomy = new Box(3.1, 5.3, 100, 100);
+        var seed = Invoke(new LegacyFillExtents(roomy, spacing), "BuildPair", drawing, angle);
+        var bbox = PairBounds(seed);
+        foreach (var axis in new[] { "length", "width", "column" })
+        {
+            var threshold = (axis == "length" ? bbox.Length : axis == "width" ? bbox.Width
+                : 2 * bbox.Width + spacing) - OpenNest.Math.Tolerance.Epsilon;
+            var decisions = new HashSet<bool>();
+            foreach (var size in AdjacentDoubles(threshold))
+            {
+                var area = new Box(roomy.X, roomy.Y, axis == "length" ? size : 100,
+                    axis == "length" ? 100 : size);
+                var legacy = new LegacyFillExtents(area, spacing);
+                var filler = new FillExtents(area, spacing);
+                var expectedPair = Invoke(legacy, "BuildPair", drawing, angle);
+                var actualPair = Invoke(filler, "BuildPair", drawing, angle);
+                Assert.Equal(expectedPair == null, actualPair == null);
+                if (axis != "column")
+                    decisions.Add(expectedPair != null);
+                if (expectedPair == null)
+                    continue;
+                AssertPairEqual(expectedPair, actualPair!);
+                var expected = (List<Part>)Invoke(legacy, "BuildColumn", expectedPair);
+                var actual = (List<Part>)Invoke(filler, "BuildColumn", actualPair!);
+                AssertSameLayout(expected, actual);
+                if (axis == "column")
+                    decisions.Add(expected.Count == 4);
+            }
+            Assert.Contains(false, decisions);
+            Assert.Contains(true, decisions);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(DifferentialCases))]
+    public void TryShiftDirection_AdjacentWidthThresholds_PreserveAcceptance(string shape, double spacing, bool rotated)
+    {
+        var drawing = MakeFixture(shape);
+        var angle = rotated ? System.Math.PI / 6 : 0;
+        var area = new Box(3.1, 5.3, 100, 100);
+        var legacy = new LegacyFillExtents(area, spacing);
+        var filler = new FillExtents(area, spacing);
+        var expectedPair = Invoke(legacy, "BuildPair", drawing, angle);
+        var actualPair = Invoke(filler, "BuildPair", drawing, angle);
+        foreach (var shift in new[] { -0.3, 0.3 })
+        {
+            // Locate adjacent rejected/accepted doubles using only the frozen pre-change
+            // path; do not derive the oracle from the implementation under test.
+            var rejected = 0.0;
+            var accepted = 100.0;
+            for (var i = 0; i < 64; i++)
+            {
+                var middle = (rejected + accepted) / 2;
+                if (Invoke(legacy, "TryShiftDirection", expectedPair, shift, middle) == null)
+                    rejected = middle;
+                else
+                    accepted = middle;
+            }
+            Assert.Equal(accepted, System.Math.BitIncrement(rejected));
+            foreach (var width in new[] { rejected, accepted })
+            {
+                var expected = Invoke(legacy, "TryShiftDirection", expectedPair, shift, width);
+                var actual = Invoke(filler, "TryShiftDirection", actualPair, shift, width);
+                Assert.Equal(width == accepted, expected != null);
+                Assert.Equal(expected == null, actual == null);
+                if (expected != null)
+                    AssertPairEqual(expected, actual!);
+            }
+        }
+    }
+
+    private static IEnumerable<double> AdjacentDoubles(double value)
+    {
+        yield return value;
+        var lower = value;
+        var upper = value;
+        for (var i = 0; i < 4; i++)
+        {
+            lower = System.Math.BitDecrement(lower);
+            upper = System.Math.BitIncrement(upper);
+            yield return lower;
+            yield return upper;
+        }
+    }
+
+    private static Box PairBounds(object pair) => (Box)pair.GetType().GetProperty("Bbox")!.GetValue(pair)!;
+
+    private static void AssertPairEqual(object expected, object actual)
+    {
+        Assert.Equal(Bounds(PairBounds(expected)), Bounds(PairBounds(actual)));
+        var expectedParts = new[] { "Part1", "Part2" }.Select(name =>
+            (Part)expected.GetType().GetProperty(name)!.GetValue(expected)!).ToList();
+        var actualParts = new[] { "Part1", "Part2" }.Select(name =>
+            (Part)actual.GetType().GetProperty(name)!.GetValue(actual)!).ToList();
+        AssertSameLayout(expectedParts, actualParts);
+    }
+
+    [Theory]
     [InlineData(5, 5)]
     [InlineData(15, 10)] // One rectangle fits, the pair does not.
     public void Fill_NoFit_MatchesFrozenLegacy(double length, double width)
@@ -188,6 +342,35 @@ public class FillExtentsTests
     [Theory]
     [InlineData(0.0)]
     [InlineData(0.5)]
+    public void Fill_BoundsWork_PerformsFewerUpdates(double spacing)
+    {
+        var area = new Box(3, 5, 45, 27);
+        var drawing = MakeFixture("triangle");
+        PerfCounters.Reset();
+        try
+        {
+            // Task 2 removed boundary preparation, not Part.UpdateBounds calls, so
+            // this frozen baseline has the pre-Task-3 full-fill bounds-update count.
+            var expected = new LegacyFillExtents(area, spacing).Fill(drawing);
+            var before = PerfCounters.PartBoundsUpdates;
+            PerfCounters.Reset();
+            var actual = new FillExtents(area, spacing).Fill(drawing);
+            var after = PerfCounters.PartBoundsUpdates;
+            output.WriteLine($"bounds spacing={spacing}: before={before}, actual={after}, parts={actual.Count}");
+            AssertSameLayout(expected, actual);
+            Assert.Equal(13, before);
+            Assert.True(after < before, $"Expected fewer than {before} part bounds updates, actual {after}.");
+            Assert.Equal(10, after);
+        }
+        finally
+        {
+            PerfCounters.Reset();
+        }
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(0.5)]
     public void BuildColumn_RepeatedCalls_DoNotPrepareBoundaries(double spacing)
     {
         var area = new Box(3, 5, 45, 27);
@@ -284,7 +467,8 @@ public class FillExtentsTests
         for (var i = 0; i < expected.Count; i++)
         {
             Assert.Same(expected[i].BaseDrawing, actual[i].BaseDrawing);
-            Assert.Equal(expected[i].Location, actual[i].Location);
+            Assert.Equal((expected[i].Location.X, expected[i].Location.Y),
+                (actual[i].Location.X, actual[i].Location.Y));
             Assert.Equal(expected[i].Rotation, actual[i].Rotation);
             Assert.Equal(Bounds(expected[i].BoundingBox), Bounds(actual[i].BoundingBox));
             Assert.Equal(ProgramValues(expected[i].Program), ProgramValues(actual[i].Program));
@@ -315,12 +499,12 @@ public class FillExtentsTests
         {
             values.Add(code.GetType());
             if (code is Motion motion)
-                values.Add(motion.EndPoint);
+                values.Add((motion.EndPoint.X, motion.EndPoint.Y));
             if (code is LinearMove line)
                 values.Add(line.Layer);
             if (code is ArcMove arc)
             {
-                values.Add(arc.CenterPoint);
+                values.Add((arc.CenterPoint.X, arc.CenterPoint.Y));
                 values.Add(arc.Rotation);
                 values.Add(arc.Layer);
             }

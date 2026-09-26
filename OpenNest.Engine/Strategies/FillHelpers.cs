@@ -18,6 +18,8 @@ namespace OpenNest.Engine.Strategies
             foreach (var part in groupParts)
             {
                 var clone = (Part)part.Clone();
+                // Keep the recompute: at angle 0, accumulated source translations can
+                // leave a different cached box than Program.BoundingBox() + Location.
                 clone.UpdateBounds();
 
                 if (!angle.IsEqualTo(0))

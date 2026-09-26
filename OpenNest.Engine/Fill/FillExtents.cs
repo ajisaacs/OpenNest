@@ -80,8 +80,8 @@ namespace OpenNest.Engine.Fill
             // Position part2 to the right of part1 at bounding box width distance.
             var startOffset = part1.BoundingBox.Length + part2.BoundingBox.Length + partSpacing;
             part2.Offset(startOffset, 0);
-            part2.UpdateBounds();
 
+            // Slide uses locations, not cached bounds; Offset already translates the box.
             // Slide part2 left toward part1.
             var movingLines = boundary2.GetLines(part2.Location, PushDirection.Left);
             var stationaryLines = boundary1.GetLines(part1.Location, PushDirection.Right);
@@ -94,7 +94,6 @@ namespace OpenNest.Engine.Fill
             if (dist < double.MaxValue && dist > 0)
             {
                 part2.Offset(-dist, 0);
-                part2.UpdateBounds();
             }
 
             var pair = AnchorToWorkArea(part1, part2);
@@ -318,9 +317,9 @@ namespace OpenNest.Engine.Fill
 
             // Separate: shift part2 right so bounding boxes don't touch.
             p2.Offset(partSpacing, 0);
-            p2.UpdateBounds();
 
-            // Apply the vertical shift.
+            // Apply the vertical shift. Recompute once after both offsets: Compactor's
+            // box-based thresholds require the original rounding, not accumulated translates.
             p2.Offset(0, verticalShift);
             p2.UpdateBounds();
 
@@ -361,6 +360,8 @@ namespace OpenNest.Engine.Fill
             var anchor = new Vector(workArea.X - bbox.Left, workArea.Y - bbox.Bottom);
             part1.Offset(anchor);
             part2.Offset(anchor);
+            // Keep these recomputations: translating the cached boxes can differ by an
+            // ulp, changing exact layouts and the pair-fit/column-tiling thresholds.
             part1.UpdateBounds();
             part2.UpdateBounds();
 

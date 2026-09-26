@@ -206,6 +206,7 @@ namespace OpenNest
         /// </summary>
         public void UpdateBounds()
         {
+            PerfCounters.CountPartBoundsUpdate();
             BoundingBox = Program.BoundingBox();
             BoundingBox.Offset(Location);
         }

@@ -12,6 +12,86 @@ namespace OpenNest.Tests.Strategies;
 public class FillHelpersTests
 {
     [Theory]
+    [InlineData("accumulated-translation", 0.0)]
+    [InlineData("accumulated-translation", 0.37)]
+    [InlineData("translated", 0.0)]
+    [InlineData("translated", 0.37)]
+    [InlineData("pre-rotated", 0.0)]
+    [InlineData("pre-rotated", 0.37)]
+    [InlineData("canonical", 0.0)]
+    [InlineData("canonical", 0.37)]
+    [InlineData("arc", 0.0)]
+    [InlineData("arc", 0.37)]
+    [InlineData("nonzero-program-origin", 0.0)]
+    [InlineData("nonzero-program-origin", 0.37)]
+    public void BuildRotatedPattern_MatchesPreChangePosesBoundsAndOwnership(string scenario, double angle)
+    {
+        var drawing = OpenNest.Tests.Fill.FillExtentsTests.MakeFixture(scenario == "arc" ? "arc" : "concave");
+        if (scenario is "pre-rotated" or "canonical")
+            drawing.Program.Rotate(0.6);
+        double canonicalAngle = 0;
+        if (scenario == "canonical")
+        {
+            // Program.Rotate mutates in place; refresh the canonical angle the same way
+            // a rotated CAD import carries it, or AsCanonicalCopy takes the zero-angle path.
+            drawing.RecomputeCanonicalAngle();
+            canonicalAngle = drawing.Source.Angle;
+            Assert.False(OpenNest.Math.Tolerance.IsEqualTo(canonicalAngle, 0));
+            drawing = CanonicalFrame.AsCanonicalCopy(drawing);
+            Assert.Equal(0.0, drawing.Source.Angle);
+        }
+        if (scenario == "accumulated-translation")
+            drawing.Program.Offset(new Vector(0.1, 0.1));
+        if (scenario == "nonzero-program-origin")
+            drawing.Program.Offset(new Vector(0.125, -0.375));
+        var group = new List<Part>
+        {
+            new(drawing, new Vector(11.25, 13.5)),
+            new(drawing, new Vector(31.75, 27.25)),
+        };
+        if (scenario == "translated")
+            foreach (var part in group)
+                part.Offset(3.5, -2.25);
+        if (scenario == "accumulated-translation")
+        {
+            group = new List<Part> { new(drawing, new Vector(0.1, 0.1)) };
+            group[0].Offset(1.1, 1.1);
+        }
+        var before = Snapshot(group);
+        var expected = PreChangeRotatedPattern(group, angle);
+        var actual = FillHelpers.BuildRotatedPattern(group, angle);
+        OpenNest.Tests.Fill.FillExtentsTests.AssertSameLayout(expected.Parts, actual.Parts);
+        Assert.Equal(Bounds(expected.BoundingBox), Bounds(actual.BoundingBox));
+        AssertNoInputPartsReturned(group, actual.Parts);
+        Assert.Equal(before, Snapshot(group));
+        for (var i = 0; i < group.Count; i++)
+        {
+            Assert.NotSame(group[i].Program, actual.Parts[i].Program);
+            // Clone must not reapply the baked drawing rotation before adding the angle.
+            // Normalize both sides: a baked canonical rotation can already sit at exactly 2pi.
+            Assert.Equal(OpenNest.Math.Angle.NormalizeRad(group[i].Rotation + angle),
+                OpenNest.Math.Angle.NormalizeRad(actual.Parts[i].Rotation));
+        }
+    }
+
+    // The exact pre-Task-3 helper, kept local to characterization, never used for timings.
+    internal static Pattern PreChangeRotatedPattern(List<Part> group, double angle)
+    {
+        var pattern = new Pattern();
+        var center = ((IEnumerable<IBoundable>)group).GetBoundingBox().Center;
+        foreach (var part in group)
+        {
+            var clone = (Part)part.Clone();
+            clone.UpdateBounds();
+            if (!OpenNest.Math.Tolerance.IsEqualTo(angle, 0))
+                clone.Rotate(angle, center);
+            pattern.Parts.Add(clone);
+        }
+        pattern.UpdateBounds();
+        return pattern;
+    }
+
+    [Theory]
     [InlineData(5, 9, 8, 7)]
     [InlineData(10, 4, 7, 8)]
     [InlineData(5, 4, 3, 3)]
@@ -186,6 +266,30 @@ public class FillHelpersTests
 
 #if DEBUG
     [Theory]
+    [InlineData(0.0, 2)]
+    [InlineData(0.37, 4)]
+    public void BuildRotatedPattern_BoundsWork_RetainsRequiredCloneRecomputation(double angle, long expectedUpdates)
+    {
+        var group = MakeGroup();
+        var expected = PreChangeRotatedPattern(group, angle);
+        PerfCounters.Reset();
+        try
+        {
+            var pattern = FillHelpers.BuildRotatedPattern(group, angle);
+            // Removing the clone recompute changes accumulated-translation boxes at angle 0.
+            // This site was retained, not optimized. Pattern.UpdateBounds aggregates boxes;
+            // it does not call Part.UpdateBounds and remains outside this counter.
+            Assert.Equal(expectedUpdates, PerfCounters.PartBoundsUpdates);
+            AssertSameLayout(expected.Parts, pattern.Parts);
+            Assert.Equal(Bounds(expected.BoundingBox), Bounds(pattern.BoundingBox));
+        }
+        finally
+        {
+            PerfCounters.Reset();
+        }
+    }
+
+    [Theory]
     [InlineData(5, 9, 0, 2)]
     [InlineData(5, 9, 1, 0)]
     [InlineData(10, 4, 1, 0)]
@@ -231,7 +335,8 @@ public class FillHelpersTests
         for (var i = 0; i < expected.Count; i++)
         {
             Assert.Same(expected[i].BaseDrawing, actual[i].BaseDrawing);
-            Assert.Equal(expected[i].Location, actual[i].Location);
+            Assert.Equal((expected[i].Location.X, expected[i].Location.Y),
+                (actual[i].Location.X, actual[i].Location.Y));
             Assert.Equal(expected[i].Rotation, actual[i].Rotation);
             Assert.Equal(Bounds(expected[i].BoundingBox), Bounds(actual[i].BoundingBox));
         }
@@ -270,7 +375,7 @@ public class FillHelpersTests
             values.Add(part);
             values.Add(part.BaseDrawing);
             values.Add(part.BaseDrawing.Area);
-            values.Add(part.Location);
+            values.Add((part.Location.X, part.Location.Y));
             values.Add(part.Rotation);
             values.Add(Bounds(part.BoundingBox));
             foreach (var program in new[] { part.Program, part.BaseDrawing.Program })
@@ -282,7 +387,13 @@ public class FillHelpersTests
                 {
                     values.Add(code);
                     if (code is Motion motion)
-                        values.Add(motion.EndPoint);
+                        values.Add((motion.EndPoint.X, motion.EndPoint.Y));
+                    if (code is ArcMove arc)
+                    {
+                        values.Add((arc.CenterPoint.X, arc.CenterPoint.Y));
+                        values.Add(arc.Rotation);
+                        values.Add(arc.Layer);
+                    }
                 }
             }
         }

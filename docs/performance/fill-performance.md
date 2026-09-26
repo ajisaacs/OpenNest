@@ -365,3 +365,107 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
 For an independent before/after comparison, keep the delivered tests/diagnostics identical in two disposable trees and use the baseline `FillExtents.cs` only in the before tree. Rebuild each configuration and verify the source/harness hashes. Do not change production spacing policy to reproduce invalid-domain cases or substitute the frozen test type for the measured production method.
 
 Final logs, TRX files, source restoration snapshot, manifests, and parsed rows were held in `/home/aj/.hermes/cache/scratch/opennest-task2-resume-20260925/` through review. The report preserves all final timing rows, allocation totals, source hashes, runtime and test summaries; temporary evidence and the superseded resumed exploration directory are removed before commit. Next planned hardening is the separately reviewable redundant-bounds slice with threshold-fit and canonical-frame safety, not a geometry repair bundled into this change.
+
+## Task 3 — remove provably redundant bounds walks — 2026-09-25
+
+### Scope and per-site decisions
+
+`Part.Offset` translates the cached `BoundingBox` arithmetically and `Part.Clone` copies it exactly, so several `UpdateBounds()` calls in the extents/pattern paths recompute a box that just changed by pure translation. Recomputation is mathematically equivalent but not bitwise identical to accumulated translates, and the extents pipeline compares boxes at `Tolerance.Epsilon` fit thresholds. Each candidate removal therefore had to keep every characterized layout, box, and threshold branch bitwise identical (the differential harness compares `(X, Y, Length, Width)` and location tuples with exact `double` equality, not tolerance — `Vector.Equals` itself is tolerance-based, so location/coordinate snapshots were switched to scalar tuples to expose ulp deltas).
+
+| Site | Decision | Evidence |
+| --- | --- | --- |
+| `BuildPair` after `Offset(startOffset, 0)` | Removed | All characterization green; slide uses locations, not cached bounds. |
+| `BuildPair` after `Offset(-dist, 0)` | Removed | All characterization green. |
+| `TryShiftDirection` after `Offset(partSpacing, 0)` | Removed | The retained post-vertical-shift recompute covers both offsets. |
+| `TryShiftDirection` after `Offset(0, verticalShift)` | Retained | Rotated triangle spacing 0.5: box Y `5.6025660004937174` → `5.6025660004937183`. `Compactor.Push` box thresholds consume this box. |
+| `AnchorToWorkArea` part1/part2 recompute | Retained | Part2-only removal changed rectangle differential X `13.499999999999998` → `13.5` and arc pair height `8.0000000000000036` → `8`; part1 removal changed X `3.1000000000000005` → `3.100000000000001`. Part1-only removal failed 6 of 101 characterization cases; part2-only removal failed 25 of 101, including overlap fallback. The anchor `workArea.X - bbox.Left` round-trip lands a ulp away from `X += anchor`. |
+| `BuildRotatedPattern` after `Clone()` | Retained | Accumulated-translation input at angle 0: box `1.3000000000000003` → `1.3`. Source comments now record why each retained site stays. |
+
+No change to `Part.Offset`, `Part.Clone`, `Part.Rotate`, `Part.UpdateBounds`, `PairBbox`, `pattern.UpdateBounds()`, the Task 2 pitch guard, or `LegacyFillExtents.cs` (frozen SHA-256 `b50b3b64014446d9688facc0b711b59cf126b64037fdf667603ce3d85859a324` unchanged). `PerfCounters.PartBoundsUpdates` (Debug-only, incremented at the top of `Part.UpdateBounds`) was added per the plan.
+
+### Source and measurement provenance
+
+- Base: `4ec92c95ec10c5c877e9fb0f34f197d7e23b87b0` on `master`. Final implementation is delivered with this report; resolve with `git log -1 --format=%H -- OpenNest.Engine/Fill/FillExtents.cs`.
+- `FillExtents.cs` SHA-256 before `efaacfca83a6d94bb7fdc65ba4da4be09c97c14c9c4e161491d48d64a69d1be3` (Task 2 delivered) → after `13be137690ad5f60e0fe3874ec0cb0b93e9864b97d7eee7f3aa65c9b962053a4`.
+- `FillHelpers.cs` before `a1c8a1bc155dbe62439f8345a3a54e06147a5404a6a46835a30b66d52cceccfa` → after `0a35075a573c7f17f9c8095a5a7bd56d0a4ea935ec1c9d8da2c4c9d78e0a9af0` (comment-only; site retained).
+- Identical before/after harness `FillPerformanceTests.cs` SHA-256 `93ec06c5b59aecfe5cb9311380afea507cc134e77df7535036fb451ab0f63e29`.
+- Before timings ran the actual pre-change production files (restored temporarily, restored back in `finally`); after timings the delivered files. Same machine, serial Release: `hermes`, Ubuntu 24.04.5 LTS x64, KVM, four vCPUs presented as AMD Ryzen 9 5900X, SDK 10.0.112, .NET 8.0.31, 1 GHz stopwatch. Shared VM, no pinning.
+
+### Work-removal evidence (genuine red/green)
+
+New Debug counter tests (serialized in `FillCacheCollection`, reset in `finally`) failed first on the unmodified production code: `Fill_BoundsWork_PerformsFewerUpdates` expected fewer than 13 part-bounds updates, actual 13 (both spacings); the group-construction work assertion expected 0/2 updates at angles 0/0.37, actual 2/4. After the change: full triangle fill 13 → 10 updates with 24 bitwise-identical parts (both spacings). The group assertions were rewritten to pin the retained counts (2 at angle 0, 4 at 0.37 = retained clone recompute + rotate recompute per part) because removing the clone recompute failed behavior characterization — disclosed partial delivery, not an optimized site. `Pattern.UpdateBounds` aggregates boxes and does not call `Part.UpdateBounds`, so it is outside this counter. Per fill the three removals save three `UpdateBounds` calls (three `Box` allocations — 144 bytes) reproduced exactly in every measured batch.
+
+### Characterization added (all passing pre-change, 133 targeted Release)
+
+- 16 extents threshold cases: pair-fit, column-tiling, and column-count branches on both sides of `Tolerance.Epsilon`, nonzero work-area origin, progress layouts, input snapshots.
+- 16 adjacent-double pair/column cases (`BitIncrement`/`BitDecrement` neighborhoods with asserted both-side decisions) and 16 adjacent-double `TryShiftDirection` width-acceptance cases (binary-searched rejected/accepted doubles located using only the frozen pre-change path, ±shifts).
+- 12 `BuildRotatedPattern` cases: translated, accumulated-translation, pre-rotated, canonical-frame, native-arc, and nonzero-program-origin groups at angles 0 and 0.37, checking exact poses/bounds against a local pre-change reference, input non-mutation, clone program ownership, and no double rotation of pre-rotated inputs.
+- Frozen-legacy differentials, threshold branch equality, and the retained-site RED logs (`task3-site-*.log`) reconcile the per-site table above.
+
+### Tests (parent independently reran the full suites on the final tree)
+
+| Suite | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Targeted Release (`FillExtentsTests|FillHelpersTests|CanonicalFrameTests|StripeFillerTests`) | 133 | 0 | 0 |
+| AGENTS.md Debug work filter | 137 | 0 | 0 |
+| Full main Release | 1266 | 16 | 0 |
+| Full main Debug | 1283 | 16 | 0 |
+| Full engine Release | 300 | 0 | 0 |
+
+Skips are the 12 optional CHR-font fixtures plus four opt-in benchmarks (the new rotated-pattern case adds one). Gate verified: unset and `0` skip all category tests. `.NET 8.0.31` adapters confirmed. Changed-file `dotnet format whitespace --verify-no-changes` and `git diff --check` passed; no new production warnings.
+
+### Reviews
+
+Implementation, spec review, and quality/integration review ran as three independent agent sessions (the earlier same-agent serial constraint was lifted by the user for this session). Spec review initially found one Important issue — the canonical fixture consumed a stale `Source.Angle` and duplicated the pre-rotated scenario — plus one Minor report-wording error; both were fixed (fixture now refreshes the canonical angle and asserts a nonzero source-to-canonical transformation; the failure counts are stated as 6/101 and 25/101), and the strengthened fixture additionally surfaced a benign test-assertion normalization issue at a baked 2π rotation, fixed by normalizing both sides. Subsequent independent quality/integration review returned PASS with no Critical, Important, or Minor findings: production diff traced through slide/Compactor consumers, counter isolation, adjacent-double oracle independence, hash/median/allocation reconciliation against raw logs, integration sweep across fill-strategy and jobs callers, and disclosure honesty were all verified by that reviewer. Pre-existing DXF-fixture-dependent tests still return early without their Windows fixture; no Windows UI runtime test or ONNX inference was run.
+
+### Results
+
+All before/after timing ranges overlap: elapsed-time improvement is inconclusive, consistent with three saved `Program.BoundingBox()` walks being small against full fills. Allocation savings are exact and reproduce in every batch: extents spacing 0 `839,624` → `839,480` bytes/fill and spacing 0.5 `1,028,544` → `1,028,400` bytes/fill (−144 B/fill). Rotated-pattern construction is an unchanged-code control: identical allocations per call at both angles.
+
+Extents: milliseconds per 200 production fills, seven batches each, alternating spacing order, warmup excluded. Rotated-pattern: milliseconds per 5,000 constructions of a 32-part native-arc group.
+
+| Workload | Batch | Before ms | After ms |
+| --- | ---: | ---: | ---: |
+| extents spacing 0 | 1 | 461.646777 | 502.378600 |
+| extents spacing 0 | 2 | 439.442203 | 446.609639 |
+| extents spacing 0 | 3 | 450.272109 | 457.012036 |
+| extents spacing 0 | 4 | 433.095759 | 454.402604 |
+| extents spacing 0 | 5 | 443.489319 | 447.382522 |
+| extents spacing 0 | 6 | 433.504166 | 448.477156 |
+| extents spacing 0 | 7 | 441.588374 | 439.879594 |
+| extents spacing 0.5 | 1 | 460.691045 | 439.973796 |
+| extents spacing 0.5 | 2 | 457.895526 | 443.225746 |
+| extents spacing 0.5 | 3 | 444.315207 | 451.898487 |
+| extents spacing 0.5 | 4 | 436.733945 | 447.851680 |
+| extents spacing 0.5 | 5 | 451.266260 | 431.428815 |
+| extents spacing 0.5 | 6 | 438.338321 | 455.657180 |
+| extents spacing 0.5 | 7 | 448.995034 | 438.982789 |
+| rotated-pattern angle 0 | 1 | 92.121779 | 95.085965 |
+| rotated-pattern angle 0 | 2 | 85.115166 | 83.764479 |
+| rotated-pattern angle 0 | 3 | 84.692335 | 82.859009 |
+| rotated-pattern angle 0 | 4 | 90.233547 | 85.003329 |
+| rotated-pattern angle 0 | 5 | 85.081651 | 83.281808 |
+| rotated-pattern angle 0 | 6 | 78.809908 | 77.355562 |
+| rotated-pattern angle 0 | 7 | 78.280977 | 80.372130 |
+| rotated-pattern angle 0.37 | 1 | 184.337007 | 186.875744 |
+| rotated-pattern angle 0.37 | 2 | 170.493990 | 155.509393 |
+| rotated-pattern angle 0.37 | 3 | 153.992846 | 155.681698 |
+| rotated-pattern angle 0.37 | 4 | 155.207434 | 156.663232 |
+| rotated-pattern angle 0.37 | 5 | 158.498327 | 149.814054 |
+| rotated-pattern angle 0.37 | 6 | 157.148604 | 150.090405 |
+| rotated-pattern angle 0.37 | 7 | 150.252399 | 150.547539 |
+
+Medians: extents spacing 0 2207.942 → 2242.386 µs/call, spacing 0.5 2244.975 → 2216.129 µs/call; rotated-pattern angle 0 17.016 → 16.656 µs/call, angle 0.37 31.430 → 31.102 µs/call. Every batch produced the expected part counts (extents 4,800; rotated-pattern 160,000) and layout assertions ran on the timed path's output outside timing. Current-thread synchronous allocations only; no whole-job or RSS claims.
+
+### Reproduction and limitations
+
+```bash
+OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'Category=FillPerformance' --logger 'console;verbosity=detailed'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~FillExtentsTests|FullyQualifiedName~FillHelpersTests|FullyQualifiedName~CanonicalFrameTests|FullyQualifiedName~StripeFillerTests'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
+  --filter 'FullyQualifiedName~DefaultFillComparerWorkTests|FullyQualifiedName~FillHelpersTests|FullyQualifiedName~FillExtentsTests|FullyQualifiedName~StrategyOverlapTests'
+```
+
+This is a partial delivery by design: three of six candidate recomputations were removable; the three retained sites are documented with their observed ulp deltas, and their `UpdateBounds` calls must not be removed without re-running the threshold and overlap-fallback characterization. Timing is inconclusive; only allocation and work-counter removal are demonstrated. No representative production corpus, Windows UI runtime test, or ONNX inference was run. Task 4 and gated follow-ups are not included.
