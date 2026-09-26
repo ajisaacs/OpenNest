@@ -67,6 +67,23 @@ internal static class TestHelpers
         return new Drawing("square", pgm);
     }
 
+    public static Drawing MakeFrameDrawing(double w = 20, double h = 6, double t = 0.5)
+    {
+        // Thin-walled hollow frame: outer CW, inner cutout CCW (CNC convention).
+        var pgm = new Program();
+        pgm.Codes.Add(new RapidMove(new Vector(0, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, h)));
+        pgm.Codes.Add(new LinearMove(new Vector(w, h)));
+        pgm.Codes.Add(new LinearMove(new Vector(w, 0)));
+        pgm.Codes.Add(new LinearMove(new Vector(0, 0)));
+        pgm.Codes.Add(new RapidMove(new Vector(t, t)));
+        pgm.Codes.Add(new LinearMove(new Vector(w - t, t)));
+        pgm.Codes.Add(new LinearMove(new Vector(w - t, h - t)));
+        pgm.Codes.Add(new LinearMove(new Vector(t, h - t)));
+        pgm.Codes.Add(new LinearMove(new Vector(t, t)));
+        return new Drawing("frame", pgm);
+    }
+
     public static Drawing MakeLShapeDrawing()
     {
         // CW winding matches CNC convention (OffsetSide.Left = outward)

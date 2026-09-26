@@ -7,7 +7,14 @@ namespace OpenNest.Engine.BestFit
         public double MaxPlateWidth { get; set; }
         public double MaxPlateHeight { get; set; }
         public double MaxAspectRatio { get; set; } = 5.0;
-        public double MinUtilization { get; set; } = 0.3;
+
+        /// <summary>
+        /// A high-aspect pair is kept anyway when this much of its rotated bounding box is
+        /// actual part area. Utilization is only ever an exception here, never a rejection:
+        /// thin-framed, hollow, or concave (e.g. S-shaped) parts have inherently low
+        /// part-to-bbox utilization, yet can nest tightly — their quality is judged by the
+        /// pair bounding-box area the results are sorted on, not by utilization.
+        /// </summary>
         public double UtilizationOverride { get; set; } = 0.75;
 
         public void Apply(List<BestFitResult> results)
@@ -36,16 +43,6 @@ namespace OpenNest.Engine.BestFit
                         "Aspect ratio {0:F1} exceeds max {1}",
                         aspect,
                         MaxAspectRatio
-                    );
-                    continue;
-                }
-
-                if (result.Utilization < MinUtilization)
-                {
-                    result.Keep = false;
-                    result.Reason = string.Format(
-                        "Utilization {0:P0} below minimum",
-                        result.Utilization
                     );
                     continue;
                 }
