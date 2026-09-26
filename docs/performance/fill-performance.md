@@ -469,3 +469,66 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
 ```
 
 This is a partial delivery by design: three of six candidate recomputations were removable; the three retained sites are documented with their observed ulp deltas, and their `UpdateBounds` calls must not be removed without re-running the threshold and overlap-fallback characterization. Timing is inconclusive; only allocation and work-counter removal are demonstrated. No representative production corpus, Windows UI runtime test, or ONNX inference was run. Task 4 and gated follow-ups are not included.
+
+## Task 4a — scalar-only feature extraction — 2026-09-25
+
+### Scope
+
+`FeatureExtractor.Extract` always built a 32×32 bitmask — 1024 `Polygon.ContainsPoint` ray-cast tests plus a 1,024-byte array — even though the only production consumer at runtime (the `AngleCandidateBuilder` ML branch) reads nothing from `PartFeatures.Bitmask`. This slice adds `Extract(Drawing, bool includeBitmask)`; the original one-argument signature is preserved as a source- and binary-compatible wrapper that keeps the training bitmap. Every scalar formula, tolerance, material filter, and the canonical-frame normalization run identically in both modes. Training consumers (`OpenNest.Training`) are unchanged, and `AngleCandidateBuilder` is not yet switched over — Task 4b gates the inference call site. No production behavior changes for any existing caller.
+
+`PerfCounters.FeatureBitmaskCells` (Debug-only, incremented inside the bitmask scan loop) was added to prove the point-in-polygon work is genuinely skipped.
+
+### Source provenance
+
+- Base: `6863c8bdb1c7d98eb5b7c45153e062e7cb335464` on `master`. Final implementation is delivered with this report.
+- `FeatureExtractor.cs` SHA-256 before `1094d386595c0513fcb6db1e5ba7b2c7a0b8c19cf351f6cf9a462356156fdd15` → after `2d7b45350abd94d7e728c962aca06f4a86920d0328d8025c75f51ebc7e5ed6b3`.
+- `PerfCounters.cs` before `0790401ae0433e416c4ac40d678403407497226d6bd40057b7c4e959da6e0582` → after `b596437210719981940ebf7ae03b31b7493f44002cf545bbe638c35bebf5b65d`.
+- Harness `FillPerformanceTests.cs` at measurement time: before/after runs identical at `c257b27a5a4335278c99b8f623540b5580b51d1cc9d31a04bc8d8641a9c722a0` (new method added to base `93ec06c5b59aecfe5cb9311380afea507cc134e77df7535036fb451ab0f63e29`; existing methods byte-identical). The delivered tree ships `27c213f202e46cdd9a1e46bb0263784277f2aecc17469ddd83c5db26c1b129aa` — disclosure/comment wording only, timed code paths identical.
+- Environment: same shared KVM VM as prior slices — Ubuntu 24.04.5 LTS x64, four vCPUs presented as AMD Ryzen 9 5900X, SDK 10.0.112, .NET 8.0.31 adapters confirmed, 1 GHz stopwatch, serial Release.
+
+### Work-removal evidence (genuine red/green)
+
+The change is additive, so red was demonstrated by neutralizing the new flag in the delivered overload (forcing always-bitmap construction — exactly the original production behavior): on the final tree 8 of 38 Debug cases failed — the five `ScalarOnlyOverload_OmitsBitmap` theory cases, `ScribeAndRapidMarks_DoNotAffectEitherOverload`, and `RotatedInput_FeaturesMatchAxisAlignedEquivalent` with `Assert.Null() Failure: Value is not null`, plus `ScalarOnlyOverload_RunsNoBitmaskCellScan` failing the same assertion inside its counted window. Restoring the flag turned all 38 Debug tests green. On the delivered tree: default extraction counts exactly 1,024 bitmask cells per call (matching the documented scan), scalar-only counts 0, and failed extraction (rapid-only program) counts 0.
+
+New `OpenNest.Tests/ML/FeatureExtractorTests.cs` (35 behavior cases plus 3 Debug counter cases, serialized in `FillCacheCollection` for the counter tests): exact-equality scalar snapshots across both overloads on five shapes (rectangle, right triangle, L-shape concave profile, native-arc ring, native circle); explicit-true bitmap equality bit-for-bit against the default overload; default training-bitmap shape/content preservation (1,024 cells, 0/1 only, mixed for ring/L-shape, all-set for a full rectangle); rotated-input invariance against an axis-aligned equivalent; canonical-copy input; scribe/rapid marks ignored by both overloads with identical bitmaps; input non-mutation; determinism across repeated extraction. Because `ExplicitTrue_MatchesDefaultOverloadBitForBit` alone cannot detect a rasterization change applied to both overloads (the default delegates to it), the five fixtures are additionally pinned against frozen SHA-256 hashes of the bitmaps emitted by the actual pre-change implementation at `6863c8b` (captured by running the original code, cross-checked by the spec reviewer against an in-memory HEAD compilation). Pre-existing edge behavior is characterized, not changed: rapid-only drawings throw `ArgumentOutOfRangeException` in `ShapeProfile` and null drawings throw `NullReferenceException` identically through both overloads.
+
+### Tests
+
+| Suite | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Targeted Release (`FeatureExtractorTests|CanonicalFrameTests`) | 40 | 0 | 0 |
+| Targeted Debug (`FeatureExtractorTests`) | 38 | 0 | 0 |
+| Full main Release | 1,301 | 17 | 0 |
+| Full main Debug | 1,321 | 17 | 0 |
+| Full engine Release | 300 | 0 | 0 |
+
+Skips: 12 optional CHR-font fixtures plus five opt-in benchmarks (the new feature-extraction case adds one). Gate verified: unset skips all five category tests. Changed-file `dotnet format whitespace --verify-no-changes` and `git diff --check` passed; no new production warnings.
+
+### Results
+
+Same-harness, same-machine, serial Release; ring OD=20 ID=8 (perimeter plus one circular cutout); warmup 2×200, measured 7×1,000 calls, alternating mode order, correctness checks outside timing; allocations are current-thread synchronous only. The before run exercised the original always-bitmap implementation in both modes (harness scalar lambda temporarily pointed at the full path); the after run is the delivered tree.
+
+| Batch | Before full ms / B | Before scalar-mode ms / B | After full ms / B | After scalar-only ms / B |
+| ---: | --- | --- | --- | --- |
+| 1 | 154.692010 / 35,338,120 | 154.066548 / 35,332,896 | 197.474351 / 35,338,120 | 31.020699 / 34,252,896 |
+| 2 | 161.643928 / 35,338,120 | 151.896080 / 35,332,896 | 157.026495 / 35,332,896 | 29.342949 / 34,252,896 |
+| 3 | 149.279498 / 35,332,896 | 155.797847 / 35,332,896 | 154.219132 / 35,332,896 | 32.988987 / 34,268,256 |
+| 4 | 153.772483 / 35,332,896 | 153.226512 / 35,332,896 | 161.453458 / 35,332,688 | 41.092334 / 34,252,688 |
+| 5 | 155.591257 / 35,338,120 | 155.760388 / 35,332,896 | 151.984770 / 35,332,688 | 30.768833 / 34,252,688 |
+| 6 | 153.993059 / 35,332,896 | 154.410087 / 35,332,896 | 153.549576 / 35,332,688 | 29.824879 / 34,252,688 |
+| 7 | 155.984019 / 35,338,120 | 159.061932 / 35,332,896 | 157.327152 / 35,332,688 | 29.530524 / 34,252,688 |
+
+Medians (µs/call): before scalar-mode (original behavior) 154.410 → after scalar-only 30.769 (−80.1%). Allocations: medians 35,332.896 → 34,252.688 B/call. Within the after run, full minus scalar-only per batch is 1,085.224 / 1,080.000 / 1,064.640 / 1,080.000 / 1,080.000 / 1,080.000 / 1,080.000 B/call (median 1,080.000): the 1,048-byte `byte[1024]` allocation plus ~32 B from the harness's in-window bitmap-count consumption (a reviewer probe on .NET 8.0.31 measured 1,048 and 32 respectively) — i.e. extraction-plus-consumption overhead, not 1,080 B of production extraction alone; the production `GenerateBitmask` loop itself allocates nothing beyond the array. Before scalar-mode and before-full rows agree within noise, confirming the harness adaptation introduced no bias. Timing likewise includes that enumeration in full mode.
+
+Default-overload (training) timing is inconclusive: after-full median 157.026 vs before-full 154.692 µs/call (+1.5%, inside the overlapping batch ranges; the after run's batch 1 at 197.474 is a warmup-adjacent outlier included unmodified). Overlapping ranges establish neither regression nor non-regression for the full mode.
+
+### Reproduction and limitations
+
+```bash
+OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~FeatureExtraction_ReportsFullAndScalarOnly' --logger 'console;verbosity=detailed'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~FeatureExtractorTests|FullyQualifiedName~CanonicalFrameTests'
+```
+
+This is a capability slice, not yet a production speedup: the inference call site keeps using the default overload until Task 4b gates predictor availability, so real nesting runs show no change from this commit. The measured gain applies to inference callers once wired. No representative production corpus, Windows UI runtime test, or ONNX inference was performed; the Debug counter increments compile away in Release.

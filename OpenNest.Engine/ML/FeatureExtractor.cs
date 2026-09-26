@@ -25,7 +25,19 @@ namespace OpenNest.Engine.ML
 
     public static class FeatureExtractor
     {
-        public static PartFeatures Extract(Drawing drawing)
+        /// <summary>
+        /// Extract scalar features plus the 32x32 training bitmap. This is the training
+        /// entry point; inference callers that never read <see cref="PartFeatures.Bitmask"/>
+        /// should use <see cref="Extract(Drawing, bool)"/> with <c>includeBitmask: false</c>.
+        /// </summary>
+        public static PartFeatures Extract(Drawing drawing) => Extract(drawing, includeBitmask: true);
+
+        /// <summary>
+        /// Extract part features. When <paramref name="includeBitmask"/> is false the
+        /// 1024-cell bitmask scan is skipped and <see cref="PartFeatures.Bitmask"/> is null;
+        /// every scalar feature is computed identically to the bitmap-including overload.
+        /// </summary>
+        public static PartFeatures Extract(Drawing drawing, bool includeBitmask)
         {
             // Normalize to canonical frame so features are invariant to import orientation.
             var canonical = CanonicalFrame.AsCanonicalCopy(drawing);
@@ -55,7 +67,7 @@ namespace OpenNest.Engine.ML
                 AspectRatio = bb.Length / (bb.Width > 0 ? bb.Width : 1.0),
                 BoundingBoxFill = canonical.Area / (bb.Area() > 0 ? bb.Area() : 1.0),
                 VertexCount = polygon.Vertices.Count,
-                Bitmask = GenerateBitmask(polygon, 32),
+                Bitmask = includeBitmask ? GenerateBitmask(polygon, 32) : null,
             };
 
             // Circularity = 4 * PI * Area / Perimeter^2
@@ -77,6 +89,8 @@ namespace OpenNest.Engine.ML
             {
                 for (int x = 0; x < size; x++)
                 {
+                    PerfCounters.CountFeatureBitmaskCell();
+
                     // Map grid coordinate (0..size) to bounding box coordinate
                     var px = bb.Left + (x + 0.5) * (bb.Length / size);
                     var py = bb.Bottom + (y + 0.5) * (bb.Width / size);

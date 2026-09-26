@@ -275,6 +275,103 @@ public class FillPerformanceTests
         }
     }
 
+    [SkippableFact]
+    public void FeatureExtraction_ReportsFullAndScalarOnly()
+    {
+        Skip.IfNot(Environment.GetEnvironmentVariable("OPENNEST_RUN_FILL_PERF") == "1",
+            "Set OPENNEST_RUN_FILL_PERF=1 to run opt-in fill microbenchmarks.");
+
+        var drawing = new RingShape { OuterDiameter = 20, InnerDiameter = 8 }.GetDrawing();
+        var full = new Func<OpenNest.Engine.ML.PartFeatures>(() => OpenNest.Engine.ML.FeatureExtractor.Extract(drawing));
+        var scalar = new Func<OpenNest.Engine.ML.PartFeatures>(() => OpenNest.Engine.ML.FeatureExtractor.Extract(drawing, includeBitmask: false));
+        var fullBaseline = full();
+        var scalarBaseline = scalar();
+        Assert.NotNull(fullBaseline.Bitmask);
+        Assert.Null(scalarBaseline.Bitmask);
+        var expectedOnes = fullBaseline.Bitmask.Count(cell => cell == 1);
+        // Perimeter-only rasterization of the circle silhouette leaves corners clear but center set.
+        Assert.InRange(expectedOnes, 1, BitmaskCells - 1);
+        var warmupCalls = 200;
+        var callsPerBatch = 1_000;
+        var repetitions = 7;
+#if DEBUG
+        output.WriteLine("Configuration=Debug (diagnostic only; use Release for measurements).");
+#else
+        output.WriteLine("Release.");
+#endif
+        output.WriteLine($"Runtime={RuntimeInformation.FrameworkDescription}; OS={RuntimeInformation.OSDescription}; "
+            + $"architecture={RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}; "
+            + $"Stopwatch.Frequency={Stopwatch.Frequency} ticks/s.");
+        output.WriteLine("feature-extraction: synthetic ring OD=20 ID=8 (perimeter + one circular cutout); "
+            + $"full=default overload (32x32 bitmask) vs scalar-only=includeBitmask:false; warmup=2 x {warmupCalls}; "
+            + $"measured={repetitions} x {callsPerBatch}; mode batch order alternates. "
+            + "Real synchronous production extraction only; setup/assertions/output excluded; canonical copy, "
+            + "geometry conversion, hull, bitmask scan (full mode only), GC and result consumption included. "
+            + "The per-call bitmap-count consumption also runs inside the window and allocates only in full mode. "
+            + "Current-thread allocations, not RSS or a whole-job benchmark.");
+        for (var batch = 0; batch < 2; batch++)
+        {
+            MeasureFeature(batch % 2 == 0 ? full : scalar, warmupCalls);
+            MeasureFeature(batch % 2 == 0 ? scalar : full, warmupCalls);
+        }
+        var samples = new (FeatureSample Full, FeatureSample Scalar)[repetitions];
+        for (var batch = 0; batch < repetitions; batch++)
+        {
+            if (batch % 2 == 0)
+            {
+                samples[batch].Full = MeasureFeature(full, callsPerBatch);
+                samples[batch].Scalar = MeasureFeature(scalar, callsPerBatch);
+            }
+            else
+            {
+                samples[batch].Scalar = MeasureFeature(scalar, callsPerBatch);
+                samples[batch].Full = MeasureFeature(full, callsPerBatch);
+            }
+            var fullSample = samples[batch].Full;
+            var scalarSample = samples[batch].Scalar;
+            Assert.Equal((long)expectedOnes * callsPerBatch, fullSample.BitmaskOnes);
+            Assert.Equal(0, scalarSample.BitmaskOnes);
+            Assert.Equal(scalarBaseline.Area, scalarSample.Area);
+            Assert.Equal(scalarBaseline.Area, fullSample.Area);
+            output.WriteLine(FormattableString.Invariant(
+                $"feature-extraction batch={batch + 1}: full ms={samples[batch].Full.Milliseconds:F6} bytes={samples[batch].Full.AllocatedBytes}."));
+            output.WriteLine(FormattableString.Invariant(
+                $"feature-extraction batch={batch + 1}: scalar ms={samples[batch].Scalar.Milliseconds:F6} bytes={samples[batch].Scalar.AllocatedBytes}."));
+        }
+        ReportFeatureSummary("full", samples.Select(s => s.Full).ToArray(), callsPerBatch);
+        ReportFeatureSummary("scalar-only", samples.Select(s => s.Scalar).ToArray(), callsPerBatch);
+    }
+
+    private const int BitmaskCells = 32 * 32;
+
+    private static FeatureSample MeasureFeature(Func<OpenNest.Engine.ML.PartFeatures> extract, int calls)
+    {
+        var ones = 0L;
+        var lastArea = 0.0;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var start = Stopwatch.GetTimestamp();
+        for (var i = 0; i < calls; i++)
+        {
+            var features = extract();
+            ones += features.Bitmask?.Count(cell => cell == 1) ?? 0;
+            lastArea = features.Area;
+        }
+        var elapsed = Stopwatch.GetTimestamp() - start;
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        return new FeatureSample(elapsed * 1000.0 / Stopwatch.Frequency, allocated, ones, lastArea);
+    }
+
+    private void ReportFeatureSummary(string mode, FeatureSample[] samples, int callsPerBatch)
+    {
+        var times = samples.Select(s => s.Milliseconds).OrderBy(t => t).ToArray();
+        var bytes = samples.Select(s => s.AllocatedBytes).OrderBy(b => b).ToArray();
+        var median = samples.Length / 2;
+        output.WriteLine(FormattableString.Invariant(
+            $"feature-extraction {mode}: batch ms min/median/max={times[0]:F6}/{times[median]:F6}/{times[^1]:F6}; us/call min/median/max={times[0] * 1000 / callsPerBatch:F3}/{times[median] * 1000 / callsPerBatch:F3}/{times[^1] * 1000 / callsPerBatch:F3}; batch bytes min/median/max={bytes[0]}/{bytes[median]}/{bytes[^1]}; B/call min/median/max={(double)bytes[0] / callsPerBatch:F3}/{(double)bytes[median] / callsPerBatch:F3}/{(double)bytes[^1] / callsPerBatch:F3}."));
+    }
+
+    private readonly record struct FeatureSample(double Milliseconds, long AllocatedBytes, long BitmaskOnes, double Area);
+
     private static ExtentsSample MeasureExtents(Func<List<Part>> fill, int calls)
     {
         var partCount = 0L;

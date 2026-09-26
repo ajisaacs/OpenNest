@@ -51,6 +51,8 @@ The extents measurement exercises repeated column rebuilding with a closed trian
 
 The synchronous rotated-pattern construction control uses a 32-part native-arc group at angles 0 and 0.37. Run it with `--filter "FullyQualifiedName~RotatedPattern_ReportsBoundsConstruction"`. Task 3 reuses the extents benchmark above; Debug `--filter "FullyQualifiedName~BoundsWork"` checks part-bounds work. Only three extents recomputations were removable: anchor, vertical-shift, and group-clone recomputations remain because removing them changes exact floating-point layouts. See the measured report for the partial-delivery evidence and inconclusive timing results.
 
+The feature-extraction measurement compares default `FeatureExtractor.Extract` (32×32 training bitmask) against `Extract(drawing, includeBitmask: false)` on a synthetic ring; run it with `--filter "FullyQualifiedName~FeatureExtraction_ReportsFullAndScalarOnly"`. The one-argument overload keeps generating the bitmap for training callers; scalar-only inference callers receive `Bitmask = null` with identical scalar features. Behavior and Debug bitmask-scan counter checks use `--filter "FullyQualifiedName~FeatureExtractorTests"`.
+
 ### Quick start
 
 1. File > New Nest
