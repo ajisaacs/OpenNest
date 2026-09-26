@@ -400,7 +400,7 @@ New Debug counter tests (serialized in `FillCacheCollection`, reset in `finally`
 - 16 extents threshold cases: pair-fit, column-tiling, and column-count branches on both sides of `Tolerance.Epsilon`, nonzero work-area origin, progress layouts, input snapshots.
 - 16 adjacent-double pair/column cases (`BitIncrement`/`BitDecrement` neighborhoods with asserted both-side decisions) and 16 adjacent-double `TryShiftDirection` width-acceptance cases (binary-searched rejected/accepted doubles located using only the frozen pre-change path, ±shifts).
 - 12 `BuildRotatedPattern` cases: translated, accumulated-translation, pre-rotated, canonical-frame, native-arc, and nonzero-program-origin groups at angles 0 and 0.37, checking exact poses/bounds against a local pre-change reference, input non-mutation, clone program ownership, and no double rotation of pre-rotated inputs.
-- Frozen-legacy differentials, threshold branch equality, and the retained-site RED logs (`task3-site-*.log`) reconcile the per-site table above.
+- Frozen-legacy differentials, threshold branch equality, and per-site removal trials (each candidate removed alone, characterization run, restored) reconcile the per-site table above; the trial logs were retained through review in the scratch directory and removed afterwards, with the resulting ulp deltas and failure counts recorded in this report.
 
 ### Tests (parent independently reran the full suites on the final tree)
 
