@@ -34,27 +34,6 @@ dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (W
 
 Shared coding-agent guidance lives in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports it for Claude Code compatibility; make shared instruction changes in AGENTS.md, not in duplicate agent-specific copies.
 
-### Opt-in fill performance measurements
-
-```bash
-OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
-  --filter "Category=FillPerformance" --logger "console;verbosity=detailed"
-```
-
-For PowerShell, set `$env:OPENNEST_RUN_FILL_PERF = '1'` before the `dotnet test` command and remove it afterward with `Remove-Item Env:OPENNEST_RUN_FILL_PERF`. Without the exact value `1`, these tests skip, including during normal suite runs.
-
-The comparer microbenchmark uses deterministic, valid nonoverlapping rectangles, warmup, seven interleaved actual/reference batches, both argument orders, and an equal-count control. It reports min/median/max duration and synchronous current-thread allocations, both per batch and per call; construction and correctness assertions are outside the timed region. Keep inputs and batch sizes fixed when comparing changes. These measurements are not timing-threshold tests and do not establish whole-job speedups. Debug-only skipped-score work checks run with `dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --filter "FullyQualifiedName~DefaultFillComparerWorkTests"`.
-
-The group-pattern measurement also compares default scoring with a custom comparer on a valid two-part group. It includes the real fill and scheduling work and omits allocation totals because fills can use worker threads. Run only that case with `--filter "FullyQualifiedName~GroupPattern_ReportsDefaultAndCustomComparer"`; helper behavior and Debug score-work checks use `--filter "FullyQualifiedName~FillHelpersTests"`. Workload details and measured limitations are in [the fill performance report](docs/performance/fill-performance.md). The report's Task 5 section additionally records a `--parallel 1` whole-job before/after over a small real-DXF manifest corpus (`OpenNest.Benchmark` with a `*.manifest.json`): identical valid outcomes, placed counts, and cost; timing differences inside baseline run-to-run spread, so whole-job timing is inconclusive — outcome confirmation, not a speedup or performance-equivalence claim.
-
-The extents measurement exercises repeated column rebuilding with a closed triangle at zero and positive spacing. It times the synchronous production fill and reports current-thread allocations; the frozen legacy implementation is used only for correctness checks outside timing. Run only that case with `--filter "FullyQualifiedName~Extents_ReportsRepeatedColumnRebuilds"`. Extents behavior, overlap-fallback, and Debug boundary-preparation checks use `--filter "FullyQualifiedName~FillExtentsTests|FullyQualifiedName~StrategyOverlapTests"`. Finite nonnegative spacing uses the equivalent bounding-box pitch without discarded vertical boundary preparation; negative/nonfinite spacing retains the legacy calculation rather than adding validation.
-
-The synchronous rotated-pattern construction control uses a 32-part native-arc group at angles 0 and 0.37. Run it with `--filter "FullyQualifiedName~RotatedPattern_ReportsBoundsConstruction"`. Task 3 reuses the extents benchmark above; Debug `--filter "FullyQualifiedName~BoundsWork"` checks part-bounds work. Only three extents recomputations were removable: anchor, vertical-shift, and group-clone recomputations remain because removing them changes exact floating-point layouts. See the measured report for the partial-delivery evidence and inconclusive timing results.
-
-The feature-extraction measurement compares default `FeatureExtractor.Extract` (32×32 training bitmask) against `Extract(drawing, includeBitmask: false)` on a synthetic ring; run it with `--filter "FullyQualifiedName~FeatureExtraction_ReportsFullAndScalarOnly"`. The one-argument overload keeps generating the bitmap for training callers; scalar-only inference callers receive `Bitmask = null` with identical scalar features. Behavior and Debug bitmask-scan counter checks use `--filter "FullyQualifiedName~FeatureExtractorTests"`.
-
-`AngleCandidateBuilder` now checks the shared one-attempt predictor initialization before extracting anything; unavailable or failed model loads retain the ordered fallback sweep, while available inference requests scalar-only features. Initialization completion is published only after the load outcome is known. Measure the warm missing-model path with `--filter "FullyQualifiedName~IrregularAngles_ReportsWarmNoModelPath"`; this skips when a model is installed and never alters model files. Loader-concurrency and prediction-double tests use `--filter "FullyQualifiedName~AngleCandidateBuilderTests|FullyQualifiedName~AnglePredictorTests|FullyQualifiedName~FeatureExtractorTests"`. These tests do not establish actual ONNX accuracy. See [fill verification](docs/performance/fill-verification.md) for shared workflow safeguards.
-
 ### Quick start
 
 1. File > New Nest
