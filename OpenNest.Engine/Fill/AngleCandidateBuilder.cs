@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -10,6 +11,29 @@ namespace OpenNest.Engine.Fill
     public class AngleCandidateBuilder
     {
         private readonly HashSet<double> knownGoodAngles = new();
+        private readonly Func<bool> isPredictionAvailable;
+        private readonly Func<Drawing, bool, PartFeatures> extractFeatures;
+        private readonly Func<PartFeatures, double, double, List<double>> predictAngles;
+
+        public AngleCandidateBuilder()
+            : this(
+                () => AnglePredictor.IsAvailable,
+                FeatureExtractor.Extract,
+                (features, width, height) => AnglePredictor.PredictAngles(features, width, height)
+            )
+        { }
+
+        // Per-instance dependencies keep tests independent of the process-wide ONNX session.
+        internal AngleCandidateBuilder(
+            Func<bool> isPredictionAvailable,
+            Func<Drawing, bool, PartFeatures> extractFeatures,
+            Func<PartFeatures, double, double, List<double>> predictAngles
+        )
+        {
+            this.isPredictionAvailable = isPredictionAvailable;
+            this.extractFeatures = extractFeatures;
+            this.predictAngles = predictAngles;
+        }
 
         public bool ForceFullSweep { get; set; }
 
@@ -87,18 +111,22 @@ namespace OpenNest.Engine.Fill
             }
         }
 
-        private static List<double> ApplyMlPrediction(
+        private List<double> ApplyMlPrediction(
             NestItem item,
             Box workArea,
             double[] baseAngles,
             List<double> fallback
         )
         {
-            var features = FeatureExtractor.Extract(item.Drawing);
+            if (!isPredictionAvailable())
+                return fallback;
+
+            // Inference needs only scalar features, never the training bitmap.
+            var features = extractFeatures(item.Drawing, false);
             if (features == null)
                 return fallback;
 
-            var predicted = AnglePredictor.PredictAngles(features, workArea.Width, workArea.Length);
+            var predicted = predictAngles(features, workArea.Width, workArea.Length);
             if (predicted == null)
                 return fallback;
 

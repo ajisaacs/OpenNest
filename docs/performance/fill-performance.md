@@ -532,3 +532,121 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
 ```
 
 This is a capability slice, not yet a production speedup: the inference call site keeps using the default overload until Task 4b gates predictor availability, so real nesting runs show no change from this commit. The measured gain applies to inference callers once wired. No representative production corpus, Windows UI runtime test, or ONNX inference was performed; the Debug counter increments compile away in Release.
+
+## Task 4b — gate angle features on predictor availability — 2026-09-26
+
+### Scope and contract
+
+`AngleCandidateBuilder` now checks `AnglePredictor.IsAvailable` before extraction, and available inference requests `includeBitmask: false`. The public parameterless constructor remains; readonly per-instance delegates provide isolated test doubles without process-global overrides. The prediction default threshold (0.3), `Width` then `Length` argument order, prediction-prefix duplicates, tolerance-based appended-angle deduplication, base/sweep order, constraints, classification shortcuts and known-good pruning are unchanged. The legacy repeated-addition sweep includes a value just below π: 37 sweep entries, not an integer-indexed 36-angle replacement.
+
+`IsAvailable` and `PredictAngles` use the same initializer. The existing lock/volatile one-attempt pattern lives in the narrow internal `SingleAttemptLoader<T>` (generic solely to test with reference objects instead of ONNX files). Completion is published in `finally`, after assignment or definitive failure; a concurrent reader waits rather than seeing transient unavailability. Missing and failed loads remain cached for the process lifetime; no model reload policy, independent availability cache, model-file changes, packages or projects were added. Training extraction is unchanged.
+
+### Provenance and verification
+
+- Base: `d70505b7c0e41692a031971fb437bbb165493b9f` on `master`; this section accompanies the final implementation commit. The baseline was an isolated `git archive` with only the identical measurement harness added. Production/project comparison found only `AngleCandidateBuilder.cs` and `AnglePredictor.cs` changed; actual baseline production was measured, not a reimplementation.
+- Environment: Ubuntu 24.04.5 LTS x64 shared KVM VM, four vCPUs presented as AMD Ryzen 9 5900X; SDK 10.0.112. Test adapters and benchmark output confirm .NET 8.0.31; Stopwatch frequency 1,000,000,000 ticks/s. Serial Release processes, forward then reversed before/after order.
+- Parent applied whitespace-only fixes to the builder constructor and the loader concurrency test after implementation-agent tests; full suites were rerun afterward. Published measurements use the final source/harness hashes below. An initial short no-model warmup showed transient timing spread; it was replaced in **both** trees by 2×20,000 warmup calls and 7×20,000 measured calls. Only the complete rerun pairs below are acceptance measurements.
+
+| Source | Before SHA-256 | Delivered/measurement SHA-256 |
+| --- | --- | --- |
+| `OpenNest.Engine/Fill/AngleCandidateBuilder.cs` | `5182f69f604332e1b8bfb46d807c8f830194a88b47f4fd4e90bcea6e91e522c4` | `97bbb82680b90d950f480c65dffab8702bd9402ef849639286d7fc90f1b6b162` |
+| `OpenNest.Engine/ML/AnglePredictor.cs` | `84bc0eafffe84447dc83e3c7084e5562a67409572fa413f78abe6e7102ba3c72` | `047e3bdb8d9aec1add49ba36e5b7947d1b375e6099a3f36f54061b6ae4d16f7a` |
+| `OpenNest.Engine/ML/FeatureExtractor.cs` | `2d7b45350abd94d7e728c962aca06f4a86920d0328d8025c75f51ebc7e5ed6b3` | `2d7b45350abd94d7e728c962aca06f4a86920d0328d8025c75f51ebc7e5ed6b3` |
+| `OpenNest.Tests/Fill/FillPerformanceTests.cs` | `f90412c87393f8542769aae5abef5e340b827003c134d0bf525efef3a3fefa62` | `f90412c87393f8542769aae5abef5e340b827003c134d0bf525efef3a3fefa62` |
+
+The harness hash in both columns is the newly added identical harness, not the original base harness. Existing feature-extraction timed code is unchanged.
+
+Genuine RED/GREEN evidence (temporary source mutations restored in `finally`): removing the availability gate failed the exact call sequence (expected availability only, actual availability/extraction/prediction); forcing `true` failed the scalar flag assertion; the real-extractor Debug integration check counted 1,024 bitmap cells instead of 0; publishing before the blocked load failed all three concurrent-reader cases (success, missing, throwing). Restored targeted suites pass. Counter tests use the nonparallel `FillCacheCollection` and reset in `finally`. Release-zero counters are not evidence. The loader concurrency test observes a blocked dedicated reader, not merely an unscheduled task; ten additional process runs passed all three cases.
+
+| Verification | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Pre-change builder characterization | 17 | 0 | 0 |
+| Targeted Release (builder/predictor/extractor) | 77 | 0 | 0 |
+| Targeted Debug (builder/predictor/extractor) | 81 | 0 | 0 |
+| Full main Release, final code | 1,335 | 18 | 0 |
+| Full main Debug, final code | 1,356 | 18 | 0 |
+| Full engine Release, final code | 300 | 0 | 0 |
+| Performance category, variable unset | 0 | 6 | 0 |
+| Performance category, variable `0` | 0 | 6 | 0 |
+| Each enabled two-case measurement process (four runs) | 2 | 0 | 0 |
+
+Full-suite skips are 12 optional CHR-font fixtures plus six opt-in benchmarks. Parent parsed TRX outcomes and reconciled all published raw measurement rows against console output. Changed-file whitespace verification and `git diff --check` passed. Existing optional-fixture, frozen-reference nullable and obsolete API warnings remain outside this slice.
+
+### Warm no-model path measurements
+
+Closed concave L vertices `(0,0),(20,0),(20,6),(8,6),(8,14),(0,14)`, primary angle 0.13 radians, work area `(3,5,120,80)`, `ForceFullSweep=true`. Public production builder, no delegate substitution. Missing-model initialization, construction, assertions and output occur outside timing. Exact ordered angles are checked against the pre-change fallback expression. Each process has two 20,000-call warmups and seven 20,000-call batches. Loop/result-count consumption and GC are included; allocations are synchronous current-thread bytes, not process RSS. The benchmark skips if a model exists and never removes it.
+
+| Batch | Before forward ms / B | After forward ms / B | After reverse ms / B | Before reverse ms / B |
+| ---: | --- | --- | --- | --- |
+| 1 | 1217.927296 / 503,670,984 | 55.374701 / 119,200,000 | 52.644238 / 119,200,000 | 1184.910444 / 503,670,984 |
+| 2 | 1187.003770 / 503,660,640 | 54.922257 / 119,200,000 | 53.317338 / 119,200,000 | 1245.986050 / 503,660,640 |
+| 3 | 1191.853980 / 503,660,640 | 53.574434 / 119,200,000 | 52.454731 / 119,200,000 | 1234.360386 / 503,660,640 |
+| 4 | 1207.375477 / 503,660,640 | 52.648817 / 119,200,000 | 51.054148 / 119,200,000 | 1247.194291 / 503,660,640 |
+| 5 | 1212.013076 / 503,670,984 | 52.498333 / 119,200,000 | 51.060020 / 119,200,000 | 1236.030807 / 503,670,984 |
+| 6 | 1223.337623 / 503,660,640 | 51.969916 / 119,200,000 | 51.673347 / 119,200,000 | 1265.240358 / 503,660,640 |
+| 7 | 1249.298485 / 503,660,640 | 51.376286 / 119,200,000 | 52.600186 / 119,200,000 | 1264.421373 / 503,660,640 |
+
+| Process | µs/call min / median / max | B/call min / median / max |
+| --- | --- | --- |
+| before-measure | 59.350 / 60.601 / 62.465 | 25,183.0320 / 25,183.0320 / 25,183.5492 |
+| after-measure | 2.569 / 2.632 / 2.769 | 5,960.0000 / 5,960.0000 / 5,960.0000 |
+| after-repeat | 2.553 / 2.623 / 2.666 | 5,960.0000 / 5,960.0000 / 5,960.0000 |
+| before-repeat | 59.246 / 62.299 / 63.262 | 25,183.0320 / 25,183.0320 / 25,183.5492 |
+
+Measured median warm-path time changes are -95.66% and -95.79% in the two process orders. Median allocations fall from 25,183.032 to 5,960 B/call (19,223.032 B/call, 76.33%). After allocations are exactly 5,960 B/call in every batch; baseline totals have small variations disclosed above. These results support a local warm no-model improvement, not a stable cross-machine latency guarantee or a whole-nesting-job speedup. No cold-start or failed-model timing is claimed.
+
+### Separate extraction control
+
+Existing `FeatureExtraction_ReportsFullAndScalarOnly`: native-arc ring OD20/ID8, two 200-call warmups, seven 1,000-call batches per mode, alternating mode order. This is a separate extraction benchmark, not available-model inference. Feature extraction is identical across these trees; the full versus scalar difference is the already-delivered Task 4a capability, now used by the builder. Timing/bytes include the harness's bitmap-count consumption for full mode (see Task 4a's ~32-byte consumption disclosure), so the delta is not solely production extraction allocation. Process-to-process differences are shared-VM noise/control observations, not a Task 4b extraction speedup claim.
+
+| Process | Batch | Full ms / B | Scalar-only ms / B |
+| --- | ---: | --- | --- |
+| before-measure | 1 | 217.757693 / 35,332,688 | 37.378244 / 34,263,032 |
+| before-measure | 2 | 170.635584 / 35,332,688 | 34.053642 / 34,252,688 |
+| before-measure | 3 | 172.566367 / 35,343,032 | 34.951535 / 34,252,688 |
+| before-measure | 4 | 170.000626 / 35,332,688 | 33.384049 / 34,273,376 |
+| before-measure | 5 | 169.570514 / 35,332,688 | 34.399103 / 34,252,688 |
+| before-measure | 6 | 171.122593 / 35,332,688 | 33.865496 / 34,283,720 |
+| before-measure | 7 | 168.040086 / 35,332,688 | 32.055312 / 34,263,032 |
+| after-measure | 1 | 227.885101 / 35,332,896 | 32.285726 / 34,252,896 |
+| after-measure | 2 | 175.358064 / 35,338,120 | 30.359862 / 34,252,896 |
+| after-measure | 3 | 184.505182 / 35,332,896 | 31.867147 / 34,252,896 |
+| after-measure | 4 | 169.872394 / 35,332,896 | 29.338054 / 34,252,896 |
+| after-measure | 5 | 168.238732 / 35,338,120 | 30.606238 / 34,252,896 |
+| after-measure | 6 | 189.879784 / 35,332,896 | 30.637576 / 34,252,896 |
+| after-measure | 7 | 174.944123 / 35,332,896 | 30.820803 / 34,252,896 |
+| after-repeat | 1 | 272.298581 / 35,332,896 | 52.314757 / 34,252,896 |
+| after-repeat | 2 | 194.604106 / 35,338,120 | 52.072921 / 34,252,896 |
+| after-repeat | 3 | 159.231266 / 35,332,896 | 33.244075 / 34,252,896 |
+| after-repeat | 4 | 152.710834 / 35,332,896 | 31.001913 / 34,252,896 |
+| after-repeat | 5 | 154.032296 / 35,338,120 | 31.102123 / 34,252,896 |
+| after-repeat | 6 | 150.289445 / 35,332,896 | 29.016949 / 34,252,896 |
+| after-repeat | 7 | 156.205127 / 35,332,896 | 30.082710 / 34,252,896 |
+| before-repeat | 1 | 215.909255 / 35,332,688 | 37.149342 / 34,252,688 |
+| before-repeat | 2 | 188.558239 / 35,332,688 | 35.593749 / 34,252,688 |
+| before-repeat | 3 | 198.129599 / 35,343,032 | 38.193683 / 34,252,688 |
+| before-repeat | 4 | 186.170223 / 35,332,688 | 36.974173 / 34,252,688 |
+| before-repeat | 5 | 193.646279 / 35,332,688 | 46.604443 / 34,252,688 |
+| before-repeat | 6 | 195.491390 / 35,332,688 | 50.731669 / 34,252,688 |
+| before-repeat | 7 | 191.895666 / 35,332,688 | 40.247489 / 34,252,688 |
+
+| Process | Full µs/call min / median / max | Scalar µs/call min / median / max |
+| --- | --- | --- |
+| before-measure | 168.040 / 170.636 / 217.758 | 32.055 / 34.054 / 37.378 |
+| after-measure | 168.239 / 175.358 / 227.885 | 29.338 / 30.638 / 32.286 |
+| after-repeat | 150.289 / 156.205 / 272.299 | 29.017 / 31.102 / 52.315 |
+| before-repeat | 186.170 / 193.646 / 215.909 | 35.594 / 38.194 / 50.732 |
+
+### Reproduction, review and remaining limits
+
+```bash
+OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~IrregularAngles_ReportsWarmNoModelPath|FullyQualifiedName~FeatureExtraction_ReportsFullAndScalarOnly' \
+  --logger 'console;verbosity=detailed'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~AngleCandidateBuilderTests|FullyQualifiedName~AnglePredictorTests|FullyQualifiedName~FeatureExtractorTests'
+```
+
+Repeat the targeted command in Debug for bitmap work assertions. Shared safeguards moved intact (with Task 4b additions) from near-capacity `AGENTS.md` into [fill verification](fill-verification.md); the combined `AGENTS.md` + `CLAUDE.md` is now 31,434 bytes, below 32 KiB. README and the shared instructions describe availability-gated scalar inference; `CLAUDE.md` remains the thin import.
+
+Independent spec review **PASS**, followed by independent quality/integration review **APPROVED**; neither found Critical, Important or Minor issues. Both reconciled source/harness provenance, raw measurements, summaries, red/green and full-suite evidence. Each independently reran the targeted suites (77 Release, 81 Debug) and both disabled benchmark gates (six skipped each); the spec reviewer ran ten more three-case concurrency processes, and the quality reviewer ran three plus the full engine suite (300 passed). Raw scratch evidence was removed after review, retaining the tables, hashes and test summaries here. No actual ONNX inference or model accuracy test, Windows UI runtime test, or representative production corpus measurement was performed. Task 5 combined acceptance/report remains separate; gated A/B/C follow-ups were not started.

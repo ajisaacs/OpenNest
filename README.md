@@ -53,6 +53,8 @@ The synchronous rotated-pattern construction control uses a 32-part native-arc g
 
 The feature-extraction measurement compares default `FeatureExtractor.Extract` (32×32 training bitmask) against `Extract(drawing, includeBitmask: false)` on a synthetic ring; run it with `--filter "FullyQualifiedName~FeatureExtraction_ReportsFullAndScalarOnly"`. The one-argument overload keeps generating the bitmap for training callers; scalar-only inference callers receive `Bitmask = null` with identical scalar features. Behavior and Debug bitmask-scan counter checks use `--filter "FullyQualifiedName~FeatureExtractorTests"`.
 
+`AngleCandidateBuilder` now checks the shared one-attempt predictor initialization before extracting anything; unavailable or failed model loads retain the ordered fallback sweep, while available inference requests scalar-only features. Initialization completion is published only after the load outcome is known. Measure the warm missing-model path with `--filter "FullyQualifiedName~IrregularAngles_ReportsWarmNoModelPath"`; this skips when a model is installed and never alters model files. Loader-concurrency and prediction-double tests use `--filter "FullyQualifiedName~AngleCandidateBuilderTests|FullyQualifiedName~AnglePredictorTests|FullyQualifiedName~FeatureExtractorTests"`. These tests do not establish actual ONNX accuracy. See [fill verification](docs/performance/fill-verification.md) for shared workflow safeguards.
+
 ### Quick start
 
 1. File > New Nest

@@ -11,9 +11,9 @@ namespace OpenNest.Engine.ML
 {
     public static class AnglePredictor
     {
-        private static InferenceSession _session;
-        private static volatile bool _loadAttempted;
-        private static readonly object _lock = new();
+        private static readonly SingleAttemptLoader<InferenceSession> SessionLoader = new(LoadSession);
+
+        internal static bool IsAvailable => GetSession() != null;
 
         public static List<double> PredictAngles(
             PartFeatures features,
@@ -84,38 +84,62 @@ namespace OpenNest.Engine.ML
             }
         }
 
-        private static InferenceSession GetSession()
+        private static InferenceSession GetSession() => SessionLoader.GetValue();
+
+        private static InferenceSession LoadSession()
+        {
+            var dir = Path.GetDirectoryName(typeof(AnglePredictor).Assembly.Location);
+            var modelPath = Path.Combine(dir, "Models", "angle_predictor.onnx");
+
+            if (!File.Exists(modelPath))
+            {
+                Debug.WriteLine($"[AnglePredictor] Model not found: {modelPath}");
+                return null;
+            }
+
+            var session = new InferenceSession(modelPath);
+            Debug.WriteLine("[AnglePredictor] Model loaded successfully");
+            return session;
+        }
+    }
+
+    // One process-lifetime attempt, including missing/failed loads. Generic only so the
+    // publication contract can be tested with reference objects instead of real ONNX files.
+    internal sealed class SingleAttemptLoader<T> where T : class
+    {
+        private readonly Func<T> _load;
+        private readonly object _lock = new();
+        private T _value;
+        private volatile bool _loadAttempted;
+
+        internal SingleAttemptLoader(Func<T> load) => _load = load;
+
+        internal T GetValue()
         {
             if (_loadAttempted)
-                return _session;
+                return _value;
 
             lock (_lock)
             {
                 if (_loadAttempted)
-                    return _session;
-
-                _loadAttempted = true;
+                    return _value;
 
                 try
                 {
-                    var dir = Path.GetDirectoryName(typeof(AnglePredictor).Assembly.Location);
-                    var modelPath = Path.Combine(dir, "Models", "angle_predictor.onnx");
-
-                    if (!File.Exists(modelPath))
-                    {
-                        Debug.WriteLine($"[AnglePredictor] Model not found: {modelPath}");
-                        return null;
-                    }
-
-                    _session = new InferenceSession(modelPath);
-                    Debug.WriteLine("[AnglePredictor] Model loaded successfully");
+                    _value = _load();
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[AnglePredictor] Failed to load model: {ex.Message}");
                 }
+                finally
+                {
+                    // Publish only after assignment or definitive failure. A concurrent
+                    // caller must wait on the lock, not observe a transient null session.
+                    _loadAttempted = true;
+                }
 
-                return _session;
+                return _value;
             }
         }
     }

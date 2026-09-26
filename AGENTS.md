@@ -24,25 +24,7 @@ NuGet dependencies: `ACadSharp` 3.1.32 (DXF/DWG import/export, in OpenNest.IO), 
 
 ### Fill performance verification
 
-Opt-in synthetic measurements (`OpenNest.Tests/Fill/FillPerformanceTests.cs`):
-
-```bash
-OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
-  --filter 'Category=FillPerformance' --logger 'console;verbosity=detailed'
-```
-
-Only the exact value `1` enables these tests; otherwise they skip; README documents the PowerShell equivalent.
-
-The category covers comparer, group-pattern, rotated-pattern, extents-column, and feature-extraction workloads; individual filters match benchmark method names in `FillPerformanceTests.cs`. Keep harness, inputs, warmups and batches identical before/after; exclude setup/assertions from timing. Comparer/extents allocations are synchronous and current-thread only; parallel group fills omit allocation totals. No timing CI gates or whole-job speedup claims. Preserve evidence in [the measured report](docs/performance/fill-performance.md).
-
-Debug behavior/skipped-work checks:
-
-```bash
-dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
-  --filter 'FullyQualifiedName~DefaultFillComparerWorkTests|FullyQualifiedName~FillHelpersTests|FullyQualifiedName~FillExtentsTests|FullyQualifiedName~StrategyOverlapTests'
-```
-
-`PerfCounters.FillScoreComputations`, `PartBoundaryPreparations`, `PartBoundsUpdates`, and `FeatureBitmaskCells` increments compile away in Release: zero Release counters prove nothing. Serialize counter assertions in `FillCacheCollection` and reset in `finally`. Keep `OpenNest.Tests/Fill/LegacyFillExtents.cs` frozen for differential tests, not production or before timings; measure the actual baseline production code.
+See [fill verification](docs/performance/fill-verification.md) for opt-in measurements, targeted tests, Debug counter isolation, and predictor initialization rules. Keep training bitmaps by default; the angle builder checks predictor availability before scalar-only extraction.
 
 ## Architecture
 

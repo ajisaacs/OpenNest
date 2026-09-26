@@ -342,6 +342,90 @@ public class FillPerformanceTests
         ReportFeatureSummary("scalar-only", samples.Select(s => s.Scalar).ToArray(), callsPerBatch);
     }
 
+    [SkippableFact]
+    public void IrregularAngles_ReportsWarmNoModelPath()
+    {
+        Skip.IfNot(Environment.GetEnvironmentVariable("OPENNEST_RUN_FILL_PERF") == "1",
+            "Set OPENNEST_RUN_FILL_PERF=1 to run opt-in fill microbenchmarks.");
+
+        // Never move/delete a user's model to obtain a no-model measurement.
+        var modelPath = Path.Combine(
+            Path.GetDirectoryName(typeof(OpenNest.Engine.ML.AnglePredictor).Assembly.Location)!,
+            "Models", "angle_predictor.onnx");
+        Skip.If(File.Exists(modelPath), "No-model measurement requires an output directory without an angle model.");
+        Assert.Null(OpenNest.Engine.ML.AnglePredictor.PredictAngles(new OpenNest.Engine.ML.PartFeatures(), 80, 120));
+
+        var program = new OpenNest.CNC.Program();
+        program.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(0, 0)));
+        foreach (var point in new[] { new Vector(20, 0), new Vector(20, 6), new Vector(8, 6),
+            new Vector(8, 14), new Vector(0, 14), new Vector(0, 0) })
+            program.Codes.Add(new OpenNest.CNC.LinearMove(point));
+        var item = new NestItem { Drawing = new Drawing("performance-L", program) };
+        var workArea = new Box(3, 5, 120, 80);
+        var classification = new ClassificationResult { Type = PartType.Irregular, PrimaryAngle = 0.13 };
+        var builder = new AngleCandidateBuilder { ForceFullSweep = true };
+        var build = new Func<List<double>>(() => builder.Build(item, classification, workArea));
+        // Independent pre-4b fallback expression; exact ordered equality, not only count.
+        var expected = new List<double> { classification.PrimaryAngle, classification.PrimaryAngle + OpenNest.Math.Angle.HalfPI };
+        for (var angle = 0.0; angle < System.Math.PI; angle += OpenNest.Math.Angle.ToRadians(5))
+        {
+            if (!expected.Any(existing => OpenNest.Math.Tolerance.IsEqualTo(existing, angle)))
+                expected.Add(angle);
+        }
+        Assert.Equal(expected, build());
+        var warmupCalls = 20_000;
+        var callsPerBatch = 20_000;
+        var repetitions = 7;
+#if DEBUG
+        output.WriteLine("Configuration=Debug (diagnostic only; use Release for measurements).");
+#else
+        output.WriteLine("Configuration=Release.");
+#endif
+        output.WriteLine($"Runtime={RuntimeInformation.FrameworkDescription}; OS={RuntimeInformation.OSDescription}; "
+            + $"architecture={RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}; "
+            + $"Stopwatch.Frequency={Stopwatch.Frequency} ticks/s.");
+        output.WriteLine("no-model angles: concave L (0,0)-(20,0)-(20,6)-(8,6)-(8,14)-(0,14), "
+            + "primary=0.13 rad, workArea=(3,5,120,80), ForceFullSweep=true; public production builder, no delegates replaced. "
+            + $"Initialization completed outside timing; warmup=2 x {warmupCalls}, measured={repetitions} x {callsPerBatch}. "
+            + "Synchronous current-thread allocations; construction/assertions/output excluded, loop/result consumption included. "
+            + "Warm missing-model branch only, not ONNX inference, cold-start latency, or whole-job speedup.");
+        for (var batch = 0; batch < 2; batch++)
+            MeasureAngles(build, warmupCalls);
+        var samples = new AngleSample[repetitions];
+        for (var batch = 0; batch < repetitions; batch++)
+        {
+            var sample = samples[batch] = MeasureAngles(build, callsPerBatch);
+            Assert.Equal((long)expected.Count * callsPerBatch, sample.AngleCount);
+            Assert.Equal(expected, sample.LastResult);
+            output.WriteLine(FormattableString.Invariant(
+                $"no-model-angles batch={batch + 1}: ms={sample.Milliseconds:F6} bytes={sample.AllocatedBytes}."));
+        }
+        var times = samples.Select(s => s.Milliseconds).OrderBy(t => t).ToArray();
+        var bytes = samples.Select(s => s.AllocatedBytes).OrderBy(b => b).ToArray();
+        var median = repetitions / 2;
+        output.WriteLine(FormattableString.Invariant(
+            $"no-model-angles: batch ms min/median/max={times[0]:F6}/{times[median]:F6}/{times[^1]:F6}; us/call min/median/max={times[0] * 1000 / callsPerBatch:F3}/{times[median] * 1000 / callsPerBatch:F3}/{times[^1] * 1000 / callsPerBatch:F3}; B/call min/median/max={(double)bytes[0] / callsPerBatch:F3}/{(double)bytes[median] / callsPerBatch:F3}/{(double)bytes[^1] / callsPerBatch:F3}."));
+    }
+
+    private static AngleSample MeasureAngles(Func<List<double>> build, int calls)
+    {
+        var count = 0L;
+        var last = new List<double>();
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var start = Stopwatch.GetTimestamp();
+        for (var i = 0; i < calls; i++)
+        {
+            last = build();
+            count += last.Count;
+        }
+        var elapsed = Stopwatch.GetTimestamp() - start;
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        return new AngleSample(elapsed * 1000.0 / Stopwatch.Frequency, allocated, count, last);
+    }
+
+    private readonly record struct AngleSample(double Milliseconds, long AllocatedBytes,
+        long AngleCount, List<double> LastResult);
+
     private const int BitmaskCells = 32 * 32;
 
     private static FeatureSample MeasureFeature(Func<OpenNest.Engine.ML.PartFeatures> extract, int calls)
