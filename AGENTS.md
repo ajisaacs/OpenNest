@@ -31,9 +31,9 @@ OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Rel
   --filter 'Category=FillPerformance' --logger 'console;verbosity=detailed'
 ```
 
-Only the exact value `1` enables these tests; otherwise they skip. PowerShell: set `$env:OPENNEST_RUN_FILL_PERF = '1'`, run `dotnet test`, then `Remove-Item Env:OPENNEST_RUN_FILL_PERF`.
+Only the exact value `1` enables these tests; otherwise they skip; README documents the PowerShell equivalent.
 
-The category covers comparer, group-pattern, rotated-pattern, and extents-column workloads; individual filters match benchmark method names in `FillPerformanceTests.cs`. Keep harness, inputs, warmups and batches identical before/after; exclude setup/assertions from timing. Comparer/extents allocations are synchronous and current-thread only; parallel group fills omit allocation totals. No timing CI gates or whole-job speedup claims. Preserve evidence in [the measured report](docs/performance/fill-performance.md).
+The category covers comparer, group-pattern, rotated-pattern, extents-column, and feature-extraction workloads; individual filters match benchmark method names in `FillPerformanceTests.cs`. Keep harness, inputs, warmups and batches identical before/after; exclude setup/assertions from timing. Comparer/extents allocations are synchronous and current-thread only; parallel group fills omit allocation totals. No timing CI gates or whole-job speedup claims. Preserve evidence in [the measured report](docs/performance/fill-performance.md).
 
 Debug behavior/skipped-work checks:
 
@@ -42,7 +42,7 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug \
   --filter 'FullyQualifiedName~DefaultFillComparerWorkTests|FullyQualifiedName~FillHelpersTests|FullyQualifiedName~FillExtentsTests|FullyQualifiedName~StrategyOverlapTests'
 ```
 
-`PerfCounters.FillScoreComputations`, `PartBoundaryPreparations`, and `PartBoundsUpdates` increments compile away in Release: zero Release counters prove nothing. Serialize counter assertions in `FillCacheCollection` and reset in `finally`. Keep `OpenNest.Tests/Fill/LegacyFillExtents.cs` frozen for differential tests, not production or before timings; measure the actual baseline production code.
+`PerfCounters.FillScoreComputations`, `PartBoundaryPreparations`, `PartBoundsUpdates`, and `FeatureBitmaskCells` increments compile away in Release: zero Release counters prove nothing. Serialize counter assertions in `FillCacheCollection` and reset in `finally`. Keep `OpenNest.Tests/Fill/LegacyFillExtents.cs` frozen for differential tests, not production or before timings; measure the actual baseline production code.
 
 ## Architecture
 
@@ -76,7 +76,7 @@ Nesting algorithms use the jobs-only API. `INestingEngine.Solve(NestJob)` return
 - **BestFit/** (`namespace OpenNest.Engine.BestFit`): NFP-based pair evaluation pipeline — `BestFitFinder` orchestrates angle sweeps, `PairEvaluator`/`IPairEvaluator` scores part pairs, `RotationSlideStrategy`/`ISlideComputer` computes slide distances. `BestFitCache` and `BestFitFilter` optimize repeated lookups.
 - **RectanglePacking/** (`namespace OpenNest.Engine.RectanglePacking`): `FillBestFit` (single-item fill, tries horizontal and vertical orientations), `PackBottomLeft` (multi-item bin packing, sorts by area descending). Both operate on `Bin`/`Item` abstractions.
 - **CirclePacking/** (`namespace OpenNest.Engine.CirclePacking`): Alternative packing for circular parts.
-- **ML/** (`namespace OpenNest.Engine.ML`): `AnglePredictor` (ONNX model for predicting good rotation angles), `FeatureExtractor` (part geometry features), `BruteForceRunner` (full angle sweep for training data).
+- **ML/** (`namespace OpenNest.Engine.ML`): `AnglePredictor` (ONNX model for predicting good rotation angles), `FeatureExtractor` (part geometry features; `Extract(drawing, includeBitmask: false)` skips the 32x32 training bitmap for inference while scalars stay identical; the default overload keeps it for training), `BruteForceRunner` (full angle sweep for training data).
 - `NestItem`: Input to the engine — wraps a `Drawing` with quantity, priority, and rotation constraints.
 - `NestProgress`: Progress reporting model with `NestPhase` enum for UI feedback.
 
