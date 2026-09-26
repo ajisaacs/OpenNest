@@ -32,6 +32,8 @@ dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (W
 
 `OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only. Format changed files with `dotnet format OpenNest.sln --include <path>`.
 
+Shared coding-agent guidance lives in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports it for Claude Code compatibility; make shared instruction changes in AGENTS.md, not in duplicate agent-specific copies.
+
 ### Opt-in fill performance measurements
 
 ```bash

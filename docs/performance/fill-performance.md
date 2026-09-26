@@ -1,6 +1,6 @@
 # Fill performance measurements
 
-Documentation follow-up — 2026-09-25: the user explicitly approved the previously blocked `CLAUDE.md` update. It now documents the delivered comparer/group/extents workflow, Debug work counters, measurement limitations, and compatibility safeguards already reflected in README. The instruction-document sync blocker is resolved; references to it in the historical slice records below describe their delivery-time status. No production code or measured results changed.
+Documentation follow-up — 2026-09-25: the user explicitly approved the previously blocked instruction update, then chose `AGENTS.md` as the shared source of truth for multiple coding agents. `CLAUDE.md` imports it with `@AGENTS.md` for compatibility. The shared instructions document the delivered comparer/group/extents workflow, Debug work counters, measurement limitations, and safeguards already reflected in README. The instruction-document sync blocker is resolved; references to it in the historical slice records below describe their delivery-time status. No production code or measured results changed.
 
 ## Count-first comparer slice — 2026-09-25
 
