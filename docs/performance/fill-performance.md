@@ -650,3 +650,63 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
 Repeat the targeted command in Debug for bitmap work assertions. Shared safeguards moved intact (with Task 4b additions) from near-capacity `AGENTS.md` into [fill verification](fill-verification.md); the combined `AGENTS.md` + `CLAUDE.md` is now 31,434 bytes, below 32 KiB. README and the shared instructions describe availability-gated scalar inference; `CLAUDE.md` remains the thin import.
 
 Independent spec review **PASS**, followed by independent quality/integration review **APPROVED**; neither found Critical, Important or Minor issues. Both reconciled source/harness provenance, raw measurements, summaries, red/green and full-suite evidence. Each independently reran the targeted suites (77 Release, 81 Debug) and both disabled benchmark gates (six skipped each); the spec reviewer ran ten more three-case concurrency processes, and the quality reviewer ran three plus the full engine suite (300 passed). Raw scratch evidence was removed after review, retaining the tables, hashes and test summaries here. No actual ONNX inference or model accuracy test, Windows UI runtime test, or representative production corpus measurement was performed. Task 5 combined acceptance/report remains separate; gated A/B/C follow-ups were not started.
+
+## Task 5 — combined initial-batch acceptance — 2026-09-26
+
+This section closes the initial batch (Tasks 1–4b, delivered as `b318950`, `cec7396`, `6efa6b1`, `4553f8a`/`6863c8b`, `8188533`, `1e8e532`) by rerunning the complete verification surface on the final tree and adding the first whole-job before/after measurement. No production code changed in this task.
+
+### Acceptance suite results on the final tree
+
+Final tree: `1e8e532063434cbbc4aeeea6d50e090f4998ac00` on `master` (SDK 10.0.112, target runtime Microsoft.NETCore.App 8.0). Same machine as all earlier sections (KVM guest, 4 vCPUs presented as AMD Ryzen 9 5900X, Ubuntu 24.04).
+
+| Run | Passed | Skipped | Failed | vs Task 0 baseline |
+| --- | ---: | ---: | ---: | --- |
+| Main suite, Release | 1,335 | 18 | 0 | +195 passed; skips are 12 optional CHR fixtures + 6 opt-in benchmarks |
+| Main suite, Debug | 1,356 | 18 | 0 | +216 passed; same skip composition |
+| Engine suite, Release | 300 | 0 | 0 | identical to baseline |
+
+Baseline was 1,140 passed / 12 skipped / 0 failed (main) and 300 / 0 / 0 (engine). Every added test from Tasks 1–4b passes; no test failures were observed. With `OPENNEST_RUN_FILL_PERF` unset the Release category run skips all six benchmarks (verified: 6 skipped / 0 failed).
+
+### Final-tree opt-in benchmark reproduction
+
+All six `Category=FillPerformance` cases passed enabled on the final tree in one run. Medians reproduce the per-task delivered numbers within shared-VM process noise (no before/after pair was rerun here; each task section retains its own same-harness pairs):
+
+| Case | Final-tree median | Delivered reference |
+| --- | --- | --- |
+| unequal-counts actual | 1.583 ns/call | 1.878 ns/call (Task 1) |
+| unequal-counts reference | 11,956.654 ns/call | 11,979.646 ns/call (Task 1) |
+| equal-count control actual/reference | 11,164.062 / 11,190.333 ns/call | same range as reference (Task 1) |
+| group-pattern default / custom | 640.955 / 635.597 µs/call | overlapping-range control (Task 1b) |
+| extents spacing 0 / 0.5 | 2,188.589 µs/call, 839,480 B/call; 2,201.340 µs/call, 1,028,400 B/call | 839,624 / 1,028,544 B (Task 2/3) |
+| feature full / scalar-only | 163.135 / 29.558 µs/call (−81.9%); Δ 1,080.2 B/call | −80.1%; 1,080 B (Task 4a) |
+| rotated-pattern angle 0 / 0.37 | 15.923 / 30.306 µs/call | Task 3 control |
+| no-model-angles | 2.647 µs/call, 5,960 B/call | 2.632 / 2.623 µs/call, 5,960 B/call (Task 4b) |
+
+### First whole-job before/after corpus measurement
+
+Inspecting `OpenNest.Benchmark/Program.cs` first, as planned: the CLI accepts a `.nest` file, folder, or `*.manifest.json`; registered engines are `Default`, `Strip`, `Vertical Remnant`, `Horizontal Remnant`, `StockLadder`; no `Engines/` plug-ins are installed. The repository contains no `.nest` corpus, so a small representative corpus was built from the user-supplied production archive `/mnt/rogers/PEP Drawings/Archive/` (27,722 files, 27,420 of them `.dxf` by case-insensitive name) as a four-DXF manifest — a 1.5-inch tube with tapped hole, a 17×13 bent plate (`1214 A02 PT04`), a 4.44×2 bracket (`1000-164-11`), and a 1.5-inch pipe saddle, quantities 60/28/45/36 (169 parts), one 48x96 sheet candidate, part/edge spacing 0.5, rotation allowed. Manifest SHA-256 `3f13c7a674b2a33a26f31dcbf8fec3fc70ab7ef7f10bd801fb784d3d9179987b`; DXF SHA-256s `c44ee5f49a8b0bccd810b202fcc96f065bac5e1b49b51b5073003116011b1852`, `a8155c68ac30e165743676f68c339c03f4633945ccd1559c4e929c0f8d6f8f2c`, `3dff4381653e1bf7843f25dd8d4e09a253393e320285ec29faabea37c8270e59`, `366e2e3fceea673d0563ae6a16feac4e93b7867ed6b8313d9c8841cf40c6ff01`. Selection was bounded to a handful of drawings per the user's instruction.
+
+Corpus limitations recorded honestly: circle-heavy archive parts (small washers, OD plates) validate INVALID at baseline `1b862dc` — identical on both trees, a pre-existing spacing-validation behavior outside this batch's scope — so they were excluded rather than papered over. At higher quantities (280 parts) both trees crash identically with `InvalidOperationException: Candidate placements violate required part spacing`, again baseline-equal and out of scope. The accepted workload is the 169-part job that validates cleanly on both trees.
+
+Before tree: baseline `1b862dc` built via a separate git worktree. Final tree: `1e8e532`. Neither build has `Models/angle_predictor.onnx`, so both run under the same model-absent conditions with Task 4b's fallback behavior preserved (the executed paths intentionally differ: baseline extracts features before discovering prediction is unavailable, the final tree checks availability first). Four alternating baseline/final process repetitions each, `--engines Default,StockLadder --parallel 1`, same manifest and arguments; no salvage options were passed, so salvage credit resolves disabled on both trees. Each repetition is a fresh process (no process-global or JIT state carries across repetitions), and each solve builds its own `NestJob` snapshot and materialized drawings; within one repetition the two engine solves run sequentially in that process (StockLadder first, then Default). No `.nest` best-fit caches are involved and DXF import happens once during manifest loading, outside the timed region. Reported `Time(ms)` starts before `BuildNestJob` and covers geometry-snapshot construction, solving, materialization and validation per `BenchmarkRunner`, and no whole-job allocation totals were measured. Wall-clock time per solve:
+
+| Engine | Baseline times (ms) | Final times (ms) | Median Δ |
+| --- | --- | --- | --- |
+| Default | 41,108 / 40,711 / 40,396 / 40,553 | 40,466 / 40,689 / 40,229 / 40,939 | −0.13% |
+| StockLadder | 1,216 / 1,164 / 1,108 / 1,171 | 1,156 / 1,197 / 1,134 / 1,165 | −0.60% |
+
+All eight runs classify identically: valid, fully placed 169/169, cost 9,216.00, 2 plates (48x96×2), empty validation notes — the acceptance gate's valid/invalid, requested/placed, and cost non-regression requirements pass on outcomes. Baseline run-to-run spread alone is 712 ms (Default) and 108 ms (StockLadder), wider than the medians' differences and overlapping the final ranges, so no reproducible material timing difference was observed in either direction — timing is inconclusive, not a measured equivalence. That fits scope: the hot phases on this job (NFP pair evaluation, BestFit sweeps, validation) were not touched by Tasks 1–4b, whose measured wins are localized to comparer dispatch, discarded extents pitch geometry, redundant bounds walks, and the no-model feature path. No scheduling was altered to influence these results.
+
+Preserved raw evidence (outside the repository): manifest `pep-archive-benchmark-manifest.json`, per-run `baseline-rep1..4` / `final-rep1..4` CSV and console logs, and the full-tree benchmark log `fillperf-final-tree.log`, all under `/home/aj/extracted/2026-09-26/`. Reproduce with:
+
+```bash
+dotnet OpenNest.Benchmark/bin/Release/net8.0/OpenNest.Benchmark.dll \
+  /home/aj/extracted/2026-09-26/pep-archive-benchmark-manifest.json \
+  --engines Default,StockLadder --parallel 1 --csv <path>
+```
+
+### Batch-level conclusion and limits
+
+- Removed work is demonstrated by the deterministic Debug counters and red/green evidence in each task section; correctness is carried by the final-tree 1,335/1,356/300 passing suites; measurable local gains exist where allocation or scanning work was actually eliminated (Tasks 2, 3, 4a, 4b), with timing claims bounded to their same-harness pairs.
+- The whole-job corpus measurement above confirms identical valid classification, placed/requested counts, and cost on one small real-drawing job, with timing differences inside baseline run-to-run spread — inconclusive timing, not a measured performance equivalence, and not a speedup claim. A representative production `.nest` corpus at scale, Windows UI runtime testing, and actual ONNX-model inference remain untested.
+- Gated follow-ups A (offset-geometry reuse), B (sorted overlap broad phase), and C remain unauthorized and were not started.
