@@ -675,69 +675,41 @@ static class NestConsole
 
     static void PrintUsage()
     {
-        Console.Error.WriteLine("Usage: OpenNest.Console <input-files...> [options]");
-        Console.Error.WriteLine();
-        Console.Error.WriteLine("Arguments:");
         Console.Error.WriteLine(
-            "  input-files            One or more .nest nest files or .dxf/.dwg drawing files"
+            """
+            Usage: OpenNest.Console <input-files...> [options]
+
+            Arguments:
+              input-files            One or more .nest nest files or .dxf/.dwg drawing files
+
+            Modes:
+              <nest.nest>             Load nest and fill (existing behavior)
+              <part.dxf> --size WxL     Import DXF, create plate, and fill
+              <nest.nest> <part.dxf>  Load nest and add imported DXF drawings
+
+            Options:
+              --repair-bends-mm <n>   Opt-in endpoint/tick repair, limit >0.001 to 3.175 physical mm
+              --cad-units inches|mm  Explicit source coordinate units required for bend repair
+              --drawing <name>       Drawing name to fill with (default: first drawing)
+              --plate <index>        Plate index to fill (default: 0)
+              --quantity <n>          Max parts to place (default: 0 = unlimited)
+              --spacing <value>      Override part spacing
+              --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode
+              --output <path>        Output nest file path (default: <input>-result.nest)
+              --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)
+              --autonest             Whole-job nesting via the jobs engine (--engine) instead of single-plate fill
+              --engine <name>        With --autonest: jobs engine (default: Default; also StockLadder, Strip, ...).
+                                     Without --autonest: fill strategy (Default, Strip, Vertical Remnant, Horizontal Remnant)
+              --keep-parts           Don't clear existing parts before filling
+              --check-overlaps       Run overlap detection after fill (exit code 1 if found)
+              --no-save              Skip saving output file
+              --post <name>          Run a post processor after nesting
+              --post-output <path>   Output file for post processor (default: <input>.cnc)
+              --posts-dir <path>     Directory containing post processor DLLs (default: Posts/)
+              --list-posts           List available post processors and exit
+              -h, --help             Show this help
+            """
         );
-        Console.Error.WriteLine();
-        Console.Error.WriteLine("Modes:");
-        Console.Error.WriteLine("  <nest.nest>             Load nest and fill (existing behavior)");
-        Console.Error.WriteLine("  <part.dxf> --size WxL     Import DXF, create plate, and fill");
-        Console.Error.WriteLine(
-            "  <nest.nest> <part.dxf>  Load nest and add imported DXF drawings"
-        );
-        Console.Error.WriteLine();
-        Console.Error.WriteLine("Options:");
-        Console.Error.WriteLine(
-            "  --repair-bends-mm <n>   Opt-in endpoint/tick repair, limit >0.001 to 3.175 physical mm"
-        );
-        Console.Error.WriteLine(
-            "  --cad-units inches|mm  Explicit source coordinate units required for bend repair"
-        );
-        Console.Error.WriteLine(
-            "  --drawing <name>       Drawing name to fill with (default: first drawing)"
-        );
-        Console.Error.WriteLine("  --plate <index>        Plate index to fill (default: 0)");
-        Console.Error.WriteLine(
-            "  --quantity <n>          Max parts to place (default: 0 = unlimited)"
-        );
-        Console.Error.WriteLine("  --spacing <value>      Override part spacing");
-        Console.Error.WriteLine(
-            "  --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode"
-        );
-        Console.Error.WriteLine(
-            "  --output <path>        Output nest file path (default: <input>-result.nest)"
-        );
-        Console.Error.WriteLine(
-            "  --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)"
-        );
-        Console.Error.WriteLine(
-            "  --autonest             Whole-job nesting via the jobs engine (--engine) instead of single-plate fill"
-        );
-        Console.Error.WriteLine(
-            "  --engine <name>        With --autonest: jobs engine (default: Default; also StockLadder, Strip, ...)."
-        );
-        Console.Error.WriteLine(
-            "                         Without --autonest: fill strategy (Default, Strip, Vertical Remnant, Horizontal Remnant)"
-        );
-        Console.Error.WriteLine(
-            "  --keep-parts           Don't clear existing parts before filling"
-        );
-        Console.Error.WriteLine(
-            "  --check-overlaps       Run overlap detection after fill (exit code 1 if found)"
-        );
-        Console.Error.WriteLine("  --no-save              Skip saving output file");
-        Console.Error.WriteLine("  --post <name>          Run a post processor after nesting");
-        Console.Error.WriteLine(
-            "  --post-output <path>   Output file for post processor (default: <input>.cnc)"
-        );
-        Console.Error.WriteLine(
-            "  --posts-dir <path>     Directory containing post processor DLLs (default: Posts/)"
-        );
-        Console.Error.WriteLine("  --list-posts           List available post processors and exit");
-        Console.Error.WriteLine("  -h, --help             Show this help");
     }
 
     class Options
