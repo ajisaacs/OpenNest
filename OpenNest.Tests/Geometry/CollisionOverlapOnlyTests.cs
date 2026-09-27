@@ -59,6 +59,87 @@ public class CollisionOverlapOnlyTests
         Assert.True(boxOverlapClear > 5000);
     }
 
+    /// <summary>
+    /// Supplied triangulations, each prepared once and reused across many pairs as
+    /// PartOverlapChecker does, give the same verdicts as the legacy per-call path and are
+    /// never mutated by clipping or hole subtraction.
+    /// </summary>
+    [Fact]
+    public void SeededPreparedTriangles_ReusedAcrossPairs_MatchLegacyVerdicts()
+    {
+        var random = new Random(28092026);
+        var decisions = 0;
+        var overlaps = 0;
+        var boxOverlapClear = 0;
+        for (var group = 0; group < 40; group++)
+        {
+            var polygons = new List<Polygon>();
+            var shapeA = Make(random, group % 6);
+            var shapeB = Make(random, (group / 6) % 6);
+            for (var sample = 0; sample < 25; sample++)
+            {
+                // Offsets gives contact/containment placements within each (A, B) pair. Pulling
+                // every pair into one ~8-unit window makes most cross-pair tests reach clipping
+                // too, so each cached triangulation is reused against many near neighbours.
+                var (ax, ay, bx, by) = Offsets(random, shapeA, shapeB, sample);
+                var dx = random.NextDouble() * 4 - ax;
+                var dy = random.NextDouble() * 4 - ay;
+                polygons.Add(Move(shapeA, ax + dx, ay + dy));
+                polygons.Add(Move(shapeB, bx + dx, by + dy));
+            }
+            var holes = group % 4 == 0
+                ? polygons.Select(p => new List<Polygon> { Move(Square(0.5), p.BoundingBox.Left + 0.2, p.BoundingBox.Bottom + 0.2) }).ToList()
+                : null;
+            var triangles = polygons.Select(p => new Lazy<List<Polygon>>(() => Collision.Triangulate(p))).ToArray();
+            for (var i = 0; i < polygons.Count; i++)
+                for (var j = i + 1; j < polygons.Count; j++)
+                {
+                    var expected = LegacyCollision.HasOverlap(polygons[i], polygons[j], holes?[i], holes?[j]);
+                    var ti = triangles[i];
+                    var tj = triangles[j];
+                    var actual = Collision.HasOverlap(polygons[i], () => ti.Value, polygons[j], () => tj.Value, holes?[i], holes?[j]);
+                    Assert.True(expected == actual, $"group={group} i={i} j={j} expected={expected}");
+                    decisions++;
+                    if (expected)
+                        overlaps++;
+                    else if (BoxesOverlap(polygons[i].BoundingBox, polygons[j].BoundingBox))
+                        boxOverlapClear++;
+                }
+            for (var i = 0; i < polygons.Count; i++)
+            {
+                if (!triangles[i].IsValueCreated)
+                    continue;
+                // Reused triangles must still equal a fresh triangulation, bit for bit.
+                Assert.Equal(TriangleBits(Collision.Triangulate(polygons[i])), TriangleBits(triangles[i].Value));
+            }
+        }
+        output.WriteLine($"prepared-triangle decisions={decisions}; overlaps={overlaps}; bbox-overlap but clear={boxOverlapClear}");
+        Assert.Equal(40 * 50 * 49 / 2, decisions);
+        Assert.True(overlaps > 10000);
+        Assert.True(boxOverlapClear > 2000);
+    }
+
+    [Fact]
+    public void PreparedTriangles_AreNotResolvedWhenBoundingBoxesMiss()
+    {
+        var a = Square(2);
+        var b = Move(Square(2), 10, 10);
+        Assert.False(Collision.HasOverlap(a, () => throw new InvalidOperationException("A"), b,
+            () => throw new InvalidOperationException("B")));
+        var c = Move(Square(2), 1, 1);
+        var resolved = new List<string>();
+        Assert.True(Collision.HasOverlap(a, () => { resolved.Add("a"); return Collision.Triangulate(a); }, c,
+            () => { resolved.Add("c"); return Collision.Triangulate(c); }));
+        Assert.Equal(new[] { "a", "c" }, resolved);
+    }
+
+    private static long[] TriangleBits(List<Polygon> triangles) => triangles
+        .SelectMany(t => new[] { t.BoundingBox.X, t.BoundingBox.Y, t.BoundingBox.Length, t.BoundingBox.Width }
+            .Concat(t.Vertices.SelectMany(v => new[] { v.X, v.Y })))
+        .Select(BitConverter.DoubleToInt64Bits)
+        .Prepend(triangles.Count)
+        .ToArray();
+
     [Fact]
     public void SeededCheck_MatchesLegacyBitwise()
     {
@@ -155,11 +236,17 @@ public class CollisionOverlapOnlyTests
         Assert.ThrowsAny<Exception>(() => LegacyCollision.Check(a, b));
         Assert.ThrowsAny<Exception>(() => Collision.HasOverlap(a, b));
         Assert.ThrowsAny<Exception>(() => Collision.Check(a, b));
+        Assert.ThrowsAny<Exception>(() => Collision.HasOverlap(a, () => Collision.Triangulate(a), b,
+            () => Collision.Triangulate(b)));
 
         var far = Move(Make(new Random(5), 0), 100, 100);
         var broken = nullFirst ? a : b;
         Assert.False(LegacyCollision.Check(broken, far).Overlaps);
         Assert.False(Collision.HasOverlap(broken, far));
+        var resolved = 0;
+        Assert.False(Collision.HasOverlap(broken, () => { resolved++; return Collision.Triangulate(broken); }, far,
+            () => { resolved++; return Collision.Triangulate(far); }));
+        Assert.Equal(0, resolved);
     }
 
 #if DEBUG

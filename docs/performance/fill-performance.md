@@ -866,3 +866,201 @@ Unqualified solution formatter and verify each initially exited 1 (`Restore oper
 Timings are from a shared four-vCPU VM, one synthetic micro workload and one corpus; not general latency guarantees. When ranges overlap, timing is inconclusive, never evidence of unchanged performance. No Windows runtime tests or ONNX accuracy/inference checks, no optional StockLadder measurement. The normal-pool nondeterminism was characterized (serializing removes it and it appears in the before tree alone) but its source was not pinned down, and no scheduler or tie-break change was made.
 
 Raw logs, TRX, CSV, all saved .nest/JSON layouts, provenance and computed measurement summary are retained under `/home/aj/extracted/2026-09-26/followup-a/`. `micro-commands.json` and `whole-commands.json` record exact process commands/cwds. Final suite logs and TRX are under `final/`, and the determinism probe under `determinism-probe/`.
+
+## Follow-up B′ — overlap-check preparation reuse (Slices 1a, 1b, 2a) — 2026-09-27
+
+### Status, scope and exact-layout acceptance
+
+This replaces the original Follow-up B (X-sorted overlap broad phase). A profile of `82feb78` on the corpus job showed that overlap checks took about 53% of main-thread wall time, but the bounding-box loop itself had almost no self time. The cost was per-pair preparation inside `Part.Intersects`: rebuilding each polygon from its `Program`, triangulating both polygons, and computing crossing points that overlap-only callers discard. Three slices remove that work without changing any verdict:
+
+| Slice | Commit | Change |
+| --- | --- | --- |
+| 1a | `2b5485f` (harness `a98a49c`) | `Collision.HasOverlap` skips crossing points; `Check` is unchanged. |
+| 1b | `a27290a` | `PartOverlapChecker`: each distinct `Program` (reference identity) and each part's world polygon is prepared once per `HasOverlappingParts` call; both loops use it. |
+| 2a | this change | The checker also triangulates each part at most once per call, lazily after the bounding-box gate, and reuses those triangles for later pairs. |
+
+Loop order, bounding-box prefilter, early exit, returned indices and `Part.Intersects` (which still returns crossing points) are unchanged. Frozen test-only oracles hold the pre-change code: `OpenNest.Tests/Geometry/LegacyCollision.cs` and `OpenNest.Tests/Fill/LegacyPartOverlap.cs`.
+
+Exact-layout acceptance follows Follow-up A. The serialized probe (`DOTNET_PROCESSOR_COUNT=1`, one pool thread) produced the same placement file on base, 1a, 1b and 2a: SHA-256 `62b5a8d065c889e3599e3bd00e3f591502553c24e81962ccdcb06c4b06159708` (base ×2, 1a ×1, 1b ×2, 2a ×2).
+
+Under the normal thread pool, base alone produced three distinct placement multisets in three untimed runs. 4 of 6 untimed 1b/2a runs match one of them bit for bit. The other two share one class not seen in this small base sample. That class is not proven equivalent, but it is consistent with base producing a new class on every run. All nine runs were valid, placed 169/169 on 2 plates at the same cost, and had no violations.
+
+Step 2b is not implemented. It would triangulate per `Program` in the local frame, and a different frame can move triangle bounds by ulps and flip near-contact verdicts. "Validate on promotion only" and StripeFiller span reuse remain listed follow-ups.
+
+### Provenance
+
+- **Environment:** Ubuntu 24.04 x64 on a shared four-vCPU KVM VM; SDK 10.0.112; .NET 8.0.31 runtime.
+- **Before trees (detached worktrees):**
+  - For 1a and 1b: base `82feb78`, with the then-uncommitted harness byte-copied in.
+  - For 2a: the 1b tree.
+- **2a after tree:** `2b5485f` + 1b + 2a. Its Core and Engine are byte-identical to `a27290a` + 2a.
+- **Harness:** `OpenNest.Tests/Fill/OverlapCheckPerformanceTests.cs`, SHA-256 `efde386b150614c8ce21c101df1f3435e0de80f1aa2936e1161044cb2653bdea`, identical in every before and after tree.
+- **Corpus manifest:** SHA-256 `3f13c7a674b2a33a26f31dcbf8fec3fc70ab7ef7f10bd801fb784d3d9179987b`, the same file as Task 5 and Follow-up A.
+- **Delivered 2a sources:**
+  - `Collision.cs`: `aac902bfbb55c4ce0c4e95f2e17d53aad84b95e3695459f6ed8f9eeaec27abe8`
+  - `PartOverlapChecker.cs`: `606a540407df8ed5c47834070cc6aa712da419a7808ef7b96dc9cb1c6a509e46`
+
+Task 0 work counts (instrumented copy of base, corpus job):
+
+| Work | Base | After 1b | After 2a |
+| --- | ---: | ---: | ---: |
+| Exact pair tests | 65,410 | 65,410 | 65,410 |
+| Polygon builds | 65,410 | 3,250 (sum of distinct Programs per call) | 3,250 |
+| Triangulations | 65,410 | 65,410 | 45,476 |
+
+Triangulations fall less than polygon builds because most exact-tested parts meet only one neighbour.
+
+The corpus in-fill checks ran 32,705 exact tests and found zero overlaps. They still decide local fallbacks, so they were made cheaper, not removed.
+
+### Genuine red/green, mutations and tests
+
+Counters are Debug-only (`CrossingPointScans`, `OverlapPolygonPreparations`, `PolygonTriangulations`), so Release zeros prove nothing.
+
+| Evidence | Result |
+| --- | --- |
+| 1a RED: `HasOverlap` pointed back at the full path | work test fails, 5 crossing-point scans vs 0 expected |
+| 1b RED: loops back on uncached `Part.Intersects` | preparations 246 vs 1 (single-Program grid), 64 vs 2 (pair grid) |
+| 1b mutant: world polygon offset +1e-6 | bitwise world-polygon test fails |
+| 1b mutant: world polygon cached per Program, not per part | 22 failures, including the existing FillLinear layout differentials |
+| 2a RED: triangles not cached | triangulations 246 vs 40, 64 vs 36 (= parts reaching an exact test) |
+| 2a mutant: triangles shared per Program | 23 failures, including the FillLinear layout differentials |
+
+Differentials:
+
+- **Collision vs `LegacyCollision`:** 50,000 seeded `HasOverlap` decisions and 2,400 bitwise `Check` comparisons.
+- **Cached triangles:** 49,000 decisions (22,027 overlaps; 4,146 bounding-box hits that are clear), with triangles cached once per polygon and reused across all pairs. Afterwards the triangles are still bit-identical to a fresh triangulation.
+- **Fill grids vs `LegacyPartOverlap`:** verdicts, indices and world polygons are bit-identical across 5 shapes × 2 spacings × 3 angles × 2 directions, with ±1e-9 and 0.05 shifts. Also covered: shared, rotated and built-pair patterns; an overlapping seed; touching and epsilon gaps; scribe-only, rapid-only and empty programs; concurrent calls.
+
+The review audited every clipping and hole-subtraction path in `Collision.cs` and `ConvexDecomposition.cs`: cached triangles and their vertex lists are only read.
+
+Invalid-input carve-out (1a onward): a polygon whose `Vertices` is null still throws when bounding boxes overlap. The exception type changed from `NullReferenceException` (thrown in `ToLines`) to `ArgumentNullException` (thrown in triangulation), including through the prepared-triangles overload. No production code creates such polygons or catches either exception type. Separated boxes still return false without touching vertices or resolving triangles.
+
+| Suite / configuration (TRX outcomes) | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Base main Release (`82feb78`) | 1439 | 19 | 0 |
+| 1a main Release / Debug | 1451 / 1475 | 20 / 20 | 0 |
+| 1b main Release / Debug | 1496 / 1524 | 20 / 20 | 0 |
+| 2a main Release / Debug | 1496 / 1526 | 22 / 22 | 0 |
+| Engine Release (each slice) | 300 | 0 | 0 |
+| IO Release (each slice) | 41 | 0 | 0 |
+| 2a targeted Release / Debug | 325 / 346 | 1 / 1 | 0 |
+
+The two extra 2a skips are the CI Fiber sample regressions. They skip because the gitignored `OpenNest.Tests/test-config.json` was absent in the 2a worktree. For 1b and 2a, clean `EnableWindowsTargeting=true` solution builds give 47 warnings and 0 errors, identical to their bases (independent reviews).
+
+### Same-harness Release microbenchmark observations
+
+The benchmark is `OverlapCheck_ReportsPolygonPairsAndGridChecks`. Setup: area (3.1, 5.3, 96, 48), spacing 0.5, Horizontal. Modes:
+
+- **`grid-single`:** `FillLinear.Fill` of the arc fixture at 0.37 rad (40 parts, one Program), checked through `FillHelpers.HasOverlappingParts`.
+- **`grid-pair`:** a 0/π concave pair via `BuildRotatedPattern` at 0.37 rad (36 parts), checked the same way.
+- **`polygon-pairs`:** `Collision.HasOverlap` timed over the 155 bounding-box-overlapping neighbour pairs, with polygons prepared once.
+
+Every verdict is clear. Each process warms up with 2 × 20 calls per mode, then measures 7 batches × 50 calls, rotating mode order per batch. Processes ran in the order before-1, after-1, after-2, before-2.
+
+The grids are smaller than the planned ~100–200 parts. Grid size only scales the pair count, and the corpus job is the size-representative measurement.
+
+Slice 1a (before = base plus harness):
+
+`polygon-pairs` (µs/call per batch 1–7; B/call is constant across batches):
+
+| Process | µs/call, batches 1–7 | B/call |
+| --- | --- | ---: |
+| before-1 | 19176.5 / 18973.2 / 18913.7 / 18944.3 / 18040.0 / 17797.8 / 17851.1 | 10,030,640 |
+| after-1 | 10399.9 / 11020.1 / 10887.9 / 10221.8 / 10459.4 / 10185.3 / 10285.5 | 7,921,168 |
+| after-2 | 10462.4 / 10669.8 / 10346.5 / 10498.0 / 10651.5 / 10547.5 / 10413.3 | 7,921,168 |
+| before-2 | 19033.7 / 18849.8 / 18593.8 / 18340.6 / 18633.5 / 17674.8 / 17724.0 | 10,030,640 |
+
+Slice 1b (before = base plus harness; after = 1a plus 1b):
+
+`grid-single` (µs/call per batch 1–7; B/call is constant across batches):
+
+| Process | µs/call, batches 1–7 | B/call |
+| --- | --- | ---: |
+| before-1 | 21360.5 / 21387.9 / 20873.0 / 21314.1 / 20192.0 / 20093.7 / 19978.9 | 11,897,168 |
+| after-1 | 10425.0 / 10207.0 / 10164.8 / 10432.8 / 10418.8 / 10170.6 / 10457.9 | 7,860,696 |
+| after-2 | 10398.3 / 10480.3 / 10418.6 / 10599.3 / 10750.0 / 10839.8 / 10677.2 | 7,860,696 |
+| before-2 | 21816.8 / 20794.4 / 21098.9 / 20600.5 / 20408.2 / 20278.8 / 20122.4 | 11,897,168 |
+
+`grid-pair` (µs/call per batch 1–7; B/call is constant across batches):
+
+| Process | µs/call, batches 1–7 | B/call |
+| --- | --- | ---: |
+| before-1 | 1023.5 / 1027.3 / 1019.3 / 989.2 / 1017.6 / 992.6 / 989.4 | 465,408 |
+| after-1 | 272.0 / 280.1 / 278.1 / 284.2 / 272.7 / 284.6 / 273.7 | 133,144 |
+| after-2 | 282.5 / 270.1 / 303.8 / 282.4 / 276.9 / 286.7 / 286.6 | 133,144 |
+| before-2 | 1046.7 / 1042.3 / 1017.0 / 995.5 / 1110.9 / 1026.7 / 1022.5 | 465,408 |
+
+Slice 2a (before = 1b):
+
+`grid-single` (µs/call per batch 1–7; B/call is constant across batches):
+
+| Process | µs/call, batches 1–7 | B/call |
+| --- | --- | ---: |
+| before-1 | 10625.9 / 10874.6 / 10452.9 / 10305.0 / 10455.8 / 10542.9 / 10581.2 | 7,860,696 |
+| after-1 | 3867.9 / 3787.2 / 3462.5 / 3544.0 / 3443.5 / 3414.5 / 3776.1 | 5,308,808 |
+| after-2 | 3812.0 / 3488.3 / 3704.7 / 3464.9 / 3585.1 / 3678.8 / 3585.7 | 5,308,808 |
+| before-2 | 10566.4 / 10763.5 / 10646.8 / 10641.7 / 10476.5 / 10780.6 / 10749.1 | 7,860,696 |
+
+`grid-pair` (µs/call per batch 1–7; B/call is constant across batches):
+
+| Process | µs/call, batches 1–7 | B/call |
+| --- | --- | ---: |
+| before-1 | 284.5 / 263.5 / 279.4 / 284.0 / 272.8 / 278.6 / 281.3 | 133,144 |
+| after-1 | 250.5 / 232.8 / 188.1 / 177.4 / 179.7 / 181.4 / 184.6 | 97,016 |
+| after-2 | 182.1 / 184.7 / 189.7 / 176.1 / 192.2 / 239.9 / 182.2 | 97,016 |
+| before-2 | 275.7 / 297.5 / 286.6 / 280.5 / 277.6 / 275.4 / 290.8 | 133,144 |
+
+Medians per process (before-1 / after-1 / after-2 / before-2, µs):
+
+| Slice | Mode | Medians |
+| --- | --- | --- |
+| 1a | `polygon-pairs` | 18,914 / 10,400 / 10,498 / 18,594 |
+| 1b | `grid-single` | 20,873 / 10,419 / 10,599 / 20,600 |
+| 1b | `grid-pair` | 1,018 / 278 / 283 / 1,027 |
+| 2a | `grid-single` | 10,543 / 3,544 / 3,586 / 10,647 |
+| 2a | `grid-pair` | 279 / 185 / 185 / 280 |
+
+In every mode, the after and before batch ranges do not overlap.
+
+### Whole-job measurement
+
+This is the same corpus job as Task 5 and Follow-up A: Default engine only, `--parallel 1`, Release, alternating fresh processes, and timing runs without `--output`. The CSV `ElapsedMs` covers the engine run, not DXF import.
+
+| Comparison | Before runs (ms) | After runs (ms) | Median before → after |
+| --- | --- | --- | --- |
+| Base `82feb78` → 1a+1b | 18926, 18734, 18844, 19061 | 13572, 13175, 13459, 13468 | 18,885 → 13,464 (−28.7%) |
+| 1b → 1b+2a | 13402, 13544, 13353, 13394 | 12788, 13113, 12615, 12554 | 13,398 → 12,702 (−5.2%) |
+
+- **Run order:** B,A,B,A,B,A,A,B. Before and after ranges do not overlap in either comparison.
+- **Outcomes:** all 16 runs were valid and none crashed. Each placed 169/169 on 2 plates, with utilization 0.5346 and cost 9,216.
+- **Cumulative figure:** the two comparisons ran in separate batches, so the cumulative base → 2a improvement (about −33%) is indicative only.
+- **Serialized probe times** (one process each) are not timing claims: base 23,518/23,607 ms; 1a 23,286; 1b 17,762/17,651; 2a 16,389/16,945.
+
+Profile after 1b (dotnet-trace, main-thread root samples):
+
+| Frame | Share |
+| --- | ---: |
+| `PartOverlapChecker.Overlaps` (total) | 35.0% |
+| — `TriangulateWithBounds` | 27.1% |
+| — clipping | about 4.4% |
+| `ConvertProgram.AddProgram` (Program and polygon preparation) | 2.1% |
+
+Triangulation dominating is what justified 2a. After 2a, the remaining overlap cost is mostly triangulating each part once, plus clipping.
+
+### Reproduction and limitations
+
+```bash
+# Linux: prefix both scoped formatter commands with EnableWindowsTargeting=true.
+dotnet format OpenNest.sln --verify-no-changes --include <changed .cs files>
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --filter 'FullyQualifiedName~CollisionOverlapOnlyTests|FullyQualifiedName~PartOverlapCheckerTests'
+OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release --filter FullyQualifiedName~OverlapCheck_ReportsPolygonPairsAndGridChecks --logger 'console;verbosity=detailed'
+dotnet OpenNest.Benchmark/bin/Release/net8.0/OpenNest.Benchmark.dll /home/aj/extracted/2026-09-26/pep-archive-benchmark-manifest.json --engines Default --parallel 1 --csv <path>
+```
+
+Limitations:
+
+- The timings come from one shared VM, one synthetic micro workload and one real corpus job; they are not general latency guarantees.
+- Serialized identity covers one thread schedule. Concurrency-only differences are covered by per-call cache ownership and the concurrent differential tests, not by the probe.
+- No Windows runtime tests were run.
+
+Raw logs, TRX files, CSVs, placement files, profiles, probe sources and reviews are retained under `/home/aj/extracted/2026-09-27/followup-b/` (`task0/`, `slice1a/`, `slice1b/`, `slice2a/`, `layout-classes/`).

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using OpenNest.Geometry;
 
@@ -6,8 +7,8 @@ namespace OpenNest
     /// <summary>
     /// Overlap-only form of <see cref="Part.Intersects"/> for one pass over a fixed set of parts.
     /// Verdicts match <c>Intersects(other, out _)</c>. Each distinct <see cref="CNC.Program"/>
-    /// (by reference) is prepared once, each part's world polygon is built once, and crossing
-    /// points are not computed. Tiled copies from <see cref="Part.CloneAtOffset"/> share one
+    /// (by reference) is prepared once, each part's world polygon is built and triangulated at
+    /// most once, and crossing points are not computed. Tiled copies from <see cref="Part.CloneAtOffset"/> share one
     /// Program, so a fill grid prepares its pattern's programs only once.
     /// Parts must not move, rotate or change Program while an instance is in use. Instances are
     /// not thread-safe: create one per check.
@@ -18,7 +19,7 @@ namespace OpenNest
             ReferenceEqualityComparer.Instance
         );
 
-        private readonly Dictionary<Part, Polygon> worldPolygons = new(
+        private readonly Dictionary<Part, PreparedPart> preparedParts = new(
             ReferenceEqualityComparer.Instance
         );
 
@@ -42,13 +43,18 @@ namespace OpenNest
             if (perimeter1 == null || perimeter2 == null)
                 return false;
 
-            var polygon1 = WorldPolygon(part1, prepared1);
-            var polygon2 = WorldPolygon(part2, prepared2);
+            var world1 = PreparePart(part1, prepared1);
+            var world2 = PreparePart(part2, prepared2);
 
-            if (polygon1 == null || polygon2 == null)
+            if (world1.Polygon == null || world2.Polygon == null)
                 return false;
 
-            return Collision.HasOverlap(polygon1, polygon2);
+            return Collision.HasOverlap(
+                world1.Polygon,
+                world1.Triangles,
+                world2.Polygon,
+                world2.Triangles
+            );
         }
 
         private PreparedProgram Prepare(CNC.Program program)
@@ -62,11 +68,12 @@ namespace OpenNest
             return prepared;
         }
 
-        private Polygon WorldPolygon(Part part, PreparedProgram prepared)
+        private PreparedPart PreparePart(Part part, PreparedProgram prepared)
         {
-            if (worldPolygons.TryGetValue(part, out var polygon))
-                return polygon;
+            if (preparedParts.TryGetValue(part, out var world))
+                return world;
 
+            Polygon polygon = null;
             var local = prepared.GetLocalPolygon();
 
             if (local != null)
@@ -78,8 +85,30 @@ namespace OpenNest
                 polygon.Offset(part.Location);
             }
 
-            worldPolygons.Add(part, polygon);
-            return polygon;
+            world = new PreparedPart(polygon);
+            preparedParts.Add(part, world);
+            return world;
+        }
+
+        /// <summary>
+        /// A part's world polygon and, once a pair first needs it, its triangulation. Both are
+        /// shared by every later pair in this check and are never mutated.
+        /// </summary>
+        private sealed class PreparedPart
+        {
+            private List<Polygon> triangles;
+
+            public PreparedPart(Polygon polygon)
+            {
+                Polygon = polygon;
+                Triangles = GetTriangles;
+            }
+
+            public Polygon Polygon { get; }
+
+            public Func<List<Polygon>> Triangles { get; }
+
+            private List<Polygon> GetTriangles() => triangles ??= Collision.Triangulate(Polygon);
         }
 
         private sealed class PreparedProgram

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using OpenNest.Math;
 
@@ -58,6 +59,34 @@ namespace OpenNest.Geometry
             return OverlapRegions(a, b, holesA, holesB).Count > 0;
         }
 
+        /// <summary>
+        /// <see cref="HasOverlap(Polygon, Polygon, List{Polygon}, List{Polygon})"/> with the
+        /// per-polygon triangulation supplied by the caller. Triangulations are resolved lazily,
+        /// only after the bounding boxes overlap, and must come from <see cref="Triangulate"/> on
+        /// the same polygon; the verdict is then identical. The triangles are only read.
+        /// </summary>
+        internal static bool HasOverlap(
+            Polygon a,
+            Func<List<Polygon>> trianglesA,
+            Polygon b,
+            Func<List<Polygon>> trianglesB,
+            List<Polygon> holesA = null,
+            List<Polygon> holesB = null
+        )
+        {
+            if (!BoundingBoxesOverlap(a.BoundingBox, b.BoundingBox))
+                return false;
+
+            return OverlapRegions(trianglesA(), trianglesB(), holesA, holesB).Count > 0;
+        }
+
+        /// <summary>
+        /// The triangulation <see cref="Check"/> and <see cref="HasOverlap(Polygon, Polygon, List{Polygon}, List{Polygon})"/>
+        /// use for <paramref name="polygon"/>: ear-clipped triangles with bounds updated. Callers
+        /// that reuse it must not mutate the polygon or the triangles.
+        /// </summary>
+        internal static List<Polygon> Triangulate(Polygon polygon) => TriangulateWithBounds(polygon);
+
         public static List<CollisionResult> CheckAll(
             List<Polygon> polygons,
             List<List<Polygon>> holes = null
@@ -108,11 +137,15 @@ namespace OpenNest.Geometry
             Polygon b,
             List<Polygon> holesA,
             List<Polygon> holesB
+        ) => OverlapRegions(TriangulateWithBounds(a), TriangulateWithBounds(b), holesA, holesB);
+
+        private static List<Polygon> OverlapRegions(
+            List<Polygon> trisA,
+            List<Polygon> trisB,
+            List<Polygon> holesA,
+            List<Polygon> holesB
         )
         {
-            var trisA = TriangulateWithBounds(a);
-            var trisB = TriangulateWithBounds(b);
-
             var regions = new List<Polygon>();
 
             foreach (var triA in trisA)
@@ -186,6 +219,7 @@ namespace OpenNest.Geometry
         /// </summary>
         private static List<Polygon> TriangulateWithBounds(Polygon polygon)
         {
+            PerfCounters.CountPolygonTriangulation();
             var tris = ConvexDecomposition.Triangulate(polygon);
             foreach (var tri in tris)
                 tri.UpdateBounds();

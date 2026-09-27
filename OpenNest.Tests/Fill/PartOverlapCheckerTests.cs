@@ -167,6 +167,12 @@ public class PartOverlapCheckerTests
                 var expected = LegacyPartOverlap.WorldPolygon(p);
                 var actual = WorldPolygon(checker, p);
                 Assert.Equal(PolygonBits(expected), PolygonBits(actual));
+                // Cached triangles equal a fresh triangulation of the pre-change world polygon.
+                var expectedTriangles = Collision.Triangulate(expected);
+                var actualTriangles = WorldTriangles(checker, p);
+                Assert.Equal(expectedTriangles.Count, actualTriangles.Count);
+                for (var t = 0; t < expectedTriangles.Count; t++)
+                    Assert.Equal(PolygonBits(expectedTriangles[t]), PolygonBits(actualTriangles[t]));
             }
         }
     }
@@ -208,20 +214,7 @@ public class PartOverlapCheckerTests
     [InlineData("pair", 2)]
     public void Work_PreparesEachDistinctProgramOncePerCheck(string kind, long distinctPrograms)
     {
-        // Rotated grids: neighbouring boxes overlap but parts do not, so every box-overlapping
-        // pair reaches an exact test and there is no early exit.
-        var filler = new FillLinear(new Box(3.1, 5.3, 96, 48), 0.5);
-        List<Part> grid;
-        if (kind == "single")
-            grid = filler.Fill(Fixture("arc"), 0.37, NestDirection.Horizontal);
-        else
-        {
-            var first = Part.CreateAtOrigin(Fixture("concave"), 0);
-            var second = Part.CreateAtOrigin(Fixture("concave"), System.Math.PI);
-            second.Offset(new Vector(first.Right + 0.5, first.Bottom));
-            grid = filler.Fill(FillHelpers.BuildRotatedPattern(new List<Part> { first, second }, 0.37),
-                NestDirection.Horizontal);
-        }
+        var grid = WorkGrid(kind);
         Assert.Equal(distinctPrograms, grid.Select(g => g.Program).Distinct(ReferenceEqualityComparer.Instance).Count());
         PerfCounters.Reset();
         try
@@ -253,7 +246,64 @@ public class PartOverlapCheckerTests
             PerfCounters.Reset();
         }
     }
+
+    [Theory]
+    [InlineData("single")]
+    [InlineData("pair")]
+    public void Work_TriangulatesEachPartAtMostOncePerCheck(string kind)
+    {
+        var grid = WorkGrid(kind);
+        // Parts that reach an exact test: their part boxes and their world polygon boxes overlap.
+        var reaching = new HashSet<Part>(ReferenceEqualityComparer.Instance);
+        var exactTests = 0;
+        ForEachBoxOverlappingPair(grid, (a, b) =>
+        {
+            if (!PolygonBoxesOverlap(LegacyPartOverlap.WorldPolygon(a), LegacyPartOverlap.WorldPolygon(b)))
+                return;
+            exactTests++;
+            reaching.Add(a);
+            reaching.Add(b);
+        });
+        PerfCounters.Reset();
+        try
+        {
+            ForEachBoxOverlappingPair(grid, (a, b) => a.Intersects(b, out _));
+            var legacy = PerfCounters.PolygonTriangulations;
+            PerfCounters.Reset();
+            Assert.False(FillHelpers.HasOverlappingParts(grid));
+            var actual = PerfCounters.PolygonTriangulations;
+            output.WriteLine($"triangulations {kind}: parts={grid.Count}; exact tests={exactTests}; parts reaching={reaching.Count}; old={legacy}; new={actual}");
+            Assert.True(exactTests > 2);
+            Assert.Equal(2L * exactTests, legacy);
+            Assert.Equal(reaching.Count, actual);
+        }
+        finally
+        {
+            PerfCounters.Reset();
+        }
+    }
 #endif
+
+    private static List<Part> WorkGrid(string kind)
+    {
+        // Rotated grids: neighbouring boxes overlap but parts do not, so every box-overlapping
+        // pair reaches an exact test and there is no early exit.
+        var filler = new FillLinear(new Box(3.1, 5.3, 96, 48), 0.5);
+        if (kind == "single")
+            return filler.Fill(Fixture("arc"), 0.37, NestDirection.Horizontal);
+        var first = Part.CreateAtOrigin(Fixture("concave"), 0);
+        var second = Part.CreateAtOrigin(Fixture("concave"), System.Math.PI);
+        second.Offset(new Vector(first.Right + 0.5, first.Bottom));
+        return filler.Fill(FillHelpers.BuildRotatedPattern(new List<Part> { first, second }, 0.37),
+            NestDirection.Horizontal);
+    }
+
+    private static bool PolygonBoxesOverlap(Polygon a, Polygon b)
+    {
+        var overlapX = System.Math.Min(a.BoundingBox.Right, b.BoundingBox.Right) - System.Math.Max(a.BoundingBox.Left, b.BoundingBox.Left);
+        var overlapY = System.Math.Min(a.BoundingBox.Top, b.BoundingBox.Top) - System.Math.Max(a.BoundingBox.Bottom, b.BoundingBox.Bottom);
+        return overlapX > OpenNest.Math.Tolerance.Epsilon && overlapY > OpenNest.Math.Tolerance.Epsilon;
+    }
 
     private static void AssertMatchesLegacy(List<Part> parts)
     {
@@ -314,11 +364,18 @@ public class PartOverlapCheckerTests
             }
     }
 
-    private static Polygon WorldPolygon(PartOverlapChecker checker, Part part)
+    private static Polygon WorldPolygon(PartOverlapChecker checker, Part part) =>
+        (Polygon)PreparedPartMember(checker, part, "Polygon");
+
+    private static List<Polygon> WorldTriangles(PartOverlapChecker checker, Part part) =>
+        ((Func<List<Polygon>>)PreparedPartMember(checker, part, "Triangles"))();
+
+    private static object PreparedPartMember(PartOverlapChecker checker, Part part, string property)
     {
-        var field = typeof(PartOverlapChecker).GetField("worldPolygons",
+        var field = typeof(PartOverlapChecker).GetField("preparedParts",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-        return ((Dictionary<Part, Polygon>)field.GetValue(checker)!)[part];
+        var prepared = ((System.Collections.IDictionary)field.GetValue(checker)!)[part]!;
+        return prepared.GetType().GetProperty(property)!.GetValue(prepared)!;
     }
 
     /// <summary>Every other part replaced by a copy moved by (-shift, -shift).</summary>
