@@ -28,9 +28,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Api", "OpenNest.Ap
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PostProcessors", "PostProcessors", "{4052CFAC-1F12-48BE-872D-F503C3B65D7E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.Cincinnati", "OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj", "{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.Cincinnati", "Posts\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj", "{FB1B2EB2-9D80-4499-BA93-B4E2F295A532}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.GravographIS", "OpenNest.Posts.GravographIS\OpenNest.Posts.GravographIS.csproj", "{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.GravographIS", "Posts\OpenNest.Posts.GravographIS\OpenNest.Posts.GravographIS.csproj", "{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Data", "OpenNest.Data\OpenNest.Data.csproj", "{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}"
 EndProject

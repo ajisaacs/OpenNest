@@ -76,7 +76,7 @@ Layouts are validated (bounds, spacing, quantity, rotation, stock match); invali
 | **OpenNest.Gpu** | GPU-accelerated pair evaluation (ILGPU) |
 | **OpenNest.Benchmark** | Head-to-head engine comparison |
 | **OpenNest.Mcp** | MCP server for AI tool integration |
-| **OpenNest.Posts.Cincinnati** | Cincinnati laser post-processor plugin |
+| **Posts/** | Post-processor plugins (Cincinnati CL lasers, Gravograph IS8000) |
 | **\*.Tests** | Cross-platform suites; WinForms tests are Windows-only |
 
 ## Nesting Engines

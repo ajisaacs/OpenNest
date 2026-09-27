@@ -14,7 +14,7 @@ This is a .NET 8 solution using SDK-style `.csproj` files. The desktop app and W
 dotnet build OpenNest.sln
 ```
 
-Cross-platform whole-job engine tests (net8.0, runs on Linux/macOS/Windows without the desktop project or DXF fixtures): `dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj`. The main `OpenNest.Tests` suite also targets `net8.0`: run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj` independently on Linux/macOS/Windows. It must not reference the WinForms `OpenNest` project. The API, Data, Cincinnati, and GravographIS libraries target `net8.0`; post-processor build deployment still targets the desktop app's `net8.0-windows/Posts` directory. Optional CHR-font fixtures are configured through `OpenNest.Tests/test-config.json` and skip when absent.
+Cross-platform whole-job engine tests (net8.0, runs on Linux/macOS/Windows without the desktop project or DXF fixtures): `dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj`. The main `OpenNest.Tests` suite also targets `net8.0`: run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj` independently on Linux/macOS/Windows. It must not reference the WinForms `OpenNest` project. The API, Data, and post-processor libraries target `net8.0`. Post-processor projects live under `Posts/` (`Posts/OpenNest.Posts.<Name>/`, referencing `..\..\OpenNest.Core`); their build deployment still targets the desktop app's `net8.0-windows/Posts` directory. Optional CHR-font fixtures are configured through `OpenNest.Tests/test-config.json` and skip when absent.
 
 `OpenNest.WinForms.Tests` contains the desktop-assembly-dependent `CadBendNoteTests` (`CadText`) and `CuttingParametersSerializerTests` (`CuttingParametersSerializer`). It targets `net8.0-windows`, references `OpenNest`, and requires a Windows runner: `dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj`. Keep future desktop-dependent tests here rather than in `OpenNest.Tests`. Linux cross-compilation uses `dotnet build OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj -p:EnableWindowsTargeting=true`; cross-compilation is not Windows runtime verification.
 
@@ -110,7 +110,7 @@ The UI application with MDI interface.
 - **Forms/**: `MainForm` (MDI parent), `EditNestForm` (MDI child per nest), `SplitDrawingForm` (split oversized drawings into smaller pieces, launched from CadConverterForm), plus dialogs for plate editing, auto-nesting, DXF conversion, cut parameters, etc.
 - **Controls/**: `PlateView` (2D plate renderer with zoom/pan, supports temporary preview parts), `DrawingListBox`, `DrawControl`, `QuadrantSelect`.
 - **Actions/**: User interaction modes — `ActionSelect`, `ActionClone`, `ActionFillArea`, `ActionSelectArea`, `ActionZoomWindow`, `ActionSetSequence`, `ActionCutOff`.
-- **Post-processing**: `IPostProcessor` plugin interface loaded from DLLs in a `Posts/` directory at runtime.
+- **Post-processing**: `IPostProcessor` plugin interface loaded from DLLs in a `Posts/` directory at runtime. Plugin sources live in the repository's `Posts/` folder (the solution's `PostProcessors` folder).
 
 ## File Format
 

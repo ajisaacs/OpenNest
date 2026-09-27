@@ -28,8 +28,8 @@
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
     <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
-    <ProjectReference Include="..\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" />
-    <ProjectReference Include="..\OpenNest.Posts.GravographIS\OpenNest.Posts.GravographIS.csproj" />
+    <ProjectReference Include="..\Posts\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" />
+    <ProjectReference Include="..\Posts\OpenNest.Posts.GravographIS\OpenNest.Posts.GravographIS.csproj" />
   </ItemGroup>
 
   <ItemGroup>
