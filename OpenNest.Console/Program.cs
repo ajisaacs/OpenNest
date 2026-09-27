@@ -7,13 +7,13 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using OpenNest;
-using OpenNest.Geometry;
-using OpenNest.IO;
-using OpenNest.IO.Bending;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Geometry;
+using OpenNest.IO;
+using OpenNest.IO.Bending;
 
 return NestConsole.Run(args);
 
@@ -392,13 +392,16 @@ static class NestConsole
         Console.WriteLine(
             $"Plate: {options.PlateIndex} ({plate.Size.Width:F1} x {plate.Size.Length:F1}), spacing={plate.PartSpacing:F2}, edge=({plate.EdgeSpacing.Left},{plate.EdgeSpacing.Bottom},{plate.EdgeSpacing.Right},{plate.EdgeSpacing.Top}), workArea={wa.Width:F1}x{wa.Length:F1}"
         );
-        Console.WriteLine($"Drawing: {drawing.Name}");
+        var existingPartsMessage = options.KeepParts
+            ? $"Keeping {existingCount} existing parts"
+            : $"Cleared {existingCount} existing parts";
         Console.WriteLine(
-            options.KeepParts
-                ? $"Keeping {existingCount} existing parts"
-                : $"Cleared {existingCount} existing parts"
+            $"""
+            Drawing: {drawing.Name}
+            {existingPartsMessage}
+            ---
+            """
         );
-        Console.WriteLine("---");
     }
 
     static (bool success, long elapsedMs) Fill(
@@ -539,10 +542,14 @@ static class NestConsole
 
     static void PrintResults(bool success, Plate plate, long elapsedMs)
     {
-        Console.WriteLine($"Result: {(success ? "success" : "failed")}");
-        Console.WriteLine($"Parts placed: {plate.Parts.Count}");
-        Console.WriteLine($"Utilization: {plate.Utilization():P1}");
-        Console.WriteLine($"Time: {elapsedMs}ms");
+        Console.WriteLine(
+            $"""
+            Result: {(success ? "success" : "failed")}
+            Parts placed: {plate.Parts.Count}
+            Utilization: {plate.Utilization():P1}
+            Time: {elapsedMs}ms
+            """
+        );
     }
 
     static void Save(Nest nest, Options options)
@@ -623,7 +630,7 @@ static class NestConsole
         Console.WriteLine($"Post processors ({postsDir}):");
 
         foreach (var p in processors)
-            Console.WriteLine($"  {p.Name, -30} {p.Description}");
+            Console.WriteLine($"  {p.Name,-30} {p.Description}");
     }
 
     static void PostProcess(Nest nest, Options options)

@@ -104,9 +104,13 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
     var resolvedDb = dbPath.EndsWith(".db", StringComparison.OrdinalIgnoreCase)
         ? dbPath
         : dbPath + ".db";
-    Console.WriteLine($"Database: {Path.GetFullPath(resolvedDb)}");
-    Console.WriteLine($"Sheet sizes: {sheetSuite.Length} configurations");
-    Console.WriteLine($"Spacing: {s:F2}");
+    Console.WriteLine(
+        $"""
+        Database: {Path.GetFullPath(resolvedDb)}
+        Sheet sizes: {sheetSuite.Length} configurations
+        Spacing: {s:F2}
+        """
+    );
     if (saveDir != null)
         Console.WriteLine($"Saving nests to: {saveDir}");
     Console.WriteLine("---");
@@ -317,13 +321,15 @@ int RunDataCollection(string dir, string dbPath, string saveDir, double s, strin
     }
 
     totalSw.Stop();
-    Console.WriteLine("---");
-    Console.WriteLine($"Processed: {processed} parts, {totalRuns} total runs");
     Console.WriteLine(
-        $"Skipped:   {skippedExisting} (existing) + {skippedGeometry} (no geometry) + {skippedFeatures} (no features)"
+        $"""
+        ---
+        Processed: {processed} parts, {totalRuns} total runs
+        Skipped:   {skippedExisting} (existing) + {skippedGeometry} (no geometry) + {skippedFeatures} (no features)
+        Time:      {totalSw.Elapsed:h\:mm\:ss}
+        Database:  {Path.GetFullPath(resolvedDb)}
+        """
     );
-    Console.WriteLine($"Time:      {totalSw.Elapsed:h\\:mm\\:ss}");
-    Console.WriteLine($"Database:  {Path.GetFullPath(resolvedDb)}");
     return 0;
 }
 
