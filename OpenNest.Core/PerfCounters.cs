@@ -16,6 +16,7 @@ namespace OpenNest
         private static long partBoundaryPreparations;
         private static long partBoundsUpdates;
         private static long featureBitmaskCells;
+        private static long crossingPointScans;
 
         public static long FindBestFits => Interlocked.Read(ref findBestFits);
         public static long OffsetPerimeterEntities => Interlocked.Read(ref offsetPerimeterEntities);
@@ -24,6 +25,7 @@ namespace OpenNest
         public static long PartBoundaryPreparations => Interlocked.Read(ref partBoundaryPreparations);
         public static long PartBoundsUpdates => Interlocked.Read(ref partBoundsUpdates);
         public static long FeatureBitmaskCells => Interlocked.Read(ref featureBitmaskCells);
+        public static long CrossingPointScans => Interlocked.Read(ref crossingPointScans);
 
         [Conditional("DEBUG")]
         public static void CountFindBestFits() => Interlocked.Increment(ref findBestFits);
@@ -47,6 +49,9 @@ namespace OpenNest
         [Conditional("DEBUG")]
         public static void CountFeatureBitmaskCell() => Interlocked.Increment(ref featureBitmaskCells);
 
+        [Conditional("DEBUG")]
+        public static void CountCrossingPointScan() => Interlocked.Increment(ref crossingPointScans);
+
         public static void Reset()
         {
             Interlocked.Exchange(ref findBestFits, 0);
@@ -56,6 +61,7 @@ namespace OpenNest
             Interlocked.Exchange(ref partBoundaryPreparations, 0);
             Interlocked.Exchange(ref partBoundsUpdates, 0);
             Interlocked.Exchange(ref featureBitmaskCells, 0);
+            Interlocked.Exchange(ref crossingPointScans, 0);
         }
     }
 }

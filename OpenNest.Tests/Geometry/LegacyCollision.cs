@@ -1,7 +1,14 @@
+#nullable disable
+// Frozen, test-only copy of OpenNest.Core/Geometry/Collision.cs at commit
+// 82feb78b0fefdffc9ef9306205eeaf44e80e1d8d (before the overlap-only HasOverlap path).
+// Only #nullable disable (restores the original compile context), the imports, namespace, type
+// name and visibility differ from the original. Do not edit:
+// differential tests use it as the independent pre-change oracle.
 using System.Collections.Generic;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest.Geometry
+namespace OpenNest.Tests.Geometry
 {
     /// <summary>
     /// Polygon overlap test with hole subtraction. This is the reference implementation
@@ -19,7 +26,7 @@ namespace OpenNest.Geometry
     /// Inputs are closed, lines-only polygons; winding is normalized by triangulation.
     /// </para>
     /// </summary>
-    public static class Collision
+    internal static class LegacyCollision
     {
         public static CollisionResult Check(
             Polygon a,
@@ -35,11 +42,35 @@ namespace OpenNest.Geometry
             // Step 2: Quick intersection test for crossing points
             var intersectionPoints = FindCrossingPoints(a, b);
 
-            // Steps 3-5: Convex decomposition, triangle-pair clipping, hole subtraction
-            var regions = OverlapRegions(a, b, holesA, holesB);
+            // Step 3: Convex decomposition
+            var trisA = TriangulateWithBounds(a);
+            var trisB = TriangulateWithBounds(b);
+
+            // Step 4: Clip all triangle pairs
+            var regions = new List<Polygon>();
+
+            foreach (var triA in trisA)
+            {
+                foreach (var triB in trisB)
+                {
+                    if (!BoundingBoxesOverlap(triA.BoundingBox, triB.BoundingBox))
+                        continue;
+
+                    var clipped = ClipConvex(triA, triB);
+                    if (clipped != null)
+                        regions.Add(clipped);
+                }
+            }
+
+            // Step 5: Hole subtraction
+            if (regions.Count > 0)
+                regions = SubtractHoles(regions, holesA, holesB);
+
+            if (regions.Count == 0)
+                return new CollisionResult(false, regions, intersectionPoints);
 
             // Step 6: Build result
-            return new CollisionResult(regions.Count > 0, regions, intersectionPoints);
+            return new CollisionResult(true, regions, intersectionPoints);
         }
 
         public static bool HasOverlap(
@@ -52,10 +83,9 @@ namespace OpenNest.Geometry
             if (!BoundingBoxesOverlap(a.BoundingBox, b.BoundingBox))
                 return false;
 
-            // Clipping decides the verdict, including containment (one polygon entirely
-            // inside another has zero edge crossings). Crossing points never affect it,
-            // so this overlap-only path skips them.
-            return OverlapRegions(a, b, holesA, holesB).Count > 0;
+            // Full check is needed: crossing points alone miss containment cases
+            // (one polygon entirely inside another has zero edge crossings).
+            return Check(a, b, holesA, holesB).Overlaps;
         }
 
         public static List<CollisionResult> CheckAll(
@@ -98,42 +128,6 @@ namespace OpenNest.Geometry
             return false;
         }
 
-        /// <summary>
-        /// Positive-area overlap regions left after hole subtraction: the verdict shared by
-        /// <see cref="Check"/> and <see cref="HasOverlap"/>. Callers apply the polygon-level
-        /// bounding-box pre-filter first.
-        /// </summary>
-        private static List<Polygon> OverlapRegions(
-            Polygon a,
-            Polygon b,
-            List<Polygon> holesA,
-            List<Polygon> holesB
-        )
-        {
-            var trisA = TriangulateWithBounds(a);
-            var trisB = TriangulateWithBounds(b);
-
-            var regions = new List<Polygon>();
-
-            foreach (var triA in trisA)
-            {
-                foreach (var triB in trisB)
-                {
-                    if (!BoundingBoxesOverlap(triA.BoundingBox, triB.BoundingBox))
-                        continue;
-
-                    var clipped = ClipConvex(triA, triB);
-                    if (clipped != null)
-                        regions.Add(clipped);
-                }
-            }
-
-            if (regions.Count > 0)
-                regions = SubtractHoles(regions, holesA, holesB);
-
-            return regions;
-        }
-
         private static bool BoundingBoxesOverlap(Box a, Box b)
         {
             var overlapX = System.Math.Min(a.Right, b.Right) - System.Math.Max(a.Left, b.Left);
@@ -144,7 +138,6 @@ namespace OpenNest.Geometry
 
         private static List<Vector> FindCrossingPoints(Polygon a, Polygon b)
         {
-            PerfCounters.CountCrossingPointScan();
             if (!Intersect.Intersects(a, b, out var rawPts))
                 return new List<Vector>();
 
