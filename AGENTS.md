@@ -22,6 +22,10 @@ Cross-platform CAD import tests: `dotnet test OpenNest.IO.Tests/OpenNest.IO.Test
 
 NuGet dependencies: `ACadSharp` 3.1.32 (DXF/DWG import/export, in OpenNest.IO), `Clipper2` 2.0.0 (region offsetting, in OpenNest.Core), `System.Drawing.Common` 8.0.10, `ModelContextProtocol` + `Microsoft.Extensions.Hosting` (in OpenNest.Mcp), `Microsoft.ML.OnnxRuntime` (in OpenNest.Engine for ML angle prediction), `Microsoft.EntityFrameworkCore.Sqlite` (in OpenNest.Training).
 
+### Windows release packaging
+
+The GitHub `Windows release build` workflow runs on `release/vX.Y.Z` branches, `vX.Y.Z` tags, or manual dispatch. It builds with .NET 8 on `windows-2022`, runs all four test projects in Release plus the main Debug suite, and executes `scripts/Publish-Windows.ps1`. The script creates a self-contained win-x64 desktop ZIP with all three shipped posts, validates its contents/version, launches the extracted app, and writes a SHA-256 checksum. It refuses an existing output directory. Workflow artifacts are release candidates, not automatically published releases; follow [the release procedure](docs/releasing.md). Keep Gitea authoritative for Git refs.
+
 ### Fill performance verification
 
 See [fill verification](docs/performance/fill-verification.md) for opt-in measurements, targeted tests, Debug counter isolation, and predictor initialization rules. Keep training bitmaps by default; the angle builder checks predictor availability before scalar-only extraction.

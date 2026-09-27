@@ -17,7 +17,9 @@ A Windows desktop application for CNC nesting — imports DXF drawings, arranges
 ## Requirements
 
 - Windows 10+ for the desktop app; the console, API, and most test projects build on Linux/macOS too.
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) to build from source.
+
+Windows release ZIPs are self-contained: extract the entire archive into a new folder and run `OpenNest.exe`; no separate .NET installation is needed. Use the ZIP and SHA-256 checksum from [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases), not the source-code archives.
 
 ## Build, Test, Run
 

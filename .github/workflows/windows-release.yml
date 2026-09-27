@@ -1,0 +1,90 @@
+name: Windows release build
+
+on:
+  push:
+    branches: ['release/**']
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (for example 0.3.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Resolve version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $version = $env:INPUT_VERSION
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+            $version = $env:GITHUB_REF_NAME -replace '^release/', '' -replace '^v', ''
+          }
+          if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
+            throw "Expected an X.Y.Z version, not '$version'."
+          }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Build solution
+        run: |
+          dotnet build OpenNest.sln -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Solution build failed.' }
+      - name: Run all test projects on Windows
+        run: |
+          foreach ($project in @('OpenNest.Tests', 'OpenNest.Engine.Tests', 'OpenNest.IO.Tests', 'OpenNest.WinForms.Tests')) {
+            dotnet test "$project/$project.csproj" -c Release --no-build --logger "trx;LogFileName=$project.trx" --results-directory TestResults
+            if ($LASTEXITCODE -ne 0) { throw "$project failed." }
+          }
+          dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --logger 'trx;LogFileName=OpenNest.Tests.Debug.trx' --results-directory TestResults
+          if ($LASTEXITCODE -ne 0) { throw 'Debug tests failed.' }
+      - name: Publish and verify Windows package
+        run: ./scripts/Publish-Windows.ps1 -Version $env:RELEASE_VERSION
+      - name: Verify overwrite protection
+        run: |
+          $zip = Get-ChildItem artifacts/*.zip
+          $before = (Get-FileHash $zip.FullName).Hash
+          $rejected = $false
+          try { ./scripts/Publish-Windows.ps1 -Version $env:RELEASE_VERSION }
+          catch {
+            if ($_.Exception.Message -notlike 'Refusing to overwrite existing output:*') { throw }
+            $rejected = $true
+          }
+          if (-not $rejected) { throw 'Existing output was not rejected.' }
+          if ((Get-FileHash $zip.FullName).Hash -ne $before) { throw 'Existing ZIP changed.' }
+          Write-Host 'PASS: existing release package preserved.'
+      - name: Upload verified release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: OpenNest-${{ env.RELEASE_VERSION }}-win-x64
+          path: |
+            artifacts/*.zip
+            artifacts/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-test-results
+          path: TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 14
