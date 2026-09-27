@@ -42,6 +42,8 @@ Shared coding-agent guidance lives in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE
 4. Fill — the engine arranges parts
 5. Optionally add cut-off lines, then save `.nest`, export DXF, or post-process to G-code
 
+Review part spacing before cutting, especially for interlocking pairs. See [pair-spacing checks and current limitations](docs/geometry/pair-spacing.md).
+
 ## Command-Line Interface
 
 ```bash

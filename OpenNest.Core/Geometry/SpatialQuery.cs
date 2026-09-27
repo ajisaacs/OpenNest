@@ -40,45 +40,45 @@ namespace OpenNest.Geometry
             {
                 case PushDirection.Left:
                 case PushDirection.Right:
-                {
-                    var dy = p2y - p1y;
-                    if (System.Math.Abs(dy) < Tolerance.Epsilon)
+                    {
+                        var dy = p2y - p1y;
+                        if (System.Math.Abs(dy) < Tolerance.Epsilon)
+                            return double.MaxValue;
+
+                        var t = (vy - p1y) / dy;
+                        if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                            return double.MaxValue;
+
+                        var ix = p1x + t * (p2x - p1x);
+                        var dist = direction == PushDirection.Left ? vx - ix : ix - vx;
+
+                        if (dist > Tolerance.Epsilon)
+                            return dist;
+                        if (dist >= -Tolerance.Epsilon)
+                            return 0;
                         return double.MaxValue;
-
-                    var t = (vy - p1y) / dy;
-                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
-                        return double.MaxValue;
-
-                    var ix = p1x + t * (p2x - p1x);
-                    var dist = direction == PushDirection.Left ? vx - ix : ix - vx;
-
-                    if (dist > Tolerance.Epsilon)
-                        return dist;
-                    if (dist >= -Tolerance.Epsilon)
-                        return 0;
-                    return double.MaxValue;
-                }
+                    }
 
                 case PushDirection.Down:
                 case PushDirection.Up:
-                {
-                    var dx = p2x - p1x;
-                    if (System.Math.Abs(dx) < Tolerance.Epsilon)
+                    {
+                        var dx = p2x - p1x;
+                        if (System.Math.Abs(dx) < Tolerance.Epsilon)
+                            return double.MaxValue;
+
+                        var t = (vx - p1x) / dx;
+                        if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
+                            return double.MaxValue;
+
+                        var iy = p1y + t * (p2y - p1y);
+                        var dist = direction == PushDirection.Down ? vy - iy : iy - vy;
+
+                        if (dist > Tolerance.Epsilon)
+                            return dist;
+                        if (dist >= -Tolerance.Epsilon)
+                            return 0;
                         return double.MaxValue;
-
-                    var t = (vx - p1x) / dx;
-                    if (t < -Tolerance.Epsilon || t > 1.0 + Tolerance.Epsilon)
-                        return double.MaxValue;
-
-                    var iy = p1y + t * (p2y - p1y);
-                    var dist = direction == PushDirection.Down ? vy - iy : iy - vy;
-
-                    if (dist > Tolerance.Epsilon)
-                        return dist;
-                    if (dist >= -Tolerance.Epsilon)
-                        return 0;
-                    return double.MaxValue;
-                }
+                    }
 
                 default:
                     return double.MaxValue;
@@ -245,6 +245,78 @@ namespace OpenNest.Geometry
                 return 0;
 
             return double.MaxValue;
+        }
+
+        /// <summary>
+        /// Returns the first external or internal tangency along a unit direction, or
+        /// double.MaxValue if none exists. Centers must be in the same world frame;
+        /// radii must be nonnegative. An optional arc constrains the contact angle
+        /// (null means a full circle); only its angular range is used.
+        /// Endpoint contacts and coincident equal-radius curves remain the caller's
+        /// vertex-to-entity responsibility, so this is not a complete collision test.
+        /// </summary>
+        public static double CurveTangencyDistance(
+            double movingCx,
+            double movingCy,
+            double movingRadius,
+            Arc movingArc,
+            double stationaryCx,
+            double stationaryCy,
+            double stationaryRadius,
+            Arc stationaryArc,
+            double dirX,
+            double dirY
+        )
+        {
+            var best = double.MaxValue;
+            for (var kind = 0; kind < 2; kind++)
+            {
+                var internalContact = kind == 1;
+                var radius = internalContact
+                    ? System.Math.Abs(movingRadius - stationaryRadius)
+                    : movingRadius + stationaryRadius;
+
+                // Equal-radius internal contact has coincident centers, not a unique
+                // tangent point. Endpoints detect any overlap of those angular spans.
+                if (radius == 0)
+                    continue;
+
+                if (!SolveRayCircle(
+                    movingCx, movingCy, stationaryCx, stationaryCy, radius,
+                    dirX, dirY, out var t1, out var t2))
+                    continue;
+
+                // The nearer center-circle root can be outside an arc while the farther
+                // root is its first contact. Check the actual tangent point at BOTH roots.
+                for (var root = 0; root < 2; root++)
+                {
+                    var t = root == 0 ? t1 : t2;
+                    if (t < -Tolerance.Epsilon || t >= best)
+                        continue;
+
+                    var toX = stationaryCx - (movingCx + t * dirX);
+                    var toY = stationaryCy - (movingCy + t * dirY);
+                    var movingSign = internalContact && movingRadius < stationaryRadius ? -1 : 1;
+                    var stationarySign = internalContact ? movingSign : -1;
+                    if (!ContainsContactAngle(movingArc, movingRadius, movingSign * toX, movingSign * toY)
+                        || !ContainsContactAngle(stationaryArc, stationaryRadius, stationarySign * toX, stationarySign * toY))
+                        continue;
+
+                    best = t > Tolerance.Epsilon ? t : 0;
+                    if (best == 0)
+                        return 0;
+                }
+            }
+            return best;
+        }
+
+        private static bool ContainsContactAngle(Arc arc, double radius, double x, double y)
+        {
+            // A zero-radius curve is a point: its angular range has no geometric meaning.
+            if (arc == null || radius == 0)
+                return true;
+            var angle = Angle.NormalizeRad(System.Math.Atan2(y, x));
+            return Angle.IsBetweenRad(angle, arc.StartAngle, arc.EndAngle, arc.IsReversed);
         }
 
         /// <summary>
@@ -717,12 +789,7 @@ namespace OpenNest.Geometry
             if (minDist <= 0)
                 return 0;
 
-            // Phase 4: Curve-to-curve direct distance.
-            // The vertex-to-entity approach misses the closest contact between two
-            // curved entities (circles/arcs) because only a few cardinal vertices are
-            // sampled. The true closest contact along the push direction is found by
-            // treating it as a ray from one center to an expanded circle at the other
-            // center (radius = r1 + r2).
+            // Phase 4: Native curve tangency, including a convex corner inside a concave arc.
             for (var i = 0; i < movingEntities.Count; i++)
             {
                 var me = movingEntities[i];
@@ -735,47 +802,11 @@ namespace OpenNest.Geometry
                     if (!TryGetCurveParams(se, out var scx, out var scy, out var sr))
                         continue;
 
-                    var d = RayCircleDistance(mcx, mcy, scx, scy, mr + sr, dirX, dirY);
-
+                    var d = CurveTangencyDistance(
+                        mcx, mcy, mr, me as Arc,
+                        scx, scy, sr, se as Arc, dirX, dirY);
                     if (d >= minDist)
                         continue;
-
-                    // For arcs, verify the contact point falls within both arcs' angular ranges.
-                    if (me is Arc || se is Arc)
-                    {
-                        var mx = mcx + d * dirX;
-                        var my = mcy + d * dirY;
-                        var toCx = scx - mx;
-                        var toCy = scy - my;
-
-                        if (me is Arc mArc)
-                        {
-                            var angle = Angle.NormalizeRad(System.Math.Atan2(toCy, toCx));
-                            if (
-                                !Angle.IsBetweenRad(
-                                    angle,
-                                    mArc.StartAngle,
-                                    mArc.EndAngle,
-                                    mArc.IsReversed
-                                )
-                            )
-                                continue;
-                        }
-
-                        if (se is Arc sArc)
-                        {
-                            var angle = Angle.NormalizeRad(System.Math.Atan2(-toCy, -toCx));
-                            if (
-                                !Angle.IsBetweenRad(
-                                    angle,
-                                    sArc.StartAngle,
-                                    sArc.EndAngle,
-                                    sArc.IsReversed
-                                )
-                            )
-                                continue;
-                        }
-                    }
 
                     minDist = d;
                     if (d <= 0)

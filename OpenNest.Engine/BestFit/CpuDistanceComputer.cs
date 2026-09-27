@@ -253,54 +253,12 @@ namespace OpenNest.Engine.BestFit
                         for (var s = 0; s < stationaryCurves.Length; s++)
                         {
                             var sc = stationaryCurves[s];
-                            var d = SpatialQuery.RayCircleDistance(
-                                mcx,
-                                mcy,
-                                sc.Cx,
-                                sc.Cy,
-                                mc.Radius + sc.Radius,
-                                dirX,
-                                dirY
-                            );
+                            var d = SpatialQuery.CurveTangencyDistance(
+                                mcx, mcy, mc.Radius, mc.Entity as Arc,
+                                sc.Cx, sc.Cy, sc.Radius, sc.Entity as Arc, dirX, dirY);
 
-                            if (d >= minDist || d == double.MaxValue)
+                            if (d >= minDist)
                                 continue;
-
-                            if (mc.Entity is Arc || sc.Entity is Arc)
-                            {
-                                var mx = mcx + d * dirX;
-                                var my = mcy + d * dirY;
-                                var toCx = sc.Cx - mx;
-                                var toCy = sc.Cy - my;
-
-                                if (mc.Entity is Arc mArc)
-                                {
-                                    var angle = Angle.NormalizeRad(System.Math.Atan2(toCy, toCx));
-                                    if (
-                                        !Angle.IsBetweenRad(
-                                            angle,
-                                            mArc.StartAngle,
-                                            mArc.EndAngle,
-                                            mArc.IsReversed
-                                        )
-                                    )
-                                        continue;
-                                }
-
-                                if (sc.Entity is Arc sArc)
-                                {
-                                    var angle = Angle.NormalizeRad(System.Math.Atan2(-toCy, -toCx));
-                                    if (
-                                        !Angle.IsBetweenRad(
-                                            angle,
-                                            sArc.StartAngle,
-                                            sArc.EndAngle,
-                                            sArc.IsReversed
-                                        )
-                                    )
-                                        continue;
-                                }
-                            }
 
                             minDist = d;
                             if (d <= 0)
