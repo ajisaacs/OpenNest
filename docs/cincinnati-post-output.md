@@ -2,8 +2,14 @@
 
 Reference for the G-code structure emitted by `OpenNest.Posts.Cincinnati`.
 Every code listed here maps to a section in the Cincinnati Laser Programming
-Manual (`docs/CINCINNATI LASER PROGRAMMING MANUAL.pdf`, EM-423 R-02/11).
-Section numbers in parentheses (e.g. `§1.52`) refer to the manual.
+Manual (EM-423 R-02/11). Section numbers in parentheses (e.g. `§1.52`)
+refer to that edition. Obtain the applicable manual from Cincinnati; vendor
+manuals are not bundled because redistribution permission has not been established.
+
+This is a project-written implementation reference, not a replacement for the
+machine's programming, operating, or safety documentation. Keep vendor PDFs and
+full-text extracts outside source control; do not re-add them without permission.
+For the separate CI Fiber post, see [CI Fiber output](cincinnati-ci-fiber-post-output.md).
 
 If you add a new emission in the post, either cite the manual section it maps
 to, or flag it here as a known custom extension. "Custom code" in this project

@@ -217,3 +217,7 @@ docs/superpowers/
 
 # Local test config (contains user-specific paths to proprietary test assets)
 OpenNest.Tests/test-config.json
+
+# Vendor programming manuals: keep reference copies outside source control.
+CINCINNATI LASER PROGRAMMING MANUAL.pdf
+TF5200_programming_manual_en.pdf

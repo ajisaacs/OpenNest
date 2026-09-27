@@ -137,6 +137,8 @@ Always keep `README.md` and `AGENTS.md` up to date when making changes that affe
 
 **Do not commit** design specs, implementation plans, or other temporary planning documents (`docs/superpowers/` etc.) to the repository. These are working documents only — keep them local and untracked.
 
+Keep vendor programming manuals and full-text extracts outside source control unless redistribution permission has been established. Maintain project-written post behavior references instead: [Cincinnati CL](docs/cincinnati-post-output.md) and [Cincinnati CI Fiber](docs/cincinnati-ci-fiber-post-output.md). Cite the manual edition and relevant sections, distinguish controller rules from machine-specific macros, and document unconfirmed behavior without copying vendor text.
+
 ## Key Patterns
 
 - OpenNest.Core uses multiple namespaces: `OpenNest` (root domain), `OpenNest.CNC`, `OpenNest.Geometry`, `OpenNest.Converters`, `OpenNest.Math`, `OpenNest.Collections`.
