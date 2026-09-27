@@ -1,42 +1,17 @@
+// Frozen from 094c4c1 for differential tests. Keep this reference unchanged.
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading.Tasks;
+using OpenNest.Engine;
+using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
-namespace OpenNest.Engine.Fill
+namespace OpenNest.Tests.Fill
 {
-    public class FillLinear
+    internal class LegacyFillLinear
     {
-        // Owned by one public call: FillHelpers can use this filler concurrently.
-        // Cached local entities never escape; only translated clones reach spatial queries.
-        private sealed class OffsetPerimeterCache
-        {
-            private readonly Dictionary<CNC.Program, List<Entity>> perimeters =
-                new Dictionary<CNC.Program, List<Entity>>(ReferenceEqualityComparer.Instance);
-            private readonly double spacing;
-
-            public OffsetPerimeterCache(double spacing) => this.spacing = spacing;
-
-            public List<Entity> AtLocation(CNC.Program program, Vector location)
-            {
-                if (!perimeters.TryGetValue(program, out var local))
-                {
-                    local = PartGeometry.GetOffsetPerimeterEntities(program, spacing);
-                    perimeters.Add(program, local);
-                }
-
-                var result = new List<Entity>(local.Count);
-                foreach (var entity in local)
-                {
-                    var clone = entity.Clone();
-                    clone.Offset(location);
-                    result.Add(clone);
-                }
-                return result;
-            }
-        }
-
-        public FillLinear(Box workArea, double partSpacing)
+        public LegacyFillLinear(Box workArea, double partSpacing)
         {
             PartSpacing = partSpacing;
             WorkArea = new Box(workArea.X, workArea.Y, workArea.Length, workArea.Width);
@@ -92,15 +67,18 @@ namespace OpenNest.Engine.Fill
         /// Uses native Line/Arc entities (inflated by half-spacing) so curves are handled
         /// exactly without polygon sampling error.
         /// </summary>
-        private double FindCopyDistance(Part partA, NestDirection direction, OffsetPerimeterCache cache)
+        private double FindCopyDistance(Part partA, NestDirection direction)
         {
             var bboxDim = GetDimension(partA.BoundingBox, direction);
             var pushDir = GetPushDirection(direction);
             var startOffset = bboxDim + PartSpacing + Tolerance.Epsilon;
             var offset = MakeOffset(direction, startOffset);
 
-            var stationaryEntities = cache.AtLocation(partA.Program, partA.Location);
-            var movingEntities = cache.AtLocation(partA.Program, partA.Location + offset);
+            var stationaryEntities = PartGeometry.GetOffsetPerimeterEntities(partA, HalfSpacing);
+            var movingEntities = PartGeometry.GetOffsetPerimeterEntities(
+                partA.CloneAtOffset(offset),
+                HalfSpacing
+            );
 
             var slideDistance = SpatialQuery.DirectionalDistance(
                 movingEntities,
@@ -121,10 +99,10 @@ namespace OpenNest.Engine.Fill
         /// geometry inflated by half-spacing — same primitive the Compactor uses — so arcs
         /// are exact and no bbox clamp is needed.
         /// </summary>
-        private double FindPatternCopyDistance(Pattern patternA, NestDirection direction, OffsetPerimeterCache cache)
+        private double FindPatternCopyDistance(Pattern patternA, NestDirection direction)
         {
             if (patternA.Parts.Count == 1)
-                return FindCopyDistance(patternA.Parts[0], direction, cache);
+                return FindCopyDistance(patternA.Parts[0], direction);
 
             var bboxDim = GetDimension(patternA.BoundingBox, direction);
             var pushDir = GetPushDirection(direction);
@@ -167,8 +145,14 @@ namespace OpenNest.Engine.Fill
                     if (!SpatialQuery.PerpendicularOverlap(movingBox, stationaryBox, dirVec))
                         continue;
 
-                    stationaryEntities[i] ??= cache.AtLocation(parts[i].Program, parts[i].Location);
-                    movingEntities[j] ??= cache.AtLocation(parts[j].Program, parts[j].Location + offset);
+                    stationaryEntities[i] ??= PartGeometry.GetOffsetPerimeterEntities(
+                        parts[i],
+                        HalfSpacing
+                    );
+                    movingEntities[j] ??= PartGeometry.GetOffsetPerimeterEntities(
+                        parts[j].CloneAtOffset(offset),
+                        HalfSpacing
+                    );
 
                     var slideDistance = SpatialQuery.DirectionalDistance(
                         movingEntities[j],
@@ -195,9 +179,9 @@ namespace OpenNest.Engine.Fill
         /// patterns, also adds individual parts from the next incomplete copy
         /// that still fit within the work area.
         /// </summary>
-        private List<Part> TilePattern(Pattern basePattern, NestDirection direction, OffsetPerimeterCache cache)
+        private List<Part> TilePattern(Pattern basePattern, NestDirection direction)
         {
-            var copyDistance = FindPatternCopyDistance(basePattern, direction, cache);
+            var copyDistance = FindPatternCopyDistance(basePattern, direction);
 
             if (copyDistance <= 0)
                 return new List<Part>();
@@ -356,13 +340,13 @@ namespace OpenNest.Engine.Fill
         /// a row, then tiling that row along the perpendicular axis to form a grid.
         /// After the grid is formed, fills the remaining strip with individual parts.
         /// </summary>
-        private List<Part> FillGrid(Pattern pattern, NestDirection direction, OffsetPerimeterCache cache)
+        private List<Part> FillGrid(Pattern pattern, NestDirection direction)
         {
             var perpAxis = PerpendicularAxis(direction);
 
             // Step 1: Tile along primary axis
             var row = new List<Part>(pattern.Parts);
-            row.AddRange(TilePattern(pattern, direction, cache));
+            row.AddRange(TilePattern(pattern, direction));
 
             if (pattern.Parts.Count > 1 && HasOverlappingParts(row, out var a1, out var b1))
             {
@@ -374,7 +358,7 @@ namespace OpenNest.Engine.Fill
             // If primary tiling didn't produce copies, just tile along perpendicular
             if (row.Count <= pattern.Parts.Count)
             {
-                row.AddRange(TilePattern(pattern, perpAxis, cache));
+                row.AddRange(TilePattern(pattern, perpAxis));
 
                 if (pattern.Parts.Count > 1 && HasOverlappingParts(row, out var a2, out var b2))
                 {
@@ -392,7 +376,7 @@ namespace OpenNest.Engine.Fill
             rowPattern.UpdateBounds();
 
             var gridResult = new List<Part>(rowPattern.Parts);
-            gridResult.AddRange(TilePattern(rowPattern, perpAxis, cache));
+            gridResult.AddRange(TilePattern(rowPattern, perpAxis));
 
             if (HasOverlappingParts(gridResult, out var a3, out var b3))
             {
@@ -454,7 +438,6 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         public Pattern FillRow(Drawing drawing, double rotationAngle, NestDirection direction)
         {
-            var cache = new OffsetPerimeterCache(HalfSpacing);
             var seed = MakeSeedPattern(drawing, rotationAngle);
 
             if (seed.Parts.Count == 0)
@@ -462,7 +445,7 @@ namespace OpenNest.Engine.Fill
 
             var template = seed.Parts[0];
 
-            var copyDistance = FindCopyDistance(template, direction, cache);
+            var copyDistance = FindCopyDistance(template, direction);
 
             if (copyDistance <= 0)
                 return seed;
@@ -494,7 +477,6 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         public List<Part> Fill(Pattern pattern, NestDirection primaryAxis)
         {
-            var cache = new OffsetPerimeterCache(HalfSpacing);
             if (pattern.Parts.Count == 0)
                 return new List<Part>();
 
@@ -507,7 +489,7 @@ namespace OpenNest.Engine.Fill
             )
                 return new List<Part>();
 
-            return FillGrid(basePattern, primaryAxis, cache);
+            return FillGrid(basePattern, primaryAxis);
         }
 
         /// <summary>
@@ -516,13 +498,12 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         public List<Part> Fill(Drawing drawing, double rotationAngle, NestDirection primaryAxis)
         {
-            var cache = new OffsetPerimeterCache(HalfSpacing);
             var seed = MakeSeedPattern(drawing, rotationAngle);
 
             if (seed.Parts.Count == 0)
                 return new List<Part>();
 
-            return FillGrid(seed, primaryAxis, cache);
+            return FillGrid(seed, primaryAxis);
         }
     }
 }

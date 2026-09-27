@@ -407,6 +407,73 @@ public class FillPerformanceTests
             $"no-model-angles: batch ms min/median/max={times[0]:F6}/{times[median]:F6}/{times[^1]:F6}; us/call min/median/max={times[0] * 1000 / callsPerBatch:F3}/{times[median] * 1000 / callsPerBatch:F3}/{times[^1] * 1000 / callsPerBatch:F3}; B/call min/median/max={(double)bytes[0] / callsPerBatch:F3}/{(double)bytes[median] / callsPerBatch:F3}/{(double)bytes[^1] / callsPerBatch:F3}."));
     }
 
+    [SkippableFact]
+    public void LinearGeometryReuse_ReportsPatternAndDrawing()
+    {
+        Skip.IfNot(Environment.GetEnvironmentVariable("OPENNEST_RUN_FILL_PERF") == "1",
+            "Set OPENNEST_RUN_FILL_PERF=1 to run opt-in fill microbenchmarks.");
+        var drawing = FillExtentsTests.MakeFixture("arc");
+        var first = Part.CreateAtOrigin(drawing, 0);
+        var second = Part.CreateAtOrigin(drawing, System.Math.PI);
+        second.Offset(new Vector(10.5, 0));
+        var pattern = FillHelpers.BuildRotatedPattern(new List<Part> { first, second }, 0.37);
+        var filler = new FillLinear(new Box(3.1, 5.3, 96, 48), 0.5);
+        var fills = new Func<List<Part>>[]
+        {
+            () => filler.Fill(pattern, NestDirection.Horizontal),
+            () => filler.Fill(drawing, 0.37, NestDirection.Horizontal),
+        };
+        var names = new[] { "pattern", "drawing" };
+        var expected = fills.Select(f => f()).ToArray();
+        Assert.All(expected, parts => Assert.NotEmpty(parts));
+        var warmupCalls = 100;
+        var callsPerBatch = 200;
+        var repetitions = 7;
+#if DEBUG
+        output.WriteLine("Configuration=Debug (diagnostic only; use Release for measurements).");
+#else
+        output.WriteLine("Configuration=Release.");
+#endif
+        output.WriteLine($"Runtime={RuntimeInformation.FrameworkDescription}; OS={RuntimeInformation.OSDescription}; "
+            + $"architecture={RuntimeInformation.ProcessArchitecture}; processors={Environment.ProcessorCount}; "
+            + $"Stopwatch.Frequency={Stopwatch.Frequency} ticks/s.");
+        output.WriteLine("linear-reuse: closed 10x8 part with native radius-1 right corner arcs; "
+            + "pair at 0/PI radians, second at (10.5,0), BuildRotatedPattern angle=0.37; "
+            + "single drawing angle=0.37; area=(3.1,5.3,96,48), spacing=0.5, Horizontal. "
+            + $"warmup=2 x {warmupCalls} calls/mode; measured={repetitions} x {callsPerBatch}; "
+            + "mode order alternates including warmup; real production Fill only. "
+            + "Setup/assertions/output excluded; geometry, tiling, overlap checks, GC, delegate/loop/count consumption included. "
+            + "Synchronous current-thread allocation bytes, not RSS. No forced GC or cross-call geometry cache; warm JIT/drawing. "
+            + "Not a timing gate or whole-job estimate.");
+        for (var batch = 0; batch < 2; batch++)
+            for (var slot = 0; slot < fills.Length; slot++)
+                MeasureExtents(fills[(batch + slot) % fills.Length], warmupCalls);
+        var samples = names.Select(_ => new ExtentsSample[repetitions]).ToArray();
+        for (var batch = 0; batch < repetitions; batch++)
+        {
+            for (var slot = 0; slot < fills.Length; slot++)
+            {
+                var mode = (batch + slot) % fills.Length;
+                samples[mode][batch] = MeasureExtents(fills[mode], callsPerBatch);
+            }
+            for (var mode = 0; mode < fills.Length; mode++)
+            {
+                var sample = samples[mode][batch];
+                Assert.Equal((long)callsPerBatch * expected[mode].Count, sample.PartCount);
+                FillExtentsTests.AssertSameLayout(expected[mode], sample.LastResult);
+                output.WriteLine(FormattableString.Invariant(
+                    $"linear-reuse mode={names[mode]} batch={batch + 1}: us/call={sample.Milliseconds * 1000 / callsPerBatch:F6}; B/call={(double)sample.AllocatedBytes / callsPerBatch:F3}; ms={sample.Milliseconds:F6}; bytes={sample.AllocatedBytes}; parts={sample.PartCount}."));
+            }
+        }
+        for (var mode = 0; mode < fills.Length; mode++)
+        {
+            var times = samples[mode].Select(s => s.Milliseconds * 1000 / callsPerBatch).OrderBy(x => x).ToArray();
+            var bytes = samples[mode].Select(s => (double)s.AllocatedBytes / callsPerBatch).OrderBy(x => x).ToArray();
+            output.WriteLine(FormattableString.Invariant(
+                $"linear-reuse {names[mode]}: us/call min/median/max={times[0]:F6}/{times[repetitions / 2]:F6}/{times[^1]:F6}; B/call min/median/max={bytes[0]:F3}/{bytes[repetitions / 2]:F3}/{bytes[^1]:F3}."));
+        }
+    }
+
     private static AngleSample MeasureAngles(Func<List<double>> build, int calls)
     {
         var count = 0L;

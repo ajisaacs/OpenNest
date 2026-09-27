@@ -53,8 +53,20 @@ namespace OpenNest
         /// </summary>
         public static List<Entity> GetOffsetPerimeterEntities(Part part, double spacing)
         {
+            var entities = GetOffsetPerimeterEntities(part.Program, spacing);
+            foreach (var entity in entities)
+                entity.Offset(part.Location);
+
+            return entities;
+        }
+
+        /// <summary>
+        /// Prepares a fresh offset perimeter in the program's local frame, without translation.
+        /// </summary>
+        public static List<Entity> GetOffsetPerimeterEntities(CNC.Program program, double spacing)
+        {
             PerfCounters.CountOffsetPerimeterEntities();
-            var geoEntities = ConvertProgram.ToGeometry(part.Program);
+            var geoEntities = ConvertProgram.ToGeometry(program);
             var profile = new ShapeProfile(
                 geoEntities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList()
             );
@@ -62,11 +74,6 @@ namespace OpenNest
             var offsetShape = profile.Perimeter.OffsetOutward(spacing);
             if (offsetShape == null)
                 return new List<Entity>();
-
-            // Offset the shape's entities to the part's location.
-            // OffsetOutward creates a new Shape, so mutating is safe.
-            foreach (var entity in offsetShape.Entities)
-                entity.Offset(part.Location);
 
             return offsetShape.Entities;
         }

@@ -710,3 +710,159 @@ dotnet OpenNest.Benchmark/bin/Release/net8.0/OpenNest.Benchmark.dll \
 - Removed work is demonstrated by the deterministic Debug counters and red/green evidence in each task section; correctness is carried by the final-tree 1,335/1,356/300 passing suites; measurable local gains exist where allocation or scanning work was actually eliminated (Tasks 2, 3, 4a, 4b), with timing claims bounded to their same-harness pairs.
 - The whole-job corpus measurement above confirms identical valid classification, placed/requested counts, and cost on one small real-drawing job, with timing differences inside baseline run-to-run spread — inconclusive timing, not a measured performance equivalence, and not a speedup claim. A representative production `.nest` corpus at scale, Windows UI runtime testing, and actual ONNX-model inference remain untested.
 - Gated follow-ups A (offset-geometry reuse), B (sorted overlap broad phase), and C remain unauthorized and were not started.
+
+## Follow-up A — reuse FillLinear offset geometry — 2026-09-26
+
+### Status and exact-layout acceptance
+
+Accepted after resolving an initial exact-layout stop. The first whole-job comparison (normal thread pool, `whole-*` runs below) showed different placements between before and after runs, so implementation work stopped at that gate. Acceptance rests on the serialized corpus comparison below, the frozen-reference differential tests (including concurrent calls on one instance), and inspection that the cache is call-local and never shared. Under normal scheduling, the observed differences are most plausibly pre-existing tie-breaking nondeterminism; the evidence:
+
+- Under the normal thread pool the before tree alone produced two distinct exact layouts across its three runs (`whole-before-1` differs from the identical `whole-before-2`/`-3`), and one after run (`whole-after-2`) reproduced the dominant before layout bit-for-bit. The first observed difference, `whole-before-1` versus `whole-after-1` at `Plates[0].Placements[0]` (`1214 A02 PT04`, before X/Y/rotation `8.312499999999998`/`19.093722188575505`/`4.71238898038469`, after `2.5000000000000013`/`8.864574062858505`/`1.5707963267948966`), is also exactly the difference between `whole-before-1` and `whole-before-2`.
+- A plausible mechanism (not proven here) is that parallel producers (`FillHelpers.FillPattern`, `PairEvaluator.EvaluateAll`, `BestFitFinder` strategy fan-out) collect into `ConcurrentBag` and later selection keeps the first of equal-scoring results, so ties follow thread completion order.
+- Determinism probe: a small console program (source and project files retained with the evidence) calls `DxfManifestLoader.Load` and `NestingEngineRegistry.Create("Default").Solve(...)` directly with `DOTNET_PROCESSOR_COUNT=1` and the thread pool capped at one worker (`SetMinThreads(1,1)`/`SetMaxThreads(1,1)`, verified before solving), then writes every placement's X/Y/rotation as IEEE-754 bits. Serial runs before-1, after-1, before-2, after-2 produced byte-identical files (SHA-256 `62b5a8d065c889e3599e3bd00e3f591502553c24e81962ccdcb06c4b06159708` for all four; 169 placements, two plates). The probe referenced each tree's own `OpenNest.Benchmark` project; its `OpenNest.Engine.dll` hashes matched the corresponding benchmark builds (`a43d9db5…` before, `ff2bc016…` after). That serialized layout also matches the dominant normal-pool layout, as a placement multiset ignoring order and instance numbering, seen in `whole-before-2`, `whole-before-3` and `whole-after-2`.
+- An earlier probe variant that ran `Solve` on a one-thread custom `TaskScheduler` did not serialize the engine (`Parallel.For`/`Parallel.Invoke` do not inherit a custom scheduler) and gave identical before layouts (`3f00c783…`) but two different after layouts (`f571c52e…`, `2c9b9c35…`); it is superseded, and its output files were not retained.
+
+Conclusion: with scheduling held fixed, the optimized tree's whole-job output is bit-for-bit identical to the base tree's on this corpus job. Serialized runs cannot exclude a difference that appears only under concurrency; that risk is covered by the concurrent differential test and the per-call cache ownership, not by this probe. Under normal parallel scheduling, neither tree gives reproducible exact layouts, so that comparison cannot serve as an exact-layout oracle. The scheduling nondeterminism is pre-existing and out of this slice's scope; it is recorded here, not fixed or tuned around. Evidence: `/home/aj/extracted/2026-09-26/followup-a/determinism-probe/` (probe source, projects, placement TSVs, and `det1-run-stdout.txt` with the exact invocation and per-run output) and `layout-comparison-blocker.json`. An independent spec review rebuilt the probe against isolated trees and reproduced the same SHA-256 in four fresh processes.
+
+### Scope, design and preservation contract
+
+`PartGeometry.GetOffsetPerimeterEntities(CNC.Program, spacing)` prepares a fresh local-frame perimeter and increments `OffsetPerimeterEntities` once. The Part overload delegates then translates that fresh list in place, preserving the old arithmetic/list semantics. No other PartGeometry method changed.
+
+Each public `FillLinear.Fill` / `FillRow` entry owns a fresh private cache keyed by Program **reference identity**, with fixed half-spacing. Private calls thread that cache through the grid/tile/distance chain. Cached entities never escape: each world-space result clones then offsets each entity. Moving locations remain `part.Location + offset`, in the same addition order as `CloneAtOffset`. Lazy `??=` preparation follows unchanged bbox prefilters. Pair order, DirectionalDistance arguments, invalid-distance fallback, max-copy logic, tiling and overlap/bbox fallback are unchanged. No shared instance/static cache, overlap algorithm, Compactor, RotationSlideStrategy or StripeFiller change.
+
+`LegacyFillLinear` was copied before production edits from `094c4c1`; undoing only the header, added imports, namespace, visibility and class/constructor names reproduces the base file exactly (formatter sorted the added imports). It is test-only and frozen. The independent entity oracle recomputes ConvertProgram → material filter → ShapeProfile → OffsetOutward → location translation, rather than comparing two delegating wrappers.
+
+Rechecked `SpatialQuery.cs` lines 627–960: DirectionalDistance, RayEntityDistance, ExtractEntityVertices, ArcToLineClosestDistance and AddArcExtremeVertices use points/centers/radii/angles, not entity BoundingBox/Left/Right/Top/Bottom. Line.Offset incrementally translates its box, while Line.Clone recomputes it; the new code clones **local** prepared entities before world translation. Across the delivered entity oracle's 783 entity comparisons, type/order/layer/geometric fields and bounding boxes were bitwise equal (rectangle 216, concave 297, arc 216, circle 27, ring 27; zero bbox divergences). This fixture evidence is not a universal box-equivalence proof. Full-fill differential tests additionally compare bitwise output locations/boxes/rotations, drawing identity and Program-sharing equivalence. Empty programs preserve the pre-existing ArgumentOutOfRangeException; no valid nonnegative-spacing null-offset fixture was established.
+
+Coverage includes both directions, zero/positive spacing, nonzero origins, orthogonal/non-orthogonal rotations, Drawing/Pattern/FillRow, shared-Program patterns, distinct rotations of one drawing, BuildRotatedPattern, adjacent-double last-copy thresholds, repeated calls and 48 bounded concurrent calls on one filler. The fallback fixture deliberately starts with overlapping seeds and proves legacy bbox fallback without claiming it repairs invalid seeds. Input geometry/program/location ownership is checked. The initial nominal rectangle threshold assumption failed two tests; it was replaced with adjacent-double threshold discovery using only the frozen reference, then passed.
+
+### Provenance
+
+Base `094c4c196bc793ef184fae15380a7c94544697de`, branch master. Ubuntu 24.04.5 LTS x64, shared KVM VM with four processors, SDK 10.0.112; measurement output reports .NET 8.0.31 and Stopwatch frequency 1,000,000,000 ticks/s. Before is the detached baseline worktree with **only** the identical benchmark test file copied in. The original base harness did not contain this new test. The manifest and all four referenced archive DXFs were reachable.
+
+| Source | Before SHA-256 | Delivered/measurement SHA-256 |
+| --- | --- | --- |
+| `OpenNest.Engine/Fill/FillLinear.cs` | `c7dc33a67d1571e671b2a90dd0b9c585dce9c7e94d532891ed7b646189918b80` | `3a0dca084aa9b8f4e61e3ed836e49ed2cfbf311c92d5076460983c573cdcc061` |
+| `OpenNest.Core/PartGeometry.cs` | `fb54f33fd029df2f76bfb30590c976f49995eb041a74c7863d1feafc6fddfc4c` | `5e3c8f9493afffb4b0db69ca6dcf0a738a591e6a636df476ed3b0d8cb6658894` |
+| `OpenNest.Tests/Fill/FillPerformanceTests.cs` | `dd33805a723b2fa9068177490f0211ac707b555c46db7ce3e1c9d161c06beba7` | `dd33805a723b2fa9068177490f0211ac707b555c46db7ce3e1c9d161c06beba7` |
+| Corpus manifest | `3f13c7a674b2a33a26f31dcbf8fec3fc70ab7ef7f10bd801fb784d3d9179987b` | same file/hash |
+
+The benchmark depends only on APIs/helpers already present at the base. No harness mode was redirected to a reference implementation. Production and harness files were restored after mutation testing before measurements; their final hashes match measurement provenance.
+
+### Genuine red/green and test evidence
+
+Counters are Debug-only; Release zero counters prove nothing. All work assertions use FillCacheCollection and reset in finally.
+
+| Workload | Legacy preparations | Always-miss RED actual / expected | Restored GREEN actual | Output parts |
+| --- | ---: | --- | ---: | ---: |
+| FillRow rectangle | 2 | 2 / 1 | 1 | 3 |
+| Drawing Fill rectangle | 8 | 8 / 1 | 1 | 6 |
+| Shared-Program pattern | 12 | 12 / 1 | 1 | 8 |
+| Two rotated Programs from one drawing | 12 | 12 / 2 | 2 | 8 |
+
+For RED, replaced the cache lookup/add block with an unconditional preparation in the delivered source: four failures, process exit 1. Restored in finally. Separately changed the key to BaseDrawing, passing Part into AtLocation: shared pattern passed, rotated and built-pair cases failed (2 failures, exit 1). Rotated expected 18 parts, actual 15; built-pair location bits expected 4626892942313738295, actual 4626987413290037556. Restored in finally, byte-for-byte source check passed. Then all 98 targeted Debug cases passed (exit 0).
+
+Exact commands (each with `--logger 'console;verbosity=detailed' --logger 'trx;LogFileName=<name>.trx' --results-directory <evidence>`):
+
+```bash
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --filter FullyQualifiedName~FillLinearGeometryReuseTests.Work_
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --filter FullyQualifiedName~FillLinearGeometryReuseTests.Pattern_Matches
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --filter FullyQualifiedName~FillLinearGeometryReuseTests
+```
+
+| Suite / configuration | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: |
+| Unmodified baseline main Release | 1337 | 18 | 0 |
+| Unmodified baseline engine Release | 300 | 0 | 0 |
+| Final-source targeted Debug | 98 | 0 | 0 |
+| Always-miss mutation Debug | 0 | 0 | 4 |
+| Wrong-drawing-key mutation Debug | 1 | 0 | 2 |
+| Each of four enabled microbenchmark Release processes | 1 | 0 | 0 |
+| Final main Release | 1431 | 19 | 0 |
+| Final main Debug | 1456 | 19 | 0 |
+| Final engine Release | 300 | 0 | 0 |
+| Final targeted Release (`FillLinearGeometryReuseTests`) | 94 | 0 | 0 |
+| `Category=FillPerformance`, variable unset / `=0` | 0 / 0 | 7 / 7 | 0 / 0 |
+
+Counts come from individual TRX UnitTestResult outcomes, not aggregate notExecuted. Baseline skips: 12 optional CHR fixtures and six opt-in performance cases; final skips add the new opt-in `LinearGeometryReuse_ReportsPatternAndDrawing`. Main Release delta +94 passed equals the targeted Release count; Debug additionally runs the four `#if DEBUG` work cases (targeted Debug 98). Both disabled gates skip all seven benchmarks. Final-tree suites ran after the determinism investigation on unchanged production/test sources (hashes above).
+
+### Same-harness Release microbenchmark observations
+
+Production Fill only: closed 10×8 native-radius-1 right-corner-arc part; pair seeded at 0/π, second at (10.5,0), then BuildRotatedPattern at 0.37 radians; single Drawing at 0.37. Area `(3.1,5.3,96,48)`, spacing 0.5, Horizontal. Two warmup batches ×100 calls per mode, seven measured batches ×200 calls, alternating mode order including warmup. Four serial fresh processes: before-1, after-1, after-2, before-2. Setup/assertions/output excluded; geometry, tiling, overlap checks, GC, delegate/loop and nonallocating count consumption included. Current-thread synchronous allocations, not RSS. No forced GC. Every pattern batch consumes 7,200 parts (36/call); drawing consumes 8,000 (40/call).
+
+Raw batches, µs/call / B/call:
+
+| Process | Batch | Pattern | Drawing |
+| --- | ---: | --- | --- |
+| before-1 | 1 | 13890.929840 / 11978904 | 22417.643430 / 15334152 |
+| before-1 | 2 | 13156.240410 / 11978904 | 22520.495810 / 15334152 |
+| before-1 | 3 | 13412.731580 / 11978904 | 22479.693845 / 15334152 |
+| before-1 | 4 | 13284.240955 / 11978904 | 22318.351345 / 15334152 |
+| before-1 | 5 | 13139.308525 / 11978904 | 22309.902190 / 15334152 |
+| before-1 | 6 | 13262.782455 / 11978904 | 22268.902850 / 15334152 |
+| before-1 | 7 | 13018.847040 / 11978904 | 22367.989855 / 15334152 |
+| after-1 | 1 | 12025.202410 / 8640400 | 20573.556690 / 12179776 |
+| after-1 | 2 | 11512.053070 / 8640400 | 20487.712005 / 12179776 |
+| after-1 | 3 | 11656.403895 / 8640400 | 20300.006810 / 12179776 |
+| after-1 | 4 | 11628.209575 / 8640400 | 20608.516540 / 12179776 |
+| after-1 | 5 | 11590.578130 / 8640400 | 20591.376225 / 12179776 |
+| after-1 | 6 | 11741.157625 / 8640400 | 20960.479975 / 12179776 |
+| after-1 | 7 | 11603.496715 / 8640400 | 20470.246675 / 12179776 |
+| after-2 | 1 | 12322.696725 / 8640400 | 20581.793035 / 12179776 |
+| after-2 | 2 | 11570.155470 / 8640400 | 20518.170995 / 12179776 |
+| after-2 | 3 | 11512.081200 / 8640400 | 20538.707185 / 12179776 |
+| after-2 | 4 | 11700.329105 / 8640400 | 20246.447735 / 12179776 |
+| after-2 | 5 | 12010.912020 / 8640400 | 20708.860945 / 12179776 |
+| after-2 | 6 | 11509.263120 / 8640400 | 20560.583720 / 12179776 |
+| after-2 | 7 | 11499.249420 / 8640400 | 20658.498240 / 12179776 |
+| before-2 | 1 | 14218.554935 / 11978904 | 22026.400520 / 15334152 |
+| before-2 | 2 | 13131.679745 / 11978904 | 22372.373875 / 15334152 |
+| before-2 | 3 | 13206.351480 / 11978904 | 22058.792355 / 15334152 |
+| before-2 | 4 | 13092.448795 / 11978904 | 21892.855215 / 15334152 |
+| before-2 | 5 | 13108.256065 / 11978904 | 22404.148505 / 15334152 |
+| before-2 | 6 | 13450.579065 / 11978904 | 22287.616975 / 15334152 |
+| before-2 | 7 | 13139.747450 / 11978904 | 21835.373995 / 15334152 |
+
+| Process / mode | µs/call min / median / max | B/call min / median / max |
+| --- | --- | --- |
+| before-1 / pattern | 13018.847040 / 13262.782455 / 13890.929840 | 11978904 / 11978904 / 11978904 |
+| before-1 / drawing | 22268.902850 / 22367.989855 / 22520.495810 | 15334152 / 15334152 / 15334152 |
+| after-1 / pattern | 11512.053070 / 11628.209575 / 12025.202410 | 8640400 / 8640400 / 8640400 |
+| after-1 / drawing | 20300.006810 / 20573.556690 / 20960.479975 | 12179776 / 12179776 / 12179776 |
+| after-2 / pattern | 11499.249420 / 11570.155470 / 12322.696725 | 8640400 / 8640400 / 8640400 |
+| after-2 / drawing | 20246.447735 / 20560.583720 / 20708.860945 | 12179776 / 12179776 / 12179776 |
+| before-2 / pattern | 13092.448795 / 13139.747450 / 14218.554935 | 11978904 / 11978904 / 11978904 |
+| before-2 / drawing | 21835.373995 / 22058.792355 / 22404.148505 | 15334152 / 15334152 / 15334152 |
+
+### Whole-job measurement
+
+Same real 169-part, four-DXF corpus manifest as Task 5; Default only, `--parallel 1`, six fresh processes in B,A,B,A,B,A order. No StockLadder run. DXF import precedes timing. With `--output`, Time(ms) includes BuildNestJob, Solve, materialization, validation/scoring preparation **and output .nest/JSON serialization** through Stopwatch.Stop in BenchmarkRunner. No whole-job allocation measurements. Both builds lacked an installed angle model.
+
+| Run | Time (ms) | Valid | Placed / requested | Cost | Plates |
+| --- | ---: | --- | --- | ---: | ---: |
+| before-1 | 40636 | True | 169 / 169 | 9216.00 | 2 |
+| after-1 | 18904 | True | 169 / 169 | 9216.00 | 2 |
+| before-2 | 40932 | True | 169 / 169 | 9216.00 | 2 |
+| after-2 | 18810 | True | 169 / 169 | 9216.00 | 2 |
+| before-3 | 40715 | True | 169 / 169 | 9216.00 | 2 |
+| after-3 | 18451 | True | 169 / 169 | 9216.00 | 2 |
+
+Before min/median/max: 40636 / 40715 / 40932 ms; after: 18451 / 18810 / 18904 ms. All runs are valid, fully placed and have empty validation notes. Ranges do not overlap: after-tree median is 53.8% lower than before (−21,905 ms) on this one corpus job, on a shared four-vCPU VM. That is a single-job observation, not a general speedup guarantee. The separate one-worker determinism probe (Status section) shows the same direction: 47,328/47,446 ms before versus 24,095/23,182 ms after. Its timings are only indicative because it runs on a single worker.
+
+Exact comparison reads each JSON's ordered Plates/Placements and compares double IEEE-754 bytes; PartId maps to names from saved .nest/nest.json. The first pair's JSON and .nest poses agree within each run. Additionally compared placement multisets without instance index/order. No tolerance or coordinate rounding was used. Exact layout classes over the six normal-pool runs, as placement multisets: {before-2, before-3, after-2} identical; before-1, after-1 and after-3 each distinct. Because the before tree alone yields multiple classes, exact-layout acceptance rests on the serialized determinism probe, not on these runs. Evidence: `layout-comparison-blocker.json` plus every raw output directory.
+
+### Reproduction, limitations and remaining work
+
+```bash
+# Prefix both scoped formatter commands with EnableWindowsTargeting=true on Linux.
+dotnet format OpenNest.sln --include OpenNest.Core/PartGeometry.cs OpenNest.Engine/Fill/FillLinear.cs OpenNest.Tests/Fill/LegacyFillLinear.cs OpenNest.Tests/Fill/FillLinearGeometryReuseTests.cs OpenNest.Tests/Fill/FillPerformanceTests.cs
+# Repeat exactly with --verify-no-changes.
+OPENNEST_RUN_FILL_PERF=1 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release   --filter FullyQualifiedName~LinearGeometryReuse_ReportsPatternAndDrawing --logger 'console;verbosity=detailed'
+dotnet OpenNest.Benchmark/bin/Release/net8.0/OpenNest.Benchmark.dll   /home/aj/extracted/2026-09-26/pep-archive-benchmark-manifest.json   --engines Default --parallel 1 --csv <path> --output <directory>
+```
+
+Unqualified solution formatter and verify each initially exited 1 (`Restore operation failed`); explicit restore diagnosed NETSDK1100, Windows targeting disabled. With environment `EnableWindowsTargeting=true`, the same solution/include formatter and verify each exited 0. No project files or broader source formatting changed. `git diff --check` exited 0. AGENTS.md gained one clause on the per-call `FillLinear` Program cache and its lifetime; CLAUDE.md is unchanged. Combined size is 31,610 bytes (AGENTS.md 31,599 + CLAUDE.md 11), under the 32,768-byte limit. README and the pre-existing untracked planning files were untouched.
+
+Timings are from a shared four-vCPU VM, one synthetic micro workload and one corpus; not general latency guarantees. When ranges overlap, timing is inconclusive, never evidence of unchanged performance. No Windows runtime tests or ONNX accuracy/inference checks, no optional StockLadder measurement. The normal-pool nondeterminism was characterized (serializing removes it and it appears in the before tree alone) but its source was not pinned down, and no scheduler or tie-break change was made.
+
+Raw logs, TRX, CSV, all saved .nest/JSON layouts, provenance and computed measurement summary are retained under `/home/aj/extracted/2026-09-26/followup-a/`. `micro-commands.json` and `whole-commands.json` record exact process commands/cwds. Final suite logs and TRX are under `final/`, and the determinism probe under `determinism-probe/`.
