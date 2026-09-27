@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>OpenNest.Posts.CincinnatiCIFiber</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\OpenNest.Core\OpenNest.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="OpenNest.Posts.CincinnatiCIFiber.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <Target Name="CopyToPostsDir" AfterTargets="Build">
+    <PropertyGroup>
+      <PostsDir>..\..\OpenNest\bin\$(Configuration)\net8.0-windows\Posts\</PostsDir>
+      <ConfigJson>$(MSBuildProjectDirectory)\OpenNest.Posts.CincinnatiCIFiber.json</ConfigJson>
+      <DeployedConfigJson>$(PostsDir)OpenNest.Posts.CincinnatiCIFiber.json</DeployedConfigJson>
+    </PropertyGroup>
+    <MakeDir Directories="$(PostsDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Copy SourceFiles="$(ConfigJson)" DestinationFolder="$(PostsDir)" SkipUnchangedFiles="true" ContinueOnError="true" Condition="!Exists('$(DeployedConfigJson)')" />
+  </Target>
+</Project>

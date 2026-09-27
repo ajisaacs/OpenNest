@@ -1,0 +1,296 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using OpenNest;
+using OpenNest.CNC;
+using OpenNest.Geometry;
+
+namespace OpenNest.Posts.CincinnatiCIFiber
+{
+    /// <summary>
+    /// Emits the CI Fiber (TF5200) machine program: header, restart jump,
+    /// per-sheet / per-part / per-contour blocks and the tail, matching the
+    /// structure of the Cincinnati-supplied sample NC:
+    ///
+    /// <code>
+    /// ( &lt;nest name&gt; )
+    /// ( CONFIGURATION - CI FIBER 8K )
+    /// ( August 20, 2026   01:10 PM )
+    /// ( Material = Mild Steel .060 )
+    /// V.E.MATERIAL = "MSN" ... V.E.UNIT = 1
+    /// G90
+    /// L PROGRAMSTART.NC
+    /// P3=V.E.R3
+    /// $GOTO NP3:
+    /// N0:
+    ///   ( Sheet number - 1 )
+    ///   ( Part #k ) ( PART:... ) V.E.R4=k
+    ///     N&lt;n&gt;: /L "L0" V.E.R3=&lt;n&gt; G0X..Y..
+    ///          /L "L2" + G41 | /L "L4" + G42
+    ///          G1X..Y..          (linear lead-in)
+    ///          /L "L6"           (cut layer on)
+    ///          G1/G2/G3 ...
+    ///          /L "ZHSOFF"
+    ///   ( PART END )
+    /// /L "L0"
+    /// L PROGRAMEND.NC
+    /// M50
+    /// M30
+    /// %
+    /// </code>
+    ///
+    /// Coordinates are spaceless (G1X3.706Y47.488); arcs post I/J incremental
+    /// from the arc start (TF5200 G162 default). The first motion block after
+    /// the G41/G42 selection is always LINEAR (TF5200 §13.2.4.1): contours
+    /// without a lead-in move are rejected with a clear error.
+    /// </summary>
+    public sealed class CIFiberProgramWriter
+    {
+        private readonly CIFiberPostConfig _config;
+        private readonly CIFiberFormatter _fmt;
+
+        public CIFiberProgramWriter(CIFiberPostConfig config)
+        {
+            _config = config ?? throw new ArgumentNullException(nameof(config));
+            _fmt = new CIFiberFormatter(config.PostedAccuracy);
+        }
+
+        public void Write(Nest nest, TextWriter w)
+        {
+            if (nest == null)
+                throw new ArgumentNullException(nameof(nest));
+
+            var plates = nest.Plates.Where(p => p.Parts.Count > 0).ToList();
+
+            WriteHeader(nest, w);
+
+            CIFiberFormatter.Line(w, "G90");
+            CIFiberFormatter.Line(w, $"L {_config.ProgramStartMacro}");
+            CIFiberFormatter.Line(w, "P3=V.E.R3");
+            CIFiberFormatter.Line(w, "$GOTO NP3:");
+            CIFiberFormatter.Line(w, "N0:");
+
+            var contourNumber = 0;
+            for (var s = 0; s < plates.Count; s++)
+            {
+                var plate = plates[s];
+                _config.ValidateTableSize(plate.Size.Length, plate.Size.Width);
+
+                CIFiberFormatter.Line(w, $"( Sheet number - {s + 1} )");
+                contourNumber = WriteSheet(plate, w, contourNumber);
+            }
+
+            WriteTail(w);
+        }
+
+        private void WriteHeader(Nest nest, TextWriter w)
+        {
+            CIFiberFormatter.Line(w, $"( {nest.Name ?? ""} )");
+            CIFiberFormatter.Line(w, $"( CONFIGURATION - {_config.ConfigurationName} )");
+            CIFiberFormatter.Line(
+                w,
+                "( "
+                    + DateTime.Now.ToString("MMMM d, yyyy   hh:mm tt", CultureInfo.InvariantCulture)
+                    + " )"
+            );
+
+            var materialName = nest.Material?.Name ?? "";
+            var thickness = _fmt.Fixed(nest.Thickness);
+            if (thickness.StartsWith("0"))
+                thickness = thickness.Substring(1); // sample posts ".060"
+            CIFiberFormatter.Line(w, $"( Material = {materialName} {thickness} )".TrimEnd());
+
+            var code = _config.ResolveMaterialCode(materialName);
+            CIFiberFormatter.Line(w, $"V.E.MATERIAL = \"{code}\"");
+            CIFiberFormatter.Line(w, $"V.E.THICKNESS = {_fmt.Fixed(nest.Thickness)}");
+
+            // Multi-plate nests run one sheet after another in this program;
+            // the header size describes the first sheet (the machine sample
+            // carries a single sheet).
+            var firstPlate = nest.Plates.FirstOrDefault();
+            var xSize = firstPlate?.Size.Length ?? 0.0;
+            var ySize = firstPlate?.Size.Width ?? 0.0;
+            CIFiberFormatter.Line(w, $"V.E.X_SIZE = {_fmt.Fixed(xSize)}");
+            CIFiberFormatter.Line(w, $"V.E.Y_SIZE = {_fmt.Fixed(ySize)}");
+
+            if (_config.EmitSheetWeight)
+                CIFiberFormatter.Line(w, "V.E.SHEET_WEIGHT = 0");
+
+            var unit = nest.Units == Units.Millimeters
+                ? _config.MetricUnitCode
+                : _config.InchUnitCode;
+            CIFiberFormatter.Line(w, $"V.E.UNIT = {unit}");
+        }
+
+        private void WriteTail(TextWriter w)
+        {
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
+            CIFiberFormatter.Line(w, $"L {_config.ProgramEndMacro}");
+            CIFiberFormatter.Line(w, "M50");
+            CIFiberFormatter.Line(w, "M30");
+            CIFiberFormatter.Line(w, "%");
+        }
+
+        private int WriteSheet(Plate plate, TextWriter w, int contourNumber)
+        {
+            var partNumber = 0;
+            foreach (var part in plate.Parts)
+            {
+                partNumber++;
+                contourNumber = WritePart(part, partNumber, w, contourNumber);
+            }
+
+            return contourNumber;
+        }
+
+        private int WritePart(Part part, int partNumber, TextWriter w, int contourNumber)
+        {
+            CIFiberFormatter.Line(w, $"( Part #{partNumber} )");
+
+            var partComment = ResolvePartComment(part);
+            CIFiberFormatter.Line(w, $"( PART:{partComment} )");
+
+            CIFiberFormatter.Line(w, $"V.E.R4={partNumber}");
+
+            var contours = CIFiberContourExtractor.Extract(part);
+            if (_config.SkipScribe)
+                contours = contours.Where(c => !IsScribeContour(c)).ToList();
+
+            foreach (var contour in contours)
+            {
+                contourNumber++;
+                WriteContour(contour, contourNumber, w);
+            }
+
+            CIFiberFormatter.Line(w, "( PART END )");
+            return contourNumber;
+        }
+
+        private void WriteContour(CIFiberContour contour, int contourNumber, TextWriter w)
+        {
+            var isExterior = contour.IsExterior || CIFiberWinding.IsExterior(contour);
+
+            CIFiberFormatter.Line(w, $"N{contourNumber}:");
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
+            CIFiberFormatter.Line(w, $"V.E.R3={contourNumber}");
+            CIFiberFormatter.Line(w, $"G0X{Fmt(contour.Pierce.X)}Y{Fmt(contour.Pierce.Y)}");
+
+            if (contour.LeadIn == null)
+                throw new InvalidOperationException(
+                    $"Contour {contourNumber} has no lead-in move. TF5200 13.2.4.1 "
+                        + "requires a LINEAR motion block immediately after G41/G42 "
+                        + "selection; assign lead-ins before posting."
+                );
+
+            if (contour.LeadIn is not LinearMove)
+                throw new InvalidOperationException(
+                    $"Contour {contourNumber} has an arc lead-in. TF5200 13.2.4.1 "
+                        + "requires the first motion block after G41/G42 selection "
+                        + "to be LINEAR."
+                );
+
+            CIFiberFormatter.Line(
+                w,
+                SkippableLine(
+                    isExterior ? _config.LayerExteriorLeadin : _config.LayerInteriorLeadin
+                )
+            );
+            CIFiberFormatter.Line(
+                w,
+                isExterior ? "G42" : "G41"
+            );
+
+            var prev = contour.LeadIn.EndPoint;
+            CIFiberFormatter.Line(
+                w,
+                $"G1X{Fmt(contour.LeadIn.EndPoint.X)}Y{Fmt(contour.LeadIn.EndPoint.Y)}"
+            );
+
+            // Additional lead-layer moves (e.g. CleanHole arc) still run
+            // before the cut layer turns on.
+            foreach (var extra in contour.LeadInExtra)
+            {
+                CIFiberFormatter.Line(w, FormatMotion(extra, prev));
+                prev = extra.EndPoint;
+            }
+
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCut));
+
+            foreach (var cut in contour.Cuts)
+            {
+                CIFiberFormatter.Line(w, FormatMotion(cut, prev));
+                prev = cut.EndPoint;
+            }
+
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCutEnd));
+        }
+
+        private string ResolvePartComment(Part part)
+        {
+            if (!string.IsNullOrWhiteSpace(_config.PartComment))
+                return _config.PartComment;
+
+            var name = part.BaseDrawing?.Name ?? "";
+            var source = part.BaseDrawing?.Source?.Path;
+            if (!string.IsNullOrEmpty(source))
+                return Path.GetFileNameWithoutExtension(source);
+
+            return name;
+        }
+
+        private static bool IsScribeContour(CIFiberContour contour)
+        {
+            var hasAny = false;
+            foreach (var cut in contour.Cuts)
+            {
+                var layer = LayerOf(cut);
+                if (layer != LayerType.Scribe)
+                    return false;
+                hasAny = true;
+            }
+            return hasAny;
+        }
+
+        private static LayerType LayerOf(Motion motion) =>
+            motion switch
+            {
+                LinearMove l => l.Layer,
+                ArcMove a => a.Layer,
+                _ => LayerType.Cut,
+            };
+
+        private string Fmt(double value) => _fmt.Coord(value);
+
+        /// <summary>
+        /// One motion line: G0/G1/G2/G3 with spaceless X/Y, plus I/J for arcs.
+        /// I/J are incremental from the arc START (TF5200 G162/basic default,
+        /// verified against the machine sample): center minus arc start point.
+        /// </summary>
+        private string FormatMotion(Motion motion, Vector arcStart)
+        {
+            var prefix = MovePrefix(motion);
+            var line = $"{prefix}X{Fmt(motion.EndPoint.X)}Y{Fmt(motion.EndPoint.Y)}";
+
+            if (motion is ArcMove arc)
+            {
+                var i = arc.CenterPoint.X - arcStart.X;
+                var j = arc.CenterPoint.Y - arcStart.Y;
+                line += $"I{Fmt(i)}J{Fmt(j)}";
+            }
+
+            return line;
+        }
+
+        private static string SkippableLine(string macroName) => $"/L \"{macroName}\"";
+
+        private static string MovePrefix(Motion motion) =>
+            motion switch
+            {
+                RapidMove => "G0",
+                ArcMove a => a.Rotation == RotationType.CW ? "G2" : "G3",
+                _ => "G1",
+            };
+    }
+}

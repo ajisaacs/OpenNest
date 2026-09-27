@@ -1,0 +1,22 @@
+{
+  "ConfigurationName": "CI FIBER 8K",
+  "PostedAccuracy": 3,
+  "InchUnitCode": 1,
+  "MetricUnitCode": 0,
+  "EmitSheetWeight": false,
+  "SkipScribe": true,
+  "MaxTableX": 160.25,
+  "MaxTableY": 81.25,
+  "PartComment": "",
+  "LayerCancel": "L0",
+  "LayerInteriorLeadin": "L2",
+  "LayerExteriorLeadin": "L4",
+  "LayerCut": "L6",
+  "LayerCutEnd": "ZHSOFF",
+  "ProgramStartMacro": "PROGRAMSTART.NC",
+  "ProgramEndMacro": "PROGRAMEND.NC",
+  "MaterialCodes": {
+    "Mild Steel": "MSN"
+  },
+  "DefaultMaterialCode": "MSN"
+}

@@ -32,6 +32,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.Cincinnati",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.GravographIS", "Posts\OpenNest.Posts.GravographIS\OpenNest.Posts.GravographIS.csproj", "{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Posts.CincinnatiCIFiber", "Posts\OpenNest.Posts.CincinnatiCIFiber\OpenNest.Posts.CincinnatiCIFiber.csproj", "{26810693-BFFA-4073-B04D-9E1B526935E8}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Data", "OpenNest.Data\OpenNest.Data.csproj", "{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenNest.Benchmark", "OpenNest.Benchmark\OpenNest.Benchmark.csproj", "{ACD8F725-829A-48A8-AA59-61DD90DE06CA}"
@@ -196,6 +198,18 @@ Global
 		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|x64.Build.0 = Release|Any CPU
 		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|x86.ActiveCfg = Release|Any CPU
 		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40}.Release|x86.Build.0 = Release|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Debug|x64.Build.0 = Debug|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Debug|x86.Build.0 = Debug|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Release|x64.ActiveCfg = Release|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Release|x64.Build.0 = Release|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Release|x86.ActiveCfg = Release|Any CPU
+		{26810693-BFFA-4073-B04D-9E1B526935E8}.Release|x86.Build.0 = Release|Any CPU
 		{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A0B4B48E-1DF0-4DD3-B42C-B9B7779EA8B0}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -263,6 +277,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{FB1B2EB2-9D80-4499-BA93-B4E2F295A532} = {4052CFAC-1F12-48BE-872D-F503C3B65D7E}
 		{3A6B8E7E-9B5F-4D2C-8AE3-2C9F5E3D1A40} = {4052CFAC-1F12-48BE-872D-F503C3B65D7E}
+		{26810693-BFFA-4073-B04D-9E1B526935E8} = {4052CFAC-1F12-48BE-872D-F503C3B65D7E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {86FE17B3-F764-40AE-BCAA-F26B470CA05C}
