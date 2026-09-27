@@ -295,6 +295,8 @@ namespace OpenNest.Engine.Fill
             out int overlapB
         )
         {
+            var checker = new PartOverlapChecker();
+
             for (var i = 0; i < parts.Count; i++)
             {
                 var b1 = parts[i].BoundingBox;
@@ -311,7 +313,7 @@ namespace OpenNest.Engine.Fill
                     if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
                         continue;
 
-                    if (parts[i].Intersects(parts[j], out _))
+                    if (checker.Overlaps(parts[i], parts[j]))
                     {
                         overlapA = i;
                         overlapB = j;

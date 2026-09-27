@@ -170,6 +170,8 @@ namespace OpenNest.Engine.Strategies
         /// </summary>
         internal static bool HasOverlappingParts(List<Part> parts)
         {
+            var checker = new PartOverlapChecker();
+
             for (var i = 0; i < parts.Count; i++)
             {
                 var b1 = parts[i].BoundingBox;
@@ -186,7 +188,7 @@ namespace OpenNest.Engine.Strategies
                     if (overlapX <= Tolerance.Epsilon || overlapY <= Tolerance.Epsilon)
                         continue;
 
-                    if (parts[i].Intersects(parts[j], out _))
+                    if (checker.Overlaps(parts[i], parts[j]))
                         return true;
                 }
             }

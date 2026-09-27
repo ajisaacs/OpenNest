@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Converters;
@@ -238,14 +238,8 @@ namespace OpenNest
             PerfCounters.CountPartIntersects();
             pts = new List<Vector>();
 
-            var entities1 = ConvertProgram
-                .ToGeometry(Program)
-                .Where(e => SpecialLayers.IsMaterial(e.Layer))
-                .ToList();
-            var entities2 = ConvertProgram
-                .ToGeometry(part.Program)
-                .Where(e => SpecialLayers.IsMaterial(e.Layer))
-                .ToList();
+            var entities1 = MaterialEntities(Program);
+            var entities2 = MaterialEntities(part.Program);
 
             if (entities1.Count == 0 || entities2.Count == 0)
                 return false;
@@ -256,8 +250,8 @@ namespace OpenNest
             if (perimeter1 == null || perimeter2 == null)
                 return false;
 
-            var polygon1 = perimeter1.ToPolygonWithTolerance(IntersectsChordTolerance);
-            var polygon2 = perimeter2.ToPolygonWithTolerance(IntersectsChordTolerance);
+            var polygon1 = BuildOverlapPolygon(perimeter1);
+            var polygon2 = BuildOverlapPolygon(perimeter2);
 
             if (polygon1 == null || polygon2 == null)
                 return false;
@@ -269,6 +263,27 @@ namespace OpenNest
             pts = result.IntersectionPoints.ToList();
             return result.Overlaps;
         }
+
+        /// <summary>
+        /// Material (cut) entities of <paramref name="program"/> in the program's local frame: the
+        /// first stage of overlap preparation, shared by <see cref="Intersects"/> and
+        /// <see cref="PartOverlapChecker"/>.
+        /// </summary>
+        internal static List<Entity> MaterialEntities(CNC.Program program)
+        {
+            PerfCounters.CountOverlapPolygonPreparation();
+            return ConvertProgram
+                .ToGeometry(program)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Local-frame overlap polygon of a material perimeter: the last stage of overlap
+        /// preparation, shared by <see cref="Intersects"/> and <see cref="PartOverlapChecker"/>.
+        /// </summary>
+        internal static Polygon BuildOverlapPolygon(Shape perimeter) =>
+            perimeter.ToPolygonWithTolerance(IntersectsChordTolerance);
 
         public double Left
         {
