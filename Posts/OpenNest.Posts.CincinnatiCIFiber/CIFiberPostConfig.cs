@@ -91,12 +91,6 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         [PostSetting(MachineSection, 2, Minimum = 0, Maximum = 10000, DecimalPlaces = 3)]
         public double MaxTableY { get; set; } = 81.25;
 
-        /// <summary>Comment text after the "( PART:" prefix for each part.</summary>
-        [DisplayName("Part comment")]
-        [Description("Text after \"( PART:\" for each part. Blank uses the source file or drawing name.")]
-        [PostSetting(OutputSection, 5)]
-        public string PartComment { get; set; } = "";
-
         /// <summary>Skippable global subroutine used to cancel comp / park between features.</summary>
         [DisplayName("Layer: cancel (L0)")]
         [Description("Called before each contour and at the end to cancel compensation and park.")]

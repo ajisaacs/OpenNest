@@ -155,7 +155,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         {
             CIFiberFormatter.Line(w, $"( Part #{partNumber} )");
 
-            var partComment = ResolvePartComment(part);
+            var partComment = PartName(part);
             CIFiberFormatter.Line(w, $"( PART:{partComment} )");
 
             CIFiberFormatter.Line(w, $"V.E.R4={partNumber}");
@@ -269,11 +269,9 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCutEnd));
         }
 
-        private string ResolvePartComment(Part part)
+        /// <summary>Source file name without extension, else the drawing name.</summary>
+        private static string PartName(Part part)
         {
-            if (!string.IsNullOrWhiteSpace(_config.PartComment))
-                return _config.PartComment;
-
             var name = part.BaseDrawing?.Name ?? "";
             var source = part.BaseDrawing?.Source?.Path;
             if (!string.IsNullOrEmpty(source))

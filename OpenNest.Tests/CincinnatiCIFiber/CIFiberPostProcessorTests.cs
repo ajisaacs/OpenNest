@@ -329,4 +329,17 @@ public class CIFiberPostProcessorTests
         Assert.Equal("SSN", config.ResolveMaterialCode(" STAINLESS "));
         Assert.Equal("MSN", config.ResolveMaterialCode("Aluminum"));
     }
+
+    [Fact]
+    public void SavedConfigWithRetiredPartComment_StillLoads()
+    {
+        const string json = """
+            { "PartComment": "OLD", "MaxTableX": 120.0, "DefaultMaterialCode": "SSN" }
+            """;
+
+        var config = System.Text.Json.JsonSerializer.Deserialize<CIFiberPostConfig>(json)!;
+
+        Assert.Equal(120.0, config.MaxTableX);
+        Assert.Equal("SSN", config.DefaultMaterialCode);
+    }
 }
