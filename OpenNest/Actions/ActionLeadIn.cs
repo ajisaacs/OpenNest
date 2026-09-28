@@ -200,12 +200,6 @@ namespace OpenNest.Actions
                     snapPoint = closest;
                     snapEntity = entity;
                     snapContourType = info.ContourType;
-                    snapNormal = ContourCuttingStrategy.ComputeNormal(
-                        closest,
-                        entity,
-                        info.ContourType,
-                        info.Winding
-                    );
                     hasSnap = true;
                     hoveredContour = info;
                 }
@@ -345,6 +339,14 @@ namespace OpenNest.Actions
             if (leadIn == null)
                 return;
 
+            snapNormal = ContourCuttingStrategy.ComputeLeadInNormal(
+                hoveredContour.Shape,
+                snapPoint,
+                snapEntity,
+                snapContourType,
+                leadIn,
+                hoveredContour.Winding
+            );
             leadIn = ClampLeadInForCircle(leadIn, parameters);
 
             var piercePoint = leadIn.GetPiercePoint(snapPoint, snapNormal);
@@ -431,12 +433,6 @@ namespace OpenNest.Actions
             {
                 snapPoint = bestPoint;
                 snapEntity = bestEntity;
-                snapNormal = ContourCuttingStrategy.ComputeNormal(
-                    bestPoint,
-                    bestEntity,
-                    snapContourType,
-                    hoveredContour.Winding
-                );
                 activeSnapType = bestType;
             }
 
