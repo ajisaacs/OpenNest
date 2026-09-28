@@ -196,14 +196,10 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
         private int WriteSheet(Plate plate, TextWriter w, int contourNumber)
         {
-            // Cut-offs run last: severing the sheet first would free the
-            // skeleton before the parts are cut (matches the CL post).
-            var ordered = plate
-                .Parts.Where(p => !p.BaseDrawing.IsCutOff)
-                .Concat(plate.Parts.Where(p => p.BaseDrawing.IsCutOff));
-
+            // Plate order is the cut sequence, cut-offs included: the user sets
+            // where each cut-off runs, so the post must not reorder them.
             var partNumber = 0;
-            foreach (var part in ordered)
+            foreach (var part in plate.Parts)
             {
                 partNumber++;
                 contourNumber = WritePart(part, partNumber, w, contourNumber);

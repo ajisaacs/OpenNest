@@ -223,7 +223,7 @@ public class CIFiberPostProcessorTests
     }
 
     [Fact]
-    public void Post_CutOff_PostsLastWithoutCompensationOrLeadIn()
+    public void Post_CutOff_PostsWithoutCompensationOrLeadIn()
     {
         var nest = MakeSquareWithHoleNest();
         var plate = nest.Plates[0];
@@ -231,17 +231,12 @@ public class CIFiberPostProcessorTests
         // Vertical cut-off at X=20: a bare rapid + line, no lead-in.
         var cutOff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
         cutOff.Regenerate(plate, new CutOffSettings());
-        plate.Parts.Insert(0, new Part(cutOff.Drawing, Vector.Zero));
+        plate.Parts.Add(new Part(cutOff.Drawing, Vector.Zero));
 
         var lines = Lines(Post(nest));
 
-        // Cut-off follows the real part despite being first in plate order.
-        var partEnd = lines.IndexOf("( PART END )");
-        var cutOffPart = lines.IndexOf("( Part #2 )");
-        Assert.True(partEnd >= 0 && cutOffPart > partEnd);
-
         var n3 = lines.IndexOf("N3:");
-        Assert.True(n3 > cutOffPart);
+        Assert.True(n3 > lines.IndexOf("( PART:CutOff-V-20.00 )"));
         Assert.Equal("/L \"L0\"", lines[n3 + 1]);
         Assert.Equal("V.E.R3=3", lines[n3 + 2]);
         Assert.StartsWith("G0X20Y", lines[n3 + 3]);
@@ -249,6 +244,34 @@ public class CIFiberPostProcessorTests
         Assert.Equal("/L \"L6\"", lines[n3 + 5]);
         Assert.StartsWith("G1X20Y", lines[n3 + 6]);
         Assert.Equal("/L \"ZHSOFF\"", lines[n3 + 7]);
+    }
+
+    [Fact]
+    public void Post_CutOff_FollowsPlateSequence()
+    {
+        // Plate order is the cut sequence: part, cut-off, part. The cut-off is
+        // sequence 2, so it posts second, not after every part.
+        var nest = MakeSquareWithHoleNest();
+        var plate = nest.Plates[0];
+        plate.Parts.Add(new Part(plate.Parts[0].BaseDrawing, new Vector(40, 2)));
+
+        var cutOff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
+        cutOff.Regenerate(plate, new CutOffSettings());
+        plate.Parts.Insert(1, new Part(cutOff.Drawing, Vector.Zero));
+
+        var lines = Lines(Post(nest));
+
+        Assert.Equal(
+            new[] { "( PART:square-hole )", "( PART:CutOff-V-20.00 )", "( PART:square-hole )" },
+            lines.Where(l => l.StartsWith("( PART:")).ToArray()
+        );
+
+        // Part number and restart label run in the same order: the first
+        // part's hole and perimeter are N1/N2, so the cut-off is N3.
+        var cutOffBlock = lines.IndexOf("( PART:CutOff-V-20.00 )");
+        Assert.Equal("( Part #2 )", lines[cutOffBlock - 1]);
+        Assert.Equal("V.E.R4=2", lines[cutOffBlock + 1]);
+        Assert.Equal("N3:", lines[cutOffBlock + 2]);
     }
 
     [Fact]

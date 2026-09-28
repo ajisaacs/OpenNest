@@ -28,7 +28,9 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
   and `%`.
 - Motion endpoints are sheet-absolute XY. Arc `I`/`J` are offsets from the arc
   start, matching the G162 convention; the post does not explicitly emit G162.
-- Sheet cut-offs post after every part on their sheet. Each segment is an open
+- Parts and sheet cut-offs post in the plate's cut sequence (`Plate.Parts`
+  order, as set by Set Sequence or a sequencer). A cut-off is not moved after
+  the parts. Each segment is an open
   line with no lead-in: rapid to its start, `/L "L4"`, `/L "L6"`, the `G1`,
   and `/L "ZHSOFF"`. No `G41`/`G42` is selected, because the line is the beam
   centreline and has no inside or outside. Whether the `L4` macro runs
@@ -85,7 +87,7 @@ validated and saved only when OK is pressed.
 
 [Output-contract tests](../OpenNest.Tests/CincinnatiCIFiber/CIFiberPostProcessorTests.cs)
 cover a square with a hole, coordinate transforms/formatting, lead-in rejection,
-cut-off ordering and output, table bounds, suppression/scribe handling, and
+cut-off sequencing and output, table bounds, suppression/scribe handling, and
 multi-sheet output in both modes. Run:
 
 ```sh
