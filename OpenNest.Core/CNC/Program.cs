@@ -269,37 +269,37 @@ namespace OpenNest.CNC
             switch (Mode)
             {
                 case Mode.Absolute:
-                {
-                    for (int i = Codes.Count; i >= 0; --i)
                     {
-                        var code = Codes[i];
-                        var motion = code as Motion;
+                        for (int i = Codes.Count; i >= 0; --i)
+                        {
+                            var code = Codes[i];
+                            var motion = code as Motion;
 
-                        if (motion == null)
-                            continue;
+                            if (motion == null)
+                                continue;
 
-                        return motion.EndPoint;
+                            return motion.EndPoint;
+                        }
+                        break;
                     }
-                    break;
-                }
 
                 case Mode.Incremental:
-                {
-                    var pos = new Vector(0, 0);
-
-                    for (int i = 0; i < Codes.Count; ++i)
                     {
-                        var code = Codes[i];
-                        var motion = code as Motion;
+                        var pos = new Vector(0, 0);
 
-                        if (motion == null)
-                            continue;
+                        for (int i = 0; i < Codes.Count; ++i)
+                        {
+                            var code = Codes[i];
+                            var motion = code as Motion;
 
-                        pos += motion.EndPoint;
+                            if (motion == null)
+                                continue;
+
+                            pos += motion.EndPoint;
+                        }
+
+                        return pos;
                     }
-
-                    return pos;
-                }
             }
 
             return new Vector(0, 0);
@@ -334,164 +334,164 @@ namespace OpenNest.CNC
                 switch (code.Type)
                 {
                     case CodeType.LinearMove:
-                    {
-                        var line = (LinearMove)code;
-                        var pt =
-                            Mode == Mode.Absolute
-                                ? frameOrigin + line.EndPoint
-                                : line.EndPoint + pos;
+                        {
+                            var line = (LinearMove)code;
+                            var pt =
+                                Mode == Mode.Absolute
+                                    ? frameOrigin + line.EndPoint
+                                    : line.EndPoint + pos;
 
-                        if (pt.X > maxX)
-                            maxX = pt.X;
-                        if (pt.X < minX)
-                            minX = pt.X;
+                            if (pt.X > maxX)
+                                maxX = pt.X;
+                            if (pt.X < minX)
+                                minX = pt.X;
 
-                        if (pt.Y > maxY)
-                            maxY = pt.Y;
-                        if (pt.Y < minY)
-                            minY = pt.Y;
+                            if (pt.Y > maxY)
+                                maxY = pt.Y;
+                            if (pt.Y < minY)
+                                minY = pt.Y;
 
-                        pos = pt;
+                            pos = pt;
 
-                        break;
-                    }
+                            break;
+                        }
 
                     case CodeType.RapidMove:
-                    {
-                        var line = (RapidMove)code;
-                        var pt =
-                            Mode == Mode.Absolute
-                                ? frameOrigin + line.EndPoint
-                                : line.EndPoint + pos;
+                        {
+                            var line = (RapidMove)code;
+                            var pt =
+                                Mode == Mode.Absolute
+                                    ? frameOrigin + line.EndPoint
+                                    : line.EndPoint + pos;
 
-                        if (pt.X > maxX)
-                            maxX = pt.X;
-                        if (pt.X < minX)
-                            minX = pt.X;
+                            if (pt.X > maxX)
+                                maxX = pt.X;
+                            if (pt.X < minX)
+                                minX = pt.X;
 
-                        if (pt.Y > maxY)
-                            maxY = pt.Y;
-                        if (pt.Y < minY)
-                            minY = pt.Y;
+                            if (pt.Y > maxY)
+                                maxY = pt.Y;
+                            if (pt.Y < minY)
+                                minY = pt.Y;
 
-                        pos = pt;
+                            pos = pt;
 
-                        break;
-                    }
+                            break;
+                        }
 
                     case CodeType.ArcMove:
-                    {
-                        var arc = (ArcMove)code;
-                        var radius = arc.CenterPoint.DistanceTo(arc.EndPoint);
-
-                        Vector endpt;
-                        Vector centerpt;
-
-                        if (Mode == Mode.Incremental)
                         {
-                            endpt = arc.EndPoint + pos;
-                            centerpt = arc.CenterPoint + pos;
+                            var arc = (ArcMove)code;
+                            var radius = arc.CenterPoint.DistanceTo(arc.EndPoint);
+
+                            Vector endpt;
+                            Vector centerpt;
+
+                            if (Mode == Mode.Incremental)
+                            {
+                                endpt = arc.EndPoint + pos;
+                                centerpt = arc.CenterPoint + pos;
+                            }
+                            else
+                            {
+                                endpt = frameOrigin + arc.EndPoint;
+                                centerpt = frameOrigin + arc.CenterPoint;
+                            }
+
+                            double minX1;
+                            double minY1;
+                            double maxX1;
+                            double maxY1;
+
+                            if (pos.X < endpt.X)
+                            {
+                                minX1 = pos.X;
+                                maxX1 = endpt.X;
+                            }
+                            else
+                            {
+                                minX1 = endpt.X;
+                                maxX1 = pos.X;
+                            }
+
+                            if (pos.Y < endpt.Y)
+                            {
+                                minY1 = pos.Y;
+                                maxY1 = endpt.Y;
+                            }
+                            else
+                            {
+                                minY1 = endpt.Y;
+                                maxY1 = pos.Y;
+                            }
+
+                            var startAngle = pos.AngleFrom(centerpt);
+                            var endAngle = endpt.AngleFrom(centerpt);
+
+                            // switch the angle to counter clockwise.
+                            if (arc.Rotation == RotationType.CW)
+                                Generic.Swap(ref startAngle, ref endAngle);
+
+                            startAngle = Angle.NormalizeRad(startAngle);
+                            endAngle = Angle.NormalizeRad(endAngle);
+
+                            if (Angle.IsBetweenRad(Angle.HalfPI, startAngle, endAngle))
+                                maxY1 = centerpt.Y + radius;
+
+                            if (Angle.IsBetweenRad(System.Math.PI, startAngle, endAngle))
+                                minX1 = centerpt.X - radius;
+
+                            const double oneHalfPI = System.Math.PI * 1.5;
+
+                            if (Angle.IsBetweenRad(oneHalfPI, startAngle, endAngle))
+                                minY1 = centerpt.Y - radius;
+
+                            if (Angle.IsBetweenRad(Angle.TwoPI, startAngle, endAngle))
+                                maxX1 = centerpt.X + radius;
+
+                            if (maxX1 > maxX)
+                                maxX = maxX1;
+
+                            if (minX1 < minX)
+                                minX = minX1;
+
+                            if (maxY1 > maxY)
+                                maxY = maxY1;
+
+                            if (minY1 < minY)
+                                minY = minY1;
+
+                            pos = endpt;
+
+                            break;
                         }
-                        else
-                        {
-                            endpt = frameOrigin + arc.EndPoint;
-                            centerpt = frameOrigin + arc.CenterPoint;
-                        }
-
-                        double minX1;
-                        double minY1;
-                        double maxX1;
-                        double maxY1;
-
-                        if (pos.X < endpt.X)
-                        {
-                            minX1 = pos.X;
-                            maxX1 = endpt.X;
-                        }
-                        else
-                        {
-                            minX1 = endpt.X;
-                            maxX1 = pos.X;
-                        }
-
-                        if (pos.Y < endpt.Y)
-                        {
-                            minY1 = pos.Y;
-                            maxY1 = endpt.Y;
-                        }
-                        else
-                        {
-                            minY1 = endpt.Y;
-                            maxY1 = pos.Y;
-                        }
-
-                        var startAngle = pos.AngleFrom(centerpt);
-                        var endAngle = endpt.AngleFrom(centerpt);
-
-                        // switch the angle to counter clockwise.
-                        if (arc.Rotation == RotationType.CW)
-                            Generic.Swap(ref startAngle, ref endAngle);
-
-                        startAngle = Angle.NormalizeRad(startAngle);
-                        endAngle = Angle.NormalizeRad(endAngle);
-
-                        if (Angle.IsBetweenRad(Angle.HalfPI, startAngle, endAngle))
-                            maxY1 = centerpt.Y + radius;
-
-                        if (Angle.IsBetweenRad(System.Math.PI, startAngle, endAngle))
-                            minX1 = centerpt.X - radius;
-
-                        const double oneHalfPI = System.Math.PI * 1.5;
-
-                        if (Angle.IsBetweenRad(oneHalfPI, startAngle, endAngle))
-                            minY1 = centerpt.Y - radius;
-
-                        if (Angle.IsBetweenRad(Angle.TwoPI, startAngle, endAngle))
-                            maxX1 = centerpt.X + radius;
-
-                        if (maxX1 > maxX)
-                            maxX = maxX1;
-
-                        if (minX1 < minX)
-                            minX = minX1;
-
-                        if (maxY1 > maxY)
-                            maxY = maxY1;
-
-                        if (minY1 < minY)
-                            minY = minY1;
-
-                        pos = endpt;
-
-                        break;
-                    }
 
                     case CodeType.SubProgramCall:
-                    {
-                        var subpgm = (SubProgramCall)code;
-                        if (subpgm.Program == null)
+                        {
+                            var subpgm = (SubProgramCall)code;
+                            if (subpgm.Program == null)
+                                break;
+
+                            // Sub-program frame origin in this program's frame
+                            // is frameOrigin + Offset, regardless of current pos.
+                            pos = frameOrigin + subpgm.Offset;
+                            if (!subpgm.Program.BoundingBox(ref pos, out var box))
+                                break;
+
+                            if (box.Left < minX)
+                                minX = box.Left;
+
+                            if (box.Right > maxX)
+                                maxX = box.Right;
+
+                            if (box.Bottom < minY)
+                                minY = box.Bottom;
+
+                            if (box.Top > maxY)
+                                maxY = box.Top;
+
                             break;
-
-                        // Sub-program frame origin in this program's frame
-                        // is frameOrigin + Offset, regardless of current pos.
-                        pos = frameOrigin + subpgm.Offset;
-                        if (!subpgm.Program.BoundingBox(ref pos, out var box))
-                            break;
-
-                        if (box.Left < minX)
-                            minX = box.Left;
-
-                        if (box.Right > maxX)
-                            maxX = box.Right;
-
-                        if (box.Bottom < minY)
-                            minY = box.Bottom;
-
-                        if (box.Top > maxY)
-                            maxY = box.Top;
-
-                        break;
-                    }
+                        }
                 }
             }
 
