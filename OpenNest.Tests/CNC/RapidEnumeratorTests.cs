@@ -55,6 +55,28 @@ namespace OpenNest.Tests.CNC
         }
 
         [Fact]
+        public void Enumerate_IncrementalProgramWithNonZeroFirstRapid_DoesNotDoubleCountIt()
+        {
+            // Lead-in programs (ContourCuttingStrategy output) are Incremental and
+            // start with a nonzero rapid from the part origin to the first pierce.
+            var pgm = new Program(Mode.Incremental);
+            pgm.Codes.Add(new RapidMove(2, 3));
+            pgm.Codes.Add(new LinearMove(5, 0));
+            pgm.Codes.Add(new RapidMove(1, 1));
+
+            var segments = RapidEnumerator.Enumerate(
+                pgm,
+                basePos: new Vector(100, 200),
+                startPos: new Vector(0, 0)
+            );
+
+            Assert.Equal(2, segments.Count);
+            Assert.Equal(new Vector(102, 203), segments[0].To);
+            Assert.Equal(new Vector(107, 203), segments[1].From);
+            Assert.Equal(new Vector(108, 204), segments[1].To);
+        }
+
+        [Fact]
         public void Enumerate_SubProgramCall_RapidEndsAtAbsoluteHolePierce()
         {
             // Main program: lead-in rapid, a line, then a SubProgramCall for a hole.

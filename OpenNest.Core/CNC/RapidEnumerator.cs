@@ -12,13 +12,14 @@ namespace OpenNest.CNC
             var results = new List<Segment>();
 
             // Draw the rapid from the previous tool position to the program's first
-            // pierce point. This also primes pos so the interior walk interprets
-            // Incremental deltas from the correct absolute location (basePos), which
-            // matters for raw pre-lead-in programs that are emitted Incremental.
+            // pierce point. The walk then starts at the program origin (basePos), not
+            // the pierce: the skipped first rapid still advances pos, so starting at
+            // the pierce would apply a nonzero Incremental first delta twice (as in
+            // lead-in programs) and shift every later rapid by it.
             var firstPierce = FirstPiercePoint(pgm, basePos);
             results.Add(new Segment(startPos, firstPierce));
 
-            var pos = firstPierce;
+            var pos = basePos;
             Walk(pgm, basePos, ref pos, skipFirst: true, results);
             return results;
         }
