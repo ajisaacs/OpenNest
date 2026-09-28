@@ -669,8 +669,13 @@ static class NestConsole
             );
         }
 
+        var outputFiles = post is IMultiFilePostProcessor multiFile
+            ? multiFile.GetOutputFiles(nest, outputFile)
+            : new[] { outputFile };
+
         post.Post(nest, outputFile);
-        Console.WriteLine($"Post: {post.Name} -> {outputFile}");
+        foreach (var file in outputFiles)
+            Console.WriteLine($"Post: {post.Name} -> {file}");
     }
 
     static void PrintUsage()

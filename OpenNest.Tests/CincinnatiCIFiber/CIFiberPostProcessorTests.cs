@@ -342,4 +342,207 @@ public class CIFiberPostProcessorTests
         Assert.Equal(120.0, config.MaxTableX);
         Assert.Equal("SSN", config.DefaultMaterialCode);
     }
+
+    private static Nest MakeMultiSheetNest(params (double Width, double Length)[] extraSheets)
+    {
+        var nest = MakeSquareWithHoleNest();
+        var drawing = nest.Plates[0].Parts[0].BaseDrawing;
+        foreach (var (width, length) in extraSheets)
+        {
+            var plate = new Plate(width, length);
+            plate.Parts.Add(new Part(drawing, new Vector(3, 4)));
+            nest.Plates.Add(plate);
+        }
+        return nest;
+    }
+
+    private static string NewTempDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"cifiber-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    [Fact]
+    public void Post_OneProgramPerSheet_WritesNumberedFiles_EachAFullProgram()
+    {
+        var nest = MakeMultiSheetNest((48, 96));
+        nest.Plates.Add(new Plate(60, 120)); // empty sheet: not posted
+        var dir = NewTempDir();
+        try
+        {
+            var chosen = Path.Combine(dir, "JOB.cnc");
+            var post = new CIFiberPostProcessor(MakeConfig());
+
+            var expected = post.GetOutputFiles(nest, chosen);
+            post.Post(nest, chosen);
+
+            Assert.Equal(
+                new[] { Path.Combine(dir, "JOB-1.cnc"), Path.Combine(dir, "JOB-2.cnc") },
+                expected
+            );
+            Assert.Equal(
+                expected.OrderBy(f => f),
+                Directory.GetFiles(dir).OrderBy(f => f)
+            );
+
+            var first = Lines(File.ReadAllText(expected[0]));
+            var second = Lines(File.ReadAllText(expected[1]));
+
+            Assert.Contains("V.E.X_SIZE = 120.000", first);
+            Assert.Contains("V.E.X_SIZE = 96.000", second);
+            Assert.Contains("V.E.Y_SIZE = 48.000", second);
+            Assert.Contains("( Sheet number - 1 )", first);
+            Assert.Contains("( Sheet number - 2 )", second);
+
+            foreach (var program in new[] { first, second })
+            {
+                // Restart labels start over in every program.
+                Assert.Contains("N1:", program);
+                Assert.DoesNotContain("N3:", program);
+                Assert.Single(program, "M50");
+                Assert.Equal(
+                    new[] { "L PROGRAMEND.NC", "M50", "M30", "%", "" },
+                    program.TakeLast(5)
+                );
+            }
+            Assert.Contains("G0X3Y3.5", second); // hole pierce at the sheet-2 part location
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void Post_SingleProgram_ChangesPalletBetweenSheets()
+    {
+        var nest = MakeMultiSheetNest((60, 120), (60, 120));
+        var config = MakeConfig();
+        config.OneProgramPerSheet = false;
+        var dir = NewTempDir();
+        try
+        {
+            var chosen = Path.Combine(dir, "JOB.cnc");
+            var post = new CIFiberPostProcessor(config);
+
+            Assert.Equal(new[] { chosen }, post.GetOutputFiles(nest, chosen));
+            post.Post(nest, chosen);
+            Assert.Equal(new[] { chosen }, Directory.GetFiles(dir));
+
+            var lines = Lines(File.ReadAllText(chosen));
+            Assert.Equal(3, lines.Count(l => l == "M50"));
+            Assert.Single(lines, "M30");
+
+            var sheet2 = lines.IndexOf("( Sheet number - 2 )");
+            Assert.Equal(
+                new[] { "( PART END )", "/L \"L0\"", "M50", "( Sheet number - 2 )" },
+                lines.Skip(sheet2 - 3).Take(4)
+            );
+            Assert.True(lines.IndexOf("( Sheet number - 3 )") > sheet2);
+
+            // Restart labels continue across sheets within one program.
+            Assert.Contains("N6:", lines);
+            Assert.Contains("V.E.R3=6", lines);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void Post_SingleProgram_RejectsMixedSheetSizes_WritingNothing()
+    {
+        var nest = MakeMultiSheetNest((48, 96));
+        var config = MakeConfig();
+        config.OneProgramPerSheet = false;
+        var dir = NewTempDir();
+        try
+        {
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                new CIFiberPostProcessor(config).Post(nest, Path.Combine(dir, "JOB.cnc"))
+            );
+            Assert.Contains("One program per sheet", ex.Message);
+            Assert.Empty(Directory.GetFiles(dir));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void Post_OneProgramPerSheet_OversizeSheet_WritesNoFiles()
+    {
+        var nest = MakeMultiSheetNest((60, 200)); // second sheet 200 long > 160.25 table
+        var dir = NewTempDir();
+        try
+        {
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                new CIFiberPostProcessor(MakeConfig()).Post(nest, Path.Combine(dir, "JOB.cnc"))
+            );
+            Assert.Contains("exceeds maximum table X", ex.Message);
+            Assert.Empty(Directory.GetFiles(dir));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void Post_OneProgramPerSheet_SingleSheet_UsesChosenName()
+    {
+        var nest = MakeSquareWithHoleNest();
+        var dir = NewTempDir();
+        try
+        {
+            var chosen = Path.Combine(dir, "JOB.cnc");
+            var post = new CIFiberPostProcessor(MakeConfig());
+
+            Assert.Equal(new[] { chosen }, post.GetOutputFiles(nest, chosen));
+            post.Post(nest, chosen);
+
+            Assert.Equal(Post(nest), File.ReadAllText(chosen));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void Post_PalletChangeCode_IsConfigurable()
+    {
+        var custom = MakeConfig();
+        custom.PalletChangeCode = " M51 ";
+        var lines = Lines(Post(MakeSquareWithHoleNest(), custom));
+        Assert.Equal(new[] { "L PROGRAMEND.NC", "M51", "M30", "%", "" }, lines.TakeLast(5));
+        Assert.DoesNotContain("M50", lines);
+
+        var none = MakeConfig();
+        none.PalletChangeCode = "";
+        lines = Lines(Post(MakeSquareWithHoleNest(), none));
+        Assert.Equal(new[] { "L PROGRAMEND.NC", "M30", "%", "" }, lines.TakeLast(4));
+    }
+
+    [Fact]
+    public void PostToStream_MultiSheetPerSheetMode_Throws()
+    {
+        var nest = MakeMultiSheetNest((60, 120));
+        var ex = Assert.Throws<InvalidOperationException>(() => Post(nest));
+        Assert.Contains("file path", ex.Message);
+    }
+
+    [Fact]
+    public void SavedConfigWithoutSheetSettings_DefaultsToPerSheetAndM50()
+    {
+        var config = System.Text.Json.JsonSerializer.Deserialize<CIFiberPostConfig>(
+            """{ "MaxTableX": 120.0 }"""
+        )!;
+
+        Assert.True(config.OneProgramPerSheet);
+        Assert.Equal("M50", config.PalletChangeCode);
+    }
 }

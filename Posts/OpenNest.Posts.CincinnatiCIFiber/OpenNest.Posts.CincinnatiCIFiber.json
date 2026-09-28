@@ -7,6 +7,8 @@
   "SkipScribe": true,
   "MaxTableX": 160.25,
   "MaxTableY": 81.25,
+  "OneProgramPerSheet": true,
+  "PalletChangeCode": "M50",
   "LayerCancel": "L0",
   "LayerInteriorLeadin": "L2",
   "LayerExteriorLeadin": "L4",

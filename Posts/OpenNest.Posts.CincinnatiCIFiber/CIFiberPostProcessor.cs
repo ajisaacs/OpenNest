@@ -16,7 +16,9 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     /// the configured table envelope. Emits the TF5200 skippable-macro program
     /// structure of the machine sample (see <see cref="CIFiberProgramWriter"/>).
     /// </summary>
-    public sealed class CIFiberPostProcessor : IConfigurablePostProcessor
+    public sealed class CIFiberPostProcessor
+        : IConfigurablePostProcessor,
+            IMultiFilePostProcessor
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -70,6 +72,11 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             return Path.Combine(dir, name + ".json");
         }
 
+        /// <summary>
+        /// Writes every sheet into one program. A stream holds a single program,
+        /// so this throws when "One program per sheet" is on and the nest has more
+        /// than one sheet; use <see cref="Post(Nest, string)"/> for that.
+        /// </summary>
         public void Post(Nest nest, Stream outputStream)
         {
             if (nest == null)
@@ -77,26 +84,86 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             if (outputStream == null)
                 throw new ArgumentNullException(nameof(outputStream));
 
-            // CRLF file, ASCII (UTF-8 without BOM), matching the machine sample.
-            var encoding = new UTF8Encoding(false);
-            using var writer = new StreamWriter(
-                outputStream,
-                encoding,
-                1024,
-                leaveOpen: true
-            );
-            new CIFiberProgramWriter(Config).Write(nest, writer);
-            writer.Flush();
+            if (SplitsSheets(nest))
+                throw new InvalidOperationException(
+                    "\"One program per sheet\" writes several files; post this nest to a file path."
+                );
+
+            var program = Render(w => new CIFiberProgramWriter(Config).Write(nest, w));
+            outputStream.Write(program, 0, program.Length);
         }
 
+        /// <summary>
+        /// Writes the program(s) for the nest. With "One program per sheet" and more
+        /// than one sheet, <c>JOB.cnc</c> becomes <c>JOB-1.cnc</c>, <c>JOB-2.cnc</c>, ...;
+        /// otherwise the single program goes to <paramref name="outputFile"/>. All
+        /// programs are generated before any file is written, so a validation
+        /// failure leaves no partial output.
+        /// </summary>
         public void Post(Nest nest, string outputFile)
         {
-            using var fs = new FileStream(
-                outputFile,
-                FileMode.Create,
-                FileAccess.Write
-            );
-            Post(nest, fs);
+            if (nest == null)
+                throw new ArgumentNullException(nameof(nest));
+            if (string.IsNullOrEmpty(outputFile))
+                throw new ArgumentNullException(nameof(outputFile));
+
+            var files = GetOutputFiles(nest, outputFile);
+            var programs = new List<byte[]>();
+
+            if (files.Count == 1)
+            {
+                programs.Add(Render(w => new CIFiberProgramWriter(Config).Write(nest, w)));
+            }
+            else
+            {
+                var sheets = CIFiberProgramWriter.PostedSheets(nest);
+                var writer = new CIFiberProgramWriter(Config);
+                writer.Validate(sheets, singleProgram: false);
+                for (var i = 0; i < sheets.Count; i++)
+                {
+                    var sheetNumber = i + 1;
+                    var sheet = sheets[i];
+                    programs.Add(Render(w => writer.WriteSheet(nest, sheet, sheetNumber, w)));
+                }
+            }
+
+            for (var i = 0; i < files.Count; i++)
+                File.WriteAllBytes(files[i], programs[i]);
+        }
+
+        public IReadOnlyList<string> GetOutputFiles(Nest nest, string outputFile)
+        {
+            if (nest == null)
+                throw new ArgumentNullException(nameof(nest));
+            if (string.IsNullOrEmpty(outputFile))
+                throw new ArgumentNullException(nameof(outputFile));
+
+            if (!SplitsSheets(nest))
+                return new[] { outputFile };
+
+            var dir = Path.GetDirectoryName(outputFile) ?? "";
+            var name = Path.GetFileNameWithoutExtension(outputFile);
+            var ext = Path.GetExtension(outputFile);
+            var count = CIFiberProgramWriter.PostedSheets(nest).Count;
+
+            return Enumerable
+                .Range(1, count)
+                .Select(n => Path.Combine(dir, $"{name}-{n}{ext}"))
+                .ToList();
+        }
+
+        private bool SplitsSheets(Nest nest) =>
+            Config.OneProgramPerSheet && CIFiberProgramWriter.PostedSheets(nest).Count > 1;
+
+        // CRLF file, ASCII (UTF-8 without BOM), matching the machine sample.
+        private static byte[] Render(Action<TextWriter> write)
+        {
+            using var ms = new MemoryStream();
+            using (var writer = new StreamWriter(ms, new UTF8Encoding(false), 1024, leaveOpen: true))
+            {
+                write(writer);
+            }
+            return ms.ToArray();
         }
     }
 }

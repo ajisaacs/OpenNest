@@ -16,23 +16,29 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         Description = "Which CI Fiber table this configuration drives and the largest sheet it accepts."
     )]
     [PostSettingsSection(
-        MaterialSection,
+        SheetsSection,
         1,
+        Description = "How a nest with more than one sheet is written, and the code that swaps pallets."
+    )]
+    [PostSettingsSection(
+        MaterialSection,
+        2,
         Description = "Maps OpenNest material names to the controller's V.E.MATERIAL code."
     )]
     [PostSettingsSection(
         OutputSection,
-        2,
+        3,
         Description = "Number format, units, and what the posted program includes."
     )]
     [PostSettingsSection(
         MacrosSection,
-        3,
+        4,
         Description = "Controller subroutines called around each contour and at program start and end. They must exist on the machine."
     )]
     public class CIFiberPostConfig
     {
         private const string MachineSection = "Machine";
+        private const string SheetsSection = "Sheets";
         private const string MaterialSection = "Material";
         private const string OutputSection = "Program output";
         private const string MacrosSection = "Macros";
@@ -90,6 +96,35 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         [Description("Largest plate width (Y) this table accepts. Posting a larger plate fails. 0 disables the check.")]
         [PostSetting(MachineSection, 2, Minimum = 0, Maximum = 10000, DecimalPlaces = 3)]
         public double MaxTableY { get; set; } = 81.25;
+
+        /// <summary>
+        /// Write each sheet as its own program (NAME-1.cnc, NAME-2.cnc, ...), the
+        /// Cincinnati convention for batch runs. When false, every sheet goes into
+        /// one program with a pallet change between sheets. A nest with a single
+        /// sheet always posts to the chosen file name.
+        /// </summary>
+        [DisplayName("One program per sheet")]
+        [Description(
+            "Save each sheet as its own program: JOB.cnc becomes JOB-1.cnc, JOB-2.cnc, ... "
+                + "Clear to put every sheet in one program, with a pallet change between sheets. "
+                + "A single-sheet nest always saves to the chosen name."
+        )]
+        [PostSetting(SheetsSection, 0)]
+        public bool OneProgramPerSheet { get; set; } = true;
+
+        /// <summary>
+        /// Line written to swap pallets: after the last sheet, and between sheets
+        /// in a single program. M50 comes from the machine sample and the CL-series
+        /// manual (EM-423 §3.50); it is unconfirmed for multi-sheet CI Fiber runs.
+        /// Blank writes no pallet change.
+        /// </summary>
+        [DisplayName("Pallet change code")]
+        [Description(
+            "Written after each sheet to swap pallets. M50 matches the machine sample; "
+                + "confirm it for multi-sheet runs. Blank writes no pallet change."
+        )]
+        [PostSetting(SheetsSection, 1)]
+        public string PalletChangeCode { get; set; } = "M50";
 
         /// <summary>Skippable global subroutine used to cancel comp / park between features.</summary>
         [DisplayName("Layer: cancel (L0)")]

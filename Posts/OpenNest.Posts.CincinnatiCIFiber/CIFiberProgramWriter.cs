@@ -26,6 +26,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     /// $GOTO NP3:
     /// N0:
     ///   ( Sheet number - 1 )
+    ///   ... (single-program mode only: /L "L0", pallet change, next sheet)
     ///   ( Part #k ) ( PART:... ) V.E.R4=k
     ///     N&lt;n&gt;: /L "L0" V.E.R3=&lt;n&gt; G0X..Y..
     ///          /L "L2" + G41 | /L "L4" + G42
@@ -36,7 +37,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     ///   ( PART END )
     /// /L "L0"
     /// L PROGRAMEND.NC
-    /// M50
+    /// M50               (configurable pallet change)
     /// M30
     /// %
     /// </code>
@@ -57,14 +58,66 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             _fmt = new CIFiberFormatter(config.PostedAccuracy);
         }
 
+        /// <summary>The plates that are posted: every plate with parts, in nest order.</summary>
+        public static IReadOnlyList<Plate> PostedSheets(Nest nest) =>
+            nest?.Plates.Where(p => p.Parts.Count > 0).ToList()
+            ?? throw new ArgumentNullException(nameof(nest));
+
+        /// <summary>
+        /// Writes every posted sheet into one program, with a pallet change
+        /// between sheets and after the last.
+        /// </summary>
         public void Write(Nest nest, TextWriter w)
         {
             if (nest == null)
                 throw new ArgumentNullException(nameof(nest));
 
-            var plates = nest.Plates.Where(p => p.Parts.Count > 0).ToList();
+            Write(nest, PostedSheets(nest), 1, w);
+        }
 
-            WriteHeader(nest, w);
+        /// <summary>
+        /// Writes one sheet as a complete program. Contour labels restart at 1;
+        /// <paramref name="sheetNumber"/> only labels the sheet comment.
+        /// </summary>
+        public void WriteSheet(Nest nest, Plate sheet, int sheetNumber, TextWriter w)
+        {
+            if (nest == null)
+                throw new ArgumentNullException(nameof(nest));
+            if (sheet == null)
+                throw new ArgumentNullException(nameof(sheet));
+
+            Write(nest, new[] { sheet }, sheetNumber, w);
+        }
+
+        /// <summary>
+        /// Throws if any sheet exceeds the table, or if a single program would hold
+        /// sheets of different sizes (its header carries only one size).
+        /// </summary>
+        public void Validate(IReadOnlyList<Plate> sheets, bool singleProgram)
+        {
+            foreach (var sheet in sheets)
+                _config.ValidateTableSize(sheet.Size.Length, sheet.Size.Width);
+
+            if (!singleProgram || sheets.Count < 2)
+                return;
+
+            var first = sheets[0].Size;
+            if (sheets.Any(p => !SameSize(p.Size, first)))
+                throw new InvalidOperationException(
+                    "The sheets are different sizes, but one program has a single sheet "
+                        + "size in its header. Turn on \"One program per sheet\" to post them."
+                );
+        }
+
+        private static bool SameSize(Size a, Size b) =>
+            System.Math.Abs(a.Length - b.Length) < 1e-6 && System.Math.Abs(a.Width - b.Width) < 1e-6;
+
+        private void Write(Nest nest, IReadOnlyList<Plate> sheets, int firstSheetNumber, TextWriter w)
+        {
+            // Check every sheet before writing anything.
+            Validate(sheets, singleProgram: true);
+
+            WriteHeader(nest, sheets.Count > 0 ? sheets[0] : nest.Plates.FirstOrDefault(), w);
 
             CIFiberFormatter.Line(w, "G90");
             CIFiberFormatter.Line(w, $"L {_config.ProgramStartMacro}");
@@ -73,19 +126,23 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             CIFiberFormatter.Line(w, "N0:");
 
             var contourNumber = 0;
-            for (var s = 0; s < plates.Count; s++)
+            for (var s = 0; s < sheets.Count; s++)
             {
-                var plate = plates[s];
-                _config.ValidateTableSize(plate.Size.Length, plate.Size.Width);
+                if (s > 0)
+                {
+                    // Park, then swap pallets before the next sheet.
+                    CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
+                    WritePalletChange(w);
+                }
 
-                CIFiberFormatter.Line(w, $"( Sheet number - {s + 1} )");
-                contourNumber = WriteSheet(plate, w, contourNumber);
+                CIFiberFormatter.Line(w, $"( Sheet number - {firstSheetNumber + s} )");
+                contourNumber = WriteSheet(sheets[s], w, contourNumber);
             }
 
             WriteTail(w);
         }
 
-        private void WriteHeader(Nest nest, TextWriter w)
+        private void WriteHeader(Nest nest, Plate firstSheet, TextWriter w)
         {
             CIFiberFormatter.Line(w, $"( {nest.Name ?? ""} )");
             CIFiberFormatter.Line(w, $"( CONFIGURATION - {_config.ConfigurationName} )");
@@ -106,12 +163,10 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             CIFiberFormatter.Line(w, $"V.E.MATERIAL = \"{code}\"");
             CIFiberFormatter.Line(w, $"V.E.THICKNESS = {_fmt.Fixed(nest.Thickness)}");
 
-            // Multi-plate nests run one sheet after another in this program;
-            // the header size describes the first sheet (the machine sample
-            // carries a single sheet).
-            var firstPlate = nest.Plates.FirstOrDefault();
-            var xSize = firstPlate?.Size.Length ?? 0.0;
-            var ySize = firstPlate?.Size.Width ?? 0.0;
+            // A single program holding several sheets still carries only the
+            // first sheet's size (the machine sample has one sheet).
+            var xSize = firstSheet?.Size.Length ?? 0.0;
+            var ySize = firstSheet?.Size.Width ?? 0.0;
             CIFiberFormatter.Line(w, $"V.E.X_SIZE = {_fmt.Fixed(xSize)}");
             CIFiberFormatter.Line(w, $"V.E.Y_SIZE = {_fmt.Fixed(ySize)}");
 
@@ -128,9 +183,15 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         {
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
             CIFiberFormatter.Line(w, $"L {_config.ProgramEndMacro}");
-            CIFiberFormatter.Line(w, "M50");
+            WritePalletChange(w);
             CIFiberFormatter.Line(w, "M30");
             CIFiberFormatter.Line(w, "%");
+        }
+
+        private void WritePalletChange(TextWriter w)
+        {
+            if (!string.IsNullOrWhiteSpace(_config.PalletChangeCode))
+                CIFiberFormatter.Line(w, _config.PalletChangeCode.Trim());
         }
 
         private int WriteSheet(Plate plate, TextWriter w, int contourNumber)

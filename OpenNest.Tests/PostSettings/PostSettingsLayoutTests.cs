@@ -17,7 +17,7 @@ public class PostSettingsLayoutTests
 
         Assert.NotNull(sections);
         Assert.Equal(
-            new[] { "Machine", "Material", "Program output", "Macros" },
+            new[] { "Machine", "Sheets", "Material", "Program output", "Macros" },
             sections.Select(s => s.Name)
         );
         Assert.All(sections, s => Assert.NotEmpty(s.Description));
@@ -40,7 +40,11 @@ public class PostSettingsLayoutTests
         Assert.Equal("Maximum table X", machine[1].Label);
         Assert.Contains("0 disables", machine[1].Description);
 
-        var materials = sections[1].Fields[0];
+        var sheets = sections[1].Fields;
+        Assert.Equal(new[] { "OneProgramPerSheet", "PalletChangeCode" }, sheets.Select(f => f.Name));
+        Assert.Equal(PostSettingKind.Boolean, sheets[0].Kind);
+
+        var materials = sections[2].Fields[0];
         Assert.Equal(PostSettingKind.StringMap, materials.Kind);
         Assert.Equal("Material name", materials.KeyHeader);
         Assert.Equal("Machine code", materials.ValueHeader);

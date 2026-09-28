@@ -1447,8 +1447,69 @@ namespace OpenNest.Forms
             if (dialog.ShowDialog() == DialogResult.OK)
             {
                 var path = dialog.FileName;
+
+                if (postProcessor is IMultiFilePostProcessor multiFile)
+                {
+                    var files = multiFile.GetOutputFiles(activeForm.Nest, path);
+                    if (!ConfirmOverwrite(files, path))
+                        return;
+
+                    try
+                    {
+                        postProcessor.Post(activeForm.Nest, path);
+                    }
+                    catch (Exception ex)
+                        when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+                    {
+                        MessageBox.Show(
+                            this,
+                            ex.Message,
+                            postProcessor.Name,
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning
+                        );
+                        return;
+                    }
+
+                    if (files.Count > 1)
+                        MessageBox.Show(
+                            this,
+                            $"Saved {files.Count} programs, one per sheet:\n\n"
+                                + string.Join("\n", files.Select(Path.GetFileName))
+                                + $"\n\nin {Path.GetDirectoryName(path)}",
+                            postProcessor.Name,
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information
+                        );
+                    return;
+                }
+
                 postProcessor.Post(activeForm.Nest, path);
             }
+        }
+
+        /// <summary>
+        /// The save dialog only checks the chosen name; ask before replacing any
+        /// other existing file a multi-file post will write.
+        /// </summary>
+        private bool ConfirmOverwrite(IReadOnlyList<string> files, string chosenPath)
+        {
+            var existing = files
+                .Where(f => File.Exists(f) && !string.Equals(f, chosenPath, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (existing.Count == 0)
+                return true;
+
+            var answer = MessageBox.Show(
+                this,
+                "These files already exist and will be replaced:\n\n"
+                    + string.Join("\n", existing.Select(Path.GetFileName))
+                    + "\n\nReplace them?",
+                "Confirm Save",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning
+            );
+            return answer == DialogResult.Yes;
         }
 
         private void CalculateNestCutTime_Click(object sender, EventArgs e)
