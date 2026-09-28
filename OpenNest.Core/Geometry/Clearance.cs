@@ -63,6 +63,24 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
+        /// Non-negative minimum boundary (edge-to-edge) distance between two rings
+        /// and the direction that translates <paramref name="a"/> away from
+        /// <paramref name="b"/> at the closest contact. Never tests overlap: a ring
+        /// contained in another (a part inside a cutout ring) still reports its true
+        /// gap. For signed material clearance use <see cref="Between"/>.
+        /// </summary>
+        public static ClearanceResult BoundaryDistance(Polygon a, Polygon b)
+        {
+            var linesA = a.ToLines();
+            var linesB = b.ToLines();
+
+            if (linesA.Count == 0 || linesB.Count == 0)
+                return new ClearanceResult(0, new Vector(1, 0));
+
+            return Separation(linesA, linesB);
+        }
+
+        /// <summary>
         /// Minimum boundary distance between two non-overlapping rings and the
         /// direction that translates <paramref name="linesA"/> away from
         /// <paramref name="linesB"/> at the closest contact.
