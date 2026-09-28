@@ -18,6 +18,11 @@ namespace OpenNest.IO
     {
         private readonly Stream stream;
         private readonly ZipArchive zipArchive;
+        private readonly Dictionary<int, string> drawingHashes = new();
+        private readonly List<string> warnings = new();
+
+        /// <summary>Part programs that could not be restored; other parts still load.</summary>
+        public IReadOnlyList<string> Warnings => warnings.AsReadOnly();
 
         public NestReader(string file)
         {
@@ -63,27 +68,57 @@ namespace OpenNest.IO
             var programs = new Dictionary<int, Program>();
             for (var i = 1; i <= count; i++)
             {
-                var entry = zipArchive.GetEntry($"programs/program-{i}");
-                if (entry == null)
+                var name = $"programs/program-{i}";
+                if (zipArchive.GetEntry(name) == null)
                     continue;
-
-                using var entryStream = entry.Open();
-                var memStream = new MemoryStream();
-                entryStream.CopyTo(memStream);
-                memStream.Position = 0;
-
-                var reader = new ProgramReader(memStream);
-                programs[i] = reader.Read();
-
-                // Read sub-programs if present
-                var subsEntry = zipArchive.GetEntry($"programs/program-{i}-subs");
-                if (subsEntry != null)
-                {
-                    using var subsStream = subsEntry.Open();
-                    ReadSubPrograms(programs[i], subsStream);
-                }
+                programs[i] = ReadProgram(name, out var hash);
+                drawingHashes[i] = hash;
             }
             return programs;
+        }
+
+        private Program ReadProgram(string name, out string hash)
+        {
+            var text = ReadEntry(name);
+            var subs = zipArchive.GetEntry(name + "-subs") == null ? "" : ReadEntry(name + "-subs");
+            hash = NestWriter.GetDrawingHash(text, subs);
+            using var programStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(text));
+            var program = new ProgramReader(programStream).Read();
+            if (subs.Length > 0)
+            {
+                using var subsStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(subs));
+                ReadSubPrograms(program, subsStream);
+            }
+            return program;
+        }
+
+        private void RestorePartProgram(Part part, PartDto dto, int plateId, int partIndex)
+        {
+            // Old files had only transient flags. They still load clean and silently.
+            if (string.IsNullOrEmpty(dto.Program))
+                return;
+
+            // A missing hash cannot establish that this program belongs to the current drawing.
+            if (!drawingHashes.TryGetValue(dto.DrawingId, out var hash)
+                || !string.Equals(dto.DrawingHash, hash, StringComparison.Ordinal))
+                return;
+
+            try
+            {
+                var program = ReadProgram(dto.Program, out _);
+                foreach (var call in program.Codes.OfType<SubProgramCall>())
+                    if (call.Program == null || !call.Program.Codes.Any(c => c is Motion))
+                        throw new InvalidDataException($"Missing or empty hole sub-program {call.Id}.");
+
+                if (!part.RestoreLeadInProgram(program, dto.LeadInsLocked))
+                    throw new InvalidDataException("The saved part program has no motion.");
+            }
+            catch (Exception ex) when (ex is IOException || ex is InvalidDataException || ex is FormatException
+                || ex is OverflowException || ex is ArgumentException || ex is InvalidOperationException)
+            {
+                warnings.Add($"Plate {plateId}, part {partIndex} ('{part.BaseDrawing.Name}'): "
+                    + $"could not restore '{dto.Program}'; loaded the clean drawing without lead-ins or tabs. {ex.Message}");
+            }
         }
 
         private static void ReadSubPrograms(Program parent, Stream stream)
@@ -357,15 +392,18 @@ namespace OpenNest.IO
                     p.EdgeSpacing.Top
                 );
                 plate.GrainAngle = p.GrainAngle;
+                plate.CuttingParameters = CuttingParametersSerializer.FromDto(p.CuttingParameters);
 
-                foreach (var partDto in p.Parts)
+                for (var partIndex = 0; partIndex < p.Parts.Count; partIndex++)
                 {
+                    var partDto = p.Parts[partIndex];
                     if (!drawingMap.TryGetValue(partDto.DrawingId, out var dwg))
                         continue;
 
                     var part = new Part(dwg);
                     part.Rotate(partDto.Rotation);
                     part.Offset(new Vector(partDto.X, partDto.Y));
+                    RestorePartProgram(part, partDto, p.Id, partIndex);
                     plate.Parts.Add(part);
                 }
 

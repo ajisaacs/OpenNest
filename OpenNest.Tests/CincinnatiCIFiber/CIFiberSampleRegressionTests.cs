@@ -97,6 +97,24 @@ public class CIFiberSampleRegressionTests
     }
 
     [SkippableFact]
+    public void Post_ReconstructedNest_IsIdenticalAfterSavedLeadInsReload()
+    {
+        var fixture = ResolveFixture();
+        Skip.If(fixture == null, "CI Fiber fixtures not configured in test-config.json");
+        var nest = LoadAndLeadIn(fixture.Value.Nest);
+        var expected = PostNest(nest);
+        using var stream = new MemoryStream();
+        new NestWriter(nest).Write(stream);
+        stream.Position = 0;
+        var reader = new NestReader(stream);
+        var restored = reader.Read();
+
+        Assert.Empty(reader.Warnings);
+        Assert.All(restored.Plates.SelectMany(plate => plate.Parts), part => Assert.True(part.HasManualLeadIns));
+        Assert.Equal(expected, PostNest(restored));
+    }
+
+    [SkippableFact]
     public void Post_ReconstructedNest_MatchesSampleCounts()
     {
         var fixture = ResolveFixture();

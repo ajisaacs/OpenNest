@@ -891,6 +891,11 @@ namespace OpenNest.Forms
             if (Nest.Drawings.Count == 0)
                 return;
 
+            // Capture before loading the editor: its conversion can mutate programs in place.
+            var snapshot = DrawingProgramSnapshot.Capture(
+                Nest.Drawings,
+                program => NestWriter.GetProgramText(program) + "\0" + NestWriter.GetSubProgramsText(program)
+            );
             var converter = new CadConverterForm();
             converter.LoadDrawings(Nest.Drawings);
 
@@ -925,11 +930,16 @@ namespace OpenNest.Forms
             foreach (var d in newByName.Values)
                 Nest.Drawings.Add(d);
 
-            // Refresh all parts to use the updated programs
-            foreach (var plate in Nest.Plates)
-                foreach (var part in plate.Parts)
-                    if (!part.BaseDrawing.IsCutOff)
-                        part.Update();
+            // Leave unchanged parts' lead-ins, tabs, locks and program instances intact.
+            var updatedParts = snapshot.UpdateChangedParts(Nest.Plates).ToHashSet();
+            foreach (var layoutPart in PlateView.Parts)
+            {
+                if (!updatedParts.Contains(layoutPart.BasePart))
+                    continue;
+
+                layoutPart.IsDirty = true;
+                layoutPart.InvalidateOffset();
+            }
 
             UpdateDrawingList();
             PlateView.Invalidate();
@@ -1064,9 +1074,12 @@ namespace OpenNest.Forms
             {
                 form.SaveDrawing(drawing);
 
-                foreach (var part in PlateView.Parts)
-                    part.Update();
+                // Metadata edits only refresh color; never rebuild the placed part program.
+                foreach (var layoutPart in PlateView.Parts)
+                    if (ReferenceEquals(layoutPart.BasePart.BaseDrawing, drawing))
+                        layoutPart.Color = drawing.Color;
 
+                UpdateDrawingList();
                 PlateView.Invalidate();
             }
         }

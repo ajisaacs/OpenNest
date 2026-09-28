@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using OpenNest.CNC;
@@ -18,6 +20,8 @@ namespace OpenNest.IO
 
         private readonly Nest nest;
         private Dictionary<int, Drawing> drawingDict;
+        private readonly Dictionary<int, string> drawingHashes = new();
+        private readonly Dictionary<string, Program> partPrograms = new();
 
         public NestWriter(Nest nest)
         {
@@ -38,8 +42,12 @@ namespace OpenNest.IO
 
             using var zipArchive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
 
-            WriteNestJson(zipArchive);
+            drawingHashes.Clear();
+            partPrograms.Clear();
             WritePrograms(zipArchive);
+            WriteNestJson(zipArchive);
+            foreach (var entry in partPrograms)
+                WriteProgramEntry(zipArchive, entry.Key, entry.Value);
             WriteEntities(zipArchive);
             WriteBestFits(zipArchive);
 
@@ -48,6 +56,7 @@ namespace OpenNest.IO
 
         private void SetDrawingIds()
         {
+            drawingDict.Clear();
             var id = 1;
             foreach (var drawing in nest.Drawings)
             {
@@ -207,6 +216,11 @@ namespace OpenNest.IO
                     var match = drawingDict
                         .Where(dwg => dwg.Value == part.BaseDrawing)
                         .FirstOrDefault();
+                    var programName = part.HasManualLeadIns
+                        ? $"parts/plate-{id}/part-{parts.Count}"
+                        : null;
+                    if (programName != null)
+                        partPrograms.Add(programName, part.Program);
                     parts.Add(
                         new PartDto
                         {
@@ -216,6 +230,8 @@ namespace OpenNest.IO
                             Rotation = part.Rotation,
                             HasManualLeadIns = part.HasManualLeadIns,
                             LeadInsLocked = part.LeadInsLocked,
+                            Program = programName,
+                            DrawingHash = programName == null ? null : drawingHashes[match.Key],
                         }
                     );
                 }
@@ -264,6 +280,7 @@ namespace OpenNest.IO
                         Parts = parts,
                         CutOffs = cutoffs,
                         GrainAngle = plate.GrainAngle,
+                        CuttingParameters = CuttingParametersSerializer.ToDto(plate.CuttingParameters),
                     }
                 );
             }
@@ -342,43 +359,44 @@ namespace OpenNest.IO
         private void WritePrograms(ZipArchive zipArchive)
         {
             foreach (var kvp in drawingDict.OrderBy(k => k.Key))
-            {
-                var name = $"programs/program-{kvp.Key}";
-                var stream = new MemoryStream();
-                WriteDrawing(stream, kvp.Value);
-
-                var entry = zipArchive.CreateEntry(name);
-                using (var entryStream = entry.Open())
-                {
-                    stream.CopyTo(entryStream);
-                }
-
-                // Write sub-programs if present
-                if (kvp.Value.Program.SubPrograms.Count > 0)
-                    WriteSubPrograms(zipArchive, kvp.Key, kvp.Value.Program.SubPrograms);
-            }
+                drawingHashes[kvp.Key] = WriteProgramEntry(
+                    zipArchive, $"programs/program-{kvp.Key}", kvp.Value.Program);
         }
 
-        private void WriteSubPrograms(
-            ZipArchive zipArchive,
-            int drawingId,
-            Dictionary<int, Program> subPrograms
-        )
+        private static string WriteProgramEntry(ZipArchive zipArchive, string name, Program program)
         {
-            var entry = zipArchive.CreateEntry($"programs/program-{drawingId}-subs");
-            using var entryStream = entry.Open();
-            using var writer = new StreamWriter(entryStream, Encoding.UTF8);
+            var text = GetProgramText(program);
+            var subs = GetSubProgramsText(program);
+            WriteTextEntry(zipArchive, name, text);
+            if (subs.Length > 0)
+                WriteTextEntry(zipArchive, name + "-subs", subs);
+            return GetDrawingHash(text, subs);
+        }
 
-            foreach (var kvp in subPrograms.OrderBy(k => k.Key))
+        private static void WriteTextEntry(ZipArchive zipArchive, string name, string text)
+        {
+            var entry = zipArchive.CreateEntry(name);
+            using var stream = entry.Open();
+            using var writer = new StreamWriter(stream, new UTF8Encoding(false));
+            writer.Write(text);
+        }
+
+        // Hash the exact saved text, including holes: a change to either invalidates the part.
+        internal static string GetDrawingHash(string text, string subs) =>
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                text.Length.ToString(CultureInfo.InvariantCulture) + ":" + text + subs)));
+
+        /// <summary>Serializes the hole programs using the same text as the nest archive.</summary>
+        public static string GetSubProgramsText(Program program)
+        {
+            using var writer = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
+            foreach (var kvp in program.SubPrograms.OrderBy(k => k.Key))
             {
                 writer.WriteLine($":{kvp.Key}");
-                writer.WriteLine(kvp.Value.Mode == Mode.Absolute ? "G90" : "G91");
-
-                foreach (var code in kvp.Value.Codes)
-                    writer.WriteLine(GetCodeString(code));
-
+                WriteProgram(writer, kvp.Value);
                 writer.WriteLine("M99");
             }
+            return writer.ToString();
         }
 
         private void WriteEntities(ZipArchive zipArchive)
@@ -402,11 +420,16 @@ namespace OpenNest.IO
             }
         }
 
-        private void WriteDrawing(Stream stream, Drawing drawing)
+        /// <summary>Serializes a program in its current local frame, without transforming it.</summary>
+        public static string GetProgramText(Program program)
         {
-            var program = drawing.Program;
-            var writer = new StreamWriter(stream);
-            writer.AutoFlush = true;
+            using var writer = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
+            WriteProgram(writer, program);
+            return writer.ToString();
+        }
+
+        private static void WriteProgram(TextWriter writer, Program program)
+        {
 
             // Emit variable definitions before G-code
             foreach (var v in program.Variables.Values)
@@ -421,16 +444,11 @@ namespace OpenNest.IO
 
             writer.WriteLine(program.Mode == Mode.Absolute ? "G90" : "G91");
 
-            for (var i = 0; i < drawing.Program.Length; ++i)
-            {
-                var code = drawing.Program[i];
+            foreach (var code in program.Codes)
                 writer.WriteLine(GetCodeString(code));
-            }
-
-            stream.Position = 0;
         }
 
-        private string FormatCoord(
+        private static string FormatCoord(
             double value,
             string axis,
             Dictionary<string, string> variableRefs
@@ -441,7 +459,7 @@ namespace OpenNest.IO
             return System.Math.Round(value, OutputPrecision).ToString(CoordinateFormat);
         }
 
-        private string GetCodeString(ICode code)
+        private static string GetCodeString(ICode code)
         {
             switch (code.Type)
             {
@@ -545,7 +563,7 @@ namespace OpenNest.IO
             return string.Empty;
         }
 
-        private string GetLayerString(LayerType layer)
+        private static string GetLayerString(LayerType layer)
         {
             switch (layer)
             {

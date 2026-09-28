@@ -111,6 +111,30 @@ namespace OpenNest
             UpdateBounds();
         }
 
+        /// <summary>
+        /// Installs an owned, already-rotated saved cutting program without rotating it again.
+        /// The current pose remains the clean-drawing pose used by RemoveLeadIns.
+        /// </summary>
+        public bool RestoreLeadInProgram(Program program, bool locked)
+        {
+            if (program == null || !program.Codes.Any(code => code is Motion
+                || code is SubProgramCall call && call.Program != null
+                    && call.Program.Codes.Any(subCode => subCode is Motion)))
+                return false;
+
+            // Compute before changing state, so a malformed program cannot half-install.
+            var bounds = program.BoundingBox();
+            bounds.Offset(Location);
+            preLeadInRotation = Rotation;
+            Program = program;
+            ownsProgram = true;
+            HasManualLeadIns = true;
+            LeadInsLocked = locked;
+            CuttingParameters = null;
+            BoundingBox = bounds;
+            return true;
+        }
+
         public void RemoveLeadIns()
         {
             var rotation = preLeadInRotation;

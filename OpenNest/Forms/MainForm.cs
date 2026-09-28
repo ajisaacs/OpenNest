@@ -566,6 +566,9 @@ namespace OpenNest.Forms
                 var reader = new NestReader(dlg.FileName);
                 var nest = reader.Read();
                 LoadNest(nest);
+                if (reader.Warnings.Count > 0)
+                    MessageBox.Show(this, string.Join(Environment.NewLine, reader.Warnings),
+                        "Nest Load Warnings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 

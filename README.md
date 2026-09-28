@@ -96,7 +96,7 @@ Jobs-only API: engines implement `INestingEngine.Solve(NestJob)`; only `NestJobR
 
 ## File Format
 
-`.nest` files are ZIP archives: `nest.json` (metadata, plates, drawings, placements), `programs/program-N` (G-code per drawing), optional `entities/`, sub-programs, and cached best-fit data.
+`.nest` files are ZIP archives containing drawing programs, metadata, plates, and placements. Saved nests retain each part's lead-ins, lead-outs, tab gaps, and locks, plus the plate's cutting settings. Changing a drawing's geometry removes obsolete cutting paths from its parts; name, quantity, and color edits preserve them. See the [file-format reference](docs/nest-file-format.md) for compatibility and recovery behavior.
 
 ## Supported Formats
 

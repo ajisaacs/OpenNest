@@ -66,6 +66,7 @@ namespace OpenNest.IO
             public double PartSpacing { get; init; }
             public SpacingDto EdgeSpacing { get; init; } = new();
             public double GrainAngle { get; init; }
+            public CuttingParametersDto CuttingParameters { get; init; }
             public List<PartDto> Parts { get; init; } = new();
             public List<CutOffDto> CutOffs { get; init; } = new();
         }
@@ -78,6 +79,8 @@ namespace OpenNest.IO
             public double Rotation { get; init; }
             public bool HasManualLeadIns { get; init; }
             public bool LeadInsLocked { get; init; }
+            public string Program { get; init; }
+            public string DrawingHash { get; init; }
         }
 
         public record CutOffDto
