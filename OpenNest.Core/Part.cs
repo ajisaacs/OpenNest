@@ -145,7 +145,7 @@ namespace OpenNest
             EnsureOwnedProgram();
             Program.Rotate(angle);
             location = Location.Rotate(angle);
-            preLeadInRotation = Program.Rotation;
+            TrackRotation(angle);
             UpdateBounds();
         }
 
@@ -159,8 +159,20 @@ namespace OpenNest
             EnsureOwnedProgram();
             Program.Rotate(angle);
             location = Location.Rotate(angle, origin);
-            preLeadInRotation = Program.Rotation;
+            TrackRotation(angle);
             UpdateBounds();
+        }
+
+        /// <summary>
+        /// Records the part's rotation after it turned by <paramref name="angle"/>. A lead-in
+        /// program is rebuilt by the cutting strategy and starts over at zero program
+        /// rotation, so for those parts the rotation is accumulated rather than read back.
+        /// </summary>
+        private void TrackRotation(double angle)
+        {
+            preLeadInRotation = HasManualLeadIns
+                ? Angle.NormalizeRad(preLeadInRotation + angle)
+                : Program.Rotation;
         }
 
         /// <summary>
@@ -323,6 +335,7 @@ namespace OpenNest
                 new Box(BoundingBox.X, BoundingBox.Y, BoundingBox.Length, BoundingBox.Width)
             );
             part.ownsProgram = true;
+            part.CopyLeadInStateFrom(this);
 
             return part;
         }
@@ -347,8 +360,22 @@ namespace OpenNest
                     BoundingBox.Width
                 )
             );
+            part.CopyLeadInStateFrom(this);
 
             return part;
+        }
+
+        /// <summary>
+        /// Copies the lead-in state that goes with a copied program. Without it a copy of a
+        /// lead-in part reads its rotation from the rebuilt program (zero), and lead-in
+        /// assignment does not know to strip the copied lead-ins before adding new ones.
+        /// </summary>
+        private void CopyLeadInStateFrom(Part source)
+        {
+            HasManualLeadIns = source.HasManualLeadIns;
+            LeadInsLocked = source.LeadInsLocked;
+            CuttingParameters = source.CuttingParameters;
+            preLeadInRotation = source.preLeadInRotation;
         }
 
         private void EnsureOwnedProgram()
