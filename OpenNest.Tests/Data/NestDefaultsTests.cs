@@ -1,0 +1,208 @@
+using OpenNest.Data;
+using OpenNest.Geometry;
+
+namespace OpenNest.Tests.Data;
+
+public class NestDefaultsTests : IDisposable
+{
+    private readonly string _testDir;
+    private readonly string _path;
+
+    public NestDefaultsTests()
+    {
+        _testDir = Path.Combine(Path.GetTempPath(), "OpenNestTests", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(_testDir);
+        _path = Path.Combine(_testDir, "defaults.json");
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_testDir))
+            Directory.Delete(_testDir, true);
+    }
+
+    [Fact]
+    public void Save_ThenLoad_RoundTrips()
+    {
+        var original = new NestDefaults
+        {
+            Units = Units.Millimeters,
+            Size = new Size(1220, 2440),
+            Quadrant = 3,
+            PartSpacing = 2.5,
+            EdgeSpacing = new Spacing(1.5, 3, 1.5, 3),
+        };
+
+        original.Save(_path);
+        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+
+        Assert.True(loadedFromDisk);
+        Assert.Equal(Units.Millimeters, loaded.Units);
+        Assert.Equal(original.Size, loaded.Size);
+        Assert.Equal(3, loaded.Quadrant);
+        Assert.Equal(2.5, loaded.PartSpacing);
+        Assert.Equal(original.EdgeSpacing.Left, loaded.EdgeSpacing.Left);
+        Assert.Equal(original.EdgeSpacing.Bottom, loaded.EdgeSpacing.Bottom);
+        Assert.Equal(original.EdgeSpacing.Right, loaded.EdgeSpacing.Right);
+        Assert.Equal(original.EdgeSpacing.Top, loaded.EdgeSpacing.Top);
+    }
+
+    [Fact]
+    public void Save_CreatesMissingDirectory()
+    {
+        var nested = Path.Combine(_testDir, "nested", "defaults.json");
+        new NestDefaults().Save(nested);
+        Assert.True(File.Exists(nested));
+    }
+
+    [Fact]
+    public void Load_MissingFile_ReturnsFallback()
+    {
+        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+
+        Assert.False(loadedFromDisk);
+        AssertFallback(loaded);
+    }
+
+    [Fact]
+    public void Load_CorruptJson_ReturnsFallbackButReportsFile()
+    {
+        File.WriteAllText(_path, "{ this is not json");
+
+        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+
+        Assert.True(loadedFromDisk);
+        AssertFallback(loaded);
+    }
+
+    [Fact]
+    public void Load_PartialFile_MergesPerField()
+    {
+        File.WriteAllText(_path, """{ "units": "millimeters", "partSpacing": 4 }""");
+
+        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+
+        Assert.True(loadedFromDisk);
+        Assert.Equal(Units.Millimeters, loaded.Units);
+        Assert.Equal(4, loaded.PartSpacing);
+        // Untouched fields keep fallback values.
+        Assert.Equal(new Size(100, 100), loaded.Size);
+        Assert.Equal(1, loaded.Quadrant);
+        Assert.Equal(new Spacing(1, 1, 1, 1), loaded.EdgeSpacing);
+    }
+
+    [Fact]
+    public void Load_OutOfRangeValues_FallBackPerField()
+    {
+        File.WriteAllText(
+            _path,
+            """
+            {
+              "units": "furlongs",
+              "size": { "width": -50, "length": 100 },
+              "quadrant": 9,
+              "partSpacing": -1,
+              "edgeSpacing": { "left": 1, "bottom": -2, "right": 1, "top": 1 }
+            }
+            """
+        );
+
+        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+
+        Assert.True(loadedFromDisk);
+        Assert.Equal(Units.Inches, loaded.Units);
+        Assert.Equal(new Size(100, 100), loaded.Size);
+        Assert.Equal(1, loaded.Quadrant);
+        Assert.Equal(1, loaded.PartSpacing);
+        Assert.Equal(new Spacing(1, 1, 1, 1), loaded.EdgeSpacing);
+    }
+
+    [Fact]
+    public void Load_NonFiniteValues_FallBack()
+    {
+        File.WriteAllText(_path, """{ "partSpacing": 1e400 }""");
+
+        var loaded = NestDefaults.Load(_path);
+
+        // 1e400 deserializes to Infinity, which is rejected.
+        Assert.Equal(1, loaded.PartSpacing);
+    }
+
+    [Fact]
+    public void Load_UnknownFieldsAndFutureVersion_Ignored()
+    {
+        File.WriteAllText(
+            _path,
+            """
+            {
+              "version": 2,
+              "units": "inches",
+              "partSpacing": 2,
+              "futureFeature": { "enabled": true },
+              "material": { "name": "steel" }
+            }
+            """
+        );
+
+        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+
+        Assert.True(loadedFromDisk);
+        Assert.Equal(2, loaded.PartSpacing);
+    }
+
+    [Fact]
+    public void FromNest_CapturesUnitsAndPlateDefaults()
+    {
+        var nest = new Nest
+        {
+            Units = Units.Millimeters,
+        };
+        nest.PlateDefaults.Size = new Size(60, 120);
+        nest.PlateDefaults.Quadrant = 2;
+        nest.PlateDefaults.PartSpacing = 0.5;
+        nest.PlateDefaults.EdgeSpacing = new Spacing(2, 2, 2, 2);
+
+        var captured = NestDefaults.FromNest(nest);
+
+        Assert.Equal(Units.Millimeters, captured.Units);
+        Assert.Equal(new Size(60, 120), captured.Size);
+        Assert.Equal(2, captured.Quadrant);
+        Assert.Equal(0.5, captured.PartSpacing);
+        Assert.Equal(new Spacing(2, 2, 2, 2), captured.EdgeSpacing);
+    }
+
+    [Fact]
+    public void ApplyTo_SetsUnitsAndPlateDefaults_AndDoesNotAliasSourceNest()
+    {
+        var source = new Nest();
+        source.PlateDefaults.Size = new Size(48, 96);
+        source.PlateDefaults.EdgeSpacing = new Spacing(1.25, 1.25, 1.25, 1.25);
+        var defaults = NestDefaults.FromNest(source);
+
+        // Mutating the source nest afterwards must not change the capture.
+        source.PlateDefaults.Size = new Size(1, 1);
+        source.PlateDefaults.EdgeSpacing = new Spacing(9, 9, 9, 9);
+
+        var target = new Nest();
+        defaults.ApplyTo(target);
+
+        Assert.Equal(new Size(48, 96), target.PlateDefaults.Size);
+        Assert.Equal(
+            new Spacing(1.25, 1.25, 1.25, 1.25),
+            target.PlateDefaults.EdgeSpacing
+        );
+
+        // And the applied target owns its own values too.
+        target.PlateDefaults.Size = new Size(2, 2);
+        Assert.Equal(new Size(48, 96), defaults.Size);
+    }
+
+    private static void AssertFallback(NestDefaults loaded)
+    {
+        Assert.Equal(Units.Inches, loaded.Units);
+        Assert.Equal(new Size(100, 100), loaded.Size);
+        Assert.Equal(1, loaded.Quadrant);
+        Assert.Equal(1, loaded.PartSpacing);
+        Assert.Equal(new Spacing(1, 1, 1, 1), loaded.EdgeSpacing);
+    }
+}
