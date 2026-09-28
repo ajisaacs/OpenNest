@@ -223,6 +223,35 @@ public class CIFiberPostProcessorTests
     }
 
     [Fact]
+    public void Post_CutOff_PostsLastWithoutCompensationOrLeadIn()
+    {
+        var nest = MakeSquareWithHoleNest();
+        var plate = nest.Plates[0];
+
+        // Vertical cut-off at X=20: a bare rapid + line, no lead-in.
+        var cutOff = new CutOff(new Vector(20, 0), CutOffAxis.Vertical);
+        cutOff.Regenerate(plate, new CutOffSettings());
+        plate.Parts.Insert(0, new Part(cutOff.Drawing, Vector.Zero));
+
+        var lines = Lines(Post(nest));
+
+        // Cut-off follows the real part despite being first in plate order.
+        var partEnd = lines.IndexOf("( PART END )");
+        var cutOffPart = lines.IndexOf("( Part #2 )");
+        Assert.True(partEnd >= 0 && cutOffPart > partEnd);
+
+        var n3 = lines.IndexOf("N3:");
+        Assert.True(n3 > cutOffPart);
+        Assert.Equal("/L \"L0\"", lines[n3 + 1]);
+        Assert.Equal("V.E.R3=3", lines[n3 + 2]);
+        Assert.StartsWith("G0X20Y", lines[n3 + 3]);
+        Assert.Equal("/L \"L4\"", lines[n3 + 4]);
+        Assert.Equal("/L \"L6\"", lines[n3 + 5]);
+        Assert.StartsWith("G1X20Y", lines[n3 + 6]);
+        Assert.Equal("/L \"ZHSOFF\"", lines[n3 + 7]);
+    }
+
+    [Fact]
     public void Post_ValidatesTableSize()
     {
         var nest = MakeSquareWithHoleNest();

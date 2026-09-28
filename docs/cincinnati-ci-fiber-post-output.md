@@ -26,6 +26,12 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
 - Tail: `/L "L0"`, `L PROGRAMEND.NC`, `M50`, `M30`, and `%`.
 - Motion endpoints are sheet-absolute XY. Arc `I`/`J` are offsets from the arc
   start, matching the G162 convention; the post does not explicitly emit G162.
+- Sheet cut-offs post after every part on their sheet. Each segment is an open
+  line with no lead-in: rapid to its start, `/L "L4"`, `/L "L6"`, the `G1`,
+  and `/L "ZHSOFF"`. No `G41`/`G42` is selected, because the line is the beam
+  centreline and has no inside or outside. Whether the `L4` macro runs
+  correctly without a following lead-in move has not been confirmed on the
+  machine.
 - Hole subprogram geometry is inlined. Suppressed moves and, by default,
   wholly scribe contours are omitted.
 - Files use UTF-8 without a BOM and CRLF lines. Default accuracy is three decimal
@@ -58,6 +64,7 @@ The post is named for the machine family; table size belongs in configuration.
 
 [Output-contract tests](../OpenNest.Tests/CincinnatiCIFiber/CIFiberPostProcessorTests.cs)
 cover a square with a hole, coordinate transforms/formatting, lead-in rejection,
+cut-off ordering and output,
 table bounds, and suppression/scribe handling. Run:
 
 ```sh

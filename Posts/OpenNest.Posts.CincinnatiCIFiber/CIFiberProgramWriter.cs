@@ -135,8 +135,14 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
         private int WriteSheet(Plate plate, TextWriter w, int contourNumber)
         {
+            // Cut-offs run last: severing the sheet first would free the
+            // skeleton before the parts are cut (matches the CL post).
+            var ordered = plate
+                .Parts.Where(p => !p.BaseDrawing.IsCutOff)
+                .Concat(plate.Parts.Where(p => p.BaseDrawing.IsCutOff));
+
             var partNumber = 0;
-            foreach (var part in plate.Parts)
+            foreach (var part in ordered)
             {
                 partNumber++;
                 contourNumber = WritePart(part, partNumber, w, contourNumber);
@@ -158,10 +164,14 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             if (_config.SkipScribe)
                 contours = contours.Where(c => !IsScribeContour(c)).ToList();
 
+            var isCutOff = part.BaseDrawing.IsCutOff;
             foreach (var contour in contours)
             {
                 contourNumber++;
-                WriteContour(contour, contourNumber, w);
+                if (isCutOff)
+                    WriteCutOffContour(contour, contourNumber, w);
+                else
+                    WriteContour(contour, contourNumber, w);
             }
 
             CIFiberFormatter.Line(w, "( PART END )");
@@ -222,6 +232,38 @@ namespace OpenNest.Posts.CincinnatiCIFiber
             {
                 CIFiberFormatter.Line(w, FormatMotion(cut, prev));
                 prev = cut.EndPoint;
+            }
+
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCutEnd));
+        }
+
+        /// <summary>
+        /// Cut-offs are open straight lines with no lead-in: the line is the
+        /// beam centreline (CutOffSettings clearance already allows for kerf)
+        /// and an open line has no inside/outside, so no G41/G42 is selected
+        /// and the §13.2.4.1 linear-lead-in rule does not apply. The exterior
+        /// lead layer still runs so the pierce sequence matches a perimeter.
+        /// </summary>
+        private void WriteCutOffContour(CIFiberContour contour, int contourNumber, TextWriter w)
+        {
+            CIFiberFormatter.Line(w, $"N{contourNumber}:");
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCancel));
+            CIFiberFormatter.Line(w, $"V.E.R3={contourNumber}");
+            CIFiberFormatter.Line(w, $"G0X{Fmt(contour.Pierce.X)}Y{Fmt(contour.Pierce.Y)}");
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerExteriorLeadin));
+            CIFiberFormatter.Line(w, SkippableLine(_config.LayerCut));
+
+            var prev = contour.Pierce;
+            if (contour.LeadIn != null)
+            {
+                CIFiberFormatter.Line(w, FormatMotion(contour.LeadIn, prev));
+                prev = contour.LeadIn.EndPoint;
+            }
+
+            foreach (var motion in contour.LeadInExtra.Concat(contour.Cuts))
+            {
+                CIFiberFormatter.Line(w, FormatMotion(motion, prev));
+                prev = motion.EndPoint;
             }
 
             CIFiberFormatter.Line(w, SkippableLine(_config.LayerCutEnd));
