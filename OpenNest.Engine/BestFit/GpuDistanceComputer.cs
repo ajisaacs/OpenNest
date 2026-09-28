@@ -18,6 +18,15 @@ namespace OpenNest.Engine.BestFit
             SlideOffset[] offsets
         )
         {
+            // ISlideComputer is axis-only; do not quantize an arbitrary direction into
+            // an unrelated cardinal push. Native curves already use this same fallback.
+            foreach (var offset in offsets)
+            {
+                if (!((offset.DirX == 0 && System.Math.Abs(offset.DirY) == 1)
+                    || (offset.DirY == 0 && System.Math.Abs(offset.DirX) == 1)))
+                    return new CpuDistanceComputer().ComputeDistances(stationaryLines, movingTemplateLines, offsets);
+            }
+
             var stationarySegments = SpatialQuery.FlattenLines(stationaryLines);
             var movingSegments = SpatialQuery.FlattenLines(movingTemplateLines);
             var count = offsets.Length;
@@ -55,7 +64,7 @@ namespace OpenNest.Engine.BestFit
 
         /// <summary>
         /// Maps a unit direction vector to a PushDirection int for the GPU interface.
-        /// Left=0, Down=1, Right=2, Up=3.
+        /// Up=0, Down=1, Left=2, Right=3.
         /// </summary>
         private static int DirectionVectorToInt(double dirX, double dirY)
         {

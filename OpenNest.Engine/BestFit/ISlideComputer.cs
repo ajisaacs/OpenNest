@@ -9,7 +9,8 @@ namespace OpenNest.Engine.BestFit
     public interface ISlideComputer : IDisposable
     {
         /// <summary>
-        /// Computes the minimum directional distance for each offset position.
+        /// Computes the first blocking contact distance for each offset position.
+        /// Separating/tangential contacts on closed boundaries do not block.
         /// </summary>
         /// <param name="stationarySegments">Flat array [x1,y1,x2,y2, ...] for stationary edges.</param>
         /// <param name="stationaryCount">Number of line segments in stationarySegments.</param>
@@ -30,7 +31,7 @@ namespace OpenNest.Engine.BestFit
         );
 
         /// <summary>
-        /// Computes minimum directional distance for offsets with per-offset directions.
+        /// Computes first blocking contact distances with per-offset directions.
         /// Uploads segment data once for all offsets, reducing GPU round-trips.
         /// </summary>
         double[] ComputeBatchMultiDir(

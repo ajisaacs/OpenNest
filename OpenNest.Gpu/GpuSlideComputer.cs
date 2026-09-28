@@ -1,8 +1,13 @@
+#nullable enable
+
 using System;
+using System.Collections.Generic;
 using ILGPU;
 using ILGPU.Algorithms;
 using ILGPU.Runtime;
 using OpenNest.Engine.BestFit;
+using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Gpu
 {
@@ -19,7 +24,7 @@ namespace OpenNest.Gpu
             ArrayView1D<double, Stride1D.Dense>, // stationaryPrep
             ArrayView1D<double, Stride1D.Dense>, // movingPrep
             ArrayView1D<double, Stride1D.Dense>, // offsets
-            ArrayView1D<double, Stride1D.Dense>, // results
+            ArrayView1D<ContactWitness, Stride1D.Dense>, // results
             int,
             int,
             int
@@ -30,7 +35,7 @@ namespace OpenNest.Gpu
             ArrayView1D<double, Stride1D.Dense>, // stationaryPrep
             ArrayView1D<double, Stride1D.Dense>, // movingPrep
             ArrayView1D<double, Stride1D.Dense>, // offsets
-            ArrayView1D<double, Stride1D.Dense>, // results
+            ArrayView1D<ContactWitness, Stride1D.Dense>, // results
             ArrayView1D<int, Stride1D.Dense>, // directions
             int,
             int
@@ -47,22 +52,24 @@ namespace OpenNest.Gpu
 
         private MemoryBuffer1D<double, Stride1D.Dense>? _gpuStationaryRaw;
         private MemoryBuffer1D<double, Stride1D.Dense>? _gpuStationaryPrep;
-        private double[]? _lastStationaryData; // Keep CPU copy/ref for content check
+        private double[]? _lastStationaryData; // Active segment snapshot used for upload and contact topology
 
         private MemoryBuffer1D<double, Stride1D.Dense>? _gpuMovingRaw;
         private MemoryBuffer1D<double, Stride1D.Dense>? _gpuMovingPrep;
-        private double[]? _lastMovingData; // Keep CPU copy/ref for content check
+        private double[]? _lastMovingData; // Active segment snapshot used for upload and contact topology
 
         private MemoryBuffer1D<double, Stride1D.Dense>? _gpuOffsets;
-        private MemoryBuffer1D<double, Stride1D.Dense>? _gpuResults;
+        private MemoryBuffer1D<ContactWitness, Stride1D.Dense>? _gpuResults;
         private MemoryBuffer1D<int, Stride1D.Dense>? _gpuDirs;
         private int _offsetCapacity;
 
-        public GpuSlideComputer()
+        public GpuSlideComputer() : this(preferCPU: false) { }
+
+        public GpuSlideComputer(bool preferCPU)
         {
             _context = Context.CreateDefault();
             _accelerator = _context
-                .GetPreferredDevice(preferCPU: false)
+                .GetPreferredDevice(preferCPU)
                 .CreateAccelerator(_context);
 
             _kernel = _accelerator.LoadAutoGroupedStreamKernel<
@@ -70,7 +77,7 @@ namespace OpenNest.Gpu
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
-                ArrayView1D<double, Stride1D.Dense>,
+                ArrayView1D<ContactWitness, Stride1D.Dense>,
                 int,
                 int,
                 int
@@ -81,7 +88,7 @@ namespace OpenNest.Gpu
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
-                ArrayView1D<double, Stride1D.Dense>,
+                ArrayView1D<ContactWitness, Stride1D.Dense>,
                 ArrayView1D<int, Stride1D.Dense>,
                 int,
                 int
@@ -118,21 +125,24 @@ namespace OpenNest.Gpu
                 EnsureMoving(movingTemplateSegments, movingCount);
                 EnsureOffsetBuffers(offsetCount);
 
-                _gpuOffsets!.View.SubView(0, offsetCount * 2).CopyFromCPU(offsets);
+                _gpuOffsets!.View.SubView(0, offsetCount * 2).CopyFromCPU(
+                    _accelerator.DefaultStream, (ReadOnlySpan<double>)offsets.AsSpan(0, offsetCount * 2));
 
                 _kernel(
                     offsetCount,
                     _gpuStationaryPrep!.View,
                     _gpuMovingPrep!.View,
-                    _gpuOffsets.View,
-                    _gpuResults!.View,
+                    _gpuOffsets.View.SubView(0, offsetCount * 2),
+                    _gpuResults!.View.SubView(0, offsetCount),
                     stationaryCount,
                     movingCount,
                     (int)direction
                 );
 
                 _accelerator.Synchronize();
-                _gpuResults.View.SubView(0, offsetCount).CopyToCPU(results);
+                var witnesses = new ContactWitness[offsetCount];
+                _gpuResults.View.SubView(0, offsetCount).CopyToCPU(witnesses);
+                ResolveContacts(witnesses, offsets, results, direction, null);
             }
 
             return results;
@@ -161,93 +171,138 @@ namespace OpenNest.Gpu
                 EnsureMoving(movingTemplateSegments, movingCount);
                 EnsureOffsetBuffers(offsetCount);
 
-                _gpuOffsets!.View.SubView(0, offsetCount * 2).CopyFromCPU(offsets);
-                _gpuDirs!.View.SubView(0, offsetCount).CopyFromCPU(directions);
+                _gpuOffsets!.View.SubView(0, offsetCount * 2).CopyFromCPU(
+                    _accelerator.DefaultStream, (ReadOnlySpan<double>)offsets.AsSpan(0, offsetCount * 2));
+                _gpuDirs!.View.SubView(0, offsetCount).CopyFromCPU(
+                    _accelerator.DefaultStream, (ReadOnlySpan<int>)directions.AsSpan(0, offsetCount));
 
                 _kernelMultiDir(
                     offsetCount,
                     _gpuStationaryPrep!.View,
                     _gpuMovingPrep!.View,
-                    _gpuOffsets.View,
-                    _gpuResults!.View,
-                    _gpuDirs.View,
+                    _gpuOffsets.View.SubView(0, offsetCount * 2),
+                    _gpuResults!.View.SubView(0, offsetCount),
+                    _gpuDirs.View.SubView(0, offsetCount),
                     stationaryCount,
                     movingCount
                 );
 
                 _accelerator.Synchronize();
-                _gpuResults.View.SubView(0, offsetCount).CopyToCPU(results);
+                var witnesses = new ContactWitness[offsetCount];
+                _gpuResults.View.SubView(0, offsetCount).CopyToCPU(witnesses);
+                ResolveContacts(witnesses, offsets, results, default, directions);
             }
 
             return results;
         }
 
-        public void InvalidateStationary() => _lastStationaryData = null;
+        public void InvalidateStationary()
+        {
+            lock (_lock)
+                _lastStationaryData = null;
+        }
 
-        public void InvalidateMoving() => _lastMovingData = null;
+        public void InvalidateMoving()
+        {
+            lock (_lock)
+                _lastMovingData = null;
+        }
+
+        private void ResolveContacts(
+            ContactWitness[] witnesses,
+            double[] offsets,
+            double[] results,
+            PushDirection direction,
+            int[]? directions
+        )
+        {
+            var moving = default(List<Line>);
+            var stationary = default(List<Line>);
+            var contacts = default(SlideContactClassifier);
+            for (var i = 0; i < witnesses.Length; i++)
+            {
+                var witness = witnesses[i];
+                results[i] = witness.Distance;
+                if (witness.Distance == double.MaxValue)
+                    continue;
+
+                // GPU finds the nearest event. Prepare the complete boundaries only
+                // once per batch, and share their material-side topology at each offset.
+                if (contacts == null)
+                {
+                    moving = ToLines(_lastMovingData!);
+                    stationary = ToLines(_lastStationaryData!);
+                    contacts = SlideContactClassifier.FromLines(
+                        moving, Vector.Zero, stationary, Vector.Zero).Prepare();
+                }
+
+                var offset = new Vector(offsets[i * 2], offsets[i * 2 + 1]);
+                var push = directions == null ? direction : (PushDirection)directions[i];
+                var unit = SpatialQuery.DirectionToOffset(push, 1);
+                var placed = contacts.At(offset, Vector.Zero);
+                if (placed.Blocks(
+                    new Vector(witness.MovingX, witness.MovingY),
+                    new Vector(witness.StationaryX, witness.StationaryY), unit.X, unit.Y))
+                    continue;
+
+                // A departing or grazing event does not discard the obstacle: replay
+                // all events through the shared resolver to find the next blocking one,
+                // including another contact tied at the same distance.
+                results[i] = SpatialQuery.DirectionalDistance(
+                    moving!, offset.X, offset.Y, stationary!, push, placed);
+            }
+        }
+
+        private static List<Line> ToLines(double[] segments)
+        {
+            var lines = new List<Line>(segments.Length / 4);
+            for (var i = 0; i < segments.Length; i += 4)
+                lines.Add(new Line(segments[i], segments[i + 1], segments[i + 2], segments[i + 3]));
+            return lines;
+        }
 
         private void EnsureStationary(double[] data, int count)
         {
-            // Fast check: if same object or content is identical, skip upload
-            if (
-                _gpuStationaryPrep != null
-                && _lastStationaryData != null
-                && _lastStationaryData.Length == data.Length
-            )
-            {
-                // Reference equality or content equality
-                if (
-                    _lastStationaryData == data
-                    || new ReadOnlySpan<double>(_lastStationaryData).SequenceEqual(
-                        new ReadOnlySpan<double>(data)
-                    )
-                )
-                {
-                    return;
-                }
-            }
+            // Cache the active prefix by value: callers may reuse an array with a
+            // different segment count or mutate its coordinates between batches.
+            var active = data.AsSpan(0, count * 4);
+            if (_gpuStationaryPrep != null && _lastStationaryData != null
+                && active.SequenceEqual(_lastStationaryData))
+                return;
 
             _gpuStationaryRaw?.Dispose();
             _gpuStationaryPrep?.Dispose();
 
-            _gpuStationaryRaw = _accelerator.Allocate1D(data);
+            var snapshot = active.ToArray();
+            _gpuStationaryRaw = _accelerator.Allocate1D(snapshot);
             _gpuStationaryPrep = _accelerator.Allocate1D<double>(count * 10);
 
             _prepareKernel(count, _gpuStationaryRaw.View, _gpuStationaryPrep.View, count);
             _accelerator.Synchronize();
 
-            _lastStationaryData = data; // store reference for next comparison
+            _lastStationaryData = snapshot;
         }
 
         private void EnsureMoving(double[] data, int count)
         {
-            if (
-                _gpuMovingPrep != null
-                && _lastMovingData != null
-                && _lastMovingData.Length == data.Length
-            )
-            {
-                if (
-                    _lastMovingData == data
-                    || new ReadOnlySpan<double>(_lastMovingData).SequenceEqual(
-                        new ReadOnlySpan<double>(data)
-                    )
-                )
-                {
-                    return;
-                }
-            }
+            // Cache the active prefix by value: callers may reuse an array with a
+            // different segment count or mutate its coordinates between batches.
+            var active = data.AsSpan(0, count * 4);
+            if (_gpuMovingPrep != null && _lastMovingData != null
+                && active.SequenceEqual(_lastMovingData))
+                return;
 
             _gpuMovingRaw?.Dispose();
             _gpuMovingPrep?.Dispose();
 
-            _gpuMovingRaw = _accelerator.Allocate1D(data);
+            var snapshot = active.ToArray();
+            _gpuMovingRaw = _accelerator.Allocate1D(snapshot);
             _gpuMovingPrep = _accelerator.Allocate1D<double>(count * 10);
 
             _prepareKernel(count, _gpuMovingRaw.View, _gpuMovingPrep.View, count);
             _accelerator.Synchronize();
 
-            _lastMovingData = data;
+            _lastMovingData = snapshot;
         }
 
         private void EnsureOffsetBuffers(int offsetCount)
@@ -262,7 +317,7 @@ namespace OpenNest.Gpu
             _gpuDirs?.Dispose();
 
             _gpuOffsets = _accelerator.Allocate1D<double>(newCapacity * 2);
-            _gpuResults = _accelerator.Allocate1D<double>(newCapacity);
+            _gpuResults = _accelerator.Allocate1D<ContactWitness>(newCapacity);
             _gpuDirs = _accelerator.Allocate1D<int>(newCapacity);
 
             _offsetCapacity = newCapacity;
@@ -293,8 +348,8 @@ namespace OpenNest.Gpu
             var dy = y2 - y1;
 
             // invD is used for parameter 't'. We use a small epsilon for stability.
-            prepared[index * 10 + 4] = (XMath.Abs(dx) < 1e-9) ? 0 : 1.0 / dx;
-            prepared[index * 10 + 5] = (XMath.Abs(dy) < 1e-9) ? 0 : 1.0 / dy;
+            prepared[index * 10 + 4] = (XMath.Abs(dx) < Tolerance.Epsilon) ? 0 : 1.0 / dx;
+            prepared[index * 10 + 5] = (XMath.Abs(dy) < Tolerance.Epsilon) ? 0 : 1.0 / dy;
 
             prepared[index * 10 + 6] = XMath.Min(x1, x2);
             prepared[index * 10 + 7] = XMath.Max(x1, x2);
@@ -304,12 +359,48 @@ namespace OpenNest.Gpu
 
         // ── Main Slide Kernels ───────────────────────────────────────
 
+        // Public because ILGPU's CPU backend emits kernel argument types in a separate assembly.
+        public struct ContactWitness
+        {
+            public double Distance;
+            public double MovingX;
+            public double MovingY;
+            public double StationaryX;
+            public double StationaryY;
+        }
+
+        private static void Consider(
+            ref ContactWitness nearest,
+            double distance,
+            double vx,
+            double vy,
+            int rayDirection,
+            bool vertexMoves
+        )
+        {
+            var snapped = distance > Tolerance.Epsilon ? distance : 0;
+            if (snapped >= nearest.Distance)
+                return;
+
+            // Use the unsnapped hit for incidence; snapping a tiny gap to zero must
+            // not move the witness off the other boundary.
+            var dirX = rayDirection == 2 ? -1 : rayDirection == 3 ? 1 : 0;
+            var dirY = rayDirection == 0 ? 1 : rayDirection == 1 ? -1 : 0;
+            var hx = vx + distance * dirX;
+            var hy = vy + distance * dirY;
+            nearest.Distance = snapped;
+            nearest.MovingX = vertexMoves ? vx : hx;
+            nearest.MovingY = vertexMoves ? vy : hy;
+            nearest.StationaryX = vertexMoves ? hx : vx;
+            nearest.StationaryY = vertexMoves ? hy : vy;
+        }
+
         private static void SlideKernel(
             Index1D index,
             ArrayView1D<double, Stride1D.Dense> stationaryPrep,
             ArrayView1D<double, Stride1D.Dense> movingPrep,
             ArrayView1D<double, Stride1D.Dense> offsets,
-            ArrayView1D<double, Stride1D.Dense> results,
+            ArrayView1D<ContactWitness, Stride1D.Dense> results,
             int sCount,
             int mCount,
             int direction
@@ -337,7 +428,7 @@ namespace OpenNest.Gpu
             ArrayView1D<double, Stride1D.Dense> stationaryPrep,
             ArrayView1D<double, Stride1D.Dense> movingPrep,
             ArrayView1D<double, Stride1D.Dense> offsets,
-            ArrayView1D<double, Stride1D.Dense> results,
+            ArrayView1D<ContactWitness, Stride1D.Dense> results,
             ArrayView1D<int, Stride1D.Dense> directions,
             int sCount,
             int mCount
@@ -361,7 +452,7 @@ namespace OpenNest.Gpu
             );
         }
 
-        private static double ComputeSlideLean(
+        private static ContactWitness ComputeSlideLean(
             ArrayView1D<double, Stride1D.Dense> sPrep,
             ArrayView1D<double, Stride1D.Dense> mPrep,
             double dx,
@@ -371,20 +462,20 @@ namespace OpenNest.Gpu
             int direction
         )
         {
-            const double eps = 0.00001;
-            var minDist = double.MaxValue;
+            const double eps = Tolerance.Epsilon;
+            var nearest = new ContactWitness { Distance = double.MaxValue };
             var horizontal = direction >= 2;
             var oppDir = direction ^ 1;
 
             // ── Forward Pass: moving vertices vs stationary edges ─────
-            for (int i = 0; i < mCount; i++)
+            for (var i = 0; i < mCount; i++)
             {
                 var m1x = mPrep[i * 10 + 0] + dx;
                 var m1y = mPrep[i * 10 + 1] + dy;
                 var m2x = mPrep[i * 10 + 2] + dx;
                 var m2y = mPrep[i * 10 + 3] + dy;
 
-                for (int j = 0; j < sCount; j++)
+                for (var j = 0; j < sCount; j++)
                 {
                     var sMin = horizontal ? sPrep[j * 10 + 8] : sPrep[j * 10 + 6];
                     var sMax = horizontal ? sPrep[j * 10 + 9] : sPrep[j * 10 + 7];
@@ -394,8 +485,8 @@ namespace OpenNest.Gpu
                     if (mv1 >= sMin - eps && mv1 <= sMax + eps)
                     {
                         var d = RayEdgeLean(m1x, m1y, sPrep, j, direction, eps);
-                        if (d < minDist)
-                            minDist = d;
+                        Consider(ref nearest, d, m1x, m1y,
+                            direction, vertexMoves: true);
                     }
 
                     // Test moving vertex 2 against stationary edge j
@@ -403,21 +494,21 @@ namespace OpenNest.Gpu
                     if (mv2 >= sMin - eps && mv2 <= sMax + eps)
                     {
                         var d = RayEdgeLean(m2x, m2y, sPrep, j, direction, eps);
-                        if (d < minDist)
-                            minDist = d;
+                        Consider(ref nearest, d, m2x, m2y,
+                            direction, vertexMoves: true);
                     }
                 }
             }
 
             // ── Reverse Pass: stationary vertices vs moving edges ─────
-            for (int i = 0; i < sCount; i++)
+            for (var i = 0; i < sCount; i++)
             {
                 var s1x = sPrep[i * 10 + 0];
                 var s1y = sPrep[i * 10 + 1];
                 var s2x = sPrep[i * 10 + 2];
                 var s2y = sPrep[i * 10 + 3];
 
-                for (int j = 0; j < mCount; j++)
+                for (var j = 0; j < mCount; j++)
                 {
                     var mMin = horizontal ? (mPrep[j * 10 + 8] + dy) : (mPrep[j * 10 + 6] + dx);
                     var mMax = horizontal ? (mPrep[j * 10 + 9] + dy) : (mPrep[j * 10 + 7] + dx);
@@ -427,8 +518,8 @@ namespace OpenNest.Gpu
                     if (sv1 >= mMin - eps && sv1 <= mMax + eps)
                     {
                         var d = RayEdgeLeanMoving(s1x, s1y, mPrep, j, dx, dy, oppDir, eps);
-                        if (d < minDist)
-                            minDist = d;
+                        Consider(ref nearest, d, s1x, s1y,
+                            oppDir, vertexMoves: false);
                     }
 
                     // Test stationary vertex 2 against moving edge j
@@ -436,13 +527,13 @@ namespace OpenNest.Gpu
                     if (sv2 >= mMin - eps && sv2 <= mMax + eps)
                     {
                         var d = RayEdgeLeanMoving(s2x, s2y, mPrep, j, dx, dy, oppDir, eps);
-                        if (d < minDist)
-                            minDist = d;
+                        Consider(ref nearest, d, s2x, s2y,
+                            oppDir, vertexMoves: false);
                     }
                 }
             }
 
-            return minDist;
+            return nearest;
         }
 
         private static double RayEdgeLean(
@@ -472,9 +563,7 @@ namespace OpenNest.Gpu
                 var ix = p1x + t * (p2x - p1x);
                 var dist = (direction == 2) ? (vx - ix) : (ix - vx);
 
-                if (dist > eps)
-                    return dist;
-                return (dist >= -eps) ? 0.0 : double.MaxValue;
+                return dist >= -eps ? dist : double.MaxValue;
             }
             else // Vertical (Up=0, Down=1)
             {
@@ -489,9 +578,7 @@ namespace OpenNest.Gpu
                 var iy = p1y + t * (p2y - p1y);
                 var dist = (direction == 1) ? (vy - iy) : (iy - vy);
 
-                if (dist > eps)
-                    return dist;
-                return (dist >= -eps) ? 0.0 : double.MaxValue;
+                return dist >= -eps ? dist : double.MaxValue;
             }
         }
 
@@ -524,9 +611,7 @@ namespace OpenNest.Gpu
                 var ix = p1x + t * (p2x - p1x);
                 var dist = (direction == 2) ? (vx - ix) : (ix - vx);
 
-                if (dist > eps)
-                    return dist;
-                return (dist >= -eps) ? 0.0 : double.MaxValue;
+                return dist >= -eps ? dist : double.MaxValue;
             }
             else // Vertical
             {
@@ -541,9 +626,7 @@ namespace OpenNest.Gpu
                 var iy = p1y + t * (p2y - p1y);
                 var dist = (direction == 1) ? (vy - iy) : (iy - vy);
 
-                if (dist > eps)
-                    return dist;
-                return (dist >= -eps) ? 0.0 : double.MaxValue;
+                return dist >= -eps ? dist : double.MaxValue;
             }
         }
 

@@ -4,7 +4,7 @@
 
 CPU best-fit slides and shared directional-distance queries now check both external and internal curve tangency. A convex offset corner inside a concave slot contacts at the difference of the radii, not their sum. Both forward ray/circle roots must be checked: the nearer root can be outside an arc's angular span while the farther root is the first actual contact. Tangent-point directions differ for internal contact, including when the moving curve is the larger one.
 
-`SpatialQuery.CurveTangencyDistance` shares this calculation between the two callers. It assumes a unit direction, nonnegative radii and world-frame centers. An optional arc supplies only angular limits; null represents a full circle. This helper supplements the existing vertex/line phases rather than replacing them. Equal-radius coincident curves have no isolated internal tangent and remain the vertex phases' responsibility; zero-radius curves are points. No spacing tolerances or acceptance policies were changed.
+The raw `SpatialQuery.CurveTangencyDistance` helper and shared slide events implement this calculation. The subsequent [directional-slide repair](directional-slides.md) routes both callers through material-aware contact events; the measurements below describe the earlier native-tangency repair. It assumes a unit direction, nonnegative radii and world-frame centers. An optional arc supplies only angular limits; null represents a full circle. This helper supplements the existing vertex/line phases rather than replacing them. Equal-radius coincident curves have no isolated internal tangent and remain the vertex phases' responsibility; zero-radius curves are points. No spacing tolerances or acceptance policies were changed.
 
 ### Reproduced U-shaped part
 

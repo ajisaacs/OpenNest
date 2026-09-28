@@ -298,22 +298,111 @@ namespace OpenNest.Tests.Fill
             Assert.Equal(32, moving.BoundingBox.Left, 7);
         }
 
+        [Theory]
+        [InlineData(PushDirection.Right)]
+        [InlineData(PushDirection.Up)]
+        [InlineData(PushDirection.Down)]
+        public void Push_WithSpacing_ContactFromPreviousPushDoesNotBlockOtherDirections(
+            PushDirection next
+        )
+        {
+            var workArea = new Box(0, 0, 100, 100);
+            var obstacle = MakeRectPart(20, 40, 10, 10);
+            var moving = MakeRectPart(60, 40, 10, 10);
+            var parts = new List<Part> { moving };
+            var obstacles = new List<Part> { obstacle };
+
+            Assert.True(Compactor.Push(parts, obstacles, workArea, 2, PushDirection.Left) > 0);
+            Assert.Equal(32, moving.BoundingBox.Left, 7);
+
+            var before = moving.Location;
+            var distance = Compactor.Push(parts, obstacles, workArea, 2, next);
+
+            Assert.True(distance > 1, $"Push {next} after contact moved only {distance:R}");
+            Assert.NotEqual(before, moving.Location);
+            AssertClearance(moving, obstacle, 2);
+        }
+
+        [Fact]
+        public void Push_WithSpacing_ContactStillBlocksTheSameDirection()
+        {
+            var workArea = new Box(0, 0, 100, 100);
+            var obstacle = MakeRectPart(20, 40, 10, 10);
+            var moving = MakeRectPart(60, 40, 10, 10);
+            var parts = new List<Part> { moving };
+            var obstacles = new List<Part> { obstacle };
+
+            Compactor.Push(parts, obstacles, workArea, 2, PushDirection.Left);
+            var distance = Compactor.Push(parts, obstacles, workArea, 2, PushDirection.Left);
+
+            Assert.Equal(0, distance);
+            Assert.Equal(32, moving.BoundingBox.Left, 7);
+            AssertClearance(moving, obstacle, 2);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(2)]
+        public void Push_SlidingAlongWall_StopsAtItsLaterHook(double spacing)
+        {
+            var hook = MakeTrianglePart(new Vector(10, 10), new Vector(20, 10),
+                new Vector(20, 50), new Vector(50, 50), new Vector(50, 60), new Vector(10, 60));
+            var moving = MakeRectPart(20 + spacing, 20, 5, 5);
+            var distance = Compactor.Push(new List<Part> { moving }, new List<Part> { hook },
+                new Box(0, 0, 100, 100), spacing, PushDirection.Up);
+            Assert.Equal(25 - spacing, distance, 7);
+            Assert.False(moving.Intersects(hook, out _));
+            if (spacing > 0)
+                AssertClearance(moving, hook, spacing);
+        }
+
+        [Theory]
+        [InlineData(0, false)]
+        [InlineData(2, false)]
+        [InlineData(0, true)]
+        [InlineData(2, true)]
+        public void Push_InsideStationaryHole_CannotPassThroughItsWall(double spacing, bool plateEntry)
+        {
+            var program = MakeRectDrawing(60, 60).Program;
+            program.Codes.Add(new OpenNest.CNC.RapidMove(new Vector(10, 10)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(50, 10)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(50, 50)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(10, 50)));
+            program.Codes.Add(new OpenNest.CNC.LinearMove(new Vector(10, 10)));
+            var frame = new Part(new Drawing("frame", program));
+            var moving = MakeRectPart(10 + spacing, 20, 5, 5);
+            var plate = new Plate(100, 100) { PartSpacing = spacing };
+            plate.Parts.Add(frame);
+            plate.Parts.Add(moving);
+            var distance = plateEntry
+                ? Compactor.Push(new List<Part> { moving }, plate, PushDirection.Right)
+                : Compactor.Push(new List<Part> { moving }, new List<Part> { frame },
+                    new Box(0, 0, 100, 100), spacing, PushDirection.Right);
+            Assert.Equal(35 - 2 * spacing, distance, 7);
+            // Independent rectangular-hole oracle; Part.Intersects ignores cutouts.
+            Assert.Equal(50 - spacing, moving.BoundingBox.Right, 7);
+            Assert.InRange(moving.BoundingBox.Bottom, 10 + spacing, 50 - spacing);
+            Assert.InRange(moving.BoundingBox.Top, 10 + spacing, 50 - spacing);
+            if (spacing > 0)
+                AssertClearance(moving, frame, spacing);
+        }
+
         private static void AssertClearance(Part moving, Part obstacle, double spacing)
         {
             var clearance = double.MaxValue;
             foreach (var a in PartGeometry.GetPartLines(moving))
-            foreach (var b in PartGeometry.GetPartLines(obstacle))
-            {
-                Assert.False(Intersect.Intersects(a, b, out _));
-                clearance = System.Math.Min(
-                    clearance,
-                    a.StartPoint.DistanceTo(b.ClosestPointTo(a.StartPoint))
-                );
-                clearance = System.Math.Min(
-                    clearance,
-                    b.StartPoint.DistanceTo(a.ClosestPointTo(b.StartPoint))
-                );
-            }
+                foreach (var b in PartGeometry.GetPartLines(obstacle))
+                {
+                    Assert.False(Intersect.Intersects(a, b, out _));
+                    clearance = System.Math.Min(
+                        clearance,
+                        a.StartPoint.DistanceTo(b.ClosestPointTo(a.StartPoint))
+                    );
+                    clearance = System.Math.Min(
+                        clearance,
+                        b.StartPoint.DistanceTo(a.ClosestPointTo(b.StartPoint))
+                    );
+                }
             Assert.True(
                 clearance >= spacing - 1e-7,
                 $"Clearance {clearance:R} is less than spacing {spacing:R}"

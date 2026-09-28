@@ -127,24 +127,20 @@ namespace OpenNest.Engine.Fill
                                     : PartGeometry.GetPerimeterEntities(moving)
                             );
 
+                    // A moving part can be inside an obstacle's cutout. Omitting that
+                    // loop would let it cross the inner wall before seeing the perimeter.
                     obstacleEntities[i] ??=
                         halfSpacing > 0
-                            ? PartGeometry.GetOffsetPerimeterEntities(obstacleParts[i], halfSpacing)
-                            : PartGeometry.GetPerimeterEntities(obstacleParts[i]);
+                            ? PartGeometry.GetOffsetPartEntities(obstacleParts[i], halfSpacing)
+                            : PartGeometry.GetPartEntities(obstacleParts[i]);
 
+                    // Contacts left by a previous push only block directions that would
+                    // push material into material; the kernel classifies them.
                     var d = SpatialQuery.DirectionalDistance(
                         movingEntities,
                         obstacleEntities[i],
                         direction
                     );
-                    if (
-                        d <= Tolerance.Epsilon
-                        && partSpacing <= Tolerance.Epsilon
-                        && CanNudgeWithoutOverlap(moving, obstacleParts[i], direction)
-                    )
-                    {
-                        continue;
-                    }
 
                     if (d < distance)
                         distance = d;
@@ -176,25 +172,23 @@ namespace OpenNest.Engine.Fill
         {
             for (var i = 0; i < parts.Count; i++)
             {
-                if (candidate.Intersects(parts[i], out _))
+                if (!candidate.Intersects(parts[i], out _))
+                    continue;
+
+                // Part.Intersects compares outer perimeters only. A valid insert in a
+                // cutout must remain an obstacle, not be discarded as already overlapping.
+                var a = new ShapeProfile(PartGeometry.GetPartEntities(candidate));
+                var b = new ShapeProfile(PartGeometry.GetPartEntities(parts[i]));
+                if (a.Cutouts.Count == 0 && b.Cutouts.Count == 0)
+                    return true;
+                if (Collision.HasOverlap(
+                    a.Perimeter.ToPolygonWithTolerance(0.001),
+                    b.Perimeter.ToPolygonWithTolerance(0.001),
+                    a.Cutouts.Select(hole => hole.ToPolygonWithTolerance(0.001)).ToList(),
+                    b.Cutouts.Select(hole => hole.ToPolygonWithTolerance(0.001)).ToList()))
                     return true;
             }
             return false;
-        }
-
-        private static bool CanNudgeWithoutOverlap(Part moving, Part obstacle, Vector direction)
-        {
-            var nudge = direction * (Tolerance.Epsilon * 10);
-
-            moving.Offset(nudge);
-            try
-            {
-                return !moving.Intersects(obstacle, out _);
-            }
-            finally
-            {
-                moving.Offset(-nudge);
-            }
         }
 
         public static double Push(

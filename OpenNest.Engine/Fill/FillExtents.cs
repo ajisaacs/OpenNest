@@ -83,8 +83,9 @@ namespace OpenNest.Engine.Fill
 
             // Slide uses locations, not cached bounds; Offset already translates the box.
             // Slide part2 left toward part1.
-            var movingLines = boundary2.GetLines(part2.Location, PushDirection.Left);
-            var stationaryLines = boundary1.GetLines(part1.Location, PushDirection.Right);
+            // Keep complete loops so the shared kernel can classify tangential contacts.
+            var movingLines = boundary2.GetLines(part2.Location);
+            var stationaryLines = boundary1.GetLines(part1.Location);
             var dist = SpatialQuery.DirectionalDistance(
                 movingLines,
                 stationaryLines,
@@ -234,15 +235,9 @@ namespace OpenNest.Engine.Fill
             PushDirection direction
         )
         {
-            var opposite = SpatialQuery.OppositeDirection(direction);
-            var movingEdges = movingBoundary.GetEdges(direction);
-            var stationaryEdges = stationaryBoundary.GetEdges(opposite);
-
             return SpatialQuery.DirectionalDistance(
-                movingEdges,
-                movingLocation,
-                stationaryEdges,
-                stationaryLocation,
+                movingBoundary.GetLines(movingLocation),
+                stationaryBoundary.GetLines(stationaryLocation),
                 direction
             );
         }

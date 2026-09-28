@@ -320,8 +320,9 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Computes the minimum translation distance along a push direction before
-        /// any edge of movingLines contacts any edge of stationaryLines.
+        /// Computes the translation distance along a push direction before any edge of
+        /// movingLines first blocks against an edge of stationaryLines. A contact that
+        /// the push slides along or leaves does not block (see <see cref="SlideContact"/>).
         /// Returns double.MaxValue if no collision path exists.
         /// </summary>
         public static double DirectionalDistance(
@@ -334,7 +335,7 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Computes the minimum directional distance with the moving lines translated
+        /// Computes the directional distance with the moving lines translated
         /// by (movingDx, movingDy) without creating new Line objects.
         /// </summary>
         public static double DirectionalDistance(
@@ -345,37 +346,57 @@ namespace OpenNest.Geometry
             PushDirection direction
         )
         {
-            var minDist = double.MaxValue;
-            var movingOffset = new Vector(movingDx, movingDy);
+            return DirectionalDistance(
+                movingLines,
+                movingDx,
+                movingDy,
+                stationaryLines,
+                direction,
+                SlideContactClassifier.FromLines(
+                    movingLines,
+                    new Vector(movingDx, movingDy),
+                    stationaryLines,
+                    Vector.Zero
+                )
+            );
+        }
 
-            // Case 1: Each moving vertex -> each stationary edge
-            var movingVertices = CollectVertices(movingLines, movingOffset);
+        /// <summary>
+        /// <see cref="DirectionalDistance(List{Line}, double, double, List{Line}, PushDirection)"/>
+        /// with caller-supplied contact topology, for inputs that are not complete closed
+        /// boundaries (for example direction-filtered edges).
+        /// </summary>
+        public static double DirectionalDistance(
+            List<Line> movingLines,
+            double movingDx,
+            double movingDy,
+            List<Line> stationaryLines,
+            PushDirection direction,
+            SlideContactClassifier contacts
+        )
+        {
+            var movingOffset = new Vector(movingDx, movingDy);
+            var movingVertices = CollectVertices(movingLines, movingOffset).ToArray();
 
             var stationaryEdges = ToEdgeArray(stationaryLines);
             SortEdgesForPruning(stationaryEdges, direction);
 
-            foreach (var mv in movingVertices)
-            {
-                var d = OneWayDistance(mv, stationaryEdges, Vector.Zero, direction);
-                if (d < minDist)
-                    minDist = d;
-            }
-
-            // Case 2: Each stationary vertex -> each moving edge (opposite direction)
-            var opposite = OppositeDirection(direction);
-            var stationaryVertices = CollectVertices(stationaryLines, Vector.Zero);
+            var stationaryVertices = CollectVertices(stationaryLines, Vector.Zero).ToArray();
 
             var movingEdges = ToEdgeArray(movingLines);
-            SortEdgesForPruning(movingEdges, opposite);
+            SortEdgesForPruning(movingEdges, OppositeDirection(direction));
 
-            foreach (var sv in stationaryVertices)
-            {
-                var d = OneWayDistance(sv, movingEdges, movingOffset, opposite);
-                if (d < minDist)
-                    minDist = d;
-            }
-
-            return minDist;
+            var source = new AxisSlideEvents(
+                movingEdges,
+                movingOffset,
+                movingVertices,
+                stationaryEdges,
+                Vector.Zero,
+                stationaryVertices,
+                direction
+            );
+            var unit = DirectionToOffset(direction, 1.0);
+            return SlideResolver.FirstBlocking(ref source, contacts, unit.X, unit.Y);
         }
 
         /// <summary>
@@ -396,8 +417,8 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Computes the minimum directional distance using raw edge arrays and location offsets
-        /// to avoid all intermediate object allocations.
+        /// Computes the blocking directional distance using raw edge arrays and location
+        /// offsets. Sorts both edge arrays in place for pruning.
         /// </summary>
         public static double DirectionalDistance(
             (Vector start, Vector end)[] movingEdges,
@@ -407,36 +428,58 @@ namespace OpenNest.Geometry
             PushDirection direction
         )
         {
-            var minDist = double.MaxValue;
-
-            SortEdgesForPruning(stationaryEdges, direction);
-
-            // Case 1: Each moving vertex -> each stationary edge
-            var movingVertices = CollectVertices(movingEdges, movingOffset);
-
-            foreach (var mv in movingVertices)
-            {
-                var d = OneWayDistance(mv, stationaryEdges, stationaryOffset, direction);
-                if (d < minDist)
-                    minDist = d;
-            }
-
-            // Case 2: Each stationary vertex -> each moving edge (opposite direction)
-            var opposite = OppositeDirection(direction);
-            SortEdgesForPruning(movingEdges, opposite);
-
-            var stationaryVertices = CollectVertices(stationaryEdges, stationaryOffset);
-
-            foreach (var sv in stationaryVertices)
-            {
-                var d = OneWayDistance(sv, movingEdges, movingOffset, opposite);
-                if (d < minDist)
-                    minDist = d;
-            }
-
-            return minDist;
+            return DirectionalDistance(
+                movingEdges,
+                movingOffset,
+                stationaryEdges,
+                stationaryOffset,
+                direction,
+                SlideContactClassifier.FromEdges(
+                    movingEdges,
+                    movingOffset,
+                    stationaryEdges,
+                    stationaryOffset
+                )
+            );
         }
 
+        /// <summary>
+        /// Edge-array overload with caller-supplied contact topology. The classifier's
+        /// origins must match <paramref name="movingOffset"/> and
+        /// <paramref name="stationaryOffset"/> in the frame of its boundaries.
+        /// </summary>
+        public static double DirectionalDistance(
+            (Vector start, Vector end)[] movingEdges,
+            Vector movingOffset,
+            (Vector start, Vector end)[] stationaryEdges,
+            Vector stationaryOffset,
+            PushDirection direction,
+            SlideContactClassifier contacts
+        )
+        {
+            SortEdgesForPruning(stationaryEdges, direction);
+            var movingVertices = CollectVertices(movingEdges, movingOffset).ToArray();
+
+            SortEdgesForPruning(movingEdges, OppositeDirection(direction));
+            var stationaryVertices = CollectVertices(stationaryEdges, stationaryOffset).ToArray();
+
+            var source = new AxisSlideEvents(
+                movingEdges,
+                movingOffset,
+                movingVertices,
+                stationaryEdges,
+                stationaryOffset,
+                stationaryVertices,
+                direction
+            );
+            var unit = DirectionToOffset(direction, 1.0);
+            return SlideResolver.FirstBlocking(ref source, contacts, unit.X, unit.Y);
+        }
+
+        /// <summary>
+        /// Nearest raw hit from one vertex along a push direction against edges sorted for
+        /// pruning. This is a first-touch primitive; it does not classify sliding contacts.
+        /// </summary>
         public static double OneWayDistance(
             Vector vertex,
             (Vector start, Vector end)[] edges,
@@ -628,8 +671,8 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Computes the minimum translation distance along an arbitrary unit direction
-        /// before any edge of movingLines contacts any edge of stationaryLines.
+        /// Computes the translation distance along an arbitrary unit direction before any
+        /// edge of movingLines first blocks against an edge of stationaryLines.
         /// </summary>
         public static double DirectionalDistance(
             List<Line> movingLines,
@@ -637,58 +680,41 @@ namespace OpenNest.Geometry
             Vector direction
         )
         {
-            var minDist = double.MaxValue;
-            var dirX = direction.X;
-            var dirY = direction.Y;
+            return DirectionalDistance(
+                movingLines,
+                stationaryLines,
+                direction,
+                SlideContactClassifier.FromLines(
+                    movingLines,
+                    Vector.Zero,
+                    stationaryLines,
+                    Vector.Zero
+                )
+            );
+        }
 
-            var movingVertices = CollectVertices(movingLines, Vector.Zero);
-
-            foreach (var mv in movingVertices)
-            {
-                for (var i = 0; i < stationaryLines.Count; i++)
-                {
-                    var e = stationaryLines[i];
-                    var d = RayEdgeDistance(
-                        mv.X,
-                        mv.Y,
-                        e.pt1.X,
-                        e.pt1.Y,
-                        e.pt2.X,
-                        e.pt2.Y,
-                        dirX,
-                        dirY
-                    );
-                    if (d < minDist)
-                        minDist = d;
-                }
-            }
-
-            var oppX = -dirX;
-            var oppY = -dirY;
-
-            var stationaryVertices = CollectVertices(stationaryLines, Vector.Zero);
-
-            foreach (var sv in stationaryVertices)
-            {
-                for (var i = 0; i < movingLines.Count; i++)
-                {
-                    var e = movingLines[i];
-                    var d = RayEdgeDistance(
-                        sv.X,
-                        sv.Y,
-                        e.pt1.X,
-                        e.pt1.Y,
-                        e.pt2.X,
-                        e.pt2.Y,
-                        oppX,
-                        oppY
-                    );
-                    if (d < minDist)
-                        minDist = d;
-                }
-            }
-
-            return minDist;
+        /// <summary>
+        /// <see cref="DirectionalDistance(List{Line}, List{Line}, Vector)"/> with
+        /// caller-supplied contact topology.
+        /// </summary>
+        public static double DirectionalDistance(
+            List<Line> movingLines,
+            List<Line> stationaryLines,
+            Vector direction,
+            SlideContactClassifier contacts
+        )
+        {
+            var source = new LineSlideEvents(
+                movingLines,
+                CollectVertices(movingLines, Vector.Zero).ToArray(),
+                0,
+                0,
+                stationaryLines,
+                CollectVertices(stationaryLines, Vector.Zero).ToArray(),
+                direction.X,
+                direction.Y
+            );
+            return SlideResolver.FirstBlocking(ref source, contacts, direction.X, direction.Y);
         }
 
         /// <summary>
@@ -710,10 +736,10 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>
-        /// Computes the minimum translation distance along an arbitrary unit direction
-        /// before any vertex/edge of movingEntities contacts any vertex/edge of
-        /// stationaryEntities. Works with native Line, Arc, and Circle entities
-        /// without tessellation.
+        /// Computes the translation distance along an arbitrary unit direction before any
+        /// vertex/edge of movingEntities first blocks against stationaryEntities. Works with
+        /// native Line, Arc, and Circle entities without tessellation. A contact that the
+        /// push slides along or leaves does not block (see <see cref="SlideContact"/>).
         /// </summary>
         public static double DirectionalDistance(
             List<Entity> movingEntities,
@@ -721,228 +747,42 @@ namespace OpenNest.Geometry
             Vector direction
         )
         {
-            var minDist = double.MaxValue;
-            var dirX = direction.X;
-            var dirY = direction.Y;
-
-            var movingVertices = ExtractEntityVertices(movingEntities);
-
-            for (var v = 0; v < movingVertices.Length; v++)
-            {
-                var vx = movingVertices[v].X;
-                var vy = movingVertices[v].Y;
-
-                for (var j = 0; j < stationaryEntities.Count; j++)
-                {
-                    var d = RayEntityDistance(vx, vy, stationaryEntities[j], dirX, dirY);
-                    if (d < minDist)
-                    {
-                        minDist = d;
-                        if (d <= 0)
-                            return 0;
-                    }
-                }
-            }
-
-            var oppX = -dirX;
-            var oppY = -dirY;
-
-            var stationaryVertices = ExtractEntityVertices(stationaryEntities);
-
-            for (var v = 0; v < stationaryVertices.Length; v++)
-            {
-                var vx = stationaryVertices[v].X;
-                var vy = stationaryVertices[v].Y;
-
-                for (var j = 0; j < movingEntities.Count; j++)
-                {
-                    var d = RayEntityDistance(vx, vy, movingEntities[j], oppX, oppY);
-                    if (d < minDist)
-                    {
-                        minDist = d;
-                        if (d <= 0)
-                            return 0;
-                    }
-                }
-            }
-
-            // Phase 3: Arc-to-line closest-point check.
-            // Phases 1-2 sample arc endpoints and cardinal extremes, but the actual
-            // closest point on a small corner arc to a straight edge may lie between
-            // those samples. Use ClosestPointTo to find it and fire a ray from there.
-            minDist = ArcToLineClosestDistance(
+            return DirectionalDistance(
                 movingEntities,
                 stationaryEntities,
-                dirX,
-                dirY,
-                minDist
+                direction,
+                new SlideContactClassifier(movingEntities, stationaryEntities)
             );
-            if (minDist <= 0)
-                return 0;
-            minDist = ArcToLineClosestDistance(
-                stationaryEntities,
+        }
+
+        /// <summary>
+        /// <see cref="DirectionalDistance(List{Entity}, List{Entity}, Vector)"/> with
+        /// caller-supplied contact topology.
+        /// </summary>
+        public static double DirectionalDistance(
+            List<Entity> movingEntities,
+            List<Entity> stationaryEntities,
+            Vector direction,
+            SlideContactClassifier contacts
+        )
+        {
+            // Phases: vertex rays both ways, arc-to-line closest points (vertex sampling
+            // misses interior arc contact), then native curve tangency.
+            var source = new EntitySlideEvents(
                 movingEntities,
-                oppX,
-                oppY,
-                minDist
+                ExtractEntityVertices(movingEntities),
+                0,
+                0,
+                stationaryEntities,
+                ExtractEntityVertices(stationaryEntities),
+                direction.X,
+                direction.Y,
+                arcToLine: true
             );
-            if (minDist <= 0)
-                return 0;
-
-            // Phase 4: Native curve tangency, including a convex corner inside a concave arc.
-            for (var i = 0; i < movingEntities.Count; i++)
-            {
-                var me = movingEntities[i];
-                if (!TryGetCurveParams(me, out var mcx, out var mcy, out var mr))
-                    continue;
-
-                for (var j = 0; j < stationaryEntities.Count; j++)
-                {
-                    var se = stationaryEntities[j];
-                    if (!TryGetCurveParams(se, out var scx, out var scy, out var sr))
-                        continue;
-
-                    var d = CurveTangencyDistance(
-                        mcx, mcy, mr, me as Arc,
-                        scx, scy, sr, se as Arc, dirX, dirY);
-                    if (d >= minDist)
-                        continue;
-
-                    minDist = d;
-                    if (d <= 0)
-                        return 0;
-                }
-            }
-
-            return minDist;
+            return SlideResolver.FirstBlocking(ref source, contacts, direction.X, direction.Y);
         }
 
-        private static double ArcToLineClosestDistance(
-            List<Entity> arcEntities,
-            List<Entity> lineEntities,
-            double dirX,
-            double dirY,
-            double minDist
-        )
-        {
-            for (var i = 0; i < arcEntities.Count; i++)
-            {
-                if (arcEntities[i] is not Arc arc)
-                    continue;
-
-                var cx = arc.Center.X;
-                var cy = arc.Center.Y;
-                var r = arc.Radius;
-
-                for (var j = 0; j < lineEntities.Count; j++)
-                {
-                    if (lineEntities[j] is not Line line)
-                        continue;
-
-                    var p1x = line.pt1.X;
-                    var p1y = line.pt1.Y;
-                    var ex = line.pt2.X - p1x;
-                    var ey = line.pt2.Y - p1y;
-
-                    var det = ex * dirY - ey * dirX;
-                    if (System.Math.Abs(det) < Tolerance.Epsilon)
-                        continue;
-
-                    // The directional distance from an arc point at angle θ to the
-                    // line is t(θ) = [A + r·(ey·cosθ − ex·sinθ)] / det.
-                    // dt/dθ = 0 at θ = atan2(−ex, ey) and θ + π.
-                    var theta1 = Angle.NormalizeRad(System.Math.Atan2(-ex, ey));
-                    var theta2 = Angle.NormalizeRad(theta1 + System.Math.PI);
-
-                    for (var k = 0; k < 2; k++)
-                    {
-                        var theta = k == 0 ? theta1 : theta2;
-
-                        if (
-                            !Angle.IsBetweenRad(theta, arc.StartAngle, arc.EndAngle, arc.IsReversed)
-                        )
-                            continue;
-
-                        var qx = cx + r * System.Math.Cos(theta);
-                        var qy = cy + r * System.Math.Sin(theta);
-
-                        var d = RayEdgeDistance(
-                            qx,
-                            qy,
-                            p1x,
-                            p1y,
-                            line.pt2.X,
-                            line.pt2.Y,
-                            dirX,
-                            dirY
-                        );
-                        if (d < minDist)
-                        {
-                            minDist = d;
-                            if (d <= 0)
-                                return 0;
-                        }
-                    }
-                }
-            }
-            return minDist;
-        }
-
-        private static double RayEntityDistance(
-            double vx,
-            double vy,
-            Entity entity,
-            double dirX,
-            double dirY
-        )
-        {
-            if (entity is Line line)
-            {
-                return RayEdgeDistance(
-                    vx,
-                    vy,
-                    line.pt1.X,
-                    line.pt1.Y,
-                    line.pt2.X,
-                    line.pt2.Y,
-                    dirX,
-                    dirY
-                );
-            }
-
-            if (entity is Arc arc)
-            {
-                return RayArcDistance(
-                    vx,
-                    vy,
-                    arc.Center.X,
-                    arc.Center.Y,
-                    arc.Radius,
-                    arc.StartAngle,
-                    arc.EndAngle,
-                    arc.IsReversed,
-                    dirX,
-                    dirY
-                );
-            }
-
-            if (entity is Circle circle)
-            {
-                return RayCircleDistance(
-                    vx,
-                    vy,
-                    circle.Center.X,
-                    circle.Center.Y,
-                    circle.Radius,
-                    dirX,
-                    dirY
-                );
-            }
-
-            return double.MaxValue;
-        }
-
-        private static Vector[] ExtractEntityVertices(List<Entity> entities)
+        public static Vector[] ExtractEntityVertices(List<Entity> entities)
         {
             var vertices = new HashSet<Vector>();
 
@@ -1039,31 +879,6 @@ namespace OpenNest.Geometry
                             .Math.Min(a.start.X, a.end.X)
                             .CompareTo(System.Math.Min(b.start.X, b.end.X))
                 );
-        }
-
-        private static bool TryGetCurveParams(
-            Entity entity,
-            out double cx,
-            out double cy,
-            out double r
-        )
-        {
-            if (entity is Circle circle)
-            {
-                cx = circle.Center.X;
-                cy = circle.Center.Y;
-                r = circle.Radius;
-                return true;
-            }
-            if (entity is Arc arc)
-            {
-                cx = arc.Center.X;
-                cy = arc.Center.Y;
-                r = arc.Radius;
-                return true;
-            }
-            cx = cy = r = 0;
-            return false;
         }
 
         private static double BoxProjectionMin(Box box, double dx, double dy)
