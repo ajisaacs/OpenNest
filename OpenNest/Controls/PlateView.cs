@@ -735,6 +735,8 @@ namespace OpenNest.Controls
 
         public void PushSelected(PushDirection direction) => selection.PushSelected(direction);
 
+        public bool ExpandSelected() => selection.ExpandSelected();
+
         public void RotateSelectedParts(double angle) => selection.RotateSelectedParts(angle);
 
         protected override void UpdateMatrix()

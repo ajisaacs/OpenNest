@@ -65,6 +65,7 @@
             mnuToolsMeasureArea = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsBestFitViewer = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsPatternTile = new System.Windows.Forms.ToolStripMenuItem();
+            mnuToolsExpandSpacing = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsAlign = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsAlignLeft = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsAlignRight = new System.Windows.Forms.ToolStripMenuItem();
@@ -419,7 +420,7 @@
             // 
             // mnuTools
             // 
-            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsPatternTile, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsMachineConfig, mnuToolsOptions });
+            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsPatternTile, mnuToolsExpandSpacing, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsMachineConfig, mnuToolsOptions });
             mnuTools.Name = "mnuTools";
             mnuTools.Size = new System.Drawing.Size(47, 20);
             mnuTools.Text = "&Tools";
@@ -444,6 +445,13 @@
             this.mnuToolsPatternTile.Size = new System.Drawing.Size(214, 22);
             this.mnuToolsPatternTile.Text = "Pattern Tile";
             this.mnuToolsPatternTile.Click += PatternTile_Click;
+            //
+            // mnuToolsExpandSpacing
+            //
+            this.mnuToolsExpandSpacing.Name = "mnuToolsExpandSpacing";
+            this.mnuToolsExpandSpacing.Size = new System.Drawing.Size(214, 22);
+            this.mnuToolsExpandSpacing.Text = "Expand Spacing";
+            this.mnuToolsExpandSpacing.Click += ExpandSpacing_Click;
             //
             // mnuToolsAlign
             //
@@ -1306,6 +1314,7 @@
         private System.Windows.Forms.ToolStripMenuItem mnuToolsMeasureArea;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsBestFitViewer;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsPatternTile;
+        private System.Windows.Forms.ToolStripMenuItem mnuToolsExpandSpacing;
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;

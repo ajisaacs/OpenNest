@@ -184,6 +184,7 @@ namespace OpenNest.Forms
             mnuWindow.Visible = hasValue;
             mnuToolsAlign.Visible = hasValue;
             mnuToolsMeasureArea.Visible = hasValue;
+            mnuToolsExpandSpacing.Visible = hasValue;
 
             toolStripMenuItem14.Visible = hasValue;
             mnuSetOffsetIncrement.Visible = hasValue;
@@ -739,6 +740,20 @@ namespace OpenNest.Forms
                     activeForm.PlateView.SetAction(typeof(ActionClone), parts);
                 }
             }
+        }
+
+        private void ExpandSpacing_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null)
+                return;
+
+            if (!activeForm.PlateView.ExpandSelected())
+                MessageBox.Show(
+                    "Select at least two parts on the plate to expand.",
+                    "Expand Spacing",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
         }
 
         private void PatternTile_Click(object sender, EventArgs e)

@@ -167,6 +167,36 @@ namespace OpenNest.Controls
             view.Invalidate();
         }
 
+        /// <summary>
+        /// Grows the part-to-part spacing of the selection as far as the plate
+        /// allows (Expander). Returns false when nothing could be done.
+        /// </summary>
+        public bool ExpandSelected()
+        {
+            var movingParts = selectedParts.Select(p => p.BasePart).ToList();
+
+            if (movingParts.Count < 2)
+                return false;
+
+            var result = Expander.Expand(movingParts, view.Plate);
+
+            if (result.Cancelled)
+                return false;
+
+            selectedParts.ForEach(p => p.IsDirty = true);
+
+            if (view.Plate.CutOffs.Count > 0)
+                view.Plate.RegenerateCutOffs(view.CutOffSettings);
+
+            view.Invalidate();
+
+            view.Status =
+                $"Expanded spacing to {result.AchievedSpacing:0.###}"
+                + (result.Violations.Count > 0 ? $" - {result.Violations.Count} blocked pairs" : "");
+
+            return true;
+        }
+
         public LayoutPart GetPartAtControlPoint(Point pt)
         {
             var pt2 = view.PointControlToGraph(pt);
