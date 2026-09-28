@@ -87,6 +87,12 @@ namespace OpenNest.IO
             public string Axis { get; init; } = "vertical";
             public double? StartLimit { get; init; }
             public double? EndLimit { get; init; }
+
+            /// <summary>
+            /// Zero-based place in the plate's cut sequence (<c>Plate.Parts</c> order,
+            /// cut-offs included). Null in older files, which load it at the end.
+            /// </summary>
+            public int? Sequence { get; init; }
         }
 
         public record SizeDto

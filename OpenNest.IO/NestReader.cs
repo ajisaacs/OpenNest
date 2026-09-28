@@ -372,6 +372,8 @@ namespace OpenNest.IO
                 // Cut-offs
                 if (p.CutOffs != null)
                 {
+                    var sequence = new Dictionary<CutOff, int>();
+
                     foreach (var cutoffDto in p.CutOffs)
                     {
                         var axis =
@@ -384,9 +386,12 @@ namespace OpenNest.IO
                             EndLimit = cutoffDto.EndLimit,
                         };
                         plate.CutOffs.Add(cutoff);
+
+                        if (cutoffDto.Sequence is int index)
+                            sequence[cutoff] = index;
                     }
 
-                    plate.RegenerateCutOffs(new CutOffSettings());
+                    plate.RegenerateCutOffs(new CutOffSettings(), sequence);
                 }
 
                 nest.Plates.Add(plate);

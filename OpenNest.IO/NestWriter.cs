@@ -223,6 +223,16 @@ namespace OpenNest.IO
                 var cutoffs = new List<CutOffDto>();
                 foreach (var cutoff in plate.CutOffs)
                 {
+                    var sequence = -1;
+                    for (var j = 0; j < plate.Parts.Count; j++)
+                    {
+                        if (ReferenceEquals(plate.Parts[j].BaseDrawing, cutoff.Drawing))
+                        {
+                            sequence = j;
+                            break;
+                        }
+                    }
+
                     cutoffs.Add(
                         new CutOffDto
                         {
@@ -231,6 +241,7 @@ namespace OpenNest.IO
                             Axis = cutoff.Axis == CutOffAxis.Vertical ? "vertical" : "horizontal",
                             StartLimit = cutoff.StartLimit,
                             EndLimit = cutoff.EndLimit,
+                            Sequence = sequence >= 0 ? sequence : null,
                         }
                     );
                 }

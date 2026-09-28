@@ -94,18 +94,40 @@ namespace OpenNest
         /// <summary>
         /// Regenerates all cut-off drawings and materializes them as parts.
         /// Existing cut-off parts are removed first, then each cut-off is
-        /// regenerated and added back if it produces any geometry.
+        /// regenerated and put back at the same place in the cut sequence
+        /// (<see cref="Parts"/> order). New cut-offs are added at the end.
         /// </summary>
         public void RegenerateCutOffs(CutOffSettings settings)
         {
-            // Remove existing cut-off parts
+            // Remember each cut-off's place in the cut sequence, so a part drag
+            // or cut-off move doesn't send it to the end of the sequence.
+            var sequence = new Dictionary<CutOff, int>();
+
             for (var i = Parts.Count - 1; i >= 0; i--)
             {
-                if (Parts[i].BaseDrawing.IsCutOff)
-                    Parts.RemoveAt(i);
+                if (!Parts[i].BaseDrawing.IsCutOff)
+                    continue;
+
+                var cutoff = CutOffs.FirstOrDefault(c => ReferenceEquals(c.Drawing, Parts[i].BaseDrawing));
+                if (cutoff != null)
+                    sequence[cutoff] = i;
+
+                Parts.RemoveAt(i);
             }
 
+            RegenerateCutOffs(settings, sequence);
+        }
+
+        /// <summary>
+        /// Regenerates all cut-off drawings and materializes them as parts, placing
+        /// each cut-off at its index in <paramref name="sequence"/> (its place in
+        /// <see cref="Parts"/> order). Cut-offs missing from it are added at the end.
+        /// Callers must remove existing cut-off parts first.
+        /// </summary>
+        public void RegenerateCutOffs(CutOffSettings settings, IReadOnlyDictionary<CutOff, int> sequence)
+        {
             var cache = BuildPerimeterCache(this);
+            var placed = new List<(int Index, Part Part)>();
 
             // Regenerate and materialize each cut-off
             foreach (var cutoff in CutOffs)
@@ -116,8 +138,17 @@ namespace OpenNest
                     continue;
 
                 var part = new Part(cutoff.Drawing);
-                Parts.Add(part);
+
+                if (sequence != null && sequence.TryGetValue(cutoff, out var index))
+                    placed.Add((index, part));
+                else
+                    Parts.Add(part);
             }
+
+            // Lowest index first: each insert then lands on its saved index, because
+            // every part sequenced before it is already in place.
+            foreach (var (index, part) in placed.OrderBy(p => p.Index))
+                Parts.Insert(System.Math.Clamp(index, 0, Parts.Count), part);
         }
 
         /// <summary>
