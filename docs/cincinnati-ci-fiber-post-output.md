@@ -42,6 +42,9 @@ uses the Cincinnati machine-sample convention, not a generic TF5200 laser API:
 See [CIFiberPostConfig](../Posts/OpenNest.Posts.CincinnatiCIFiber/CIFiberPostConfig.cs)
 for macro names, material mappings, unit codes, precision, and table limits.
 The post is named for the machine family; table size belongs in configuration.
+In the desktop app these settings open in a sectioned editor (Machine, Material,
+Program output, Macros) with a material-code table; values are validated and
+saved only when OK is pressed.
 
 - Assign linear lead-ins before posting, including circular holes. The writer
   rejects missing or arc-first lead-ins. Its conservative rule cites the G238
