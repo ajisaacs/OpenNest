@@ -17,11 +17,6 @@ namespace OpenNest.Forms
 
         private void InitializeComponent()
         {
-            ColorScheme colorScheme1 = new ColorScheme();
-            CutOffSettings cutOffSettings1 = new CutOffSettings();
-            Plate plate1 = new Plate();
-            Collections.ObservableList<CutOff> observableList_11 = new Collections.ObservableList<CutOff>();
-            Collections.ObservableList<Part> observableList_12 = new Collections.ObservableList<Part>();
             phaseStepper = new OpenNest.Controls.PhaseStepperControl();
             resultsPanel = new System.Windows.Forms.Panel();
             resultsTable = new System.Windows.Forms.TableLayoutPanel();
@@ -46,8 +41,6 @@ namespace OpenNest.Forms
             buttonPanel = new System.Windows.Forms.FlowLayoutPanel();
             stopButton = new System.Windows.Forms.Button();
             acceptButton = new System.Windows.Forms.Button();
-            splitContainer = new System.Windows.Forms.SplitContainer();
-            previewPlateView = new OpenNest.Controls.PlateView();
             statsPanel = new System.Windows.Forms.Panel();
             resultsPanel.SuspendLayout();
             resultsTable.SuspendLayout();
@@ -55,10 +48,6 @@ namespace OpenNest.Forms
             statusPanel.SuspendLayout();
             statusTable.SuspendLayout();
             buttonPanel.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
-            splitContainer.Panel1.SuspendLayout();
-            splitContainer.Panel2.SuspendLayout();
-            splitContainer.SuspendLayout();
             statsPanel.SuspendLayout();
             SuspendLayout();
             // 
@@ -365,74 +354,6 @@ namespace OpenNest.Forms
             acceptButton.UseVisualStyleBackColor = true;
             acceptButton.Click += AcceptButton_Click;
             // 
-            // splitContainer
-            // 
-            splitContainer.Dock = System.Windows.Forms.DockStyle.Fill;
-            splitContainer.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
-            splitContainer.Location = new System.Drawing.Point(0, 0);
-            splitContainer.Name = "splitContainer";
-            // 
-            // splitContainer.Panel1
-            // 
-            splitContainer.Panel1.Controls.Add(previewPlateView);
-            // 
-            // splitContainer.Panel2
-            // 
-            splitContainer.Panel2.Controls.Add(statsPanel);
-            splitContainer.Size = new System.Drawing.Size(626, 341);
-            splitContainer.SplitterDistance = 356;
-            splitContainer.TabIndex = 0;
-            // 
-            // previewPlateView
-            // 
-            previewPlateView.ActiveWorkArea = null;
-            previewPlateView.AllowPan = true;
-            previewPlateView.AllowSelect = true;
-            previewPlateView.AllowZoom = true;
-            previewPlateView.BackColor = System.Drawing.Color.DarkGray;
-            colorScheme1.BackgroundColor = System.Drawing.Color.DarkGray;
-            colorScheme1.BoundingBoxColor = System.Drawing.Color.FromArgb(128, 128, 255);
-            colorScheme1.EdgeSpacingColor = System.Drawing.Color.FromArgb(180, 180, 180);
-            colorScheme1.LayoutFillColor = System.Drawing.Color.WhiteSmoke;
-            colorScheme1.LayoutOutlineColor = System.Drawing.Color.Gray;
-            colorScheme1.OriginColor = System.Drawing.Color.Gray;
-            colorScheme1.PreviewPartColor = System.Drawing.Color.FromArgb(255, 140, 0);
-            colorScheme1.RapidColor = System.Drawing.Color.DodgerBlue;
-            previewPlateView.ColorScheme = colorScheme1;
-            cutOffSettings1.CutDirection = CutDirection.AwayFromOrigin;
-            cutOffSettings1.MinSegmentLength = 0.05D;
-            cutOffSettings1.Overtravel = 0D;
-            cutOffSettings1.PartClearance = 0.02D;
-            previewPlateView.CutOffSettings = cutOffSettings1;
-            previewPlateView.DebugRemnantPriorities = null;
-            previewPlateView.DebugRemnants = null;
-            previewPlateView.Dock = System.Windows.Forms.DockStyle.Fill;
-            previewPlateView.DrawBounds = true;
-            previewPlateView.DrawCutDirection = false;
-            previewPlateView.DrawOffset = false;
-            previewPlateView.DrawOrigin = true;
-            previewPlateView.DrawPiercePoints = false;
-            previewPlateView.DrawRapid = false;
-            previewPlateView.FillParts = true;
-            previewPlateView.Location = new System.Drawing.Point(0, 0);
-            previewPlateView.Name = "previewPlateView";
-            previewPlateView.OffsetIncrementDistance = 10D;
-            previewPlateView.OffsetTolerance = 0.001D;
-            plate1.CutOffs = observableList_11;
-            plate1.CuttingParameters = null;
-            plate1.GrainAngle = 0D;
-            plate1.Parts = observableList_12;
-            plate1.PartSpacing = 0D;
-            plate1.Quadrant = 1;
-            plate1.Quantity = 0;
-            previewPlateView.Plate = plate1;
-            previewPlateView.RotateIncrementAngle = 10D;
-
-            previewPlateView.ShowBendLines = false;
-            previewPlateView.Size = new System.Drawing.Size(356, 341);
-            previewPlateView.Status = "Select";
-            previewPlateView.TabIndex = 0;
-            // 
             // statsPanel
             // 
             statsPanel.AutoScroll = true;
@@ -450,12 +371,12 @@ namespace OpenNest.Forms
             // 
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            ClientSize = new System.Drawing.Size(626, 341);
-            Controls.Add(splitContainer);
+            ClientSize = new System.Drawing.Size(266, 341);
+            Controls.Add(statsPanel);
             FormBorderStyle = System.Windows.Forms.FormBorderStyle.SizableToolWindow;
             MaximizeBox = false;
             MinimizeBox = false;
-            MinimumSize = new System.Drawing.Size(550, 380);
+            MinimumSize = new System.Drawing.Size(320, 380);
             Name = "NestProgressForm";
             ShowInTaskbar = false;
             StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
@@ -471,10 +392,6 @@ namespace OpenNest.Forms
             statusTable.ResumeLayout(false);
             statusTable.PerformLayout();
             buttonPanel.ResumeLayout(false);
-            splitContainer.Panel1.ResumeLayout(false);
-            splitContainer.Panel2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
-            splitContainer.ResumeLayout(false);
             statsPanel.ResumeLayout(false);
             statsPanel.PerformLayout();
             ResumeLayout(false);
@@ -506,8 +423,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.FlowLayoutPanel buttonPanel;
         private System.Windows.Forms.Button acceptButton;
         private System.Windows.Forms.Button stopButton;
-        private System.Windows.Forms.SplitContainer splitContainer;
         private System.Windows.Forms.Panel statsPanel;
-        private Controls.PlateView previewPlateView;
     }
 }

@@ -6,7 +6,6 @@ namespace OpenNest.Controls
     internal class PreviewManager
     {
         private readonly PlateView view;
-        private readonly List<LayoutPart> stationaryParts = new List<LayoutPart>();
         private readonly List<LayoutPart> activeParts = new List<LayoutPart>();
 
         public PreviewManager(PlateView view)
@@ -14,32 +13,11 @@ namespace OpenNest.Controls
             this.view = view;
         }
 
-        public IReadOnlyList<LayoutPart> PreviewParts =>
-            activeParts.Count > 0 ? activeParts : stationaryParts;
+        public IReadOnlyList<LayoutPart> PreviewParts => activeParts;
 
-        public Brush PreviewBrush =>
-            activeParts.Count > 0
-                ? view.ColorScheme.ActivePreviewPartBrush
-                : view.ColorScheme.PreviewPartBrush;
+        public Brush PreviewBrush => view.ColorScheme.ActivePreviewPartBrush;
 
-        public Pen PreviewPen =>
-            activeParts.Count > 0
-                ? view.ColorScheme.ActivePreviewPartPen
-                : view.ColorScheme.PreviewPartPen;
-
-        public void SetStationaryParts(List<Part> parts)
-        {
-            stationaryParts.Clear();
-            activeParts.Clear();
-
-            if (parts != null)
-            {
-                foreach (var part in parts)
-                    stationaryParts.Add(LayoutPart.Create(part, view));
-            }
-
-            view.Invalidate();
-        }
+        public Pen PreviewPen => view.ColorScheme.ActivePreviewPartPen;
 
         public void SetActiveParts(List<Part> parts)
         {
@@ -56,7 +34,6 @@ namespace OpenNest.Controls
 
         public void ClearPreviewParts()
         {
-            stationaryParts.Clear();
             activeParts.Clear();
             view.Invalidate();
         }
@@ -69,19 +46,16 @@ namespace OpenNest.Controls
                     view.Plate.Parts.Add(part);
             }
 
-            stationaryParts.Clear();
             activeParts.Clear();
         }
 
         public void Update()
         {
-            stationaryParts.ForEach(p => p.Update(view));
             activeParts.ForEach(p => p.Update(view));
         }
 
         public void Clear()
         {
-            stationaryParts.Clear();
             activeParts.Clear();
         }
     }

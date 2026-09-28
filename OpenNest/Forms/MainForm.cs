@@ -10,16 +10,16 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
 using OpenNest.Data;
+using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 using OpenNest.Gpu;
 using OpenNest.IO;
 using OpenNest.Properties;
-using OpenNest.Engine;
-using OpenNest.Engine.Jobs;
-using OpenNest.Engine.Jobs.Adapters;
-using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Forms
 {
@@ -1040,7 +1040,6 @@ namespace OpenNest.Forms
 
             nestingCts = new CancellationTokenSource();
             var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
-            progressForm.PreviewPlate = CreatePreviewPlate(activeForm.PlateView.Plate);
 
             var jobEngineName = EngineSelection.IsFillStrategy(EngineSelection.EngineName)
                 ? null
@@ -1052,9 +1051,7 @@ namespace OpenNest.Forms
                 progressForm.UpdateProgress(p);
 
                 if (p.IsOverallBest)
-                    progressForm.UpdatePreview(p.BestParts);
-
-                activeForm.PlateView.SetActiveParts(p.BestParts);
+                    activeForm.PlateView.SetActiveParts(p.BestParts);
                 activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
 
@@ -1152,7 +1149,7 @@ namespace OpenNest.Forms
                 {
                     if (pr.IsNew)
                     {
-                        var plate = GetOrCreatePlate(progressForm);
+                        var plate = GetOrCreatePlate();
                         plate.Size = pr.Plate.Size;
                         plate.Parts.AddRange(pr.Parts);
                     }
@@ -1172,7 +1169,7 @@ namespace OpenNest.Forms
                 if (remaining.Count == 0 || token.IsCancellationRequested)
                     break;
 
-                var plate = GetOrCreatePlate(progressForm);
+                var plate = GetOrCreatePlate();
 
                 var placed = await NestSinglePlateAsync(
                     plate,
@@ -1242,7 +1239,7 @@ namespace OpenNest.Forms
                 if (parts.Count == 0)
                     continue;
 
-                var plate = GetOrCreatePlate(progressForm);
+                var plate = GetOrCreatePlate();
                 plate.Size = sheet.Stock.Size;
                 plate.Parts.AddRange(parts);
             }
@@ -1260,11 +1257,10 @@ namespace OpenNest.Forms
                 );
         }
 
-        private Plate GetOrCreatePlate(NestProgressForm progressForm)
+        private Plate GetOrCreatePlate()
         {
             var plate = activeForm.PlateManager.GetOrCreateEmpty();
             activeForm.PlateManager.LoadLast();
-            progressForm.PreviewPlate = CreatePreviewPlate(plate);
             return plate;
         }
 
@@ -1338,17 +1334,6 @@ namespace OpenNest.Forms
             plate.Parts.AddRange(nestParts);
             activeForm.PlateView.Invalidate();
             return true;
-        }
-
-        private static Plate CreatePreviewPlate(Plate source)
-        {
-            var plate = new Plate(source.Size)
-            {
-                Quadrant = source.Quadrant,
-                PartSpacing = source.PartSpacing,
-            };
-            plate.EdgeSpacing = source.EdgeSpacing;
-            return plate;
         }
 
         private void SequenceAllPlates_Click(object sender, EventArgs e)

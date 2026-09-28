@@ -38,22 +38,10 @@ namespace OpenNest.Forms
             set => acceptButton.Visible = value;
         }
 
-        public Plate PreviewPlate
-        {
-            get => previewPlateView.Plate;
-            set
-            {
-                previewPlateView.Plate = value;
-                previewPlateView.ZoomToFit();
-            }
-        }
-
         public NestProgressForm(CancellationTokenSource cts, bool showPlateRow = true)
         {
             this.cts = cts;
             InitializeComponent();
-
-            previewPlateView.AllowSelect = false;
 
             if (!showPlateRow)
             {
@@ -102,20 +90,6 @@ namespace OpenNest.Forms
             descriptionValue.Text = !string.IsNullOrEmpty(progress.Description)
                 ? progress.Description
                 : progress.Phase.DisplayName();
-        }
-
-        public void UpdatePreview(List<Part> bestParts)
-        {
-            if (IsDisposed || !IsHandleCreated)
-                return;
-
-            var plate = previewPlateView.Plate;
-            plate.Parts.Clear();
-
-            foreach (var part in bestParts)
-                plate.Parts.Add((Part)part.Clone());
-
-            previewPlateView.ZoomToFit();
         }
 
         public void ShowCompleted()
@@ -177,8 +151,6 @@ namespace OpenNest.Forms
 
             if (!cts.IsCancellationRequested)
                 cts.Cancel();
-
-            previewPlateView.Dispose();
 
             base.OnFormClosing(e);
         }

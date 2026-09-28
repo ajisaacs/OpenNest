@@ -10,13 +10,13 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Forms;
 using OpenNest.Geometry;
 using OpenNest.Math;
 using Timer = System.Timers.Timer;
-using OpenNest.Engine;
-using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Controls
 {
@@ -562,9 +562,6 @@ namespace OpenNest.Controls
             Plate.Parts.Add(part);
         }
 
-        public void SetStationaryParts(List<Part> parts) =>
-            previewManager.SetStationaryParts(parts);
-
         public void SetActiveParts(List<Part> parts) => previewManager.SetActiveParts(parts);
 
         public void ClearPreviewParts() => previewManager.ClearPreviewParts();
@@ -578,23 +575,12 @@ namespace OpenNest.Controls
             var cts = new CancellationTokenSource();
             var progressForm = new NestProgressForm(cts, showPlateRow: false);
 
-            var previewPlate = new Plate(Plate.Size)
-            {
-                Quadrant = Plate.Quadrant,
-                PartSpacing = Plate.PartSpacing,
-            };
-            previewPlate.EdgeSpacing = Plate.EdgeSpacing;
-            progressForm.PreviewPlate = previewPlate;
-
             var progress = new Progress<NestProgress>(p =>
             {
                 progressForm.UpdateProgress(p);
 
                 if (p.IsOverallBest)
-                {
-                    progressForm.UpdatePreview(p.BestParts);
                     SetActiveParts(p.BestParts);
-                }
 
                 ActiveWorkArea = p.ActiveWorkArea;
             });
