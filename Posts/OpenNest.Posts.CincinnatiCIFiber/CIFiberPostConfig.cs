@@ -114,14 +114,15 @@ namespace OpenNest.Posts.CincinnatiCIFiber
 
         /// <summary>
         /// Line written to swap pallets: after the last sheet, and between sheets
-        /// in a single program. M50 comes from the machine sample and the CL-series
-        /// manual (EM-423 §3.50); it is unconfirmed for multi-sheet CI Fiber runs.
-        /// Blank writes no pallet change.
+        /// in a single program. M50 is the Cincinnati pallet change (machine sample
+        /// tail, CL-series manual EM-423 §3.50; confirmed by the machine owner): it
+        /// moves the cut sheet out for unloading before M30. Blank writes no pallet
+        /// change.
         /// </summary>
         [DisplayName("Pallet change code")]
         [Description(
-            "Written after each sheet to swap pallets. M50 matches the machine sample; "
-                + "confirm it for multi-sheet runs. Blank writes no pallet change."
+            "Written after each sheet to swap pallets, moving the cut sheet out for unloading. "
+                + "Cincinnati uses M50. Blank writes no pallet change."
         )]
         [PostSetting(SheetsSection, 1)]
         public string PalletChangeCode { get; set; } = "M50";

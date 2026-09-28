@@ -68,10 +68,14 @@ validated and saved only when OK is pressed.
   change separate sheets, and the header carries the first sheet's size. Sheets
   of different sizes are rejected in this mode. Posting to a stream always
   produces one program, so it rejects a multi-sheet nest in per-sheet mode.
-- **Release blocker:** `PalletChangeCode` defaults to `M50`, taken from the
-  single-sheet machine sample and the CL-series manual (EM-423 §3.50). Neither the
-  pallet code nor the between-sheet sequence has been confirmed for multi-sheet CI
-  Fiber runs. Confirm both against a Cincinnati multi-sheet sample before release.
+- `PalletChangeCode` defaults to `M50`, the Cincinnati pallet change: the machine
+  sample ends `L PROGRAMEND.NC`, `M50`, `M30`, moving the cut sheet out for
+  unloading before the program ends (CL-series manual EM-423 §3.50; confirmed by
+  the machine owner).
+- **Release blocker:** the single-program sequence between sheets (`/L "L0"`, then
+  `M50`, then the next sheet with no new header or start macro) is inferred, not
+  observed. Confirm it against a Cincinnati multi-sheet sample before release, or
+  keep **One program per sheet** on, which matches the single-sheet sample.
 - All programs are generated and every sheet is validated before any file is
   written, so a failed file post writes nothing. A failed stream post may leave
   partial output; discard it. Successful generation and tests do not establish
