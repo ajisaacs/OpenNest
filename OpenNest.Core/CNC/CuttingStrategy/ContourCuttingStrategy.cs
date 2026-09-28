@@ -367,7 +367,8 @@ namespace OpenNest.CNC.CuttingStrategy
                 return;
             }
 
-            program.Codes.AddRange(leadIn.Generate(point, normal, winding));
+            var leadInNormal = ComputeLeadInNormal(shape, point, entity, contourType, leadIn, winding);
+            program.Codes.AddRange(leadIn.Generate(point, leadInNormal, winding));
 
             var reindexedShape = shape.ReindexAt(point, entity);
 
@@ -434,6 +435,65 @@ namespace OpenNest.CNC.CuttingStrategy
                 return ContourType.ArcCircle;
 
             return ContourType.Internal;
+        }
+
+        /// <summary>
+        /// Uses the inward angle bisector for straight lead-ins at cutout corners.
+        /// Edge interiors and other lead-in styles keep the entity normal. Shared
+        /// by program generation and the manual placement preview.
+        /// </summary>
+        public static double ComputeLeadInNormal(
+            Shape shape,
+            Vector point,
+            Entity entity,
+            ContourType contourType,
+            LeadIn leadIn,
+            RotationType winding = RotationType.CW
+        )
+        {
+            var normal = ComputeNormal(point, entity, contourType, winding);
+            if (contourType != ContourType.Internal || leadIn is not LineLeadIn
+                || entity is not (Line or Arc) || entity.Length <= Tolerance.Epsilon
+                || shape.Entities.Count < 2 || !shape.IsClosed())
+                return normal;
+
+            var index = shape.Entities.IndexOf(entity);
+            if (index < 0)
+                return normal;
+
+            var atStart = point.DistanceTo(EntityStartPoint(entity)) <= Tolerance.Epsilon;
+            if (!atStart && point.DistanceTo(EntityEndPoint(entity)) > Tolerance.Epsilon)
+                return normal;
+
+            var adjacentIndex = atStart
+                ? (index + shape.Entities.Count - 1) % shape.Entities.Count
+                : (index + 1) % shape.Entities.Count;
+            var adjacent = shape.Entities[adjacentIndex];
+            var adjacentPoint = atStart ? EntityEndPoint(adjacent) : EntityStartPoint(adjacent);
+
+            if (adjacent is not (Line or Arc) || adjacent.Length <= Tolerance.Epsilon
+                || point.DistanceTo(adjacentPoint) > Tolerance.Epsilon)
+                return normal;
+
+            var adjacentNormal = ComputeNormal(point, adjacent, contourType, winding);
+            // Sum unit normals rather than averaging angles (which fails at 0/2π).
+            // Winding makes this point into the scrap even at reflex corners.
+            var x = System.Math.Cos(normal) + System.Math.Cos(adjacentNormal);
+            var y = System.Math.Sin(normal) + System.Math.Sin(adjacentNormal);
+            if (!double.IsFinite(x) || !double.IsFinite(y)
+                || x * x + y * y <= Tolerance.Epsilon * Tolerance.Epsilon)
+                return normal; // Opposing normals at a cusp have no unique bisector.
+
+            return Angle.NormalizeRad(System.Math.Atan2(y, x));
+        }
+
+        private static Vector EntityEndPoint(Entity entity)
+        {
+            if (entity is Line line)
+                return line.EndPoint;
+            if (entity is Arc arc)
+                return arc.EndPoint();
+            return Vector.Invalid;
         }
 
         public static double ComputeNormal(
