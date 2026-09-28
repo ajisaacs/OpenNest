@@ -89,7 +89,7 @@ namespace OpenNest.IO
         private static void ReadSubPrograms(Program parent, Stream stream)
         {
             using var reader = new StreamReader(stream);
-            var currentId = -1;
+            var currentId = (int?)null;
             var lines = new List<string>();
 
             string line;
@@ -100,18 +100,18 @@ namespace OpenNest.IO
                 if (trimmed.StartsWith(":") && int.TryParse(trimmed.Substring(1), out var id))
                 {
                     // Flush previous sub-program
-                    if (currentId >= 0 && lines.Count > 0)
-                        parent.SubPrograms[currentId] = ParseSubProgram(lines);
+                    if (currentId.HasValue && lines.Count > 0)
+                        parent.SubPrograms[currentId.Value] = ParseSubProgram(lines);
 
                     currentId = id;
                     lines.Clear();
                 }
                 else if (trimmed == "M99")
                 {
-                    if (currentId >= 0 && lines.Count > 0)
-                        parent.SubPrograms[currentId] = ParseSubProgram(lines);
+                    if (currentId.HasValue && lines.Count > 0)
+                        parent.SubPrograms[currentId.Value] = ParseSubProgram(lines);
 
-                    currentId = -1;
+                    currentId = null;
                     lines.Clear();
                 }
                 else

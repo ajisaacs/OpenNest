@@ -46,6 +46,27 @@ public class SubProgramSerializationTests
         Assert.True(drawing.Program.SubPrograms.ContainsKey(call.Id));
     }
 
+    [Theory]
+    [InlineData(-42)]
+    [InlineData(-1)]
+    public void NegativeSubProgramId_RoundTripsAndBinds(int id)
+    {
+        var nest = CreateNestWithHoleSubProgram();
+        var program = nest.Drawings.First().Program;
+        var sub = program.SubPrograms[42];
+        program.SubPrograms.Clear();
+        program.SubPrograms[id] = sub;
+        program.Codes.OfType<SubProgramCall>().Single().Id = id;
+        using var stream = new MemoryStream();
+        new NestWriter(nest).Write(stream);
+        stream.Position = 0;
+
+        var restored = new NestReader(stream).Read().Drawings.First().Program;
+
+        Assert.True(restored.SubPrograms.ContainsKey(id));
+        Assert.Same(restored.SubPrograms[id], restored.Codes.OfType<SubProgramCall>().Single().Program);
+    }
+
     private static Nest CreateNestWithHoleSubProgram()
     {
         var sub = new Program(Mode.Incremental);
