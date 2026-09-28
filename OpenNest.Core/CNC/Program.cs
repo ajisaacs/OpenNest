@@ -90,6 +90,9 @@ namespace OpenNest.CNC
 
             SetModeAbs();
 
+            // Several calls can share one sub-program (identical holes); rotate each once.
+            var rotatedSubPrograms = new HashSet<Program>(ReferenceEqualityComparer.Instance);
+
             for (int i = 0; i < Codes.Count; ++i)
             {
                 var code = Codes[i];
@@ -110,7 +113,7 @@ namespace OpenNest.CNC
                         );
                     }
 
-                    if (subpgm.Program != null)
+                    if (subpgm.Program != null && rotatedSubPrograms.Add(subpgm.Program))
                         subpgm.Program.Rotate(angle, origin);
                 }
 
@@ -519,8 +522,31 @@ namespace OpenNest.CNC
             foreach (var kvp in Variables)
                 pgm.Variables[kvp.Key] = kvp.Value;
 
+            // The copy owns its sub-programs: rotating it must never turn the source's holes.
+            // Calls that shared one sub-program keep sharing one copy.
+            Dictionary<Program, Program> subCopies = null;
+
+            Program CopyOf(Program sub)
+            {
+                subCopies ??= new Dictionary<Program, Program>(ReferenceEqualityComparer.Instance);
+
+                if (!subCopies.TryGetValue(sub, out var copy))
+                {
+                    copy = (Program)sub.Clone();
+                    subCopies[sub] = copy;
+                }
+
+                return copy;
+            }
+
             foreach (var kvp in SubPrograms)
-                pgm.SubPrograms[kvp.Key] = (Program)kvp.Value.Clone();
+                pgm.SubPrograms[kvp.Key] = CopyOf(kvp.Value);
+
+            foreach (var code in codes)
+            {
+                if (code is SubProgramCall call && call.Program != null)
+                    call.BindProgram(CopyOf(call.Program));
+            }
 
             return pgm;
         }

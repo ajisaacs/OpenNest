@@ -79,12 +79,28 @@ namespace OpenNest.CNC
         }
 
         /// <summary>
-        /// Gets a shallow copy.
+        /// Gets a shallow copy that references the same program. Copies the fields
+        /// directly: going through the setters would re-align (rotate) the shared program.
         /// </summary>
         /// <returns></returns>
         public ICode Clone()
         {
-            return new SubProgramCall(program, Rotation) { Id = Id, Offset = Offset };
+            return new SubProgramCall
+            {
+                program = program,
+                rotation = rotation,
+                Id = Id,
+                Offset = Offset,
+            };
+        }
+
+        /// <summary>
+        /// Points the call at <paramref name="copy"/>, a copy of its current program, without
+        /// re-aligning its rotation: the copy already has the geometry the call executes.
+        /// </summary>
+        internal void BindProgram(Program copy)
+        {
+            program = copy;
         }
 
         public override string ToString()
