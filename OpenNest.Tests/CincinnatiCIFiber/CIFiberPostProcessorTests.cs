@@ -309,4 +309,24 @@ public class CIFiberPostProcessorTests
         Assert.Contains("G0X50Y50", output);
         Assert.Contains("V.E.R3=1", output);
     }
+
+    [Fact]
+    public void MaterialCodes_MatchIgnoringCase_AfterJsonReload()
+    {
+        var options = new System.Text.Json.JsonSerializerOptions();
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new CIFiberPostConfig
+            {
+                MaterialCodes = new() { ["Stainless"] = "SSN" },
+                DefaultMaterialCode = "MSN",
+            },
+            options
+        );
+
+        var config = System.Text.Json.JsonSerializer.Deserialize<CIFiberPostConfig>(json, options)!;
+
+        Assert.Equal("SSN", config.ResolveMaterialCode("stainless"));
+        Assert.Equal("SSN", config.ResolveMaterialCode(" STAINLESS "));
+        Assert.Equal("MSN", config.ResolveMaterialCode("Aluminum"));
+    }
 }

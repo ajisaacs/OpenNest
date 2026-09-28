@@ -139,12 +139,36 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         [PostSetting(MacrosSection, 6)]
         public string ProgramEndMacro { get; set; } = "PROGRAMEND.NC";
 
-        /// <summary>Material name (case-insensitive) to machine material code map for V.E.MATERIAL.</summary>
+        /// <summary>
+        /// Material name (case-insensitive) to machine material code map for
+        /// V.E.MATERIAL. The setter re-keys any assigned map (including one
+        /// deserialized from JSON, which is case-sensitive) case-insensitively;
+        /// if names collide by case, the later entry wins.
+        /// </summary>
         [DisplayName("Material codes")]
         [Description("Material name (not case-sensitive) and the code written to V.E.MATERIAL.")]
         [PostSetting(MaterialSection, 0, KeyHeader = "Material name", ValueHeader = "Machine code")]
-        public Dictionary<string, string> MaterialCodes { get; set; } =
-            new(StringComparer.OrdinalIgnoreCase) { ["Mild Steel"] = "MSN" };
+        public Dictionary<string, string> MaterialCodes
+        {
+            get => _materialCodes;
+            set => _materialCodes = IgnoreCase(value);
+        }
+
+        private Dictionary<string, string> _materialCodes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Mild Steel"] = "MSN",
+        };
+
+        private static Dictionary<string, string> IgnoreCase(Dictionary<string, string> map)
+        {
+            if (map == null || map.Comparer == StringComparer.OrdinalIgnoreCase)
+                return map;
+
+            var copy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in map)
+                copy[entry.Key] = entry.Value;
+            return copy;
+        }
 
         /// <summary>Fallback V.E.MATERIAL code when the material name has no mapping.</summary>
         [DisplayName("Default material code")]
