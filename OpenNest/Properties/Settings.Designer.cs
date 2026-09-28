@@ -158,6 +158,8 @@ namespace OpenNest.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        // Legacy .nstdot nest-template path. No longer read by the app
+        // except by the one-time migration to defaults.json in MainForm.
         public string NestTemplatePath {
             get {
                 return ((string)(this["NestTemplatePath"]));

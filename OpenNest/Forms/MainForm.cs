@@ -90,13 +90,37 @@ namespace OpenNest.Forms
         private Nest CreateDefaultNest()
         {
             var nest = new Nest();
-            nest.Units = Properties.Settings.Default.DefaultUnit;
-            nest.PlateDefaults.EdgeSpacing = new Spacing(1, 1, 1, 1);
-            nest.PlateDefaults.PartSpacing = 1;
-            nest.PlateDefaults.Size = new OpenNest.Geometry.Size(100, 100);
-            nest.PlateDefaults.Quadrant = 1;
+            LoadNestDefaults().ApplyTo(nest);
             return nest;
         }
+
+        /// <summary>
+        /// Loads the persisted nest defaults. When no usable file exists,
+        /// units come from the legacy DefaultUnit setting; a corrupt file
+        /// warns once per session.
+        /// </summary>
+        private NestDefaults LoadNestDefaults()
+        {
+            var defaults = NestDefaults.Load(NestDefaults.DefaultPath, out var status);
+            if (status == NestDefaultsStatus.Ok)
+                return defaults;
+
+            defaults.Units = Properties.Settings.Default.DefaultUnit;
+
+            if (status == NestDefaultsStatus.Invalid && !defaultsWarned)
+            {
+                defaultsWarned = true;
+                MessageBox.Show(
+                    $"The nest defaults file could not be read:\n{NestDefaults.DefaultPath}\n\nBuilt-in defaults will be used. Re-save your defaults from Tools > Nest Defaults.",
+                    "Nest Defaults",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+            }
+            return defaults;
+        }
+
+        private bool defaultsWarned;
 
         private string GetNestName(DateTime date, int id)
         {
@@ -185,6 +209,7 @@ namespace OpenNest.Forms
             mnuToolsAlign.Visible = hasValue;
             mnuToolsMeasureArea.Visible = hasValue;
             mnuToolsExpandSpacing.Visible = hasValue;
+            mnuToolsSaveCurrentAsDefaults.Visible = hasValue;
 
             toolStripMenuItem14.Visible = hasValue;
             mnuSetOffsetIncrement.Visible = hasValue;
@@ -454,8 +479,50 @@ namespace OpenNest.Forms
         {
             base.OnLoad(e);
 
+            MigrateNestTemplate();
+
             if (Settings.Default.CreateNewNestOnOpen)
                 New_Click(this, new EventArgs());
+        }
+
+        /// <summary>
+        /// One-time upgrade: converts a legacy .nstdot nest template
+        /// (NestTemplatePath setting) into defaults.json, then clears the
+        /// setting so the template mechanism is never consulted again.
+        /// </summary>
+        private void MigrateNestTemplate()
+        {
+            var templatePath = Settings.Default.NestTemplatePath;
+            if (string.IsNullOrWhiteSpace(templatePath))
+                return;
+
+            // A failed conversion keeps the setting populated so the user
+            // can still find their template file.
+            var converted = true;
+            if (File.Exists(templatePath) && !File.Exists(NestDefaults.DefaultPath))
+            {
+                try
+                {
+                    var nest = new NestReader(templatePath).Read();
+                    NestDefaults.FromNest(nest).Save(NestDefaults.DefaultPath);
+                }
+                catch (Exception ex)
+                {
+                    converted = false;
+                    MessageBox.Show(
+                        $"The nest template could not be converted to the new defaults file:\n{templatePath}\n\n{ex.Message}\n\nIt will no longer be loaded automatically. Set defaults under Tools > Nest Defaults.",
+                        "Nest Template",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                }
+            }
+
+            if (!converted)
+                return;
+
+            Settings.Default.NestTemplatePath = "";
+            Settings.Default.Save();
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -473,30 +540,7 @@ namespace OpenNest.Forms
             var windowState =
                 ActiveMdiChild != null ? ActiveMdiChild.WindowState : FormWindowState.Maximized;
 
-            Nest nest;
-
-            if (File.Exists(Properties.Settings.Default.NestTemplatePath))
-            {
-                try
-                {
-                    var reader = new NestReader(Properties.Settings.Default.NestTemplatePath);
-                    nest = reader.Read();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(
-                        $"Failed to load nest template:\n{ex.Message}\n\nA default nest will be created instead.",
-                        "Template Error",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning
-                    );
-                    nest = CreateDefaultNest();
-                }
-            }
-            else
-            {
-                nest = CreateDefaultNest();
-            }
+            var nest = CreateDefaultNest();
 
             nest.DateCreated = DateTime.Now;
             nest.DateLastModified = DateTime.Now;
@@ -832,6 +876,25 @@ namespace OpenNest.Forms
         {
             var form = new OptionsForm();
             form.ShowDialog();
+        }
+
+        private void NestDefaults_Click(object sender, EventArgs e)
+        {
+            using (var form = new NestDefaultsForm(NestDefaults.Load(NestDefaults.DefaultPath)))
+            {
+                if (form.ShowDialog(this) == DialogResult.OK)
+                    form.GetDefaults().Save(NestDefaults.DefaultPath);
+            }
+        }
+
+        private void SaveCurrentAsDefaults_Click(object sender, EventArgs e)
+        {
+            if (activeForm == null)
+                return;
+
+            NestDefaults
+                .FromPlate(activeForm.Nest.Units, activeForm.PlateView.Plate)
+                .Save(NestDefaults.DefaultPath);
         }
 
         private void MachineConfig_Click(object sender, EventArgs e)

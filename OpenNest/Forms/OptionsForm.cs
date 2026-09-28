@@ -72,7 +72,6 @@ namespace OpenNest.Forms
 
         private void LoadSettings()
         {
-            textBox1.Text = Settings.Default.NestTemplatePath;
             checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
             numericUpDown1.Value = (decimal)Settings.Default.AutoSizePlateFactor;
 
@@ -92,7 +91,6 @@ namespace OpenNest.Forms
 
         private void SaveSettings()
         {
-            Settings.Default.NestTemplatePath = textBox1.Text;
             Settings.Default.CreateNewNestOnOpen = checkBox1.Checked;
             Settings.Default.AutoSizePlateFactor = (double)numericUpDown1.Value;
             Settings.Default.ActiveColorScheme =
@@ -143,15 +141,6 @@ namespace OpenNest.Forms
         private void SaveSettings_Click(object sender, EventArgs e)
         {
             SaveSettings();
-        }
-
-        private void BrowseNestTemplatePath_Click(object sender, EventArgs e)
-        {
-            var dlg = new OpenFileDialog();
-            dlg.Filter = "Template File|*.nstdot";
-
-            if (dlg.ShowDialog() == DialogResult.OK)
-                textBox1.Text = dlg.FileName;
         }
     }
 }

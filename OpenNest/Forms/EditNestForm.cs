@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
@@ -301,33 +301,17 @@ namespace OpenNest.Forms
         public void SaveAs()
         {
             var dlg = new SaveFileDialog();
-            dlg.Filter = $"{NestFormat.FileFilter}|Template File|*.nstdot";
+            dlg.Filter = NestFormat.FileFilter;
             dlg.FileName = Nest.Name;
 
             if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                if (dlg.FilterIndex == 2)
-                    SaveTemplate(dlg.FileName);
-                else
-                    SaveAs(dlg.FileName);
-            }
+                SaveAs(dlg.FileName);
         }
 
         public void SaveAs(string path)
         {
             Document.SaveAs(path);
             Text = Document.Name;
-        }
-
-        public void SaveTemplate(string path)
-        {
-            var nst = new Nest();
-            nst.Name = Path.GetFileNameWithoutExtension(path);
-            nst.PlateDefaults = Nest.PlateDefaults;
-            nst.Units = Nest.Units;
-
-            var writer = new NestWriter(nst);
-            writer.Write(path);
         }
 
         public void Import()
@@ -943,9 +927,9 @@ namespace OpenNest.Forms
 
             // Refresh all parts to use the updated programs
             foreach (var plate in Nest.Plates)
-            foreach (var part in plate.Parts)
-                if (!part.BaseDrawing.IsCutOff)
-                    part.Update();
+                foreach (var part in plate.Parts)
+                    if (!part.BaseDrawing.IsCutOff)
+                        part.Update();
 
             UpdateDrawingList();
             PlateView.Invalidate();

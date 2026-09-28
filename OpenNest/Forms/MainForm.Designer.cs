@@ -82,6 +82,8 @@
             mnuSetRotationIncrement = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem15 = new System.Windows.Forms.ToolStripSeparator();
             mnuToolsMachineConfig = new System.Windows.Forms.ToolStripMenuItem();
+            mnuToolsNestDefaults = new System.Windows.Forms.ToolStripMenuItem();
+            mnuToolsSaveCurrentAsDefaults = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsOptions = new System.Windows.Forms.ToolStripMenuItem();
             mnuNest = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestEdit = new System.Windows.Forms.ToolStripMenuItem();
@@ -420,7 +422,7 @@
             // 
             // mnuTools
             // 
-            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsPatternTile, mnuToolsExpandSpacing, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsMachineConfig, mnuToolsOptions });
+            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsPatternTile, mnuToolsExpandSpacing, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsMachineConfig, mnuToolsNestDefaults, mnuToolsSaveCurrentAsDefaults, mnuToolsOptions });
             mnuTools.Name = "mnuTools";
             mnuTools.Size = new System.Drawing.Size(47, 20);
             mnuTools.Text = "&Tools";
@@ -558,6 +560,20 @@
             mnuToolsMachineConfig.Size = new System.Drawing.Size(214, 22);
             mnuToolsMachineConfig.Text = "Machine Configuration...";
             mnuToolsMachineConfig.Click += MachineConfig_Click;
+            //
+            // mnuToolsNestDefaults
+            //
+            mnuToolsNestDefaults.Name = "mnuToolsNestDefaults";
+            mnuToolsNestDefaults.Size = new System.Drawing.Size(214, 22);
+            mnuToolsNestDefaults.Text = "Nest Defaults...";
+            mnuToolsNestDefaults.Click += NestDefaults_Click;
+            //
+            // mnuToolsSaveCurrentAsDefaults
+            //
+            mnuToolsSaveCurrentAsDefaults.Name = "mnuToolsSaveCurrentAsDefaults";
+            mnuToolsSaveCurrentAsDefaults.Size = new System.Drawing.Size(214, 22);
+            mnuToolsSaveCurrentAsDefaults.Text = "Save Current Plate as Defaults";
+            mnuToolsSaveCurrentAsDefaults.Click += SaveCurrentAsDefaults_Click;
             //
             // mnuToolsOptions
             //
@@ -1225,6 +1241,8 @@
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem5;
         private System.Windows.Forms.ToolStripMenuItem mnuTools;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsMachineConfig;
+        private System.Windows.Forms.ToolStripMenuItem mnuToolsNestDefaults;
+        private System.Windows.Forms.ToolStripMenuItem mnuToolsSaveCurrentAsDefaults;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsOptions;
         private System.Windows.Forms.ToolStripMenuItem mnuNest;
         private System.Windows.Forms.ToolStripMenuItem mnuNestEdit;

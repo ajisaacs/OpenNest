@@ -34,9 +34,9 @@ public class NestDefaultsTests : IDisposable
         };
 
         original.Save(_path);
-        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+        var loaded = NestDefaults.Load(_path, out var status);
 
-        Assert.True(loadedFromDisk);
+        Assert.Equal(NestDefaultsStatus.Ok, status);
         Assert.Equal(Units.Millimeters, loaded.Units);
         Assert.Equal(original.Size, loaded.Size);
         Assert.Equal(3, loaded.Quadrant);
@@ -58,20 +58,20 @@ public class NestDefaultsTests : IDisposable
     [Fact]
     public void Load_MissingFile_ReturnsFallback()
     {
-        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+        var loaded = NestDefaults.Load(_path, out var status);
 
-        Assert.False(loadedFromDisk);
+        Assert.Equal(NestDefaultsStatus.Missing, status);
         AssertFallback(loaded);
     }
 
     [Fact]
-    public void Load_CorruptJson_ReturnsFallbackButReportsFile()
+    public void Load_CorruptJson_ReturnsFallbackButReportsInvalid()
     {
         File.WriteAllText(_path, "{ this is not json");
 
-        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+        var loaded = NestDefaults.Load(_path, out var status);
 
-        Assert.True(loadedFromDisk);
+        Assert.Equal(NestDefaultsStatus.Invalid, status);
         AssertFallback(loaded);
     }
 
@@ -80,9 +80,9 @@ public class NestDefaultsTests : IDisposable
     {
         File.WriteAllText(_path, """{ "units": "millimeters", "partSpacing": 4 }""");
 
-        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+        var loaded = NestDefaults.Load(_path, out var status);
 
-        Assert.True(loadedFromDisk);
+        Assert.Equal(NestDefaultsStatus.Ok, status);
         Assert.Equal(Units.Millimeters, loaded.Units);
         Assert.Equal(4, loaded.PartSpacing);
         // Untouched fields keep fallback values.
@@ -107,9 +107,10 @@ public class NestDefaultsTests : IDisposable
             """
         );
 
-        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+        var loaded = NestDefaults.Load(_path, out var status);
 
-        Assert.True(loadedFromDisk);
+        // The file parses; only the invalid values fall back, so no warning.
+        Assert.Equal(NestDefaultsStatus.Ok, status);
         Assert.Equal(Units.Inches, loaded.Units);
         Assert.Equal(new Size(100, 100), loaded.Size);
         Assert.Equal(1, loaded.Quadrant);
@@ -144,9 +145,9 @@ public class NestDefaultsTests : IDisposable
             """
         );
 
-        var loaded = NestDefaults.Load(_path, out var loadedFromDisk);
+        var loaded = NestDefaults.Load(_path, out var status);
 
-        Assert.True(loadedFromDisk);
+        Assert.Equal(NestDefaultsStatus.Ok, status);
         Assert.Equal(2, loaded.PartSpacing);
     }
 

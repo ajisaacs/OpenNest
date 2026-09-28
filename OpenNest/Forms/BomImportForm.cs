@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Data;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.IO.Bom;
@@ -16,7 +17,7 @@ namespace OpenNest.Forms
         private List<BomPartRow> _parts;
         private Dictionary<string, GroupSettings> _groupSettings;
         private bool _suppressRegroup;
-        private Nest.PlateSettings _templateDefaults;
+        private NestDefaults _defaults;
 
         public Form MdiParentForm { get; set; }
 
@@ -25,37 +26,14 @@ namespace OpenNest.Forms
             InitializeComponent();
             _parts = new List<BomPartRow>();
             _groupSettings = new Dictionary<string, GroupSettings>();
-            _templateDefaults = LoadTemplateDefaults();
-            ApplyTemplateDefaults();
+            _defaults = NestDefaults.Load(NestDefaults.DefaultPath);
+            ApplyDefaults();
         }
 
-        private Nest.PlateSettings LoadTemplateDefaults()
+        private void ApplyDefaults()
         {
-            var templatePath = Properties.Settings.Default.NestTemplatePath;
-            if (File.Exists(templatePath))
-            {
-                try
-                {
-                    var nest = new NestReader(templatePath).Read();
-                    return nest.PlateDefaults;
-                }
-                catch { }
-            }
-
-            // Fallback defaults matching CreateDefaultNest
-            return new Nest.PlateSettings
-            {
-                Size = new Geometry.Size(100, 100),
-                Quadrant = 1,
-                PartSpacing = 1,
-                EdgeSpacing = new Spacing(1, 1, 1, 1),
-            };
-        }
-
-        private void ApplyTemplateDefaults()
-        {
-            txtPlateWidth.Text = _templateDefaults.Size.Width.ToString("0.####");
-            txtPlateLength.Text = _templateDefaults.Size.Length.ToString("0.####");
+            txtPlateWidth.Text = _defaults.Size.Width.ToString("0.####");
+            txtPlateLength.Text = _defaults.Size.Length.ToString("0.####");
         }
 
         #region File Browsing
@@ -147,9 +125,9 @@ namespace OpenNest.Forms
             var matchedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var group in analysis.Groups)
-            foreach (var part in group.Parts)
-                if (part.DxfPath != null)
-                    matchedPaths[part.Item.FileName ?? ""] = part.DxfPath;
+                foreach (var part in group.Parts)
+                    if (part.DxfPath != null)
+                        matchedPaths[part.Item.FileName ?? ""] = part.DxfPath;
 
             _parts = new List<BomPartRow>();
 
@@ -290,10 +268,10 @@ namespace OpenNest.Forms
 
             var defaultWidth = double.TryParse(txtPlateWidth.Text, out var w)
                 ? w
-                : _templateDefaults.Size.Width;
+                : _defaults.Size.Width;
             var defaultLength = double.TryParse(txtPlateLength.Text, out var l)
                 ? l
-                : _templateDefaults.Size.Length;
+                : _defaults.Size.Length;
 
             var groups = _parts
                 .Where(p =>
@@ -336,11 +314,11 @@ namespace OpenNest.Forms
                     group.Sum(p => p.Qty ?? 0),
                     existing ? gs.PlateWidth : defaultWidth,
                     existing ? gs.PlateLength : defaultLength,
-                    existing ? gs.PartSpacing : _templateDefaults.PartSpacing,
-                    existing ? gs.EdgeLeft : _templateDefaults.EdgeSpacing.Left,
-                    existing ? gs.EdgeBottom : _templateDefaults.EdgeSpacing.Bottom,
-                    existing ? gs.EdgeRight : _templateDefaults.EdgeSpacing.Right,
-                    existing ? gs.EdgeTop : _templateDefaults.EdgeSpacing.Top
+                    existing ? gs.PartSpacing : _defaults.PartSpacing,
+                    existing ? gs.EdgeLeft : _defaults.EdgeSpacing.Left,
+                    existing ? gs.EdgeBottom : _defaults.EdgeSpacing.Bottom,
+                    existing ? gs.EdgeRight : _defaults.EdgeSpacing.Right,
+                    existing ? gs.EdgeTop : _defaults.EdgeSpacing.Top
                 );
             }
 
@@ -374,23 +352,23 @@ namespace OpenNest.Forms
                 {
                     PlateWidth = row["Plate Width"] is double pw
                         ? pw
-                        : _templateDefaults.Size.Width,
+                        : _defaults.Size.Width,
                     PlateLength = row["Plate Length"] is double pl
                         ? pl
-                        : _templateDefaults.Size.Length,
+                        : _defaults.Size.Length,
                     PartSpacing = row["Part Spacing"] is double ps
                         ? ps
-                        : _templateDefaults.PartSpacing,
+                        : _defaults.PartSpacing,
                     EdgeLeft = row["Edge Left"] is double el
                         ? el
-                        : _templateDefaults.EdgeSpacing.Left,
+                        : _defaults.EdgeSpacing.Left,
                     EdgeBottom = row["Edge Bottom"] is double eb
                         ? eb
-                        : _templateDefaults.EdgeSpacing.Bottom,
+                        : _defaults.EdgeSpacing.Bottom,
                     EdgeRight = row["Edge Right"] is double er
                         ? er
-                        : _templateDefaults.EdgeSpacing.Right,
-                    EdgeTop = row["Edge Top"] is double et ? et : _templateDefaults.EdgeSpacing.Top,
+                        : _defaults.EdgeSpacing.Right,
+                    EdgeTop = row["Edge Top"] is double et ? et : _defaults.EdgeSpacing.Top,
                 };
             }
         }
@@ -434,10 +412,10 @@ namespace OpenNest.Forms
 
             var defaultWidth = double.TryParse(txtPlateWidth.Text, out var dw)
                 ? dw
-                : _templateDefaults.Size.Width;
+                : _defaults.Size.Width;
             var defaultLength = double.TryParse(txtPlateLength.Text, out var dl)
                 ? dl
-                : _templateDefaults.Size.Length;
+                : _defaults.Size.Length;
 
             var groups = _parts
                 .Where(p =>
@@ -477,11 +455,11 @@ namespace OpenNest.Forms
                 var hasSettings = _groupSettings.TryGetValue(key, out var gs);
                 var plateWidth = hasSettings ? gs.PlateWidth : defaultWidth;
                 var plateLength = hasSettings ? gs.PlateLength : defaultLength;
-                var partSpacing = hasSettings ? gs.PartSpacing : _templateDefaults.PartSpacing;
-                var edgeLeft = hasSettings ? gs.EdgeLeft : _templateDefaults.EdgeSpacing.Left;
-                var edgeBottom = hasSettings ? gs.EdgeBottom : _templateDefaults.EdgeSpacing.Bottom;
-                var edgeRight = hasSettings ? gs.EdgeRight : _templateDefaults.EdgeSpacing.Right;
-                var edgeTop = hasSettings ? gs.EdgeTop : _templateDefaults.EdgeSpacing.Top;
+                var partSpacing = hasSettings ? gs.PartSpacing : _defaults.PartSpacing;
+                var edgeLeft = hasSettings ? gs.EdgeLeft : _defaults.EdgeSpacing.Left;
+                var edgeBottom = hasSettings ? gs.EdgeBottom : _defaults.EdgeSpacing.Bottom;
+                var edgeRight = hasSettings ? gs.EdgeRight : _defaults.EdgeSpacing.Right;
+                var edgeTop = hasSettings ? gs.EdgeTop : _defaults.EdgeSpacing.Top;
 
                 var nestName = $"{jobName} - {thickness:0.###} {material}";
                 var nest = new Nest(nestName);
@@ -490,7 +468,7 @@ namespace OpenNest.Forms
                 nest.PlateDefaults.Size = new Geometry.Size(plateWidth, plateLength);
                 nest.Thickness = thickness;
                 nest.Material = new Material(material);
-                nest.PlateDefaults.Quadrant = _templateDefaults.Quadrant;
+                nest.PlateDefaults.Quadrant = _defaults.Quadrant;
                 nest.PlateDefaults.PartSpacing = partSpacing;
                 nest.PlateDefaults.EdgeSpacing = new Spacing(
                     edgeLeft,

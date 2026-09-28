@@ -4,6 +4,19 @@ using OpenNest.Geometry;
 
 namespace OpenNest.Data;
 
+/// <summary>Outcome of <see cref="NestDefaults.Load(string, out NestDefaultsStatus)"/>.</summary>
+public enum NestDefaultsStatus
+{
+    /// <summary>Defaults were read from the file (invalid fields still fall back individually).</summary>
+    Ok,
+
+    /// <summary>No file exists at the path; built-in fallback values were used.</summary>
+    Missing,
+
+    /// <summary>The file exists but could not be read or parsed; fallback values were used.</summary>
+    Invalid,
+}
+
 /// <summary>
 /// Plate/nest defaults persisted to a single JSON file
 /// (by default %APPDATA%\OpenNest\defaults.json), replacing the
@@ -56,18 +69,18 @@ public sealed class NestDefaults
     public static NestDefaults Load(string path) => Load(path, out _);
 
     /// <summary>
-    /// Loads defaults; <paramref name="fileExisted"/> is true when the file
-    /// was present (even if it failed to parse), so callers can surface a
-    /// warning when a present file did not load cleanly.
+    /// Loads defaults and reports whether the file was missing, loaded, or
+    /// present but unreadable/invalid, so callers can warn about a corrupt
+    /// file while still returning usable values.
     /// </summary>
-    public static NestDefaults Load(string path, out bool fileExisted)
+    public static NestDefaults Load(string path, out NestDefaultsStatus status)
     {
-        fileExisted = false;
         var defaults = Fallback;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            status = NestDefaultsStatus.Missing;
             return defaults;
-
-        fileExisted = true;
+        }
 
         NestDefaultsDto? dto;
         try
@@ -77,15 +90,22 @@ public sealed class NestDefaults
         }
         catch (JsonException)
         {
+            status = NestDefaultsStatus.Invalid;
             return defaults;
         }
         catch (IOException)
         {
+            status = NestDefaultsStatus.Invalid;
             return defaults;
         }
 
         if (dto is null)
+        {
+            status = NestDefaultsStatus.Invalid;
             return defaults;
+        }
+
+        status = NestDefaultsStatus.Ok;
 
         if (
             dto.Units is not null
@@ -131,6 +151,23 @@ public sealed class NestDefaults
         return new NestDefaults
         {
             Units = nest.Units,
+            Size = plate.Size,
+            Quadrant = plate.Quadrant,
+            PartSpacing = plate.PartSpacing,
+            EdgeSpacing = plate.EdgeSpacing,
+        };
+    }
+
+    /// <summary>
+    /// Captures defaults from an existing plate (a copy of its size,
+    /// quadrant, and spacing), e.g. the active plate in the desktop app.
+    /// </summary>
+    public static NestDefaults FromPlate(Units units, Plate plate)
+    {
+        ArgumentNullException.ThrowIfNull(plate);
+        return new NestDefaults
+        {
+            Units = units,
             Size = plate.Size,
             Quadrant = plate.Quadrant,
             PartSpacing = plate.PartSpacing,
