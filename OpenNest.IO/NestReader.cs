@@ -341,6 +341,11 @@ namespace OpenNest.IO
             nest.DateLastModified = DateTime.Parse(dto.DateLastModified);
             nest.Notes = dto.Notes;
             nest.AssistGas = dto.AssistGas ?? "";
+            // Additive v2 fields: absent or unknown values keep the defaults.
+            nest.Status = Enum.TryParse<NestStatus>(dto.Status, true, out var status)
+                ? status
+                : NestStatus.Quote;
+            nest.MadeBy = dto.MadeBy ?? "";
 
             // Nest-level material and thickness (fall back to PlateDefaults for old files)
             var pd = dto.PlateDefaults;

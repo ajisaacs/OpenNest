@@ -64,6 +64,10 @@
             this.label5 = new System.Windows.Forms.Label();
             this.labelMaterial = new System.Windows.Forms.Label();
             this.materialBox = new System.Windows.Forms.ComboBox();
+            this.labelStatus = new System.Windows.Forms.Label();
+            this.statusBox = new System.Windows.Forms.ComboBox();
+            this.labelMadeBy = new System.Windows.Forms.Label();
+            this.madeByBox = new System.Windows.Forms.TextBox();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.tabPage3 = new System.Windows.Forms.TabPage();
             this.notesBox = new System.Windows.Forms.TextBox();
@@ -417,16 +421,22 @@
             this.tableLayoutPanel3.Controls.Add(this.textBox1, 1, 1);
             this.tableLayoutPanel3.Controls.Add(this.textBox2, 1, 2);
             this.tableLayoutPanel3.Controls.Add(this.label5, 0, 6);
+            this.tableLayoutPanel3.Controls.Add(this.labelStatus, 0, 7);
+            this.tableLayoutPanel3.Controls.Add(this.statusBox, 1, 7);
+            this.tableLayoutPanel3.Controls.Add(this.labelMadeBy, 0, 8);
+            this.tableLayoutPanel3.Controls.Add(this.madeByBox, 1, 8);
             this.tableLayoutPanel3.Location = new System.Drawing.Point(6, 6);
             this.tableLayoutPanel3.Name = "tableLayoutPanel3";
-            this.tableLayoutPanel3.RowCount = 7;
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 14.28571F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 14.28571F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 14.28571F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 14.28571F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 14.28571F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 14.28571F));
-            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 14.28571F));
+            this.tableLayoutPanel3.RowCount = 9;
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
+            this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 11.11111F));
             this.tableLayoutPanel3.Size = new System.Drawing.Size(362, 280);
             this.tableLayoutPanel3.TabIndex = 0;
             // 
@@ -521,6 +531,37 @@
             this.materialBox.Name = "materialBox";
             this.materialBox.Size = new System.Drawing.Size(224, 24);
             this.materialBox.TabIndex = 11;
+            // 
+            // labelStatus
+            // 
+            this.labelStatus.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.labelStatus.AutoSize = true;
+            this.labelStatus.Name = "labelStatus";
+            this.labelStatus.TabIndex = 12;
+            this.labelStatus.Text = "Status :";
+            // 
+            // statusBox
+            // 
+            this.statusBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.statusBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.statusBox.FormattingEnabled = true;
+            this.statusBox.Name = "statusBox";
+            this.statusBox.TabIndex = 13;
+            // 
+            // labelMadeBy
+            // 
+            this.labelMadeBy.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.labelMadeBy.AutoSize = true;
+            this.labelMadeBy.Name = "labelMadeBy";
+            this.labelMadeBy.TabIndex = 14;
+            this.labelMadeBy.Text = "Made By :";
+            // 
+            // madeByBox
+            // 
+            this.madeByBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.madeByBox.Name = "madeByBox";
+            this.madeByBox.Size = new System.Drawing.Size(224, 22);
+            this.madeByBox.TabIndex = 15;
             //
             // label3
             //
@@ -731,5 +772,9 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Label labelMaterial;
         private System.Windows.Forms.ComboBox materialBox;
+        private System.Windows.Forms.Label labelStatus;
+        private System.Windows.Forms.ComboBox statusBox;
+        private System.Windows.Forms.Label labelMadeBy;
+        private System.Windows.Forms.TextBox madeByBox;
     }
 }

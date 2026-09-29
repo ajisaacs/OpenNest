@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using OpenNest.Collections;
 using OpenNest.Geometry;
@@ -37,6 +37,10 @@ namespace OpenNest
         public string Notes { get; set; }
 
         public string AssistGas { get; set; } = "";
+
+        public NestStatus Status { get; set; } = NestStatus.Quote;
+
+        public string MadeBy { get; set; } = "";
 
         public double Thickness { get; set; }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
 using OpenNest.Geometry;
 using Timer = System.Timers.Timer;
@@ -17,6 +17,10 @@ namespace OpenNest.Forms
 
             foreach (var name in PostProcessorMaterials.Names)
                 materialBox.Items.Add(name);
+
+            foreach (var status in Enum.GetValues<NestStatus>())
+                statusBox.Items.Add(status);
+            statusBox.SelectedItem = NestStatus.Quote;
 
             timer = new Timer
             {
@@ -115,6 +119,18 @@ namespace OpenNest.Forms
             set { materialBox.Text = value; }
         }
 
+        public NestStatus Status
+        {
+            get { return statusBox.SelectedItem is NestStatus status ? status : NestStatus.Quote; }
+            set { statusBox.SelectedItem = value; }
+        }
+
+        public string MadeBy
+        {
+            get { return madeByBox.Text; }
+            set { madeByBox.Text = value; }
+        }
+
         public void SetUnits(Units units)
         {
             switch (units)
@@ -200,6 +216,8 @@ namespace OpenNest.Forms
             DateLastModified = nest.DateLastModified;
             Thickness = nest.Thickness;
             MaterialName = nest.Material?.Name ?? "";
+            Status = nest.Status;
+            MadeBy = nest.MadeBy ?? "";
             SizeString = nest.PlateDefaults.Size.ToString();
             PartSpacing = nest.PlateDefaults.PartSpacing;
             LeftSpacing = nest.PlateDefaults.EdgeSpacing.Left;
@@ -221,6 +239,8 @@ namespace OpenNest.Forms
             nest.DateLastModified = DateLastModified;
             nest.Thickness = Thickness;
             nest.Material = new Material(MaterialName);
+            nest.Status = Status;
+            nest.MadeBy = MadeBy;
             nest.PlateDefaults.Size = OpenNest.Geometry.Size.Parse(SizeString);
             nest.PlateDefaults.PartSpacing = PartSpacing;
             nest.PlateDefaults.EdgeSpacing = new Spacing(

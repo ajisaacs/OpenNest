@@ -24,6 +24,8 @@ namespace OpenNest.IO
             public string DateLastModified { get; init; } = "";
             public string Notes { get; init; } = "";
             public string AssistGas { get; init; } = "";
+            public string Status { get; init; } = "Quote";
+            public string MadeBy { get; init; } = "";
             public double Thickness { get; init; }
             public MaterialDto Material { get; init; } = new();
             public PlateDefaultsDto PlateDefaults { get; init; } = new();

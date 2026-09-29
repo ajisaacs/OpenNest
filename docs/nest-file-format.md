@@ -4,6 +4,14 @@
 Old files remain readable. Older applications ignore the new cutting-state fields;
 opening and saving with an older application loses that state.
 
+## Job metadata
+
+`nest.json` carries the workflow fields shown in the nest info dialog:
+`name`, `customer`, `dateCreated`, `dateLastModified`, `notes`, `material`,
+`thickness`, plus `status` (`"Quote"`, `"ToBeCut"`, `"HasBeenCut"`) and `madeBy`.
+Status and made-by are additive: files written before them load as Quote with an
+empty maker, and an unrecognized status value likewise falls back to Quote.
+
 ## Programs and placements
 
 - `programs/program-N` is drawing N's clean G-code program; optional

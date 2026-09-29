@@ -88,6 +88,8 @@ namespace OpenNest.IO
                 DateLastModified = nest.DateLastModified.ToString("o"),
                 Notes = nest.Notes ?? "",
                 AssistGas = nest.AssistGas ?? "",
+                Status = nest.Status.ToString(),
+                MadeBy = nest.MadeBy ?? "",
                 Thickness = nest.Thickness,
                 Material = new MaterialDto
                 {
