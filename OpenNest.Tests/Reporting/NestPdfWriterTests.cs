@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using OpenNest.Geometry;
@@ -21,8 +20,8 @@ public sealed class NestPdfWriterTests : IDisposable
         using (var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import))
         {
             Assert.Equal(2, pdf.PageCount);
-            Assert.Equal((612, 792), EffectiveSize(pdf.Pages[0]));
-            Assert.Equal((792, 612), EffectiveSize(pdf.Pages[1]));
+            Assert.Equal((612, 792), ReportPdf.EffectiveSize(pdf.Pages[0]));
+            Assert.Equal((792, 612), ReportPdf.EffectiveSize(pdf.Pages[1]));
         }
         var bytes = Encoding.Latin1.GetString(File.ReadAllBytes(path));
         // Subset-embedded faces; PDF names escape the space as #20.
@@ -38,8 +37,8 @@ public sealed class NestPdfWriterTests : IDisposable
     public void Write_PdfTextCarriesDocumentLocalIdsQuantitiesAndPageNumbers()
     {
         var path = WriteReport(NestReportTestData.CreateNest());
-        var summary = ExtractText(path, 1);
-        var plate = ExtractText(path, 2);
+        var summary = ReportPdf.Text(path, 1);
+        var plate = ReportPdf.Text(path, 2);
 
         Assert.Contains("Report test job", summary);
         Assert.Contains("Test customer", summary);
@@ -68,21 +67,21 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Contains("Page 2 of 2", plate);
 
         // Repeated export of the same snapshot is textually identical.
-        Assert.Equal(summary + plate, ExtractText(WriteReport(NestReportTestData.CreateNest(), "again.pdf"), 1)
-            + ExtractText(Path.Combine(directory, "again.pdf"), 2));
+        Assert.Equal(summary + plate, ReportPdf.Text(WriteReport(NestReportTestData.CreateNest(), "again.pdf"), 1)
+            + ReportPdf.Text(Path.Combine(directory, "again.pdf"), 2));
     }
 
     [SkippableFact]
     public void Write_EmptyAndDemandOnlyJobsProduceExplicitSummaryOnlyReports()
     {
         var nest = new Nest("Empty test") { Units = Units.Millimeters };
-        var empty = ExtractText(WriteReport(nest, "empty.pdf"), 1);
+        var empty = ReportPdf.Text(WriteReport(nest, "empty.pdf"), 1);
         Assert.Contains("No plates in this job.", empty);
         Assert.Contains("No parts in this job.", empty);
         Assert.Contains("Page 1 of 1", empty);
 
         nest.Drawings.Add(NestReportTestData.Rectangle("Alpha", 20, 10, 2));
-        var demand = ExtractText(WriteReport(nest, "demand.pdf"), 1);
+        var demand = ReportPdf.Text(WriteReport(nest, "demand.pdf"), 1);
         Assert.Contains("No plates in this job.", demand);
         Assert.Matches(@"R001\s+Alpha\s+2\s+0\s+2\s+0\s+-", demand);
         Assert.Contains("Page 1 of 1", demand);
@@ -99,7 +98,9 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Equal(2, pdf.PageCount);
         // The vector diagram is the last content stream on the plate page. Each stroke-only
         // contour must begin its own subpath; a missing move-to draws a false connecting line.
-        var diagram = ContentStreams(pdf.Pages[1]).Last();
+        // The drawing area's clip path ("W* n") precedes the geometry.
+        var diagram = ReportPdf.ContentStreams(pdf.Pages[1]).Last();
+        diagram = diagram[(diagram.IndexOf("W* n", StringComparison.Ordinal) + 4)..];
         Assert.Equal(geometry.Contours.Length, Regex.Matches(diagram, @"(?m)^[-\d. ]+ m$").Count);
     }
 
@@ -128,42 +129,38 @@ public sealed class NestPdfWriterTests : IDisposable
     }
 
     [Theory]
-    [InlineData("second-plate")]
-    [InlineData("summary-overflow")]
-    [InlineData("plate-table-overflow")]
-    [InlineData("illegible-label")]
-    public void Write_UnsupportedLayoutFailsBeforeReplacingDestination(string scenario)
+    [InlineData("illegible-label", "Plate 4, part 2 (R004)")]
+    [InlineData("cell-overflow", "Drawing R002")]
+    [InlineData("header-overflow", "Page header")]
+    public void Write_UnsupportedLayoutFailsBeforeReplacingDestination(string scenario, string identified)
     {
-        var nest = NestReportTestData.CreateNest();
-        var plate = nest.Plates[0];
+        var nest = NestReportTestData.CreateMultiPlateNest();
         switch (scenario)
         {
-            case "second-plate":
-                nest.Plates.Add(new Plate(24, 48) { Quantity = 1 });
-                nest.Plates[1].Parts.Add(new Part(plate.Parts[0].BaseDrawing));
-                break;
-            case "summary-overflow":
-                for (var i = 0; i < 40; i++)
-                    nest.Drawings.Add(NestReportTestData.Rectangle($"Demand {i:D2}", 1, 1));
-                break;
-            case "plate-table-overflow":
-                for (var i = 0; i < 12; i++)
-                    // Large enough for readable labels, so only the table can overflow.
-                    plate.Parts.Add(new Part(NestReportTestData.Rectangle($"Small {i:D2}", 2, 2), new Vector(2 + i * 3, 16)));
-                break;
             case "illegible-label":
-                plate.Parts.Add(new Part(NestReportTestData.Rectangle("Tiny", 0.05, 0.05), new Vector(44, 20)));
+                // Too small for a legible label even in a detail view, on the LAST plate.
+                nest.Plates[3].Parts.Add(new Part(NestReportTestData.Rectangle("Tiny", 0.01, 0.01), new Vector(44, 20)));
+                break;
+            case "cell-overflow":
+                // A row taller than a page would be silently clipped by MigraDoc.
+                nest.Plates[0].Parts[2].BaseDrawing.Name = string.Concat(Enumerable.Repeat("0123456789", 60));
+                break;
+            case "header-overflow":
+                nest.Name = string.Join(" ", Enumerable.Repeat("Very long nest name", 40));
                 break;
         }
         var path = Path.Combine(directory, "keep.report.pdf");
         File.WriteAllText(path, "keep");
+        var before = NestReportBuilderTests.Fingerprint(nest);
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
 
         var error = Assert.Throws<NotSupportedException>(() => NestPdfWriter.Write(snapshot, path));
 
-        Assert.Contains("not supported", error.Message);
+        Assert.Contains(identified, error.Message);
+        Assert.Contains("support", error.Message);
         Assert.Equal("keep", File.ReadAllText(path));
         Assert.Equal(new[] { path }, Directory.GetFiles(directory));
+        Assert.Equal(before, NestReportBuilderTests.Fingerprint(nest));
     }
 
     [Fact]
@@ -192,55 +189,7 @@ public sealed class NestPdfWriterTests : IDisposable
         return path;
     }
 
-    private static (int, int) EffectiveSize(PdfSharp.Pdf.PdfPage page)
-    {
-        var box = page.MediaBox;
-        var width = (int)System.Math.Round(box.Width);
-        var height = (int)System.Math.Round(box.Height);
-        return page.Rotate % 180 == 0 ? (width, height) : (height, width);
-    }
-
-    private static IEnumerable<string> ContentStreams(PdfSharp.Pdf.PdfPage page)
-    {
-        foreach (var item in page.Contents.Elements)
-        {
-            var dictionary = (item as PdfSharp.Pdf.Advanced.PdfReference)?.Value as PdfSharp.Pdf.PdfDictionary
-                ?? item as PdfSharp.Pdf.PdfDictionary;
-            if (dictionary?.Stream != null)
-                yield return Encoding.Latin1.GetString(dictionary.Stream.UnfilteredValue);
-        }
-    }
-
-    /// <summary>Poppler text extraction; skipped where poppler-utils is not installed.</summary>
-    private static string ExtractText(string path, int page)
-    {
-        var info = new ProcessStartInfo("pdftotext")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        foreach (var argument in new[] { "-layout", "-f", page.ToString(), "-l", page.ToString(), path, "-" })
-            info.ArgumentList.Add(argument);
-        Process process;
-        try
-        {
-            process = Process.Start(info)!;
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            Skip.If(true, "pdftotext (poppler-utils) is not installed.");
-            throw;
-        }
-        using (process)
-        {
-            var text = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-            Assert.Equal(0, process.ExitCode);
-            return Regex.Replace(text, "[ \t]+\n", "\n");
-        }
-    }
-
-    private sealed class FailingStream(Stream inner, long limit) : Stream
+    internal sealed class FailingStream(Stream inner, long limit) : Stream
     {
         private long written;
         public override bool CanRead => false;

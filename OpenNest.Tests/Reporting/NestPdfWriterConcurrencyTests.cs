@@ -14,6 +14,30 @@ public sealed class NestPdfWriterConcurrencyTests : IDisposable
     public void Dispose() => Directory.Delete(directory, true);
 
     [Fact]
+    public void Write_ConcurrentMultiPageAndDetailViewExportsMatchSequentialExports()
+    {
+        var snapshots = new[] { NestReportTestData.CreateMultiPlateNest(), NestReportTestData.CreateDenseNest() }
+            .Select(nest => NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt)).ToArray();
+        var expected = snapshots.Select((snapshot, index) =>
+        {
+            var path = Path.Combine(directory, $"reference-{index}.pdf");
+            NestPdfWriter.Write(snapshot, path);
+            return PageContent(path);
+        }).ToArray();
+        var mismatches = new ConcurrentBag<int>();
+
+        Parallel.For(0, 32, new ParallelOptions { MaxDegreeOfParallelism = System.Math.Max(8, Environment.ProcessorCount) }, index =>
+        {
+            var path = Path.Combine(directory, $"multi-{index}.pdf");
+            NestPdfWriter.Write(snapshots[index % 2], path);
+            if (PageContent(path) != expected[index % 2])
+                mismatches.Add(index);
+        });
+
+        Assert.Empty(mismatches);
+    }
+
+    [Fact]
     public void Write_ConcurrentExportsProduceTheSameLayoutAsASequentialExport()
     {
         // PDFsharp/MigraDoc layout shares process-wide font state; unsynchronized concurrent

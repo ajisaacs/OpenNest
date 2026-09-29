@@ -48,6 +48,51 @@ public static class NestReportTestData
         return nest;
     }
 
+    /// <summary>
+    /// Four layouts: "Bracket" R001 on plates 1, 2 and 4; R002 on plates 1 and 3; the distinct
+    /// same-named "Bracket" R003 on plates 1 and 3; R004 demanded but unplaced.
+    /// </summary>
+    public static Nest CreateMultiPlateNest()
+    {
+        var nest = CreateNest();
+        var first = nest.Plates[0];
+        var holed = first.Parts[0].BaseDrawing;
+        var rotated = first.Parts[2].BaseDrawing;
+        var second = new Plate(24, 48) { Quantity = 3, PartSpacing = 0.25 };
+        second.Parts.Add(new Part(holed, new Vector(2, 2)));
+        nest.Plates.Add(second);
+        var third = new Plate(30, 60) { Quantity = 1, PartSpacing = 0.125 };
+        third.Parts.Add(new Part(rotated, new Vector(10, 2)));
+        third.Parts.Add(new Part(first.Parts[3].BaseDrawing, new Vector(20, 2)));
+        nest.Plates.Add(third);
+        var fourth = new Plate(24, 48) { Quantity = 1 };
+        fourth.Parts.Add(new Part(holed, new Vector(20, 8)));
+        nest.Plates.Add(fourth);
+        return nest;
+    }
+
+    /// <summary>
+    /// One 120 x 60 sheet: two large parts and a cluster of tiny holed washers whose IDs cannot
+    /// be labeled legibly at overview scale, so they need detail views.
+    /// </summary>
+    public static Nest CreateDenseNest()
+    {
+        var nest = new Nest("Dense label test") { Units = Units.Inches };
+        var large = CreateHoledDrawing("Large bracket", 2);
+        var washer = new Drawing("Washer", HoledSquare(1, 0.25));
+        washer.Quantity.Required = 24;
+        nest.Drawings.Add(large);
+        nest.Drawings.Add(washer);
+        var plate = new Plate(60, 120) { Quantity = 2, PartSpacing = 0.25 };
+        plate.Parts.Add(new Part(large, new Vector(5, 5)));
+        plate.Parts.Add(new Part(large, new Vector(20, 5)));
+        for (var row = 0; row < 4; row++)
+            for (var column = 0; column < 6; column++)
+                plate.Parts.Add(new Part(washer, new Vector(62 + column * 1.5, 30 + row * 1.5)));
+        nest.Plates.Add(plate);
+        return nest;
+    }
+
     public static Nest CreateTabbedNest()
     {
         var drawing = CreateHoledDrawing("Tabbed with hole", 1);
@@ -79,6 +124,15 @@ public static class NestReportTestData
         var drawing = new Drawing(name, program);
         drawing.Quantity.Required = required;
         return drawing;
+    }
+
+    private static Program HoledSquare(double size, double radius)
+    {
+        var program = RectangleProgram(size, size);
+        var center = size / 2;
+        program.Codes.Add(new RapidMove(center + radius, center));
+        program.Codes.Add(new ArcMove(new Vector(center + radius, center), new Vector(center, center), RotationType.CW));
+        return program;
     }
 
     public static Drawing Rectangle(string name, double length, double width, int required = 1)

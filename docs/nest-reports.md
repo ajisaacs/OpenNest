@@ -33,22 +33,38 @@ the selected plate, or certify that a layout passed geometry/pre-post checks.
 - Snapshots retain values, not live drawings, parts, CNC programs or mutable
   geometry. Invalid/missing/nonfinite geometry fails with drawing/plate context.
 
-## Initial layout and safety limits
+## Layout, pagination and dense-label fallback
 
-Slice 1 supports an empty/demand-only job or one plate layout: a Letter portrait
-summary page and a Letter landscape plate page, each with "Page X of Y". The
-writer rejects, with `NotSupportedException` and before touching the destination:
+An empty/demand-only job, a single plate, or many plates and drawings all
+produce one document: a Letter portrait summary followed by one Letter
+landscape section per plate, every page carrying a repeated header and
+"Page X of Y". Long notes, long drawing names, many drawings and many parts
+per sheet paginate naturally: MigraDoc continues the Plates/Parts tables and
+each plate's part table across pages with the heading row repeated, and notes
+flow as an ordinary paragraph. No row, table or note text is ever dropped or
+truncated to fit a page.
 
-- more than one distinct plate layout;
-- a summary (job fields, plate list, part rows with thumbnails) longer than one page;
-- a plate page (header, diagram, part table) longer than one page;
-- a part ID label that does not fit inside its part's fitted bounds at 7 pt, or
-  that overlaps another label.
+Each part ID is centered on its part's pole of inaccessibility (`PolyLabel`,
+the same method `PlateView`'s `LayoutPart` uses), computed on a
+placement-independent quantized copy so identical parts always get the
+identical label position and the label naturally clears a central hole. When
+an ID cannot sit legibly inside its own material at overview scale (for
+example, a cluster of tiny repeated parts), the plate gains a lettered
+(rows)/numbered (columns) map grid drawn beneath the sheet, and only the
+crowded cells get a zoomed, framed detail page listing that cell's real
+coordinates. Detail-cell outlines use a long dash-dot stroke, distinct from
+the shorter dashed scrap-cutoff stroke and the dotted grid lines. IDs are
+never shrunk below 7 pt or silently dropped.
 
-It never shrinks text, truncates rows or drops labels to make a layout fit.
-Multi-plate pagination, dense-label callouts and the desktop command belong to
-subsequent slices. Labels are centered on the part's bounds, which can place them
-inside a central hole; smarter placement is part of the dense-label work.
+The writer still rejects, with `NotSupportedException` and before touching
+the destination:
+
+- a page header (nest name plus plate/material line) needing more than 3
+  wrapped lines;
+- a table cell needing more than 20 wrapped lines;
+- a part ID that cannot be placed legibly even in the most zoomed supported
+  detail view, or a plate that would need more than 24 detail views to label
+  every part — named with the plate, part index and ID.
 
 Summary thumbnails and the sheet diagram are vector paths, never raster images.
 Each thumbnail is a small PDFsharp page embedded by MigraDoc as a form XObject.
@@ -62,7 +78,9 @@ otherwise draw a false segment across a tab gap.
 A report is fully rendered to a unique temporary sibling before replacement of
 its destination. A failed render or write leaves an existing report untouched and
 removes temporary output. Applications should obtain overwrite consent before
-calling the library.
+calling the library. PDFsharp/MigraDoc layout and font state is process-wide;
+`NestPdfWriter.Write` serializes every export behind one static lock so
+concurrent calls cannot lay out text differently from a sequential export.
 
 Advanced timing, cutting distances, pierce counts, weights, costs, gas use, and
 machine/NC identity are intentionally omitted until their semantics are verified.
