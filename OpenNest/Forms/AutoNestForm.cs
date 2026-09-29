@@ -195,8 +195,9 @@ namespace OpenNest.Forms
 
         public List<PlateOption> GetPlateOptions()
         {
+            plateGrid.EndEdit();
             var result = new List<PlateOption>();
-            var gridItems = plateGrid.DataSource as List<PlateOptionItem>;
+            var gridItems = plateGrid.DataSource as BindingList<PlateOptionItem>;
             if (gridItems == null)
                 return result;
 
@@ -231,7 +232,7 @@ namespace OpenNest.Forms
                         Cost = o.Cost,
                     })
                     .ToList();
-                plateGrid.DataSource = items;
+                plateGrid.DataSource = new BindingList<PlateOptionItem>(items);
                 optimizePlateSizeBox.Checked = true;
             }
             SalvageRate = salvageRate;
@@ -239,7 +240,8 @@ namespace OpenNest.Forms
 
         private void LoadDefaultPlateOptions()
         {
-            var items = new List<PlateOptionItem>
+            // A bound DataGridView needs IBindingList.AddNew support for its blank last row.
+            var items = new BindingList<PlateOptionItem>
             {
                 new() { Size = "48 x 96", Cost = 0 },
                 new() { Size = "48 x 120", Cost = 0 },
@@ -385,6 +387,8 @@ namespace OpenNest.Forms
 
         private class PlateOptionItem
         {
+            public PlateOptionItem() { }
+
             public string Size { get; set; }
             public double Cost { get; set; }
         }

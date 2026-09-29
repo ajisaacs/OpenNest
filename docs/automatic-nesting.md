@@ -14,7 +14,7 @@
 
 Every engine selected in **Nest > Auto Nest** uses the pipeline. Part-First and its sorting controls are removed. Use interactive Fill Area/remnant tools for leftover space on occupied sheets; these are not whole-job nesting.
 
-Auto Nest starts on empty/new sheets and does not change existing populated plates. Stock Options offers sheet sizes and salvage settings; minimum salvage size is part of that section, not a Part-First option. The maximum remains 100 physical sheets per run.
+Auto Nest starts on empty/new sheets and does not change existing populated plates. Stock Options offers sheet sizes and salvage settings; minimum salvage size is part of that section, not a Part-First option. When enabled, its grid keeps a blank last row for adding another size (`W x L`) and cost, including after loading saved options. Unused blank rows are not offered as stock. The maximum remains 100 physical sheets per run.
 
 Progress is owned and modal so the input drawings cannot be edited while a worker uses them. Stop or closing progress cancels and discards the whole proposal. The dialog waits for the worker to finish; no engine has an Accept-early button on this path. A plug-in that ignores the cancellation token cannot commit its late result.
 
