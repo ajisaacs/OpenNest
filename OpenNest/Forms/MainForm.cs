@@ -1488,36 +1488,60 @@ namespace OpenNest.Forms
             var menuItem = (ToolStripMenuItem)sender;
             var postProcessor = menuItem.Tag as IPostProcessor;
 
-            if (postProcessor == null)
+            var editForm = activeForm;
+            if (postProcessor == null || editForm == null)
                 return;
 
+            // Closed progress windows can still have a fill awaiting its final commit.
+            // Keep the nest stable throughout verification and all owned modal dialogs.
+            var views = MdiChildren.OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, editForm.Nest))
+                .Select(form => form.PlateView).ToArray();
+            if (nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
+                || views.Any(view => view.IsFillInProgress || view.Actions.CurrentAction?.IsBusy() == true))
+            {
+                MessageBox.Show(this, "Finish or cancel the current nesting or plate action before posting.",
+                    "Verify Nest Before Posting", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            foreach (var view in views)
+                view.SetAction(typeof(ActionSelect));
+            var nest = editForm.Nest;
+
             if (postProcessor is IPostProcessorNestAware nestAware)
-                nestAware.PrepareForNest(activeForm.Nest);
+                nestAware.PrepareForNest(nest);
 
             if (postProcessor is IConfigurablePostProcessor configurable)
             {
                 using var configForm = new PostProcessorConfigForm(configurable);
-                if (configForm.ShowDialog() != DialogResult.OK)
+                if (configForm.ShowDialog(this) != DialogResult.OK)
                     return;
             }
 
-            var dialog = new SaveFileDialog();
-            dialog.Filter = "CNC File (*.cnc) | *.cnc";
-            dialog.FileName = activeForm.Nest.Name;
+            using (var verification = new PostVerificationForm(nest, postProcessor))
+            {
+                if (verification.ShowDialog(this) != DialogResult.OK)
+                    return;
+            }
 
-            if (dialog.ShowDialog() == DialogResult.OK)
+            using var dialog = new SaveFileDialog();
+            dialog.Filter = "CNC File (*.cnc) | *.cnc";
+            dialog.FileName = nest.Name;
+
+            if (dialog.ShowDialog(this) == DialogResult.OK)
             {
                 var path = dialog.FileName;
 
                 if (postProcessor is IMultiFilePostProcessor multiFile)
                 {
-                    var files = multiFile.GetOutputFiles(activeForm.Nest, path);
+                    var files = multiFile.GetOutputFiles(nest, path);
                     if (!ConfirmOverwrite(files, path))
                         return;
 
                     try
                     {
-                        postProcessor.Post(activeForm.Nest, path);
+                        postProcessor.Post(nest, path);
                     }
                     catch (Exception ex)
                         when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
@@ -1545,7 +1569,7 @@ namespace OpenNest.Forms
                     return;
                 }
 
-                postProcessor.Post(activeForm.Nest, path);
+                postProcessor.Post(nest, path);
             }
         }
 

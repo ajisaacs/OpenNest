@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using OpenNest;
+using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
@@ -120,8 +121,8 @@ static class NestConsole
         var overlapCount = CheckOverlaps(plate, options);
 
         PrintResults(success, plate, elapsed);
-        Save(nest, options);
-        PostProcess(nest, options);
+        if (!SaveAndPost(nest, options))
+            return 1;
 
         return options.CheckOverlaps && overlapCount > 0 ? 1 : 0;
     }
@@ -193,6 +194,9 @@ static class NestConsole
                     break;
                 case "--post" when i + 1 < args.Length:
                     o.PostName = args[++i];
+                    break;
+                case "--acknowledge-post-risks":
+                    o.AcknowledgePostRisks = true;
                     break;
                 case "--post-output" when i + 1 < args.Length:
                     o.PostOutput = args[++i];
@@ -557,17 +561,15 @@ static class NestConsole
         if (options.NoSave)
             return;
 
-        var firstInput = options.InputFiles[0];
-        var outputFile =
-            options.OutputFile
-            ?? Path.Combine(
-                Path.GetDirectoryName(firstInput),
-                $"{Path.GetFileNameWithoutExtension(firstInput)}-result{NestFormat.FileExtension}"
-            );
+        var outputFile = NestOutputPath(options);
 
         new NestWriter(nest).Write(outputFile);
         Console.WriteLine($"Saved: {outputFile}");
     }
+
+    static string NestOutputPath(Options options) => options.OutputFile
+        ?? Path.Combine(Path.GetDirectoryName(options.InputFiles[0]),
+            $"{Path.GetFileNameWithoutExtension(options.InputFiles[0])}-result{NestFormat.FileExtension}");
 
     static string ResolvePostsDir(Options options)
     {
@@ -633,10 +635,13 @@ static class NestConsole
             Console.WriteLine($"  {p.Name,-30} {p.Description}");
     }
 
-    static void PostProcess(Nest nest, Options options)
+    static bool SaveAndPost(Nest nest, Options options)
     {
         if (options.PostName == null)
-            return;
+        {
+            Save(nest, options);
+            return true;
+        }
 
         var postsDir = ResolvePostsDir(options);
         var processors = LoadPostProcessors(postsDir);
@@ -655,7 +660,15 @@ static class NestConsole
             else
                 Console.Error.WriteLine($"No post processors found in: {postsDir}");
 
-            return;
+            return false;
+        }
+
+        var verification = PostVerificationAnalyzer.AnalyzeForPost(nest, post);
+        Console.WriteLine(verification.ToDisplayText());
+        if (!verification.CanPost(options.AcknowledgePostRisks))
+        {
+            Console.Error.WriteLine("Posting blocked: review these warnings. To accept the risks, including possible head crashes and machine or material damage, explicitly use --acknowledge-post-risks for this invocation.");
+            return false;
         }
 
         var outputFile = options.PostOutput;
@@ -673,9 +686,18 @@ static class NestConsole
             ? multiFile.GetOutputFiles(nest, outputFile)
             : new[] { outputFile };
 
+        if (!options.NoSave && outputFiles.Any(file => string.Equals(
+            Path.GetFullPath(file), Path.GetFullPath(NestOutputPath(options)), StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.Error.WriteLine("Error: nest save and CNC output paths must be different. No output was written.");
+            return false;
+        }
+
+        Save(nest, options);
         post.Post(nest, outputFile);
         foreach (var file in outputFiles)
             Console.WriteLine($"Post: {post.Name} -> {file}");
+        return true;
     }
 
     static void PrintUsage()
@@ -710,6 +732,7 @@ static class NestConsole
               --no-save              Skip saving output file
               --post <name>          Run a post processor after nesting
               --post-output <path>   Output file for post processor (default: <input>.cnc)
+              --acknowledge-post-risks  Explicitly accept displayed verification risks for this invocation
               --posts-dir <path>     Directory containing post processor DLLs (default: Posts/)
               --list-posts           List available post processors and exit
               -h, --help             Show this help
@@ -733,6 +756,7 @@ static class NestConsole
         public string Engine = "Default";
         public string TemplateFile;
         public string PostName;
+        public bool AcknowledgePostRisks;
         public string PostOutput;
         public string PostsDir;
         public bool ListPosts;

@@ -18,7 +18,8 @@ namespace OpenNest.Posts.CincinnatiCIFiber
     /// </summary>
     public sealed class CIFiberPostProcessor
         : IConfigurablePostProcessor,
-            IMultiFilePostProcessor
+            IMultiFilePostProcessor,
+            IPostVerificationSupport
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -27,6 +28,7 @@ namespace OpenNest.Posts.CincinnatiCIFiber
         };
 
         public string Name => "Cincinnati CI Fiber";
+        public bool PreservesPlacedProgramOrder => true;
         public string Author => "OpenNest";
         public string Description =>
             "CI Fiber family laser (TF5200 / nLight CLX), e.g. CI Fiber 4020 8kW";
