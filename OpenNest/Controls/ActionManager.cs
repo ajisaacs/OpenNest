@@ -28,6 +28,7 @@ namespace OpenNest.Controls
                 if (
                     type == typeof(Actions.ActionSelect)
                     && !(currentAction is Actions.ActionSelect)
+                    && currentAction.ResumeOnEscape
                 )
                     previousAction = currentAction;
                 else
@@ -73,6 +74,17 @@ namespace OpenNest.Controls
                 RestorePreviousAction();
             else
                 view.SetAction(typeof(Actions.ActionSelect));
+        }
+
+        /// <summary>
+        /// Ends the current action at the user's explicit request (for example a
+        /// side panel's Close button). Unlike Escape, the ended action is not kept
+        /// for a later Escape to restore.
+        /// </summary>
+        public void EndAction()
+        {
+            SetAction(typeof(Actions.ActionSelect));
+            previousAction = null;
         }
 
         public void RestorePreviousAction()

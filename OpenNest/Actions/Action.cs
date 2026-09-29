@@ -28,6 +28,11 @@ namespace OpenNest.Actions
 
         public virtual bool SurvivesPlateChange => false;
 
+        /// <summary>
+        /// Whether Escape from Select may bring this action back after it ends.
+        /// </summary>
+        public virtual bool ResumeOnEscape => true;
+
         public virtual void OnPlateChanged() { }
 
         public virtual void ConnectEvents() { }

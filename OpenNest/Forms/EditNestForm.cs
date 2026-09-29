@@ -53,6 +53,7 @@ namespace OpenNest.Forms
 
         private SplitContainer viewSplitContainer;
         private Panel sidePanel;
+        private Label sidePanelTitle;
 
         /// <summary>
         /// Used to distinguish between single/double click on drawing within drawinglistbox.
@@ -163,6 +164,40 @@ namespace OpenNest.Forms
                 BackColor = Color.White,
             };
 
+            // The header sits outside the scrolling content so Close stays visible.
+            sidePanelTitle = new Label
+            {
+                Dock = DockStyle.Fill,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+            };
+
+            var closeButton = new Button
+            {
+                Name = "sidePanelCloseButton",
+                Text = "\u00D7",
+                AccessibleName = "Close panel",
+                Dock = DockStyle.Right,
+                Width = 30,
+                Font = new Font("Segoe UI", 12f),
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 0 },
+                Cursor = Cursors.Hand,
+            };
+            closeButton.Click += (s, e) => CloseSidePanel();
+            new ToolTip(components).SetToolTip(closeButton, "Close (Esc)");
+
+            var sidePanelHeader = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 30,
+                BackColor = Color.FromArgb(240, 240, 240),
+                Padding = new Padding(8, 0, 0, 0),
+            };
+            sidePanelHeader.Controls.Add(sidePanelTitle);
+            sidePanelHeader.Controls.Add(closeButton);
+
             viewSplitContainer = new SplitContainer
             {
                 Dock = DockStyle.Fill,
@@ -173,14 +208,18 @@ namespace OpenNest.Forms
 
             viewSplitContainer.Panel1.Controls.Add(PlateView);
             viewSplitContainer.Panel2.Controls.Add(sidePanel);
+            viewSplitContainer.Panel2.Controls.Add(sidePanelHeader);
             viewSplitContainer.Panel2Collapsed = true;
         }
 
-        public void ShowSidePanel(Control content, int width = 390)
+        public bool IsSidePanelVisible => !viewSplitContainer.Panel2Collapsed;
+
+        public void ShowSidePanel(Control content, string title, int width = 390)
         {
             sidePanel.Controls.Clear();
             content.Dock = DockStyle.Fill;
             sidePanel.Controls.Add(content);
+            sidePanelTitle.Text = title;
             viewSplitContainer.SplitterDistance = viewSplitContainer.Width - width;
             viewSplitContainer.Panel2Collapsed = false;
         }
@@ -189,6 +228,17 @@ namespace OpenNest.Forms
         {
             viewSplitContainer.Panel2Collapsed = true;
             sidePanel.Controls.Clear();
+            sidePanelTitle.Text = string.Empty;
+        }
+
+        private void CloseSidePanel()
+        {
+            // Side panels belong to the plate action that opened them; ending the
+            // action hides its panel. Hide directly as well so Close always closes.
+            PlateView.EndAction();
+            if (IsSidePanelVisible)
+                HideSidePanel();
+            PlateView.Focus();
         }
 
         private static Button CreateNavButton(System.Drawing.Image image)

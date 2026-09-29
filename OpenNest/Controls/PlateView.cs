@@ -487,6 +487,8 @@ namespace OpenNest.Controls
 
         public void ProcessEscapeKey() => actionManager.ProcessEscapeKey();
 
+        public void EndAction() => actionManager.EndAction();
+
         protected override bool ProcessDialogKey(Keys keyData)
         {
             // Only handle TAB, RETURN, ESC, and ARROW KEYS here.

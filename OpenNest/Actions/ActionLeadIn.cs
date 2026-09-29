@@ -55,7 +55,6 @@ namespace OpenNest.Actions
         {
             plateView.MouseMove += OnMouseMove;
             plateView.MouseDown += OnMouseDown;
-            plateView.KeyDown += OnKeyDown;
             plateView.Paint += OnPaint;
             ShowSidePanel();
         }
@@ -64,7 +63,6 @@ namespace OpenNest.Actions
         {
             plateView.MouseMove -= OnMouseMove;
             plateView.MouseDown -= OnMouseDown;
-            plateView.KeyDown -= OnKeyDown;
             plateView.Paint -= OnPaint;
 
             HideSidePanel();
@@ -72,22 +70,24 @@ namespace OpenNest.Actions
             contextMenu?.Dispose();
             contextMenu = null;
 
-            if (selectedLayoutPart != null)
-                selectedLayoutPart.IsSelected = false;
-
-            selectedLayoutPart = null;
-            selectedPart = null;
-            profile = null;
-            contours = null;
-            hasSnap = false;
-            activeSnapType = SnapType.None;
-            hoveredContour = null;
-            plateView.Invalidate();
+            DeselectPart();
         }
 
-        public override void CancelAction() { }
+        // Escape reaches here through ActionManager.ProcessEscapeKey while IsBusy:
+        // step back one level (unlock the contour, then release the part). Once
+        // nothing is selected, Escape ends the action and closes the side panel.
+        public override void CancelAction()
+        {
+            if (lockedContour != null)
+                UnlockContour();
+            else
+                DeselectPart();
+        }
 
         public override bool IsBusy() => selectedPart != null;
+
+        // Escape closes the side panel; a second Escape must not reopen it.
+        public override bool ResumeOnEscape => false;
 
         private void ShowSidePanel()
         {
@@ -119,7 +119,7 @@ namespace OpenNest.Actions
                 }
             }
 
-            form.ShowSidePanel(cuttingPanel);
+            form.ShowSidePanel(cuttingPanel, "Place Lead-in");
         }
 
         private void HideSidePanel()
@@ -246,19 +246,6 @@ namespace OpenNest.Actions
                     ShowContextMenu(e.Location);
                 else
                     DeselectPart();
-            }
-        }
-
-        private void OnKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Escape)
-            {
-                if (lockedContour != null)
-                    UnlockContour();
-                else if (selectedPart != null)
-                    DeselectPart();
-                else
-                    plateView.SetAction(typeof(ActionSelect));
             }
         }
 
