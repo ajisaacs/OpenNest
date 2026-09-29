@@ -34,6 +34,14 @@ For a 120-by-81-inch sheet whose parts extend through 80 inches, the nominal ske
 - Internal-hole scrap is not processed. This command reuses the outside-skeleton behavior of manual cutoffs; it does not force cuts through parts or remove clearance to guarantee separation.
 - Review the preview and posted NC using the normal machine-review process before production cutting.
 
+## Part sequencing
+
+After adding cutoffs, apply **Part Sequencing** to the current plate or all plates. Each cutoff is moved earlier as needed so it is cut before every part its nominal line passes through. Ordinary parts retain their relative order from the chosen sequencing route; a tail separator that crosses no parts keeps its normal route position rather than being forced to the front. Cutoff geometry, clearance, part programs, placements, and quantities are unchanged.
+
+The dependency check uses the nominal horizontal/vertical line and its start/end limits, not the trimmed cutting segments, which intentionally skip the parts. It conservatively checks placed part bounds (including edge contacts), so a cutoff through a concave recess can also move ahead of that part. Definitions are matched by drawing identity, not their displayed names. A cutoff part with no matching definition is conservatively ordered before all ordinary parts.
+
+This rule runs when applying automatic sequencing, after reversing the exit-first sequencer route into cutting order. Manual sequence edits are still manual; adding or moving cutoffs does not automatically reapply this rule. Reapply Part Sequencing after layout changes and review the resulting rapids before posting. Regeneration and saving/reloading retain the applied mixed sequence.
+
 ## Rerunning, editing, and saving
 
 The command is one-shot; spacing and minimum-tail inputs start at their defaults each time the dialog opens. Generated lines are ordinary cutoffs and can subsequently be dragged, deleted, or sequenced with the existing tools. Moving parts regenerates their trimmed segments but does not reposition the cutoff grid or recalculate the retained tail automatically.

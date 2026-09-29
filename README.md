@@ -43,7 +43,7 @@ Shared coding-agent guidance lives in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE
 2. Import DXFs via the CAD Converter (layer/color filtering, bend detection, G-code preview) or create built-in shapes
 3. Define plate size, material, quadrant, spacing
 4. Fill — the engine arranges parts
-5. Optionally add cut-off lines, then save `.nest`, export DXF, or post-process to G-code
+5. Optionally add cut-off lines, apply Part Sequencing to order crossing cut-offs before their parts, then save `.nest`, export DXF, or post-process to G-code
 
 Review part spacing before cutting, especially for interlocking pairs. See [pair-spacing checks and current limitations](docs/geometry/pair-spacing.md).
 

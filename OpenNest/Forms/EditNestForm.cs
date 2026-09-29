@@ -577,12 +577,7 @@ namespace OpenNest.Forms
         private static void SequencePlate(Plate plate)
         {
             var parameters = new SequenceParameters { Method = SequenceMethod.LeastCode };
-            var sequencer = PartSequencerFactory.Create(parameters);
-            var ordered = sequencer.Sequence(plate.Parts.ToList(), plate);
-
-            plate.Parts.Clear();
-            for (var i = ordered.Count - 1; i >= 0; i--)
-                plate.Parts.Add(ordered[i].Part);
+            PlateSequencing.Apply(plate, parameters);
         }
 
         public void CalculateCurrentPlateCutTime()
