@@ -1638,6 +1638,40 @@ namespace OpenNest.Forms
             activeForm.PlateView.SetAction(typeof(ActionCutOff));
         }
 
+        private void AutomaticCutOff_Click(object sender, EventArgs e)
+        {
+            var view = activeForm?.PlateView;
+            if (view?.Plate == null)
+                return;
+
+            // A closed progress window can still have a fill awaiting completion/commit.
+            if (nestingInProgress || view.IsFillInProgress
+                || Application.OpenForms.OfType<NestProgressForm>().Any()
+                || view.Actions.CurrentAction?.IsBusy() == true)
+            {
+                MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
+                    "Automatic Scrap Cutoffs", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                view.SetAction(typeof(ActionSelect));
+                using var form = new AutomaticCutOffForm(view, activeForm.Nest.Units);
+                form.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "Automatic Scrap Cutoffs",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (!view.IsDisposed)
+                    view.ClearPreviewParts();
+            }
+        }
+
         private void PlateAssignLeadIns_Click(object sender, EventArgs e)
         {
             if (activeForm == null)

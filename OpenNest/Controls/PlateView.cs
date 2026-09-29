@@ -569,59 +569,80 @@ namespace OpenNest.Controls
         public void AcceptPreviewParts(List<Part> parts) =>
             previewManager.AcceptPreviewParts(parts);
 
+        // UI-thread state: closing the progress window only requests cancellation.
+        public bool IsFillInProgress { get; private set; }
+
         public async void FillWithProgress(List<Part> groupParts, Box workArea)
         {
-            var sw = Stopwatch.StartNew();
-            var cts = new CancellationTokenSource();
-            var progressForm = new NestProgressForm(cts, showPlateRow: false);
+            if (IsFillInProgress)
+                return;
 
-            var progress = new Progress<NestProgress>(p =>
-            {
-                progressForm.UpdateProgress(p);
-
-                if (p.IsOverallBest)
-                    SetActiveParts(p.BestParts);
-
-                ActiveWorkArea = p.ActiveWorkArea;
-            });
-
-            progressForm.Show(FindForm());
-
+            IsFillInProgress = true;
+            var operationActive = true;
             try
             {
-                var strategy = EngineSelection.FillStrategy;
-                var spacing = Plate.PartSpacing;
-                var parts = await Task.Run(() =>
+                var sw = Stopwatch.StartNew();
+                using var cts = new CancellationTokenSource();
+                using var progressForm = new NestProgressForm(cts, showPlateRow: false);
+                try
                 {
-                    var result = PlateFillService.FillGroup(
-                        strategy,
-                        Plate,
-                        groupParts,
-                        workArea,
-                        progress,
-                        cts.Token
-                    );
-                    Compactor.Settle(result, workArea, spacing);
-                    return result;
-                });
+                    var progress = new Progress<NestProgress>(p =>
+                    {
+                        // This callback can outlive its operation, even into the next fill.
+                        if (!operationActive || IsDisposed || progressForm.IsDisposed)
+                            return;
 
-                if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
-                {
-                    SetActiveParts(parts);
-                    AcceptPreviewParts(parts);
+                        progressForm.UpdateProgress(p);
 
-                    if (Plate.CutOffs.Count > 0)
-                        Plate.RegenerateCutOffs(cutOffSettings);
+                        if (p.IsOverallBest)
+                            SetActiveParts(p.BestParts);
 
-                    sw.Stop();
-                    Status = $"Fill: {parts.Count} parts in {sw.ElapsedMilliseconds} ms";
+                        ActiveWorkArea = p.ActiveWorkArea;
+                    });
+
+                    progressForm.Show(FindForm());
+                    var strategy = EngineSelection.FillStrategy;
+                    var spacing = Plate.PartSpacing;
+                    var parts = await Task.Run(() =>
+                    {
+                        var result = PlateFillService.FillGroup(
+                            strategy,
+                            Plate,
+                            groupParts,
+                            workArea,
+                            progress,
+                            cts.Token
+                        );
+                        Compactor.Settle(result, workArea, spacing);
+                        return result;
+                    });
+                    operationActive = false;
+
+                    if (parts.Count > 0 && (!cts.IsCancellationRequested || progressForm.Accepted))
+                    {
+                        SetActiveParts(parts);
+                        AcceptPreviewParts(parts);
+
+                        if (Plate.CutOffs.Count > 0)
+                            Plate.RegenerateCutOffs(cutOffSettings);
+
+                        sw.Stop();
+                        Status = $"Fill: {parts.Count} parts in {sw.ElapsedMilliseconds} ms";
+                    }
+                    else
+                    {
+                        ClearPreviewParts();
+                    }
+
+                    progressForm.ShowCompleted();
                 }
-                else
+                finally
                 {
-                    ClearPreviewParts();
+                    operationActive = false;
+                    ActiveWorkArea = null;
+                    progressForm.Close();
+                    Focus();
                 }
-
-                progressForm.ShowCompleted();
             }
             catch (Exception)
             {
@@ -629,10 +650,8 @@ namespace OpenNest.Controls
             }
             finally
             {
-                ActiveWorkArea = null;
-                progressForm.Close();
-                cts.Dispose();
-                Focus();
+                operationActive = false;
+                IsFillInProgress = false;
             }
         }
 
