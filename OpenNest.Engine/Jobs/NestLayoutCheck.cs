@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.Converters;
@@ -25,12 +26,28 @@ public static class NestLayoutCheck
     /// not checked, matching the benchmark contract.</summary>
     public static IReadOnlyList<string> Violations(NestJob job, NestJobResult result)
     {
+        ArgumentNullException.ThrowIfNull(job);
+        return Violations(job, result, job.Parts.ToDictionary(p => p.Id, p => p.Id));
+    }
+
+    /// <summary>Same checks as <see cref="Violations(NestJob, NestJobResult)"/>, with messages
+    /// naming each requirement by <paramref name="displayNames"/> (requirement ID -> name).</summary>
+    public static IReadOnlyList<string> Violations(
+        NestJob job,
+        NestJobResult result,
+        IReadOnlyDictionary<string, string> displayNames
+    )
+    {
+        ArgumentNullException.ThrowIfNull(job);
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(displayNames);
         var materialized = NestResultMaterializer.Materialize(job, result);
         var requirements = job.Parts.ToDictionary(p => materialized.DrawingsByPartId[p.Id],
-            p => (p.Id, p.Quantity));
+            p => (Name: displayNames.GetValueOrDefault(p.Id, p.Id), p.Quantity));
         var runs = materialized.Nest.Plates.Select(p => (p, p.Parts.ToList())).ToList();
         var violations = Validate(runs, requirements);
-        ValidateAgainstJob(job, result, job.Parts.ToDictionary(p => p.Id, p => p.Id), violations);
+        ValidateAgainstJob(job, result, job.Parts.ToDictionary(p => p.Id,
+            p => displayNames.GetValueOrDefault(p.Id, p.Id)), violations);
         return violations;
     }
 
