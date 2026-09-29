@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using OpenNest.Controls;
 using OpenNest.Geometry;
 
