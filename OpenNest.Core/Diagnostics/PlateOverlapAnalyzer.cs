@@ -21,13 +21,22 @@ public static class PlateOverlapAnalyzer
     /// Inputs must not change during capture. Later analysis never reads live domain objects.
     /// </summary>
     public static PlateOverlapSnapshot Capture(IReadOnlyList<Part> parts,
+        CancellationToken cancellationToken = default) =>
+        Capture(parts, new OverlapMaterialCache(), cancellationToken);
+
+    /// <summary>
+    /// As <see cref="Capture(IReadOnlyList{Part}, CancellationToken)"/>, but reuses converted
+    /// and prepared drawing material from <paramref name="cache"/> across requests. Clear the
+    /// cache before any in-place clean-program edit (see <see cref="OverlapMaterialCache"/>).
+    /// </summary>
+    public static PlateOverlapSnapshot Capture(IReadOnlyList<Part> parts, OverlapMaterialCache cache,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(parts);
+        ArgumentNullException.ThrowIfNull(cache);
         cancellationToken.ThrowIfCancellationRequested();
         var captured = new List<CapturedOverlapPart>();
         var issues = new List<PlateOverlapIssue>();
-        var sources = new Dictionary<Program, CapturedSource>(ReferenceEqualityComparer.Instance);
         for (var id = 0; id < parts.Count; id++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -43,28 +52,11 @@ public static class PlateOverlapAnalyzer
                 var location = part.Location;
                 if (!double.IsFinite(rotation) || !OverlapMaterial.IsFinite(location))
                     throw new ArgumentException("Part pose must be finite.");
-                if (!sources.TryGetValue(program, out var source))
-                {
-                    try
-                    {
-                        ValidateProgram(program, new HashSet<Program>(ReferenceEqualityComparer.Instance));
-                        // Conversion creates fresh geometry, including expanded shared hole calls;
-                        // no cloning/rotation of a live program or subprogram is necessary.
-                        source = new CapturedSource(ConvertProgram.ToGeometry(program)
-                            .Where(entity => SpecialLayers.IsMaterial(entity.Layer)
-                                && entity.Layer != SpecialLayers.Leadin
-                                && entity.Layer != SpecialLayers.Leadout).ToList(), null);
-                    }
-                    catch (Exception exception) when (IsGeometryFailure(exception))
-                    {
-                        source = new CapturedSource(null, exception.Message);
-                    }
-                    sources.Add(program, source);
-                }
+                var source = cache.Get(program, CaptureSource);
                 if (source.Error != null)
                     throw new ArgumentException(source.Error);
                 captured.Add(new CapturedOverlapPart(id, part.BaseDrawing.Name,
-                    source.Entities, rotation, location));
+                    source, rotation, location));
             }
             catch (Exception exception) when (IsGeometryFailure(exception))
             {
@@ -73,6 +65,24 @@ public static class PlateOverlapAnalyzer
         }
         cancellationToken.ThrowIfCancellationRequested();
         return new PlateOverlapSnapshot(captured, issues);
+    }
+
+    private static OverlapSource CaptureSource(Program program)
+    {
+        try
+        {
+            ValidateProgram(program, new HashSet<Program>(ReferenceEqualityComparer.Instance));
+            // Conversion creates fresh geometry, including expanded shared hole calls;
+            // no cloning/rotation of a live program or subprogram is necessary.
+            return new OverlapSource(program, ConvertProgram.ToGeometry(program)
+                .Where(entity => SpecialLayers.IsMaterial(entity.Layer)
+                    && entity.Layer != SpecialLayers.Leadin
+                    && entity.Layer != SpecialLayers.Leadout).ToList(), null);
+        }
+        catch (Exception exception) when (IsGeometryFailure(exception))
+        {
+            return new OverlapSource(program, null, exception.Message);
+        }
     }
 
     /// <summary>Convenience synchronous capture and analysis of a group of parts.</summary>
@@ -85,31 +95,33 @@ public static class PlateOverlapAnalyzer
     /// Cancellation throws and publishes no partial report. Check IsComplete before claiming clear.
     /// </summary>
     public static PlateOverlapReport Analyze(PlateOverlapSnapshot snapshot,
+        CancellationToken cancellationToken = default) =>
+        Analyze(snapshot, null, cancellationToken);
+
+    /// <summary>
+    /// Incremental recheck: identical to a full analysis of <paramref name="snapshot"/>, but a
+    /// pair whose two parts are unchanged since <paramref name="previous"/> (same captured source
+    /// and bit-identical pose, in the same relative order) reuses that report's result instead
+    /// of being clipped again. After moving one part only its own neighbors are recomputed.
+    /// Reuse needs sources shared through one <see cref="OverlapMaterialCache"/>; otherwise every
+    /// pair is recomputed. Null <paramref name="previous"/> performs a full analysis.
+    /// </summary>
+    public static PlateOverlapReport Analyze(PlateOverlapSnapshot snapshot, PlateOverlapReport previous,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         cancellationToken.ThrowIfCancellationRequested();
+        var reuse = PairReuse.Create(previous, snapshot);
         var issues = snapshot.Issues.ToList();
         var pairs = new List<PlateOverlapPair>();
         var prepared = new List<PreparedPart>();
-        var sources = new Dictionary<List<Entity>, PreparedSource>(ReferenceEqualityComparer.Instance);
         foreach (var part in snapshot.Parts)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                if (!sources.TryGetValue(part.Entities, out var source))
-                {
-                    try
-                    {
-                        source = new PreparedSource(OverlapMaterial.Read(part.Entities, cancellationToken), null);
-                    }
-                    catch (Exception exception) when (IsGeometryFailure(exception))
-                    {
-                        source = new PreparedSource(null, exception.Message);
-                    }
-                    sources.Add(part.Entities, source);
-                }
+                // Prepared material is shared by every part and request using this source.
+                var source = part.Source.Prepare(cancellationToken);
                 if (source.Error != null)
                     throw new ArgumentException(source.Error);
                 var material = source.Material.Transform(part.Rotation, part.Location);
@@ -139,6 +151,8 @@ public static class PlateOverlapAnalyzer
                     continue;
                 var a = first.Input.Id < second.Input.Id ? first : second;
                 var b = first.Input.Id < second.Input.Id ? second : first;
+                if (reuse != null && reuse.TryReuse(a.Input, b.Input, pairs, issues))
+                    continue;
                 try
                 {
                     // Keep pair clipping arithmetic near the parts where possible, then
@@ -180,10 +194,77 @@ public static class PlateOverlapAnalyzer
         cancellationToken.ThrowIfCancellationRequested();
         return new PlateOverlapReport(pairs.OrderBy(pair => pair.PartAId)
             .ThenBy(pair => pair.PartBId).ToList(), issues.OrderBy(issue => issue.PartAId)
-            .ThenBy(issue => issue.PartBId).ToList());
+            .ThenBy(issue => issue.PartBId).ToList(), snapshot);
     }
 
-    private static bool IsGeometryFailure(Exception exception) => exception is
+    /// <summary>
+    /// Maps unchanged parts to their previous input positions and looks up previous pair results.
+    /// A part is unchanged when its captured source object and exact pose bits match; identical
+    /// duplicates are matched in input order, which is safe because their inputs are bit-identical.
+    /// </summary>
+    private sealed class PairReuse
+    {
+        private readonly Dictionary<int, int> previousIds;
+        private readonly Dictionary<(int, int), PlateOverlapPair> pairs = new();
+        private readonly Dictionary<(int, int), PlateOverlapIssue> issues = new();
+
+        private PairReuse(Dictionary<int, int> previousIds, PlateOverlapReport previous)
+        {
+            this.previousIds = previousIds;
+            foreach (var pair in previous.Pairs)
+                pairs[(pair.PartAId, pair.PartBId)] = pair;
+            foreach (var issue in previous.Issues)
+                if (issue.PartBId.HasValue)
+                    issues[(issue.PartAId, issue.PartBId.Value)] = issue;
+        }
+
+        public static PairReuse Create(PlateOverlapReport previous, PlateOverlapSnapshot snapshot)
+        {
+            if (previous?.Snapshot == null)
+                return null;
+            var available = new Dictionary<PoseKey, Queue<int>>();
+            foreach (var part in previous.Snapshot.Parts)
+            {
+                var key = PoseKey.Of(part);
+                if (!available.TryGetValue(key, out var ids))
+                    available.Add(key, ids = new Queue<int>());
+                ids.Enqueue(part.Id);
+            }
+            var previousIds = new Dictionary<int, int>();
+            foreach (var part in snapshot.Parts)
+                if (available.TryGetValue(PoseKey.Of(part), out var ids) && ids.Count > 0)
+                    previousIds.Add(part.Id, ids.Dequeue());
+            return previousIds.Count < 2 ? null : new PairReuse(previousIds, previous);
+        }
+
+        /// <summary>
+        /// Every bounding-box candidate pair among prepared parts was evaluated by the previous
+        /// analysis, and unchanged parts have identical bounds, so absence there means clear.
+        /// The previous pair must have had the same operand order: clipping is order-sensitive.
+        /// </summary>
+        public bool TryReuse(CapturedOverlapPart a, CapturedOverlapPart b,
+            List<PlateOverlapPair> pairOutput, List<PlateOverlapIssue> issueOutput)
+        {
+            if (!previousIds.TryGetValue(a.Id, out var oldA) || !previousIds.TryGetValue(b.Id, out var oldB)
+                || oldA >= oldB)
+                return false;
+            if (pairs.TryGetValue((oldA, oldB), out var pair))
+                pairOutput.Add(pair.Renumber(a.Id, b.Id, a.Name, b.Name));
+            else if (issues.TryGetValue((oldA, oldB), out var issue))
+                issueOutput.Add(issue with { PartAId = a.Id, PartBId = b.Id });
+            return true;
+        }
+    }
+
+    private readonly record struct PoseKey(OverlapSource Source, long Rotation, long X, long Y)
+    {
+        public static PoseKey Of(CapturedOverlapPart part) => new(part.Source,
+            BitConverter.DoubleToInt64Bits(part.Rotation),
+            BitConverter.DoubleToInt64Bits(part.Location.X),
+            BitConverter.DoubleToInt64Bits(part.Location.Y));
+    }
+
+    internal static bool IsGeometryFailure(Exception exception) => exception is
         ArgumentException or InvalidOperationException or NotSupportedException or ArithmeticException;
 
     private static void ValidateProgram(Program program, HashSet<Program> visiting)
@@ -207,7 +288,5 @@ public static class PlateOverlapAnalyzer
         visiting.Remove(program);
     }
 
-    private sealed record CapturedSource(List<Entity> Entities, string Error);
-    private sealed record PreparedSource(OverlapMaterial Material, string Error);
     private sealed record PreparedPart(CapturedOverlapPart Input, OverlapMaterial Material);
 }

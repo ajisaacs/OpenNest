@@ -7,11 +7,16 @@ namespace OpenNest.Diagnostics;
 /// <summary>An owned diagnostic result. An empty Pairs list is clear only if IsComplete is true.</summary>
 public sealed class PlateOverlapReport
 {
-    internal PlateOverlapReport(List<PlateOverlapPair> pairs, List<PlateOverlapIssue> issues)
+    internal PlateOverlapReport(List<PlateOverlapPair> pairs, List<PlateOverlapIssue> issues,
+        PlateOverlapSnapshot snapshot)
     {
         Pairs = pairs.AsReadOnly();
         Issues = issues.AsReadOnly();
+        Snapshot = snapshot;
     }
+
+    /// <summary>The owned input this report was computed from; the baseline for incremental rechecks.</summary>
+    internal PlateOverlapSnapshot Snapshot { get; }
 
     public IReadOnlyList<PlateOverlapPair> Pairs { get; }
     public IReadOnlyList<PlateOverlapIssue> Issues { get; }
@@ -23,6 +28,23 @@ public sealed class PlateOverlapReport
 public sealed class PlateOverlapPair
 {
     private readonly Box bounds;
+
+    private PlateOverlapPair(PlateOverlapPair source, int partAId, int partBId, string partAName,
+        string partBName)
+    {
+        PartAId = partAId;
+        PartBId = partBId;
+        PartAName = partAName;
+        PartBName = partBName;
+        Regions = source.Regions;
+        Area = source.Area;
+        Centroid = source.Centroid;
+        bounds = source.bounds;
+    }
+
+    /// <summary>The same immutable geometry under new input positions and captured names.</summary>
+    internal PlateOverlapPair Renumber(int partAId, int partBId, string partAName, string partBName) =>
+        new(this, partAId, partBId, partAName, partBName);
 
     internal PlateOverlapPair(int partAId, int partBId, string partAName, string partBName,
         List<PlateOverlapRegion> regions, Vector centroid)
@@ -90,5 +112,5 @@ public sealed class PlateOverlapSnapshot
     internal IReadOnlyList<PlateOverlapIssue> Issues { get; }
 }
 
-internal sealed record CapturedOverlapPart(int Id, string Name, List<Entity> Entities,
+internal sealed record CapturedOverlapPart(int Id, string Name, OverlapSource Source,
     double Rotation, Vector Location);
