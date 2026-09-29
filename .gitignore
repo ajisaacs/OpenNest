@@ -207,10 +207,14 @@ FakesAssemblies/
 *.db
 *.db-journal
 
-# Claude Code
+# Local agent state and temporary planning/progress documents
 .claude/
+/.hermes/plans/
+/.hermes/progress/
 .superpowers/
 docs/superpowers/
+/docs/*-plan.md
+/docs/*-progress.md
 
 # Launch settings
 **/Properties/launchSettings.json
