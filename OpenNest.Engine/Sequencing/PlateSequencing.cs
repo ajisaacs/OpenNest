@@ -9,6 +9,16 @@ namespace OpenNest.Engine.Sequencing
     /// <summary>Applies a sequencer's exit-first route as the plate's cutting order.</summary>
     public static class PlateSequencing
     {
+        /// <summary>Sequences the plates present when the operation starts.</summary>
+        public static void ApplyAll(IEnumerable<Plate> plates, SequenceParameters parameters)
+        {
+            // Reordering parts can make PlateManager replace the trailing empty
+            // plate. Snapshot before applying so those events cannot invalidate
+            // enumeration of the nest's live plate collection.
+            foreach (var plate in plates.ToArray())
+                Apply(plate, parameters);
+        }
+
         public static void Apply(Plate plate, SequenceParameters parameters)
         {
             var sequencer = PartSequencerFactory.Create(parameters);

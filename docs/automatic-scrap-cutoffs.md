@@ -42,6 +42,8 @@ The dependency check uses the nominal horizontal/vertical line and its start/end
 
 This rule runs when applying automatic sequencing, after reversing the exit-first sequencer route into cutting order. Manual sequence edits are still manual; adding or moving cutoffs does not automatically reapply this rule. Reapply Part Sequencing after layout changes and review the resulting rapids before posting. Regeneration and saving/reloading retain the applied mixed sequence.
 
+The all-plates command uses `PlateSequencing.ApplyAll`, which snapshots the target plate references before sequencing. Reordering parts raises collection events that can replace the nest's trailing empty plate; those events must not invalidate the batch's iteration or skip any original plate. This snapshot is not a transaction or a concurrency guard: sequencing still runs synchronously on the owning thread, using the same per-plate cutoff rules.
+
 ## Rerunning, editing, and saving
 
 The command is one-shot; spacing and minimum-tail inputs start at their defaults each time the dialog opens. Generated lines are ordinary cutoffs and can subsequently be dragged, deleted, or sequenced with the existing tools. Moving parts regenerates their trimmed segments but does not reposition the cutoff grid or recalculate the retained tail automatically.

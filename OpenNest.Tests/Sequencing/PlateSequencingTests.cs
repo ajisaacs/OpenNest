@@ -7,6 +7,124 @@ namespace OpenNest.Tests.Sequencing;
 
 public class PlateSequencingTests
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void ApplyAll_WithManagedNest_SequencesEveryPlateAndPreservesParts(int plateCount)
+    {
+        var nest = new Nest("sequence-all");
+        var drawing = TestHelpers.MakeSquareDrawing();
+        nest.Drawings.Add(drawing);
+        for (var i = 0; i < plateCount; i++)
+        {
+            var plate = TestHelpers.MakePlate(60, 120,
+                new Part(drawing, new Vector(10, 5)),
+                new Part(drawing, new Vector(30, 20)),
+                new Part(drawing, new Vector(20, 10)));
+            plate.Quantity = i + 1;
+            nest.Plates.Add(plate);
+        }
+
+        using var manager = new PlateManager(nest);
+        manager.EnsureSentinel();
+        manager.LoadFirst();
+        var plates = nest.Plates.Take(plateCount).ToArray();
+        var parameters = new SequenceParameters { Method = SequenceMethod.LeastCode };
+        var expected = plates.Select(plate => Baseline(plate, parameters)).ToArray();
+        var parts = plates.SelectMany(plate => plate.Parts)
+            .Select(part => (Part: part, part.Program, part.Location, part.Rotation)).ToArray();
+        var nested = drawing.Quantity.Nested;
+        var added = new int[plateCount];
+        for (var i = 0; i < plateCount; i++)
+        {
+            var index = i;
+            plates[i].PartAdded += (_, _) => added[index]++;
+        }
+
+        PlateSequencing.ApplyAll(nest.Plates, parameters);
+
+        Assert.Equal(plateCount + 1, nest.Plates.Count);
+        Assert.Equal(plates, nest.Plates.Take(plateCount));
+        Assert.Empty(nest.Plates[^1].Parts);
+        Assert.Same(plates[0], manager.CurrentPlate);
+        for (var i = 0; i < plateCount; i++)
+        {
+            Assert.Equal(expected[i], plates[i].Parts);
+            Assert.Equal(expected[i].Length, added[i]);
+            Assert.Equal(i + 1, plates[i].Quantity);
+        }
+        Assert.Equal(nested, drawing.Quantity.Nested);
+        foreach (var item in parts)
+        {
+            Assert.Same(item.Program, item.Part.Program);
+            Assert.Equal(item.Location, item.Part.Location);
+            Assert.Equal(item.Rotation, item.Part.Rotation);
+        }
+    }
+
+    [Fact]
+    public void ApplyAll_EmptyNestAndSentinelOnly_AreUnchanged()
+    {
+        var nest = new Nest("empty");
+        var parameters = new SequenceParameters { Method = SequenceMethod.LeastCode };
+        PlateSequencing.ApplyAll(nest.Plates, parameters);
+        Assert.Empty(nest.Plates);
+
+        using var manager = new PlateManager(nest);
+        manager.EnsureSentinel();
+        var sentinel = Assert.Single(nest.Plates);
+
+        PlateSequencing.ApplyAll(nest.Plates, parameters);
+
+        Assert.Same(sentinel, Assert.Single(nest.Plates));
+        Assert.Empty(sentinel.Parts);
+    }
+
+    [Fact]
+    public void ApplyAll_InvalidSequenceMethod_LeavesAllPlatesUntouched()
+    {
+        var nest = new Nest("invalid-sequence");
+        nest.Plates.Add(TestHelpers.MakePlate(60, 120, TestHelpers.MakePartAt(10, 5)));
+        nest.Plates.Add(TestHelpers.MakePlate(60, 120, TestHelpers.MakePartAt(30, 20)));
+        using var manager = new PlateManager(nest);
+        manager.EnsureSentinel();
+        var plates = nest.Plates.ToArray();
+        var parts = plates.Select(plate => plate.Parts.ToArray()).ToArray();
+
+        Assert.Throws<NotSupportedException>(() => PlateSequencing.ApplyAll(nest.Plates,
+            new SequenceParameters { Method = (SequenceMethod)999 }));
+
+        Assert.Equal(plates, nest.Plates);
+        for (var i = 0; i < plates.Length; i++)
+            Assert.Equal(parts[i], plates[i].Parts);
+    }
+
+    [Fact]
+    public void ApplyAll_WithManagedNest_PreservesCutOffDependenciesOnEveryPlate()
+    {
+        var nest = new Nest("sequence-all-cutoffs");
+        var plates = new[]
+        {
+            TestHelpers.MakePlate(60, 120, TestHelpers.MakePartAt(10, 10, 10)),
+            TestHelpers.MakePlate(60, 120, TestHelpers.MakePartAt(10, 30, 10)),
+        };
+        var parts = plates.Select(plate => Assert.Single(plate.Parts)).ToArray();
+        foreach (var plate in plates)
+        {
+            plate.CutOffs.Add(new CutOff(new Vector(15, 0), CutOffAxis.Vertical));
+            plate.RegenerateCutOffs(new CutOffSettings());
+            nest.Plates.Add(plate);
+        }
+        using var manager = new PlateManager(nest);
+        manager.EnsureSentinel();
+
+        PlateSequencing.ApplyAll(nest.Plates,
+            new SequenceParameters { Method = SequenceMethod.LeastCode });
+
+        for (var i = 0; i < plates.Length; i++)
+            AssertPrecedes(plates[i], Assert.Single(plates[i].CutOffs), parts[i]);
+    }
+
     [Fact]
     public void Apply_WithoutCutOffs_PreservesExistingReversedSequencerOrder()
     {

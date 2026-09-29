@@ -620,9 +620,8 @@ namespace OpenNest.Forms
 
         public void AutoSequenceAllPlates()
         {
-            foreach (var plate in Nest.Plates)
-                SequencePlate(plate);
-
+            var parameters = new SequenceParameters { Method = SequenceMethod.LeastCode };
+            PlateSequencing.ApplyAll(Nest.Plates, parameters);
             PlateView.Invalidate();
         }
 
