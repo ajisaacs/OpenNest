@@ -5,12 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using ModelContextProtocol.Server;
+using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs;
-using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
-using OpenNest.Engine;
 
 namespace OpenNest.Mcp.Tools
 {
@@ -251,91 +250,75 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "autonest_plate")]
-        [Description(
-            "Mixed-part autonesting. Solves the drawings as one whole job against the plate using the named jobs engine and commits the resulting placements onto the plate."
-        )]
+        [Description("Validated whole-job nesting onto an empty single sheet. Invalid results are discarded unless allow_invalid is explicitly true; unrepresentable or multiple-sheet results are always rejected.")]
         public string AutoNestPlate(
-            [Description("Index of the plate")] int plateIndex,
+            [Description("Index of the empty plate")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
-            [Description("Comma-separated quantities for each drawing")] string quantities,
-            [Description("Jobs engine name (Default, Strip, Vertical Remnant, Horizontal Remnant, StockLadder)")]
-                string engine = null
+            [Description("Comma-separated positive quantities")] string quantities,
+            [Description("Registered jobs engine name, including loaded plug-ins")] string engine = null,
+            [Description("Explicitly keep representable layouts despite validation violations")] bool allow_invalid = false,
+            CancellationToken cancellationToken = default
         )
         {
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
-
+            if (plate.Parts.Count > 0)
+                return "Error: autonest cannot use an occupied plate. Use fill_area or fill_remnants for existing obstacles.";
             if (string.IsNullOrWhiteSpace(drawingNames))
                 return "Error: drawingNames is required";
-
             if (string.IsNullOrWhiteSpace(quantities))
                 return "Error: quantities is required";
 
-            var engineName = string.IsNullOrWhiteSpace(engine)
-                ? _session.DefaultEngineName
-                : engine.Trim();
-
+            var engineName = string.IsNullOrWhiteSpace(engine) ? _session.DefaultEngineName : engine.Trim();
             var parsed = ParseItems(drawingNames, quantities);
             if (parsed.error != null)
                 return parsed.error;
-
             if (parsed.items.Any(item => item.Quantity <= 0))
                 return "Error: autonest quantities must be positive";
 
-            INestingEngine nestingEngine;
+            NestPipelineResult result;
             try
             {
-                nestingEngine = NestingEngineRegistry.Create(engineName);
+                result = NestPipeline.Run(new NestPipelineRequest(
+                    engineName, parsed.items, NestStockBuilder.SinglePlate(plate)), token: cancellationToken);
             }
             catch (NotSupportedException)
             {
                 return UnknownEngineMessage(engineName);
             }
 
-            var jobParts = new List<NestJobPart>(parsed.items.Count);
-            var drawingsByPartId = new Dictionary<string, Drawing>(StringComparer.Ordinal);
-            for (var i = 0; i < parsed.items.Count; i++)
-            {
-                var partId = $"part-{i}";
-                jobParts.Add(DrawingJobMapper.FromItem(partId, parsed.items[i]));
-                drawingsByPartId[partId] = parsed.items[i].Drawing;
-            }
-
-            // One physical sheet: this plate, this solve — the runner owns stock accounting.
-            var stock = DrawingJobMapper.FromPlate("plate-0", plate, 1);
-            var job = new NestJob(jobParts, [stock]);
-
-            var result = nestingEngine.Solve(job, null, CancellationToken.None);
-
-            var totalPlaced = 0;
-            foreach (var plateResult in result.Plates)
-            {
-                foreach (var pose in plateResult.Placements)
-                {
-                    if (!drawingsByPartId.TryGetValue(pose.PartId, out var drawing))
-                        continue;
-                    var part = new Part(drawing);
-                    part.Rotate(pose.Rotation);
-                    part.Location = new Vector(pose.X, pose.Y);
-                    part.UpdateBounds();
-                    plate.Parts.Add(part);
-                    totalPlaced++;
-                }
-            }
-
             var sb = new StringBuilder();
-            sb.AppendLine(
-                $"AutoNest plate {plateIndex} ({engineName} engine): {(totalPlaced > 0 ? "success" : "no parts placed")}"
-            );
+            foreach (var violation in result.Violations)
+                sb.AppendLine($"Violation: {violation}");
+            if (!result.CanKeep || result.Plates.Count > 1 || (!result.IsValid && !allow_invalid))
+            {
+                sb.AppendLine(result.Plates.Count > 1
+                    ? "Error: multiple result sheets cannot be merged onto one target, even with allow_invalid. Nothing committed."
+                    : !result.CanKeep
+                        ? "Error: result cannot be represented faithfully, even with allow_invalid. Nothing committed."
+                        : "Error: invalid result discarded. Set allow_invalid to explicitly keep its violations. Nothing committed.");
+                return sb.ToString();
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var proposed = result.Plates.SingleOrDefault();
+            var totalPlaced = proposed?.Parts.Count ?? 0;
+            if (totalPlaced > 0)
+            {
+                plate.Size = proposed.Stock.Size;
+                plate.PartSpacing = proposed.Stock.PartSpacing;
+                plate.EdgeSpacing = proposed.Stock.EdgeSpacing;
+                plate.Quadrant = proposed.Stock.Quadrant;
+                plate.Quantity = 1;
+                plate.Parts.AddRange(proposed.Parts);
+            }
+            sb.AppendLine($"AutoNest plate {plateIndex} ({engineName} engine): {(totalPlaced > 0 ? "success" : "no parts placed")}");
             sb.AppendLine($"  Parts placed: {totalPlaced}");
             sb.AppendLine($"  Total parts: {plate.Parts.Count}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
-
-            var groups = plate.Parts.GroupBy(p => p.BaseDrawing.Name);
-            foreach (var group in groups)
+            foreach (var group in plate.Parts.GroupBy(p => p.BaseDrawing.Name))
                 sb.AppendLine($"  {group.Key}: {group.Count()}");
-
             return sb.ToString();
         }
 

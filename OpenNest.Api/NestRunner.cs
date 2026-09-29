@@ -5,10 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using OpenNest.IO;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
-using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.IO;
 
 namespace OpenNest.Api;
 
@@ -32,7 +31,7 @@ public static class NestRunner
         var sw = Stopwatch.StartNew();
         var parts = IdentifyParts(requestParts);
         var importedByPath = new Dictionary<string, Drawing>(StringComparer.Ordinal);
-        var jobParts = new List<NestJobPart>(parts.Count);
+        var items = new List<NestItem>(parts.Count);
 
         foreach (var part in parts)
         {
@@ -68,23 +67,64 @@ public static class NestRunner
                 importedByPath.Add(part.Request.DxfPath, drawing);
             }
 
-            ConfigureDrawingForRequirement(drawing, part.Request);
-            jobParts.Add(DrawingJobMapper.FromDrawing(part.Id, drawing, part.Request.Quantity));
+            // Each requirement keeps its own identity/constraints even when paths are shared.
+            var requirementDrawing = new Drawing(part.Id, drawing.Program);
+            ConfigureDrawingForRequirement(requirementDrawing, part.Request);
+            requirementDrawing.Quantity.Required = part.Request.Quantity;
+            items.Add(new NestItem
+            {
+                Drawing = requirementDrawing,
+                Quantity = part.Request.Quantity,
+                Priority = part.Request.Priority,
+                StepAngle = requirementDrawing.Constraints.StepAngle,
+                RotationStart = requirementDrawing.Constraints.StartAngle,
+                RotationEnd = requirementDrawing.Constraints.EndAngle,
+            });
         }
 
-        var job = new NestJob(
-            jobParts,
-            CreateStock(request),
-            new NestJobOptions(ResolvePlacementStrategy(request))
-        );
+        var stock = CreateStock(request);
+        var engineName = request.Engine ?? ResolvePlacementStrategy(request);
         var jobProgress = progress == null ? null : new JobProgressBridge(progress);
-        var result = new NestJobRunner(PlateNesterFactory.Create).Solve(job, jobProgress, token);
+        var result = NestPipeline.Run(new NestPipelineRequest(
+            engineName, items, stock, new NestJobOptions(engineName)), jobProgress, token);
 
-        // This is the sole translation from immutable result poses to mutable legacy output objects.
-        var materialized = NestResultMaterializer.Materialize(job, result);
-        var nest = materialized.Nest;
-        nest.Thickness = request.Thickness;
-        nest.Material = new Material(request.Material);
+        // API returns a detached proposal, not an acceptance/commit to a caller's nest.
+        // Invalid but representable proposals retain every pose and carry explicit validation status.
+        var nest = new Nest { Thickness = request.Thickness, Material = new Material(request.Material) };
+        foreach (var item in items)
+            nest.Drawings.Add(item.Drawing);
+        foreach (var proposed in result.Plates)
+        {
+            var plate = new Plate(proposed.Stock.Size)
+            {
+                PartSpacing = proposed.Stock.PartSpacing,
+                EdgeSpacing = proposed.Stock.EdgeSpacing,
+                Quadrant = proposed.Stock.Quadrant,
+                Quantity = 1,
+            };
+            plate.Parts.AddRange(proposed.Parts);
+            nest.Plates.Add(plate);
+        }
+
+        // Pipeline IDs are internal part-i values. Exposed counts/IDs come from the
+        // returned, bound placements and the original request, never plug-in summaries.
+        var counts = result.Plates.SelectMany(p => p.Parts)
+            .GroupBy(p => p.BaseDrawing).ToDictionary(g => g.Key, g => g.Count());
+        var fulfillment = parts.Select((part, i) =>
+        {
+            var placed = counts.GetValueOrDefault(items[i].Drawing);
+            return new NestPartFulfillment(part.Id, part.Request.Quantity, placed,
+                System.Math.Max(0, part.Request.Quantity - placed));
+        }).ToArray();
+        var usage = stock.Select(s =>
+        {
+            var used = result.Plates.Count(p => p.Stock.Id == s.Id);
+            return new NestStockUsage(s.Id, used, s.Quantity.HasValue ? System.Math.Max(0, s.Quantity.Value - used) : null);
+        }).ToArray();
+        var complete = fulfillment.All(f => f.Placed == f.Requested);
+        var stopReason = complete ? NestJobStopReason.Completed
+            : usage.All(u => u.Remaining == 0) ? NestJobStopReason.StockExhausted
+            : NestJobStopReason.NoPlacementFound;
 
         var timingInfo = Timing.GetTimingInfo(nest);
         var cutTime = Timing.CalculateTime(timingInfo, request.Cutting);
@@ -97,29 +137,15 @@ public static class NestRunner
                 Utilization = CalculateUtilization(nest),
                 CutTime = cutTime,
                 Elapsed = sw.Elapsed,
-                Status = result.Status,
-                StopReason = result.StopReason,
-                Fulfillment = result
-                    .Fulfillment.Select(value => new NestPartFulfillment(
-                        value.PartId,
-                        value.Requested,
-                        value.Placed,
-                        value.Unplaced
-                    ))
-                    .ToArray(),
-                StockUsage = result
-                    .StockUsage.Select(value => new NestStockUsage(
-                        value.StockId,
-                        value.Used,
-                        value.Remaining
-                    ))
-                    .ToArray(),
-                PlateStockMappings = result
-                    .Plates.Select(value => new NestPlateStockMapping(
-                        value.PlateIndex,
-                        value.StockId
-                    ))
-                    .ToArray(),
+                Status = complete ? NestJobStatus.Complete : NestJobStatus.Incomplete,
+                StopReason = stopReason,
+                ValidationStatus = !result.CanKeep ? NestValidationStatus.Unrepresentable
+                    : result.IsValid ? NestValidationStatus.Valid : NestValidationStatus.Invalid,
+                Violations = result.Violations,
+                Fulfillment = fulfillment,
+                StockUsage = usage,
+                PlateStockMappings = result.Plates.Select((value, index) =>
+                    new NestPlateStockMapping(index, value.Stock.Id)).ToArray(),
                 Nest = nest,
                 Request = request,
             }
@@ -140,6 +166,8 @@ public static class NestRunner
                     "Request parts must not contain null entries.",
                     nameof(requestParts)
                 );
+            if (part.Quantity < 0)
+                throw new ArgumentException("Part quantities must be nonnegative.", nameof(requestParts));
             var id = part.Id ?? $"part-{index}";
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Part IDs must not be blank.", nameof(requestParts));

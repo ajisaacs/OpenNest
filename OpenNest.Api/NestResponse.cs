@@ -5,8 +5,8 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using OpenNest.IO;
 using OpenNest.Engine.Jobs;
+using OpenNest.IO;
 
 namespace OpenNest.Api;
 
@@ -19,9 +19,12 @@ public sealed record NestStockUsage(string StockId, int Used, int? Remaining);
 /// <summary>Maps each materialized physical sheet to its source stock identity.</summary>
 public sealed record NestPlateStockMapping(int PlateIndex, string StockId);
 
+/// <summary>Independent geometry validation; null on old archives means not recorded.</summary>
+public enum NestValidationStatus { Valid, Invalid, Unrepresentable }
+
 public class NestResponse
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     /// <summary>Zero identifies an archive written before response metadata was versioned.</summary>
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
@@ -35,6 +38,9 @@ public class NestResponse
     /// <summary>Null means an older archive did not record whole-job fulfillment status.</summary>
     public NestJobStatus? Status { get; init; }
     public NestJobStopReason? StopReason { get; init; }
+    /// <summary>Fulfillment status is not geometry acceptance. Review this status before using Nest.</summary>
+    public NestValidationStatus? ValidationStatus { get; init; }
+    public IReadOnlyList<string> Violations { get; init; } = [];
     public IReadOnlyList<NestPartFulfillment> Fulfillment { get; init; } = [];
     public IReadOnlyList<NestStockUsage> StockUsage { get; init; } = [];
     public IReadOnlyList<NestPlateStockMapping> PlateStockMappings { get; init; } = [];
@@ -75,6 +81,8 @@ public class NestResponse
                     ElapsedTicks = Elapsed.Ticks,
                     Status = Status,
                     StopReason = StopReason,
+                    ValidationStatus = ValidationStatus,
+                    Violations = Violations is null ? [] : new List<string>(Violations),
                     Fulfillment = Fulfillment is null
                         ? []
                         : new List<NestPartFulfillment>(Fulfillment),
@@ -158,6 +166,8 @@ public class NestResponse
             Elapsed = TimeSpan.FromTicks(archive.ElapsedTicks),
             Status = hasStatusMetadata ? archive.Status : null,
             StopReason = hasStatusMetadata ? archive.StopReason : null,
+            ValidationStatus = archive.ValidationStatus,
+            Violations = archive.Violations ?? [],
             Fulfillment = hasStatusMetadata ? archive.Fulfillment ?? [] : [],
             StockUsage = hasStatusMetadata ? archive.StockUsage ?? [] : [],
             PlateStockMappings = hasStatusMetadata ? archive.PlateStockMappings ?? [] : [],
@@ -175,6 +185,8 @@ public class NestResponse
         public long ElapsedTicks { get; init; }
         public NestJobStatus? Status { get; init; }
         public NestJobStopReason? StopReason { get; init; }
+        public NestValidationStatus? ValidationStatus { get; init; }
+        public List<string> Violations { get; init; } = [];
         public List<NestPartFulfillment> Fulfillment { get; init; } = [];
         public List<NestStockUsage> StockUsage { get; init; } = [];
         public List<NestPlateStockMapping> PlateStockMappings { get; init; } = [];

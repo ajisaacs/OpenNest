@@ -16,6 +16,9 @@ public class NestRequest
 
     /// <summary>Built-in whole-job placement strategy. Explicit values take precedence over legacy Strategy.</summary>
     public string PlacementStrategy { get; init; } = "Default";
+
+    /// <summary>Registered whole-job engine. Null uses PlacementStrategy (or legacy Strategy).</summary>
+    public string Engine { get; init; }
     public string Material { get; init; } = "Steel, A1011 HR";
     public double Thickness { get; init; } = 0.06;
     public double Spacing { get; init; } = 0.1;

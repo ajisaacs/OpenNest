@@ -10,7 +10,6 @@ using OpenNest;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
-using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 using OpenNest.IO;
@@ -22,6 +21,33 @@ static class NestConsole
 {
     public static int Run(string[] args)
     {
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            return RunCore(args, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            Console.Error.WriteLine("Nesting cancelled; nothing saved.");
+            return 2;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return 1;
+        }
+        finally
+        {
+            Console.CancelKeyPress -= cancel;
+        }
+    }
+
+    static int RunCore(string[] args, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        NestingEngineRegistry.LoadPlugins(Path.Combine(AppContext.BaseDirectory, "Engines"));
         var options = ParseArgs(args);
 
         if (options == null)
@@ -101,6 +127,12 @@ static class NestConsole
 
         var plate = nest.Plates[options.PlateIndex];
 
+        if (options.AutoNest && options.KeepParts && plate.Parts.Count > 0)
+        {
+            Console.Error.WriteLine("Error: --autonest --keep-parts cannot use an occupied plate. Use plain fill for existing obstacles.");
+            return 2;
+        }
+
         ApplyTemplate(plate, options);
         ApplyOverrides(plate, options);
 
@@ -111,16 +143,19 @@ static class NestConsole
 
         var existingCount = plate.Parts.Count;
 
-        if (!options.KeepParts)
+        if (!options.AutoNest && !options.KeepParts)
             plate.Parts.Clear();
 
         PrintHeader(nest, plate, drawing, existingCount, options);
 
-        var (success, elapsed) = Fill(nest, plate, drawing, options);
+        var (success, elapsed, accepted) = Fill(nest, plate, drawing, options, token);
+        if (!accepted)
+            return 2; // No save or post may run after a rejected proposal.
 
         var overlapCount = CheckOverlaps(plate, options);
 
         PrintResults(success, plate, elapsed);
+        token.ThrowIfCancellationRequested();
         if (!SaveAndPost(nest, options))
             return 1;
 
@@ -185,6 +220,9 @@ static class NestConsole
                     break;
                 case "--template" when i + 1 < args.Length:
                     o.TemplateFile = args[++i];
+                    break;
+                case "--allow-invalid":
+                    o.AllowInvalid = true;
                     break;
                 case "--autonest":
                     o.AutoNest = true;
@@ -398,7 +436,9 @@ static class NestConsole
         );
         var existingPartsMessage = options.KeepParts
             ? $"Keeping {existingCount} existing parts"
-            : $"Cleared {existingCount} existing parts";
+            : options.AutoNest
+                ? $"Will replace {existingCount} existing parts only after acceptance"
+                : $"Cleared {existingCount} existing parts";
         Console.WriteLine(
             $"""
             Drawing: {drawing.Name}
@@ -408,15 +448,17 @@ static class NestConsole
         );
     }
 
-    static (bool success, long elapsedMs) Fill(
+    static (bool success, long elapsedMs, bool accepted) Fill(
         Nest nest,
         Plate plate,
         Drawing drawing,
-        Options options
+        Options options,
+        CancellationToken token
     )
     {
         var sw = Stopwatch.StartNew();
         bool success;
+        var accepted = true;
 
         if (options.AutoNest)
         {
@@ -437,7 +479,9 @@ static class NestConsole
                 $"AutoNest: {nestItems.Count} drawing(s), {nestItems.Sum(i => i.Quantity)} total parts"
             );
 
-            success = AutoNestJob(plate, nestItems, options.Engine);
+            var outcome = AutoNestJob(plate, nestItems, options.Engine, options.AllowInvalid, token);
+            accepted = outcome.accepted;
+            success = outcome.committed > 0;
         }
         else
         {
@@ -451,8 +495,9 @@ static class NestConsole
                 item,
                 plate.WorkArea(),
                 null,
-                CancellationToken.None
+                token
             );
+            token.ThrowIfCancellationRequested();
 
             if (parts.Count > 0)
                 plate.Parts.AddRange(parts);
@@ -460,52 +505,45 @@ static class NestConsole
         }
 
         sw.Stop();
-        return (success, sw.ElapsedMilliseconds);
+        return (success, sw.ElapsedMilliseconds, accepted);
     }
 
-    /// <summary>
-    /// Solves the drawings as one whole job against this single plate using the named jobs
-    /// engine, then commits the returned placements onto the plate. Placements are mapped back
-    /// onto the caller's original drawings (same pose semantics as NestResultMaterializer), so
-    /// the saved nest keeps its existing drawing identities.
-    /// </summary>
-    static bool AutoNestJob(Plate plate, List<NestItem> nestItems, string engineName)
+    static (bool accepted, int committed) AutoNestJob(
+        Plate plate, List<NestItem> nestItems, string engineName, bool allowInvalid, CancellationToken token)
     {
-        var engine = NestingEngineRegistry.Create(engineName);
+        var result = NestPipeline.Run(new NestPipelineRequest(
+            engineName, nestItems, NestStockBuilder.SinglePlate(plate)), token: token);
+        foreach (var violation in result.Violations)
+            Console.Error.WriteLine($"Violation: {violation}");
 
-        var parts = new List<NestJobPart>(nestItems.Count);
-        var drawingsByPartId = new Dictionary<string, Drawing>(StringComparer.Ordinal);
-        for (var i = 0; i < nestItems.Count; i++)
+        if (!result.CanKeep || result.Plates.Count > 1 || (!result.IsValid && !allowInvalid))
         {
-            var partId = $"part-{i}";
-            parts.Add(DrawingJobMapper.FromItem(partId, nestItems[i]));
-            drawingsByPartId[partId] = nestItems[i].Drawing;
+            Console.Error.WriteLine(result.Plates.Count > 1
+                ? "Error: multiple result sheets cannot be merged onto one target, even with --allow-invalid. Nothing saved."
+                : !result.CanKeep
+                    ? "Error: result cannot be represented faithfully, even with --allow-invalid. Nothing saved."
+                    : "Error: invalid result discarded. Use --allow-invalid to explicitly keep its violations. Nothing saved.");
+            return (false, 0);
         }
 
-        // One physical sheet: this plate, this solve — the runner owns stock accounting.
-        var stock = DrawingJobMapper.FromPlate("plate-0", plate, 1);
-        var job = new NestJob(parts, [stock]);
-
-        var result = engine.Solve(job, null, CancellationToken.None);
-
-        var committed = 0;
-        foreach (var plateResult in result.Plates)
+        token.ThrowIfCancellationRequested();
+        var proposed = result.Plates.SingleOrDefault();
+        var committed = proposed?.Parts.Count ?? 0;
+        if (committed == 0)
         {
-            foreach (var pose in plateResult.Placements)
-            {
-                if (!drawingsByPartId.TryGetValue(pose.PartId, out var drawing))
-                    continue;
-                var part = new Part(drawing);
-                part.Rotate(pose.Rotation);
-                part.Location = new Vector(pose.X, pose.Y);
-                part.UpdateBounds();
-                plate.Parts.Add(part);
-                committed++;
-            }
+            Console.Error.WriteLine("Error: no placements returned. Existing layout and output left unchanged.");
+            return (false, 0);
         }
 
+        plate.Parts.Clear();
+        plate.Size = proposed.Stock.Size;
+        plate.PartSpacing = proposed.Stock.PartSpacing;
+        plate.EdgeSpacing = proposed.Stock.EdgeSpacing;
+        plate.Quadrant = proposed.Stock.Quadrant;
+        plate.Quantity = 1;
+        plate.Parts.AddRange(proposed.Parts);
         Console.WriteLine($"Engine: {engineName} — committed {committed} placements");
-        return committed > 0;
+        return (true, committed);
     }
 
     static string ResolveFillStrategy(string engineName)
@@ -724,7 +762,8 @@ static class NestConsole
               --size <WxL>           Override plate size (e.g. 60x120); required for DXF-only mode
               --output <path>        Output nest file path (default: <input>-result.nest)
               --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)
-              --autonest             Whole-job nesting via the jobs engine (--engine) instead of single-plate fill
+              --autonest             Validated whole-job nesting onto one sheet; replaces only after acceptance
+              --allow-invalid        Explicitly keep representable invalid autonest layouts (default: reject, exit 2)
               --engine <name>        With --autonest: jobs engine (default: Default; also StockLadder, Strip, ...).
                                      Without --autonest: fill strategy (Default, Strip, Vertical Remnant, Horizontal Remnant)
               --keep-parts           Don't clear existing parts before filling
@@ -753,6 +792,7 @@ static class NestConsole
         public bool NoSave;
         public bool KeepParts;
         public bool AutoNest;
+        public bool AllowInvalid;
         public string Engine = "Default";
         public string TemplateFile;
         public string PostName;

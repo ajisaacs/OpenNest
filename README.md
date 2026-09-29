@@ -30,6 +30,7 @@ cd OpenNest
 dotnet build OpenNest.sln                                       # full solution (Windows)
 dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj  # cross-platform engine tests
 dotnet test OpenNest.Tests/OpenNest.Tests.csproj                # core/engine/IO/API tests
+dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj # console/MCP/API integration
 dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (Windows)
 ```
 
@@ -55,7 +56,7 @@ dotnet run --project OpenNest.Console -- part1.dxf part2.dxf --size 60x120 --aut
 dotnet run --project OpenNest.Console -- project.zip                          # re-fill a nest file
 ```
 
-Key options: `--size WxL`, `--autonest` (whole-job nesting), `--engine <name>` (jobs engine or fill strategy), `--quantity`, `--spacing`, `--template <nest>`, `--output <path>`, `--check-overlaps`, `--post <name>`, `--no-save`. Run without arguments for the full list.
+Key options: `--size WxL`, `--autonest` (validated single-sheet whole-job nesting), `--allow-invalid` (explicit warning override), `--engine <name>` (jobs engine or fill strategy), `--quantity`, `--spacing`, `--template <nest>`, `--output <path>`, `--check-overlaps`, `--post <name>`, `--no-save`. Run without arguments for the full list.
 
 ## Benchmarking Engines
 
@@ -86,7 +87,7 @@ Layouts are validated (bounds, spacing, quantity, rotation, stock match); invali
 
 ## Nesting Engines
 
-Jobs-only API: engines implement `INestingEngine.Solve(NestJob)`; only `NestJobRunner` commits demand and stock, and every candidate passes the placement validator (bounds, spacing, rotation policy, stock match) before it consumes anything.
+Engines implement `INestingEngine.Solve(NestJob)`. Desktop Auto Nest, console autonest, MCP autonest and the API use one independent validation pipeline for every engine, including plug-ins. Invalid layouts require an explicit decision; malformed output cannot be kept. See [automatic nesting and validation](docs/automatic-nesting.md) for caller behavior and API validation status.
 
 | Engine | Description |
 |--------|-------------|

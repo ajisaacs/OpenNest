@@ -35,4 +35,24 @@ replace the saved missing-engine preference.
 
 Callers must hold drawings and target state stable from snapshot through attachment. Do not append whole-job placements to an occupied target or flatten multiple returned sheets onto one plate: that would commit a layout different from the one checked. Do not trust arbitrary engine fulfillment metadata as a substitute for counting returned placements.
 
-Interactive fills are outside this contract and still use `PlateFillService`. The benchmark invokes the same independent validator. Console/MCP/API migration is a separate adoption step; the existence of the pipeline does not imply every front end already calls it.
+Interactive fills are outside this contract and still use `PlateFillService`. The benchmark invokes the same independent validator.
+
+## Console and MCP
+
+Console `--autonest` uses the selected jobs engine against one physical sheet. The selected plate's old parts are replaced only after acceptance; other plates are unchanged. Default demand is still one of each drawing unless `--quantity` is supplied. A partially fulfilled, valid result may be saved; a successful placement is not a claim that all demand was met.
+
+Invalid output is printed and rejected with exit code 2 without saving or posting. `--allow-invalid` explicitly accepts representable layout violations. Malformed output, multiple returned sheets, and zero placements are never saved by this path. Unknown engines exit 1. `--autonest --keep-parts` rejects an occupied target: use the plain interactive fill path for existing obstacles instead.
+
+MCP `autonest_plate` requires an empty target. The stdio server serializes all tool calls sharing its mutable session, so another request cannot change drawings or occupy a target during a solve. `allow_invalid` defaults to false. It reports violations and makes no changes on rejection, including with an override when the output is unrepresentable or contains multiple sheets. Existing fill tools remain separate. Console and MCP load jobs plug-ins from `Engines/` beside their executable.
+
+## .NET API and saved responses
+
+Set `NestRequest.Engine` to a registered engine name; null retains `PlacementStrategy` / legacy `Strategy` behavior. Library hosts own plug-in discovery via `NestingEngineRegistry.LoadPlugins` before calling the API. Explicit request requirement IDs are preserved in response fulfillment even when multiple requirements use the same source DXF.
+
+The API returns a detached proposal. `ValidationStatus` is `Valid`, `Invalid`, or `Unrepresentable`, and `Violations` lists the problems. Representable invalid proposals retain their parts for caller review; unrepresentable proposals contain no sheets. Consumers must inspect validation before applying, quoting or posting the proposal. `Status` describes fulfillment, not acceptance: counts, stock usage and completeness are derived from returned placements rather than trusting plug-in summary metadata.
+
+Response archive schema 3 persists validation status and violations. Older archives with no validation metadata load with null status; null must not be interpreted as a successful check. Saving a proposal archive records it and does not authorize CNC posting.
+
+## Verification
+
+`dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj` exercises Console, MCP and API rejection/override, cancellation, physical-sheet settings, response IDs and archive round-trips. Its current target matches MCP's `net8.0-windows` marker but does not use WindowsDesktop and executes on Linux as well as Windows. It is included in the solution and Windows test workflow. Desktop interaction tests remain in Windows-only `OpenNest.WinForms.Tests`.
