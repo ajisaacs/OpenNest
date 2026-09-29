@@ -1,4 +1,4 @@
-# Lead-in placement at cutout corners
+# Lead-in placement at corners
 
 Straight (`LineLeadIn`) lead-ins at closed internal contour corners use the
 inward angle bisector instead of the normal of whichever edge was selected.
@@ -24,13 +24,39 @@ An excessively long lead-in or an approach angle rotated away from the bisector
 can still leave a small cutout. General non-circular containment/length clamping
 and sharp-corner handling for curved/composite lead-ins remain separate work.
 
+## Outside perimeter corners
+
+A straight (`LineLeadIn`) lead-in at a convex corner of the outside perimeter
+(interior angle under 180 degrees) extends the edge cut first: the pierce sits on
+that edge's line, behind the corner, and the torch travels straight into the corner
+and keeps cutting along the same line. Which of the two edges was picked (auto
+assignment or the manual cursor) does not matter; the cut direction never changes.
+The approach angle is ignored at such a corner.
+
+The straight lead is used only while its pierce stays at least
+`CuttingParameters.PierceClearance` from the contour and the lead crosses the
+contour nowhere but at the corner. Very flat corners (about 165 degrees and over for
+a 0.25 lead with 0.0625 clearance) fall back to the normal lead-in, perpendicular to
+the first-cut edge, so tessellated curves do not get straight leads. Reflex perimeter
+corners (the inside corner of an L) use the notch bisector, like cutout corners.
+
+A `LineLeadOut` mirrors this: at a convex perimeter corner it runs straight on past
+the corner along the last-cut edge, with the same clearance fallback to the last-cut
+edge's normal and a bisector at reflex corners. A tabbed perimeter keeps its old
+lead-out. `ContourCuttingStrategy.ResolveLeadIn`/`ResolveLeadOut` own these rules;
+program generation and the manual preview share them. Other lead-in styles are
+unchanged.
+
 ## Regression checks
 
-Run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter FullyQualifiedName~CutoutCornerLeadInTests`.
-The tests exercise generated part programs, default automatic placement, every
+Run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter "FullyQualifiedName~CutoutCornerLeadInTests|FullyQualifiedName~PerimeterCornerLeadInTests"`.
+The cutout tests exercise generated part programs, default automatic placement, every
 rectangular corner with both adjoining edges and windings, part rotation, acute
 and obtuse angles, reflex corners, line/arc corners, preview agreement, and
-unchanged/fallback behavior.
+unchanged/fallback behavior. The perimeter tests cover every square corner under both
+windings and a rotation, auto and manual placement from either edge, preview
+agreement, approach-angle handling, the flat-corner clearance fallback, reflex
+notches, and straight lead-outs.
 
 A headless before/after import of `4980 A01 PT07.dxf` (SHA-256
 `1535D77BC1EEEDD21A27E7CE91EA4C51055118D019C5A09C144F1F41740895B6`)

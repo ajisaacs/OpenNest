@@ -367,20 +367,26 @@ namespace OpenNest.CNC.CuttingStrategy
                 return;
             }
 
-            var leadInNormal = ComputeLeadInNormal(shape, point, entity, contourType, leadIn, winding);
+            leadIn = ResolveLeadIn(shape, point, entity, contourType, leadIn, winding,
+                Parameters.PierceClearance, out var leadInNormal);
             program.Codes.AddRange(leadIn.Generate(point, leadInNormal, winding));
 
             var reindexedShape = shape.ReindexAt(point, entity);
 
-            if (
-                Parameters.TabsEnabled
+            var tabbed = Parameters.TabsEnabled
                 && Parameters.TabConfig != null
-                && contourType == ContourType.External
-            )
+                && contourType == ContourType.External;
+            if (tabbed)
                 reindexedShape = TrimShapeForTab(reindexedShape, point, Parameters.TabConfig.Size);
 
+            // A tab leaves the contour short of the corner; a run-out through it would cut the tab.
+            var leadOutNormal = normal;
+            if (!tabbed)
+                leadOut = ResolveLeadOut(shape, point, entity, contourType, leadOut, winding,
+                    Parameters.PierceClearance, out leadOutNormal);
+
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
-            program.Codes.AddRange(leadOut.Generate(point, normal, winding));
+            program.Codes.AddRange(leadOut.Generate(point, leadOutNormal, winding));
         }
 
         private void EmitScribeContours(Program program, List<Entity> scribeEntities)
@@ -453,17 +459,136 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             var normal = ComputeNormal(point, entity, contourType, winding);
             if (contourType != ContourType.Internal || leadIn is not LineLeadIn
-                || entity is not (Line or Arc) || entity.Length <= Tolerance.Epsilon
-                || shape.Entities.Count < 2 || !shape.IsClosed())
+                || !TryGetCorner(shape, point, entity, out var corner))
                 return normal;
+
+            return BisectCorner(point, corner, contourType, winding) ?? normal;
+        }
+
+        /// <summary>
+        /// Returns the lead-in to emit at <paramref name="point"/> and the normal to
+        /// generate it with. At a corner of an outside perimeter, a straight
+        /// (<see cref="LineLeadIn"/>) lead-in extends the edge cut first so the torch
+        /// enters on that edge's line, provided the pierce keeps
+        /// <paramref name="pierceClearance"/> from the contour; the approach angle is
+        /// ignored there. Otherwise it is perpendicular to the edge cut first, and at a
+        /// reflex corner it bisects the notch. The result does not depend on which of
+        /// the two edges meeting at the corner was picked. Other styles and contour
+        /// types keep <see cref="ComputeLeadInNormal"/>.
+        /// </summary>
+        public static LeadIn ResolveLeadIn(
+            Shape shape,
+            Vector point,
+            Entity entity,
+            ContourType contourType,
+            LeadIn leadIn,
+            RotationType winding,
+            double pierceClearance,
+            out double normal
+        )
+        {
+            normal = ComputeLeadInNormal(shape, point, entity, contourType, leadIn, winding);
+            if (contourType != ContourType.External || leadIn is not LineLeadIn line
+                || !TryGetCorner(shape, point, entity, out var corner))
+                return leadIn;
+
+            switch (ClassifyCorner(corner, winding))
+            {
+                case CornerKind.Convex:
+                    var pierce = point - corner.TangentOut * line.Length;
+                    if (IsClearStraightLead(shape, point, pierce, pierceClearance))
+                    {
+                        normal = Angle.NormalizeRad((-corner.TangentOut).Angle());
+                        return new LineLeadIn { Length = line.Length, ApproachAngle = 90 };
+                    }
+                    normal = ComputeNormal(point, corner.Outgoing, contourType, winding);
+                    return leadIn;
+                case CornerKind.Smooth:
+                    normal = ComputeNormal(point, corner.Outgoing, contourType, winding);
+                    return leadIn;
+                case CornerKind.Reflex:
+                    normal = BisectCorner(point, corner, contourType, winding) ?? normal;
+                    return leadIn;
+                default:
+                    return leadIn;
+            }
+        }
+
+        /// <summary>
+        /// Lead-out counterpart of <see cref="ResolveLeadIn"/>. At a convex outside
+        /// perimeter corner a <see cref="LineLeadOut"/> runs straight on past the corner
+        /// along the edge cut last, when its end keeps <paramref name="clearance"/> from
+        /// the contour; otherwise it is perpendicular to that edge. At a reflex corner it
+        /// bisects the notch. Other styles and contour types keep the entity normal.
+        /// </summary>
+        public static LeadOut ResolveLeadOut(
+            Shape shape,
+            Vector point,
+            Entity entity,
+            ContourType contourType,
+            LeadOut leadOut,
+            RotationType winding,
+            double clearance,
+            out double normal
+        )
+        {
+            normal = ComputeNormal(point, entity, contourType, winding);
+            if (contourType != ContourType.External || leadOut is not LineLeadOut line
+                || !TryGetCorner(shape, point, entity, out var corner))
+                return leadOut;
+
+            switch (ClassifyCorner(corner, winding))
+            {
+                case CornerKind.Convex:
+                    var end = point + corner.TangentIn * line.Length;
+                    if (IsClearStraightLead(shape, point, end, clearance))
+                    {
+                        normal = Angle.NormalizeRad(corner.TangentIn.Angle());
+                        return new LineLeadOut { Length = line.Length, ApproachAngle = 90 };
+                    }
+                    normal = ComputeNormal(point, corner.Incoming, contourType, winding);
+                    return leadOut;
+                case CornerKind.Smooth:
+                    normal = ComputeNormal(point, corner.Incoming, contourType, winding);
+                    return leadOut;
+                case CornerKind.Reflex:
+                    normal = BisectCorner(point, corner, contourType, winding) ?? normal;
+                    return leadOut;
+                default:
+                    return leadOut;
+            }
+        }
+
+        private enum CornerKind
+        {
+            Convex,
+            Reflex,
+            Smooth,
+            Cusp,
+        }
+
+        /// <summary>A contour vertex: the entity cut into it and the one cut away from it.</summary>
+        private readonly record struct ContourCorner(
+            Entity Incoming,
+            Entity Outgoing,
+            Vector TangentIn,
+            Vector TangentOut
+        );
+
+        private static bool TryGetCorner(Shape shape, Vector point, Entity entity, out ContourCorner corner)
+        {
+            corner = default;
+            if (entity is not (Line or Arc) || entity.Length <= Tolerance.Epsilon
+                || shape.Entities.Count < 2 || !shape.IsClosed())
+                return false;
 
             var index = shape.Entities.IndexOf(entity);
             if (index < 0)
-                return normal;
+                return false;
 
             var atStart = point.DistanceTo(EntityStartPoint(entity)) <= Tolerance.Epsilon;
             if (!atStart && point.DistanceTo(EntityEndPoint(entity)) > Tolerance.Epsilon)
-                return normal;
+                return false;
 
             var adjacentIndex = atStart
                 ? (index + shape.Entities.Count - 1) % shape.Entities.Count
@@ -473,18 +598,93 @@ namespace OpenNest.CNC.CuttingStrategy
 
             if (adjacent is not (Line or Arc) || adjacent.Length <= Tolerance.Epsilon
                 || point.DistanceTo(adjacentPoint) > Tolerance.Epsilon)
-                return normal;
+                return false;
 
-            var adjacentNormal = ComputeNormal(point, adjacent, contourType, winding);
+            var incoming = atStart ? adjacent : entity;
+            var outgoing = atStart ? entity : adjacent;
+            var tangentIn = TravelTangent(incoming, point);
+            var tangentOut = TravelTangent(outgoing, point);
+            if (!IsFinite(tangentIn) || !IsFinite(tangentOut))
+                return false;
+
+            corner = new ContourCorner(incoming, outgoing, tangentIn, tangentOut);
+            return true;
+        }
+
+        /// <summary>Unit direction of travel along a line or arc at a point on it.</summary>
+        private static Vector TravelTangent(Entity entity, Vector point)
+        {
+            if (entity is Line line)
+                return (line.EndPoint - line.StartPoint).Normalize();
+
+            var arc = (Arc)entity;
+            var radial = (point - arc.Center).Normalize();
+            return arc.IsReversed ? new Vector(radial.Y, -radial.X) : new Vector(-radial.Y, radial.X);
+        }
+
+        private static bool IsFinite(Vector v) => double.IsFinite(v.X) && double.IsFinite(v.Y);
+
+        /// <summary>
+        /// Convex corners point away from the part (interior angle under 180 degrees).
+        /// A turn whose offset over the tangent is within chaining tolerance is smooth,
+        /// not a corner.
+        /// </summary>
+        private static CornerKind ClassifyCorner(ContourCorner corner, RotationType winding)
+        {
+            var cross = corner.TangentIn.X * corner.TangentOut.Y - corner.TangentIn.Y * corner.TangentOut.X;
+            var dot = corner.TangentIn.DotProduct(corner.TangentOut);
+            var turn = winding == RotationType.CCW ? cross : -cross;
+
+            if (System.Math.Abs(turn) <= Tolerance.Epsilon)
+                return dot > 0 ? CornerKind.Smooth : CornerKind.Cusp;
+
+            return turn > 0 ? CornerKind.Convex : CornerKind.Reflex;
+        }
+
+        private static double? BisectCorner(
+            Vector point,
+            ContourCorner corner,
+            ContourType contourType,
+            RotationType winding
+        )
+        {
+            var normal = ComputeNormal(point, corner.Outgoing, contourType, winding);
+            var adjacentNormal = ComputeNormal(point, corner.Incoming, contourType, winding);
             // Sum unit normals rather than averaging angles (which fails at 0/2π).
             // Winding makes this point into the scrap even at reflex corners.
             var x = System.Math.Cos(normal) + System.Math.Cos(adjacentNormal);
             var y = System.Math.Sin(normal) + System.Math.Sin(adjacentNormal);
             if (!double.IsFinite(x) || !double.IsFinite(y)
                 || x * x + y * y <= Tolerance.Epsilon * Tolerance.Epsilon)
-                return normal; // Opposing normals at a cusp have no unique bisector.
+                return null; // Opposing normals at a cusp have no unique bisector.
 
             return Angle.NormalizeRad(System.Math.Atan2(y, x));
+        }
+
+        /// <summary>
+        /// A straight lead from <paramref name="end"/> to the corner stays in the scrap:
+        /// its free end keeps <paramref name="clearance"/> from the contour and the lead
+        /// crosses the contour nowhere but at the corner.
+        /// </summary>
+        private static bool IsClearStraightLead(Shape shape, Vector corner, Vector end, double clearance)
+        {
+            if (!IsFinite(end) || end.DistanceTo(corner) <= Tolerance.Epsilon)
+                return false;
+
+            var nearest = shape.ClosestPointTo(end, out _);
+            if (nearest.DistanceTo(end) < System.Math.Max(clearance, 0) - Tolerance.Epsilon)
+                return false;
+
+            if (shape.Intersects(new Line(end, corner), out var crossings))
+            {
+                foreach (var crossing in crossings)
+                {
+                    if (crossing.DistanceTo(corner) > Tolerance.ChainTolerance)
+                        return false;
+                }
+            }
+
+            return true;
         }
 
         private static Vector EntityEndPoint(Entity entity)

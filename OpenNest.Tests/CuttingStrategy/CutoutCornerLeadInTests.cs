@@ -120,20 +120,20 @@ public class CutoutCornerLeadInTests
     }
 
     [Fact]
-    public void ApplySingleLeadIn_ExternalCorner_KeepsEntityNormal()
+    public void ApplySingleLeadIn_ExternalCorner_ExtendsFirstCutEdgeNotBisector()
     {
+        // Outside perimeter corners have their own rule (PerimeterCornerLeadInTests).
         var part = MakePart(Rectangle());
         var profile = Profile(part);
         var entity = Assert.IsType<Line>(profile.Perimeter.Entities[0]);
         var point = entity.StartPoint;
         var parameters = Parameters();
         parameters.ExternalLeadIn = parameters.InternalLeadIn;
-        var normal = ContourCuttingStrategy.ComputeNormal(point, entity, ContourType.External,
-            ContourCuttingStrategy.DetermineWinding(profile.Perimeter));
+        var direction = (entity.EndPoint - entity.StartPoint).Normalize();
 
         part.ApplySingleLeadIn(parameters, point, entity, ContourType.External);
 
-        AssertPoint(parameters.ExternalLeadIn.GetPiercePoint(point, normal), SingleLeadIn(part).StartPoint);
+        AssertPoint(point - direction * LeadLength, SingleLeadIn(part).StartPoint);
     }
 
     [Fact]

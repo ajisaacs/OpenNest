@@ -339,13 +339,17 @@ namespace OpenNest.Actions
             if (leadIn == null)
                 return;
 
-            snapNormal = ContourCuttingStrategy.ComputeLeadInNormal(
+            // Same resolution as program generation, so a corner previews identically
+            // whichever of its two edges the cursor picked.
+            leadIn = ContourCuttingStrategy.ResolveLeadIn(
                 hoveredContour.Shape,
                 snapPoint,
                 snapEntity,
                 snapContourType,
                 leadIn,
-                hoveredContour.Winding
+                hoveredContour.Winding,
+                parameters.PierceClearance,
+                out snapNormal
             );
             leadIn = ClampLeadInForCircle(leadIn, parameters);
 
