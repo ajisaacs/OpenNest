@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
+using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs.Placement;
@@ -23,6 +24,7 @@ namespace OpenNest.Controls
     public class PlateView : DrawControl
     {
         private readonly Timer redrawTimer;
+        private readonly OverlapOverlayController overlapOverlay;
 
         private string status;
         private Plate plate;
@@ -86,6 +88,7 @@ namespace OpenNest.Controls
 
         public PlateView(ColorScheme colorScheme)
         {
+            overlapOverlay = new OverlapOverlayController(this);
             Plate = new Plate(60, 120);
             origin = new PointF();
             parts = new List<LayoutPart>();
@@ -208,8 +211,27 @@ namespace OpenNest.Controls
             foreach (var part in plate.Parts)
                 parts.Add(LayoutPart.Create(part, this));
 
+            overlapOverlay.SetPlate(plate);
             actionManager?.OnPlateChanged();
         }
+
+        internal OverlapOverlayController OverlapOverlay => overlapOverlay;
+        public OverlapCheckStatus OverlapStatus => overlapOverlay.Status;
+        public PlateOverlapReport OverlapReport => overlapOverlay.Report;
+        public bool IsOverlapCheckRunning => overlapOverlay.IsRunning;
+        public OverlapDisplayMode OverlapDisplay
+        {
+            get => overlapOverlay.DisplayMode;
+            set => overlapOverlay.DisplayMode = value;
+        }
+        public event EventHandler OverlapStateChanged
+        {
+            add => overlapOverlay.StateChanged += value;
+            remove => overlapOverlay.StateChanged -= value;
+        }
+        public Task CheckOverlapsAsync() => overlapOverlay.CheckAsync();
+        public void CancelOverlapCheck() => overlapOverlay.Cancel();
+        public void InvalidateOverlapCheck() => overlapOverlay.Invalidate();
 
         public string Status
         {
@@ -491,6 +513,7 @@ namespace OpenNest.Controls
             renderer.DrawCutOffs(e.Graphics);
             renderer.DrawActiveWorkArea(e.Graphics);
             renderer.DrawDebugRemnants(e.Graphics);
+            DrawOverlapOverlay(e.Graphics);
 
             base.OnPaint(e);
 
@@ -515,10 +538,20 @@ namespace OpenNest.Controls
             }
         }
 
+        private void DrawOverlapOverlay(Graphics graphics) => overlapOverlay.Draw(graphics);
+
         protected override void OnHandleDestroyed(EventArgs e)
         {
+            overlapOverlay.ReleaseHandle();
             base.OnHandleDestroyed(e);
             actionManager.Cleanup();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                overlapOverlay?.Dispose();
+            base.Dispose(disposing);
         }
 
         public override void Refresh()

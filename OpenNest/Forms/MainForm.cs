@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.Collections;
 using OpenNest.Data;
+using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
@@ -47,6 +48,7 @@ namespace OpenNest.Forms
         public MainForm()
         {
             InitializeComponent();
+            UpdateOverlapMenu();
             LoadSettings();
 
             var renderer = new ToolStripRenderer(ToolbarTheme.Toolbar);
@@ -438,6 +440,7 @@ namespace OpenNest.Forms
                 activeForm.PlateView.MouseMove -= PlateView_MouseMove;
                 activeForm.PlateView.MouseClick -= PlateView_MouseClick;
                 activeForm.PlateView.StatusChanged -= PlateView_StatusChanged;
+                activeForm.PlateView.OverlapStateChanged -= OverlapStateChanged;
                 activeForm.PlateView.SelectionChanged -= PlateView_SelectionChanged;
                 activeForm.PlateView.PartAdded -= PlateView_PartAdded;
                 activeForm.PlateView.PartRemoved -= PlateView_PartRemoved;
@@ -450,6 +453,7 @@ namespace OpenNest.Forms
             }
 
             activeForm = ActiveMdiChild as EditNestForm;
+            UpdateOverlapMenu();
 
             EnableCheck();
             UpdatePlateStatus();
@@ -465,6 +469,7 @@ namespace OpenNest.Forms
             UpdateLocationMode();
             UpdateSelectionStatus();
             activeForm.PlateView.StatusChanged += PlateView_StatusChanged;
+            activeForm.PlateView.OverlapStateChanged += OverlapStateChanged;
             activeForm.PlateView.SelectionChanged += PlateView_SelectionChanged;
             activeForm.PlateView.PartAdded += PlateView_PartAdded;
             activeForm.PlateView.PartRemoved += PlateView_PartRemoved;
@@ -657,6 +662,43 @@ namespace OpenNest.Forms
         #endregion Edit Menu Events
 
         #region View Menu Events
+
+        private void OverlapStateChanged(object sender, EventArgs e) => UpdateOverlapMenu();
+        private void OverlapMenu_Opening(object sender, EventArgs e) => UpdateOverlapMenu();
+
+        private void UpdateOverlapMenu()
+        {
+            var hasPlate = activeForm != null && !activeForm.IsDisposed && activeForm.PlateView.Plate != null;
+            mnuViewOverlapCheck.Enabled = hasPlate;
+            mnuOverlapCheckActive.Enabled = hasPlate;
+            mnuOverlapCancel.Enabled = hasPlate && activeForm.PlateView.IsOverlapCheckRunning;
+            mnuOverlapDisplay.Enabled = hasPlate;
+            mnuOverlapOff.Enabled = hasPlate;
+            mnuOverlapAreas.Enabled = hasPlate;
+            mnuOverlapOff.Checked = hasPlate && activeForm.OverlapDisplay == OverlapDisplayMode.Off;
+            mnuOverlapAreas.Checked = hasPlate && activeForm.OverlapDisplay == OverlapDisplayMode.Areas;
+        }
+
+        private async void CheckOverlaps_Click(object sender, EventArgs e)
+        {
+            var form = activeForm;
+            if (form != null)
+                await form.CheckOverlapsAsync();
+        }
+
+        private void CancelOverlapCheck_Click(object sender, EventArgs e) => activeForm?.CancelOverlapCheck();
+
+        private void OverlapOff_Click(object sender, EventArgs e)
+        {
+            if (activeForm != null)
+                activeForm.OverlapDisplay = OverlapDisplayMode.Off;
+        }
+
+        private void OverlapAreas_Click(object sender, EventArgs e)
+        {
+            if (activeForm != null)
+                activeForm.OverlapDisplay = OverlapDisplayMode.Areas;
+        }
 
         private void ToggleDrawRapids_Click(object sender, EventArgs e)
         {

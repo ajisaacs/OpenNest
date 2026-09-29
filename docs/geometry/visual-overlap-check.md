@@ -1,9 +1,30 @@
-# Material-overlap polygon diagnostics
+# Visual material-overlap check
+
+## Desktop use
+
+Choose **View > Overlap Check > Check Active Plate** to check committed parts on
+this plate. Shared material is shaded red/magenta without changing the nest,
+selection, cutting paths, or export behavior. Cutoffs and temporary preview parts
+are excluded. **Cancel Check** discards the running request. **Display > Off /
+Areas** changes visibility without rerunning analysis; checking from Off shows
+Areas. Display preferences belong to the current document and are not saved.
+
+A persistent label distinguishes unchecked, checking, current, incomplete, stale,
+canceled, and failed checks. Only a completed, current, fully checked report can
+say **No material overlaps detected**. An incomplete check retains known overlaps
+and states how many distinct parts could not be checked. Pair counts are not
+fragment counts. This diagnostic checks shared material, not minimum spacing,
+plate edges, or cutting-path crossings.
+
+Edits clear the overlay and require another explicit check. Plate changes reset
+the check. Pan, zoom, selection, and display changes do not rerun geometry.
+Drawing-editor loading invalidates before loading, even if the dialog is later
+canceled. There is no automatic check during dragging or export.
+
+## Analysis API
 
 `OpenNest.Diagnostics.PlateOverlapAnalyzer` in OpenNest.Core checks a group of placed
-parts and returns the shared polygon areas for each overlapping pair. This is the
-cross-platform analysis foundation for a future PlateView overlay; it does not add
-a menu command, painting, centroids, or freshness management yet. Existing
+parts and returns the shared polygon areas for each overlapping pair. Existing
 `Part.Intersects`, `PartOverlapChecker`, `Plate.HasOverlappingParts`, engine
 validators, and CLI entry points are unchanged. A separate shared-triangulator fix
 uses translation-stable winding, correcting missed clockwise outlines/holes far
@@ -121,10 +142,33 @@ slivers are below its reporting policy. Floating-point coordinates still have
 finite resolution. Contact and fragment thresholds are unchanged; only the shared
 triangulator's winding arithmetic was stabilized in the prerequisite fix.
 
-Next integration/hardening: add PlateView request generations and stale-result
-invalidation before rendering; measure real-plate capture/analysis cost and
-cancellation latency before adding cached triangulations or background capture;
-add area-weighted centroids separately if the UI needs them.
+## Desktop lifecycle and rendering
+
+`OverlapReportState` and `OverlapGeometryStamp` in Core hold the testable request
+policy. The stamp compares ordered part identities, exact pose scalars, drawing
+and program references, cutoff status, and plate identity. It is not a geometry
+hash: any new editor that mutates a clean program in place must call
+`PlateView.InvalidateOverlapCheck()` before loading/mutation. Current live clean
+program editing goes through `EditNestForm.EditDrawingsInConverter_Click`;
+metadata-only edits do not change material. In-place hole-program edits require
+the same explicit invalidation.
+
+`OverlapOverlayController` owns UI-thread captures, background analysis, request
+generations, cancellation, and the GDI display cache. It checks freshness before
+publication and painting. Handle destruction/disposal cancels work and releases
+paths; old completions cannot replace a newer report. Snapshot conversion and
+clipping never run in paint or mouse-move handlers.
+
+PlateView draws the controller overlay after work-area/debug-remnant drawing and
+before action paint subscribers and hover tooltips. One consistently wound path
+is filled once, avoiding fragment outlines, internal triangulation seams, and
+darker triple coverage. World-to-graph conversion excludes pan, because PlateView
+already applies origin translation. Paths are rebuilt for report/scale changes,
+not ordinary repaints or panning. The state label saves/restores graphics state.
+
+Next hardening: measure real-plate capture/analysis cost and cancellation latency
+before adding cached triangulations or background capture. Cancellation cannot
+interrupt the interior of an existing kernel operation.
 
 ## Verification
 
@@ -136,5 +180,21 @@ inputs, snapshot isolation, read-only output, cutting-program independence, and
 cancellation. Run:
 
 ```sh
-dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter FullyQualifiedName~PlateOverlapAnalyzerTests
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests'
 ```
+
+`OverlapReportStateTests` verifies request supersession, exact pose/reference
+freshness, stale clearing, cancellation, and incomplete-versus-clear messaging.
+`OpenNest.WinForms.Tests/PlateOverlapOverlayTests.cs` adds STA worker/publication,
+menu/MDI, path-cache, uniform-fill pixel, and control-lifetime checks. Run those
+on Windows:
+
+```sh
+dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
+```
+
+Linux can cross-build with `-p:EnableWindowsTargeting=true`, but that does not
+execute Windows tests or verify appearance, DPI, or interaction. On Windows,
+check partial overlap, containment, inside-hole placement, pan/zoom and quadrant
+alignment, stale clearing during edits/plate switches, converter cancellation,
+and repeated check/toggle/close cycles without GDI/disposed-control errors.

@@ -10,6 +10,7 @@ using OpenNest.Api;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Controls;
+using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Sequencing;
 using OpenNest.IO;
@@ -26,6 +27,15 @@ namespace OpenNest.Forms
 
         public readonly Document Document;
         public readonly PlateView PlateView;
+
+        public System.Threading.Tasks.Task CheckOverlapsAsync() => PlateView.CheckOverlapsAsync();
+        public void CancelOverlapCheck() => PlateView.CancelOverlapCheck();
+        public OverlapDisplayMode OverlapDisplay
+        {
+            get => PlateView.OverlapDisplay;
+            set => PlateView.OverlapDisplay = value;
+        }
+
         public readonly PlateManager PlateManager;
 
         public Nest Nest => Document.Nest;
@@ -897,6 +907,8 @@ namespace OpenNest.Forms
                 program => NestWriter.GetProgramText(program) + "\0" + NestWriter.GetSubProgramsText(program)
             );
             var converter = new CadConverterForm();
+            // LoadDrawings can edit live programs even when the dialog is canceled.
+            PlateView.InvalidateOverlapCheck();
             converter.LoadDrawings(Nest.Drawings);
 
             if (converter.ShowDialog() != DialogResult.OK)
