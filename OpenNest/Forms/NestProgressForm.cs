@@ -25,6 +25,20 @@ namespace OpenNest.Forms
         private readonly System.Windows.Forms.Timer fadeTimer;
         private readonly Dictionary<Label, (int remaining, Color flashColor)> fadeCounters = new();
         private bool hasReceivedProgress;
+        private bool completed;
+
+        /// <summary>Keep the owner disabled until a whole-job worker finishes after Stop/close.</summary>
+        private bool holdOpenUntilCompleted;
+        public bool HoldOpenUntilCompleted
+        {
+            get => holdOpenUntilCompleted;
+            set
+            {
+                holdOpenUntilCompleted = value;
+                if (value)
+                    stopButton.Enabled = true; // Plug-ins need not report progress before cancellation.
+            }
+        }
 
         public bool Accepted { get; private set; }
 
@@ -94,6 +108,7 @@ namespace OpenNest.Forms
 
         public void ShowCompleted()
         {
+            completed = true;
             if (IsDisposed || !IsHandleCreated)
                 return;
 
@@ -143,13 +158,19 @@ namespace OpenNest.Forms
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            if (HoldOpenUntilCompleted && !completed)
+            {
+                cts.Cancel();
+                e.Cancel = true;
+                return;
+            }
             fadeTimer.Stop();
             fadeTimer.Dispose();
             elapsedTimer.Stop();
             elapsedTimer.Dispose();
             stopwatch.Stop();
 
-            if (!cts.IsCancellationRequested)
+            if (!completed && !cts.IsCancellationRequested)
                 cts.Cancel();
 
             base.OnFormClosing(e);

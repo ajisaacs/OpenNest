@@ -22,11 +22,6 @@ namespace OpenNest.Forms
             LoadDefaultPlateOptions();
             SetPlateOptimizerVisible(false);
 
-            sortOrderComboBox.Items.Add("Bounding Box Area");
-            sortOrderComboBox.Items.Add("Size");
-            sortOrderComboBox.SelectedIndex = 0;
-            SetPartFirstVisible(false);
-
             partsGrid.DataError += PartsGrid_DataError;
         }
 
@@ -34,12 +29,6 @@ namespace OpenNest.Forms
         {
             get { return engineComboBox.SelectedItem as string; }
             set { engineComboBox.SelectedItem = value; }
-        }
-
-        public bool AllowPlateCreation
-        {
-            get { return createNewPlatesAsNeededBox.Checked; }
-            set { createNewPlatesAsNeededBox.Checked = value; }
         }
 
         public bool OptimizePlateSize
@@ -57,22 +46,6 @@ namespace OpenNest.Forms
                 return 0.5;
             }
             set { salvageRateBox.Text = (value * 100).ToString("F0"); }
-        }
-
-        public bool PartFirstMode
-        {
-            get { return partFirstCheckBox.Checked; }
-            set { partFirstCheckBox.Checked = value; }
-        }
-
-        public PartSortOrder SortOrder
-        {
-            get
-            {
-                if (sortOrderComboBox.SelectedItem is string s && s == "Size")
-                    return PartSortOrder.Size;
-                return PartSortOrder.BoundingBoxArea;
-            }
         }
 
         public double MinRemnantSize
@@ -292,17 +265,6 @@ namespace OpenNest.Forms
             salvageRateLabel.Visible = visible;
             salvageRateBox.Visible = visible;
             salvageRatePercentLabel.Visible = visible;
-        }
-
-        private void partFirstCheckBox_CheckedChanged(object sender, EventArgs e)
-        {
-            SetPartFirstVisible(partFirstCheckBox.Checked);
-        }
-
-        private void SetPartFirstVisible(bool visible)
-        {
-            sortOrderLabel.Visible = visible;
-            sortOrderComboBox.Visible = visible;
             minRemnantLabel.Visible = visible;
             minRemnantBox.Visible = visible;
         }

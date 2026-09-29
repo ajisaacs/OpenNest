@@ -1146,336 +1146,132 @@ namespace OpenNest.Forms
 
         private async void RunAutoNest_Click(object sender, EventArgs e)
         {
-            var form = new AutoNestForm(activeForm.Nest);
-            form.AllowPlateCreation = true;
-
-            if (activeForm.Nest.PlateOptions.Count > 0)
-                form.LoadPlateOptions(activeForm.Nest.PlateOptions, activeForm.Nest.SalvageRate);
-
-            if (form.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            var target = activeForm;
+            if (target == null || target.IsDisposed || target.PlateView.Plate == null)
                 return;
-
-            if (form.EngineName != null)
+            var views = MdiChildren.OfType<EditNestForm>()
+                .Where(f => ReferenceEquals(f.Nest, target.Nest)).Select(f => f.PlateView).ToArray();
+            if (nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
+                || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true))
             {
-                EngineSelection.EngineName = form.EngineName;
-                engineComboBox.SelectedItem = form.EngineName;
+                MessageBox.Show(this, "Finish or cancel the current plate operation before Auto Nest.",
+                    "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
+            foreach (var view in views)
+                view.SetAction(typeof(ActionSelect));
+
+            using var form = new AutoNestForm(target.Nest);
+            if (target.Nest.PlateOptions.Count > 0)
+                form.LoadPlateOptions(target.Nest.PlateOptions, target.Nest.SalvageRate);
+            if (form.ShowDialog(this) != DialogResult.OK)
+                return;
 
             var items = form.GetNestItems();
-
             if (!items.Any(it => it.Quantity > 0))
                 return;
-
-            var optimizePlateSize = form.OptimizePlateSize;
-            var plateOptions = optimizePlateSize ? form.GetPlateOptions() : null;
-            var salvageRate = form.SalvageRate;
-            var partFirstMode = form.PartFirstMode;
-            var sortOrder = form.SortOrder;
-            var minRemnantSize = form.MinRemnantSize;
-            var allowPlateCreation = form.AllowPlateCreation;
-
-            if (optimizePlateSize)
+            var engineName = form.EngineName ?? EngineSelection.EngineName;
+            EngineSelection.EngineName = engineName;
+            engineComboBox.SelectedItem = engineName;
+            var plateOptions = form.OptimizePlateSize ? form.GetPlateOptions() : null;
+            using var cts = new CancellationTokenSource();
+            nestingCts = cts;
+            using var progressForm = new NestProgressForm(cts, showPlateRow: true)
             {
-                activeForm.Nest.PlateOptions = plateOptions;
-                activeForm.Nest.SalvageRate = salvageRate;
-            }
-
-            nestingCts = new CancellationTokenSource();
-            var progressForm = new NestProgressForm(nestingCts, showPlateRow: true);
-
-            var jobEngineName = EngineSelection.IsFillStrategy(EngineSelection.EngineName)
-                ? null
-                : EngineSelection.EngineName;
-            progressForm.AllowAccept = jobEngineName == null;
-
+                AllowAccept = false,
+                HoldOpenUntilCompleted = true,
+            };
+            var receivingProgress = true;
             var progress = new Progress<NestProgress>(p =>
             {
+                if (!receivingProgress || target.IsDisposed || cts.IsCancellationRequested)
+                    return;
                 progressForm.UpdateProgress(p);
-
                 if (p.IsOverallBest)
-                    activeForm.PlateView.SetActiveParts(p.BestParts);
-                activeForm.PlateView.ActiveWorkArea = p.ActiveWorkArea;
+                    target.PlateView.SetActiveParts(p.BestParts);
+                target.PlateView.ActiveWorkArea = p.ActiveWorkArea;
             });
-
-            progressForm.Show(this);
+            var jobProgress = JobEngineNest.CreateProgress(engineName, progress);
             SetNestingLockout(true);
-
             try
             {
-                if (jobEngineName != null)
-                    await RunJobEngineAsync(
-                        jobEngineName,
-                        items,
-                        progressForm,
-                        progress,
-                        nestingCts.Token,
-                        plateOptions,
-                        salvageRate,
-                        minRemnantSize
-                    );
-                else
-                    await RunAutoNestAsync(
-                        items,
-                        progressForm,
-                        progress,
-                        nestingCts.Token,
-                        plateOptions,
-                        salvageRate,
-                        partFirstMode,
-                        sortOrder,
-                        minRemnantSize,
-                        allowPlateCreation
-                    );
-            }
-            catch (Exception ex)
-            {
-                activeForm.PlateView.ClearPreviewParts();
-                MessageBox.Show(
-                    $"Nesting error: {ex.Message}",
-                    "Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-            }
-            finally
-            {
-                activeForm.PlateView.ActiveWorkArea = null;
-                progressForm.Close();
-                SetNestingLockout(false);
-                nestingCts.Dispose();
-                nestingCts = null;
-            }
-        }
+                var request = new NestPipelineRequest(engineName, items,
+                    NestStockBuilder.FromTemplate(target.PlateView.Plate, plateOptions),
+                    new NestJobOptions(maxPlates: 100,
+                        salvageRate: plateOptions?.Count > 0 ? form.SalvageRate : 0,
+                        minimumSalvageDimension: form.MinRemnantSize));
 
-        private async Task RunAutoNestAsync(
-            List<NestItem> items,
-            NestProgressForm progressForm,
-            IProgress<NestProgress> progress,
-            CancellationToken token,
-            List<PlateOption> plateOptions = null,
-            double salvageRate = 0.5,
-            bool partFirstMode = false,
-            PartSortOrder sortOrder = PartSortOrder.BoundingBoxArea,
-            double minRemnantSize = 12.0,
-            bool allowPlateCreation = true
-        )
-        {
-            if (partFirstMode)
-            {
-                var existingPlates = new List<Plate>();
-                for (var i = 0; i < activeForm.Nest.Plates.Count; i++)
+                async Task<NestPipelineResult> SolveAsync()
                 {
-                    var p = activeForm.Nest.Plates[i];
-                    if (p.Parts.Count > 0)
-                        existingPlates.Add(p);
-                }
-
-                var template = activeForm.PlateView.Plate;
-
-                var nestOptions = new MultiPlateNestOptions
-                {
-                    Template = template,
-                    PlateOptions = plateOptions,
-                    SalvageRate = salvageRate,
-                    SortOrder = sortOrder,
-                    MinRemnantSize = minRemnantSize,
-                    AllowPlateCreation = allowPlateCreation,
-                    Strategy = EngineSelection.FillStrategy,
-                };
-
-                var result = await Task.Run(() =>
-                    MultiPlateNester.Nest(items, nestOptions, existingPlates, progress, token)
-                );
-
-                foreach (var pr in result.Plates)
-                {
-                    if (pr.IsNew)
+                    try
                     {
-                        var plate = GetOrCreatePlate();
-                        plate.Size = pr.Plate.Size;
-                        plate.Parts.AddRange(pr.Parts);
+                        return await Task.Run(() => NestPipeline.Run(request, jobProgress, cts.Token));
+                    }
+                    finally
+                    {
+                        receivingProgress = false;
+                        progressForm.ShowCompleted();
+                        progressForm.Close();
                     }
                 }
 
-                activeForm.Nest.UpdateDrawingQuantities();
-                progressForm.ShowCompleted();
-                return;
-            }
+                var solve = SolveAsync();
+                // Owned modal progress holds drawings/plates stable through solve and cancellation.
+                if (!solve.IsCompleted)
+                    progressForm.ShowDialog(this);
+                var result = await solve;
+                cts.Token.ThrowIfCancellationRequested();
+                target.PlateView.ClearPreviewParts();
+                target.PlateView.ActiveWorkArea = null;
 
-            const int maxPlates = 100;
-
-            for (var plateIndex = 0; plateIndex < maxPlates; plateIndex++)
-            {
-                var remaining = items.Where(i => i.Quantity > 0).ToList();
-
-                if (remaining.Count == 0 || token.IsCancellationRequested)
-                    break;
-
-                var plate = GetOrCreatePlate();
-
-                var placed = await NestSinglePlateAsync(
-                    plate,
-                    plateIndex,
-                    remaining,
-                    progressForm,
-                    progress,
-                    token,
-                    plateOptions,
-                    salvageRate
-                );
-
-                if (!placed)
-                    break;
-            }
-
-            activeForm.Nest.UpdateDrawingQuantities();
-            progressForm.ShowCompleted();
-        }
-
-        /// <summary>
-        /// Whole-job path for StockLadder and Engines/ plug-ins: the engine owns plate count and
-        /// size selection, reports NestJobProgress into the progress form, and its result is
-        /// committed onto empty or new plates. Cancellation discards the run (engines throw).
-        /// </summary>
-        private async Task RunJobEngineAsync(
-            string engineName,
-            List<NestItem> items,
-            NestProgressForm progressForm,
-            IProgress<NestProgress> progress,
-            CancellationToken token,
-            List<PlateOption> plateOptions,
-            double salvageRate,
-            double minRemnantSize
-        )
-        {
-            const int maxPlates = 100;
-
-            var engine = NestingEngineRegistry.Create(engineName);
-            var job = JobEngineNest.BuildJob(
-                items,
-                activeForm.PlateView.Plate,
-                plateOptions,
-                salvageRate,
-                minRemnantSize,
-                maxPlates,
-                out var drawingsByPartId
-            );
-            var jobProgress = JobEngineNest.CreateProgress(engineName, progress);
-
-            NestJobResult result;
-            try
-            {
-                result = await Task.Run(() => engine.Solve(job, jobProgress, token));
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                activeForm.PlateView.ClearPreviewParts();
-                return;
-            }
-
-            activeForm.PlateView.ClearPreviewParts();
-
-            foreach (var sheet in result.Plates)
-            {
-                var parts = JobEngineNest.CreateParts(sheet, drawingsByPartId);
-                if (parts.Count == 0)
-                    continue;
-
-                var plate = GetOrCreatePlate();
-                plate.Size = sheet.Stock.Size;
-                plate.Parts.AddRange(parts);
-            }
-
-            activeForm.PlateView.Invalidate();
-            activeForm.Nest.UpdateDrawingQuantities();
-            progressForm.ShowCompleted();
-
-            if (result.Status != NestJobStatus.Complete)
-                MessageBox.Show(
-                    $"{engineName} could not place every part ({result.StopReason}).",
-                    "Auto Nest",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-        }
-
-        private Plate GetOrCreatePlate()
-        {
-            var plate = activeForm.PlateManager.GetOrCreateEmpty();
-            activeForm.PlateManager.LoadLast();
-            return plate;
-        }
-
-        private async Task<bool> NestSinglePlateAsync(
-            Plate plate,
-            int plateIndex,
-            List<NestItem> items,
-            NestProgressForm progressForm,
-            IProgress<NestProgress> progress,
-            CancellationToken token,
-            List<PlateOption> plateOptions = null,
-            double salvageRate = 0.5
-        )
-        {
-            List<Part> nestParts;
-
-            if (plateOptions != null && plateOptions.Count > 0)
-            {
-                var result = await Task.Run(() =>
-                    PlateOptimizer.Optimize(
-                        items,
-                        plateOptions,
-                        salvageRate,
-                        plate,
-                        progress,
-                        token,
-                        EngineSelection.FillStrategy
-                    )
-                );
-
-                if (
-                    result == null
-                    || result.Parts.Count == 0
-                    || (token.IsCancellationRequested && !progressForm.Accepted)
-                )
-                    return false;
-
-                plate.Size = new Geometry.Size(result.ChosenSize.Width, result.ChosenSize.Length);
-                nestParts = result.Parts;
-
-                // Deduct placed quantities — the optimizer clones items internally
-                // so the originals are untouched after dry runs.
-                foreach (var item in items)
+                var allowInvalid = false;
+                if (!result.IsValid)
                 {
-                    var placed = nestParts.Count(p => p.BaseDrawing.Name == item.Drawing.Name);
-                    item.Quantity = System.Math.Max(0, item.Quantity - placed);
+                    using var review = new NestValidationForm(result.Violations, result.CanKeep);
+                    if (review.ShowDialog(this) != DialogResult.OK)
+                        return;
+                    allowInvalid = true;
                 }
+
+                var applied = NestPipelineCommit.ApplyToEmptyPlates(result, target.PlateManager,
+                    allowInvalid, cts.Token);
+                if (applied.Count > 0)
+                    target.PlateManager.LoadAt(target.Nest.Plates.IndexOf(applied[0]));
+                if (plateOptions?.Count > 0)
+                {
+                    target.Nest.PlateOptions = plateOptions;
+                    target.Nest.SalvageRate = form.SalvageRate;
+                }
+                target.PlateView.Invalidate();
+                if (allowInvalid)
+                {
+                    target.OverlapDisplay = OverlapDisplayMode.Both;
+                    await target.CheckOverlapsAsync();
+                }
+                if (result.Status != NestJobStatus.Complete)
+                    MessageBox.Show(this, $"{engineName} could not place every part ({result.StopReason}).",
+                        "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-            else
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
-                // Same preview flow as before: fill the current plate's remaining demand with the
-                // selected strategy, then commit the returned parts. App-scoped selection — the
-                // process-global engine registry is never consulted.
-                nestParts = await Task.Run(() =>
-                    PlateFillService.Nest(
-                        EngineSelection.FillStrategy,
-                        plate,
-                        items,
-                        plateIndex,
-                        progress,
-                        token
-                    )
-                );
+                // Stop discards the entire proposal, including engines that ignore cancellation.
             }
-
-            activeForm.PlateView.ClearPreviewParts();
-
-            if (nestParts.Count == 0 || (token.IsCancellationRequested && !progressForm.Accepted))
-                return false;
-
-            plate.Parts.AddRange(nestParts);
-            activeForm.PlateView.Invalidate();
-            return true;
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Nesting error: {ex.Message}", "Auto Nest",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                receivingProgress = false;
+                if (!target.IsDisposed)
+                {
+                    target.PlateView.ClearPreviewParts();
+                    target.PlateView.ActiveWorkArea = null;
+                }
+                SetNestingLockout(false);
+                nestingCts = null;
+            }
         }
 
         private void SequenceAllPlates_Click(object sender, EventArgs e)

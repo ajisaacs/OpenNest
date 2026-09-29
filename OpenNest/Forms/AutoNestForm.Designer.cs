@@ -24,11 +24,6 @@ namespace OpenNest.Forms
             this.summaryLabel = new System.Windows.Forms.Label();
             this.engineLabel = new System.Windows.Forms.Label();
             this.engineComboBox = new System.Windows.Forms.ComboBox();
-            this.createNewPlatesAsNeededBox = new System.Windows.Forms.CheckBox();
-            this.partFirstGroup = new System.Windows.Forms.GroupBox();
-            this.partFirstCheckBox = new System.Windows.Forms.CheckBox();
-            this.sortOrderLabel = new System.Windows.Forms.Label();
-            this.sortOrderComboBox = new System.Windows.Forms.ComboBox();
             this.minRemnantLabel = new System.Windows.Forms.Label();
             this.minRemnantBox = new System.Windows.Forms.TextBox();
             this.plateOptimizerGroup = new System.Windows.Forms.GroupBox();
@@ -45,7 +40,6 @@ namespace OpenNest.Forms
             this.platesTab.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.partsGrid)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.plateGrid)).BeginInit();
-            this.partFirstGroup.SuspendLayout();
             this.plateOptimizerGroup.SuspendLayout();
             this.buttonPanel.SuspendLayout();
             this.SuspendLayout();
@@ -77,8 +71,6 @@ namespace OpenNest.Forms
             //
             this.platesTab.Controls.Add(this.engineLabel);
             this.platesTab.Controls.Add(this.engineComboBox);
-            this.platesTab.Controls.Add(this.createNewPlatesAsNeededBox);
-            this.platesTab.Controls.Add(this.partFirstGroup);
             this.platesTab.Controls.Add(this.plateOptimizerGroup);
             this.platesTab.Location = new System.Drawing.Point(4, 25);
             this.platesTab.Name = "platesTab";
@@ -129,70 +121,18 @@ namespace OpenNest.Forms
             this.engineComboBox.Size = new System.Drawing.Size(200, 24);
             this.engineComboBox.TabIndex = 1;
             //
-            // createNewPlatesAsNeededBox
-            //
-            this.createNewPlatesAsNeededBox.AutoSize = true;
-            this.createNewPlatesAsNeededBox.Location = new System.Drawing.Point(10, 44);
-            this.createNewPlatesAsNeededBox.Name = "createNewPlatesAsNeededBox";
-            this.createNewPlatesAsNeededBox.Size = new System.Drawing.Size(202, 20);
-            this.createNewPlatesAsNeededBox.TabIndex = 2;
-            this.createNewPlatesAsNeededBox.Text = "Create new plates as needed";
-            this.createNewPlatesAsNeededBox.UseVisualStyleBackColor = true;
-            //
-            // partFirstGroup
-            //
-            this.partFirstGroup.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
-            this.partFirstGroup.Controls.Add(this.partFirstCheckBox);
-            this.partFirstGroup.Controls.Add(this.sortOrderLabel);
-            this.partFirstGroup.Controls.Add(this.sortOrderComboBox);
-            this.partFirstGroup.Controls.Add(this.minRemnantLabel);
-            this.partFirstGroup.Controls.Add(this.minRemnantBox);
-            this.partFirstGroup.Location = new System.Drawing.Point(10, 72);
-            this.partFirstGroup.Name = "partFirstGroup";
-            this.partFirstGroup.Size = new System.Drawing.Size(528, 80);
-            this.partFirstGroup.TabIndex = 3;
-            this.partFirstGroup.TabStop = false;
-            this.partFirstGroup.Text = "      Part-First Mode";
-            //
-            // partFirstCheckBox
-            //
-            this.partFirstCheckBox.AutoSize = true;
-            this.partFirstCheckBox.Location = new System.Drawing.Point(10, 0);
-            this.partFirstCheckBox.Name = "partFirstCheckBox";
-            this.partFirstCheckBox.Size = new System.Drawing.Size(15, 14);
-            this.partFirstCheckBox.TabIndex = 0;
-            this.partFirstCheckBox.UseVisualStyleBackColor = true;
-            this.partFirstCheckBox.CheckedChanged += new System.EventHandler(this.partFirstCheckBox_CheckedChanged);
-            //
-            // sortOrderLabel
-            //
-            this.sortOrderLabel.AutoSize = true;
-            this.sortOrderLabel.Location = new System.Drawing.Point(10, 26);
-            this.sortOrderLabel.Name = "sortOrderLabel";
-            this.sortOrderLabel.Size = new System.Drawing.Size(75, 16);
-            this.sortOrderLabel.TabIndex = 1;
-            this.sortOrderLabel.Text = "Sort Order:";
-            //
-            // sortOrderComboBox
-            //
-            this.sortOrderComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.sortOrderComboBox.Location = new System.Drawing.Point(100, 23);
-            this.sortOrderComboBox.Name = "sortOrderComboBox";
-            this.sortOrderComboBox.Size = new System.Drawing.Size(180, 24);
-            this.sortOrderComboBox.TabIndex = 2;
-            //
             // minRemnantLabel
             //
             this.minRemnantLabel.AutoSize = true;
-            this.minRemnantLabel.Location = new System.Drawing.Point(10, 54);
+            this.minRemnantLabel.Location = new System.Drawing.Point(10, 193);
             this.minRemnantLabel.Name = "minRemnantLabel";
             this.minRemnantLabel.Size = new System.Drawing.Size(117, 16);
             this.minRemnantLabel.TabIndex = 3;
-            this.minRemnantLabel.Text = "Min Remnant Size:";
+            this.minRemnantLabel.Text = "Min Salvage Size:";
             //
             // minRemnantBox
             //
-            this.minRemnantBox.Location = new System.Drawing.Point(133, 51);
+            this.minRemnantBox.Location = new System.Drawing.Point(155, 190);
             this.minRemnantBox.Name = "minRemnantBox";
             this.minRemnantBox.Size = new System.Drawing.Size(60, 22);
             this.minRemnantBox.TabIndex = 4;
@@ -201,17 +141,19 @@ namespace OpenNest.Forms
             // plateOptimizerGroup
             //
             this.plateOptimizerGroup.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
+            this.plateOptimizerGroup.Controls.Add(this.minRemnantLabel);
+            this.plateOptimizerGroup.Controls.Add(this.minRemnantBox);
             this.plateOptimizerGroup.Controls.Add(this.optimizePlateSizeBox);
             this.plateOptimizerGroup.Controls.Add(this.plateGrid);
             this.plateOptimizerGroup.Controls.Add(this.salvageRateLabel);
             this.plateOptimizerGroup.Controls.Add(this.salvageRateBox);
             this.plateOptimizerGroup.Controls.Add(this.salvageRatePercentLabel);
-            this.plateOptimizerGroup.Location = new System.Drawing.Point(10, 158);
+            this.plateOptimizerGroup.Location = new System.Drawing.Point(10, 52);
             this.plateOptimizerGroup.Name = "plateOptimizerGroup";
-            this.plateOptimizerGroup.Size = new System.Drawing.Size(528, 188);
+            this.plateOptimizerGroup.Size = new System.Drawing.Size(528, 224);
             this.plateOptimizerGroup.TabIndex = 4;
             this.plateOptimizerGroup.TabStop = false;
-            this.plateOptimizerGroup.Text = "      Plate Optimizer";
+            this.plateOptimizerGroup.Text = "      Stock Options";
             //
             // optimizePlateSizeBox
             //
@@ -318,8 +260,6 @@ namespace OpenNest.Forms
             this.platesTab.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.partsGrid)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.plateGrid)).EndInit();
-            this.partFirstGroup.ResumeLayout(false);
-            this.partFirstGroup.PerformLayout();
             this.plateOptimizerGroup.ResumeLayout(false);
             this.plateOptimizerGroup.PerformLayout();
             this.buttonPanel.ResumeLayout(false);
@@ -335,11 +275,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Label summaryLabel;
         private System.Windows.Forms.Label engineLabel;
         private System.Windows.Forms.ComboBox engineComboBox;
-        private System.Windows.Forms.CheckBox createNewPlatesAsNeededBox;
-        private System.Windows.Forms.GroupBox partFirstGroup;
-        private System.Windows.Forms.CheckBox partFirstCheckBox;
-        private System.Windows.Forms.Label sortOrderLabel;
-        private System.Windows.Forms.ComboBox sortOrderComboBox;
         private System.Windows.Forms.Label minRemnantLabel;
         private System.Windows.Forms.TextBox minRemnantBox;
         private System.Windows.Forms.GroupBox plateOptimizerGroup;
