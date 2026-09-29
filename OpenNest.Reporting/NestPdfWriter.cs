@@ -26,6 +26,11 @@ public static class NestPdfWriter
     private static readonly XColor Fill = XColor.FromArgb(222, 222, 222);
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
+    // PDFsharp/MigraDoc layout and font state is process-wide and not safe for concurrent
+    // documents: parallel exports laid out text differently. Reports are rare, so serialize them.
+    private static readonly object RenderLock = new();
+
+    /// <summary>Thread-safe; concurrent calls are serialized.</summary>
     public static void Write(NestReportSnapshot snapshot, string destination) =>
         Write(snapshot, destination, null);
 
@@ -34,6 +39,12 @@ public static class NestPdfWriter
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        lock (RenderLock)
+            WriteSerialized(snapshot, destination, wrapOutput);
+    }
+
+    private static void WriteSerialized(NestReportSnapshot snapshot, string destination, Func<Stream, Stream>? wrapOutput)
+    {
         ValidateText(snapshot);
         if (snapshot.Plates.Length > 1)
             throw new NotSupportedException($"A report with {snapshot.Plates.Length} plate layouts is not supported by this report slice; it supports at most one layout.");
