@@ -7,10 +7,30 @@ namespace OpenNest.CNC
     {
         public readonly record struct Segment(Vector From, Vector To);
 
+        /// <summary>
+        /// Enumerates plate rapids in cutting order, advancing through all cutting
+        /// motions before connecting to the next part (including scrap cutoffs).
+        /// </summary>
+        public static List<Segment> Enumerate(IEnumerable<Part> parts)
+        {
+            var results = new List<Segment>();
+            var pos = Vector.Zero;
+
+            foreach (var part in parts)
+                pos = AppendProgram(part.Program, part.Location, pos, results);
+
+            return results;
+        }
+
         public static List<Segment> Enumerate(Program pgm, Vector basePos, Vector startPos)
         {
             var results = new List<Segment>();
+            AppendProgram(pgm, basePos, startPos, results);
+            return results;
+        }
 
+        private static Vector AppendProgram(Program pgm, Vector basePos, Vector startPos, List<Segment> results)
+        {
             // Draw the rapid from the previous tool position to the program's first
             // pierce point. The walk then starts at the program origin (basePos), not
             // the pierce: the skipped first rapid still advances pos, so starting at
@@ -21,7 +41,8 @@ namespace OpenNest.CNC
 
             var pos = basePos;
             Walk(pgm, basePos, ref pos, skipFirst: true, results);
-            return results;
+            // The last rapid ends at a pierce, not necessarily the final tool position.
+            return pos;
         }
 
         private static Vector FirstPiercePoint(Program pgm, Vector basePos)

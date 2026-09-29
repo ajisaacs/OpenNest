@@ -426,19 +426,8 @@ namespace OpenNest.Controls
         private void DrawRapids(Graphics g)
         {
             var pen = view.ColorScheme.RapidPen;
-            var pos = new Vector(0, 0);
-
-            for (var i = 0; i < view.Plate.Parts.Count; ++i)
-            {
-                var part = view.Plate.Parts[i];
-                var segments = RapidEnumerator.Enumerate(part.Program, part.Location, pos);
-
-                foreach (var seg in segments)
-                {
-                    DrawLine(g, seg.From, seg.To, pen);
-                    pos = seg.To;
-                }
-            }
+            foreach (var segment in RapidEnumerator.Enumerate(view.Plate.Parts))
+                DrawLine(g, segment.From, segment.To, pen);
         }
 
         private void DrawAllPiercePoints(Graphics g)

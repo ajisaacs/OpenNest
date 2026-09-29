@@ -22,6 +22,8 @@ For a 120-by-81-inch sheet whose parts extend through 80 inches, the nominal ske
 
 ## Limits and operator review
 
+**View > Draw Rapids** follows the complete cutting sequence: an incoming rapid ends at a cutoff's first pierce, gaps between its trimmed segments remain rapids, and the next part's rapid starts at the cutoff's final cutting endpoint—not its last pierce. This display does not add a return move or alter the cutoff program.
+
 - Spacing is nominal. Clearance gaps and suppressed short segments can leave bridges between scrap regions. This command does **not** certify that every connected scrap piece is disconnected or fits a hopper.
 - The active sheet's physical width is used, not a hard-coded 81 inches. Check the actual width against the hopper; a wider sheet is not automatically hopper-compatible.
 - Internal-hole scrap is not processed. This command reuses the outside-skeleton behavior of manual cutoffs; it does not force cuts through parts or remove clearance to guarantee separation.
