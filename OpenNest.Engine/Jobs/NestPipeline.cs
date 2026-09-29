@@ -34,6 +34,7 @@ public sealed class NestPipelineResult
         NestJobResult raw,
         IReadOnlyList<ProposedPlate> plates,
         IReadOnlyList<string> violations,
+        bool canKeep,
         TimeSpan solveTime,
         TimeSpan validationTime
     )
@@ -43,6 +44,7 @@ public sealed class NestPipelineResult
         Raw = raw;
         Plates = plates;
         Violations = violations;
+        CanKeep = canKeep;
         SolveTime = solveTime;
         ValidationTime = validationTime;
     }
@@ -53,6 +55,9 @@ public sealed class NestPipelineResult
     public IReadOnlyList<ProposedPlate> Plates { get; }
     public IReadOnlyList<string> Violations { get; }
     public bool IsValid => Violations.Count == 0;
+    /// <summary>True when every placement can be represented, even if layout rules fail.
+    /// False for unknown/null requirement IDs or nonfinite poses; Plates is then empty.</summary>
+    public bool CanKeep { get; }
     public NestJobStatus Status => Raw.Status;
     public NestJobStopReason StopReason => Raw.StopReason;
     public TimeSpan SolveTime { get; }
@@ -109,6 +114,7 @@ public static class NestPipeline
         }
 
         var job = new NestJob(parts, request.Stock, request.Options);
+        NestJobValidator.Validate(job);
 
         var clock = Stopwatch.StartNew();
         var raw =
@@ -118,16 +124,22 @@ public static class NestPipeline
         token.ThrowIfCancellationRequested();
 
         clock.Restart();
-        var violations = Validate(job, raw, drawingsByPartId);
+        var names = drawingsByPartId.ToDictionary(
+            kv => kv.Key,
+            kv => kv.Value.Name ?? kv.Key,
+            StringComparer.Ordinal
+        );
+        var violations = NestLayoutCheck.Violations(job, raw, names, out var canKeep);
         var validationTime = clock.Elapsed;
 
-        var plates = raw
-            .Plates.Select(sheet => new ProposedPlate(
+        var plates = canKeep
+            ? raw.Plates.Select(sheet => new ProposedPlate(
                 sheet.PlateIndex,
                 sheet.Stock,
                 NestResultBinder.Bind(sheet, drawingsByPartId)
             ))
-            .ToList();
+            .ToList()
+            : new List<ProposedPlate>();
 
         token.ThrowIfCancellationRequested();
         return new NestPipelineResult(
@@ -136,55 +148,9 @@ public static class NestPipeline
             raw,
             plates,
             violations,
+            canKeep,
             solveTime,
             validationTime
         );
-    }
-
-    /// <summary>Benchmark validation, with messages naming the caller's drawings rather than
-    /// internal requirement IDs. Placements for unknown requirements are reported and then
-    /// excluded so the remaining layout is still checked.</summary>
-    private static IReadOnlyList<string> Validate(
-        NestJob job,
-        NestJobResult raw,
-        IReadOnlyDictionary<string, Drawing> drawingsByPartId
-    )
-    {
-        var violations = new List<string>();
-        var known = raw;
-        var unknown = raw
-            .Plates.SelectMany(sheet =>
-                sheet.Placements.Where(p => !drawingsByPartId.ContainsKey(p.PartId))
-                    .Select(p => (sheet.PlateIndex, p.PartId))
-            )
-            .ToList();
-
-        if (unknown.Count > 0)
-        {
-            foreach (var group in unknown.GroupBy(u => (u.PlateIndex, u.PartId)))
-                violations.Add(
-                    $"Plate {group.Key.PlateIndex} has {group.Count()} placement(s) for '{group.Key.PartId}', which is not part of this job"
-                );
-
-            known = new NestJobResult(
-                raw.Status,
-                raw.StopReason,
-                raw.Plates.Select(sheet => new NestJobPlateResult(
-                    sheet.PlateIndex,
-                    sheet.Stock,
-                    sheet.Placements.Where(p => drawingsByPartId.ContainsKey(p.PartId))
-                )),
-                raw.Fulfillment,
-                raw.StockUsage
-            );
-        }
-
-        var names = drawingsByPartId.ToDictionary(
-            kv => kv.Key,
-            kv => kv.Value.Name ?? kv.Key,
-            StringComparer.Ordinal
-        );
-        violations.AddRange(NestLayoutCheck.Violations(job, known, names));
-        return violations;
     }
 }

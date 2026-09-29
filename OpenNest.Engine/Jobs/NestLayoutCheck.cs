@@ -21,7 +21,8 @@ namespace OpenNest.Engine.Jobs;
 /// </summary>
 public static class NestLayoutCheck
 {
-    /// <summary>Checks bounds, spacing, quantities, offered stock and rotation policies.
+    /// <summary>Checks placement structure, bounds, spacing, quantities, offered stock,
+    /// MaxPlates and rotation policies. Unrepresentable placements skip geometry checks.
     /// Requirement IDs are used in messages. Instance indices and fulfillment metadata are
     /// not checked, matching the benchmark contract.</summary>
     public static IReadOnlyList<string> Violations(NestJob job, NestJobResult result)
@@ -36,19 +37,59 @@ public static class NestLayoutCheck
         NestJob job,
         NestJobResult result,
         IReadOnlyDictionary<string, string> displayNames
+    ) => Violations(job, result, displayNames, out _);
+
+    internal static IReadOnlyList<string> Violations(
+        NestJob job,
+        NestJobResult result,
+        IReadOnlyDictionary<string, string> displayNames,
+        out bool canKeep
     )
     {
         ArgumentNullException.ThrowIfNull(job);
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(displayNames);
-        var materialized = NestResultMaterializer.Materialize(job, result);
-        var requirements = job.Parts.ToDictionary(p => materialized.DrawingsByPartId[p.Id],
-            p => (Name: displayNames.GetValueOrDefault(p.Id, p.Id), p.Quantity));
-        var runs = materialized.Nest.Plates.Select(p => (p, p.Parts.ToList())).ToList();
-        var violations = Validate(runs, requirements);
+        var violations = new List<string>();
+        ValidateStructure(job, result, displayNames, violations);
+        canKeep = violations.Count == 0;
+        if (canKeep)
+        {
+            var materialized = NestResultMaterializer.Materialize(job, result);
+            var requirements = job.Parts.ToDictionary(p => materialized.DrawingsByPartId[p.Id],
+                p => (Name: displayNames.GetValueOrDefault(p.Id, p.Id), p.Quantity));
+            var runs = materialized.Nest.Plates.Select(p => (p, p.Parts.ToList())).ToList();
+            violations.AddRange(Validate(runs, requirements));
+        }
         ValidateAgainstJob(job, result, job.Parts.ToDictionary(p => p.Id,
             p => displayNames.GetValueOrDefault(p.Id, p.Id)), violations);
         return violations;
+    }
+
+    private static void ValidateStructure(
+        NestJob job,
+        NestJobResult result,
+        IReadOnlyDictionary<string, string> displayNames,
+        List<string> violations
+    )
+    {
+        var partIds = job.Parts.Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var sheet in result.Plates)
+        {
+            for (var i = 0; i < sheet.Placements.Count; i++)
+            {
+                var pose = sheet.Placements[i];
+                var name = pose.PartId == null ? "<null>" : displayNames.GetValueOrDefault(pose.PartId, pose.PartId);
+                var description = $"Plate {sheet.PlateIndex} placement {i} for '{name}'";
+                if (pose.PartId == null || !partIds.Contains(pose.PartId))
+                    violations.Add($"{description}, which is not part of this job");
+                if (!double.IsFinite(pose.X))
+                    violations.Add($"{description} has nonfinite X ({pose.X})");
+                if (!double.IsFinite(pose.Y))
+                    violations.Add($"{description} has nonfinite Y ({pose.Y})");
+                if (!double.IsFinite(pose.Rotation))
+                    violations.Add($"{description} has nonfinite Rotation ({pose.Rotation})");
+            }
+        }
     }
 
     /// <summary>Tests material clearance using the benchmark's conservative outlines.
@@ -121,7 +162,7 @@ public static class NestLayoutCheck
     /// Checks what the materialized layout cannot show: every sheet must be
     /// one of the job's own stock entries (an engine may not invent a sheet
     /// size or loosen its spacing/edge settings, which the layout checks
-    /// would otherwise trust), finite stock may not be overdrawn, and every
+    /// would otherwise trust), finite stock and MaxPlates may not be overdrawn, and every
     /// placement's rotation must satisfy its part's RotationPolicy.
     /// </summary>
     internal static void ValidateAgainstJob(
@@ -134,6 +175,9 @@ public static class NestLayoutCheck
         var stockById = job.Plates.ToDictionary(s => s.Id);
         var partsById = job.Parts.ToDictionary(p => p.Id);
         var sheetsUsed = new Dictionary<string, int>();
+
+        if (job.Options.MaxPlates is int maxPlates && jobResult.Plates.Count > maxPlates)
+            result.Add($"Used {jobResult.Plates.Count} sheet(s) but the job MaxPlates limit is {maxPlates}");
 
         foreach (var sheet in jobResult.Plates)
         {
@@ -167,8 +211,10 @@ public static class NestLayoutCheck
         {
             foreach (var placement in sheet.Placements)
             {
-                if (!partsById.TryGetValue(placement.PartId, out var part))
-                    continue; // reported by ValidateQuantities
+                if (placement.PartId == null
+                    || !partsById.TryGetValue(placement.PartId, out var part)
+                    || !double.IsFinite(placement.Rotation))
+                    continue; // reported by ValidateStructure
 
                 if (!part.Rotation.Allows(placement.Rotation))
                 {
