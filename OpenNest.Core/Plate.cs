@@ -174,7 +174,13 @@ namespace OpenNest
 
                     if (entities.Count > 0)
                     {
-                        var profile = new Geometry.ShapeProfile(entities);
+                        // Leads are cutting paths in scrap, not boundary edges. Chaining them
+                        // into the outline can make a closed part appear open and replace its
+                        // recesses with a convex hull. Keep the full geometry for the existing
+                        // conservative fallback when the material contour really is open.
+                        var outline = entities.Where(e => e.Layer != SpecialLayers.Leadin &&
+                            e.Layer != SpecialLayers.Leadout).ToList();
+                        var profile = new Geometry.ShapeProfile(outline);
 
                         if (profile.Perimeter.IsClosed())
                         {

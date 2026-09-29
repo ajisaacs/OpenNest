@@ -14,6 +14,8 @@ An empty sheet is left untouched. Invalid input or out-of-sheet part geometry pr
 
 Only real parts contribute to the occupied envelope; existing cutoff parts do not. When there is room, the final separator is beyond the furthest occupied extent by the larger of plate part spacing and cutoff part clearance, plus numerical tolerance. Repeated skeleton cuts stop before that separator. The larger margin affects only the separator: repeated cuts keep the existing manual-cutoff clearance behavior.
 
+Cutoff trimming measures clearance from the part contour, excluding tagged lead-in and lead-out moves when building the closed outline. Leads must not turn a recessed outline into a convex hull and leave oversized gaps elsewhere. Genuinely open contours still use the conservative hull/bounds fallback. The conservative curve/offset approximation can leave a small extra gap (about 0.0003 in on a straight edge at the default 0.02-in clearance), not an extra quarter inch.
+
 If no safe separator fits inside the sheet, there is no retained-tail claim and the nominal cuts may cover the full sheet length. A proposed tail is not reported as separated unless its generated program spans the full sheet width. Obstructed or minimum-length-filtered lines produce diagnostics; they are not proof of a completed partition.
 
 For a 120-by-81-inch sheet whose parts extend through 80 inches, the nominal skeleton lines are at 35 and 70 inches, followed by a separator beyond 80 inches at the required margin. There is no line at 105 inches through the retained tail.
