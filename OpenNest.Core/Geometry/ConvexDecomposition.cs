@@ -148,14 +148,12 @@ namespace OpenNest.Geometry
         /// </summary>
         private static double SignedArea(List<Vector> verts)
         {
+            // World-coordinate products can erase the sign of a small polygon's area
+            // far from the origin, leaving CW outlines/holes untriangulated. Measure
+            // relative to a vertex, just as the clipping kernel measures its fragments.
             var area = 0.0;
-
-            for (var i = 0; i < verts.Count; i++)
-            {
-                var j = (i + 1) % verts.Count;
-                area += verts[i].X * verts[j].Y;
-                area -= verts[j].X * verts[i].Y;
-            }
+            for (var i = 1; i + 1 < verts.Count; i++)
+                area += Cross(verts[0], verts[i], verts[i + 1]);
 
             return area * 0.5;
         }
