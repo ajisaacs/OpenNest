@@ -135,8 +135,15 @@ namespace OpenNest
         )
         {
             var bb = part.BoundingBox;
+            var roundoff = GetBoundsRoundoff(part);
             var (partMin, partMax) = AxisBounds(bb, clearance);
             var (partStart, partEnd) = CrossAxisBounds(bb, clearance);
+            // Match the planner's representational allowance in BOTH pruning and
+            // fallback exclusions. Tolerating it only in validation could cut an edge.
+            partMin -= roundoff;
+            partMax += roundoff;
+            partStart -= roundoff;
+            partEnd += roundoff;
 
             if (cutPosition < partMin || cutPosition > partMax)
                 return EmptyExclusions;
@@ -155,6 +162,25 @@ namespace OpenNest
             }
 
             return new List<(double Start, double End)> { (partStart, partEnd) };
+        }
+
+        /// <summary>
+        /// Bounds reconstructed as (local minimum + placement) + size can differ
+        /// from translated material endpoints by a few floating-point steps. This
+        /// is not a geometry tolerance: cap it well below epsilon so inconsistent
+        /// arcs still require repair. Do not change shared Part bounds or programs.
+        /// </summary>
+        internal static double GetBoundsRoundoff(Part part)
+        {
+            var bb = part.BoundingBox;
+            var magnitude = System.Math.Max(System.Math.Abs(bb.Left), System.Math.Abs(bb.Right));
+            magnitude = System.Math.Max(magnitude,
+                System.Math.Max(System.Math.Abs(bb.Bottom), System.Math.Abs(bb.Top)));
+            magnitude = System.Math.Max(magnitude, System.Math.Max(bb.Length, bb.Width));
+            magnitude = System.Math.Max(magnitude,
+                System.Math.Max(System.Math.Abs(part.Location.X), System.Math.Abs(part.Location.Y)));
+            var step = System.Math.BitIncrement(magnitude) - magnitude;
+            return double.IsFinite(step) ? System.Math.Min(8 * step, Math.Tolerance.Epsilon / 4) : 0;
         }
 
         private List<(double Start, double End)> IntersectPerimeter(

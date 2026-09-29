@@ -99,8 +99,7 @@ public static class AutomaticCutOffPlanner
             if (part.BaseDrawing.IsCutOff)
                 continue;
 
-            var partBounds = ValidatePart(part, bounds);
-            occupied = System.Math.Max(occupied, sign > 0 ? partBounds.Right : -partBounds.Left);
+            occupied = System.Math.Max(occupied, ValidatePart(part, bounds, sign));
             hasParts = true;
         }
         if (!hasParts)
@@ -232,7 +231,7 @@ public static class AutomaticCutOffPlanner
             "Plate parts and cut-off collections are required.", nameof(plate));
     }
 
-    private static Box ValidatePart(Part part, Box sheet)
+    private static double ValidatePart(Part part, Box sheet, int sign)
     {
         Require(Finite(part.Location) && double.IsFinite(part.Rotation),
             "Part pose must be finite.", "plate");
@@ -250,6 +249,8 @@ public static class AutomaticCutOffPlanner
         // Checking raw coordinates above prevents NaNs being hidden by min/max comparisons.
         // Checking converted entities catches overflowing incremental moves and curve bounds.
         var hasMaterial = false;
+        var occupied = sign > 0 ? box.Right : -box.Left;
+        var roundoff = CutOff.GetBoundsRoundoff(part);
         foreach (var entity in ConvertProgram.ToGeometry(part.Program))
         {
             var entityBox = entity.BoundingBox;
@@ -257,17 +258,18 @@ public static class AutomaticCutOffPlanner
             if (!SpecialLayers.IsMaterial(entity.Layer))
                 continue;
             entityBox = entityBox.Translate(part.Location);
-            // Conversion can refit arc centers beyond the raw-program/cached bounds.
-            // CutOff's broad phase uses cached bounds without tolerance: even a smaller
-            // protrusion can be crossed by a repeated line, so require strict containment.
-            Require(entityBox.Left >= cached.Left && entityBox.Right <= cached.Right &&
-                entityBox.Bottom >= cached.Bottom && entityBox.Top <= cached.Top,
+            // Permit only bounded floating-point roundoff, with the same conservative
+            // padding in CutOff's broad phase and fallback. Geometry-scale protrusions
+            // (including refitted arc centers) are still rejected, even below epsilon.
+            Require(entityBox.Left >= cached.Left - roundoff && entityBox.Right <= cached.Right + roundoff &&
+                entityBox.Bottom >= cached.Bottom - roundoff && entityBox.Top <= cached.Top + roundoff,
                 "Converted material extends outside cached part bounds; repair it before planning.", "plate");
             Require(Inside(entityBox, sheet), "Part geometry extends outside the physical sheet.", "plate");
+            occupied = System.Math.Max(occupied, sign > 0 ? entityBox.Right : -entityBox.Left);
             hasMaterial |= entityBox.Length > 0 || entityBox.Width > 0;
         }
         Require(hasMaterial, "Real parts must contain material geometry.", "plate");
-        return box;
+        return occupied;
     }
 
     private static void ValidateProgram(Program program, HashSet<Program> path)
