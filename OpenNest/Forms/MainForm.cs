@@ -30,6 +30,10 @@ namespace OpenNest.Forms
         private bool clickUpdateLocation;
         private bool nestingInProgress;
         private CancellationTokenSource nestingCts;
+        private bool databaseSaveInProgress;
+        private bool databaseOpenInProgress;
+        private readonly ToolStripMenuItem storageModeMenu = new("Storage Mode...");
+        private readonly ToolStripMenuItem exportNestMenu = new("Export .nest...");
 
         private const float ZoomInFactor = 1.5f;
         private const float ZoomOutFactor = 1.0f / ZoomInFactor;
@@ -48,6 +52,10 @@ namespace OpenNest.Forms
         public MainForm()
         {
             InitializeComponent();
+            storageModeMenu.Click += StorageMode_Click;
+            exportNestMenu.Click += ExportNest_Click;
+            mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExport), exportNestMenu);
+            mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExit), storageModeMenu);
             UpdateOverlapMenu();
             LoadSettings();
 
@@ -150,9 +158,12 @@ namespace OpenNest.Forms
             return result;
         }
 
-        private void LoadNest(Nest nest, FormWindowState windowState = FormWindowState.Maximized)
+        private void LoadNest(Nest nest, FormWindowState windowState = FormWindowState.Maximized,
+            Guid remoteId = default, string serverUrl = null)
         {
             var editForm = new EditNestForm(nest);
+            if (remoteId != Guid.Empty)
+                editForm.Document.BindRemote(remoteId, serverUrl);
             editForm.MdiParent = this;
             editForm.PlateChanged += (sender, e) =>
             {
@@ -198,10 +209,11 @@ namespace OpenNest.Forms
             var hasValue = activeForm != null;
 
             btnZoomToFit.Enabled = hasValue;
-            mnuFileSave.Enabled = hasValue;
-            btnSave.Enabled = hasValue;
-            btnSaveAs.Enabled = hasValue;
-            mnuFileSaveAs.Enabled = hasValue;
+            mnuFileSave.Enabled = hasValue && !databaseSaveInProgress;
+            btnSave.Enabled = hasValue && !databaseSaveInProgress;
+            btnSaveAs.Enabled = hasValue && !databaseSaveInProgress;
+            mnuFileSaveAs.Enabled = hasValue && !databaseSaveInProgress;
+            exportNestMenu.Enabled = hasValue;
             mnuFileExport.Enabled = hasValue;
             mnuFileExportAll.Enabled = hasValue;
             btnZoomOut.Enabled = hasValue;
@@ -563,21 +575,57 @@ namespace OpenNest.Forms
             LoadNest(nest, windowState);
         }
 
-        private void Open_Click(object sender, EventArgs e)
+        private async void Open_Click(object sender, EventArgs e)
         {
-            var dlg = new OpenFileDialog();
-            dlg.Filter = NestFormat.FileFilter;
-            dlg.Multiselect = true;
-
-            if (dlg.ShowDialog() == DialogResult.OK)
+            if (NestStorage.Settings.Mode == NestStorageMode.File)
             {
-                var reader = new NestReader(dlg.FileName);
-                var nest = reader.Read();
-                LoadNest(nest);
-                if (reader.Warnings.Count > 0)
-                    MessageBox.Show(this, string.Join(Environment.NewLine, reader.Warnings),
-                        "Nest Load Warnings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                using var dlg = new OpenFileDialog { Filter = NestFormat.FileFilter, Multiselect = true };
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    var reader = new NestReader(dlg.FileName);
+                    var nest = reader.Read();
+                    LoadNest(nest);
+                    ShowNestWarnings(reader);
+                }
+                return;
             }
+
+            try
+            {
+                var repository = NestStorage.CreateRepository();
+                using var dlg = new SavedNestsForm(repository);
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                var serverUrl = NestStorage.Settings.ServerUrl;
+                databaseOpenInProgress = true;
+                storageModeMenu.Enabled = false;
+                var file = await repository.GetFileAsync(dlg.SelectedId);
+                if (file == null)
+                    throw new FileNotFoundException("This nest no longer exists on the server.");
+                using var stream = new MemoryStream(file);
+                var reader = new NestReader(stream);
+                var nest = reader.Read();
+                LoadNest(nest, remoteId: dlg.SelectedId, serverUrl: serverUrl);
+                ShowNestWarnings(reader);
+            }
+            catch (Exception ex)
+            {
+                ShowStorageError("open", ex);
+            }
+            finally
+            {
+                databaseOpenInProgress = false;
+                if (!IsDisposed)
+                    storageModeMenu.Enabled = !databaseSaveInProgress;
+            }
+        }
+
+        private void ShowNestWarnings(NestReader reader)
+        {
+            if (reader.Warnings.Count > 0)
+                MessageBox.Show(this, string.Join(Environment.NewLine, reader.Warnings),
+                    "Nest Load Warnings", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         private void ImportBom_Click(object sender, EventArgs e)
@@ -587,17 +635,98 @@ namespace OpenNest.Forms
             form.ShowDialog(this);
         }
 
-        private void Save_Click(object sender, EventArgs e)
+        private async void Save_Click(object sender, EventArgs e)
         {
-            if (activeForm != null)
-                activeForm.Save();
+            var form = activeForm;
+            if (form == null || databaseSaveInProgress)
+                return;
+            if (NestStorage.Settings.Mode == NestStorageMode.File)
+                form.Save();
+            else
+                await SaveDatabaseAsync(form, saveCopy: false);
         }
 
-        private void SaveAs_Click(object sender, EventArgs e)
+        private async void SaveAs_Click(object sender, EventArgs e)
         {
-            if (activeForm != null)
-                activeForm.SaveAs();
+            var form = activeForm;
+            if (form == null || databaseSaveInProgress)
+                return;
+            if (NestStorage.Settings.Mode == NestStorageMode.File)
+                form.SaveAs();
+            else
+                await SaveDatabaseAsync(form, saveCopy: true);
         }
+
+        private async Task SaveDatabaseAsync(EditNestForm form, bool saveCopy)
+        {
+            databaseSaveInProgress = true;
+            storageModeMenu.Enabled = false;
+            EnableCheck();
+            try
+            {
+                var serverUrl = NestStorage.Settings.ServerUrl;
+                var saved = await form.Document.SaveToDatabaseAsync(
+                    NestStorage.CreateRepository(), serverUrl, saveCopy);
+                if (!form.IsDisposed)
+                    form.Text = form.Document.Name;
+                if (!IsDisposed)
+                    statusLabel1.Text = $"Saved {saved.Name} to nest database";
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed)
+                    ShowStorageError("save", ex);
+            }
+            finally
+            {
+                databaseSaveInProgress = false;
+                if (!IsDisposed)
+                {
+                    storageModeMenu.Enabled = !databaseOpenInProgress;
+                    EnableCheck();
+                }
+            }
+        }
+
+        private void StorageMode_Click(object sender, EventArgs e)
+        {
+            using var dlg = new StorageModeForm();
+            if (dlg.ShowDialog(this) != DialogResult.OK)
+                return;
+            try
+            {
+                NestStorage.Save(dlg.SelectedMode, dlg.ServerUrl);
+                statusLabel1.Text = $"Nest storage: {dlg.SelectedMode}";
+            }
+            catch (Exception ex)
+            {
+                ShowStorageError("change storage mode", ex);
+            }
+        }
+
+        private void ExportNest_Click(object sender, EventArgs e)
+        {
+            var form = activeForm;
+            if (form == null)
+                return;
+            using var dlg = new SaveFileDialog { Filter = NestFormat.FileFilter, FileName = form.Nest.Name };
+            if (dlg.ShowDialog(this) != DialogResult.OK)
+                return;
+            try
+            {
+                // Export never changes the document's save path, remote id, or nest name.
+                new NestWriter(form.Nest).Write(dlg.FileName);
+                statusLabel1.Text = $"Exported .nest to {dlg.FileName}";
+            }
+            catch (Exception ex)
+            {
+                ShowStorageError("export", ex);
+            }
+        }
+
+        private void ShowStorageError(string action, Exception ex) =>
+            MessageBox.Show(this, $"Could not {action} nest: {ex.Message}",
+                "Nest Storage", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
         private void Export_Click(object sender, EventArgs e)
         {

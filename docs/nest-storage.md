@@ -4,10 +4,15 @@ The desktop app can save nests two ways:
 
 - **File mode** (default, unchanged behavior): Save/Save As write a `.nest` ZIP
   archive to disk via the normal file dialog. See [nest-file-format.md](nest-file-format.md).
-- **Database mode**: Save uploads the nest to a central `OpenNest.Server`
-  instance shared by every shop PC, instead of writing a local file. A separate
-  **File > Export .nest...** command is always available (in both modes) for
-  producing a local file to share or back up.
+- **Database mode**: Open lists server records with filterable metadata and
+  sortable columns; Save creates a record on first save and updates that same
+  record afterward. Save As creates a new record (a copy). A failed save keeps
+  the previous record association; switching server URLs creates a record on the
+  new server rather than updating an id from the previous one. Delete in the
+  saved-nest list permanently removes the selected server record after confirmation.
+  A separate **File > Export .nest...** command is always available (in both
+  modes) for producing a local file to share or back up. Export does not change
+  the document's file save path or database record association.
 
 The mode and server address are stored per-PC at `%APPDATA%\OpenNest\storage.json`
 (`OpenNest.Data.NestStorageSettings`), defaulting to File mode so existing
