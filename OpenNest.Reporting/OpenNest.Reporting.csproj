@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
+    <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <EmbeddedResource Include="Fonts\*.ttf" />
+    <None Update="Fonts\LICENSE.txt;THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" TargetPath="ReportingNotices\%(Filename)%(Extension)" />
+    <InternalsVisibleTo Include="OpenNest.Tests" />
+  </ItemGroup>
+</Project>
