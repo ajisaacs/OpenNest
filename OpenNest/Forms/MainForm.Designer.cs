@@ -111,6 +111,7 @@
             toolStripMenuItem19 = new System.Windows.Forms.ToolStripSeparator();
             calculateCutTimeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem22 = new System.Windows.Forms.ToolStripSeparator();
+            mnuNestAutomaticCutOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestAssignLeadIns = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestRemoveLeadIns = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlate = new System.Windows.Forms.ToolStripMenuItem();
@@ -644,7 +645,7 @@
             // 
             // mnuNest
             // 
-            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestImportDrawing, mnuNestShapeLibrary, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
+            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestImportDrawing, mnuNestShapeLibrary, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAutomaticCutOff, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
             mnuNest.Name = "mnuNest";
             mnuNest.Size = new System.Drawing.Size(43, 20);
             mnuNest.Text = "&Nest";
@@ -763,6 +764,13 @@
             //
             toolStripMenuItem22.Name = "toolStripMenuItem22";
             toolStripMenuItem22.Size = new System.Drawing.Size(202, 6);
+            //
+            // mnuNestAutomaticCutOff
+            //
+            mnuNestAutomaticCutOff.Name = "mnuNestAutomaticCutOff";
+            mnuNestAutomaticCutOff.Size = new System.Drawing.Size(205, 22);
+            mnuNestAutomaticCutOff.Text = "Automatic Scrap Cutoffs (All Plates)...";
+            mnuNestAutomaticCutOff.Click += NestAutomaticCutOff_Click;
             //
             // mnuNestAssignLeadIns
             //
@@ -1426,6 +1434,7 @@
         private System.Windows.Forms.ToolStripMenuItem mnuPlatePlaceLeadIn;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateRemoveLeadIns;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem22;
+        private System.Windows.Forms.ToolStripMenuItem mnuNestAutomaticCutOff;
         private System.Windows.Forms.ToolStripMenuItem mnuNestAssignLeadIns;
         private System.Windows.Forms.ToolStripMenuItem mnuNestRemoveLeadIns;
     }

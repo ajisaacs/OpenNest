@@ -1720,16 +1720,25 @@ namespace OpenNest.Forms
             activeForm.PlateView.SetAction(typeof(ActionCutOff));
         }
 
-        private void AutomaticCutOff_Click(object sender, EventArgs e)
+        private void AutomaticCutOff_Click(object sender, EventArgs e) => ShowAutomaticCutOff(allPlates: false);
+
+        private void NestAutomaticCutOff_Click(object sender, EventArgs e) => ShowAutomaticCutOff(allPlates: true);
+
+        private void ShowAutomaticCutOff(bool allPlates)
         {
-            var view = activeForm?.PlateView;
+            var editForm = activeForm;
+            var view = editForm?.PlateView;
             if (view?.Plate == null)
                 return;
 
+            var nest = editForm.Nest;
+            var views = MdiChildren.OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, nest))
+                .Select(form => form.PlateView).ToArray();
             // A closed progress window can still have a fill awaiting completion/commit.
-            if (nestingInProgress || view.IsFillInProgress
-                || Application.OpenForms.OfType<NestProgressForm>().Any()
-                || view.Actions.CurrentAction?.IsBusy() == true)
+            bool IsBusy() => nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
+                || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true);
+            if (IsBusy())
             {
                 MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
                     "Automatic Scrap Cutoffs", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1738,8 +1747,11 @@ namespace OpenNest.Forms
 
             try
             {
-                view.SetAction(typeof(ActionSelect));
-                using var form = new AutomaticCutOffForm(view, activeForm.Nest.Units);
+                foreach (var plateView in views)
+                    plateView.SetAction(typeof(ActionSelect));
+                using var form = allPlates
+                    ? new AutomaticCutOffForm(view, nest, IsBusy)
+                    : new AutomaticCutOffForm(view, nest.Units, IsBusy);
                 form.ShowDialog(this);
             }
             catch (Exception ex)

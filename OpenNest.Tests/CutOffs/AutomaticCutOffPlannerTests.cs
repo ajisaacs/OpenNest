@@ -69,6 +69,93 @@ public class AutomaticCutOffPlannerTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void MinimumTail_SkipsOnlyFinalSeparatorWithoutExtendingSkeletonGrid(int quadrant)
+    {
+        // The proposed separator is just before X=105, with a tail shorter than 16.
+        // Skipping it must not add the otherwise-next nominal line at X=105.
+        var plate = MakePlate(quadrant, occupied: 104);
+        var before = Plan(plate);
+        var options = new AutomaticCutOffOptions { Spacing = 35, MinimumTailLength = 16 };
+
+        var plan = AutomaticCutOffPlanner.Create(plate, options, new CutOffSettings());
+
+        Assert.Equal(before.Definitions.Take(before.Definitions.Count - 1).Select(c => c.Position.X), Positions(plan));
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Null(plan.TailSeparatorX);
+        Assert.Equal(0, plan.TailLength);
+        Assert.Equal(120, plan.UsedSpan);
+        Assert.Contains(plan.Diagnostics, d => d.Message.Contains("minimum tail length"));
+        Assert.Empty(plate.CutOffs);
+        Assert.Single(plate.Parts);
+    }
+
+    [Theory]
+    [InlineData(1, -0.01, false)]
+    [InlineData(1, 0, true)]
+    [InlineData(1, 0.01, true)]
+    [InlineData(2, -0.01, false)]
+    [InlineData(2, 0, true)]
+    [InlineData(2, 0.01, true)]
+    [InlineData(3, -0.01, false)]
+    [InlineData(3, 0, true)]
+    [InlineData(3, 0.01, true)]
+    [InlineData(4, -0.01, false)]
+    [InlineData(4, 0, true)]
+    [InlineData(4, 0.01, true)]
+    public void MinimumTail_TwelveInchesIsInclusiveAfterSeparatorClearance(int quadrant, double extra, bool keep)
+    {
+        var occupied = 120 - 12 - 0.5 - Tolerance.Epsilon - extra;
+        var plate = MakePlate(quadrant, occupied);
+        var options = new AutomaticCutOffOptions { Spacing = 35, MinimumTailLength = 12 };
+
+        var plan = AutomaticCutOffPlanner.Create(plate, options, new CutOffSettings());
+
+        Assert.Equal(keep, plan.HasSeparatedTail);
+        Assert.Equal(keep ? 4 : 3, plan.Definitions.Count);
+        if (keep)
+            Assert.Equal(12 + extra, plan.TailLength, 6);
+    }
+
+    [Fact]
+    public void MinimumTail_DoesNotRemoveExistingSeparatorWhenRerunWithHigherMinimum()
+    {
+        var plate = MakePlate(occupied: 110);
+        var settings = new CutOffSettings();
+        var original = Plan(plate);
+        plate.CutOffs.AddRange(original.Definitions);
+        plate.RegenerateCutOffs(settings);
+        var definitions = plate.CutOffs.ToArray();
+        var parts = plate.Parts.ToArray();
+        var programs = definitions.Select(c => c.Drawing.Program).ToArray();
+
+        var plan = AutomaticCutOffPlanner.Create(plate,
+            new AutomaticCutOffOptions { Spacing = 35, MinimumTailLength = 12 }, settings);
+
+        Assert.Empty(plan.Definitions);
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Equal(definitions, plate.CutOffs.ToArray());
+        Assert.Equal(parts, plate.Parts.ToArray());
+        Assert.Equal(programs, plate.CutOffs.Select(c => c.Drawing.Program));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void MinimumTail_InvalidValueIsRejected(double minimum)
+    {
+        var plate = MakePlate();
+        Assert.Throws<ArgumentException>(() => AutomaticCutOffPlanner.Create(plate,
+            new AutomaticCutOffOptions { Spacing = 35, MinimumTailLength = minimum }, new CutOffSettings()));
+        Assert.Empty(plate.CutOffs);
+    }
+
+    [Theory]
     [InlineData(2, 0.5)]
     [InlineData(0.5, 2)]
     [InlineData(2, 2)]

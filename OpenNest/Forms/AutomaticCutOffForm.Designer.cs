@@ -24,6 +24,8 @@ partial class AutomaticCutOffForm
         spacingPanel = new TableLayoutPanel();
         spacingLabel = new Label();
         spacingBox = new TextBox();
+        minimumTailLabel = new Label();
+        minimumTailBox = new TextBox();
         warningLabel = new Label();
         occupiedLabel = new Label();
         usedLabel = new Label();
@@ -86,10 +88,13 @@ partial class AutomaticCutOffForm
         spacingPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         spacingPanel.Controls.Add(spacingLabel, 0, 0);
         spacingPanel.Controls.Add(spacingBox, 1, 0);
+        spacingPanel.Controls.Add(minimumTailLabel, 0, 1);
+        spacingPanel.Controls.Add(minimumTailBox, 1, 1);
         spacingPanel.Dock = DockStyle.Fill;
         spacingPanel.Margin = new Padding(0, 0, 0, 6);
         spacingPanel.Name = "spacingPanel";
-        spacingPanel.RowCount = 1;
+        spacingPanel.RowCount = 2;
+        spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         spacingPanel.TabIndex = 1;
         //
@@ -106,7 +111,22 @@ partial class AutomaticCutOffForm
         spacingBox.Dock = DockStyle.Fill;
         spacingBox.Name = "spacingBox";
         spacingBox.TabIndex = 1;
-        spacingBox.TextChanged += SpacingBox_TextChanged;
+        spacingBox.TextChanged += SettingsBox_TextChanged;
+        //
+        // minimumTailLabel
+        //
+        minimumTailLabel.Anchor = AnchorStyles.Left;
+        minimumTailLabel.AutoSize = true;
+        minimumTailLabel.Name = "minimumTailLabel";
+        minimumTailLabel.TabIndex = 2;
+        minimumTailLabel.Text = "Minimum tail to keep:";
+        //
+        // minimumTailBox
+        //
+        minimumTailBox.Dock = DockStyle.Fill;
+        minimumTailBox.Name = "minimumTailBox";
+        minimumTailBox.TabIndex = 3;
+        minimumTailBox.TextChanged += SettingsBox_TextChanged;
         //
         // warningLabel
         //
@@ -221,7 +241,7 @@ partial class AutomaticCutOffForm
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
         CancelButton = cancelButton;
-        ClientSize = new Size(600, 470);
+        ClientSize = new Size(660, 520);
         Controls.Add(layout);
         Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -247,6 +267,8 @@ partial class AutomaticCutOffForm
     private TableLayoutPanel spacingPanel;
     private Label spacingLabel;
     private TextBox spacingBox;
+    private Label minimumTailLabel;
+    private TextBox minimumTailBox;
     private Label warningLabel;
     private Label occupiedLabel;
     private Label usedLabel;

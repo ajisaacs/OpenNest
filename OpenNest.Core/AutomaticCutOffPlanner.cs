@@ -15,6 +15,12 @@ public sealed class AutomaticCutOffOptions
     /// greater than AutomaticCutOffPlanner.MinimumSpacing; Create also bounds candidate count.
     /// </summary>
     public double Spacing { get; set; }
+
+    /// <summary>
+    /// Minimum retained-tail length along X in model units. Zero permits any positive tail.
+    /// The desktop default is 12 inches (304.8 mm).
+    /// </summary>
+    public double MinimumTailLength { get; set; }
 }
 
 public enum AutomaticCutOffDiagnosticCode
@@ -24,6 +30,7 @@ public enum AutomaticCutOffDiagnosticCode
     EmptyCut,
     SegmentedCut,
     NoSafeTailSeparator,
+    TailBelowMinimum,
 }
 
 public sealed record AutomaticCutOffDiagnostic(
@@ -133,7 +140,16 @@ public static class AutomaticCutOffPlanner
             AddCandidate(sign * distance, false);
         }
         if (hasTailCandidate)
-            AddCandidate(sign * separator, true);
+        {
+            if (length - separator >= options.MinimumTailLength)
+                AddCandidate(sign * separator, true);
+            else
+                diagnostics.Add(new AutomaticCutOffDiagnostic(
+                    AutomaticCutOffDiagnosticCode.TailBelowMinimum,
+                    "The proposed tail is shorter than the minimum tail length; the final separator was skipped. "
+                    + "Other automatic lines and existing cut-offs are unchanged. No retained tail is claimed.",
+                    X: sign * separator));
+        }
 
         if (diagnostics.Any(d => d.IsBlocking))
         {
@@ -219,6 +235,8 @@ public static class AutomaticCutOffPlanner
     {
         Require(double.IsFinite(options.Spacing) && options.Spacing > MinimumSpacing,
             $"Spacing must be finite and greater than {MinimumSpacing} model units.", nameof(options));
+        Require(Nonnegative(options.MinimumTailLength),
+            "Minimum tail length must be finite and nonnegative.", nameof(options));
         Require(double.IsFinite(plate.Size.Length) && plate.Size.Length > 0 &&
             double.IsFinite(plate.Size.Width) && plate.Size.Width > 0,
             "Sheet length and width must be positive and finite.", nameof(plate));

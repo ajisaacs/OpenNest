@@ -11,9 +11,9 @@ namespace OpenNest.WinForms.Tests.Forms;
 public class AutomaticCutOffFormTests
 {
     [Theory]
-    [InlineData(Units.Inches, "35", "in")]
-    [InlineData(Units.Millimeters, "889", "mm")]
-    public void InitialSpacingUsesNestUnitsAndActualSheetWidth(Units units, string spacing, string suffix)
+    [InlineData(Units.Inches, "35", "in", 12)]
+    [InlineData(Units.Millimeters, "889", "mm", 304.8)]
+    public void InitialSpacingUsesNestUnitsAndActualSheetWidth(Units units, string spacing, string suffix, double minimumTail)
     {
         RunSta(() =>
         {
@@ -21,6 +21,8 @@ public class AutomaticCutOffFormTests
             using var form = new AutomaticCutOffForm(view, units);
             Assert.Equal(spacing, Control<TextBox>(form, "spacingBox").Text);
             Assert.Contains(suffix, Control<Label>(form, "spacingLabel").Text);
+            Assert.Contains(suffix, Control<Label>(form, "minimumTailLabel").Text);
+            Assert.Equal(minimumTail, double.Parse(Control<TextBox>(form, "minimumTailBox").Text));
             Assert.Contains($"36 {suffix} width", Control<Label>(form, "sheetLabel").Text);
         });
     }
@@ -191,6 +193,140 @@ public class AutomaticCutOffFormTests
             Assert.Equal(beforeQuantity, beforeParts[1].BaseDrawing.Quantity.Nested);
             Assert.Empty(PreviewParts(view));
             Assert.Contains("original cut-offs were restored", Control<TextBox>(form, "diagnosticsBox").Text);
+        });
+    }
+
+    [Fact]
+    public void NestApply_PreviewsWithoutMutationAndAppliesEveryPlate()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            using var otherView = CreateView();
+            var nest = new Nest();
+            nest.Plates.Add(view.Plate);
+            nest.Plates.Add(otherView.Plate);
+            nest.Plates.Add(new Plate(36, 120));
+            using var form = new AutomaticCutOffForm(view, nest);
+            Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
+            Assert.Contains("All 3 plates", Control<Label>(form, "sheetLabel").Text);
+            Assert.Contains("Plate 2", Control<TextBox>(form, "diagnosticsBox").Text);
+            Assert.Contains("Plate 3", Control<TextBox>(form, "diagnosticsBox").Text);
+            Assert.NotEmpty(PreviewParts(view));
+            Assert.All(nest.Plates, p => Assert.Empty(p.CutOffs));
+
+            Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+
+            Assert.Equal(DialogResult.OK, form.DialogResult);
+            Assert.NotEmpty(view.Plate.CutOffs);
+            Assert.NotEmpty(otherView.Plate.CutOffs);
+            Assert.Empty(nest.Plates[2].CutOffs);
+            Assert.Empty(PreviewParts(view));
+            Assert.Same(nest.Plates[0], view.Plate);
+        });
+    }
+
+    [Fact]
+    public void NestApply_LaterConflictBlocksEntireNest()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            using var otherView = CreateView();
+            var nest = new Nest();
+            nest.Plates.Add(view.Plate);
+            nest.Plates.Add(otherView.Plate);
+            using var form = new AutomaticCutOffForm(view, nest);
+            Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
+            otherView.Plate.CutOffs.Add(new CutOff(new Vector(35, 0), CutOffAxis.Vertical) { EndLimit = 2 });
+
+            Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+
+            Assert.NotEqual(DialogResult.OK, form.DialogResult);
+            Assert.Empty(view.Plate.CutOffs);
+            Assert.Single(otherView.Plate.CutOffs);
+            Assert.False(Control<Button>(form, "applyButton").Enabled);
+            Assert.Contains("Plate 2", Control<TextBox>(form, "diagnosticsBox").Text);
+            Assert.Contains("BLOCKING", Control<TextBox>(form, "diagnosticsBox").Text);
+            Assert.Empty(PreviewParts(view));
+        });
+    }
+
+    [Fact]
+    public void NestApply_RechecksOperationGuardAfterPreview()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            var nest = new Nest();
+            nest.Plates.Add(view.Plate);
+            var busy = false;
+            using var form = new AutomaticCutOffForm(view, nest, () => busy);
+            Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
+            Assert.NotEmpty(PreviewParts(view));
+            busy = true;
+
+            Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+
+            Assert.NotEqual(DialogResult.OK, form.DialogResult);
+            Assert.Empty(view.Plate.CutOffs);
+            Assert.Empty(PreviewParts(view));
+            Assert.False(Control<Button>(form, "applyButton").Enabled);
+        });
+    }
+
+    [Fact]
+    public void NestPreview_DisposeLeavesEveryPlateUntouched()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            using var otherView = CreateView();
+            var nest = new Nest();
+            nest.Plates.Add(view.Plate);
+            nest.Plates.Add(otherView.Plate);
+            using (var form = new AutomaticCutOffForm(view, nest))
+                Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
+            Assert.All(nest.Plates, p => Assert.Empty(p.CutOffs));
+            Assert.All(nest.Plates, p => Assert.Single(p.Parts));
+            Assert.Empty(PreviewParts(view));
+        });
+    }
+
+    [Fact]
+    public void MinimumTailChangeClearsPreviewAndApplyUsesCurrentValue()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            view.Plate.Size = new Size(36, 90);
+            using var form = new AutomaticCutOffForm(view, Units.Inches);
+            Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
+            Assert.Equal(2, PreviewParts(view).Count);
+            Assert.Contains("TailBelowMinimum", Control<TextBox>(form, "diagnosticsBox").Text);
+            Control<TextBox>(form, "minimumTailBox").Text = "0";
+            Assert.Empty(PreviewParts(view));
+            Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+            Assert.Equal(DialogResult.OK, form.DialogResult);
+            Assert.Equal(3, view.Plate.CutOffs.Count);
+        });
+    }
+
+    [Theory]
+    [InlineData("not a number")]
+    [InlineData("-1")]
+    [InlineData("NaN")]
+    public void InvalidMinimumTailBlocksApply(string text)
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            using var form = new AutomaticCutOffForm(view, Units.Inches);
+            Control<TextBox>(form, "minimumTailBox").Text = text;
+            Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+            Assert.NotEqual(DialogResult.OK, form.DialogResult);
+            Assert.Empty(view.Plate.CutOffs);
+            Assert.False(Control<Button>(form, "applyButton").Enabled);
         });
     }
 
