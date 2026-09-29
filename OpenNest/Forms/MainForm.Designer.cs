@@ -54,6 +54,8 @@
             mnuOverlapDisplay = new System.Windows.Forms.ToolStripMenuItem();
             mnuOverlapOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuOverlapAreas = new System.Windows.Forms.ToolStripMenuItem();
+            mnuOverlapCentroids = new System.Windows.Forms.ToolStripMenuItem();
+            mnuOverlapBoth = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawRapids = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawPiercePoints = new System.Windows.Forms.ToolStripMenuItem();
             mnuViewDrawBounds = new System.Windows.Forms.ToolStripMenuItem();
@@ -353,7 +355,7 @@
             //
             mnuOverlapDisplay.Name = "mnuOverlapDisplay";
             mnuOverlapDisplay.Text = "Display";
-            mnuOverlapDisplay.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuOverlapOff, mnuOverlapAreas });
+            mnuOverlapDisplay.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuOverlapOff, mnuOverlapAreas, mnuOverlapCentroids, mnuOverlapBoth });
             mnuOverlapDisplay.DropDownOpening += OverlapMenu_Opening;
             //
             // mnuOverlapOff
@@ -367,6 +369,18 @@
             mnuOverlapAreas.Name = "mnuOverlapAreas";
             mnuOverlapAreas.Text = "Areas";
             mnuOverlapAreas.Click += OverlapAreas_Click;
+            //
+            // mnuOverlapCentroids
+            //
+            mnuOverlapCentroids.Name = "mnuOverlapCentroids";
+            mnuOverlapCentroids.Text = "Centroids";
+            mnuOverlapCentroids.Click += OverlapCentroids_Click;
+            //
+            // mnuOverlapBoth
+            //
+            mnuOverlapBoth.Name = "mnuOverlapBoth";
+            mnuOverlapBoth.Text = "Both";
+            mnuOverlapBoth.Click += OverlapBoth_Click;
             // 
             // mnuViewDrawRapids
             // 
@@ -1292,6 +1306,8 @@
         private System.Windows.Forms.ToolStripMenuItem mnuOverlapDisplay;
         private System.Windows.Forms.ToolStripMenuItem mnuOverlapOff;
         private System.Windows.Forms.ToolStripMenuItem mnuOverlapAreas;
+        private System.Windows.Forms.ToolStripMenuItem mnuOverlapCentroids;
+        private System.Windows.Forms.ToolStripMenuItem mnuOverlapBoth;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawRapids;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawPiercePoints;
         private System.Windows.Forms.ToolStripMenuItem mnuViewDrawBounds;

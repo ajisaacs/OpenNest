@@ -41,6 +41,7 @@ namespace OpenNest.Controls
         private LayoutPart hoveredPart;
         private Point hoverPoint;
         private bool showTooltip;
+        private bool hoverPending;
         private Timer hoverTimer;
 
         public Box ActiveWorkArea
@@ -229,7 +230,7 @@ namespace OpenNest.Controls
             add => overlapOverlay.StateChanged += value;
             remove => overlapOverlay.StateChanged -= value;
         }
-        public Task CheckOverlapsAsync() => overlapOverlay.CheckAsync();
+        public Task CheckOverlapsAsync(Units units) => overlapOverlay.CheckAsync(units);
         public void CancelOverlapCheck() => overlapOverlay.Cancel();
         public void InvalidateOverlapCheck() => overlapOverlay.Invalidate();
 
@@ -248,6 +249,40 @@ namespace OpenNest.Controls
         protected override void OnMouseEnter(EventArgs e)
         {
             base.OnMouseEnter(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            ClearHover();
+            base.OnMouseLeave(e);
+        }
+
+        private void ClearHover()
+        {
+            overlapOverlay?.ClearHover();
+            hoverTimer?.Stop();
+            hoverPending = false;
+            hoveredPart = null;
+            showTooltip = false;
+            Invalidate();
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            ClearHover();
+            base.OnResize(e);
+        }
+
+        protected override void OnDpiChangedAfterParent(EventArgs e)
+        {
+            ClearHover();
+            base.OnDpiChangedAfterParent(e);
+        }
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            ClearHover();
+            base.OnFontChanged(e);
         }
 
         protected override void OnDragEnter(DragEventArgs drgevent)
@@ -271,6 +306,7 @@ namespace OpenNest.Controls
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
+            ClearHover();
             if (!Focused)
                 Focus();
 
@@ -359,6 +395,8 @@ namespace OpenNest.Controls
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            if (e.Button != MouseButtons.None)
+                ClearHover();
             if (e.Button == MouseButtons.Middle)
             {
                 if (AllowPan)
@@ -389,19 +427,18 @@ namespace OpenNest.Controls
             if (e.Button == MouseButtons.None && actionManager.CurrentAction is ActionSelect)
             {
                 hoverPoint = e.Location;
+                hoverPending = true;
                 showTooltip = false;
                 hoverTimer.Stop();
                 hoverTimer.Start();
 
                 if (hoveredPart != null)
                     Invalidate();
+                overlapOverlay.UpdateHover(e.Location);
             }
-            else if (hoveredPart != null || showTooltip)
+            else
             {
-                hoveredPart = null;
-                hoverTimer.Stop();
-                showTooltip = false;
-                Invalidate();
+                ClearHover();
             }
 
             base.OnMouseMove(e);
@@ -413,6 +450,18 @@ namespace OpenNest.Controls
 
             if (e.Button == MouseButtons.Middle && SelectedParts.Count == 0)
                 ZoomToFit();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            // Audited: DrawControl/PlateView, Action key handlers, EditNestForm,
+            // MainForm.ProcessCmdKey and menu shortcuts have no plain PgUp/PgDn
+            // binding. BestFitViewerForm owns these only in its separate dialog.
+            // No modifier keys, clicks, or wheel events are consumed by hover paging.
+            if ((keyData == Keys.PageUp || keyData == Keys.PageDown)
+                && overlapOverlay.TryPageHover(keyData == Keys.PageUp ? -1 : 1))
+                return true;
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
@@ -517,7 +566,7 @@ namespace OpenNest.Controls
 
             base.OnPaint(e);
 
-            if (hoveredPart != null && showTooltip)
+            if (!overlapOverlay.DrawHover(e.Graphics) && hoveredPart != null && showTooltip)
             {
                 e.Graphics.ResetTransform();
                 var text = hoveredPart.BasePart.BaseDrawing.Name;
@@ -542,6 +591,7 @@ namespace OpenNest.Controls
 
         protected override void OnHandleDestroyed(EventArgs e)
         {
+            ClearHover();
             overlapOverlay.ReleaseHandle();
             base.OnHandleDestroyed(e);
             actionManager.Cleanup();
@@ -550,7 +600,12 @@ namespace OpenNest.Controls
         protected override void Dispose(bool disposing)
         {
             if (disposing)
+            {
                 overlapOverlay?.Dispose();
+                hoverTimer?.Dispose();
+                hoverTimer = null;
+                redrawTimer?.Dispose();
+            }
             base.Dispose(disposing);
         }
 
@@ -706,6 +761,9 @@ namespace OpenNest.Controls
 
         private void HoverCheck()
         {
+            if (!hoverPending || IsDisposed || Disposing)
+                return;
+            hoverPending = false;
             var graphPt = PointControlToGraph(hoverPoint);
             LayoutPart hitPart = null;
 
@@ -793,6 +851,7 @@ namespace OpenNest.Controls
 
         protected override void UpdateMatrix()
         {
+            ClearHover();
             base.UpdateMatrix();
             parts.ForEach(p => p.Update(this));
             previewManager.Update();

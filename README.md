@@ -12,7 +12,7 @@ A Windows desktop application for CNC nesting — imports DXF drawings, arranges
 - **Import / export** — DXF & DWG parts (ACadSharp), Excel BOMs, bend-line detection, built-in parametric shapes; export DXF or post-processed G-code.
 - **Nesting** — pluggable whole-job engines (Default, Strip, Vertical/Horizontal Remnant, StockLadder, plus DLL plugins), NFP-based interlocking pair evaluation, gravity compaction, rotation sweeps, multi-plate/multi-material jobs.
 - **Plate operations** — manual sheet cut-offs, [automatic scrap cutoffs with unused-tail preservation](docs/automatic-scrap-cutoffs.md), oversized-part splitting (straight, weld-gap tabs, spike-groove), interactive editing, and spacing-aware pushes that can slide along or away from touching parts.
-- **Visual overlap check** — manually highlight shared material on the active plate, including containment and cutouts, through View > Overlap Check. [Usage and limitations](docs/geometry/visual-overlap-check.md).
+- **Visual overlap check** — manually highlight shared material on the active plate, including containment and cutouts, with area shading, pair centroids, and hover details through View > Overlap Check. [Usage and limitations](docs/geometry/visual-overlap-check.md).
 - **CNC output** — configurable lead-ins/outs and tabs, contour editing, user-defined G-code variables (`$name` → `#200+` machine variables), plugin post-processors (Cincinnati CL-707/800/900/940/CLX included).
 
 ## Requirements

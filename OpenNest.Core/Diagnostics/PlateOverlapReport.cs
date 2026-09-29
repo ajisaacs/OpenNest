@@ -25,7 +25,7 @@ public sealed class PlateOverlapPair
     private readonly Box bounds;
 
     internal PlateOverlapPair(int partAId, int partBId, string partAName, string partBName,
-        List<PlateOverlapRegion> regions)
+        List<PlateOverlapRegion> regions, Vector centroid)
     {
         PartAId = partAId;
         PartBId = partBId;
@@ -33,6 +33,7 @@ public sealed class PlateOverlapPair
         PartBName = partBName;
         Regions = regions.AsReadOnly();
         Area = regions.Sum(region => region.Area);
+        Centroid = centroid;
         var points = regions.SelectMany(region => region.Vertices).ToArray();
         var left = points.Min(point => point.X);
         var bottom = points.Min(point => point.Y);
@@ -47,6 +48,11 @@ public sealed class PlateOverlapPair
     /// <summary>Convex fragments, not connected islands; no mutable kernel polygons are exposed.</summary>
     public IReadOnlyList<PlateOverlapRegion> Regions { get; }
     public double Area { get; }
+    /// <summary>
+    /// Finite world-coordinate area centroid of all shared material, after hole subtraction.
+    /// This can lie outside disconnected or concave shared material. Returned by value.
+    /// </summary>
+    public Vector Centroid { get; }
     /// <summary>A fresh world-coordinate bounds copy.</summary>
     public Box Bounds => new(bounds.X, bounds.Y, bounds.Length, bounds.Width);
 }

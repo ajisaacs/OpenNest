@@ -6,8 +6,25 @@ Choose **View > Overlap Check > Check Active Plate** to check committed parts on
 this plate. Shared material is shaded red/magenta without changing the nest,
 selection, cutting paths, or export behavior. Cutoffs and temporary preview parts
 are excluded. **Cancel Check** discards the running request. **Display > Off /
-Areas** changes visibility without rerunning analysis; checking from Off shows
-Areas. Display preferences belong to the current document and are not saved.
+Areas / Centroids / Both** changes visibility without rerunning analysis. Areas
+is the default; rechecking preserves a visible mode, while checking from Off
+shows Areas. Display preferences belong to the current document and are not saved.
+
+Centroids and Both show fixed-screen-size, DPI-scaled pair crosshairs with a
+contrasting halo. Labels such as `1/3` identify the two plate sequence positions
+at capture time, including gaps occupied by cutoffs. Hover near a marker to see
+captured names, approximate shared area in in² or mm², and centroid coordinates
+in the same linear units. Units are captured with the request; hover does not
+relabel an old report from live settings. Nearby/coincident markers show all
+matching pairs in sequence order. If details exceed the view, the tooltip wraps
+and pages them with a `Page x/y` hint: keep the pointer near the marker and use
+plain **PageUp / PageDown** while PlateView has focus. Long individual details
+continue across pages without truncation; an impossibly small viewport asks you
+to enlarge it. These keys act only while a multipage diagnostic tooltip is
+visible; wheel zoom, modified keys, selection clicks, and dragging are unchanged.
+Small positive areas use significant-figure formatting rather than rounding to
+zero. Selection and dragging remain ordinary plate operations, not overlay
+interactions.
 
 A persistent label distinguishes unchecked, checking, current, incomplete, stale,
 canceled, and failed checks. Only a completed, current, fully checked report can
@@ -41,7 +58,7 @@ var areas = report.Pairs.SelectMany(pair => pair.Regions).ToList();
 foreach (var pair in report.Pairs)
 {
     // IDs are zero-based positions in the original input list, including skipped cutoffs.
-    Console.WriteLine($"{pair.PartAId} / {pair.PartBId}: {pair.Area}");
+    Console.WriteLine($"{pair.PartAId} / {pair.PartBId}: {pair.Area}, centroid {pair.Centroid}");
     foreach (var region in pair.Regions)
     {
         // region.Vertices: closed, read-only world-coordinate polygon
@@ -129,6 +146,20 @@ seams as physical boundaries. Areas within one pair may be summed. Areas across
 pairs are not a union: three coincident parts produce three overlapping pairs,
 so summing all pair areas double-counts shared plate locations.
 
+`pair.Centroid` is the true area-weighted center of every shared-material fragment
+for that pair, after hole subtraction. It is not an average of crossings or
+vertices. For a disconnected or concave overlap, the mathematical centroid can
+lie outside the red material (for example, between two separate patches). This
+is intentional: shaded Areas are authoritative for actual overlap locations;
+use Both for detailed inspection rather than interpreting a centroid as an
+interior collision point. There is one centroid per pair, not per connected island.
+
+`PolygonAreaMoments` evaluates signed moments about local origins and combines
+fragments with positive area weights independent of winding. The analyzer does
+this on rebased clipping fragments before adding the world origin back. Invalid,
+degenerate, or nonfinite moments produce an incomplete pair issue, not a marker
+at zero. Curved-outline centroids inherit the polygonization approximation.
+
 Full containment and coincident parts are detected without relying on crossing
 points. Edge/corner contact with no positive shared material is not overlap.
 There are no spacing offsets, plate-edge checks, cut-path crossing checks, automatic
@@ -165,6 +196,10 @@ is filled once, avoiding fragment outlines, internal triangulation seams, and
 darker triple coverage. World-to-graph conversion excludes pan, because PlateView
 already applies origin translation. Paths are rebuilt for report/scale changes,
 not ordinary repaints or panning. The state label saves/restores graphics state.
+Centroid hit tests use only cached report coordinates and DPI-scaled screen
+radii. Hover clears on edits, mode/request/view changes, leave, and teardown.
+Diagnostic details draw above action adorners and take precedence over the normal
+part-name tooltip only while visible.
 
 Next hardening: measure real-plate capture/analysis cost and cancellation latency
 before adding cached triangulations or background capture. Cancellation cannot
@@ -180,11 +215,17 @@ inputs, snapshot isolation, read-only output, cutting-program independence, and
 cancellation. Run:
 
 ```sh
-dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests|FullyQualifiedName~PolygonAreaMomentsTests|FullyQualifiedName~OverlapPairPresentationTests|FullyQualifiedName~OverlapHoverPagesTests'
 ```
 
 `OverlapReportStateTests` verifies request supersession, exact pose/reference
 freshness, stale clearing, cancellation, and incomplete-versus-clear messaging.
+`PolygonAreaMomentsTests` covers analytic
+centers, unequal/disconnected fragments, winding, closure, large translations,
+and invalid/overflow cases. `OverlapPairPresentationTests` checks adaptive unit
+formatting, sequence labels, coincident ordering, and zoom-independent DPI hit
+radii. `OverlapHoverPagesTests` proves bounded continuation pages retain every
+pair and long/Unicode name, with navigation bounds and explicit tiny-view failure.
 `OpenNest.WinForms.Tests/PlateOverlapOverlayTests.cs` adds STA worker/publication,
 menu/MDI, path-cache, uniform-fill pixel, and control-lifetime checks. Run those
 on Windows:
@@ -197,4 +238,5 @@ Linux can cross-build with `-p:EnableWindowsTargeting=true`, but that does not
 execute Windows tests or verify appearance, DPI, or interaction. On Windows,
 check partial overlap, containment, inside-hole placement, pan/zoom and quadrant
 alignment, stale clearing during edits/plate switches, converter cancellation,
-and repeated check/toggle/close cycles without GDI/disposed-control errors.
+crowded-marker PageUp/PageDown access to the last pair, and repeated
+check/toggle/close cycles without GDI/disposed-control errors.

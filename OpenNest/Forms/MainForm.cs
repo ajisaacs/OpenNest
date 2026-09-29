@@ -675,8 +675,12 @@ namespace OpenNest.Forms
             mnuOverlapDisplay.Enabled = hasPlate;
             mnuOverlapOff.Enabled = hasPlate;
             mnuOverlapAreas.Enabled = hasPlate;
+            mnuOverlapCentroids.Enabled = hasPlate;
+            mnuOverlapBoth.Enabled = hasPlate;
             mnuOverlapOff.Checked = hasPlate && activeForm.OverlapDisplay == OverlapDisplayMode.Off;
             mnuOverlapAreas.Checked = hasPlate && activeForm.OverlapDisplay == OverlapDisplayMode.Areas;
+            mnuOverlapCentroids.Checked = hasPlate && activeForm.OverlapDisplay == OverlapDisplayMode.Centroids;
+            mnuOverlapBoth.Checked = hasPlate && activeForm.OverlapDisplay == OverlapDisplayMode.Both;
         }
 
         private async void CheckOverlaps_Click(object sender, EventArgs e)
@@ -698,6 +702,18 @@ namespace OpenNest.Forms
         {
             if (activeForm != null)
                 activeForm.OverlapDisplay = OverlapDisplayMode.Areas;
+        }
+
+        private void OverlapCentroids_Click(object sender, EventArgs e)
+        {
+            if (activeForm != null)
+                activeForm.OverlapDisplay = OverlapDisplayMode.Centroids;
+        }
+
+        private void OverlapBoth_Click(object sender, EventArgs e)
+        {
+            if (activeForm != null)
+                activeForm.OverlapDisplay = OverlapDisplayMode.Both;
         }
 
         private void ToggleDrawRapids_Click(object sender, EventArgs e)

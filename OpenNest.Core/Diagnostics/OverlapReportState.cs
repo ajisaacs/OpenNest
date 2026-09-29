@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace OpenNest.Diagnostics;
 
-public enum OverlapDisplayMode { Off, Areas }
+public enum OverlapDisplayMode { Off, Areas, Centroids, Both }
 public enum OverlapCheckStatus { NotChecked, Checking, Current, Incomplete, Failed, Canceled, Stale }
 
 /// <summary>UI-thread lifecycle policy, independent of workers, GDI and view transforms.</summary>
@@ -34,7 +34,8 @@ public sealed class OverlapReportState
     {
         Clear(OverlapCheckStatus.Checking);
         stamp = OverlapGeometryStamp.Capture(plate);
-        DisplayMode = OverlapDisplayMode.Areas;
+        if (DisplayMode == OverlapDisplayMode.Off)
+            DisplayMode = OverlapDisplayMode.Areas;
         return Generation;
     }
 

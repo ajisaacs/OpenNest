@@ -28,7 +28,7 @@ namespace OpenNest.Forms
         public readonly Document Document;
         public readonly PlateView PlateView;
 
-        public System.Threading.Tasks.Task CheckOverlapsAsync() => PlateView.CheckOverlapsAsync();
+        public System.Threading.Tasks.Task CheckOverlapsAsync() => PlateView.CheckOverlapsAsync(Nest.Units);
         public void CancelOverlapCheck() => PlateView.CancelOverlapCheck();
         public OverlapDisplayMode OverlapDisplay
         {

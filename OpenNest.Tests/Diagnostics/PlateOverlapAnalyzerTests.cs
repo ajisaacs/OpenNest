@@ -19,6 +19,7 @@ public class PlateOverlapAnalyzerTests
         var pair = Assert.Single(report.Pairs);
         Assert.Equal((0, 1), (pair.PartAId, pair.PartBId));
         Assert.Equal(0.5, pair.Area, 9);
+        AssertCentroid(pair, 0.75, 0.5);
         Assert.NotEmpty(pair.Regions);
         Assert.All(pair.Regions, region =>
         {
@@ -43,6 +44,7 @@ public class PlateOverlapAnalyzerTests
             Rectangle(0, 0, 4, 4), Rectangle(1, 1, 1, 1)
         }).Pairs);
         Assert.Equal(1, pair.Area, 9);
+        AssertCentroid(pair, 1.5, 1.5);
     }
 
     [Theory]
@@ -84,7 +86,9 @@ public class PlateOverlapAnalyzerTests
         insert.Location = new Vector(0.5, 1.5);
         report = PlateOverlapAnalyzer.Analyze(swap ? new[] { insert, frame } : new[] { frame, insert });
         Assert.True(report.IsComplete, string.Join("; ", report.Issues));
-        Assert.Equal(0.5, Assert.Single(report.Pairs).Area, 9);
+        var pair = Assert.Single(report.Pairs);
+        Assert.Equal(0.5, pair.Area, 9);
+        AssertCentroid(pair, 0.75, 2);
     }
 
     [Fact]
@@ -94,7 +98,9 @@ public class PlateOverlapAnalyzerTests
         var b = WithContours(Square(0, 0, 4), Square(2, 2, 1));
         var report = PlateOverlapAnalyzer.Analyze(new[] { a, b });
         Assert.True(report.IsComplete, string.Join("; ", report.Issues));
-        Assert.Equal(14, Assert.Single(report.Pairs).Area, 8);
+        var pair = Assert.Single(report.Pairs);
+        Assert.Equal(14, pair.Area, 8);
+        AssertCentroid(pair, 28.5 / 14, 28.5 / 14);
     }
 
     [Fact]
@@ -109,6 +115,7 @@ public class PlateOverlapAnalyzerTests
         Assert.True(report.IsComplete, string.Join("; ", report.Issues));
         var pair = Assert.Single(report.Pairs);
         Assert.Equal(2, pair.Area, 8);
+        AssertCentroid(pair, 1.5, 2.5);
         Assert.All(pair.Regions, region => Assert.True(
             region.Vertices.All(p => p.X <= 1) || region.Vertices.All(p => p.X >= 2)));
     }
@@ -127,6 +134,7 @@ public class PlateOverlapAnalyzerTests
         Assert.True(report.IsComplete, string.Join("; ", report.Issues));
         var pair = Assert.Single(report.Pairs);
         Assert.Equal(0.5, pair.Area, 7);
+        AssertCentroid(pair, x + 0.75, y + 0.5);
         Assert.Equal(x + 0.5, pair.Bounds.Left, 7);
         Assert.Equal(y + 1, pair.Bounds.Top, 7);
     }
@@ -141,7 +149,9 @@ public class PlateOverlapAnalyzerTests
         part.Location = new Vector(10, 10);
         var report = PlateOverlapAnalyzer.Analyze(new[] { part, Rectangle(8, 9, 2, 1) });
         Assert.True(report.IsComplete, string.Join("; ", report.Issues));
-        Assert.Equal(2, Assert.Single(report.Pairs).Area, 8);
+        var pair = Assert.Single(report.Pairs);
+        Assert.Equal(2, pair.Area, 8);
+        AssertCentroid(pair, 9, 9.5);
     }
 
     [Fact]
@@ -297,6 +307,10 @@ public class PlateOverlapAnalyzerTests
         Assert.Throws<NotSupportedException>(() => ((IList<Vector>)region.Vertices)[0] = new Vector(99, 99));
         pair.Bounds.X = 99;
         Assert.Equal(0, pair.Bounds.X);
+        var centroid = pair.Centroid;
+        centroid.X = 99;
+        centroid.Y = 99;
+        AssertCentroid(pair, 0.5, 0.5);
     }
 
     [Fact]
@@ -368,7 +382,9 @@ public class PlateOverlapAnalyzerTests
         small.Location = new Vector(999999998, 999999998);
         var report = PlateOverlapAnalyzer.Analyze(swap ? new[] { small, outer } : new[] { outer, small });
         Assert.True(report.IsComplete, string.Join("; ", report.Issues));
-        Assert.Equal(1, Assert.Single(report.Pairs).Area, 8);
+        var pair = Assert.Single(report.Pairs);
+        Assert.Equal(1, pair.Area, 8);
+        AssertCentroid(pair, 999999998.5, 999999998.5);
     }
 
     [Fact]
@@ -421,6 +437,68 @@ public class PlateOverlapAnalyzerTests
         cancellation.Cancel();
         Assert.Throws<OperationCanceledException>(() => PlateOverlapAnalyzer.Capture(parts, cancellation.Token));
         Assert.Throws<OperationCanceledException>(() => PlateOverlapAnalyzer.Analyze(snapshot, cancellation.Token));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1000000000)]
+    [InlineData(-1000000000)]
+    public void Analyze_UnequalDisconnectedOverlapWeightsAllFragments(double offset)
+    {
+        var u = WithContours(new[]
+        {
+            new Vector(0, 0), new Vector(6, 0), new Vector(6, 3), new Vector(3, 3),
+            new Vector(3, 1), new Vector(1, 1), new Vector(1, 3), new Vector(0, 3)
+        });
+        u.Location = new Vector(offset, offset);
+
+        var report = PlateOverlapAnalyzer.Analyze(new[] { u, Rectangle(offset, offset + 2, 6, 1) });
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues));
+        var pair = Assert.Single(report.Pairs);
+        Assert.Equal(4, pair.Area, 8);
+        AssertCentroid(pair, offset + 3.5, offset + 2.5);
+    }
+
+    [Fact]
+    public void Analyze_RotatedTriangleHasTrueMaterialCentroid()
+    {
+        var triangle = WithContours(new[] { new Vector(0, 0), new Vector(6, 0), new Vector(0, 3) });
+        triangle.Rotate(System.Math.PI / 2);
+        triangle.Location = new Vector(10, 20);
+
+        var report = PlateOverlapAnalyzer.Analyze(new[] { Rectangle(0, 0, 30, 30), triangle });
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues));
+        var pair = Assert.Single(report.Pairs);
+        Assert.Equal(9, pair.Area, 8);
+        AssertCentroid(pair, 9, 22);
+    }
+
+    [Fact]
+    public void Analyze_OverflowingPairMomentsAreIncompleteAndRetainOtherPairs()
+    {
+        var huge = Rectangle(0, 0, 1e103, 1e103);
+        var report = PlateOverlapAnalyzer.Analyze(new[]
+        {
+            huge, new Part(huge.BaseDrawing), Rectangle(-2, -2, 1, 1), Rectangle(-2, -2, 1, 1)
+        });
+
+        Assert.False(report.IsComplete);
+        var issue = Assert.Single(report.Issues);
+        Assert.Equal((0, (int?)1), (issue.PartAId, issue.PartBId));
+        Assert.Contains("moment", issue.Message, StringComparison.OrdinalIgnoreCase);
+        var valid = Assert.Single(report.Pairs);
+        Assert.Equal((2, 3), (valid.PartAId, valid.PartBId));
+        AssertCentroid(valid, -1.5, -1.5);
+    }
+
+    private static void AssertCentroid(PlateOverlapPair pair, double x, double y)
+    {
+        Assert.True(double.IsFinite(pair.Centroid.X));
+        Assert.True(double.IsFinite(pair.Centroid.Y));
+        Assert.Equal(x, pair.Centroid.X, 7);
+        Assert.Equal(y, pair.Centroid.Y, 7);
     }
 
     private static Part Rectangle(double x, double y, double width, double height) =>

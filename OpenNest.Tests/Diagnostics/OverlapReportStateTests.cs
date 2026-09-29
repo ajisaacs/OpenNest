@@ -134,6 +134,22 @@ public class OverlapReportStateTests
         Assert.Null(state.Report);
     }
 
+    [Theory]
+    [InlineData(OverlapDisplayMode.Off, OverlapDisplayMode.Areas)]
+    [InlineData(OverlapDisplayMode.Areas, OverlapDisplayMode.Areas)]
+    [InlineData(OverlapDisplayMode.Centroids, OverlapDisplayMode.Centroids)]
+    [InlineData(OverlapDisplayMode.Both, OverlapDisplayMode.Both)]
+    public void CheckAndRecheckPreserveVisibleMode(OverlapDisplayMode chosen, OverlapDisplayMode expected)
+    {
+        var plate = PlateWithParts();
+        var state = new OverlapReportState { DisplayMode = chosen };
+        var request = state.Begin(plate);
+        Assert.Equal(expected, state.DisplayMode);
+        Assert.True(state.TryPublish(request, plate, Analyze(plate)));
+        state.Begin(plate);
+        Assert.Equal(expected, state.DisplayMode);
+    }
+
     [Fact]
     public void NewPlateResetsStateButRetainsDocumentDisplayPreference()
     {

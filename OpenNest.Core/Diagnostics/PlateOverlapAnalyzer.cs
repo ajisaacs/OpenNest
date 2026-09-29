@@ -150,14 +150,26 @@ public static class PlateOverlapAnalyzer
                     var result = Collision.Check(localA.Outer, localB.Outer, localA.Holes, localB.Holes);
                     if (!result.Overlaps)
                         continue;
-                    var regions = result.OverlapRegions.Select(region => new PlateOverlapRegion(
-                        region.Vertices.Select(point => point + origin),
-                        OverlapMaterial.Area(region.Vertices))).ToList();
-                    var area = regions.Sum(region => region.Area);
-                    if (!double.IsFinite(area) || area <= 0)
-                        throw new ArithmeticException("Overlap area is not finite and positive.");
+                    // Evaluate every hole-subtracted fragment before restoring world space.
+                    // A failed moment must make this pair incomplete, never an origin marker.
+                    var moments = new List<PolygonAreaMoments>();
+                    var regions = new List<PlateOverlapRegion>();
+                    foreach (var region in result.OverlapRegions)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!PolygonAreaMoments.TryCompute(region.Vertices, out var fragment))
+                            throw new ArithmeticException("Overlap fragment area moments are invalid.");
+                        moments.Add(fragment);
+                        regions.Add(new PlateOverlapRegion(region.Vertices.Select(point => point + origin),
+                            fragment.Area));
+                    }
+                    if (!PolygonAreaMoments.TryCombine(moments, out var combined))
+                        throw new ArithmeticException("Combined overlap area moments are invalid.");
+                    var centroid = combined.Centroid + origin;
+                    if (!OverlapMaterial.IsFinite(centroid))
+                        throw new ArithmeticException("Overlap centroid is not finite in world coordinates.");
                     pairs.Add(new PlateOverlapPair(a.Input.Id, b.Input.Id,
-                        a.Input.Name, b.Input.Name, regions));
+                        a.Input.Name, b.Input.Name, regions, centroid));
                 }
                 catch (Exception exception) when (IsGeometryFailure(exception))
                 {
