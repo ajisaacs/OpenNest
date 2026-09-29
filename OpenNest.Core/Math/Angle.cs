@@ -1,4 +1,4 @@
-﻿namespace OpenNest.Math
+namespace OpenNest.Math
 {
     public static class Angle
     {
@@ -106,14 +106,14 @@
             if (reversed)
                 Generic.Swap(ref a1, ref a2);
 
-            var diff = Angle.NormalizeRad(a2 - a1);
+            var diff = Angle.NormalizeDeg(a2 - a1);
 
             // full circle
             if (a2.IsEqualTo(a1))
                 return true;
 
-            a1 = Angle.NormalizeRad(angle - a1);
-            a2 = Angle.NormalizeRad(a2 - angle);
+            a1 = Angle.NormalizeDeg(angle - a1);
+            a2 = Angle.NormalizeDeg(a2 - angle);
 
             return diff >= a1 - Tolerance.Epsilon || diff >= a2 - Tolerance.Epsilon;
         }
