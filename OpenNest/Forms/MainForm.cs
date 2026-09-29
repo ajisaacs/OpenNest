@@ -78,6 +78,9 @@ namespace OpenNest.Forms
             // contract and expose a public parameterless constructor.
             var enginesDir = Path.Combine(Application.StartupPath, "Engines");
             NestingEngineRegistry.LoadPlugins(enginesDir);
+            var engineWarning = EngineSelection.LoadSavedSelection();
+            if (!string.IsNullOrEmpty(engineWarning))
+                Shown += (_, _) => statusLabel1.Text = engineWarning;
 
             OptionsForm.ApplyDisabledStrategies();
             ColorSchemeRegistry.ApplyActiveFromSettings();
