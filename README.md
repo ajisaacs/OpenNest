@@ -72,7 +72,7 @@ Layouts are validated (bounds, spacing, quantity, rotation, stock match); invali
 | Project | Purpose |
 |---------|---------|
 | **OpenNest** | WinForms desktop app |
-| **OpenNest.Core** | Domain model, geometry, CNC primitives |
+| **OpenNest.Core** | Domain model, geometry, CNC primitives; [material-overlap diagnostics](docs/geometry/visual-overlap-check.md) |
 | **OpenNest.Engine** | Nesting algorithms and whole-job contracts |
 | **OpenNest.IO** | DXF/DWG, `.nest`, G-code, BOM I/O; CAD import |
 | **OpenNest.Console** | Headless batch nesting |
