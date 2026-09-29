@@ -8,18 +8,28 @@ using System.Threading;
 using System.Threading.Tasks;
 using OpenNest.Collections;
 using OpenNest.Diagnostics;
+using OpenNest.Forms;
 using OpenNest.Geometry;
 
 namespace OpenNest.Controls;
 
 /// <summary>
-/// UI-thread owner of manual overlap requests and their cached display geometry.
+/// UI-thread owner of overlap requests and their cached display geometry.
 /// Workers see only owned analyzer snapshots, never the live plate or view.
+/// When auto-check is enabled, an unchecked or out-of-date layout is rechecked after it
+/// has been quiet for <see cref="AutoCheckDelay"/> (see <see cref="OverlapAutoCheckScheduler"/>).
 /// </summary>
 internal sealed class OverlapOverlayController : IDisposable
 {
     private readonly PlateView view;
     private readonly OverlapReportState state = new();
+    private readonly OverlapAutoCheckScheduler autoCheck = new();
+    // Prepared drawing material survives rechecks; only in-place program edits clear it.
+    private readonly OverlapMaterialCache materialCache = new();
+    // Last completed report: pairs of parts unchanged since then are reused, not clipped again.
+    private PlateOverlapReport baseline;
+    private readonly System.Windows.Forms.Timer autoCheckTimer;
+    private Func<Units> autoCheckUnits;
     private ObservableList<Part> observedParts;
     private CancellationTokenSource cancellation;
     private GraphicsPath path;
@@ -33,7 +43,14 @@ internal sealed class OverlapOverlayController : IDisposable
     private (float Scale, PointF Offset, int Dpi) hoverTransform;
     private bool disposed;
 
-    public OverlapOverlayController(PlateView view) => this.view = view;
+    public OverlapOverlayController(PlateView view)
+    {
+        this.view = view;
+        autoCheckTimer = new System.Windows.Forms.Timer { Interval = DefaultAutoCheckDelayMs };
+        autoCheckTimer.Tick += AutoCheckTick;
+    }
+
+    public const int DefaultAutoCheckDelayMs = 500;
 
     public event EventHandler StateChanged;
     public OverlapCheckStatus Status => state.Status;
@@ -41,11 +58,37 @@ internal sealed class OverlapOverlayController : IDisposable
     public bool IsRunning => state.IsRunning;
 
     // Deterministic worker seam for STA lifecycle tests. Capture always stays on the UI thread.
+    // Null runs the incremental analyzer against the last completed report.
     internal Func<PlateOverlapSnapshot, CancellationToken, PlateOverlapReport> Analyze { get; set; }
-        = PlateOverlapAnalyzer.Analyze;
     internal GraphicsPath CachedPath => path;
     internal OverlapHoverPages HoverPages => hoverPages;
     internal RectangleF HoverBounds { get; private set; }
+    internal bool IsAutoCheckEnabled => autoCheckUnits != null;
+    internal bool IsAutoCheckScheduled => autoCheckTimer.Enabled;
+    // Test seam for gestures that cannot be simulated off a real message loop.
+    internal Func<bool> IsInteractionActive { get; set; } = DefaultInteractionActive;
+
+    public int AutoCheckDelay
+    {
+        get => autoCheckTimer.Interval;
+        set => autoCheckTimer.Interval = value;
+    }
+
+    public string Message => autoCheck.IsWaiting
+        ? "Overlaps: check pending…"
+        : state.Message;
+
+    /// <summary>
+    /// Recheck automatically after layout edits settle. Units are read when each request
+    /// starts, like the manual command. Pass null to return to manual-only checks.
+    /// </summary>
+    public void SetAutoCheck(Func<Units> units)
+    {
+        autoCheckUnits = units;
+        autoCheck.Reset();
+        autoCheckTimer.Stop();
+        NotifyChanged();
+    }
 
     public OverlapDisplayMode DisplayMode
     {
@@ -64,6 +107,8 @@ internal sealed class OverlapOverlayController : IDisposable
         Unsubscribe();
         CancelWorker();
         state.Reset();
+        autoCheck.Reset();
+        baseline = null;
         ReleasePath();
         observedParts = plate?.Parts;
         if (observedParts != null)
@@ -75,7 +120,11 @@ internal sealed class OverlapOverlayController : IDisposable
         NotifyChanged();
     }
 
-    public async Task CheckAsync(Units units)
+    public Task CheckAsync(Units units) => CheckAsync(units, automatic: false);
+
+    // Automatic requests keep the display mode and report only on the canvas label; the
+    // status bar keeps the user's last command result (for example a fill's timing).
+    private async Task CheckAsync(Units units, bool automatic)
     {
         if (!CanUseView || view.Plate == null)
             return;
@@ -84,33 +133,37 @@ internal sealed class OverlapOverlayController : IDisposable
 
         CancelWorker();
         var plate = view.Plate;
-        var generation = state.Begin(plate);
+        var generation = state.Begin(plate, automatic);
+        autoCheck.Started(plate);
         capturedUnits = units; // Same request boundary as the owned geometry/names, never read live units in paint.
         var source = new CancellationTokenSource();
         cancellation = source;
         var token = source.Token;
         ReleasePath();
-        NotifyChanged();
+        NotifyChanged(toStatusBar: !automatic);
         try
         {
             // Do not include PreviewManager parts. Capture owns clean geometry and stable names.
-            var snapshot = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(), token);
-            var analyze = Analyze;
+            var snapshot = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(), materialCache, token);
+            var previous = baseline;
+            var analyze = Analyze ?? ((input, cancel) => PlateOverlapAnalyzer.Analyze(input, previous, cancel));
             var report = await Task.Run(() => analyze(snapshot, token), token);
             if (!CanUseView || generation != state.Generation || !ReferenceEquals(plate, view.Plate))
                 return;
             if (token.IsCancellationRequested)
                 state.Cancel();
-            else if (!state.TryPublish(generation, view.Plate, report))
+            else if (state.TryPublish(generation, view.Plate, report))
+                baseline = report;
+            else
                 CancelWorker(); // A pose/reference mismatch discovered at publication is stale.
-            NotifyChanged();
+            NotifyChanged(toStatusBar: !automatic);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             if (CanUseView && generation == state.Generation)
             {
                 state.Cancel();
-                NotifyChanged();
+                NotifyChanged(toStatusBar: !automatic);
             }
         }
         catch (Exception ex)
@@ -120,7 +173,7 @@ internal sealed class OverlapOverlayController : IDisposable
             {
                 if (!state.TryFail(generation, view.Plate))
                     CancelWorker();
-                NotifyChanged();
+                NotifyChanged(toStatusBar: !automatic);
             }
         }
         finally
@@ -140,7 +193,18 @@ internal sealed class OverlapOverlayController : IDisposable
         CancelWorker();
         state.Cancel();
         ReleasePath();
-        NotifyChanged();
+        NotifyChanged(toStatusBar: true); // The user's Cancel command.
+    }
+
+    /// <summary>
+    /// For editors that may mutate clean drawing programs in place: drops cached material
+    /// as well as the current report. Call before loading the editor.
+    /// </summary>
+    public void InvalidateGeometry()
+    {
+        materialCache.Clear();
+        baseline = null;
+        Invalidate();
     }
 
     public void Invalidate()
@@ -148,7 +212,16 @@ internal sealed class OverlapOverlayController : IDisposable
         var generation = state.Generation;
         state.Invalidate();
         if (generation == state.Generation)
+        {
+            // Already unchecked/stale: an edit restarts the quiet period. Bulk fills raise one
+            // event per part, so only restart the timer here; the next paint or the timer's own
+            // settle check refreshes the layout stamp.
+            if (autoCheck.IsWaiting)
+                RestartAutoCheckTimer();
+            else
+                UpdateAutoCheck(repaint: true);
             return;
+        }
         CancelWorker();
         ReleasePath();
         NotifyChanged();
@@ -160,6 +233,10 @@ internal sealed class OverlapOverlayController : IDisposable
         state.Cancel();
         state.Invalidate();
         ReleasePath();
+        // Handle loss is not a user cancel: forget that request so the first paint after
+        // recreation can schedule a recheck. A tick while the handle is gone only resets.
+        autoCheck.Reset();
+        autoCheckTimer.Stop();
         NotifyChanged();
     }
 
@@ -171,15 +248,78 @@ internal sealed class OverlapOverlayController : IDisposable
         source?.Cancel();
     }
 
-    private void NotifyChanged()
+    private void NotifyChanged(bool toStatusBar = false)
     {
         ClearHover();
         if (disposed || view.IsDisposed || view.Disposing)
             return;
-        view.Status = state.Message;
+        UpdateAutoCheck(repaint: false);
+        // Without auto-check every change is reported as before.
+        if (toStatusBar || autoCheckUnits == null)
+            view.Status = Message;
         view.Invalidate();
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>
+    /// Restart the quiet period when the layout changed since it was last observed.
+    /// <paramref name="repaint"/> redraws the label if its pending text changed; paint and
+    /// NotifyChanged callers draw or invalidate themselves.
+    /// </summary>
+    private void UpdateAutoCheck(bool repaint)
+    {
+        if (autoCheckUnits == null || disposed)
+            return;
+        var wasWaiting = autoCheck.IsWaiting;
+        if (autoCheck.Observe(view.Plate, state))
+            RestartAutoCheckTimer();
+        else if (!autoCheck.IsWaiting)
+            autoCheckTimer.Stop();
+        if (repaint && wasWaiting != autoCheck.IsWaiting && !view.IsDisposed && !view.Disposing)
+            view.Invalidate();
+    }
+
+    private void RestartAutoCheckTimer()
+    {
+        autoCheckTimer.Stop();
+        autoCheckTimer.Start();
+    }
+
+    private void AutoCheckTick(object sender, EventArgs e) => RunAutoCheckTimer();
+
+    /// <summary>The timer's tick. Returns the started request, if any, for STA tests.</summary>
+    internal Task RunAutoCheckTimer()
+    {
+        autoCheckTimer.Stop();
+        if (autoCheckUnits == null || disposed)
+            return Task.CompletedTask;
+        if (!CanUseView)
+        {
+            autoCheck.Reset();
+            return Task.CompletedTask;
+        }
+        var busy = view.IsFillInProgress || IsInteractionActive();
+        switch (autoCheck.Elapsed(view.Plate, state, busy))
+        {
+            case OverlapAutoCheckStep.Wait:
+                autoCheckTimer.Start();
+                return Task.CompletedTask;
+            case OverlapAutoCheckStep.Check:
+                // CheckAsync reports its own failures through the state label.
+                return CheckAsync(autoCheckUnits(), automatic: true);
+            default:
+                view.Invalidate(); // Pending text may have cleared.
+                return Task.CompletedTask;
+        }
+    }
+
+    // Do not check mid-gesture or while another operation owns the plate: dragging holds a
+    // mouse button, fills/auto-nest show a progress window, and modal editors (for example
+    // the drawing converter) may be mutating clean programs in place.
+    private static bool DefaultInteractionActive() =>
+        System.Windows.Forms.Control.MouseButtons != System.Windows.Forms.MouseButtons.None
+        || System.Windows.Forms.Application.OpenForms.Cast<System.Windows.Forms.Form>()
+            .Any(form => form.Modal || form is NestProgressForm);
 
     private void PartAdded(object sender, ItemAddedEventArgs<Part> e) => Invalidate();
     private void PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => Invalidate();
@@ -200,6 +340,7 @@ internal sealed class OverlapOverlayController : IDisposable
         if (disposed)
             return;
         EnsureFresh();
+        UpdateAutoCheck(repaint: false); // Drags/nudges are only visible to the stamp; the label is drawn below.
         ValidateHoverTransform();
 
         if (state.Report != null)
@@ -435,7 +576,7 @@ internal sealed class OverlapOverlayController : IDisposable
         try
         {
             graphics.ResetTransform();
-            var text = state.Message + (state.DisplayMode == OverlapDisplayMode.Off ? " (display off)" : "");
+            var text = Message + (state.DisplayMode == OverlapDisplayMode.Off ? " (display off)" : "");
             var size = graphics.MeasureString(text, view.Font);
             using var background = new SolidBrush(Color.FromArgb(235, Color.White));
             graphics.FillRectangle(background, 6, 6, size.Width + 8, size.Height + 6);
@@ -459,6 +600,8 @@ internal sealed class OverlapOverlayController : IDisposable
         if (disposed)
             return;
         disposed = true;
+        autoCheckTimer.Stop();
+        autoCheckTimer.Dispose();
         Unsubscribe();
         CancelWorker();
         state.Reset();

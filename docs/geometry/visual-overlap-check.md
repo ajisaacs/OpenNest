@@ -33,10 +33,21 @@ and states how many distinct parts could not be checked. Pair counts are not
 fragment counts. This diagnostic checks shared material, not minimum spacing,
 plate edges, or cutting-path crossings.
 
-Edits clear the overlay and require another explicit check. Plate changes reset
-the check. Pan, zoom, selection, and display changes do not rerun geometry.
-Drawing-editor loading invalidates before loading, even if the dialog is later
-canceled. There is no automatic check during dragging or export.
+In a nest window the active plate is checked automatically. Any layout edit
+(add, remove, reorder, move, rotate, fill) clears the overlay and shows
+**Overlaps: check pending…**; once the layout has been unchanged for 0.5 s and no
+mouse button, modal dialog, or fill progress window is active, the check reruns.
+Automatic results appear only in the canvas label, so the status bar keeps the
+last command's message, and an automatic check keeps Display > Off rather than
+switching to Areas. Rechecks are incremental: drawing material is prepared once
+and reused, and pairs whose two parts have not moved reuse the previous result,
+so only the moved parts' neighbors are clipped again. Canceling a check is
+respected until the layout changes again, and a failed layout is not retried
+until it changes. Check Active Plate remains available and always runs at once.
+
+Plate changes reset the check. Pan, zoom, selection, and display changes do not
+rerun geometry. Drawing-editor loading invalidates before loading (dropping cached
+material), even if the dialog is later canceled. There is no check during export.
 
 ## Analysis API
 
@@ -185,7 +196,29 @@ metadata-only edits do not change material. In-place hole-program edits require
 the same explicit invalidation.
 
 `OverlapOverlayController` owns UI-thread captures, background analysis, request
-generations, cancellation, and the GDI display cache. It checks freshness before
+generations, cancellation, and the GDI display cache. `EditNestForm` enables its
+automatic recheck with `PlateView.SetOverlapAutoCheck(() => Nest.Units)`; other
+PlateView hosts (fill previews, pattern tiles) stay manual. The debounce decision
+is the Linux-testable `OverlapAutoCheckScheduler`: collection events and every
+paint's stamp comparison restart a WinForms timer, and the tick starts a check only
+if the stamp is unchanged since the last observation and no interaction is active.
+
+The controller passes one `OverlapMaterialCache` to
+`PlateOverlapAnalyzer.Capture(parts, cache)` and its last published report to
+`Analyze(snapshot, previous)`. The cache keeps each clean `Program`'s converted
+entities and prepared, validated material (weakly keyed by program reference; a
+changed code count or rotation is detected). Preparing material dominates
+first-check time for drawings with many holes. Incremental analysis reuses a pair
+only when both parts have the same cached source, bit-identical pose, and the same
+relative input order (clipping is operand-order sensitive), then renumbers it.
+`InvalidateOverlapCheck()` clears the cache and baseline, so in-place program
+editors must keep calling it before loading.
+
+Measured on 501 real PEP-converted plates with 2 to 384 parts, a from-scratch check
+takes median 1 ms, p99 368 ms and max 6.5 s (a 299-part plate); an incremental
+recheck after moving one part takes median 0.1 ms, p99 20 ms and max 35 ms. A
+comparison against uncached full analysis over 2505 edits (nudge, drag onto
+another part, move three, delete first, swap order) matched exactly. It checks freshness before
 publication and painting. Handle destruction/disposal cancels work and releases
 paths; old completions cannot replace a newer report. Snapshot conversion and
 clipping never run in paint or mouse-move handlers.
@@ -201,9 +234,10 @@ radii. Hover clears on edits, mode/request/view changes, leave, and teardown.
 Diagnostic details draw above action adorners and take precedence over the normal
 part-name tooltip only while visible.
 
-Next hardening: measure real-plate capture/analysis cost and cancellation latency
-before adding cached triangulations or background capture. Cancellation cannot
-interrupt the interior of an existing kernel operation.
+Next hardening: the first check of a plate with a hole-heavy drawing can still
+take seconds, and cancellation cannot interrupt the interior of material
+preparation or one kernel operation. Prepared per-part triangulations are not yet
+cached across requests.
 
 ## Verification
 
@@ -215,9 +249,14 @@ inputs, snapshot isolation, read-only output, cutting-program independence, and
 cancellation. Run:
 
 ```sh
-dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests|FullyQualifiedName~PolygonAreaMomentsTests|FullyQualifiedName~OverlapPairPresentationTests|FullyQualifiedName~OverlapHoverPagesTests'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests|FullyQualifiedName~PolygonAreaMomentsTests|FullyQualifiedName~OverlapPairPresentationTests|FullyQualifiedName~OverlapHoverPagesTests|FullyQualifiedName~IncrementalOverlapAnalysisTests|FullyQualifiedName~OverlapAutoCheckSchedulerTests'
 ```
 
+`IncrementalOverlapAnalysisTests` compares incremental rechecks with uncached full
+analysis across moves, rotation, deletion, insertion, order swaps, renames and
+coincident duplicates, and covers pair reuse, issue renumbering, cache clearing and
+cancellation. `OverlapAutoCheckSchedulerTests` covers the quiet period, interaction
+waits, and the no-retry rule for canceled or failed layouts.
 `OverlapReportStateTests` verifies request supersession, exact pose/reference
 freshness, stale clearing, cancellation, and incomplete-versus-clear messaging.
 `PolygonAreaMomentsTests` covers analytic
@@ -227,7 +266,8 @@ formatting, sequence labels, coincident ordering, and zoom-independent DPI hit
 radii. `OverlapHoverPagesTests` proves bounded continuation pages retain every
 pair and long/Unicode name, with navigation bounds and explicit tiny-view failure.
 `OpenNest.WinForms.Tests/PlateOverlapOverlayTests.cs` adds STA worker/publication,
-menu/MDI, path-cache, uniform-fill pixel, and control-lifetime checks. Run those
+menu/MDI, path-cache, uniform-fill pixel, control-lifetime, and automatic-recheck
+(debounce, drag detection, busy wait, supersession, display/status) checks. Run those
 on Windows:
 
 ```sh
@@ -238,5 +278,6 @@ Linux can cross-build with `-p:EnableWindowsTargeting=true`, but that does not
 execute Windows tests or verify appearance, DPI, or interaction. On Windows,
 check partial overlap, containment, inside-hole placement, pan/zoom and quadrant
 alignment, stale clearing during edits/plate switches, converter cancellation,
+the pending label and automatic recheck after dragging a part onto another,
 crowded-marker PageUp/PageDown access to the last pair, and repeated
 check/toggle/close cycles without GDI/disposed-control errors.

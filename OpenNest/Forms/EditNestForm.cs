@@ -265,6 +265,8 @@ namespace OpenNest.Forms
             updateDrawingListTimer.Elapsed += drawingListUpdateTimer_Elapsed;
 
             Document = new Document { Nest = nest };
+            // Units are read when each check starts, matching the manual command.
+            PlateView.SetOverlapAutoCheck(() => Nest.Units);
 
             PlateManager = new PlateManager(nest);
             PlateManager.CurrentPlateChanged += PlateManager_CurrentPlateChanged;

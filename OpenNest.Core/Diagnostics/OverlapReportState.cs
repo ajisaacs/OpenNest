@@ -30,11 +30,15 @@ public sealed class OverlapReportState
         _ => "Overlaps: not checked"
     };
 
-    public long Begin(Plate plate)
+    /// <summary>
+    /// Starts a request. A manual check from Off shows Areas; an automatic recheck keeps
+    /// the user's display choice, including Off.
+    /// </summary>
+    public long Begin(Plate plate, bool automatic = false)
     {
         Clear(OverlapCheckStatus.Checking);
         stamp = OverlapGeometryStamp.Capture(plate);
-        if (DisplayMode == OverlapDisplayMode.Off)
+        if (!automatic && DisplayMode == OverlapDisplayMode.Off)
             DisplayMode = OverlapDisplayMode.Areas;
         return Generation;
     }

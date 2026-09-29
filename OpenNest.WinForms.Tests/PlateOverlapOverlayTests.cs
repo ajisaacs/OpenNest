@@ -277,12 +277,15 @@ public class PlateOverlapOverlayTests
         Assert.All(new[] { check, cancel, off, areas, centroids, both }, item => Assert.Equal(Keys.None, item.ShortcutKeys));
 
         using var first = new EditNestForm(new Nest("first")) { MdiParent = host };
+        // Manual-command test: an auto-check timer pumped during a wait would race its requests.
+        first.PlateView.SetOverlapAutoCheck(null);
         first.Show();
         Assert.True(check.Enabled);
         Assert.True(areas.Checked);
         off.PerformClick();
         Assert.Equal(OverlapDisplayMode.Off, first.OverlapDisplay);
         using var second = new EditNestForm(new Nest("second")) { MdiParent = host };
+        second.PlateView.SetOverlapAutoCheck(null);
         second.Show();
         Assert.True(areas.Checked);
         Assert.False(off.Checked);
@@ -341,6 +344,7 @@ public class PlateOverlapOverlayTests
     public void CheckCommandCapturesUnitsAndNamesUntilTheNextCheck() => RunSta(() =>
     {
         using var form = new EditNestForm(new Nest("units") { Units = Units.Millimeters });
+        form.PlateView.SetOverlapAutoCheck(null); // Manual-command test; see the menu test.
         form.Show();
         form.PlateView.Plate.Parts.Add(Rectangle());
         form.PlateView.Plate.Parts.Add(Rectangle(1));
@@ -766,6 +770,142 @@ public class PlateOverlapOverlayTests
         Assert.False(run.View.Command(Keys.PageDown));
     });
 
+    [Fact]
+    public void AutoCheckRunsOnceTheLayoutSettlesAndRechecksAfterADrag() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Status = "Fill: 2 parts in 5 ms";
+        run.EnableAutoCheck();
+        var overlay = run.View.OverlapOverlay;
+        Assert.True(overlay.IsAutoCheckScheduled);
+        Assert.Equal("Overlaps: check pending…", overlay.Message);
+
+        var task = run.AutoTick();
+        run.Next().Complete();
+        run.Pump(task);
+        Assert.Equal(OverlapCheckStatus.Current, run.View.OverlapStatus);
+        Assert.False(overlay.IsAutoCheckScheduled);
+        Assert.Equal(1, run.Calls);
+        Assert.Equal("Fill: 2 parts in 5 ms", run.View.Status); // canvas label only
+        Assert.Equal("Overlaps: 1 pairs", overlay.Message);
+
+        // A drag changes only Part.Location: no collection event, so paint must notice it.
+        run.View.Plate.Parts[1].Offset(0.5, 0);
+        run.Paint();
+        Assert.Equal(OverlapCheckStatus.Stale, run.View.OverlapStatus);
+        Assert.True(overlay.IsAutoCheckScheduled);
+        run.View.Plate.Parts[1].Offset(0.5, 0);      // still moving when the timer fires
+        Assert.Same(Task.CompletedTask, run.AutoTick());
+        Assert.True(overlay.IsAutoCheckScheduled);    // waited another quiet period
+        Assert.Equal(1, run.Calls);
+        task = run.AutoTick();
+        run.Next().Complete();
+        run.Pump(task);
+        Assert.Equal(OverlapCheckStatus.Current, run.View.OverlapStatus);
+        Assert.Equal(2, run.Calls);
+    });
+
+    [Fact]
+    public void AutoCheckWaitsForInteractionsAndRespectsCancel() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        var busy = true;
+        run.EnableAutoCheck(() => busy);
+        Assert.Same(Task.CompletedTask, run.AutoTick());
+        Assert.True(run.View.OverlapOverlay.IsAutoCheckScheduled);
+        Assert.Equal(0, run.Calls);
+        busy = false;
+        var task = run.AutoTick();
+        var work = run.Next();
+        run.View.CancelOverlapCheck();
+        work.Complete();
+        run.Pump(task);
+        Assert.Equal(OverlapCheckStatus.Canceled, run.View.OverlapStatus);
+        run.Paint();
+        Assert.False(run.View.OverlapOverlay.IsAutoCheckScheduled); // no retry of a canceled layout
+
+        run.View.Plate.Parts.Add(Rectangle(2));                     // but a new edit rechecks
+        Assert.True(run.View.OverlapOverlay.IsAutoCheckScheduled);
+        task = run.AutoTick();
+        run.Next().Complete();
+        run.Pump(task);
+        Assert.Equal(OverlapCheckStatus.Current, run.View.OverlapStatus);
+        Assert.Equal(3, run.View.OverlapReport.Pairs.Count);
+    });
+
+    [Fact]
+    public void AutoCheckSupersedesARunningCheckWhenTheLayoutChanges() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.EnableAutoCheck();
+        var first = run.AutoTick();
+        var old = run.Next();
+        run.View.Plate.Parts[0].Offset(-10, 0);   // user keeps editing while the check runs
+        run.Paint();
+        Assert.True(old.Token.IsCancellationRequested);
+        Assert.True(run.View.OverlapOverlay.IsAutoCheckScheduled);
+        old.Complete();
+        run.Pump(first);
+        Assert.Null(run.View.OverlapReport);      // the old layout's result is never shown
+        var second = run.AutoTick();
+        run.Next().Complete();
+        run.Pump(second);
+        Assert.Equal(OverlapCheckStatus.Current, run.View.OverlapStatus);
+        Assert.Empty(run.View.OverlapReport!.Pairs);
+    });
+
+    [Fact]
+    public void AutoCheckKeepsDisplayOffButManualCheckStillShowsAreasAndReportsToStatusBar() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.EnableAutoCheck();
+        run.View.OverlapDisplay = OverlapDisplayMode.Off;
+        var task = run.AutoTick();
+        run.Next().Complete();
+        run.Pump(task);
+        Assert.Equal(OverlapCheckStatus.Current, run.View.OverlapStatus);
+        Assert.Equal(OverlapDisplayMode.Off, run.View.OverlapDisplay);
+
+        run.View.Plate.Parts[1].Offset(0.25, 0);
+        task = run.Start();                       // manual Check Active Plate
+        run.Next().Complete();
+        run.Pump(task);
+        Assert.Equal(OverlapDisplayMode.Areas, run.View.OverlapDisplay);
+        Assert.Equal("Overlaps: 1 pairs", run.View.Status);
+        Assert.False(run.View.OverlapOverlay.IsAutoCheckScheduled);
+    });
+
+    [Fact]
+    public void DefaultAnalyzerRechecksIncrementallyAndEditorsDropTheCache() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.OverlapOverlay.Analyze = null;   // production path: incremental real analyzer
+        run.View.Plate.Parts.Add(Rectangle(20));
+        run.View.Plate.Parts.Add(Rectangle(21));
+        var task = run.Start();
+        run.Pump(task);
+        var untouched = run.View.OverlapReport.Pairs.Single(pair => pair.PartAId == 2);
+        run.View.Plate.Parts[1].Offset(1, 0);
+        task = run.Start();
+        run.Pump(task);
+        Assert.Same(untouched.Regions, run.View.OverlapReport.Pairs.Single(pair => pair.PartAId == 2).Regions);
+        Assert.Equal(8, run.View.OverlapReport.Pairs.Single(pair => pair.PartAId == 0).Area, 9);
+
+        run.View.InvalidateOverlapCheck();        // converter may edit programs in place
+        task = run.Start();
+        run.Pump(task);
+        Assert.NotSame(untouched.Regions, run.View.OverlapReport.Pairs.Single(pair => pair.PartAId == 2).Regions);
+    });
+
+    [Fact]
+    public void EditNestFormEnablesAutoCheck() => RunSta(() =>
+    {
+        using var form = new EditNestForm(new Nest("auto"));
+        Assert.True(form.PlateView.OverlapOverlay.IsAutoCheckEnabled);
+        using var standalone = new PlateView();
+        Assert.False(standalone.OverlapOverlay.IsAutoCheckEnabled);
+    });
+
     private static void PrepareCrowdedHover(OverlayRun run)
     {
         run.View.Size = new System.Drawing.Size(260, 160);
@@ -866,6 +1006,23 @@ public class PlateOverlapOverlayTests
             return result!;
         }
         public void Pump(Task task) => context.Pump(task);
+        public Task AutoTick()
+        {
+            var task = View.OverlapOverlay.RunAutoCheckTimer();
+            tasks.Add(task);
+            return task;
+        }
+        public void EnableAutoCheck(Func<bool>? busy = null)
+        {
+            View.OverlapOverlay.IsInteractionActive = busy ?? (() => false);
+            View.SetOverlapAutoCheck(() => Units.Inches);
+        }
+        public void Paint()
+        {
+            using var image = new Bitmap(64, 64);
+            using var graphics = Graphics.FromImage(image);
+            View.OverlapOverlay.Draw(graphics);
+        }
         public void Finish()
         {
             var task = Start();

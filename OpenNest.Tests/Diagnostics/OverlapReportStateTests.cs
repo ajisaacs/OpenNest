@@ -151,6 +151,16 @@ public class OverlapReportStateTests
     }
 
     [Fact]
+    public void AutomaticCheckKeepsDisplayOff()
+    {
+        var plate = PlateWithParts();
+        var state = new OverlapReportState { DisplayMode = OverlapDisplayMode.Off };
+        Assert.True(state.TryPublish(state.Begin(plate, automatic: true), plate, Analyze(plate)));
+        Assert.Equal(OverlapDisplayMode.Off, state.DisplayMode);
+        Assert.Single(state.Report.Pairs);
+    }
+
+    [Fact]
     public void NewPlateResetsStateButRetainsDocumentDisplayPreference()
     {
         var plate = PlateWithParts();

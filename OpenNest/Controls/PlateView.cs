@@ -232,7 +232,23 @@ namespace OpenNest.Controls
         }
         public Task CheckOverlapsAsync(Units units) => overlapOverlay.CheckAsync(units);
         public void CancelOverlapCheck() => overlapOverlay.Cancel();
-        public void InvalidateOverlapCheck() => overlapOverlay.Invalidate();
+        /// <summary>
+        /// Call before any editor that may mutate clean drawing programs in place: marks the
+        /// report out of date and drops cached drawing material.
+        /// </summary>
+        public void InvalidateOverlapCheck() => overlapOverlay.InvalidateGeometry();
+
+        /// <summary>
+        /// Recheck overlaps automatically once layout edits have been quiet for
+        /// <see cref="OverlapAutoCheckDelay"/> ms. Null restores manual-only checks.
+        /// </summary>
+        public void SetOverlapAutoCheck(Func<Units> units) => overlapOverlay.SetAutoCheck(units);
+
+        public int OverlapAutoCheckDelay
+        {
+            get => overlapOverlay.AutoCheckDelay;
+            set => overlapOverlay.AutoCheckDelay = value;
+        }
 
         public string Status
         {
