@@ -191,6 +191,15 @@ namespace OpenNest
             if (coords.Count % 2 != 0)
                 return null;
 
+            // Intersects reports both incident edges at a shared vertex. Such hits may be
+            // crossings or tangencies, so neither pairing nor deduplicating them preserves
+            // inside/outside parity. Fall back to the clearance-expanded part bounds.
+            for (var i = 1; i < coords.Count; i++)
+            {
+                if (coords[i] - coords[i - 1] <= Math.Tolerance.Epsilon)
+                    return null;
+            }
+
             var padding = usedOffset ? 0 : clearance;
             var result = new List<(double Start, double End)>();
             for (var i = 0; i < coords.Count; i += 2)
