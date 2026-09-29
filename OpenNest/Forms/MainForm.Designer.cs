@@ -39,6 +39,7 @@
             toolStripMenuItem2 = new System.Windows.Forms.ToolStripSeparator();
             mnuFileExport = new System.Windows.Forms.ToolStripMenuItem();
             mnuFileExportAll = new System.Windows.Forms.ToolStripMenuItem();
+            mnuFileExportNestReport = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem3 = new System.Windows.Forms.ToolStripSeparator();
             mnuFileExit = new System.Windows.Forms.ToolStripMenuItem();
             mnuEdit = new System.Windows.Forms.ToolStripMenuItem();
@@ -193,7 +194,7 @@
             // 
             // mnuFile
             // 
-            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, toolStripMenuItem3, mnuFileExit });
+            mnuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuFileNew, mnuFileOpen, mnuFileImportBom, toolStripMenuItem1, mnuFileSave, mnuFileSaveAs, toolStripMenuItem2, mnuFileExport, mnuFileExportAll, mnuFileExportNestReport, toolStripMenuItem3, mnuFileExit });
             mnuFile.Name = "mnuFile";
             mnuFile.Size = new System.Drawing.Size(37, 20);
             mnuFile.Text = "&File";
@@ -265,6 +266,14 @@
             mnuFileExportAll.Size = new System.Drawing.Size(146, 22);
             mnuFileExportAll.Text = "Export All";
             mnuFileExportAll.Click += ExportAll_Click;
+            // 
+            // mnuFileExportNestReport
+            // 
+            mnuFileExportNestReport.Enabled = false;
+            mnuFileExportNestReport.Name = "mnuFileExportNestReport";
+            mnuFileExportNestReport.Size = new System.Drawing.Size(146, 22);
+            mnuFileExportNestReport.Text = "Export Nest Report...";
+            mnuFileExportNestReport.Click += ExportNestReport_Click;
             // 
             // toolStripMenuItem3
             // 
@@ -1360,6 +1369,7 @@
         private System.Windows.Forms.ToolStripStatusLabel plateQtyStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel plateUtilStatusLabel;
         private System.Windows.Forms.ToolStripMenuItem mnuFileExportAll;
+        private System.Windows.Forms.ToolStripMenuItem mnuFileExportNestReport;
         private System.Windows.Forms.ToolStripMenuItem openNestToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem pEPToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomTo;

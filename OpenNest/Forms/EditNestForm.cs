@@ -16,6 +16,7 @@ using OpenNest.Engine.Sequencing;
 using OpenNest.IO;
 using OpenNest.Math;
 using OpenNest.Properties;
+using OpenNest.Reporting;
 using OpenNest.Shapes;
 using Timer = System.Timers.Timer;
 
@@ -477,6 +478,79 @@ namespace OpenNest.Forms
                     return;
             } while (PlateManager.LoadNext());
         }
+
+        /// <summary>The report target fixed before the save dialog opens.</summary>
+        internal sealed record NestReportTargets(Nest Nest, string SuggestedFileName);
+
+        /// <summary>
+        /// Capture the report target before the owned save dialog opens. The exact nest
+        /// reference is fixed here; later failures are reported against it, not a newer
+        /// active document. Whole-job nesting, open progress windows (via <paramref name="isJobBusy"/>),
+        /// interactive fill and busy plate actions on every view sharing this nest are rejected.
+        /// </summary>
+        internal NestReportTargets CaptureReportTargets(Func<bool> isJobBusy)
+        {
+            ArgumentNullException.ThrowIfNull(isJobBusy);
+            var nest = Nest;
+            if (nest == null)
+                throw new InvalidOperationException("No nest is available to report.");
+
+            // The nest name becomes the suggested file name; reject unusable names before the dialog.
+            if (
+                string.IsNullOrWhiteSpace(nest.Name)
+                || nest.Name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+            )
+                throw new InvalidOperationException(
+                    $"The nest name '{nest.Name}' cannot be used as a report file name. Rename the nest first."
+                );
+
+            if (isJobBusy() || IsReportTargetBusy(nest))
+                throw new InvalidOperationException(
+                    "Finish or cancel the current nesting or plate action before exporting the nest report."
+                );
+
+            return new NestReportTargets(nest, $"{nest.Name}.report.pdf");
+        }
+
+        /// <summary>
+        /// Revalidate the fixed target after the dialog closed, then synchronously capture the
+        /// snapshot on the UI thread and write it. The dialog pumps messages, so an async fill
+        /// could have committed or started meanwhile; once capture begins nothing yields.
+        /// </summary>
+        internal void WriteNestReport(
+            NestReportTargets targets,
+            string destination,
+            Func<bool> isJobBusy
+        )
+        {
+            ArgumentNullException.ThrowIfNull(targets);
+            ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+            ArgumentNullException.ThrowIfNull(isJobBusy);
+
+            if (!ReferenceEquals(targets.Nest, Nest))
+                throw new InvalidOperationException(
+                    "The active document changed while saving. No report was written."
+                );
+            if (isJobBusy() || IsReportTargetBusy(targets.Nest))
+                throw new InvalidOperationException(
+                    "A nesting or plate operation started while saving. No report was written."
+                );
+
+            // Reporting must have no accounting side effects: no quantity refresh, no
+            // selection or dirty-state change. Only the detached snapshot reaches the writer.
+            var snapshot = NestReportBuilder.Capture(targets.Nest, DateTimeOffset.Now);
+            NestPdfWriter.Write(snapshot, destination);
+        }
+
+        private bool IsReportTargetBusy(Nest nest) =>
+            Application
+                .OpenForms.OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, nest))
+                .Select(form => form.PlateView)
+                .Any(view =>
+                    !view.IsDisposed
+                    && (view.IsFillInProgress || view.Actions.CurrentAction?.IsBusy() == true)
+                );
 
         public void RotateCw()
         {

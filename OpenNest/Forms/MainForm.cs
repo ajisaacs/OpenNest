@@ -216,6 +216,7 @@ namespace OpenNest.Forms
             exportNestMenu.Enabled = hasValue;
             mnuFileExport.Enabled = hasValue;
             mnuFileExportAll.Enabled = hasValue;
+            mnuFileExportNestReport.Enabled = hasValue && !databaseSaveInProgress;
             btnZoomOut.Enabled = hasValue;
             btnZoomIn.Enabled = hasValue;
             mnuEdit.Visible = hasValue;
@@ -741,6 +742,87 @@ namespace OpenNest.Forms
                 return;
             activeForm.ExportAll();
         }
+
+        private void ExportNestReport_Click(object sender, EventArgs e)
+        {
+            var form = activeForm;
+            if (form == null)
+                return;
+
+            // The report never depends on a selected post or NC output; it only needs a
+            // quiescent nest so the snapshot is coherent.
+            Func<bool> isJobBusy = IsNestJobBusy;
+            EditNestForm.NestReportTargets targets;
+            try
+            {
+                targets = form.CaptureReportTargets(isJobBusy);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+            {
+                ReportFailure(null, ex);
+                return;
+            }
+
+            var destination = ShowReportSaveDialog(targets.SuggestedFileName);
+            if (destination == null)
+                return; // Cancel: nothing written, job untouched.
+
+            try
+            {
+                form.WriteNestReport(targets, destination, isJobBusy);
+            }
+            catch (Exception ex)
+                when (ex is InvalidOperationException
+                    or NotSupportedException
+                    or InvalidDataException
+                    or IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException)
+            {
+                // Failures describe the captured target; an active-document switch is irrelevant.
+                ReportFailure(targets, ex);
+                return;
+            }
+            statusLabel1.Text = $"Saved nest report to {destination}";
+            ReportSuccess(destination);
+        }
+
+        /// <summary>
+        /// True while any operation could mutate nests or hold their plate views: whole-job
+        /// nesting, an open progress window (a closed one can still await its commit), or a
+        /// background database save serializing the live nest.
+        /// </summary>
+        private bool IsNestJobBusy() =>
+            nestingInProgress
+            || Application.OpenForms.OfType<NestProgressForm>().Any()
+            || databaseSaveInProgress;
+
+        /// <summary>Returns the chosen path, or null on cancel. Overwrite consent is the dialog prompt.</summary>
+        internal virtual string ShowReportSaveDialog(string suggestedFileName)
+        {
+            using var dlg = new SaveFileDialog
+            {
+                Filter = "PDF report (*.pdf)|*.pdf",
+                FileName = suggestedFileName,
+                AddExtension = true,
+                DefaultExt = ".pdf",
+                OverwritePrompt = true,
+            };
+            return dlg.ShowDialog(this) == DialogResult.OK ? dlg.FileName : null;
+        }
+
+        /// <summary>Failure notice naming the fixed target; internal so tests observe it without dialogs.</summary>
+        internal virtual void ReportFailure(
+            EditNestForm.NestReportTargets targets,
+            Exception error) =>
+            MessageBox.Show(this,
+                $"Could not export the nest report{(targets == null ? "" : $" for '{targets.Nest.Name}'")}: {error.Message}",
+                "Export Nest Report", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+        /// <summary>Success notice; internal so tests observe completion without dialogs.</summary>
+        internal virtual void ReportSuccess(string destination) =>
+            MessageBox.Show(this, $"Nest report saved to:\n\n{destination}", "Export Nest Report",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
 
         private void Exit_Click(object sender, EventArgs e)
         {

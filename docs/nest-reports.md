@@ -1,8 +1,18 @@
-# Nest report PDF library
+# Nest report PDF export
 
-The first delivery is a bounded, cross-platform library slice, not yet a desktop
-menu command or a general report layout engine. Capture a stable `Nest` on its
-owning thread, then render only the detached snapshot:
+Desktop: **File -> Export Nest Report...** writes `<nest-name>.report.pdf` for the
+active nest's whole job through an overwrite-confirming save dialog. The command
+is disabled without an open document and during a background database save, and
+it refuses to run while whole-job nesting, an open progress window, interactive
+fill or a busy plate action holds the nest or any second window sharing it. After
+the dialog closes, the target and those conditions are revalidated; the snapshot
+is then captured synchronously on the UI thread and only that detached snapshot
+reaches the renderer. Export never changes the selected plate, dirty state,
+timestamps or quantities, and it never touches post selection, verification or
+CNC output. Opening and printing use any normal PDF viewer; the report includes
+no printer controls and there are no persisted report settings or templates.
+
+The same two calls back the command and any future integration:
 
 ```csharp
 var snapshot = NestReportBuilder.Capture(nest, DateTimeOffset.Now);
@@ -129,6 +139,11 @@ vector curves, unfilled holes and visible tab gaps with no connecting stroke.
 Pixel inspection supplements geometry assertions; it is not a CNC-validation
 result.
 
-Windows compilation is not runtime acceptance. The later desktop adapter must be
-tested on Windows for busy-operation guards, cancellation, overwrite handling,
-unchanged job state and PDF viewing/printing, including the packaged application.
+Windows compilation is not runtime acceptance. `OpenNest.WinForms.Tests/Forms/NestReportExportTests.cs`
+covers enablement, busy/cancel/failure/success adapter behavior, but it only
+compiles on Linux. Windows runtime acceptance still owes: exporting a real nest
+(and the packaged application, so bundled fonts/notices are verified), checking
+page sizes/labels/copies and embedded fonts with `pdffonts`, a tabbed part with a
+hole, opening and printing the PDF, and exercising fill/nesting rejection, cancel,
+overwrite and invalid-path behavior with job state and any existing destination
+unchanged.
