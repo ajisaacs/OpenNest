@@ -102,6 +102,21 @@ public class NestPipelineTests
     }
 
     [Fact]
+    public void CancellationDuringSolveDiscardsEvenAnEngineThatReturnsNormally()
+    {
+        using var cts = new CancellationTokenSource();
+        var engine = new StubEngine(job =>
+        {
+            cts.Cancel();
+            return OnePlate(job, new NestJobPlacement(job.Parts[0].Id, 0, 1, 1, 0));
+        });
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            NestPipeline.Run(engine, "IgnoresStop", Request("IgnoresStop", Item("bracket", 1)), null, cts.Token)
+        );
+    }
+
+    [Fact]
     public void CancellationPropagatesWithoutAResult()
     {
         using var cts = new CancellationTokenSource();

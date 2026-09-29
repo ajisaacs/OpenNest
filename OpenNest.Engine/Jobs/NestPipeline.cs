@@ -115,6 +115,7 @@ public static class NestPipeline
             engine.Solve(job, progress, token)
             ?? throw new InvalidOperationException($"Engine '{engineName}' returned no result.");
         var solveTime = clock.Elapsed;
+        token.ThrowIfCancellationRequested();
 
         clock.Restart();
         var violations = Validate(job, raw, drawingsByPartId);
@@ -128,6 +129,7 @@ public static class NestPipeline
             ))
             .ToList();
 
+        token.ThrowIfCancellationRequested();
         return new NestPipelineResult(
             engineName,
             job,
