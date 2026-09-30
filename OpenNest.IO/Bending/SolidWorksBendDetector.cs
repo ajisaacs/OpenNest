@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -17,17 +18,26 @@ namespace OpenNest.IO.Bending
 
         private static readonly Regex BendNoteRegex = new Regex(
             @"(?<direction>UP|DOWN|DN)\s+(?<angle>\d+(\.\d+)?)[^A-Z\d]*R\s*(?<radius>\d+(\.\d+)?)",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase
+            RegexOptions.Compiled | RegexOptions.IgnoreCase,
+            TimeSpan.FromSeconds(1)
         );
 
         private static readonly Regex MTextFormatRegex = new Regex(
             @"\\[fHCTQWASpOoLlKk][^;]*;|\\P|[{}]|%%[dDpPcC]",
-            RegexOptions.Compiled
+            RegexOptions.Compiled,
+            TimeSpan.FromSeconds(1)
         );
 
         private static readonly Regex UnicodeEscapeRegex = new Regex(
             @"\\U\+([0-9A-Fa-f]{4})",
-            RegexOptions.Compiled
+            RegexOptions.Compiled,
+            TimeSpan.FromSeconds(1)
+        );
+
+        private static readonly Regex WhitespaceRegex = new Regex(
+            @"\s+",
+            RegexOptions.None,
+            TimeSpan.FromSeconds(1)
         );
 
         public List<Bend> DetectBends(CadDocument document)
@@ -238,7 +248,7 @@ namespace OpenNest.IO.Bending
             result = MTextFormatRegex.Replace(result, " ");
 
             // Collapse multiple spaces
-            return Regex.Replace(result.Trim(), @"\s+", " ");
+            return WhitespaceRegex.Replace(result.Trim(), " ");
         }
 
         private MText FindClosestBendNote(ACadSharp.Entities.Line bendLine, List<MText> notes)

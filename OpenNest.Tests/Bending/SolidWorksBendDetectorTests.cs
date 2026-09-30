@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
 using ACadSharp.IO;
 using OpenNest.Bending;
 using OpenNest.IO.Bending;
@@ -6,6 +8,50 @@ namespace OpenNest.Tests.Bending;
 
 public class SolidWorksBendDetectorTests
 {
+    [Theory]
+    [InlineData("BendNoteRegex")]
+    [InlineData("MTextFormatRegex")]
+    [InlineData("UnicodeEscapeRegex")]
+    [InlineData("WhitespaceRegex")]
+    public void DetectorRegex_HasExplicitTimeout(string fieldName)
+    {
+        var field = typeof(SolidWorksBendDetector).GetField(fieldName,
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var regex = Assert.IsType<Regex>(field.GetValue(null));
+        Assert.Equal(TimeSpan.FromSeconds(1), regex.MatchTimeout);
+    }
+
+    [Theory]
+    [InlineData("UP 90 R0.125", BendDirection.Up, 0.125, "UP 90 R0.125")]
+    [InlineData("DOWN 90 R0.313", BendDirection.Down, 0.313, "DOWN 90 R0.313")]
+    [InlineData("DN 90 SHARP", BendDirection.Down, 0.0, "DN 90 SHARP")]
+    [InlineData(@"{\fArial;UP\P90\U+00B0 R0.125}", BendDirection.Up, 0.125, "UP 90° R0.125")]
+    [InlineData("UP\t90%%d   R0.125", BendDirection.Up, 0.125, "UP 90° R0.125")]
+    [InlineData(@"UP 90 R0.125 \fUnterminated", BendDirection.Up, 0.125, @"UP 90 R0.125 \fUnterminated")]
+    public void DetectBends_PreservesDirectionFormattingAndRadius(string text,
+        BendDirection direction, double radius, string expectedNote)
+    {
+        var document = new ACadSharp.CadDocument();
+        document.Entities.Add(new ACadSharp.Entities.Line(new CSMath.XYZ(0, 0, 0), new CSMath.XYZ(10, 0, 0))
+        {
+            Layer = new ACadSharp.Tables.Layer("BEND"),
+            LineType = new ACadSharp.Tables.LineType("CENTER"),
+        });
+        document.Entities.Add(new ACadSharp.Entities.MText
+        {
+            Value = text,
+            InsertPoint = new CSMath.XYZ(5, 0, 0),
+            Height = 1,
+        });
+
+        var bend = Assert.Single(new SolidWorksBendDetector().DetectBends(document));
+        Assert.Equal(direction, bend.Direction);
+        Assert.Equal(90.0, bend.Angle);
+        Assert.Equal(radius, bend.Radius);
+        Assert.Equal(expectedNote, bend.NoteText);
+    }
+
     [Fact]
     public void SolidWorksDetector_IsRegistered()
     {
