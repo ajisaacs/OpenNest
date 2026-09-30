@@ -198,6 +198,11 @@ namespace OpenNest.Forms
             return nestItems;
         }
 
+        /// <summary>
+        /// Returns the validated stock collection. Throws <see cref="FormatException"/> when a
+        /// nonblank row is invalid or timed out; all-or-nothing, never a valid prefix. Prefer
+        /// <see cref="TryGetPlateOptions"/> for callers that must report the failure.
+        /// </summary>
         public List<PlateOption> GetPlateOptions()
         {
             if (!TryGetPlateOptions(out var options, out var error))
@@ -212,7 +217,7 @@ namespace OpenNest.Forms
             if (!plateGrid.EndEdit())
             {
                 var value = plateGrid.EditingControl?.Text ?? plateGrid.CurrentCell?.Value?.ToString();
-                error = $"Invalid stock size '{value}'. Enter positive dimensions as W x L.";
+                error = $"Invalid stock size '{Preview(value)}'. Enter positive dimensions as W x L.";
                 return false;
             }
 
@@ -228,7 +233,7 @@ namespace OpenNest.Forms
                     continue;
                 if (!TryParseSize(item.Size, out var width, out var length))
                 {
-                    error = $"Invalid stock size '{item.Size}' in row {index + 1}. Enter positive dimensions as W x L.";
+                    error = $"Invalid stock size '{Preview(item.Size)}' in row {index + 1}. Enter positive dimensions as W x L.";
                     if (index < plateGrid.Rows.Count)
                         plateGrid.Rows[index].ErrorText = error;
                     return false;
@@ -259,6 +264,16 @@ namespace OpenNest.Forms
         internal virtual void ReportStockValidationFailure(string error)
         {
             MessageBox.Show(this, error, "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        // Bounded single-line preview so a long or multiline cell value cannot produce an
+        // unreadable message box; the full value stays in the editable cell.
+        private static string Preview(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+            var line = value.Replace("\r", " ").Replace("\n", " ");
+            return line.Length <= 40 ? line : line[..40] + "...";
         }
 
         public void LoadPlateOptions(List<PlateOption> options, double salvageRate)
@@ -396,7 +411,9 @@ namespace OpenNest.Forms
 
         private static string FormatSize(double width, double length)
         {
-            return $"{width:G} x {length:G}";
+            // Invariant: TryParseSize requires invariant decimal notation; current-culture
+            // formatting would produce comma decimals that the parser then rejects.
+            return FormattableString.Invariant($"{width:G} x {length:G}");
         }
 
         private void PartsGrid_DataError(object sender, DataGridViewDataErrorEventArgs e)

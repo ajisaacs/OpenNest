@@ -1,5 +1,6 @@
 using System.Collections;
 using System.ComponentModel;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text.RegularExpressions;
@@ -160,6 +161,31 @@ public class AutoNestFormStockOptionsTests
         grid.CancelEdit();
     });
 
+    [Fact]
+    public void FractionalStockSizesRoundTripUnderCommaDecimalCulture() => RunSta(() =>
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            using var form = new StockTestForm();
+            // FormatSize must emit invariant dots or the reloaded collection would be
+            // rejected as invalid under the invariant parser.
+            form.LoadPlateOptions(new List<PlateOption>
+            {
+                new() { Width = 48.5, Length = 96.25, Cost = 25 },
+            }, 0.5);
+            Assert.True(form.TryGetPlateOptions(out var options, out var error));
+            Assert.Null(error);
+            Assert.Equal(48.5, options[0].Width);
+            Assert.Equal(96.25, options[0].Length);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    });
+
     private sealed class StockTestForm : AutoNestForm
     {
         public StockTestForm() : base(new Nest()) { }
@@ -212,10 +238,11 @@ public class AutoNestFormStockOptionsTests
         {
             try { action(); }
             catch (Exception ex) { error = ex; }
-        });
+        })
+        { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(15)));
+        Assert.True(thread.Join(TimeSpan.FromSeconds(15)), "The STA test did not complete.");
         if (error != null)
             ExceptionDispatchInfo.Capture(error).Throw();
     }
