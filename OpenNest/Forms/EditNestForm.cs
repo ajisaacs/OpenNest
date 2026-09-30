@@ -317,9 +317,9 @@ namespace OpenNest.Forms
 
         private Control GetFocusedControl()
         {
-            var ctrl = this;
+            Control ctrl = this;
             while (ctrl is ContainerControl container && container.ActiveControl != null)
-                return container.ActiveControl;
+                ctrl = container.ActiveControl;
             return ctrl;
         }
 
