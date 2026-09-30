@@ -27,9 +27,10 @@ Every invalid result shows the validation report before any plates are changed:
 Overlap Check displays material overlaps, not every spacing/stock/rotation failure in the report. A layout passing validation may still be incomplete; completeness and stop reason are separate from geometric validity. This check does not replace pre-post CNC verification.
 
 The selected engine is saved in `%APPDATA%\OpenNest\engine-selection.json`.
-Selection is restored after plug-ins load. If the saved engine is unavailable,
-Default is selected and the status bar reports the fallback; startup does not
-replace the saved missing-engine preference.
+Selection is restored after plug-ins load. A saved name from an earlier release
+maps to the engine that replaced it (see [nesting engines](nesting-engines.md)).
+If the saved engine is unavailable, Default is selected and the status bar
+reports the fallback; startup does not replace the saved missing-engine preference.
 
 ## Integration constraints
 

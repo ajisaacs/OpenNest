@@ -20,7 +20,7 @@ A Windows desktop application for CNC nesting — imports DXF drawings, arranges
 - Windows 10+ for the desktop app; the console, API, and most test projects build on Linux/macOS too.
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) to build from source.
 
-Windows release ZIPs are self-contained: extract the entire archive into a new folder and run `OpenNest.exe`; no separate .NET installation is needed. The package includes the Gpt6Astra, Opus55, and Qwen38FlashNext engine plug-ins. Use the ZIP and SHA-256 checksum from [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases), not the source-code archives.
+Windows release ZIPs are self-contained: extract the entire archive into a new folder and run `OpenNest.exe`; no separate .NET installation is needed. The Rectangles and Irregular nesting engines are built in; see [nesting engines](docs/nesting-engines.md). Use the ZIP and SHA-256 checksum from [GitHub Releases](https://github.com/ajisaacs/OpenNest/releases), not the source-code archives.
 
 ## Build, Test, Run
 
@@ -67,7 +67,7 @@ dotnet run --project OpenNest.Benchmark -- ./benchmark-jobs \
   --sheet-sizes 48x96,60x120,72x120 --engines Default,StockLadder --csv results.csv
 ```
 
-Layouts are validated (bounds, spacing, quantity, rotation, stock match); invalid runs place nothing and pay the penalty. `--parallel` (default 3) speeds up scoring but inflates `Time(ms)` — use `--parallel 1` when comparing speed. Pass `--sheet-sizes` for an unbiased run; otherwise only each file's original sizes are offered. `--progress` logs each solve's start, the engine's `NestJobProgress` (plate evaluations throttled to one line per 2 s, every plate commit) and its finish. Custom engines drop in as DLLs implementing `INestingEngine` (public parameterless constructor) in an `Engines/` folder next to the benchmark. Community engines live in [OpenNest-Engines](https://git.thecozycat.net/aj/OpenNest-Engines).
+Layouts are validated (bounds, spacing, quantity, rotation, stock match); invalid runs place nothing and pay the penalty. `--parallel` (default 3) speeds up scoring but inflates `Time(ms)` — use `--parallel 1` when comparing speed. Pass `--sheet-sizes` for an unbiased run; otherwise only each file's original sizes are offered. `--progress` logs each solve's start, the engine's `NestJobProgress` (plate evaluations throttled to one line per 2 s, every plate commit) and its finish. Custom engines drop in as DLLs implementing `INestingEngine` (public parameterless constructor) in an `Engines/` folder next to the benchmark. Built-in engines and how to change them: [nesting engines](docs/nesting-engines.md).
 
 ## Project Structure
 
@@ -91,10 +91,14 @@ Engines implement `INestingEngine.Solve(NestJob)`. Desktop Auto Nest, console au
 
 | Engine | Description |
 |--------|-------------|
+| **Rectangles** | Plain and near-rectangular plates: maximal-rectangles box packing |
+| **Irregular** | Irregular profiles: no-fit-polygon frontier packing |
 | **Default** | Multi-phase: linear fill → pairs → rect best-fit → extents |
 | **Strip** | Iterative shrink-fill for mixed-drawing layouts |
 | **Vertical / Horizontal Remnant** | Optimizes a clean remnant drop on one edge |
 | **StockLadder** | Whole-job, stock-constrained baseline with salvage-credit ranking |
+
+Which engine suits which jobs, renamed engine names, and the rules for changing an engine: [nesting engines](docs/nesting-engines.md).
 
 ## File Format
 

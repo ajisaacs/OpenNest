@@ -19,13 +19,12 @@ Git refs are owned by Gitea (`aj/OpenNest`) and push-mirrored to GitHub
 4. Download the `OpenNest-X.Y.Z-win-x64` artifact and verify its `.sha256`.
    It contains `OpenNest.vX.Y.Z.win-x64.zip`, with the .NET runtime, native
    dependencies, shipped configurations, all three post-processors, license,
-   and `build-info.json` identifying the exact source commit. Gpt6Astra, Opus55,
-   and Qwen38FlashNext are bundled in `Engines/` with their MIT license and source
-   manifest. `scripts/external-engines.json` pins the external repository revision;
-   no moving branch or prebuilt third-party DLL is used. The script tests and
-   builds each engine against this host, then exercises actual packaged registry
-   discovery and an intentionally missing-DLL failure case. Keep the explicit
-   engine allowlist; never package the template, shared test kit, or test DLLs.
+   and `build-info.json` identifying the exact source commit. The nesting engines
+   are built into `OpenNest.Engine.dll`; no external engine repository or plug-in
+   DLL is packaged. `scripts/ReleaseSmoke` loads the packaged engine assembly and
+   checks that every built-in engine instantiates from it, that the renamed
+   `Opus55NestingEngine` selection resolves to Irregular, and that an unknown
+   engine name is rejected.
 
 The workflow has read-only repository permissions and does **not** publish
 releases. Once present on the default branch, it can also be dispatched manually
