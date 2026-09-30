@@ -46,6 +46,37 @@ Invalid output is printed and rejected with exit code 2 without saving or postin
 
 MCP `autonest_plate` requires an empty target. The stdio server serializes all tool calls sharing its mutable session, so another request cannot change drawings or occupy a target during a solve. `allow_invalid` defaults to false. It reports violations and makes no changes on rejection, including with an override when the output is unrepresentable or contains multiple sheets. Existing fill tools remain separate. Console and MCP load jobs plug-ins from `Engines/` beside their executable.
 
+### MCP engine development harness
+
+`test_engine` builds and runs `OpenNest.Console` in a configured, trusted checkout.
+`nestFile` is required; there is no machine-specific sample default. Drawing,
+plate and output arguments and the stdout / `=== Errors ===` / nonzero-exit
+response format are unchanged. Relative nest/output paths resolve from the MCP
+server's working directory, before launching the checkout's console.
+
+The existing .NET host configuration accepts:
+
+- `EngineHarness:SourceRoot`: required absolute checkout path containing
+  `OpenNest.Console/OpenNest.Console.csproj`.
+- `EngineHarness:DotnetPath`: optional existing absolute executable path;
+  defaults to the dotnet host in the active .NET installation, never a PATH search.
+- `EngineHarness:TimeoutSeconds`: positive integer, default **120**, maximum
+  2147483. The single deadline covers build/run, process exit and both concurrent
+  output drains. MCP request cancellation uses the same bounded path.
+
+For environment variables, use `EngineHarness__SourceRoot`,
+`EngineHarness__DotnetPath` and `EngineHarness__TimeoutSeconds`. These are
+server/operator settings, not caller-supplied executable or checkout overrides.
+
+Timeout/cancellation returns a clear error, kills the owned live process tree,
+waits up to five additional seconds for direct-process cleanup, and closes local
+pipe readers. Cleanup failures are reported. A descendant already detached when
+its parent exits cannot reliably be found by `Process.Kill(entireProcessTree)`;
+it may remain alive, but inherited pipe writers cannot hold the tool open.
+The harness does not scan for or kill unrelated processes. Windows process-tree
+semantics still need Windows runtime acceptance; the private process regressions
+also execute on Linux without customer nest files.
+
 ## .NET API and saved responses
 
 Set `NestRequest.Engine` to a registered engine name; null retains `PlacementStrategy` / legacy `Strategy` behavior. Library hosts own plug-in discovery via `NestingEngineRegistry.LoadPlugins` before calling the API. Explicit request requirement IDs are preserved in response fulfillment even when multiple requirements use the same source DXF.
