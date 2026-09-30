@@ -403,47 +403,63 @@ namespace OpenNest.Forms
 
         public bool Export()
         {
-            var dlg = new SaveFileDialog();
-            dlg.Filter =
-                "DXF file (*.dxf)|*.dxf|"
-                + "Image as displayed (*.jpg)|*.jpg|"
-                + "Locations and rotations (*.txt)|*.txt";
+            var suggestedFileName = string.Format("{0}-P{1}", Nest.Name, PlateManager.CurrentIndex + 1);
+            var target = ShowPlateExportDialog(suggestedFileName);
+            if (target == null)
+                return false;
 
-            dlg.FileName = string.Format("{0}-P{1}", Nest.Name, PlateManager.CurrentIndex + 1);
-            dlg.AddExtension = true;
-            dlg.DefaultExt = ".";
+            return TryExportPlate(PlateView.Plate, target.Value.Destination, target.Value.FilterIndex);
+        }
 
-            if (dlg.ShowDialog() == DialogResult.OK)
+        internal virtual (string Destination, int FilterIndex)? ShowPlateExportDialog(string suggestedFileName)
+        {
+            using var dlg = new SaveFileDialog
             {
-                if (dlg.FilterIndex == 1)
-                {
-                    Dxf.ExportPlate(PlateView.Plate, dlg.FileName);
-                    return true;
-                }
-                else if (dlg.FilterIndex == 2)
-                {
-                    try
+                Filter = "DXF file (*.dxf)|*.dxf|"
+                    + "Image as displayed (*.jpg)|*.jpg|"
+                    + "Locations and rotations (*.txt)|*.txt",
+                FileName = suggestedFileName,
+                AddExtension = true,
+                DefaultExt = ".",
+            };
+            return dlg.ShowDialog(this) == DialogResult.OK ? (dlg.FileName, dlg.FilterIndex) : null;
+        }
+
+        internal bool TryExportPlate(Plate plate, string destination, int filterIndex)
+        {
+            try
+            {
+                WritePlateExport(plate, destination, filterIndex);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ReportPlateExportFailure(destination, ex);
+                return false;
+            }
+        }
+
+        internal virtual void WritePlateExport(Plate plate, string destination, int filterIndex)
+        {
+            switch (filterIndex)
+            {
+                case 1:
+                    Dxf.ExportPlate(plate, destination);
+                    break;
+                case 2:
+                    using (var img = new Bitmap(PlateView.Width, PlateView.Height))
                     {
-                        var img = new Bitmap(PlateView.Width, PlateView.Height);
                         PlateView.DrawToBitmap(
                             img,
                             new Rectangle(0, 0, PlateView.Width, PlateView.Height)
                         );
-                        img.Save(dlg.FileName);
+                        img.Save(destination, System.Drawing.Imaging.ImageFormat.Jpeg);
                     }
-                    catch { }
-
-                    return true;
-                }
-                else if (dlg.FilterIndex == 3)
-                {
-                    StreamWriter writer = null;
-
-                    try
+                    break;
+                case 3:
+                    using (var writer = new StreamWriter(destination))
                     {
-                        writer = new StreamWriter(dlg.FileName);
-
-                        foreach (var part in PlateView.Plate.Parts)
+                        foreach (var part in plate.Parts)
                         {
                             var pt = part.BaseDrawing.Source.Offset.Rotate(part.Rotation);
 
@@ -456,17 +472,15 @@ namespace OpenNest.Forms
                             );
                         }
                     }
-                    catch { }
-                    finally
-                    {
-                        if (writer != null)
-                            writer.Dispose();
-                    }
-                }
+                    break;
+                default:
+                    throw new ArgumentException("Unsupported plate export format.", nameof(filterIndex));
             }
-
-            return false;
         }
+
+        internal virtual void ReportPlateExportFailure(string destination, Exception error) =>
+            MessageBox.Show(this, $"Could not export plate to '{destination}': {error.Message}",
+                "Export Plate", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
         public void ExportAll()
         {
