@@ -313,7 +313,7 @@ public class EllipseConverterTests
             var b = e.BoundingBox;
             var flag = (b.Length > 1 || b.Width > 1) ? " ***" : "";
             _output.WriteLine(
-                $"{i + 1, 3}. {e.GetType().Name, -8} X={b.X:F4} Y={b.Y:F4} W={b.Length:F4} H={b.Width:F4}{flag}"
+                $"{i + 1,3}. {e.GetType().Name,-8} X={b.X:F4} Y={b.Y:F4} W={b.Length:F4} H={b.Width:F4}{flag}"
             );
         }
     }
