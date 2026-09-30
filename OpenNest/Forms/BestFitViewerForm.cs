@@ -47,6 +47,7 @@ namespace OpenNest.Forms
         private int pageCount;
         private CancellationTokenSource computeCts;
         private Label lblLoading;
+        private bool closed;
 
         public BestFitResult SelectedResult { get; private set; }
         public Drawing SelectedDrawing => activeDrawing;
@@ -75,14 +76,17 @@ namespace OpenNest.Forms
             Shown += BestFitViewerForm_Shown;
         }
 
-        private void BestFitViewerForm_Shown(object sender, EventArgs e)
+        private async void BestFitViewerForm_Shown(object sender, EventArgs e)
         {
-            LoadResultsAsync();
+            await LoadResultsAsync();
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            computeCts?.Cancel();
+            closed = true;
+            var cts = computeCts;
+            computeCts = null;
+            cts?.Cancel();
             base.OnFormClosed(e);
         }
 
@@ -106,37 +110,56 @@ namespace OpenNest.Forms
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        private void drawingListBox_SelectedIndexChanged(object sender, EventArgs e)
+        private async void drawingListBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             var drawing = drawingListBox.SelectedItem as Drawing;
             if (drawing == null)
                 return;
 
             activeDrawing = drawing;
-            LoadResultsAsync();
+            await LoadResultsAsync();
         }
 
-        private async void LoadResultsAsync()
-        {
-            computeCts?.Cancel();
-            var cts = new CancellationTokenSource();
-            computeCts = cts;
+        private bool CanUpdateView => !closed && !IsDisposed && !Disposing;
 
-            SetLoading(true);
+        private bool OwnsOperation(CancellationTokenSource cts) =>
+            cts == computeCts && CanUpdateView && !cts.IsCancellationRequested;
+
+        internal async Task LoadResultsAsync()
+        {
+            if (!CanUpdateView)
+                return;
+
+            var previousCts = computeCts;
+            using var cts = new CancellationTokenSource();
+            computeCts = cts;
+            var drawing = activeDrawing;
 
             try
             {
-                var drawing = activeDrawing;
                 var length = plate.Size.Length;
                 var width = plate.Size.Width;
                 var spacing = plate.PartSpacing;
 
-                var result = await Task.Run(
-                    () => ComputeResults(drawing, length, width, spacing),
-                    cts.Token
-                );
+                if (previousCts != null)
+                    await previousCts.CancelAsync();
+                if (!OwnsOperation(cts))
+                    return;
 
-                if (cts.Token.IsCancellationRequested)
+                results = null;
+                pageCount = 0;
+                currentPage = 0;
+                SetLoading(true);
+
+                // No cancellation callbacks use this source. A running cache computation is
+                // synchronous: cancellation skips queued work or rejects its eventual result.
+                var result = await Task.Run(() =>
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    return ComputeResults(drawing, length, width, spacing);
+                }, CancellationToken.None);
+
+                if (!OwnsOperation(cts))
                     return;
 
                 results = result.Results;
@@ -151,15 +174,40 @@ namespace OpenNest.Forms
 
                 ShowPage(0);
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                // Superseded or closed viewers discard results without a cancellation notice.
+            }
+            catch (Exception error)
+            {
+                if (OwnsOperation(cts))
+                {
+                    results = null;
+                    pageCount = 0;
+                    currentPage = 0;
+                    gridPanel.Controls.Clear();
+                    gridPanel.ResumeLayout(true);
+                    lblLoading = null;
+                    Text = "Best-Fit Viewer — Could not load results";
+                    ReportLoadFailure(drawing, error);
+                }
+            }
             finally
             {
                 if (cts == computeCts)
-                    SetLoading(false);
+                {
+                    computeCts = null;
+                    if (CanUpdateView)
+                        SetLoading(false);
+                }
             }
         }
 
-        private void SetLoading(bool loading)
+        internal virtual void ReportLoadFailure(Drawing drawing, Exception error) =>
+            MessageBox.Show(this, $"Could not load best fits for '{drawing.Name}': {error.Message}",
+                "Best-Fit Viewer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+        internal virtual void SetLoading(bool loading)
         {
             Cursor = loading ? Cursors.WaitCursor : Cursors.Default;
             btnPrev.Enabled = !loading;
@@ -204,7 +252,7 @@ namespace OpenNest.Forms
             gridPanel.SetRowSpan(lblLoading, Rows);
         }
 
-        private static ComputeResult ComputeResults(
+        internal virtual ComputeResult ComputeResults(
             Drawing drawing,
             double length,
             double width,
@@ -237,7 +285,7 @@ namespace OpenNest.Forms
             };
         }
 
-        private void ShowPage(int page)
+        internal virtual void ShowPage(int page)
         {
             currentPage = page;
             var start = page * ItemsPerPage;
@@ -375,7 +423,7 @@ namespace OpenNest.Forms
             return cell;
         }
 
-        private struct ComputeResult
+        internal struct ComputeResult
         {
             public List<BestFitResult> Results;
             public int TotalResults;
