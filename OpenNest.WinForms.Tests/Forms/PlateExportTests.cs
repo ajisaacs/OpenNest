@@ -232,7 +232,10 @@ public class PlateExportTests
         Assert.Equal(1, form.PlateManager.CurrentIndex);
         Assert.Equal(plates, nest.Plates.ToArray());
         Assert.Equal(plateQuantities, nest.Plates.Select(plate => plate.Quantity).ToArray());
+        // Drawing.Equals compares names, so reference identity is asserted explicitly.
         Assert.Equal(drawings, nest.Drawings.ToArray());
+        foreach (var (expected, actual) in drawings.Zip(nest.Drawings))
+            Assert.Same(expected, actual);
         Assert.Equal(drawingQuantities, nest.Drawings.Select(drawing => drawing.Quantity).ToArray());
         Assert.Equal(partCounts, nest.Plates.Select(plate => plate.Parts.Count).ToArray());
         Assert.Equal(parts, nest.Plates.SelectMany(plate => plate.Parts).ToArray());
@@ -328,8 +331,17 @@ public class PlateExportTests
     private static TestEditNestForm ShowJob()
     {
         var form = new TestEditNestForm(CreateJob());
-        form.PlateView.SetOverlapAutoCheck(null);
-        form.Show();
+        try
+        {
+            form.PlateView.SetOverlapAutoCheck(null);
+            form.Show();
+        }
+        catch
+        {
+            form.Dispose();
+            throw;
+        }
+
         return form;
     }
 
