@@ -29,14 +29,15 @@ public class FractionTests
     [Theory]
     [InlineData("en-US")]
     [InlineData("fr-FR")]
-    public void Parse_UsesCurrentCultureForOrdinaryIntegerComponents(string culture)
+    public void Parse_AcceptsOrdinaryFractionsAcrossCultures(string culture)
     {
         var original = CultureInfo.CurrentCulture;
         try
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
-            // The implementation uses current-culture double.Parse, not invariant parsing.
-            // Ordinary digits are invariant-parseable too; exotic numeric syntax is not this contract.
+            // Compatibility coverage: ordinary digits parse identically under these cultures.
+            // This does not prove current-culture vs invariant parsing; exotic numeric syntax
+            // is not this contract.
             var expected = double.Parse("1") + System.Math.Round(double.Parse("3") / double.Parse("4"), 8);
             Assert.Equal(expected, Fraction.Parse("1 3/4"), 8);
         }
