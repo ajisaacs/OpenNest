@@ -63,7 +63,9 @@ public sealed class CincinnatiPartSubprogramWriter
             // SubProgramCall features are emitted as M98 hole calls
             if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
             {
-                WriteHoleSubprogramCall(w, holeCall, i, isLastFeature);
+                CincinnatiHoleCallWriter.Write(
+                    w, holeCall, i, isLastFeature, _config, _fmt, _holeSubprograms
+                );
                 continue;
             }
 
@@ -89,35 +91,6 @@ public sealed class CincinnatiPartSubprogramWriter
         }
 
         w.WriteLine($"M99 (END OF {drawingName})");
-    }
-
-    private void WriteHoleSubprogramCall(
-        TextWriter w,
-        SubProgramCall call,
-        int featureIndex,
-        bool isLastFeature
-    )
-    {
-        var postSubNum =
-            _holeSubprograms != null && _holeSubprograms.TryGetValue(call.Id, out var num)
-                ? num
-                : call.Id;
-
-        var featureNumber =
-            featureIndex == 0 ? _config.FeatureLineNumberStart : 1000 + featureIndex + 1;
-
-        var sb = new StringBuilder();
-        if (_config.UseLineNumbers)
-            sb.Append($"N{featureNumber} ");
-        sb.Append($"G52 X{_fmt.FormatCoord(call.Offset.X)} Y{_fmt.FormatCoord(call.Offset.Y)}");
-        w.WriteLine(sb.ToString());
-
-        w.WriteLine($"M98 P{postSubNum}");
-
-        w.WriteLine("G52 X0 Y0");
-
-        if (!isLastFeature)
-            w.WriteLine("M47");
     }
 
     /// <summary>

@@ -184,7 +184,9 @@ public sealed class CincinnatiSheetWriter
                     // SubProgramCall features are emitted as M98 hole calls
                     if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
                     {
-                        WriteHoleSubprogramCall(w, holeCall, featureIndex, isLastFeature);
+                        CincinnatiHoleCallWriter.Write(
+                            w, holeCall, featureIndex, isLastFeature, _config, _fmt, _holeSubprograms
+                        );
                         featureIndex++;
                         lastPartName = partName;
                         continue;
@@ -268,42 +270,6 @@ public sealed class CincinnatiSheetWriter
             w.WriteLine("M47");
     }
 
-    private void WriteHoleSubprogramCall(
-        TextWriter w,
-        SubProgramCall call,
-        int featureIndex,
-        bool isLastFeature
-    )
-    {
-        var postSubNum =
-            _holeSubprograms != null && _holeSubprograms.TryGetValue(call.Id, out var num)
-                ? num
-                : call.Id;
-
-        var featureNumber =
-            featureIndex == 0 ? _config.FeatureLineNumberStart : 1000 + featureIndex + 1;
-
-        // Shift the local origin to the hole center via G52 (manual §1.52).
-        // G52 does not move the nozzle, so the sub-program's first rapid
-        // (the lead-in to the pierce point) takes the tool straight from the
-        // previous feature's end to pierce. The hole sub-program is authored
-        // in hole-local coordinates and resolves to `hole + local` under the
-        // shift. See docs/cincinnati-post-output.md for the full bracket.
-        var sb = new StringBuilder();
-        if (_config.UseLineNumbers)
-            sb.Append($"N{featureNumber} ");
-        sb.Append($"G52 X{_fmt.FormatCoord(call.Offset.X)} Y{_fmt.FormatCoord(call.Offset.Y)}");
-        w.WriteLine(sb.ToString());
-
-        w.WriteLine($"M98 P{postSubNum}");
-
-        // Cancel the local shift (manual §1.52).
-        w.WriteLine("G52 X0 Y0");
-
-        if (!isLastFeature)
-            w.WriteLine("M47");
-    }
-
     private void WritePartsInline(
         TextWriter w,
         List<Part> allParts,
@@ -337,7 +303,9 @@ public sealed class CincinnatiSheetWriter
             // SubProgramCall features are emitted as M98 hole calls
             if (codes.Count == 1 && codes[0] is SubProgramCall holeCall)
             {
-                WriteHoleSubprogramCall(w, holeCall, i, isLastFeature);
+                CincinnatiHoleCallWriter.Write(
+                    w, holeCall, i, isLastFeature, _config, _fmt, _holeSubprograms
+                );
                 lastPartName = partName;
                 continue;
             }
