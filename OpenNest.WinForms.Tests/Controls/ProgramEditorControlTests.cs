@@ -68,6 +68,9 @@ public class ProgramEditorControlTests
         var oldPreview = preview.Entities.ToArray();
 
         beforeClick = oldPreview;
+        // Overwrite any stale indication so the event snapshot can only show the label
+        // applied by THIS operation's highlighting pass.
+        status.Text = "<stale>";
         GetControl<Button>(control, "reverseButton").PerformClick();
 
         Assert.NotSame(oldProgram, control.Program);
@@ -84,6 +87,7 @@ public class ProgramEditorControlTests
         oldProgram = control.Program;
         oldPreview = preview.Entities.ToArray();
         beforeClick = oldPreview;
+        status.Text = "<stale>";
         GetField<ToolStripMenuItem>(control, "menuMoveDown").PerformClick();
 
         Assert.NotSame(oldProgram, control.Program);
