@@ -362,6 +362,9 @@ namespace OpenNest.Engine.Fill
         {
             var perpAxis = PerpendicularAxis(direction);
 
+            // Set only when Step 1's check executed, passed, and no fallback replaced the row.
+            var rowIsVerified = false;
+
             // Step 1: Tile along primary axis
             var row = new List<Part>(pattern.Parts);
             row.AddRange(TilePattern(pattern, direction, cache));
@@ -371,6 +374,10 @@ namespace OpenNest.Engine.Fill
                 LogOverlap("Step1-Primary", direction, pattern, row, a1, b1);
                 row = new List<Part>(pattern.Parts);
                 row.AddRange(TilePatternBbox(pattern, direction));
+            }
+            else if (pattern.Parts.Count > 1)
+            {
+                rowIsVerified = true;
             }
 
             // If primary tiling didn't produce copies, just tile along perpendicular
@@ -396,7 +403,11 @@ namespace OpenNest.Engine.Fill
             var gridResult = new List<Part>(rowPattern.Parts);
             gridResult.AddRange(TilePattern(rowPattern, perpAxis, cache));
 
-            if (HasOverlappingParts(gridResult, out var a3, out var b3))
+            // Only the unchanged row is covered by Step 1's clean verdict: skip Step 2
+            // only when the perpendicular tiling appended zero parts, so gridResult
+            // still contains the same Part objects, in the same order and poses.
+            if ((!rowIsVerified || gridResult.Count != row.Count)
+                && HasOverlappingParts(gridResult, out var a3, out var b3))
             {
                 LogOverlap("Step2-Perp", perpAxis, rowPattern, gridResult, a3, b3);
                 gridResult = new List<Part>(rowPattern.Parts);

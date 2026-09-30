@@ -165,6 +165,112 @@ public class FillLinearValidationReuseTests
         output.WriteLine($"{direction}: rejected={rejected:R} accepted={accepted:R}");
     }
 
+#if DEBUG
+    // Work-count assertions rely on Debug-only PerfCounters increments; the Release
+    // properties would read zero, so the whole methods compile only in Debug.
+    [Theory]
+    [InlineData("horizontal-stripe", 8, 4, 2, 8)]
+    [InlineData("vertical-stripe", 19, 18, 2, 19)]
+    public void UnchangedRow_ReducesStep2OverlapWork(string mode, int count, int exact, int preparations, int triangulations)
+    {
+        // One production Fill call between counter resets; the check itself is
+        // independent validity, taken after the counters are captured.
+        var pattern = MakePattern("concave", "rotated");
+        var direction = mode == "vertical-stripe" ? NestDirection.Vertical : NestDirection.Horizontal;
+        var area = mode == "vertical-stripe"
+            ? new Box(0, 0, pattern.BoundingBox.Length, 96)
+            : new Box(0, 0, 96, pattern.BoundingBox.Width);
+        long observedExact = -1, observedPreparations = -1, observedTriangulations = -1;
+        List<Part> parts;
+        PerfCounters.Reset();
+        try
+        {
+            parts = new FillLinear(area, 0.5).Fill(pattern, direction);
+            observedExact = PerfCounters.PartIntersects;
+            observedPreparations = PerfCounters.OverlapPolygonPreparations;
+            observedTriangulations = PerfCounters.PolygonTriangulations;
+            // Validity checks run after capturing the counters but inside the measured
+            // window's try, so the outer finally leaves zero residual counters.
+            Assert.Equal(count, parts.Count);
+            AssertValid(parts, area);
+            Assert.Equal(exact, observedExact);
+            Assert.Equal(preparations, observedPreparations);
+            Assert.Equal(triangulations, observedTriangulations);
+            output.WriteLine($"{mode}: exact={observedExact}; preparations={observedPreparations}; triangulations={observedTriangulations}");
+        }
+        finally
+        {
+            PerfCounters.Reset();
+        }
+    }
+
+    [Theory]
+    [InlineData("single-seed-stripe", 7, 1, 8)]
+    [InlineData("full-grid", 36, 4, 44)]
+    [InlineData("partial-only", 36, 4, 38)]
+    public void GuardedControls_KeepEagerStep2Work(string mode, int exact, int preparations, int triangulations)
+    {
+        // Single seed (Step 1 skipped), nonzero perpendicular additions, and partial-only
+        // additions must all keep the eager Step 2 check: identical work counts to base.
+        var pattern = MakePattern("concave", mode == "single-seed-stripe" ? "single" : "rotated");
+        var vertical = mode == "partial-only";
+        var direction = vertical ? NestDirection.Vertical : NestDirection.Horizontal;
+        var area = mode switch
+        {
+            "full-grid" => new Box(0, 0, 96, 48),
+            "partial-only" => new Box(0, 0, 1.8 * pattern.BoundingBox.Length, 96),
+            _ => new Box(0, 0, 96, pattern.BoundingBox.Width),
+        };
+        long observedExact = -1, observedPreparations = -1, observedTriangulations = -1;
+        List<Part> parts;
+        PerfCounters.Reset();
+        try
+        {
+            parts = new FillLinear(area, 0.5).Fill(pattern, direction);
+            observedExact = PerfCounters.PartIntersects;
+            observedPreparations = PerfCounters.OverlapPolygonPreparations;
+            observedTriangulations = PerfCounters.PolygonTriangulations;
+            Assert.Equal(exact, observedExact);
+            Assert.Equal(preparations, observedPreparations);
+            Assert.Equal(triangulations, observedTriangulations);
+            output.WriteLine($"{mode}: exact={observedExact}; preparations={observedPreparations}; triangulations={observedTriangulations}");
+        }
+        finally
+        {
+            PerfCounters.Reset();
+        }
+    }
+
+    [Theory]
+    [InlineData(NestDirection.Horizontal, 9)]
+    [InlineData(NestDirection.Vertical, 3)]
+    public void PerpOnly_KeepsPerpOnlyCheckWork(NestDirection direction, int exact)
+    {
+        // The untouched Step1-PerpOnly path keeps checking; PartIntersects counts every
+        // exact checker call the path makes (measured on the clean dbcf7de base).
+        var pattern = MakePattern("concave", "rotated");
+        var area = direction == NestDirection.Horizontal
+            ? new Box(0, 0, pattern.BoundingBox.Length, 48)
+            : new Box(0, 0, 48, pattern.BoundingBox.Width);
+        long observed = -1;
+        List<Part> parts;
+        PerfCounters.Reset();
+        try
+        {
+            parts = new FillLinear(area, 0.5).Fill(pattern, direction);
+            observed = PerfCounters.PartIntersects;
+            Assert.Equal(exact, observed);
+            Assert.NotEmpty(parts);
+            AssertValid(parts, area);
+            output.WriteLine($"PerpOnly {direction}: exact={observed}");
+        }
+        finally
+        {
+            PerfCounters.Reset();
+        }
+    }
+#endif
+
     [Fact]
     public void InvalidOverlappingSeeds_PreserveBothFallbacks_EvenWithoutPerpendicularAdditions()
     {
@@ -184,14 +290,27 @@ public class FillLinearValidationReuseTests
         Trace.Listeners.Add(listener);
         try
         {
-#endif
             var expected = frozen.Fill(pattern, NestDirection.Horizontal);
-            var actual = filler.Fill(pattern, NestDirection.Horizontal);
-            Assert.Equal(6, expected.Count);
-            AssertLayout(expected, actual, pattern.Parts.Select(p => p.Program).ToArray());
-            Assert.True(FillHelpers.HasOverlappingParts(actual));
-            Assert.Equal(before, PatternSnapshot(pattern));
-#if DEBUG
+            long exactWithGuard;
+            PerfCounters.Reset();
+            try
+            {
+                var actual = filler.Fill(pattern, NestDirection.Horizontal);
+                exactWithGuard = PerfCounters.PartIntersects;
+                Assert.Equal(6, expected.Count);
+                AssertLayout(expected, actual, pattern.Parts.Select(p => p.Program).ToArray());
+                Assert.True(FillHelpers.HasOverlappingParts(actual));
+                Assert.Equal(before, PatternSnapshot(pattern));
+                // The Step 1 fallback clears rowIsVerified, so the Step 2 check must
+                // still execute despite zero perpendicular additions: its exact
+                // short-circuit call is retained. Layout equality alone would miss a
+                // wrongly skipped check whose fallback happens to reproduce the same row.
+                Assert.Equal(2, exactWithGuard);
+            }
+            finally
+            {
+                PerfCounters.Reset();
+            }
             foreach (var label in new[] { "invalid-frozen", "invalid-production" })
             {
                 var records = listener.Records.Where(r => r.Label == label).ToArray();
@@ -207,6 +326,15 @@ public class FillLinearValidationReuseTests
         finally
         {
             Trace.Listeners.Remove(listener);
+        }
+#else
+        {
+            var expected = frozen.Fill(pattern, NestDirection.Horizontal);
+            var actual = filler.Fill(pattern, NestDirection.Horizontal);
+            Assert.Equal(6, expected.Count);
+            AssertLayout(expected, actual, pattern.Parts.Select(p => p.Program).ToArray());
+            Assert.True(FillHelpers.HasOverlappingParts(actual));
+            Assert.Equal(before, PatternSnapshot(pattern));
         }
 #endif
     }
