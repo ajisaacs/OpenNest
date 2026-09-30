@@ -108,8 +108,18 @@ namespace OpenNest.Geometry
                     nameof(tolerance),
                     "Tolerance must be positive."
                 );
-            if (semiMajor <= 0 || semiMinor <= 0)
-                throw new ArgumentOutOfRangeException("Semi-axis lengths must be positive.");
+            if (semiMajor <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(semiMajor),
+                    semiMajor,
+                    "Semi-major axis length must be positive."
+                );
+            if (semiMinor <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(semiMinor),
+                    semiMinor,
+                    "Semi-minor axis length must be positive."
+                );
 
             if (endParam <= startParam)
                 endParam += Angle.TwoPI;
