@@ -15,6 +15,40 @@ namespace OpenNest.WinForms.Tests.Forms;
 public class BestFitViewerOperationLifetimeTests
 {
     [Fact]
+    public void DispatcherObservesAsyncVoidFailureAfterOperationCompletes() => RunSta(() =>
+    {
+        var priorContext = SynchronizationContext.Current;
+        var dispatcher = new Dispatcher();
+        SynchronizationContext.SetSynchronizationContext(dispatcher);
+        try
+        {
+            async void FailAfterAwait()
+            {
+                await Task.Yield();
+                throw new InvalidOperationException("Escaped async-void failure");
+            }
+            FailAfterAwait();
+            var error = Assert.Throws<InvalidOperationException>(() =>
+                dispatcher.RunUntil(() => dispatcher.Operations == 0));
+            Assert.Equal("Escaped async-void failure", error.Message);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(priorContext);
+        }
+    });
+
+    [Fact]
+    public void DispatcherDrainsPendingCallbacksWhenCompletionAlreadyHolds() => RunSta(() =>
+    {
+        var dispatcher = new Dispatcher();
+        var callbackCount = 0;
+        dispatcher.Post(_ => callbackCount++, null);
+        dispatcher.RunUntil(() => true);
+        Assert.Equal(1, callbackCount);
+    });
+
+    [Fact]
     public void ShownAndSelectionPublishCompleteResultsWithPagingAndSourceSelection() => RunSta(() =>
     {
         using var run = new ViewerRun();
@@ -264,13 +298,19 @@ public class BestFitViewerOperationLifetimeTests
                 foreach (var work in works)
                     work.Release.Set();
                 dispatcher.RunUntil(() => tasks.All(task => task.IsCompleted) && dispatcher.Operations == 0);
-                Form.Dispose();
             }
             finally
             {
-                SynchronizationContext.SetSynchronizationContext(priorContext);
-                foreach (var work in works)
-                    work.Dispose();
+                try
+                {
+                    Form.Dispose();
+                }
+                finally
+                {
+                    SynchronizationContext.SetSynchronizationContext(priorContext);
+                    foreach (var work in works)
+                        work.Dispose();
+                }
             }
         }
     }
@@ -350,7 +390,8 @@ public class BestFitViewerOperationLifetimeTests
         public override void Post(SendOrPostCallback d, object? state) => callbacks.Add(() => d(state));
         public void RunUntil(Func<bool> done)
         {
-            while (!done())
+            // Async-void faults are posted before OperationCompleted: drain those too.
+            while (!done() || callbacks.Count > 0)
             {
                 Assert.True(callbacks.TryTake(out var callback, TimeSpan.FromSeconds(15)), "UI continuation did not complete.");
                 callback();
