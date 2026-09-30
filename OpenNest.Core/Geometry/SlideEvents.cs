@@ -415,11 +415,7 @@ namespace OpenNest.Geometry
 
         private static bool ContainsContactAngle(Arc arc, double radius, double x, double y)
         {
-            // A zero-radius curve is a point: its angular range has no geometric meaning.
-            if (arc == null || radius == 0)
-                return true;
-            var angle = Angle.NormalizeRad(System.Math.Atan2(y, x));
-            return Angle.IsBetweenRad(angle, arc.StartAngle, arc.EndAngle, arc.IsReversed);
+            return SlideCurvePrimitives.ContainsContactAngle(arc, radius, x, y);
         }
 
         internal static bool SolveRayCircle(
@@ -434,25 +430,7 @@ namespace OpenNest.Geometry
             out double t2
         )
         {
-            var ox = vx - cx;
-            var oy = vy - cy;
-
-            var a = dirX * dirX + dirY * dirY;
-            var b = 2.0 * (ox * dirX + oy * dirY);
-            var c = ox * ox + oy * oy - r * r;
-
-            var discriminant = b * b - 4.0 * a * c;
-            if (discriminant < 0)
-            {
-                t1 = t2 = double.MaxValue;
-                return false;
-            }
-
-            var sqrtD = System.Math.Sqrt(discriminant);
-            var inv2a = 1.0 / (2.0 * a);
-            t1 = (-b - sqrtD) * inv2a;
-            t2 = (-b + sqrtD) * inv2a;
-            return true;
+            return SlideCurvePrimitives.SolveRayCircle(vx, vy, cx, cy, r, dirX, dirY, out t1, out t2);
         }
     }
 
