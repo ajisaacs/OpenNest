@@ -4,6 +4,7 @@ namespace OpenNest.Engine.CirclePacking
 {
     internal class Item : Circle
     {
+        // Optional caller-supplied packing identifier; not assigned automatically; preserved by clones.
         public int PackingId { get; set; }
 
         public override Item Clone()
