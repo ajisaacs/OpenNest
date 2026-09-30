@@ -65,6 +65,7 @@ namespace OpenNest.Controls
             preview.Entities.Clear();
             preview.Invalidate();
             gcodeEditor.Clear();
+            lblGcode.Text = "G-Code";
             Program = null;
             isDirty = false;
             isLoaded = false;
@@ -154,44 +155,67 @@ namespace OpenNest.Controls
                 .ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
         }
 
+        internal virtual IReadOnlyList<HighlightSpan> ComputeHighlightSpans(string text) =>
+            ProgramHighlighting.ComputeSpans(text);
+
         private void ApplyHighlighting()
         {
             var text = gcodeEditor.Text;
             if (string.IsNullOrEmpty(text))
+            {
+                lblGcode.Text = "G-Code";
                 return;
-
-            gcodeEditor.SuspendLayout();
-
-            var rapidColor = Color.FromArgb(230, 180, 80);
-            var linearColor = Color.FromArgb(130, 200, 140);
-            var arcColor = Color.FromArgb(120, 160, 255);
-            var commentColor = Color.FromArgb(120, 120, 140);
-            var modeColor = Color.FromArgb(200, 140, 220);
-            var coordColor = Color.FromArgb(180, 200, 180);
-
-            gcodeEditor.SelectAll();
-            gcodeEditor.SelectionColor = coordColor;
-
-            var rules = new (Regex pattern, Color color)[]
-            {
-                (new Regex(@"^;.*$", RegexOptions.Multiline), commentColor),
-                (new Regex(@"^G9[01]\b", RegexOptions.Multiline), modeColor),
-                (new Regex(@"^G00\b", RegexOptions.Multiline), rapidColor),
-                (new Regex(@"^G01\b", RegexOptions.Multiline), linearColor),
-                (new Regex(@"^G0[23]\b", RegexOptions.Multiline), arcColor),
-            };
-
-            foreach (var (pattern, color) in rules)
-            {
-                foreach (Match match in pattern.Matches(text))
-                {
-                    gcodeEditor.Select(match.Index, match.Length);
-                    gcodeEditor.SelectionColor = color;
-                }
             }
 
-            gcodeEditor.Select(0, 0);
-            gcodeEditor.ResumeLayout();
+            IReadOnlyList<HighlightSpan> spans;
+            var timedOut = false;
+            try
+            {
+                // Complete lazy regex enumeration before applying any rule colors.
+                spans = ComputeHighlightSpans(text);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                spans = Array.Empty<HighlightSpan>();
+                timedOut = true;
+            }
+
+            var colors = new[]
+            {
+                Color.FromArgb(120, 120, 140), // Comment
+                Color.FromArgb(200, 140, 220), // Mode
+                Color.FromArgb(230, 180, 80),  // Rapid
+                Color.FromArgb(130, 200, 140), // Linear
+                Color.FromArgb(120, 160, 255), // Arc
+            };
+            var coordColor = Color.FromArgb(180, 200, 180);
+
+            gcodeEditor.SuspendLayout();
+            try
+            {
+                gcodeEditor.SelectAll();
+                gcodeEditor.SelectionColor = coordColor;
+
+                foreach (var span in spans)
+                {
+                    gcodeEditor.Select(span.Index, span.Length);
+                    gcodeEditor.SelectionColor = colors[span.RuleIndex];
+                }
+
+                // Reuse the existing toolbar label; no modal UI or handle-dependent invoke.
+                lblGcode.Text = timedOut ? "G-Code (highlighting timed out)" : "G-Code";
+            }
+            finally
+            {
+                try
+                {
+                    gcodeEditor.Select(0, 0);
+                }
+                finally
+                {
+                    gcodeEditor.ResumeLayout();
+                }
+            }
         }
 
         private void RefreshPreview()
