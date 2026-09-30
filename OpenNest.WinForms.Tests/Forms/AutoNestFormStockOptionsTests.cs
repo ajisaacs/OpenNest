@@ -1,6 +1,8 @@
 using System.Collections;
 using System.ComponentModel;
+using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using OpenNest.Forms;
 
@@ -71,6 +73,117 @@ public class AutoNestFormStockOptionsTests
             Assert.Equal(96, saved[0].Length);
             Assert.Equal(25, saved[0].Cost);
         });
+    }
+
+    [Fact]
+    public void StockSizeRegexHasExplicitTimeout()
+    {
+        var regex = Assert.IsType<Regex>(typeof(AutoNestForm)
+            .GetField("SizePattern", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null));
+        Assert.Equal(TimeSpan.FromMilliseconds(250), regex.MatchTimeout);
+        Assert.Equal(RegexOptions.None, regex.Options);
+    }
+
+    [Theory]
+    [InlineData("48 x")]
+    [InlineData("abc")]
+    [InlineData("0 x 96")]
+    [InlineData("-1 x 96")]
+    [InlineData("١ x 96")]
+    public void NonblankInvalidRowRejectsWholeCollection(string invalid) => RunSta(() =>
+    {
+        using var form = new StockTestForm();
+        form.LoadPlateOptions(new List<PlateOption> { new() { Width = 48, Length = 96, Cost = 25 } }, 0.5);
+        var grid = GetGrid(form);
+        var rows = Assert.IsAssignableFrom<IBindingList>(grid.DataSource);
+        var row = rows.AddNew()!;
+        SetValue(row, "Size", invalid);
+        ((ICancelAddNew)rows).EndNew(rows.Count - 1);
+
+        Assert.False(form.TryGetPlateOptions(out var options, out var error));
+        Assert.Empty(options);
+        Assert.Contains(invalid, error);
+        Assert.Contains("row 2", error);
+        Assert.Throws<FormatException>(() => form.GetPlateOptions());
+        Assert.NotEmpty(grid.Rows[1].ErrorText);
+
+        SetValue(row, "Size", "72.5 × 144.25");
+        Assert.True(form.TryGetPlateOptions(out options, out error));
+        Assert.Null(error);
+        Assert.Equal(2, options.Count);
+        Assert.Equal(72.5, options[1].Width);
+        Assert.Equal(144.25, options[1].Length);
+        Assert.Equal(25, options[0].Cost);
+        Assert.Empty(grid.Rows[1].ErrorText);
+    });
+
+    [Fact]
+    public void TimeoutAfterValidRowPublishesNoPrefixAndDoesNotAcceptDialog() => RunSta(() =>
+    {
+        using var form = new StockTestForm();
+        form.LoadPlateOptions(new List<PlateOption> { new() { Width = 48, Length = 96 } }, 0.5);
+        var grid = GetGrid(form);
+        var rows = Assert.IsAssignableFrom<IBindingList>(grid.DataSource);
+        var row = rows.AddNew()!;
+        SetValue(row, "Size", "timeout row");
+        ((ICancelAddNew)rows).EndNew(rows.Count - 1);
+        form.FailOn = "timeout row";
+
+        Assert.False(form.TryGetPlateOptions(out var options, out var error));
+        Assert.Empty(options);
+        Assert.Contains("timeout row", error);
+        Assert.True(form.TryClose(DialogResult.OK));
+        Assert.Equal(DialogResult.None, form.DialogResult);
+        Assert.Contains("timeout row", Assert.Single(form.Notices));
+        Assert.True(form.MatchCalls > 1);
+
+        form.Notices.Clear();
+        Assert.False(form.TryClose(DialogResult.Cancel));
+        Assert.Empty(form.Notices);
+        Assert.False(Assert.IsType<Button>(form.Controls.Find("cancelButton", true).Single()).CausesValidation);
+    });
+
+    [Fact]
+    public void InvalidPendingEditCannotPublishOldBoundValue() => RunSta(() =>
+    {
+        using var form = new StockTestForm();
+        form.LoadPlateOptions(new List<PlateOption> { new() { Width = 48, Length = 96 } }, 0.5);
+        var grid = GetGrid(form);
+        form.Show();
+        grid.CurrentCell = grid.Rows[0].Cells[0];
+        Assert.True(grid.BeginEdit(false));
+        grid.EditingControl.Text = "48 x";
+
+        Assert.False(form.TryGetPlateOptions(out var options, out var error));
+        Assert.Empty(options);
+        Assert.Contains("48 x", error);
+        grid.CancelEdit();
+    });
+
+    private sealed class StockTestForm : AutoNestForm
+    {
+        public StockTestForm() : base(new Nest()) { }
+        public string? FailOn { get; set; }
+        public int MatchCalls { get; private set; }
+        public List<string> Notices { get; } = new();
+
+        internal override Match MatchStockSize(string value)
+        {
+            MatchCalls++;
+            if (value == FailOn)
+                throw new RegexMatchTimeoutException();
+            return base.MatchStockSize(value);
+        }
+
+        internal override void ReportStockValidationFailure(string error) => Notices.Add(error);
+
+        public bool TryClose(DialogResult result)
+        {
+            DialogResult = result;
+            var closing = new FormClosingEventArgs(CloseReason.UserClosing, false);
+            OnFormClosing(closing);
+            return closing.Cancel;
+        }
     }
 
     private static DataGridView GetGrid(AutoNestForm form)

@@ -10,11 +10,16 @@ namespace OpenNest.Forms
 {
     public partial class AutoNestForm : Form
     {
-        private static readonly Regex SizePattern = new(@"^(\d+\.?\d*)\s*[xX×]\s*(\d+\.?\d*)$");
+        private static readonly Regex SizePattern = new(
+            @"^(\d+\.?\d*)\s*[xX×]\s*(\d+\.?\d*)$",
+            RegexOptions.None,
+            TimeSpan.FromMilliseconds(250)
+        );
 
         public AutoNestForm(Nest nest)
         {
             InitializeComponent();
+            cancelButton.CausesValidation = false;
             SetupPartsGrid();
             SetupPlateGrid();
             LoadEngines();
@@ -195,30 +200,65 @@ namespace OpenNest.Forms
 
         public List<PlateOption> GetPlateOptions()
         {
-            plateGrid.EndEdit();
-            var result = new List<PlateOption>();
-            var gridItems = plateGrid.DataSource as BindingList<PlateOptionItem>;
-            if (gridItems == null)
-                return result;
+            if (!TryGetPlateOptions(out var options, out var error))
+                throw new FormatException(error);
+            return options;
+        }
 
-            foreach (var item in gridItems)
+        public bool TryGetPlateOptions(out List<PlateOption> options, out string error)
+        {
+            options = new List<PlateOption>();
+            error = null;
+            if (!plateGrid.EndEdit())
             {
-                if (!TryParseSize(item.Size, out var width, out var length))
-                    continue;
-                if (width <= 0 || length <= 0)
-                    continue;
-
-                result.Add(
-                    new PlateOption
-                    {
-                        Width = width,
-                        Length = length,
-                        Cost = item.Cost,
-                    }
-                );
+                var value = plateGrid.EditingControl?.Text ?? plateGrid.CurrentCell?.Value?.ToString();
+                error = $"Invalid stock size '{value}'. Enter positive dimensions as W x L.";
+                return false;
             }
 
-            return result;
+            var gridItems = plateGrid.DataSource as BindingList<PlateOptionItem>;
+            if (gridItems == null)
+                return true;
+
+            var validated = new List<PlateOption>();
+            for (var index = 0; index < gridItems.Count; index++)
+            {
+                var item = gridItems[index];
+                if (string.IsNullOrWhiteSpace(item.Size))
+                    continue;
+                if (!TryParseSize(item.Size, out var width, out var length))
+                {
+                    error = $"Invalid stock size '{item.Size}' in row {index + 1}. Enter positive dimensions as W x L.";
+                    if (index < plateGrid.Rows.Count)
+                        plateGrid.Rows[index].ErrorText = error;
+                    return false;
+                }
+
+                if (index < plateGrid.Rows.Count)
+                    plateGrid.Rows[index].ErrorText = "";
+                validated.Add(new PlateOption { Width = width, Length = length, Cost = item.Cost });
+            }
+
+            // Publish only a completely validated collection, never a valid prefix.
+            options = validated;
+            return true;
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (DialogResult == DialogResult.OK && OptimizePlateSize
+                && !TryGetPlateOptions(out _, out var error))
+            {
+                e.Cancel = true;
+                DialogResult = DialogResult.None;
+                ReportStockValidationFailure(error);
+            }
+            base.OnFormClosing(e);
+        }
+
+        internal virtual void ReportStockValidationFailure(string error)
+        {
+            MessageBox.Show(this, error, "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         public void LoadPlateOptions(List<PlateOption> options, double salvageRate)
@@ -300,7 +340,10 @@ namespace OpenNest.Forms
 
             var value = e.FormattedValue?.ToString();
             if (string.IsNullOrWhiteSpace(value))
+            {
+                plateGrid.Rows[e.RowIndex].ErrorText = "";
                 return;
+            }
 
             if (!TryParseSize(value, out _, out _))
             {
@@ -313,25 +356,43 @@ namespace OpenNest.Forms
             }
         }
 
-        private static bool TryParseSize(string value, out double width, out double length)
+        private bool TryParseSize(string value, out double width, out double length)
         {
             width = 0;
             length = 0;
             if (string.IsNullOrWhiteSpace(value))
                 return false;
-            var match = SizePattern.Match(value.Trim());
-            if (!match.Success)
+            try
+            {
+                var match = MatchStockSize(value.Trim());
+                if (!match.Success)
+                    return false;
+                var parsedWidth = double.Parse(
+                    match.Groups[1].Value,
+                    System.Globalization.CultureInfo.InvariantCulture
+                );
+                var parsedLength = double.Parse(
+                    match.Groups[2].Value,
+                    System.Globalization.CultureInfo.InvariantCulture
+                );
+                if (!double.IsFinite(parsedWidth) || !double.IsFinite(parsedLength)
+                    || parsedWidth <= 0 || parsedLength <= 0)
+                    return false;
+                width = parsedWidth;
+                length = parsedLength;
+                return true;
+            }
+            catch (RegexMatchTimeoutException)
+            {
                 return false;
-            width = double.Parse(
-                match.Groups[1].Value,
-                System.Globalization.CultureInfo.InvariantCulture
-            );
-            length = double.Parse(
-                match.Groups[2].Value,
-                System.Globalization.CultureInfo.InvariantCulture
-            );
-            return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
         }
+
+        internal virtual Match MatchStockSize(string value) => SizePattern.Match(value);
 
         private static string FormatSize(double width, double length)
         {

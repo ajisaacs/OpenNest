@@ -10,7 +10,9 @@ namespace OpenNest
     public static class ArchUnits
     {
         private static readonly Regex UnitRegex = new Regex(
-            "^(?<Feet>\\d+\\.?\\d*\\s*')?\\s*(?<Inches>\\d+\\.?\\d*\\s*\")?$"
+            "^(?<Feet>\\d+\\.?\\d*\\s*')?\\s*(?<Inches>\\d+\\.?\\d*\\s*\")?$",
+            RegexOptions.None,
+            TimeSpan.FromMilliseconds(250)
         );
 
         public static double ParseToInches(string input)

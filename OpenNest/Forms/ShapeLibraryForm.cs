@@ -13,6 +13,12 @@ namespace OpenNest.Forms
 {
     public partial class ShapeLibraryForm : Form
     {
+        private static readonly Regex FriendlyNamePattern = new(
+            @"(?<=[a-z0-9])([A-Z])",
+            RegexOptions.None,
+            TimeSpan.FromMilliseconds(100)
+        );
+
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
@@ -272,9 +278,13 @@ namespace OpenNest.Forms
             {
                 var shape = CreateShapeFromInputs();
                 if (shape == null)
+                {
+                    InvalidatePreview();
                     return;
+                }
 
                 var drawing = shape.GetDrawing();
+                addButton.Enabled = drawing?.Program != null;
                 nameTextBox.Text = shape.GenerateName();
                 previewBox.ShowDrawing(drawing);
 
@@ -298,8 +308,15 @@ namespace OpenNest.Forms
             }
             catch
             {
-                previewBox.ShowDrawing(null);
+                InvalidatePreview();
             }
+        }
+
+        private void InvalidatePreview()
+        {
+            addButton.Enabled = false;
+            previewBox.ShowDrawing(null);
+            previewBox.SetInfo("Invalid shape input");
         }
 
         private void UpdatePipeSizeFilter()
@@ -424,7 +441,10 @@ namespace OpenNest.Forms
             {
                 var shape = CreateShapeFromInputs();
                 if (shape == null)
+                {
+                    InvalidatePreview();
                     return;
+                }
 
                 var drawing = shape.GetDrawing();
                 drawing.Name = GetUniqueName(drawing.Name);
@@ -461,12 +481,28 @@ namespace OpenNest.Forms
             }
         }
 
-        private static string FriendlyName(string name)
+        internal static string FriendlyName(
+            string name,
+            Func<string, string> replace = null,
+            Action<string> report = null
+        )
         {
             if (name.EndsWith("Shape"))
                 name = name.Substring(0, name.Length - 5);
 
-            return Regex.Replace(name, @"(?<=[a-z0-9])([A-Z])", " $1");
+            try
+            {
+                return replace != null ? replace(name) : FriendlyNamePattern.Replace(name, " $1");
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                var diagnostic = $"Friendly-name formatting timed out for '{name}'; using the unchanged name.";
+                if (report != null)
+                    report(diagnostic);
+                else
+                    System.Diagnostics.Trace.TraceWarning(diagnostic);
+                return name;
+            }
         }
 
         private class ShapeEntry

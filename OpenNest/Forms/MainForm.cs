@@ -1381,10 +1381,15 @@ namespace OpenNest.Forms
             var items = form.GetNestItems();
             if (!items.Any(it => it.Quantity > 0))
                 return;
+            var plateOptions = default(List<PlateOption>);
+            if (form.OptimizePlateSize && !form.TryGetPlateOptions(out plateOptions, out var stockError))
+            {
+                MessageBox.Show(this, stockError, "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             var engineName = form.EngineName ?? EngineSelection.EngineName;
             EngineSelection.EngineName = engineName;
             engineComboBox.SelectedItem = engineName;
-            var plateOptions = form.OptimizePlateSize ? form.GetPlateOptions() : null;
             using var cts = new CancellationTokenSource();
             nestingCts = cts;
             using var progressForm = new NestProgressForm(cts, showPlateRow: true)
