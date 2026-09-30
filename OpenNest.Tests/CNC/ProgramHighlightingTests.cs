@@ -9,6 +9,11 @@ namespace OpenNest.Tests.CNC;
 
 public class ProgramHighlightingTests
 {
+    [Fact]
+    public void ComputeSpans_RejectsNullText()
+    {
+        Assert.Throws<ArgumentNullException>(() => ProgramHighlighting.ComputeSpans(null));
+    }
     [Theory]
     [InlineData("G00", 2, 3)]
     [InlineData("G000", -1, 0)]

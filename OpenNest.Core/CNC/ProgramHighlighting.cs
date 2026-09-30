@@ -4,6 +4,15 @@ using System.Text.RegularExpressions;
 
 namespace OpenNest.CNC;
 
+/// <summary>
+/// A character range in generated G-code assigned by one highlighting rule.
+/// </summary>
+/// <param name="Index">Zero-based UTF-16 index of the first colored character.</param>
+/// <param name="Length">Number of UTF-16 characters to color.</param>
+/// <param name="RuleIndex">
+/// Zero-based rule index: 0 comments, 1 motion modes (G90/G91), 2 rapid moves (G00),
+/// 3 linear moves (G01), 4 arcs (G02/G03).
+/// </param>
 public readonly record struct HighlightSpan(int Index, int Length, int RuleIndex);
 
 /// <summary>Computes cosmetic G-code highlight spans without changing the generated text.</summary>

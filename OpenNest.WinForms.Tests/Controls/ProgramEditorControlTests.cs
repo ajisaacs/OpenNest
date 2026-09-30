@@ -44,8 +44,17 @@ public class ProgramEditorControlTests
         control.Dock = DockStyle.Fill;
         form.Controls.Add(control);
         form.Show();
+        var status = GetControl<Label>(control, "lblGcode");
+        var preview = GetControl<EntityView>(control, "preview");
         var changes = 0;
-        control.ProgramChanged += (_, _) => changes++;
+        Entity[] beforeClick = Array.Empty<Entity>();
+        var eventStates = new List<(string Label, bool PreviewChanged)>();
+        control.ProgramChanged += (_, _) =>
+        {
+            changes++;
+            // Prove the fallback and preview completed BEFORE the model change was announced.
+            eventStates.Add((status.Text, !preview.Entities.SequenceEqual(beforeClick)));
+        };
 
         control.LoadEntities(CreateEntities());
         Assert.Equal(0, changes); // Loading did not raise ProgramChanged before this repair either.
@@ -56,15 +65,16 @@ public class ProgramEditorControlTests
         var firstContour = Assert.IsType<ContourInfo>(list.Items[0]);
         var oldDirection = firstContour.DirectionLabel;
         var oldProgram = control.Program;
-        var preview = GetControl<EntityView>(control, "preview");
         var oldPreview = preview.Entities.ToArray();
 
+        beforeClick = oldPreview;
         GetControl<Button>(control, "reverseButton").PerformClick();
 
         Assert.NotSame(oldProgram, control.Program);
         Assert.NotEqual(oldDirection, firstContour.DirectionLabel);
         Assert.True(control.IsDirty);
         Assert.Equal(1, changes);
+        AssertHighlightingStateAtEvent(eventStates[0], timeout);
         AssertPreviewRebuilt(preview, oldPreview);
         Assert.Equal(Assert.IsType<Circle>(firstContour.Shape.Entities[0]).Rotation,
             Assert.IsType<Circle>(preview.Entities[0]).Rotation);
@@ -73,6 +83,7 @@ public class ProgramEditorControlTests
 
         oldProgram = control.Program;
         oldPreview = preview.Entities.ToArray();
+        beforeClick = oldPreview;
         GetField<ToolStripMenuItem>(control, "menuMoveDown").PerformClick();
 
         Assert.NotSame(oldProgram, control.Program);
@@ -80,6 +91,7 @@ public class ProgramEditorControlTests
         Assert.Equal(1, list.SelectedIndex);
         Assert.True(control.IsDirty);
         Assert.Equal(2, changes);
+        AssertHighlightingStateAtEvent(eventStates[1], timeout);
         AssertPreviewRebuilt(preview, oldPreview);
         AssertCompleteText(control);
         AssertHighlightingOutcome(control, timeout);
@@ -125,7 +137,7 @@ public class ProgramEditorControlTests
 
         ApplyHighlighting(control);
 
-        Assert.Equal(original, editor.Text);
+        Assert.Equal(NormalizeLineEndings(original), NormalizeLineEndings(editor.Text));
         Assert.Equal(0, editor.SelectionStart);
         Assert.Equal(0, editor.SelectionLength);
         var colors = new[]
@@ -200,6 +212,9 @@ public class ProgramEditorControlTests
         }
     }
 
+    private static string NormalizeLineEndings(string value) =>
+        value.Replace("\r\n", "\n").Replace("\r", "\n");
+
     private static List<Entity> CreateEntities() => new()
     {
         new Circle(3, 3, 1), new Circle(7, 7, 1), new Circle(10, 10, 10),
@@ -211,13 +226,23 @@ public class ProgramEditorControlTests
         var raw = Assert.IsType<string>(typeof(ProgramEditorControl)
             .GetMethod("FormatProgram", BindingFlags.Static | BindingFlags.NonPublic)!
             .Invoke(null, new object[] { control.Program, contours }));
-        // RichTextBox performs its existing newline normalization; compare with the same
-        // generated text assigned to an unhighlighted editor, not with another highlight pass.
-        using var unhighlighted = new RichTextBox { Text = raw };
+        // A RichTextBox with a created handle returns native text with LF-normalized line
+        // endings; before handle creation it returns the cached string as assigned. Compare
+        // against the generated text normalized the same way so the assertion is independent
+        // of the editor's handle state.
         var editor = GetControl<RichTextBox>(control, "gcodeEditor");
         Assert.NotEmpty(raw);
-        Assert.Equal(unhighlighted.Text, editor.Text);
+        Assert.Equal(NormalizeLineEndings(raw), NormalizeLineEndings(editor.Text));
         Assert.True(editor.ReadOnly);
+    }
+
+    private static void AssertHighlightingStateAtEvent(
+        (string Label, bool PreviewChanged) state, bool timeout)
+    {
+        // Captured inside the ProgramChanged handler: highlighting fallback and preview
+        // rebuild must already be complete when the model change is announced.
+        Assert.Equal(timeout ? "G-Code (highlighting timed out)" : "G-Code", state.Label);
+        Assert.True(state.PreviewChanged);
     }
 
     private static void AssertHighlightingOutcome(ProgramEditorControl control, bool timeout)
