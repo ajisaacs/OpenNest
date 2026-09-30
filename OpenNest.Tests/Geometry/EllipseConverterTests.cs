@@ -375,6 +375,75 @@ public class EllipseConverterTests
         );
     }
 
+    // Frozen ordered output from 5bf3c5f, including both angular seams and a
+    // translated, rotated partial ellipse (the public API traverses parameters CCW).
+    [Theory]
+    [MemberData(nameof(SignedAngleCharacterizationCases))]
+    public void Convert_SignedAngleCharacterization_PreservesOrderedArcs(
+        string scenario, double[][] expected, bool[] reversed
+    )
+    {
+        var (start, end, rotation) = scenario switch
+        {
+            "atan-seam" => (2.8, 3.8, 0.0),
+            "positive-x-seam" => (5.8, 0.5, 0.0),
+            _ => (0.2, 1.3, 0.6),
+        };
+        var result = EllipseConverter.Convert(new Vector(3, -2), 6, 4, rotation,
+            start, end, tolerance: 0.1);
+
+        Assert.Collection(result, expected.Select((parameters, i) =>
+            (Action<Entity>)(entity => AssertCharacterizedArc(entity, parameters, reversed[i]))
+        ).ToArray());
+    }
+
+    public static IEnumerable<object[]> SignedAngleCharacterizationCases()
+    {
+        yield return new object[]
+        {
+            "atan-seam",
+            new double[][]
+            {
+                new[] { -0.16603986922559466, -2.0183680896443055, 2.8340196558132877, 2.6417457217524727, 3.1351113230149354 },
+                new[] { -0.17776605557071123, -1.983538836846724, 2.8222819502985983, 3.1474252588278113, 3.624130294015861 },
+                new[] { 0.7441132153098247, -1.4836007849113604, 3.8709161624146646, 3.6280252302389693, 4.013669489810318 },
+            },
+            new[] { false, false, false },
+        };
+        yield return new object[]
+        {
+            "positive-x-seam",
+            new double[][]
+            {
+                new[] { 6.004270273073607, -1.9488971518180598, 2.996165565832901, 5.592171901293686, 6.26612839723762 },
+                new[] { 5.9818198770623745, -2.0564884222942372, 3.0187086968352994, 0.018713869149703036, 0.7128403110339223 },
+            },
+            new[] { false, false },
+        };
+        yield return new object[]
+        {
+            "rotated-partial-ellipse",
+            new double[][]
+            {
+                new[] { 5.1346691175944725, -1.0670403345989339, 3.79655973712418, 0.9299300117607583, 1.5841942790174177 },
+                new[] { 5.075469862824099, -4.265516161507367, 6.994699783814414, 1.5696047599218284, 2.002556947193732 },
+            },
+            new[] { false, false },
+        };
+    }
+
+    private static void AssertCharacterizedArc(Entity entity, double[] expected, bool reversed)
+    {
+        var arc = Assert.IsType<Arc>(entity);
+        var actual = new[]
+        {
+            arc.Center.X, arc.Center.Y, arc.Radius, arc.StartAngle, arc.EndAngle,
+        };
+        for (var i = 0; i < expected.Length; i++)
+            Assert.InRange(actual[i], expected[i] - 1e-10, expected[i] + 1e-10);
+        Assert.Equal(reversed, arc.IsReversed);
+    }
+
     private static (double minX, double maxX) GetBoundingBox(IEnumerable<Arc> arcs)
     {
         var minX = double.MaxValue;

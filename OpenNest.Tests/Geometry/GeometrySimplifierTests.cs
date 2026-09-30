@@ -241,6 +241,134 @@ public class GeometrySimplifierTests
         );
     }
 
+    // Frozen Analyze + Apply output from 5bf3c5f. The circles are order markers;
+    // the rotated ellipse also pins the two trailing lines left unfitted.
+    [Theory]
+    [MemberData(nameof(SignedAngleCharacterizationCases))]
+    public void Apply_SignedAngleCharacterization_PreservesOrderedEntities(
+        string scenario, double[][] expected, bool[] reversed, int expectedEndIndex
+    )
+    {
+        var points = SplineConverterTests.SignedAngleCharacterizationPoints(scenario);
+        var shape = new Shape();
+        shape.Entities.Add(new Circle(new Vector(-30, 40), 2.5));
+        for (var i = 0; i < points.Count - 1; i++)
+            shape.Entities.Add(new Line(points[i], points[i + 1]));
+        shape.Entities.Add(new Circle(new Vector(30, -40), 3.5));
+        var simplifier = new GeometrySimplifier { Tolerance = 0.05 };
+
+        var candidate = Assert.Single(simplifier.Analyze(shape));
+        Assert.Equal(1, candidate.StartIndex);
+        Assert.Equal(expectedEndIndex, candidate.EndIndex);
+        var result = simplifier.Apply(shape, new List<ArcCandidate> { candidate });
+        var assertions = new List<Action<Entity>>
+        {
+            entity => AssertCharacterizedCircle(entity, -30, 40, 2.5),
+            entity => AssertCharacterizedArc(entity, expected[0], reversed[0]),
+        };
+        if (scenario == "rotated-partial-ellipse")
+        {
+            assertions.Add(entity => AssertCharacterizedLine(entity,
+                new[] { 2.644054114237731, 2.288101855169011, 2.3955895038427424, 2.1920946874414766 }));
+            assertions.Add(entity => AssertCharacterizedLine(entity,
+                new[] { 2.3955895038427424, 2.1920946874414766, 2.148394352966971, 2.087282751199381 }));
+        }
+        assertions.Add(entity => AssertCharacterizedCircle(entity, 30, -40, 3.5));
+        Assert.Collection(result.Entities, assertions.ToArray());
+    }
+
+    public static IEnumerable<object[]> SignedAngleCharacterizationCases()
+    {
+        yield return new object[]
+        {
+            "ccw",
+            new double[][]
+            {
+                new[] { 2.999999999999998, -2.000000000000008, 5.000000000000004, 0.30000000000000143, 2.2999999999999985 },
+            },
+            new[] { false },
+            24,
+        };
+        yield return new object[]
+        {
+            "cw",
+            new double[][]
+            {
+                new[] { 3.0000000000000053, -1.9999999999999813, 4.999999999999989, 2.300000000000003, 0.2999999999999968 },
+            },
+            new[] { true },
+            24,
+        };
+        yield return new object[]
+        {
+            "reversed",
+            new double[][]
+            {
+                new[] { 2.999999999999998, -2.000000000000008, 5.000000000000004, 2.2999999999999985, 0.30000000000000143 },
+            },
+            new[] { true },
+            24,
+        };
+        yield return new object[]
+        {
+            "atan-seam",
+            new double[][]
+            {
+                new[] { 2.9999999999999436, -2.0000000000000098, 4.999999999999949, 2.799999999999994, 3.8000000000000047 },
+            },
+            new[] { false },
+            24,
+        };
+        yield return new object[]
+        {
+            "positive-x-seam",
+            new double[][]
+            {
+                new[] { 2.9999999999999565, -2.000000000000001, 5.00000000000004, 5.800000000000003, 0.5168146928204091 },
+            },
+            new[] { false },
+            24,
+        };
+        yield return new object[]
+        {
+            "rotated-partial-ellipse",
+            new double[][]
+            {
+                new[] { 4.738877816517773, -2.224586867329932, 4.975203096337214, 1.0053406925186938, 2.0054021506562583 },
+            },
+            new[] { false },
+            22,
+        };
+    }
+
+    private static void AssertCharacterizedArc(Entity entity, double[] expected, bool reversed)
+    {
+        var arc = Assert.IsType<Arc>(entity);
+        var actual = new[]
+        {
+            arc.Center.X, arc.Center.Y, arc.Radius, arc.StartAngle, arc.EndAngle,
+        };
+        for (var i = 0; i < expected.Length; i++)
+            Assert.InRange(actual[i], expected[i] - 1e-10, expected[i] + 1e-10);
+        Assert.Equal(reversed, arc.IsReversed);
+    }
+
+    private static void AssertCharacterizedCircle(Entity entity, double x, double y, double radius)
+    {
+        var circle = Assert.IsType<Circle>(entity);
+        Assert.Equal(x, circle.Center.X);
+        Assert.Equal(y, circle.Center.Y);
+        Assert.Equal(radius, circle.Radius);
+    }
+
+    private static void AssertCharacterizedLine(Entity entity, double[] expected)
+    {
+        var line = Assert.IsType<Line>(entity);
+        var actual = new[] { line.StartPoint.X, line.StartPoint.Y, line.EndPoint.X, line.EndPoint.Y };
+        for (var i = 0; i < expected.Length; i++)
+            Assert.InRange(actual[i], expected[i] - 1e-10, expected[i] + 1e-10);
+    }
+
     private static Vector ArcTangentAt(Arc arc, Vector pt)
     {
         var ang = System.Math.Atan2(pt.Y - arc.Center.Y, pt.X - arc.Center.X);
