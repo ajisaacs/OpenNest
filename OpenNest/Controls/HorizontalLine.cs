@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -16,6 +16,22 @@ namespace OpenNest.Controls
 
             lightPen = new Pen(ProfessionalColors.SeparatorLight);
             darkPen = new Pen(ProfessionalColors.SeparatorDark);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            try
+            {
+                if (disposing)
+                {
+                    lightPen.Dispose();
+                    darkPen.Dispose();
+                }
+            }
+            finally
+            {
+                base.Dispose(disposing);
+            }
         }
 
         protected override void OnResize(EventArgs e)
