@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Runtime.Loader;
-using System.Text.Json;
 
 try
 {
@@ -15,21 +14,36 @@ try
         return File.Exists(path) ? AssemblyLoadContext.Default.LoadFromAssemblyPath(path) : null;
     };
 
-    var engineAssembly = Assembly.LoadFrom(Path.Combine(package, "OpenNest.Engine.dll"));
+    var engineAssemblyPath = Path.Combine(package, "OpenNest.Engine.dll");
+    var engineAssembly = Assembly.LoadFrom(engineAssemblyPath);
     var registry = engineAssembly.GetType("OpenNest.Engine.Jobs.NestingEngineRegistry", true)!;
-    var engineDirectory = Path.Combine(package, "Engines");
-    registry.GetMethod("LoadPlugins")!.Invoke(null, [engineDirectory]);
-    using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(engineDirectory, "manifest.json")));
-    foreach (var entry in manifest.RootElement.GetProperty("engines").EnumerateArray())
+    var create = registry.GetMethod("Create")!;
+
+    // Every built-in engine the desktop offers must instantiate from the packaged assembly.
+    string[] expected = ["Rectangles", "Irregular", "StockLadder", "Default", "Strip", "Vertical Remnant", "Horizontal Remnant"];
+    foreach (var name in expected)
     {
-        var name = entry.GetProperty("registryName").GetString()!;
-        var expected = Path.Combine(engineDirectory, entry.GetProperty("project").GetString() + ".dll");
-        if (!File.Exists(expected))
-            throw new FileNotFoundException("Required engine missing", expected);
-        var engine = registry.GetMethod("Create")!.Invoke(null, [name])!;
-        if (!string.Equals(engine.GetType().Assembly.Location, expected, StringComparison.OrdinalIgnoreCase))
+        var engine = create.Invoke(null, [name])!;
+        if (!string.Equals(engine.GetType().Assembly.Location, engineAssemblyPath, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"Engine {name} was not loaded from the release package.");
-        Console.WriteLine($"PASS: {name} loaded and instantiated from {expected}");
+        Console.WriteLine($"PASS: {name} instantiated from {engineAssemblyPath}");
+    }
+
+    // A selection saved before the engines were renamed must still resolve.
+    var resolved = registry.GetMethod("ResolveName")!.Invoke(null, ["Opus55NestingEngine"]);
+    if (!Equals(resolved, "Irregular"))
+        throw new InvalidOperationException($"Legacy selection Opus55NestingEngine resolved to '{resolved}', expected Irregular.");
+    Console.WriteLine("PASS: legacy selection Opus55NestingEngine resolves to Irregular");
+
+    // Failure case: an unknown engine must be rejected, so a broken registry cannot pass silently.
+    try
+    {
+        create.Invoke(null, ["ReleaseSmokeMissingEngine"]);
+        throw new InvalidOperationException("Unknown engine name was accepted.");
+    }
+    catch (TargetInvocationException exception) when (exception.InnerException is NotSupportedException)
+    {
+        Console.WriteLine("PASS: unknown engine name rejected");
     }
     return 0;
 }

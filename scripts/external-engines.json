@@ -1,9 +1,0 @@
-{
-  "repository": "https://git.thecozycat.net/aj/OpenNest-Engines.git",
-  "commit": "33cc2ee810a9408a4e720eecd5be30271f87d720",
-  "engines": [
-    { "project": "OpenNest.Engine.Gpt6Astra", "registryName": "Gpt6AstraNestingEngine" },
-    { "project": "OpenNest.Engine.Opus55", "registryName": "Opus55NestingEngine" },
-    { "project": "OpenNest.Engine.Qwen38FlashNext", "registryName": "Qwen38FlashNextNestingEngine" }
-  ]
-}
