@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -18,6 +19,12 @@ namespace OpenNest.Forms
 {
     public partial class CadConverterForm : Form
     {
+        private static readonly Regex MTextFormattingPattern = new(
+            @"\\[A-Za-z][^;]*;",
+            RegexOptions.None,
+            TimeSpan.FromSeconds(1)
+        );
+
         private SimplifierViewerForm simplifierViewer;
         private bool staleProgram = true;
 
@@ -101,10 +108,20 @@ namespace OpenNest.Forms
                 else
                     fileList.AddItem(item);
             }
+            catch (RegexMatchTimeoutException ex)
+            {
+                ReportImportFailure(file, new InvalidDataException(
+                    "CAD text extraction timed out. The file was not imported.", ex));
+            }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error importing \"{file}\": {ex.Message}");
+                ReportImportFailure(file, ex);
             }
+        }
+
+        internal virtual void ReportImportFailure(string file, Exception error)
+        {
+            MessageBox.Show($"Error importing \"{file}\": {error.Message}");
         }
 
         public void AddFiles(IEnumerable<string> files)
@@ -974,7 +991,7 @@ namespace OpenNest.Forms
 
         #endregion
 
-        private static List<CadText> ExtractTexts(ACadSharp.CadDocument doc)
+        internal List<CadText> ExtractTexts(ACadSharp.CadDocument doc)
         {
             var texts = new List<CadText>();
             if (doc == null)
@@ -1093,15 +1110,11 @@ namespace OpenNest.Forms
             return (h, v);
         }
 
-        private static string StripMTextFormatting(string text)
+        internal virtual string StripMTextFormatting(string text)
         {
             if (string.IsNullOrEmpty(text))
                 return text;
-            var result = System.Text.RegularExpressions.Regex.Replace(
-                text,
-                @"\\[A-Za-z][^;]*;",
-                ""
-            );
+            var result = MTextFormattingPattern.Replace(text, "");
             result = result.Replace("{", "").Replace("}", "");
             return result.Trim();
         }
