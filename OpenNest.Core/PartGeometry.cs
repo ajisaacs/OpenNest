@@ -31,20 +31,9 @@ namespace OpenNest
             double chordTolerance = 0.001
         )
         {
-            var entities = ConvertProgram.ToGeometry(part.Program);
-            var shapes = ShapeBuilder.GetShapes(
-                entities.Where(e => SpecialLayers.IsMaterial(e.Layer))
+            return GetDirectionalPartLines(
+                part, chordTolerance, useVector: false, facingDirection, default
             );
-            var lines = new List<Line>();
-
-            foreach (var shape in shapes)
-            {
-                var polygon = shape.ToPolygonWithTolerance(chordTolerance);
-                polygon.Offset(part.Location);
-                lines.AddRange(GetDirectionalLines(polygon, facingDirection));
-            }
-
-            return lines;
         }
 
         /// <summary>
@@ -163,6 +152,19 @@ namespace OpenNest
             double chordTolerance = 0.001
         )
         {
+            return GetDirectionalPartLines(
+                part, chordTolerance, useVector: true, default, facingDirection
+            );
+        }
+
+        private static List<Line> GetDirectionalPartLines(
+            Part part,
+            double chordTolerance,
+            bool useVector,
+            PushDirection cardinalDirection,
+            Vector vectorDirection
+        )
+        {
             var entities = ConvertProgram.ToGeometry(part.Program);
             var shapes = ShapeBuilder.GetShapes(
                 entities.Where(e => SpecialLayers.IsMaterial(e.Layer))
@@ -173,7 +175,10 @@ namespace OpenNest
             {
                 var polygon = shape.ToPolygonWithTolerance(chordTolerance);
                 polygon.Offset(part.Location);
-                lines.AddRange(GetDirectionalLines(polygon, facingDirection));
+                // Keep the overload-specific arithmetic and invalid-direction behavior.
+                lines.AddRange(useVector
+                    ? GetDirectionalLines(polygon, vectorDirection)
+                    : GetDirectionalLines(polygon, cardinalDirection));
             }
 
             return lines;
