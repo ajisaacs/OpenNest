@@ -55,7 +55,7 @@ namespace OpenNest.Forms
         public static string LoadSavedSelection()
         {
             var settings = EngineSelectionSettings.Load(EngineSelectionSettings.DefaultPath);
-            engineName = settings.Resolve(UiEngineNames, out var statusMessage);
+            engineName = settings.Resolve(UiEngineNames, out var statusMessage, NestingEngineRegistry.ResolveName);
             return statusMessage ?? string.Empty;
         }
 

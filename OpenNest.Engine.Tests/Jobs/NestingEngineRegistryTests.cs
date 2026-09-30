@@ -1,5 +1,5 @@
-using Xunit;
 using OpenNest.Engine.Jobs;
+using Xunit;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -10,10 +10,43 @@ public class NestingEngineRegistryTests
     {
         var names = NestingEngineRegistry.AvailableEngines.Select(e => e.Name).ToList();
 
+        Assert.Contains("Rectangles", names);
+        Assert.Contains("Irregular", names);
         Assert.Contains("Default", names);
         Assert.Contains("Strip", names);
         Assert.Contains("Vertical Remnant", names);
         Assert.Contains("Horizontal Remnant", names);
+    }
+
+    [Fact]
+    public void RenamedPlugInNamesResolveToTheirBuiltInReplacements()
+    {
+        Assert.Equal("Irregular", NestingEngineRegistry.ResolveName("Opus55NestingEngine"));
+        Assert.Equal("Rectangles", NestingEngineRegistry.ResolveName("rectanglesnestingengine"));
+        Assert.Equal("Rectangles", NestingEngineRegistry.ResolveName(" rectangles "));
+        Assert.IsType<OpenNest.Engine.NestingEngines.Irregular.IrregularNestingEngine>(
+            NestingEngineRegistry.Create("Opus55NestingEngine"));
+    }
+
+    [Fact]
+    public void RetiredEnginesAreNotSilentlyAliased()
+    {
+        Assert.Null(NestingEngineRegistry.ResolveName("Gpt6AstraNestingEngine"));
+        Assert.Null(NestingEngineRegistry.ResolveName("Qwen38FlashNextNestingEngine"));
+        Assert.Null(NestingEngineRegistry.ResolveName("  "));
+        Assert.Throws<NotSupportedException>(() => NestingEngineRegistry.Create("Qwen38FlashNextNestingEngine"));
+    }
+
+    [Fact]
+    public void LeftoverPlugInUnderARenamedNameCannotShadowItsReplacement()
+    {
+        var before = NestingEngineRegistry.AvailableEngines.Count;
+
+        NestingEngineRegistry.Register("Opus55NestingEngine", "stale plug-in",
+            () => new FixedStrategyNestingEngine("Default"));
+
+        Assert.Equal(before, NestingEngineRegistry.AvailableEngines.Count);
+        Assert.Equal("Irregular", NestingEngineRegistry.ResolveName("Opus55NestingEngine"));
     }
 
     [Fact]

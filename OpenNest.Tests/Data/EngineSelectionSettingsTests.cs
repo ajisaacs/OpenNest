@@ -168,6 +168,31 @@ public class EngineSelectionSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Resolve_RenamedEngineMapsToItsReplacementWithoutRewritingSavedChoice()
+    {
+        new EngineSelectionSettings { EngineName = "Opus55NestingEngine" }.Save(_path);
+        var settings = EngineSelectionSettings.Load(_path);
+
+        var resolved = settings.Resolve(new[] { "Default", "Irregular" }, out var message,
+            name => name == "Opus55NestingEngine" ? "irregular" : null);
+
+        Assert.Equal("Irregular", resolved);
+        Assert.Null(message);
+        Assert.Equal("Opus55NestingEngine", EngineSelectionSettings.Load(_path).EngineName);
+    }
+
+    [Fact]
+    public void Resolve_RenameToAnUnselectableEngineStillFallsBackWithMessage()
+    {
+        var settings = new EngineSelectionSettings { EngineName = "Opus55NestingEngine" };
+
+        var resolved = settings.Resolve(new[] { "Default", "Strip" }, out var message, _ => "Irregular");
+
+        Assert.Equal("Default", resolved);
+        Assert.Equal("Saved Auto Nest engine 'Opus55NestingEngine' is unavailable. Using Default.", message);
+    }
+
+    [Fact]
     public void Save_UnwritablePathReportsFailureToCaller()
     {
         File.WriteAllText(_path, "not a directory");

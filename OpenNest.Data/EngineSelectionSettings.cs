@@ -46,14 +46,20 @@ public sealed class EngineSelectionSettings
     /// <summary>
     /// Resolves against the host's selectable engines AFTER plug-in loading. A missing engine
     /// returns Default plus a status-bar warning, without replacing the saved preference.
-    /// Names use registry casing so desktop combo-box selection remains exact.
+    /// Names use registry casing so desktop combo-box selection remains exact. When the saved
+    /// name is not selectable, <paramref name="renamed"/> (the registry's legacy-name lookup)
+    /// may map it to the engine that replaced it; the result must itself be selectable.
     /// </summary>
-    public string Resolve(IEnumerable<string> availableEngineNames, out string? statusMessage)
+    public string Resolve(
+        IEnumerable<string> availableEngineNames,
+        out string? statusMessage,
+        Func<string, string?>? renamed = null)
     {
         ArgumentNullException.ThrowIfNull(availableEngineNames);
+        var available = availableEngineNames.ToList();
         var requestedName = NormalizeName(EngineName);
-        var registeredName = availableEngineNames.FirstOrDefault(
-            name => string.Equals(name, requestedName, StringComparison.OrdinalIgnoreCase));
+        var registeredName = Find(available, requestedName)
+            ?? (renamed?.Invoke(requestedName) is { } replacement ? Find(available, replacement) : null);
         if (registeredName is not null)
         {
             statusMessage = null;
@@ -63,6 +69,9 @@ public sealed class EngineSelectionSettings
         statusMessage = $"Saved Auto Nest engine '{requestedName}' is unavailable. Using Default.";
         return DefaultEngineName;
     }
+
+    private static string? Find(IEnumerable<string> names, string name) =>
+        names.FirstOrDefault(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Writes camelCase JSON, creating the parent directory and retrying IO collisions as
