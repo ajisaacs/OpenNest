@@ -62,7 +62,7 @@ namespace OpenNest.Engine.CirclePacking
 
                 for (; inner <= innerMax; inner += primaryOffset)
                 {
-                    var addedItem = item.Clone() as Item;
+                    var addedItem = item.Clone();
                     addedItem.Center = horizontal
                         ? new Vector(inner, outer)
                         : new Vector(outer, inner);

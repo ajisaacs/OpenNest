@@ -4,16 +4,19 @@ namespace OpenNest.Engine.CirclePacking
 {
     internal class Item : Circle
     {
-        public int Id { get; set; }
+        public int PackingId { get; set; }
 
-        public object Clone()
+        public override Item Clone()
         {
-            return new Item
+            var copy = new Item
             {
                 Radius = this.Radius,
                 Center = this.Center,
-                Id = this.Id,
+                Rotation = this.Rotation,
+                PackingId = this.PackingId,
             };
+            CopyBaseTo(copy);
+            return copy;
         }
     }
 }
