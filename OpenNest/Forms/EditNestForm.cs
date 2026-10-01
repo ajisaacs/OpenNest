@@ -1200,6 +1200,11 @@ namespace OpenNest.Forms
                     }
 
                     drawingListBox1.Invalidate();
+
+                    // Parts were added or removed: rebuild the plate rows so the
+                    // part-count and utilization columns stay current. The debounce
+                    // timer collapses a fill's many per-part events into one refresh.
+                    UpdatePlateList();
                 })
             );
         }
@@ -1254,6 +1259,7 @@ namespace OpenNest.Forms
 
             Nest.Drawings.Remove(drawing);
             UpdateDrawingList();
+            UpdatePlateList();
             PlateView.Invalidate();
         }
 
