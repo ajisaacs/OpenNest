@@ -56,9 +56,12 @@ namespace OpenNest.Engine.Fill
             if (grid.Rows <= 0 || grid.Cols <= 0)
                 return new List<Box>();
 
-            var merged = MergeCells(grid);
-            var sized = FilterBySize(merged, minDimension);
-            var unique = RemoveDominated(sized);
+            var unique = MaximalRectangles.FromGrid(
+                grid.XCoords,
+                grid.YCoords,
+                grid.Empty,
+                minDimension
+            );
             SortByEdgeProximity(unique);
             return unique;
         }
@@ -186,56 +189,6 @@ namespace OpenNest.Engine.Fill
             }
 
             return false;
-        }
-
-        private static List<Box> FilterBySize(List<Box> boxes, double minDimension)
-        {
-            if (minDimension <= 0)
-                return boxes;
-
-            var result = new List<Box>();
-
-            foreach (var box in boxes)
-            {
-                if (box.Width >= minDimension && box.Length >= minDimension)
-                    result.Add(box);
-            }
-
-            return result;
-        }
-
-        private static List<Box> RemoveDominated(List<Box> boxes)
-        {
-            boxes.Sort((a, b) => b.Area().CompareTo(a.Area()));
-            var results = new List<Box>();
-
-            foreach (var box in boxes)
-            {
-                var dominated = false;
-
-                foreach (var larger in results)
-                {
-                    if (IsContainedIn(box, larger))
-                    {
-                        dominated = true;
-                        break;
-                    }
-                }
-
-                if (!dominated)
-                    results.Add(box);
-            }
-
-            return results;
-        }
-
-        private static bool IsContainedIn(Box inner, Box outer)
-        {
-            var eps = Math.Tolerance.Epsilon;
-            return inner.Left >= outer.Left - eps
-                && inner.Right <= outer.Right + eps
-                && inner.Bottom >= outer.Bottom - eps
-                && inner.Top <= outer.Top + eps;
         }
 
         private void SortByEdgeProximity(List<Box> boxes)
@@ -450,55 +403,6 @@ namespace OpenNest.Engine.Fill
                 return Box.Empty;
 
             return new Box(left, bottom, right - left, top - bottom);
-        }
-
-        /// <summary>
-        /// Finds maximal empty rectangles using the histogram method.
-        /// For each row, builds a height histogram of consecutive empty cells
-        /// above, then extracts the largest rectangles from the histogram.
-        /// </summary>
-        private static List<Box> MergeCells(CellGrid grid)
-        {
-            var height = new int[grid.Rows, grid.Cols];
-
-            for (var c = 0; c < grid.Cols; c++)
-            {
-                for (var r = 0; r < grid.Rows; r++)
-                    height[r, c] = grid.Empty[r, c] ? (r > 0 ? height[r - 1, c] + 1 : 1) : 0;
-            }
-
-            var candidates = new List<Box>();
-
-            for (var r = 0; r < grid.Rows; r++)
-            {
-                var stack = new Stack<(int startCol, int h)>();
-
-                for (var c = 0; c <= grid.Cols; c++)
-                {
-                    var h = c < grid.Cols ? height[r, c] : 0;
-                    var startCol = c;
-
-                    while (stack.Count > 0 && stack.Peek().h > h)
-                    {
-                        var top = stack.Pop();
-                        startCol = top.startCol;
-
-                        candidates.Add(
-                            new Box(
-                                grid.XCoords[top.startCol],
-                                grid.YCoords[r - top.h + 1],
-                                grid.XCoords[c] - grid.XCoords[top.startCol],
-                                grid.YCoords[r + 1] - grid.YCoords[r - top.h + 1]
-                            )
-                        );
-                    }
-
-                    if (h > 0)
-                        stack.Push((startCol, h));
-                }
-            }
-
-            return candidates;
         }
     }
 }
