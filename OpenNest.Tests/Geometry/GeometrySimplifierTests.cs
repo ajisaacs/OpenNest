@@ -1,4 +1,3 @@
-using System.IO;
 using System.Linq;
 using OpenNest.Geometry;
 using OpenNest.IO;
@@ -386,12 +385,15 @@ public class GeometrySimplifierTests
         return System.Math.Acos(dot) * 180.0 / System.Math.PI;
     }
 
-    [Fact]
-    public void Apply_DynaPanDxf_NoGapsAfterSimplification()
+    /// <summary>
+    /// Optional real-drawing check. The DXF stays outside the repository; set
+    /// "SimplifierGapDxfPath" in OpenNest.Tests/test-config.json to run it.
+    /// </summary>
+    [SkippableFact]
+    public void Apply_RealDxf_NoGapsAfterSimplification()
     {
-        var path = @"C:\Users\aisaacs\Desktop\Sullys Q29 DXFs\SULLYS-031 Dyna Pan.dxf";
-        if (!File.Exists(path))
-            return; // skip if file not available
+        var path = TestConfig.GetExistingPath("SimplifierGapDxfPath");
+        Skip.If(path == null, "SimplifierGapDxfPath not configured in test-config.json or file not found");
 
         var result = Dxf.Import(path);
         var shapes = ShapeBuilder.GetShapes(result.Entities);

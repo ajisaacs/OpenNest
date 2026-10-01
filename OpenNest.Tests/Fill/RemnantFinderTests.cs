@@ -326,7 +326,7 @@ public class RemnantFinderTests
     [Fact]
     public void DensePack_FindsGapAtTop()
     {
-        // Reproduce real plate: 120x60, 68 parts of SULLYS-004.
+        // Reproduce a real plate: 120x60 with 68 copies of one production part.
         // Main grid tops out at y=53.14 (obstacle). Two rotated parts on the
         // right extend to y=58.49 but only at x > 106. The gap at x < 106
         // from y=53.14 to y=59.8 is ~106 x 6.66 — should be found.
