@@ -122,11 +122,8 @@ public static class PlateFillService
         );
     }
 
-    /// <summary>
-    /// Builds the filler for an optional strategy (null/empty = Default). Internal so the
-    /// engine-side multi-plate orchestrators share one resolution/rejection contract.
-    /// </summary>
-    internal static PlateFillerBase CreateFiller(string strategy, Plate plate)
+    /// <summary>Builds the filler for an optional strategy (null/empty = Default).</summary>
+    private static PlateFillerBase CreateFiller(string strategy, Plate plate)
     {
         ArgumentNullException.ThrowIfNull(plate);
         return ResolveStrategy(strategy) switch
@@ -142,8 +139,8 @@ public static class PlateFillService
     private static PlateFillerBase RequireFiller(string strategy, Plate plate)
     {
         ArgumentNullException.ThrowIfNull(strategy);
-        // An explicit empty string is an unknown strategy, not the orchestrator's
-        // null-means-Default defaulting; only the orchestrator boundary may default.
+        // An explicit empty string is an unknown strategy; only ResolveStrategy(string),
+        // used for caller selections, maps null/empty to Default.
         ResolveStrategy(strategy, allowEmpty: false);
         return CreateFiller(strategy, plate);
     }

@@ -38,6 +38,8 @@ Callers must hold drawings and target state stable from snapshot through attachm
 
 Interactive fills are outside this contract and still use `PlateFillService`. The benchmark invokes the same independent validator.
 
+The pre-pipeline multi-plate orchestrator and plate-size optimizer have been removed from `OpenNest.Engine`; this is a source and binary break for external code that called them. Whole-job callers use `NestPipeline.Run` (or implement `INestingEngine` as a plug-in); multiple stock sizes and salvage credit are expressed as job stock and `NestJobOptions`.
+
 ## Console and MCP
 
 Console `--autonest` uses the selected jobs engine against one physical sheet. The selected plate's old parts are replaced only after acceptance; other plates are unchanged. Default demand is still one of each drawing unless `--quantity` is supplied. A partially fulfilled, valid result may be saved; a successful placement is not a claim that all demand was met.

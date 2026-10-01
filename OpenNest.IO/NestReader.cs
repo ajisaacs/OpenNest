@@ -364,7 +364,7 @@ namespace OpenNest.IO
                 pd.EdgeSpacing.Top
             );
 
-            // Plate optimizer settings
+            // Stock options: sheet sizes and salvage rate
             nest.SalvageRate = dto.SalvageRate;
             if (dto.PlateOptions != null)
             {
