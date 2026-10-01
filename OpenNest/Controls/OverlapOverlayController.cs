@@ -33,7 +33,7 @@ internal sealed class OverlapOverlayController : IDisposable
     private ObservableList<Part> observedParts;
     private CancellationTokenSource cancellation;
     private GraphicsPath path;
-    private PlateOverlapReport pathReport;
+    private IReadOnlyList<PlateOverlapPair> pathPairs;
     private float pathScale;
     private Units capturedUnits;
     private IReadOnlyList<PlateOverlapPair> hoveredPairs = Array.Empty<PlateOverlapPair>();
@@ -139,7 +139,6 @@ internal sealed class OverlapOverlayController : IDisposable
         var source = new CancellationTokenSource();
         cancellation = source;
         var token = source.Token;
-        ReleasePath();
         NotifyChanged(toStatusBar: !automatic);
         try
         {
@@ -204,13 +203,22 @@ internal sealed class OverlapOverlayController : IDisposable
     {
         materialCache.Clear();
         baseline = null;
-        Invalidate();
+        state.Invalidate();
+        CancelWorker();
+        ReleasePath();
+        NotifyChanged();
     }
 
     public void Invalidate()
     {
         var generation = state.Generation;
-        state.Invalidate();
+        var display = state.DisplayPairs;
+        state.Invalidate(view.Plate);
+        if (!ReferenceEquals(display, state.DisplayPairs))
+        {
+            ReleasePath();
+            ClearHover();
+        }
         if (generation == state.Generation)
         {
             // Already unchecked/stale: an edit restarts the quiet period. Bulk fills raise one
@@ -223,7 +231,6 @@ internal sealed class OverlapOverlayController : IDisposable
             return;
         }
         CancelWorker();
-        ReleasePath();
         NotifyChanged();
     }
 
@@ -250,6 +257,8 @@ internal sealed class OverlapOverlayController : IDisposable
 
     private void NotifyChanged(bool toStatusBar = false)
     {
+        if (!ReferenceEquals(pathPairs, state.DisplayPairs))
+            ReleasePath();
         ClearHover();
         if (disposed || view.IsDisposed || view.Disposing)
             return;
@@ -343,7 +352,7 @@ internal sealed class OverlapOverlayController : IDisposable
         UpdateAutoCheck(repaint: false); // Drags/nudges are only visible to the stamp; the label is drawn below.
         ValidateHoverTransform();
 
-        if (state.Report != null)
+        if (state.DisplayPairs.Count > 0)
         {
             if (state.DisplayMode is OverlapDisplayMode.Areas or OverlapDisplayMode.Both)
             {
@@ -366,11 +375,16 @@ internal sealed class OverlapOverlayController : IDisposable
         if (disposed)
             return false;
         var generation = state.Generation;
+        var display = state.DisplayPairs;
         var fresh = state.EnsureFresh(view.Plate);
+        if (!ReferenceEquals(display, state.DisplayPairs))
+        {
+            ReleasePath();
+            ClearHover();
+        }
         if (generation != state.Generation)
         {
             CancelWorker();
-            ReleasePath();
             NotifyChanged();
         }
         return fresh;
@@ -457,7 +471,7 @@ internal sealed class OverlapOverlayController : IDisposable
         using var crosshair = new Pen(Color.DarkRed, 2 * dpiScale);
         // Stack coincident pair labels instead of replacing them with a fragment count.
         var labelRows = new Dictionary<PointF, int>();
-        foreach (var pair in state.Report.Pairs.OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId))
+        foreach (var pair in state.DisplayPairs.OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId))
         {
             var center = view.PointWorldToGraph(pair.Centroid);
             if (!float.IsFinite(center.X) || !float.IsFinite(center.Y))
@@ -532,13 +546,13 @@ internal sealed class OverlapOverlayController : IDisposable
 
     private void EnsurePath()
     {
-        if (ReferenceEquals(pathReport, state.Report) && pathScale == view.ViewScale && path != null)
+        if (ReferenceEquals(pathPairs, state.DisplayPairs) && pathScale == view.ViewScale && path != null)
             return;
         ReleasePath();
         var next = new GraphicsPath(FillMode.Winding);
         try
         {
-            foreach (var pair in state.Report.Pairs)
+            foreach (var pair in state.DisplayPairs)
             {
                 foreach (var region in pair.Regions)
                 {
@@ -560,7 +574,7 @@ internal sealed class OverlapOverlayController : IDisposable
                 }
             }
             path = next;
-            pathReport = state.Report;
+            pathPairs = state.DisplayPairs;
             pathScale = view.ViewScale;
         }
         catch
@@ -592,7 +606,7 @@ internal sealed class OverlapOverlayController : IDisposable
     {
         path?.Dispose();
         path = null;
-        pathReport = null;
+        pathPairs = null;
     }
 
     public void Dispose()

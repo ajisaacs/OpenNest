@@ -32,6 +32,20 @@ public sealed class OverlapGeometryStamp
         return true;
     }
 
+    /// <summary>
+    /// Conservative display reuse: only unchanged ordered slots on the same plate survive.
+    /// Index-changing edits may hide extra pairs, but cannot attach old geometry to new parts.
+    /// </summary>
+    internal bool[] UnchangedSlots(Plate current)
+    {
+        var matches = new bool[entries.Length];
+        if (!ReferenceEquals(plate, current))
+            return matches;
+        for (var i = 0; i < entries.Length && i < current.Parts.Count; i++)
+            matches[i] = entries[i].Matches(current.Parts[i]);
+        return matches;
+    }
+
     private readonly struct Entry
     {
         private readonly Part part;

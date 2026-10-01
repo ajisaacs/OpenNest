@@ -215,6 +215,145 @@ public class OverlapReportStateTests
         Assert.Equal("No material overlaps detected", state.Message);
     }
 
+    [Fact]
+    public void MovingOnePartRetainsOnlyUnaffectedPairsThroughRecheck()
+    {
+        var plate = PlateWithTwoPairs();
+        var state = new OverlapReportState();
+        var report = Analyze(plate);
+        Assert.True(state.TryPublish(state.Begin(plate), plate, report));
+        var untouched = report.Pairs[0];
+        plate.Parts[3].Offset(1e-10, 0);
+
+        Assert.False(state.EnsureFresh(plate));
+        Assert.Null(state.Report);
+        Assert.Equal(OverlapCheckStatus.Stale, state.Status);
+        Assert.Same(untouched, Assert.Single(state.DisplayPairs));
+        var display = state.DisplayPairs;
+        Assert.False(state.EnsureFresh(plate));
+        Assert.Same(display, state.DisplayPairs);
+
+        var request = state.Begin(plate, automatic: true);
+        Assert.Equal(OverlapCheckStatus.Checking, state.Status);
+        Assert.Null(state.Report);
+        Assert.Same(display, state.DisplayPairs);
+        Assert.True(state.TryPublish(request, plate, Analyze(plate)));
+        Assert.Equal(2, state.DisplayPairs.Count);
+        Assert.Same(Assert.IsType<PlateOverlapReport>(state.Report).Pairs, state.DisplayPairs);
+    }
+
+    [Theory]
+    [InlineData("move")]
+    [InlineData("rotate")]
+    [InlineData("placed-program")]
+    [InlineData("clean-program")]
+    [InlineData("cutoff")]
+    [InlineData("replace")]
+    [InlineData("remove")]
+    [InlineData("reorder")]
+    public void FurtherEditsDropAffectedPairsEvenBeforeTheNextCompletedCheck(string edit)
+    {
+        var plate = PlateWithTwoPairs();
+        var state = new OverlapReportState();
+        Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
+        plate.Parts[3].Offset(0.5, 0);
+        Assert.False(state.EnsureFresh(plate));
+        Assert.Single(state.DisplayPairs);
+        var request = state.Begin(plate, automatic: true);
+        var pending = Analyze(plate);
+        var part = plate.Parts[0];
+        switch (edit)
+        {
+            case "move": part.Offset(0, 1e-10); break;
+            case "rotate": part.Rotate(0.01); break;
+            case "placed-program": part.Update(); break;
+            case "clean-program": part.BaseDrawing.Program = (Program)part.BaseDrawing.Program.Clone(); break;
+            case "cutoff": part.BaseDrawing.IsCutOff = true; break;
+            case "replace": plate.Parts[0] = Rectangle(); break;
+            case "remove": plate.Parts.RemoveAt(0); break;
+            case "reorder": (plate.Parts[0], plate.Parts[1]) = (plate.Parts[1], plate.Parts[0]); break;
+        }
+        Assert.False(state.EnsureFresh(plate));
+        Assert.Empty(state.DisplayPairs);
+        Assert.False(state.TryPublish(request, plate, pending));
+        Assert.Null(state.Report);
+        Assert.Equal(OverlapCheckStatus.Stale, state.Status);
+        Assert.DoesNotContain("No material overlaps", state.Message);
+    }
+
+    [Theory]
+    [InlineData("invalidate")]
+    [InlineData("reset")]
+    [InlineData("plate")]
+    [InlineData("cancel")]
+    [InlineData("fail")]
+    public void HardInvalidationAndRequestFailureClearRetainedPairs(string edit)
+    {
+        var plate = PlateWithTwoPairs();
+        var state = new OverlapReportState();
+        Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
+        plate.Parts[3].Offset(1, 0);
+        Assert.False(state.EnsureFresh(plate));
+        Assert.Single(state.DisplayPairs);
+        var request = state.Begin(plate);
+        switch (edit)
+        {
+            case "invalidate": state.Invalidate(); break;
+            case "reset": state.Reset(); break;
+            case "plate": Assert.False(state.EnsureFresh(new Plate())); break;
+            case "cancel": state.Cancel(); break;
+            case "fail": Assert.True(state.TryFail(request, plate)); break;
+        }
+        Assert.Empty(state.DisplayPairs);
+        Assert.Null(state.Report);
+    }
+
+    [Fact]
+    public void AdditionalUnrelatedMotionDoesNotReplaceTheRetainedDisplayList()
+    {
+        var plate = PlateWithTwoPairs();
+        var state = new OverlapReportState();
+        Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
+        plate.Parts[3].Offset(1, 0);
+        Assert.False(state.EnsureFresh(plate));
+        var display = state.DisplayPairs;
+        Assert.Single(display);
+        plate.Parts[3].Offset(1, 0);
+        Assert.False(state.EnsureFresh(plate));
+        Assert.Same(display, state.DisplayPairs);
+        state.Begin(plate);
+        Assert.Same(display, state.DisplayPairs);
+    }
+
+    [Fact]
+    public void AppendingPartInvalidatesTheFullReportWithoutReplacingUnchangedDisplayPairs()
+    {
+        var plate = PlateWithParts();
+        var state = new OverlapReportState();
+        Assert.True(state.TryPublish(state.Begin(plate), plate, Analyze(plate)));
+        var display = state.DisplayPairs;
+        plate.Parts.Add(Rectangle());
+        state.Invalidate(plate); // Same entry point as the controller's collection event.
+        Assert.Null(state.Report);
+        Assert.Equal(OverlapCheckStatus.Stale, state.Status);
+        Assert.Same(display, state.DisplayPairs);
+        Assert.Single(state.DisplayPairs);
+        Assert.False(state.EnsureFresh(plate));
+        Assert.Same(display, state.DisplayPairs);
+    }
+
+    private static Plate PlateWithTwoPairs()
+    {
+        var plate = PlateWithParts();
+        var a = Rectangle();
+        var b = Rectangle();
+        a.Offset(20, 0);
+        b.Offset(20, 0);
+        plate.Parts.Add(a);
+        plate.Parts.Add(b);
+        return plate;
+    }
+
     private static PlateOverlapReport Analyze(Plate plate) => PlateOverlapAnalyzer.Analyze(plate.Parts.ToArray());
 
     private static Plate PlateWithParts()

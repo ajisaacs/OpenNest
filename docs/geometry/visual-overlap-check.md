@@ -34,8 +34,10 @@ fragment counts. This diagnostic checks shared material, not minimum spacing,
 plate edges, or cutting-path crossings.
 
 In a nest window the active plate is checked automatically. Any layout edit
-(add, remove, reorder, move, rotate, fill) clears the overlay and shows
-**Overlaps: check pending…**; once the layout has been unchanged for 0.5 s and no
+(add, remove, reorder, move, rotate, fill) invalidates the full report and shows
+**Overlaps: check pending…**, but highlights for unchanged pairs remain visible.
+Only highlights involving changed ordered input slots are removed; once the
+layout has been unchanged for 0.5 s and no
 mouse button, modal dialog, or fill progress window is active, the check reruns.
 Automatic results appear only in the canvas label, so the status bar keeps the
 last command's message, and an automatic check keeps Display > Off rather than
@@ -211,8 +213,21 @@ changed code count or rotation is detected). Preparing material dominates
 first-check time for drawings with many holes. Incremental analysis reuses a pair
 only when both parts have the same cached source, bit-identical pose, and the same
 relative input order (clipping is operand-order sensitive), then renumbers it.
-`InvalidateOverlapCheck()` clears the cache and baseline, so in-place program
-editors must keep calling it before loading.
+`InvalidateOverlapCheck()` clears the cache, baseline and every highlight, so
+in-place program editors must keep calling it before loading.
+
+Moving one part hides only highlights involving changed parts. Unchanged pairs
+remain visible throughout the quiet period and background recheck, sharing their
+existing immutable regions rather than recalculating them. `OverlapReportState`
+keeps these `DisplayPairs` separate from its full `Report`: the full report is
+unavailable and the label stays pending/out-of-date/checking until a fresh result
+is published. Retained highlights are known overlaps, never an all-clear for the
+edited layout. Each paint checks exact poses and references again, including
+further edits while an earlier check is pending. Hover details remain disabled
+until the full report is current. Collection edits conservatively discard pairs
+whose ordered input slots changed; this display-only path does not renumber them.
+Explicit geometry invalidation, plate switch, handle loss, cancellation and
+failure clear all retained highlights.
 
 Measured on 501 real PEP-converted plates with 2 to 384 parts, a from-scratch check
 takes median 1 ms, p99 368 ms and max 6.5 s (a 299-part plate); an incremental
@@ -227,7 +242,7 @@ PlateView draws the controller overlay after work-area/debug-remnant drawing and
 before action paint subscribers and hover tooltips. One consistently wound path
 is filled once, avoiding fragment outlines, internal triangulation seams, and
 darker triple coverage. World-to-graph conversion excludes pan, because PlateView
-already applies origin translation. Paths are rebuilt for report/scale changes,
+already applies origin translation. Paths are rebuilt for displayed-pair/scale changes,
 not ordinary repaints or panning. The state label saves/restores graphics state.
 Centroid hit tests use only cached report coordinates and DPI-scaled screen
 radii. Hover clears on edits, mode/request/view changes, leave, and teardown.
@@ -258,7 +273,8 @@ coincident duplicates, and covers pair reuse, issue renumbering, cache clearing 
 cancellation. `OverlapAutoCheckSchedulerTests` covers the quiet period, interaction
 waits, and the no-retry rule for canceled or failed layouts.
 `OverlapReportStateTests` verifies request supersession, exact pose/reference
-freshness, stale clearing, cancellation, and incomplete-versus-clear messaging.
+freshness, per-pair display retention through repeated edits and pending checks,
+hard invalidation, cancellation, and incomplete-versus-clear messaging.
 `PolygonAreaMomentsTests` covers analytic
 centers, unequal/disconnected fragments, winding, closure, large translations,
 and invalid/overflow cases. `OverlapPairPresentationTests` checks adaptive unit
@@ -277,7 +293,8 @@ dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
 Linux can cross-build with `-p:EnableWindowsTargeting=true`, but that does not
 execute Windows tests or verify appearance, DPI, or interaction. On Windows,
 check partial overlap, containment, inside-hole placement, pan/zoom and quadrant
-alignment, stale clearing during edits/plate switches, converter cancellation,
+alignment, changed-pair clearing and unchanged-pair retention during edits and
+pending rechecks, full clearing on plate switches and converter cancellation,
 the pending label and automatic recheck after dragging a part onto another,
 crowded-marker PageUp/PageDown access to the last pair, and repeated
 check/toggle/close cycles without GDI/disposed-control errors.

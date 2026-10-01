@@ -98,6 +98,80 @@ public class PlateOverlapOverlayTests
     });
 
     [Fact]
+    public void UnchangedPairStaysVisibleDuringMotionAndPendingRecheck() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.Add(Rectangle(20));
+        run.View.Plate.Parts.Add(Rectangle(21));
+        run.Finish();
+        run.View.OverlapDisplay = OverlapDisplayMode.Both;
+        run.View.ZoomToPoint(new Vector(), 20);
+        using var image = new Bitmap(240, 240);
+        using var graphics = Graphics.FromImage(image);
+        var overlay = run.View.OverlapOverlay;
+        var untouchedPoint = run.View.PointWorldToGraph(new Vector(2, 2));
+        var movedPoint = run.View.PointWorldToGraph(new Vector(22, 2));
+        overlay.Draw(graphics);
+        Assert.True(overlay.CachedPath.IsVisible(untouchedPoint));
+        Assert.True(overlay.CachedPath.IsVisible(movedPoint));
+
+        run.View.Plate.Parts[3].Offset(1e-10, 0);
+        overlay.Draw(graphics);
+        Assert.Equal(OverlapCheckStatus.Stale, run.View.OverlapStatus);
+        Assert.Null(run.View.OverlapReport);
+        Assert.True(overlay.CachedPath.IsVisible(untouchedPoint));
+        Assert.False(overlay.CachedPath.IsVisible(movedPoint));
+        var retainedPath = overlay.CachedPath;
+        run.View.Plate.Parts[3].Offset(1, 0);
+        overlay.Draw(graphics);
+        Assert.Same(retainedPath, overlay.CachedPath);
+        Assert.Equal(1, run.Calls); // Paint never analyzes.
+
+        var task = run.Start();
+        var pending = run.Next();
+        overlay.Draw(graphics); // Both areas and centroid markers must render without a full report.
+        Assert.Equal(OverlapCheckStatus.Checking, run.View.OverlapStatus);
+        Assert.Same(retainedPath, overlay.CachedPath);
+        run.View.Plate.Parts[0].Offset(1e-10, 0);
+        overlay.Draw(graphics);
+        Assert.Null(overlay.CachedPath);
+        pending.Complete();
+        run.Pump(task);
+        Assert.Equal(OverlapCheckStatus.Stale, run.View.OverlapStatus);
+        Assert.Null(run.View.OverlapReport);
+        overlay.Draw(graphics);
+        Assert.Null(overlay.CachedPath); // Late completion cannot restore the removed pair.
+    });
+
+    [Theory]
+    [InlineData("editor")]
+    [InlineData("cancel")]
+    [InlineData("failure")]
+    public void RetainedPathClearsOnHardInvalidationOrRequestFailure(string edit) => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.View.Plate.Parts.Add(Rectangle(20));
+        run.Finish();
+        run.View.Plate.Parts[2].Offset(1, 0);
+        run.Paint();
+        var path = run.View.OverlapOverlay.CachedPath;
+        Assert.NotNull(path);
+        var task = run.Start();
+        var pending = run.Next();
+        Assert.Same(path, run.View.OverlapOverlay.CachedPath);
+        switch (edit)
+        {
+            case "editor": run.View.InvalidateOverlapCheck(); pending.Complete(); break;
+            case "cancel": run.View.CancelOverlapCheck(); pending.Complete(); break;
+            case "failure": pending.Fail(); break;
+        }
+        run.Pump(task);
+        Assert.Null(run.View.OverlapReport);
+        run.Paint();
+        Assert.Null(run.View.OverlapOverlay.CachedPath);
+    });
+
+    [Fact]
     public void DisplayPanZoomAndPreviewDoNotAnalyzeOrChangeCommittedParts() => RunSta(() =>
     {
         using var run = new OverlayRun();
@@ -233,11 +307,10 @@ public class PlateOverlapOverlayTests
     });
 
     [Theory]
-    [InlineData("add")]
     [InlineData("remove")]
     [InlineData("replace")]
     [InlineData("clear")]
-    public void CollectionEventsImmediatelyDiscardCurrentReportAndPath(string edit) => RunSta(() =>
+    public void SlotChangingCollectionEventsImmediatelyDiscardCurrentReportAndPath(string edit) => RunSta(() =>
     {
         using var run = new OverlayRun();
         run.Finish();
@@ -247,7 +320,6 @@ public class PlateOverlapOverlayTests
         Assert.NotNull(run.View.OverlapOverlay.CachedPath);
         switch (edit)
         {
-            case "add": run.View.Plate.Parts.Add(Rectangle()); break;
             case "remove": run.View.Plate.Parts.RemoveAt(0); break;
             case "replace": run.View.Plate.Parts[0] = Rectangle(); break;
             case "clear": run.View.Plate.Parts.Clear(); break;
@@ -255,6 +327,23 @@ public class PlateOverlapOverlayTests
         Assert.Equal(OverlapCheckStatus.Stale, run.View.OverlapStatus);
         Assert.Null(run.View.OverlapReport);
         Assert.Null(run.View.OverlapOverlay.CachedPath);
+    });
+
+    [Fact]
+    public void AppendingPartRetainsTheExistingPairsPathButInvalidatesTheFullReport() => RunSta(() =>
+    {
+        using var run = new OverlayRun();
+        run.Finish();
+        run.Paint();
+        var path = run.View.OverlapOverlay.CachedPath;
+        Assert.NotNull(path);
+        run.View.Plate.Parts.Add(Rectangle());
+        Assert.Equal(OverlapCheckStatus.Stale, run.View.OverlapStatus);
+        Assert.Null(run.View.OverlapReport);
+        Assert.Same(path, run.View.OverlapOverlay.CachedPath);
+        run.Paint();
+        Assert.Same(path, run.View.OverlapOverlay.CachedPath);
+        Assert.Equal(1, run.Calls);
     });
 
     [Fact]

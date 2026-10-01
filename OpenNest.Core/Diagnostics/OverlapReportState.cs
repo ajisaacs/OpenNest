@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest.Diagnostics;
 
@@ -9,12 +11,16 @@ public enum OverlapCheckStatus { NotChecked, Checking, Current, Incomplete, Fail
 public sealed class OverlapReportState
 {
     private OverlapGeometryStamp stamp;
+    private OverlapGeometryStamp displayStamp;
+    private OverlapGeometryStamp observedDisplayStamp;
     private int uncheckedPartCount;
 
     public long Generation { get; private set; }
     public OverlapCheckStatus Status { get; private set; } = OverlapCheckStatus.NotChecked;
     public OverlapDisplayMode DisplayMode { get; set; } = OverlapDisplayMode.Areas;
     public PlateOverlapReport Report { get; private set; }
+    /// <summary>Known overlap pairs safe to draw, even while the full layout needs a recheck.</summary>
+    public IReadOnlyList<PlateOverlapPair> DisplayPairs { get; private set; } = Array.Empty<PlateOverlapPair>();
     public bool IsRunning => Status == OverlapCheckStatus.Checking;
 
     public string Message => Status switch
@@ -36,7 +42,8 @@ public sealed class OverlapReportState
     /// </summary>
     public long Begin(Plate plate, bool automatic = false)
     {
-        Clear(OverlapCheckStatus.Checking);
+        RefreshDisplayPairs(plate);
+        Clear(OverlapCheckStatus.Checking, preserveDisplay: true);
         stamp = OverlapGeometryStamp.Capture(plate);
         if (!automatic && DisplayMode == OverlapDisplayMode.Off)
             DisplayMode = OverlapDisplayMode.Areas;
@@ -48,6 +55,9 @@ public sealed class OverlapReportState
         if (!CanComplete(generation, plate))
             return false;
         Report = report;
+        DisplayPairs = report.Pairs;
+        displayStamp = stamp;
+        observedDisplayStamp = stamp;
         uncheckedPartCount = CountUncheckedParts(report.Issues);
         Status = report.IsComplete ? OverlapCheckStatus.Current : OverlapCheckStatus.Incomplete;
         return true;
@@ -66,18 +76,50 @@ public sealed class OverlapReportState
 
     public bool EnsureFresh(Plate plate)
     {
+        RefreshDisplayPairs(plate);
         if (stamp == null)
             return false;
         if (stamp.Matches(plate))
             return true;
-        Invalidate();
+        Invalidate(plate);
         return false;
     }
 
+    /// <summary>Layout edit: retain only pairs whose two ordered slots still match exactly.</summary>
+    public void Invalidate(Plate plate)
+    {
+        RefreshDisplayPairs(plate);
+        if (Status is OverlapCheckStatus.Checking or OverlapCheckStatus.Current or OverlapCheckStatus.Incomplete)
+            Clear(OverlapCheckStatus.Stale, preserveDisplay: true);
+    }
+
+    /// <summary>In-place geometry edits and teardown must forget every cached display pair.</summary>
     public void Invalidate()
     {
+        ClearDisplayPairs();
         if (Status is OverlapCheckStatus.Checking or OverlapCheckStatus.Current or OverlapCheckStatus.Incomplete)
             Clear(OverlapCheckStatus.Stale);
+    }
+
+    private void RefreshDisplayPairs(Plate plate)
+    {
+        if (displayStamp == null || observedDisplayStamp?.Matches(plate) == true)
+            return;
+        var unchanged = displayStamp.UnchangedSlots(plate);
+        var retained = DisplayPairs.Where(pair => unchanged[pair.PartAId] && unchanged[pair.PartBId]).ToList();
+        if (retained.Count != DisplayPairs.Count)
+            DisplayPairs = retained.AsReadOnly();
+        if (DisplayPairs.Count == 0)
+            ClearDisplayPairs();
+        else
+            observedDisplayStamp = OverlapGeometryStamp.Capture(plate);
+    }
+
+    private void ClearDisplayPairs()
+    {
+        DisplayPairs = Array.Empty<PlateOverlapPair>();
+        displayStamp = null;
+        observedDisplayStamp = null;
     }
 
     public void Cancel()
@@ -88,8 +130,10 @@ public sealed class OverlapReportState
 
     public void Reset() => Clear(OverlapCheckStatus.NotChecked);
 
-    private void Clear(OverlapCheckStatus status)
+    private void Clear(OverlapCheckStatus status, bool preserveDisplay = false)
     {
+        if (!preserveDisplay)
+            ClearDisplayPairs();
         Generation++;
         Report = null;
         uncheckedPartCount = 0;
