@@ -55,17 +55,27 @@ internal sealed class FrontierPacker
 
     private readonly IReadOnlyList<PartType> types;
     private readonly NoFitCache nfps;
+    private readonly IReadOnlyDictionary<int, IReadOnlyList<PairPose>> pairs;
     private readonly NestPlateStock stock;
     private readonly PackAxis axis;
     private readonly double beta;
     private readonly Box work;
     private readonly WorkCounter counter;
 
-    public FrontierPacker(IReadOnlyList<PartType> types, NoFitCache nfps, NestPlateStock stock, PackAxis axis, double beta, WorkCounter counter)
+    public FrontierPacker(
+        IReadOnlyList<PartType> types,
+        NoFitCache nfps,
+        IReadOnlyDictionary<int, IReadOnlyList<PairPose>> pairs,
+        NestPlateStock stock,
+        PackAxis axis,
+        double beta,
+        WorkCounter counter
+    )
     {
         this.counter = counter;
         this.types = types;
         this.nfps = nfps;
+        this.pairs = pairs;
         this.stock = stock;
         this.axis = axis;
         this.beta = beta;
@@ -76,13 +86,33 @@ internal sealed class FrontierPacker
     {
         var left = remaining.ToArray();
         var states = new List<Region>();
+        var byOrientation = new Dictionary<Orientation, Region>(ReferenceEqualityComparer.Instance);
+        bool Track(Orientation o, bool single)
+        {
+            if (byOrientation.ContainsKey(o))
+                return true;
+            if (!stock.Fits(o.Width, o.Height))
+                return false;
+            var region = new Region(o, work, single);
+            states.Add(region);
+            byOrientation[o] = region;
+            return true;
+        }
+        var offered = new List<PairState>();
         foreach (var type in types)
         {
             if (left[type.Index] <= 0)
                 continue;
             foreach (var o in type.Orientations)
-                if (stock.Fits(o.Width, o.Height))
-                    states.Add(new Region(o, work));
+                Track(o, single: true);
+            if (left[type.Index] < 2 || !pairs.TryGetValue(type.Index, out var typePairs))
+                continue;
+            foreach (var pair in typePairs)
+            {
+                // Members missing from the catalog get regions too, but only for pair placement.
+                if (stock.Fits(pair.Width, pair.Height) && Track(pair.A, single: false) && Track(pair.B, single: false))
+                    offered.Add(new PairState(pair, byOrientation[pair.A], byOrientation[pair.B]));
+            }
         }
 
         var placed = new List<Placed>();
@@ -92,58 +122,73 @@ internal sealed class FrontierPacker
         while (states.Count > 0)
         {
             token.ThrowIfCancellationRequested();
-            var choice = Choose(states, front);
+            var choice = Choose(states, offered, front);
             if (choice == null)
                 break;
 
-            var (region, point) = choice.Value;
-            var part = new Placed(region.Orientation, point.x, point.y);
-            placed.Add(part);
-            var typeIndex = region.Orientation.TypeIndex;
-            partArea += types[typeIndex].Area;
-            front = System.Math.Max(front, axis == PackAxis.X ? part.Right : part.Top);
+            var typeIndex = choice[0].Orientation.TypeIndex;
+            foreach (var part in choice)
+            {
+                placed.Add(part);
+                partArea += types[typeIndex].Area;
+                front = System.Math.Max(front, axis == PackAxis.X ? part.Right : part.Top);
+            }
 
-            if (--left[typeIndex] == 0)
+            left[typeIndex] -= choice.Count;
+            if (left[typeIndex] == 0)
                 states.RemoveAll(s => s.Orientation.TypeIndex == typeIndex);
+            if (left[typeIndex] < 2)
+            {
+                offered.RemoveAll(p => p.Pose.TypeIndex == typeIndex);
+                states.RemoveAll(s => s.Orientation.TypeIndex == typeIndex && !s.Single);
+            }
 
-            // Each surviving region loses the positions the new part now blocks. Regions are
+            // Each surviving region loses the positions the new parts now block. Regions are
             // independent, so they update in parallel without affecting determinism.
             var snapshot = states.ToArray();
-            counter.Add(snapshot.Length);
-            Parallel.For(
-                0,
-                snapshot.Length,
-                new ParallelOptions { CancellationToken = token },
-                i => snapshot[i].Subtract(nfps.Get(part.Orientation, snapshot[i].Orientation), part.X, part.Y)
-            );
+            foreach (var part in choice)
+            {
+                counter.Add(snapshot.Length);
+                Parallel.For(
+                    0,
+                    snapshot.Length,
+                    new ParallelOptions { CancellationToken = token },
+                    i => snapshot[i].Subtract(nfps.Get(part.Orientation, snapshot[i].Orientation), part.X, part.Y)
+                );
+            }
             states.RemoveAll(s => s.IsEmpty);
+            offered.RemoveAll(p => p.A.IsEmpty || p.B.IsEmpty);
+            if (offered.Count == 0)
+                states.RemoveAll(s => !s.Single);
         }
 
         return new SheetFill(stock, placed, partArea);
     }
 
-    private (Region, PointD)? Choose(List<Region> states, double front)
+    /// <summary>
+    /// The next placement: one part, or both members of a pair. Singles and pairs compete
+    /// under the same rule; a pair counts as one piece of twice the part area, and on a tie
+    /// the single (considered first) is kept.
+    /// </summary>
+    private IReadOnlyList<Placed>? Choose(List<Region> states, List<PairState> offered, double front)
     {
-        Region? bestRegion = null;
-        var bestPoint = default(PointD);
+        IReadOnlyList<Placed>? bestParts = null;
         var bestFills = false;
         var bestValue = double.PositiveInfinity;
         var bestSide = double.PositiveInfinity;
         var bestLead = double.PositiveInfinity;
         var bestPriority = int.MaxValue;
 
-        foreach (var region in states)
+        void Consider(Func<IReadOnlyList<Placed>> build, int typeIndex, double area, double advance, double side, double lead)
         {
-            if (!region.TryLowest(axis, front, out var point, out var advance, out var side, out var lead))
-                continue;
-            var area = types[region.Orientation.TypeIndex].Area;
-            var priority = types[region.Orientation.TypeIndex].Part.Priority;
-            if (priority > bestPriority) continue;
+            var priority = types[typeIndex].Part.Priority;
+            if (priority > bestPriority)
+                return;
             var fills = advance <= Tie;
             // Gap fill prefers bigger parts (negated area); advance prefers least advance per area.
             var value = fills ? -area : advance / System.Math.Pow(System.Math.Max(area, 1e-12), beta);
 
-            var better = bestRegion == null
+            var better = bestParts == null
                 || priority < bestPriority
                 || (fills && !bestFills)
                 || (
@@ -157,17 +202,41 @@ internal sealed class FrontierPacker
                     )
                 );
             if (!better)
-                continue;
-            bestRegion = region;
+                return;
+            bestParts = build();
             bestPriority = priority;
-            bestPoint = point;
             bestFills = fills;
             bestValue = value;
             bestSide = side;
             bestLead = lead;
         }
 
-        return bestRegion == null ? null : (bestRegion, bestPoint);
+        foreach (var region in states)
+        {
+            if (!region.Single)
+                continue;
+            if (!region.TryLowest(axis, front, out var point, out var advance, out var side, out var lead))
+                continue;
+            var o = region.Orientation;
+            Consider(() => new[] { new Placed(o, point.x, point.y) }, o.TypeIndex, types[o.TypeIndex].Area, advance, side, lead);
+        }
+
+        foreach (var state in offered)
+        {
+            var pair = state.Pose;
+            if (!state.TryLowest(axis, front, counter, out var point, out var advance, out var side, out var lead))
+                continue;
+            Consider(
+                () => new[] { new Placed(pair.A, point.x, point.y), new Placed(pair.B, point.x + pair.Dx, point.y + pair.Dy) },
+                pair.TypeIndex,
+                2 * types[pair.TypeIndex].Area,
+                advance,
+                side,
+                lead
+            );
+        }
+
+        return bestParts;
     }
 
     /// <summary>Legal reference points for one orientation on this sheet.</summary>
@@ -177,9 +246,10 @@ internal sealed class FrontierPacker
         private PathsD free;
         private RectD bounds;
 
-        public Region(Orientation orientation, Box work)
+        public Region(Orientation orientation, Box work, bool single)
         {
             Orientation = orientation;
+            Single = single;
             minX = work.Left - orientation.MinX;
             maxX = work.Right - orientation.MaxX;
             minY = work.Bottom - orientation.MinY;
@@ -203,6 +273,10 @@ internal sealed class FrontierPacker
         }
 
         public Orientation Orientation { get; }
+
+        /// <summary>False for a pair-only orientation: it is never placed on its own.</summary>
+        public bool Single { get; }
+
         public bool IsEmpty => free.Count == 0;
 
         public void Subtract(Nfp nfp, double dx, double dy)
@@ -219,7 +293,18 @@ internal sealed class FrontierPacker
             // Drop numerical dust; a sliver thinner than the precision grid is no real room.
             free.RemoveAll(p => p.Count < 3);
             bounds = free.Count == 0 ? default : Clipper.GetBounds(free);
+            Version++;
         }
+
+        /// <summary>Changes whenever the free region does.</summary>
+        public int Version { get; private set; }
+
+        public PathsD Free => free;
+        public RectD Bounds => bounds;
+        public double MinX => minX;
+        public double MinY => minY;
+        public double MaxX => maxX;
+        public double MaxY => maxY;
 
         /// <summary>
         /// Best vertex of the free region: least front advance, then lowest cross-axis position,
@@ -227,41 +312,113 @@ internal sealed class FrontierPacker
         /// </summary>
         public bool TryLowest(PackAxis axis, double front, out PointD point, out double advance, out double side, out double lead)
         {
-            point = default;
-            advance = side = lead = double.PositiveInfinity;
-            var found = false;
             var o = Orientation;
-            foreach (var path in free)
-                foreach (var raw in path)
+            return BestVertex(free, minX, minY, maxX, maxY, (o.MinX, o.MinY, o.MaxX, o.MaxY),
+                axis, front, out point, out advance, out side, out lead);
+        }
+    }
+
+    /// <summary>
+    /// Scores the vertices of <paramref name="free"/>, each clamped to the inner-fit box
+    /// [minX, maxX] x [minY, maxY], for a piece occupying <paramref name="box"/> around its
+    /// reference point.
+    /// </summary>
+    private static bool BestVertex(
+        PathsD free,
+        double minX,
+        double minY,
+        double maxX,
+        double maxY,
+        (double MinX, double MinY, double MaxX, double MaxY) box,
+        PackAxis axis,
+        double front,
+        out PointD point,
+        out double advance,
+        out double side,
+        out double lead
+    )
+    {
+        point = default;
+        advance = side = lead = double.PositiveInfinity;
+        var found = false;
+        foreach (var path in free)
+            foreach (var raw in path)
+            {
+                var x = System.Math.Clamp(raw.x, minX, maxX);
+                var y = System.Math.Clamp(raw.y, minY, maxY);
+                double reach, across, start;
+                if (axis == PackAxis.X)
                 {
-                    var x = System.Math.Clamp(raw.x, minX, maxX);
-                    var y = System.Math.Clamp(raw.y, minY, maxY);
-                    double reach, across, start;
-                    if (axis == PackAxis.X)
-                    {
-                        reach = x + o.MaxX;
-                        across = y + o.MinY;
-                        start = x + o.MinX;
-                    }
-                    else
-                    {
-                        reach = y + o.MaxY;
-                        across = x + o.MinX;
-                        start = y + o.MinY;
-                    }
-                    var adv = System.Math.Max(0, reach - front);
-                    var better = !found
-                        || adv < advance - Tie
-                        || (adv <= advance + Tie && (across < side - Tie || (across <= side + Tie && start < lead - Tie)));
-                    if (!better)
-                        continue;
-                    found = true;
-                    point = new PointD(x, y);
-                    advance = adv;
-                    side = across;
-                    lead = start;
+                    reach = x + box.MaxX;
+                    across = y + box.MinY;
+                    start = x + box.MinX;
                 }
-            return found;
+                else
+                {
+                    reach = y + box.MaxY;
+                    across = x + box.MinX;
+                    start = y + box.MinY;
+                }
+                var adv = System.Math.Max(0, reach - front);
+                var better = !found
+                    || adv < advance - Tie
+                    || (adv <= advance + Tie && (across < side - Tie || (across <= side + Tie && start < lead - Tie)));
+                if (!better)
+                    continue;
+                found = true;
+                point = new PointD(x, y);
+                advance = adv;
+                side = across;
+                lead = start;
+            }
+        return found;
+    }
+
+    /// <summary>
+    /// Legal reference points for a pair: member A's free region intersected with member B's
+    /// moved back by the pair offset. Recomputed only after either member's region changes.
+    /// </summary>
+    private sealed class PairState(PairPose pose, Region a, Region b)
+    {
+        private int versionA = -1, versionB = -1;
+        private PathsD free = new();
+
+        public PairPose Pose { get; } = pose;
+        public Region A { get; } = a;
+        public Region B { get; } = b;
+
+        public bool TryLowest(PackAxis axis, double front, WorkCounter counter,
+            out PointD point, out double advance, out double side, out double lead)
+        {
+            if (versionA != A.Version || versionB != B.Version)
+            {
+                versionA = A.Version;
+                versionB = B.Version;
+                counter.Add(1);
+                free = Intersect();
+            }
+            // Clamp into both members' inner-fit boxes; they overlap whenever the pair fits.
+            var minX = System.Math.Max(A.MinX, B.MinX - Pose.Dx);
+            var maxX = System.Math.Max(minX, System.Math.Min(A.MaxX, B.MaxX - Pose.Dx));
+            var minY = System.Math.Max(A.MinY, B.MinY - Pose.Dy);
+            var maxY = System.Math.Max(minY, System.Math.Min(A.MaxY, B.MaxY - Pose.Dy));
+            return BestVertex(free, minX, minY, maxX, maxY, (Pose.MinX, Pose.MinY, Pose.MaxX, Pose.MaxY),
+                axis, front, out point, out advance, out side, out lead);
+        }
+
+        private PathsD Intersect()
+        {
+            if (A.IsEmpty || B.IsEmpty)
+                return new PathsD();
+            var a = A.Bounds;
+            var b = B.Bounds;
+            if (b.right - Pose.Dx < a.left || b.left - Pose.Dx > a.right
+                || b.bottom - Pose.Dy < a.top || b.top - Pose.Dy > a.bottom)
+                return new PathsD();
+            var shifted = Clipper.TranslatePaths(B.Free, -Pose.Dx, -Pose.Dy);
+            var result = Clipper.Intersect(A.Free, shifted, FillRule.NonZero, NoFitCache.Precision);
+            result.RemoveAll(p => p.Count < 3);
+            return result;
         }
     }
 }

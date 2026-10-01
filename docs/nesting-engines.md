@@ -12,7 +12,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Engine | Best for | Method |
 |---|---|---|
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
-| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling, six whole-job strategy variants and a tail re-plan |
+| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
 | StockLadder | Caller-supplied stock ladders | Constrained-first fill with equivalent-demand area repacking |
 | Default, Strip, Vertical Remnant, Horizontal Remnant | Single-strategy fills | The fixed placement strategies behind interactive fill |
 
@@ -26,7 +26,14 @@ coincides with the plate work-area boundary. Internal leftover edges keep the st
 tolerance, and actual part dimensions still determine spacing away from the plate boundary.
 
 Irregular fills gaps and open notches using outer profiles; it does not yet place parts inside
-enclosed cutouts. Concave no-fit polygons are prepared with a single boundary/containment union.
+enclosed cutouts. For a part with two or more copies it also offers its best-fit pairs (two copies
+interlocked, as the Best Fit viewer shows them) alongside the single copies, and places a pair
+where both members' free regions allow it. Each pair's internal spacing is re-checked with the
+layout check before it is offered, and only rotations the part's policy allows are used. A pair
+may introduce legal rotations beyond the sampled single poses; these remain eligible even when
+none of the sampled singles fits the stock. Both members block space separately, leaving their
+notches and intervening gaps available for later parts. Concave no-fit polygons are prepared
+with a single boundary/containment union.
 Any remaining numerical hole is filled only when its entire ring is certified to lie in forbidden
 space, preserving genuine enclosed placement pockets without changing spacing tolerances.
 

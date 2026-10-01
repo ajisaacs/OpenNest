@@ -1,7 +1,7 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System;
 using System.Threading;
 using OpenNest.Engine.Jobs;
 
@@ -50,7 +50,8 @@ public sealed class IrregularNestingEngine : INestingEngine
         var types = PartCatalog.Build(job);
         var solver = new Solver(job, types, progress, token);
 
-        // Demand that no offered stock can hold in any allowed orientation is reported unplaced.
+        // Pair-only orientations may fit stock even when the sampled single poses do not.
+        // Demand that neither a single nor a pair can fit is reported unplaced.
         var demand = new int[types.Count];
         foreach (var type in types)
         {
@@ -58,7 +59,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                 stock.Quantity != 0
                 && type.Orientations.Any(o => stock.Fits(o.Width, o.Height))
             );
-            demand[type.Index] = placeable ? type.Part.Quantity : 0;
+            demand[type.Index] = placeable || solver.PairFits(type) ? type.Part.Quantity : 0;
         }
 
         Plan? best = null;
@@ -89,6 +90,7 @@ public sealed class IrregularNestingEngine : INestingEngine
     {
         private const int MaxTail = 3;
         private readonly Dictionary<double, NoFitCache> caches = new();
+        private readonly Dictionary<double, IReadOnlyDictionary<int, IReadOnlyList<PairPose>>> pairs = new();
 
         public WorkCounter Work { get; } = new();
 
@@ -157,6 +159,30 @@ public sealed class IrregularNestingEngine : INestingEngine
             return cache;
         }
 
+        public bool PairFits(PartType type)
+        {
+            if (type.Part.Quantity < 2 || type.Orientations.Count == 0)
+                return false;
+            return job.Plates.Any(stock => stock.Quantity != 0
+                && PairsFor(stock).TryGetValue(type.Index, out var candidates)
+                && candidates.Any(pair => stock.Fits(pair.Width, pair.Height)));
+        }
+
+        /// <summary>Best-fit pairs for this stock's spacing, built once per solve.</summary>
+        private IReadOnlyDictionary<int, IReadOnlyList<PairPose>> PairsFor(NestPlateStock stock)
+        {
+            var clearance = System.Math.Max(0, stock.PartSpacing);
+            if (!pairs.TryGetValue(clearance, out var found))
+            {
+                // The best-fit plate filter only needs the largest sheet at this spacing;
+                // each packer still checks the pair against its own work area.
+                var sheets = job.Plates.Where(p => System.Math.Max(0, p.PartSpacing) == clearance).ToList();
+                pairs[clearance] = found = PairCatalog.Build(types, clearance,
+                    sheets.Max(p => p.Size.Length), sheets.Max(p => p.Size.Width), token);
+            }
+            return found;
+        }
+
         /// <summary>
         /// Greedy sheet-by-sheet decode. <paramref name="usedBefore"/> seeds finite-stock
         /// accounting, <paramref name="sheetCap"/> bounds the sheets this run may add, and
@@ -199,7 +225,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                     if (stock.Quantity is int available && used[stock.Id] >= available)
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
-                    var packer = new FrontierPacker(types, CacheFor(stock), stock, axis, beta, Work);
+                    var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work);
                     var fill = packer.Fill(remaining, token);
                     if (fill.Parts.Count > 0)
                         trials.Add((fill, NetArea(job.Options, fill)));

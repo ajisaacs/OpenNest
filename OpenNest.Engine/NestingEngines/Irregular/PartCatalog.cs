@@ -41,6 +41,9 @@ internal sealed class PartType
     public required NestJobPart Part { get; init; }
     public required double Area { get; init; }
     public required IReadOnlyList<Orientation> Orientations { get; init; }
+
+    /// <summary>Analytic perimeter the orientations were flattened from; null when unreadable.</summary>
+    public Shape? Perimeter { get; init; }
 }
 
 /// <summary>
@@ -97,9 +100,30 @@ internal static class PartCatalog
             }
 
             var area = orientations.Count == 0 ? 0 : System.Math.Abs(Clipper.Area(orientations[0].Outline));
-            types.Add(new PartType { Index = index, Part = part, Area = area, Orientations = orientations });
+            types.Add(new PartType
+            {
+                Index = index,
+                Part = part,
+                Area = area,
+                Orientations = orientations,
+                Perimeter = perimeter,
+            });
         }
         return types;
+    }
+
+    /// <summary>
+    /// An extra pose of <paramref name="type"/> at <paramref name="angle"/>, flattened like the
+    /// catalog's own. <paramref name="index"/> must be unique within the type, because NFP
+    /// caches key on it.
+    /// </summary>
+    internal static Orientation? CreateOrientation(PartType type, int index, double angle)
+    {
+        if (type.Perimeter == null || type.Orientations.Count == 0)
+            return null;
+        var tolerance = type.Orientations[0].Tolerance;
+        var outline = Polygonize(type.Perimeter, angle, tolerance);
+        return outline.Count < 3 ? null : MakeOrientation(type.Index, index, angle, outline, tolerance);
     }
 
     private static Shape? ReadPerimeter(PartGeometrySnapshot geometry) =>
