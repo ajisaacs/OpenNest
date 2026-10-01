@@ -34,6 +34,21 @@ internal sealed record SheetPlan(
 /// </summary>
 internal static class SheetPacker
 {
+    /// <summary>
+    /// How far a box may overhang the work area. Kept just inside the layout check's
+    /// <see cref="NestTolerances.WorkAreaSlack"/> so floating-point rounding cannot push an
+    /// accepted box over it.
+    /// </summary>
+    public const double OverhangAllowance = NestTolerances.WorkAreaSlack * 0.9;
+
+    /// <summary>
+    /// Packing size along one axis: a box that exceeds the sheet by no more than
+    /// <see cref="OverhangAllowance"/> packs as exactly the sheet's size. It then spans the whole
+    /// axis, so it has no neighbour there and the overhang lands only past the work-area edge.
+    /// </summary>
+    public static double PackSize(double size, double sheet) =>
+        size > sheet && size <= sheet + OverhangAllowance ? sheet : size;
+
     public static SheetPlan Pack(
         IReadOnlyList<BoxType> types, IReadOnlyList<int> remaining, NestPlateStock stock,
         FitRule rule, PickMode mode, CancellationToken token)
@@ -43,7 +58,11 @@ internal static class SheetPacker
         var sheet = new MaxRectsSheet(work.Right - work.Left + s, work.Top - work.Bottom + s);
         var packTypes = types
             .Select(t => new PackType(
-                t.Priority, t.Orientations.Select(o => (o.Width + s, o.Height + s)).ToList(), t.BoxArea))
+                t.Priority,
+                t.Orientations
+                    .Select(o => (PackSize(o.Width + s, sheet.Width), PackSize(o.Height + s, sheet.Height)))
+                    .ToList(),
+                t.BoxArea))
             .ToList();
         var placed = MaxRectsPacker
             .Pack(packTypes, remaining.ToArray(), sheet, rule, mode, token)

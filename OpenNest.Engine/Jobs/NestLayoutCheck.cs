@@ -291,10 +291,10 @@ public static class NestLayoutCheck
         {
             var bb = MaterialBounds(part);
 
-            var outLeft = bb.Left < workArea.X - Tolerance.Epsilon;
-            var outBottom = bb.Bottom < workArea.Y - Tolerance.Epsilon;
-            var outRight = bb.Right > workArea.Right + Tolerance.Epsilon;
-            var outTop = bb.Top > workArea.Top + Tolerance.Epsilon;
+            var outLeft = bb.Left < workArea.X - NestTolerances.WorkAreaSlack;
+            var outBottom = bb.Bottom < workArea.Y - NestTolerances.WorkAreaSlack;
+            var outRight = bb.Right > workArea.Right + NestTolerances.WorkAreaSlack;
+            var outTop = bb.Top > workArea.Top + NestTolerances.WorkAreaSlack;
 
             if (outLeft || outBottom || outRight || outTop)
             {

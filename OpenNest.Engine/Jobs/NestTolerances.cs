@@ -1,5 +1,6 @@
 using System;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.Engine.Jobs;
 
@@ -17,6 +18,11 @@ public static class NestTolerances
     /// coordinates (e.g. PEP's 4-decimal exports) meet the Clipper grid; 0.0005 covers that
     /// with margin and is far below anything a cutting machine can resolve.</summary>
     public const double SpacingSlack = 0.0005;
+
+    /// <summary>How far material may extend past the work area and still pass the layout check's
+    /// bounds test. Matches the general geometry tolerance, so a part drawn a few millionths
+    /// larger than its sheet's work area (as exported dimensions often are) is still accepted.</summary>
+    public const double WorkAreaSlack = Tolerance.Epsilon;
 
     /// <summary>Clipper decimal precision (a 1e-4 coordinate grid).</summary>
     public const int ClipperPrecision = ClipperBridge.Precision;

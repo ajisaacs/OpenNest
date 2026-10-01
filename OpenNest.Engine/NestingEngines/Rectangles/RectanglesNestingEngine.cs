@@ -143,8 +143,8 @@ public sealed class RectanglesNestingEngine : INestingEngine
     private static bool FitsStock(NestPlateStock stock, BoxOrientation o)
     {
         var work = stock.WorkArea;
-        return o.Width <= work.Right - work.Left + MaxRectsSheet.Eps
-            && o.Height <= work.Top - work.Bottom + MaxRectsSheet.Eps;
+        return o.Width <= work.Right - work.Left + SheetPacker.OverhangAllowance
+            && o.Height <= work.Top - work.Bottom + SheetPacker.OverhangAllowance;
     }
 }
 

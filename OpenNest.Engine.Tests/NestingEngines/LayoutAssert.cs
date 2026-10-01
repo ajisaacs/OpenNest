@@ -27,8 +27,9 @@ public static class LayoutAssert
                 foreach (var entity in geometry) { entity.Rotate(pose.Rotation); entity.Offset(pose.X, pose.Y); }
                 var b = (L: geometry.Min(e => e.Left), B: geometry.Min(e => e.Bottom),
                     R: geometry.Max(e => e.Right), T: geometry.Max(e => e.Top));
-                Assert.True(b.L >= work.Left - 1e-7 && b.B >= work.Bottom - 1e-7
-                    && b.R <= work.Right + 1e-7 && b.T <= work.Top + 1e-7);
+                var slack = NestTolerances.WorkAreaSlack;
+                Assert.True(b.L >= work.Left - slack && b.B >= work.Bottom - slack
+                    && b.R <= work.Right + slack && b.T <= work.Top + slack);
             }
         }
         foreach (var part in job.Parts)

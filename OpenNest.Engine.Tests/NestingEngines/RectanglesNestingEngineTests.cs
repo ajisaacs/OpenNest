@@ -152,6 +152,36 @@ public class RectanglesNestingEngineTests
         LayoutAssert.Valid(job, result);
         Assert.Equal(NestJobStatus.Complete, result.Status);
     }
+
+    [Fact]
+    public void PartAFewMillionthsWiderThanTheWorkAreaIsPlaced()
+    {
+        // Exported panels are often drawn a few millionths over their sheet's work area; the
+        // layout check accepts that overhang, so the engine must place them. The chamfer keeps the
+        // material area inside the sheet's area budget, as a real panel's corner radii do.
+        var panel = Polyline((0, 0), (36.125006, 0), (36.125006, 74), (35.125006, 75), (0, 75));
+        var job = Job(new[] { Part("panel", panel, 1) },
+            new[] { Stock("s", 75, 36.125, spacing: 0.25, quantity: 1) });
+
+        var result = new RectanglesNestingEngine().Solve(job);
+
+        LayoutAssert.Valid(job, result);
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+    }
+
+    [Fact]
+    public void PartBeyondTheOverhangAllowanceStaysUnplaced()
+    {
+        var panel = Polyline((0, 0), (36.12502, 0), (36.12502, 74), (35.12502, 75), (0, 75));
+        var job = Job(new[] { Part("panel", panel, 1) },
+            new[] { Stock("s", 75, 36.125, spacing: 0.25, quantity: 1) });
+
+        var result = new RectanglesNestingEngine().Solve(job);
+
+        LayoutAssert.Valid(job, result);
+        Assert.Empty(result.Plates);
+        Assert.Equal(1, Assert.Single(result.Fulfillment).Unplaced);
+    }
 }
 
 public sealed class RectanglesContractTests : EngineContractTests<RectanglesNestingEngine> { }
