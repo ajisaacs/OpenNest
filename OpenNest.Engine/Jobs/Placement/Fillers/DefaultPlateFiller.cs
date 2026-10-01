@@ -399,7 +399,7 @@ internal class DefaultPlateFiller : PlateFillerBase
         CancellationToken token
     )
     {
-        return AreaPacker.Pack(box, items, Plate.PartSpacing, Comparer, token);
+        return AreaPacker.Pack(box, items, Plate.PartSpacing, Comparer, token, Plate.WorkArea());
     }
 
     protected virtual void RunPipeline(FillContext context)

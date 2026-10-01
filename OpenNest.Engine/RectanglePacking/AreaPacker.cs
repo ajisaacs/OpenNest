@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine.NestingEngines.Rectangles;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -33,13 +34,21 @@ internal static class AreaPacker
     /// right/top sides, so neighbouring parts are one spacing apart and the last may touch the
     /// area's edge. A cancelled token stops between candidates and keeps the best layout so far.
     /// </summary>
+    /// <param name="workArea">Plate work area, when known. Only matching right/top boundaries
+    /// receive the existing work-area overhang allowance; internal areas remain strict.</param>
     public static List<Part> Pack(
-        Box area, IReadOnlyList<NestItem> items, double spacing, IFillComparer comparer, CancellationToken token)
+        Box area, IReadOnlyList<NestItem> items, double spacing, IFillComparer comparer, CancellationToken token, Box? workArea = null)
     {
         var boxes = items.Select(i => i.Drawing.Program.BoundingBox()).ToList();
         var types = new List<PackType>(items.Count);
         var demand = new int[items.Count];
-        var packArea = (area.Length + spacing) * (area.Width + spacing);
+        // Only the positive edges can overhang: placements anchor at a free box's lower-left.
+        var rightSlack = workArea != null && System.Math.Abs(area.Right - workArea.Right) <= MaxRectsSheet.Eps
+            ? SheetPacker.OverhangAllowance : 0;
+        var topSlack = workArea != null && System.Math.Abs(area.Top - workArea.Top) <= MaxRectsSheet.Eps
+            ? SheetPacker.OverhangAllowance : 0;
+        // Include boundary slack in this upper bound so a near-full-area item is not capped at zero.
+        var packArea = (area.Length + spacing + rightSlack) * (area.Width + spacing + topSlack);
         for (var i = 0; i < items.Count; i++)
         {
             var w = boxes[i].Length + spacing;
@@ -67,7 +76,7 @@ internal static class AreaPacker
                 if (best != null && token.IsCancellationRequested)
                     return best;
 
-                var sheet = new MaxRectsSheet(area.Length + spacing, area.Width + spacing);
+                var sheet = new MaxRectsSheet(area.Length + spacing, area.Width + spacing, rightSlack, topSlack);
                 var placed = MaxRectsPacker.Pack(
                     types, (int[])demand.Clone(), sheet, rule, mode, CancellationToken.None);
                 var tierScores = tiers

@@ -20,6 +20,11 @@ Rectangles places irregular parts validly, but only as their bounding boxes; it 
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
 valid at box contact.
 
+Interactive/full-area box packing uses the same 90% work-area slack allowance as Rectangles.
+A free box may absorb a slightly oversized side only at its right/top edge when that edge
+coincides with the plate work-area boundary. Internal leftover edges keep the strict packing
+tolerance, and actual part dimensions still determine spacing away from the plate boundary.
+
 Irregular fills gaps and open notches using outer profiles; it does not yet place parts inside
 enclosed cutouts. Concave no-fit polygons are prepared with a single boundary/containment union.
 Any remaining numerical hole is filled only when its entire ring is certified to lie in forbidden

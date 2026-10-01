@@ -50,9 +50,13 @@ internal sealed class MaxRectsSheet
 
     private readonly List<Rect> free = new();
     private readonly List<Rect> used = new();
+    private readonly double rightSlack;
+    private readonly double topSlack;
 
-    public MaxRectsSheet(double width, double height)
+    public MaxRectsSheet(double width, double height, double rightSlack = 0, double topSlack = 0)
     {
+        this.rightSlack = rightSlack;
+        this.topSlack = topSlack;
         Width = width;
         Height = height;
         free.Add(new Rect(0, 0, width, height));
@@ -68,9 +72,15 @@ internal sealed class MaxRectsSheet
         (Rect Place, double Primary, double Secondary)? best = null;
         foreach (var f in free)
         {
-            if (w > f.W + Eps || h > f.H + Eps)
+            // Clamp only at the bin's allowed plate boundaries. Internal free edges still
+            // use Eps, and real sizes are retained there to preserve neighbour spacing.
+            var packW = w > f.W && w <= f.W + rightSlack && System.Math.Abs(f.Right - Width) <= Eps
+                ? f.W : w;
+            var packH = h > f.H && h <= f.H + topSlack && System.Math.Abs(f.Top - Height) <= Eps
+                ? f.H : h;
+            if (packW > f.W + Eps || packH > f.H + Eps)
                 continue;
-            var place = new Rect(f.X, f.Y, w, h);
+            var place = new Rect(f.X, f.Y, packW, packH);
             var (p, s) = Score(f, place, rule);
             if (best is not { } b || p < b.Primary - Eps
                 || (p <= b.Primary + Eps && s < b.Secondary - Eps))
