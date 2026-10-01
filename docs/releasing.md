@@ -1,16 +1,16 @@
 # Windows releases
 
-Git refs are owned by Gitea (`aj/OpenNest`) and push-mirrored to GitHub
-(`ajisaacs/OpenNest`). Create release branches and tags on Gitea, not GitHub.
+GitHub (`ajisaacs/OpenNest`) is the primary repository: push branches and tags
+there. Gitea (`git.thecozycat.net/aj/OpenNest`) is a read-only backup that
+pulls from GitHub every hour; it refuses pushes.
 
 ## Build a candidate
 
 1. Choose a committed source revision; never include uncommitted work implicitly.
-2. Push a `release/vX.Y.Z` branch containing the release workflow to Gitea and
-   verify that the push mirror delivered the same commit to GitHub. The mirror's
-   GitHub credential needs **Contents: read/write** and **Workflows: read/write**
-   to introduce or update `.github/workflows` files. Do not change credentials
-   or broaden permissions without the owner's approval.
+2. Push a `release/vX.Y.Z` branch containing the release workflow to GitHub.
+   The pushing credential needs **Contents: read/write**, plus
+   **Workflows: read/write** to introduce or update `.github/workflows` files.
+   Do not change credentials or broaden permissions without the owner's approval.
 3. The `Windows release build` workflow uses a GitHub-hosted `windows-2022`
    runner. It builds the solution, runs all four test projects in Release and
    the main test project in Debug, then packages and smoke-tests the desktop app.
@@ -45,8 +45,8 @@ previous packages. CI also exercises this refusal and verifies the ZIP is unchan
 
 Review release notes, breaking API changes, and known limitations with the owner.
 After the candidate passes, integrate the release tooling into the chosen branch,
-create an annotated `vX.Y.Z` tag on the exact release commit, push to Gitea, and
-verify the same tag/commit on GitHub. Use the successful **tag build's** artifacts
+create an annotated `vX.Y.Z` tag on the exact release commit and push it to
+GitHub. Use the successful **tag build's** artifacts
 for the GitHub Release; do not substitute packages built from another commit.
 Verify the public asset names, sizes, download/checksum, and release status after
 upload. Do not overwrite an existing release/tag or asset silently.

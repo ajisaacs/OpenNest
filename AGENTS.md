@@ -28,7 +28,7 @@ dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
 
 Keep desktop-dependent tests in `OpenNest.WinForms.Tests`, never add a WinForms reference to `OpenNest.Tests`. Optional CHR fixtures use local `OpenNest.Tests/test-config.json` and skip when absent. On Linux, build Windows projects with `-p:EnableWindowsTargeting=true`; this is not Windows runtime verification. The headless console builds independently with `dotnet build OpenNest.Console/OpenNest.Console.csproj`.
 
-Releases: follow [the release procedure](docs/releasing.md) and `scripts/Publish-Windows.ps1`; workflow artifacts are candidates, not published releases. Gitea is authoritative for Git refs.
+Releases: follow [the release procedure](docs/releasing.md) and `scripts/Publish-Windows.ps1`; workflow artifacts are candidates, not published releases. GitHub (`ajisaacs/OpenNest`) is the primary repository; Gitea is a read-only backup mirror.
 
 ## Project map and boundaries
 

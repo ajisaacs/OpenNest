@@ -25,7 +25,7 @@ Windows release ZIPs are self-contained: extract the entire archive into a new f
 ## Build, Test, Run
 
 ```bash
-git clone https://git.thecozycat.net/aj/OpenNest.git
+git clone https://github.com/ajisaacs/OpenNest.git
 cd OpenNest
 dotnet build OpenNest.sln                                       # full solution (Windows)
 dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj  # cross-platform engine tests
