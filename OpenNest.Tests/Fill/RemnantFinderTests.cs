@@ -256,8 +256,8 @@ public class RemnantFinderTests
 
         // Place a 5x5 grid of 10x10 obstacles with 10-unit gaps
         for (var row = 0; row < 5; row++)
-        for (var col = 0; col < 5; col++)
-            finder.AddObstacle(new Box(col * 20, row * 20, 10, 10));
+            for (var col = 0; col < 5; col++)
+                finder.AddObstacle(new Box(col * 20, row * 20, 10, 10));
 
         var remnants = finder.FindRemnants();
 
@@ -342,15 +342,15 @@ public class RemnantFinderTests
         double[] oddY = { 0.75, 9.48, 18.21, 26.94, 35.67, 44.40 };
 
         foreach (var cx in colX)
-        foreach (var ey in evenY)
-            obstacles.Add(
-                new Box(cx - spacing, ey - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2)
-            );
+            foreach (var ey in evenY)
+                obstacles.Add(
+                    new Box(cx - spacing, ey - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2)
+                );
         foreach (var cx in colXOdd)
-        foreach (var oy in oddY)
-            obstacles.Add(
-                new Box(cx - spacing, oy - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2)
-            );
+            foreach (var oy in oddY)
+                obstacles.Add(
+                    new Box(cx - spacing, oy - spacing, 20.65 + spacing * 2, 5.56 + spacing * 2)
+                );
 
         // Right-side rotated parts (only 2 extend high: parts 62 and 66).
         obstacles.Add(
