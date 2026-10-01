@@ -399,13 +399,7 @@ internal class DefaultPlateFiller : PlateFillerBase
         CancellationToken token
     )
     {
-        var binItems = BinConverter.ToItems(items, Plate.PartSpacing, Plate.Area());
-        var bin = BinConverter.CreateBin(box, Plate.PartSpacing);
-
-        var engine = new PackBottomLeft(bin);
-        engine.Pack(binItems);
-
-        return BinConverter.ToParts(bin, items);
+        return AreaPacker.Pack(box, items, Plate.PartSpacing, Comparer, token);
     }
 
     protected virtual void RunPipeline(FillContext context)

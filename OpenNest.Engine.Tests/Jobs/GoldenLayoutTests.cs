@@ -1,8 +1,8 @@
 using System.Globalization;
 using OpenNest.CNC;
+using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 using Xunit;
-using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Engine.Tests.Jobs;
 
@@ -16,7 +16,9 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// </summary>
 /// <remarks>
 /// Captured on Linux/.NET 8 at commit 42bbde7 (post ShrinkFiller axis fix), verified
-/// identical across 30 repeat runs per strategy. The Strip strategy is only pinned on the
+/// identical across 30 repeat runs per strategy. The Default and remnant mixed-job layouts were
+/// re-captured when leftover packing moved to the maximal-rectangles packer (every pose passes
+/// NestLayoutCheck). The Strip strategy is only pinned on the
 /// rectangle-variety job: on dense mixed-shape jobs the iterative shrink path intermittently
 /// proposes overlapping candidates (pre-existing scheduling nondeterminism, not a regression),
 /// so its mixed-geometry layout is deliberately not pinned here.
@@ -169,12 +171,12 @@ public class GoldenLayoutTests
         AssertGolden(
             result,
             [
-                P("arc", 0, 15, 1, 0),
-                P("arc", 1, 15, 7, 0),
-                P("arc", 2, 15, 13, 0),
-                P("lshape", 0, 15, 19, 0),
-                P("lshape", 1, 15, 24, 0),
-                P("lshape", 2, 21.5, 1, 0),
+                P("arc", 0, 20, 1, 1.5707963267948966),
+                P("arc", 1, 20, 7.5, 1.5707963267948966),
+                P("arc", 2, 20, 14, 1.5707963267948966),
+                P("lshape", 0, 19, 20.5, 1.5707963267948966),
+                P("lshape", 1, 24, 20.5, 1.5707963267948966),
+                P("lshape", 2, 25, 1, 1.5707963267948966),
                 P("rect-a", 0, 5, 21, 1.5707963267948966),
                 P("rect-a", 1, 1, 1, 0),
                 P("rect-a", 2, 1, 6, 0),
@@ -183,12 +185,12 @@ public class GoldenLayoutTests
                 P("rect-a", 5, 10, 21, 1.5707963267948966),
                 P("rect-a", 6, 8, 1, 0),
                 P("rect-a", 7, 8, 6, 0),
-                P("rect-b", 0, 21.5, 6, 0),
-                P("rect-b", 1, 21.5, 10, 0),
-                P("rect-b", 2, 21.5, 14, 0),
-                P("rect-b", 3, 22, 19, 0),
-                P("rect-b", 4, 22, 23, 0),
-                P("rect-b", 5, 26.5, 6, 0),
+                P("rect-b", 0, 24, 8, 1.5707963267948966),
+                P("rect-b", 1, 24, 13, 1.5707963267948966),
+                P("rect-b", 2, 28, 8, 1.5707963267948966),
+                P("rect-b", 3, 28, 13, 1.5707963267948966),
+                P("rect-b", 4, 28, 18, 1.5707963267948966),
+                P("rect-b", 5, 28, 23, 1.5707963267948966),
             ]
         );
     }
@@ -206,12 +208,12 @@ public class GoldenLayoutTests
         AssertGolden(
             result,
             [
-                P("arc", 0, 15, 1, 0),
-                P("arc", 1, 15, 7, 0),
-                P("arc", 2, 15, 13, 0),
-                P("lshape", 0, 15, 19, 0),
-                P("lshape", 1, 15, 24, 0),
-                P("lshape", 2, 21.5, 1, 0),
+                P("arc", 0, 20, 1, 1.5707963267948966),
+                P("arc", 1, 20, 7.5, 1.5707963267948966),
+                P("arc", 2, 20, 14, 1.5707963267948966),
+                P("lshape", 0, 19, 20.5, 1.5707963267948966),
+                P("lshape", 1, 24, 20.5, 1.5707963267948966),
+                P("lshape", 2, 25, 1, 1.5707963267948966),
                 P("rect-a", 0, 5, 21, 1.5707963267948966),
                 P("rect-a", 1, 1, 1, 0),
                 P("rect-a", 2, 1, 6, 0),
@@ -220,12 +222,12 @@ public class GoldenLayoutTests
                 P("rect-a", 5, 10, 21, 1.5707963267948966),
                 P("rect-a", 6, 8, 1, 0),
                 P("rect-a", 7, 8, 6, 0),
-                P("rect-b", 0, 21.5, 6, 0),
-                P("rect-b", 1, 21.5, 10, 0),
-                P("rect-b", 2, 21.5, 14, 0),
-                P("rect-b", 3, 22, 19, 0),
-                P("rect-b", 4, 22, 23, 0),
-                P("rect-b", 5, 26.5, 6, 0),
+                P("rect-b", 0, 24, 8, 1.5707963267948966),
+                P("rect-b", 1, 24, 13, 1.5707963267948966),
+                P("rect-b", 2, 28, 8, 1.5707963267948966),
+                P("rect-b", 3, 28, 13, 1.5707963267948966),
+                P("rect-b", 4, 28, 18, 1.5707963267948966),
+                P("rect-b", 5, 28, 23, 1.5707963267948966),
             ]
         );
     }
@@ -241,12 +243,12 @@ public class GoldenLayoutTests
         AssertGolden(
             result,
             [
-                P("arc", 0, 1, 23, 0),
-                P("arc", 1, 7.5, 23, 0),
-                P("arc", 2, 8, 8, 0),
-                P("lshape", 0, 1, 8, 0),
-                P("lshape", 1, 1, 13, 0),
-                P("lshape", 2, 1, 18, 0),
+                P("arc", 0, 1, 8, 0),
+                P("arc", 1, 7.5, 8, 0),
+                P("arc", 2, 14, 8, 0),
+                P("lshape", 0, 20.5, 8, 0),
+                P("lshape", 1, 27.5, 8, 0),
+                P("lshape", 2, 34.5, 8, 0),
                 P("rect-a", 0, 1, 1, 0),
                 P("rect-a", 1, 8, 1, 0),
                 P("rect-a", 2, 15, 1, 0),
@@ -255,12 +257,12 @@ public class GoldenLayoutTests
                 P("rect-a", 5, 36, 1, 1.5707963267948966),
                 P("rect-a", 6, 41, 1, 1.5707963267948966),
                 P("rect-a", 7, 46, 1, 1.5707963267948966),
-                P("rect-b", 0, 8, 14, 0),
-                P("rect-b", 1, 8, 18, 0),
-                P("rect-b", 2, 13, 14, 0),
-                P("rect-b", 3, 13, 18, 0),
-                P("rect-b", 4, 14, 23, 0),
-                P("rect-b", 5, 14.5, 8, 0),
+                P("rect-b", 0, 41.5, 8, 0),
+                P("rect-b", 1, 41.5, 12, 0),
+                P("rect-b", 2, 20.5, 13, 0),
+                P("rect-b", 3, 25.5, 13, 0),
+                P("rect-b", 4, 30.5, 13, 0),
+                P("rect-b", 5, 35.5, 13, 0),
             ]
         );
     }

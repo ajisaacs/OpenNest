@@ -31,25 +31,6 @@ namespace OpenNest.Engine.RectanglePacking
             };
         }
 
-        public static List<Item> ToItems(List<NestItem> items, double partSpacing, double plateArea)
-        {
-            var binItems = new List<Item>();
-
-            for (var i = 0; i < items.Count; i++)
-            {
-                var item = items[i];
-                var binItem = ToItem(item, partSpacing, i);
-
-                var maxQty = (int)System.Math.Floor(plateArea / binItem.Area());
-                var qty = item.Quantity < maxQty ? item.Quantity : maxQty;
-
-                for (var j = 0; j < qty; j++)
-                    binItems.Add(binItem.Clone() as Item);
-            }
-
-            return binItems;
-        }
-
         public static List<Part> ToParts(Bin bin, List<NestItem> items)
         {
             var parts = new List<Part>();
