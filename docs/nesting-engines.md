@@ -20,6 +20,11 @@ Rectangles places irregular parts validly, but only as their bounding boxes; it 
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
 valid at box contact.
 
+Irregular fills gaps and open notches using outer profiles; it does not yet place parts inside
+enclosed cutouts. Concave no-fit polygons are prepared with a single boundary/containment union.
+Any remaining numerical hole is filled only when its entire ring is certified to lie in forbidden
+space, preserving genuine enclosed placement pockets without changing spacing tolerances.
+
 ## Renamed engines
 
 Earlier releases shipped these as plug-ins under other names. The registry maps the old names so

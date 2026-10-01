@@ -80,15 +80,44 @@ internal sealed class NoFitCache
         }
         else
         {
-            // A (+) P, with P = -B: a reference point the boundary sweep misses puts the moving
-            // copy of B clear of A's boundary, so that copy is inside A, contains A, or misses it.
-            // (A + p0) covers "B inside A" and (P + a0) covers "B swallows A"; both are needed.
-            var sweep = Minkowski.Sum(negB, a, true, Precision);
-            sweep.Add(Clipper.TranslatePath(a, negB[0].x, negB[0].y));
-            sweep.Add(Clipper.TranslatePath(negB, a[0].x, a[0].y));
-            region = Clipper.Union(sweep, new PathsD(), FillRule.NonZero, Precision);
+            region = ConcaveSum(a, negB);
+            NfpHoleFilter.RemoveCoveredHoles(region, a, negB);
         }
         return new Nfp(region, Clipper.GetBounds(region));
+    }
+
+    /// <summary>Filled Minkowski sum, with boundary sweeps and containment unioned together.</summary>
+    private static PathsD ConcaveSum(PathD a, PathD b)
+    {
+        // Minkowski.Sum rounds the boundary sweep before returning it. Unioning containment
+        // covers afterward can leave hairline holes along those rounded edges. Submit the
+        // raw edge-pair parallelograms and both covers together instead.
+        var pieces = new PathsD
+        {
+            Clipper.TranslatePath(a, b[0].x, b[0].y), // Moving part inside the fixed part.
+            Clipper.TranslatePath(b, a[0].x, a[0].y), // Moving part contains the fixed part.
+        };
+        var previousA = a[^1];
+        foreach (var currentA in a)
+        {
+            var previousB = b[^1];
+            foreach (var currentB in b)
+            {
+                var quad = new PathD
+                {
+                    new(previousA.x + previousB.x, previousA.y + previousB.y),
+                    new(currentA.x + previousB.x, currentA.y + previousB.y),
+                    new(currentA.x + currentB.x, currentA.y + currentB.y),
+                    new(previousA.x + currentB.x, previousA.y + currentB.y),
+                };
+                if (!Clipper.IsPositive(quad))
+                    quad.Reverse();
+                pieces.Add(quad);
+                previousB = currentB;
+            }
+            previousA = currentA;
+        }
+        return Clipper.Union(pieces, new PathsD(), FillRule.NonZero, Precision);
     }
 
     /// <summary>Minkowski sum of two convex CCW polygons by merging edges in angle order.</summary>
