@@ -435,7 +435,7 @@ public class GeometrySimplifier
         // Reject arcs that subtend a tiny angle — these are nearly-straight lines
         // that happen to fit a huge circle. Applied after extension so that many small
         // segments can accumulate enough sweep to qualify.
-        var sweep = System.Math.Abs(SumSignedAngles(center, points));
+        var sweep = System.Math.Abs(ArcFit.SumSignedAngles(center, points));
         if (sweep < Angle.ToRadians(5))
             return null;
 
@@ -454,7 +454,7 @@ public class GeometrySimplifier
                 continue;
 
             // Check that the arc doesn't bulge away from the original line segments
-            var isReversed = SumSignedAngles(center, points) < 0;
+            var isReversed = ArcFit.SumSignedAngles(center, points) < 0;
             var arcDev = MaxArcToSegmentDeviation(points, center, radius, isReversed);
             if (arcDev > Tolerance)
                 continue;
@@ -673,7 +673,7 @@ public class GeometrySimplifier
         var lastPt = points[^1];
         var rx = lastPt.X - center.X;
         var ry = lastPt.Y - center.Y;
-        var sign = SumSignedAngles(center, points) >= 0 ? 1 : -1;
+        var sign = ArcFit.SumSignedAngles(center, points) >= 0 ? 1 : -1;
         return new Vector(-sign * ry, sign * rx);
     }
 
@@ -792,7 +792,7 @@ public class GeometrySimplifier
         var endAngle = NormalizeAngle(
             System.Math.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X)
         );
-        var isReversed = SumSignedAngles(center, points) < 0;
+        var isReversed = ArcFit.SumSignedAngles(center, points) < 0;
 
         var arc = new Arc(center, radius, startAngle, endAngle, isReversed);
         arc.Layer = sourceEntity.Layer;
@@ -815,27 +815,6 @@ public class GeometrySimplifier
                 : new Vector(-System.Math.Sin(arc.EndAngle), System.Math.Cos(arc.EndAngle)),
             _ => Vector.Invalid,
         };
-
-    /// <summary>
-    /// Sums signed angular change traversing consecutive points around a center.
-    /// Positive = CCW, negative = CW.
-    /// </summary>
-    private static double SumSignedAngles(Vector center, List<Vector> points)
-    {
-        var total = 0.0;
-        for (var i = 0; i < points.Count - 1; i++)
-        {
-            var a1 = System.Math.Atan2(points[i].Y - center.Y, points[i].X - center.X);
-            var a2 = System.Math.Atan2(points[i + 1].Y - center.Y, points[i + 1].X - center.X);
-            var da = a2 - a1;
-            while (da > System.Math.PI)
-                da -= Angle.TwoPI;
-            while (da < -System.Math.PI)
-                da += Angle.TwoPI;
-            total += da;
-        }
-        return total;
-    }
 
     /// <summary>
     /// Measures the maximum distance from sampled points along the fitted arc

@@ -330,7 +330,7 @@ namespace OpenNest.Geometry
             var endAngle = System.Math.Atan2(p1.Y - arcCenter.Y, p1.X - arcCenter.X);
 
             var points = new List<Vector> { p0, pMid, p1 };
-            var isReversed = SumSignedAngles(arcCenter, points) < 0;
+            var isReversed = ArcFit.SumSignedAngles(arcCenter, points) < 0;
 
             if (startAngle < 0)
                 startAngle += Angle.TwoPI;
@@ -338,23 +338,6 @@ namespace OpenNest.Geometry
                 endAngle += Angle.TwoPI;
 
             return new Arc(arcCenter, radius, startAngle, endAngle, isReversed);
-        }
-
-        private static double SumSignedAngles(Vector center, List<Vector> points)
-        {
-            var total = 0.0;
-            for (var i = 0; i < points.Count - 1; i++)
-            {
-                var a1 = System.Math.Atan2(points[i].Y - center.Y, points[i].X - center.X);
-                var a2 = System.Math.Atan2(points[i + 1].Y - center.Y, points[i + 1].X - center.X);
-                var da = a2 - a1;
-                while (da > System.Math.PI)
-                    da -= Angle.TwoPI;
-                while (da < -System.Math.PI)
-                    da += Angle.TwoPI;
-                total += da;
-            }
-            return total;
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
@@ -116,6 +117,27 @@ namespace OpenNest.Geometry
             if (len < 1e-10)
                 return 0;
             return System.Math.Atan2(ux * to.Y - uy * to.X, ux * to.X + uy * to.Y);
+        }
+
+        /// <summary>
+        /// Sums signed angular change traversing consecutive points around a center.
+        /// Positive = CCW, negative = CW.
+        /// </summary>
+        public static double SumSignedAngles(Vector center, List<Vector> points)
+        {
+            var total = 0.0;
+            for (var i = 0; i < points.Count - 1; i++)
+            {
+                var a1 = System.Math.Atan2(points[i].Y - center.Y, points[i].X - center.X);
+                var a2 = System.Math.Atan2(points[i + 1].Y - center.Y, points[i + 1].X - center.X);
+                var da = a2 - a1;
+                while (da > System.Math.PI)
+                    da -= Angle.TwoPI;
+                while (da < -System.Math.PI)
+                    da += Angle.TwoPI;
+                total += da;
+            }
+            return total;
         }
 
         /// <summary>

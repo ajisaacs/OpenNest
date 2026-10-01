@@ -80,7 +80,7 @@ namespace OpenNest.Geometry
             }
 
             var finalPoints = points.GetRange(start, endIdx - start + 1);
-            var sweep = System.Math.Abs(SumSignedAngles(center, finalPoints));
+            var sweep = System.Math.Abs(ArcFit.SumSignedAngles(center, finalPoints));
             if (sweep < Angle.ToRadians(5))
                 return null;
 
@@ -151,27 +151,10 @@ namespace OpenNest.Geometry
             double radius
         ) => ArcFit.MaxRadialDeviation(points, cx, cy, radius);
 
-        private static double SumSignedAngles(Vector center, List<Vector> points)
-        {
-            var total = 0.0;
-            for (var i = 0; i < points.Count - 1; i++)
-            {
-                var a1 = System.Math.Atan2(points[i].Y - center.Y, points[i].X - center.X);
-                var a2 = System.Math.Atan2(points[i + 1].Y - center.Y, points[i + 1].X - center.X);
-                var da = a2 - a1;
-                while (da > System.Math.PI)
-                    da -= Angle.TwoPI;
-                while (da < -System.Math.PI)
-                    da += Angle.TwoPI;
-                total += da;
-            }
-            return total;
-        }
-
         private static Vector ComputeEndTangent(Vector center, List<Vector> points)
         {
             var lastPt = points[^1];
-            var totalAngle = SumSignedAngles(center, points);
+            var totalAngle = ArcFit.SumSignedAngles(center, points);
 
             var rx = lastPt.X - center.X;
             var ry = lastPt.Y - center.Y;
@@ -186,7 +169,7 @@ namespace OpenNest.Geometry
 
             var startAngle = System.Math.Atan2(firstPoint.Y - center.Y, firstPoint.X - center.X);
             var endAngle = System.Math.Atan2(lastPoint.Y - center.Y, lastPoint.X - center.X);
-            var isReversed = SumSignedAngles(center, points) < 0;
+            var isReversed = ArcFit.SumSignedAngles(center, points) < 0;
 
             if (startAngle < 0)
                 startAngle += Angle.TwoPI;
