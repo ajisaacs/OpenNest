@@ -48,7 +48,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         var types = PartCatalog.Build(job);
-        var solver = new Solver(job, types, progress, token);
+        using var solver = new Solver(job, types, progress, token);
 
         // Pair-only orientations may fit stock even when the sampled single poses do not.
         // Demand that neither a single nor a pair can fit is reported unplaced.
@@ -59,7 +59,8 @@ public sealed class IrregularNestingEngine : INestingEngine
                 stock.Quantity != 0
                 && type.Orientations.Any(o => stock.Fits(o.Width, o.Height))
             );
-            demand[type.Index] = placeable || solver.PairFits(type) ? type.Part.Quantity : 0;
+            demand[type.Index] = placeable || solver.PairFits(type)
+                || (type.Part.Quantity > 2 && type.Orientations.Count > 0) ? type.Part.Quantity : 0;
         }
 
         Plan? best = null;
@@ -86,11 +87,26 @@ public sealed class IrregularNestingEngine : INestingEngine
         IReadOnlyList<PartType> types,
         IProgress<NestJobProgress>? progress,
         CancellationToken token
-    )
+    ) : IDisposable
     {
+        public void Dispose()
+        {
+            foreach (var catalog in blocks.Values)
+                catalog.Dispose();
+        }
+
         private const int MaxTail = 3;
         private readonly Dictionary<double, NoFitCache> caches = new();
         private readonly Dictionary<double, IReadOnlyDictionary<int, IReadOnlyList<PairPose>>> pairs = new();
+        private readonly Dictionary<double, BlockCatalog> blocks = new();
+
+        private BlockCatalog BlocksFor(NestPlateStock stock)
+        {
+            var spacing = System.Math.Max(0, stock.PartSpacing);
+            if (!blocks.TryGetValue(spacing, out var found))
+                blocks[spacing] = found = new BlockCatalog(spacing, types, PairsFor(stock));
+            return found;
+        }
 
         public WorkCounter Work { get; } = new();
 
@@ -225,7 +241,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                     if (stock.Quantity is int available && used[stock.Id] >= available)
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
-                    var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work);
+                    var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work, BlocksFor(stock));
                     var fill = packer.Fill(remaining, token);
                     if (fill.Parts.Count > 0)
                         trials.Add((fill, NetArea(job.Options, fill)));

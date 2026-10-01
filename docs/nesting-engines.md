@@ -37,6 +37,22 @@ with a single boundary/containment union.
 Any remaining numerical hole is filled only when its entire ring is certified to lie in forbidden
 space, preserving genuine enclosed placement pockets without changing spacing tolerances.
 
+When remaining demand exceeds two, Irregular also offers Default Fill patterns as optional
+multi-member candidates, not as solid bounding boxes or a whole-job Default fallback. It searches
+the empty work area and physical leftover space for up to two high-area rectangles. Occupied
+outlines are expanded by part spacing before rectangle search. Each sheet prepares blocks initially
+and after its first placement, for up to four high-demand-area types; each type has at most eight
+new Fill preparations per spacing per solve. Repeated rectangles reuse private drawing/candidate
+caches. Quantity-one and quantity-two requests never run block Fill.
+
+Block members are trimmed to remaining demand, mapped back to source-frame rotations, and checked
+for legal rotations and internal material clearance before competing with singles and pairs.
+Group-only rotations do not expand the single-part rotation choices. Placement intersects all
+member free regions and subtracts each placed member separately, preserving usable gaps. A failed
+or invalid Fill proposal leaves singles and pairs available. Large enclosed-pocket blocks remain
+pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
+remain separate sequencer/verification work.
+
 ## Renamed engines
 
 Earlier releases shipped these as plug-ins under other names. The registry maps the old names so

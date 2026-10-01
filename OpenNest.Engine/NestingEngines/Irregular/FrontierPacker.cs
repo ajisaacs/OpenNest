@@ -61,6 +61,7 @@ internal sealed class FrontierPacker
     private readonly double beta;
     private readonly Box work;
     private readonly WorkCounter counter;
+    private readonly BlockCatalog? blocks;
 
     public FrontierPacker(
         IReadOnlyList<PartType> types,
@@ -69,9 +70,11 @@ internal sealed class FrontierPacker
         NestPlateStock stock,
         PackAxis axis,
         double beta,
-        WorkCounter counter
+        WorkCounter counter,
+        BlockCatalog? blocks = null
     )
     {
+        this.blocks = blocks;
         this.counter = counter;
         this.types = types;
         this.nfps = nfps;
@@ -116,13 +119,46 @@ internal sealed class FrontierPacker
         }
 
         var placed = new List<Placed>();
+        var blockStates = new List<BlockState>();
+        var preparations = 0;
+        void PrepareBlocks()
+        {
+            if (blocks == null || preparations++ >= 2)
+                return;
+            var rectangles = BlockCatalog.Rectangles(work, placed, stock.PartSpacing);
+            foreach (var type in types.Where(t => left[t.Index] > 2)
+                .OrderByDescending(t => t.Area * left[t.Index]).ThenBy(t => t.Index).Take(4))
+                foreach (var rectangle in rectangles)
+                {
+                    var members = blocks.Get(type, left[type.Index], rectangle, token);
+                    if (members.Count <= 2)
+                        continue;
+                    var width = members.Max(p => p.Right) - members.Min(p => p.Left);
+                    var height = members.Max(p => p.Top) - members.Min(p => p.Bottom);
+                    if (!stock.Fits(width, height))
+                        continue;
+                    foreach (var member in members)
+                    {
+                        if (byOrientation.ContainsKey(member.Orientation))
+                            continue;
+                        if (!Track(member.Orientation, single: false))
+                            break;
+                        var region = byOrientation[member.Orientation];
+                        foreach (var existing in placed)
+                            region.Subtract(nfps.Get(existing.Orientation, member.Orientation), existing.X, existing.Y);
+                    }
+                    if (members.All(p => byOrientation.ContainsKey(p.Orientation)))
+                        blockStates.Add(new BlockState(members, members.Select(p => byOrientation[p.Orientation]).ToArray()));
+                }
+        }
+        PrepareBlocks();
         var partArea = 0.0;
         var front = axis == PackAxis.X ? work.Left : work.Bottom;
 
         while (states.Count > 0)
         {
             token.ThrowIfCancellationRequested();
-            var choice = Choose(states, offered, front);
+            var choice = Choose(states, offered, blockStates, front);
             if (choice == null)
                 break;
 
@@ -135,6 +171,7 @@ internal sealed class FrontierPacker
             }
 
             left[typeIndex] -= choice.Count;
+            blockStates.RemoveAll(b => b.Members.Count > left[b.Members[0].Orientation.TypeIndex]);
             if (left[typeIndex] == 0)
                 states.RemoveAll(s => s.Orientation.TypeIndex == typeIndex);
             if (left[typeIndex] < 2)
@@ -158,8 +195,10 @@ internal sealed class FrontierPacker
             }
             states.RemoveAll(s => s.IsEmpty);
             offered.RemoveAll(p => p.A.IsEmpty || p.B.IsEmpty);
-            if (offered.Count == 0)
+            if (offered.Count == 0 && blocks == null)
                 states.RemoveAll(s => !s.Single);
+            blockStates.RemoveAll(b => b.Regions.Any(r => r.IsEmpty));
+            PrepareBlocks();
         }
 
         return new SheetFill(stock, placed, partArea);
@@ -170,7 +209,7 @@ internal sealed class FrontierPacker
     /// under the same rule; a pair counts as one piece of twice the part area, and on a tie
     /// the single (considered first) is kept.
     /// </summary>
-    private IReadOnlyList<Placed>? Choose(List<Region> states, List<PairState> offered, double front)
+    private IReadOnlyList<Placed>? Choose(List<Region> states, List<PairState> offered, List<BlockState> blocks, double front)
     {
         IReadOnlyList<Placed>? bestParts = null;
         var bestFills = false;
@@ -236,7 +275,49 @@ internal sealed class FrontierPacker
             );
         }
 
+        foreach (var block in blocks)
+        {
+            if (!block.TryLowest(axis, front, counter, out var point, out var advance, out var side, out var lead))
+                continue;
+            var typeIndex = block.Members[0].Orientation.TypeIndex;
+            Consider(() => block.Members.Select(p => new Placed(p.Orientation, p.X + point.x, p.Y + point.y)).ToArray(),
+                typeIndex, block.Members.Count * types[typeIndex].Area, advance, side, lead);
+        }
         return bestParts;
+    }
+
+    private sealed class BlockState(IReadOnlyList<Placed> members, Region[] regions)
+    {
+        public IReadOnlyList<Placed> Members { get; } = members;
+        public Region[] Regions { get; } = regions;
+
+        public bool TryLowest(PackAxis axis, double front, WorkCounter counter,
+            out PointD point, out double advance, out double side, out double lead)
+        {
+            var free = Clipper.TranslatePaths(Regions[0].Free, -Members[0].X, -Members[0].Y);
+            var minX = double.NegativeInfinity;
+            var minY = double.NegativeInfinity;
+            var maxX = double.PositiveInfinity;
+            var maxY = double.PositiveInfinity;
+            for (var i = 0; i < Members.Count; i++)
+            {
+                var member = Members[i];
+                var region = Regions[i];
+                minX = System.Math.Max(minX, region.MinX - member.X);
+                minY = System.Math.Max(minY, region.MinY - member.Y);
+                maxX = System.Math.Min(maxX, region.MaxX - member.X);
+                maxY = System.Math.Min(maxY, region.MaxY - member.Y);
+                if (i > 0)
+                {
+                    counter.Add(1);
+                    free = Clipper.Intersect(free, Clipper.TranslatePaths(region.Free, -member.X, -member.Y),
+                        FillRule.NonZero, NoFitCache.Precision);
+                }
+            }
+            return BestVertex(free, minX, minY, System.Math.Max(minX, maxX), System.Math.Max(minY, maxY),
+                (Members.Min(p => p.Left), Members.Min(p => p.Bottom), Members.Max(p => p.Right), Members.Max(p => p.Top)),
+                axis, front, out point, out advance, out side, out lead);
+        }
     }
 
     /// <summary>Legal reference points for one orientation on this sheet.</summary>
