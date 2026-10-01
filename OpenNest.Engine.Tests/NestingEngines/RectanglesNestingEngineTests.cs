@@ -1,13 +1,13 @@
-using OpenNest.Engine.NestingEngines.Rectangles;
-using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;
-using static OpenNest.Engine.Tests.NestingEngines.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.NestingEngines.Rectangles;
 using OpenNest.Geometry;
+using static OpenNest.Engine.Tests.NestingEngines.JobBuilder;
+using static OpenNest.Engine.Tests.NestingEngines.Shapes;
 
 namespace OpenNest.Engine.Tests.NestingEngines;
 
