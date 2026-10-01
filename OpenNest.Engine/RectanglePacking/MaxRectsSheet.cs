@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-namespace OpenNest.Engine.NestingEngines.Rectangles;
+namespace OpenNest.Engine.RectanglePacking;
 
 /// <summary>Axis-aligned rectangle in sheet-local packing coordinates.</summary>
 internal readonly record struct Rect(double X, double Y, double W, double H)

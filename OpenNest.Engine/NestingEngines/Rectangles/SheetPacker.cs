@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.RectanglePacking;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.NestingEngines.Rectangles;
