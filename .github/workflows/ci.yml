@@ -23,5 +23,10 @@ jobs:
         run: dotnet test OpenNest.Tests/OpenNest.Tests.csproj
       - name: Run OpenNest.Engine.Tests
         run: dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj
+      - name: Check six synthetic Irregular nests
+        timeout-minutes: 6
+        run: |
+          python3 scripts/test_check_synthetic_nests.py -v
+          python3 scripts/check-synthetic-nests.py --parallel 2
       - name: Run OpenNest.IO.Tests
         run: dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj
