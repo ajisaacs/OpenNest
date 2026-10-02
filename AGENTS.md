@@ -21,6 +21,7 @@ dotnet build OpenNest.sln
 dotnet test OpenNest.Tests/OpenNest.Tests.csproj
 dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj
 dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj
+dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj
 
 # Windows runtime tests
 dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
