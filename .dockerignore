@@ -1,0 +1,15 @@
+**
+!OpenNest.Server/
+!OpenNest.Server/**
+!OpenNest.Data/
+!OpenNest.Data/**
+!OpenNest.Core/
+!OpenNest.Core/**
+**/bin/**
+**/obj/**
+**/data/**
+**/*.db
+**/*.db-*
+**/.env*
+**/*.user
+**/Properties/launchSettings.json

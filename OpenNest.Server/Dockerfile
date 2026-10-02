@@ -4,10 +4,12 @@ WORKDIR /src
 
 COPY OpenNest.Server/OpenNest.Server.csproj OpenNest.Server/
 COPY OpenNest.Data/OpenNest.Data.csproj OpenNest.Data/
+COPY OpenNest.Core/OpenNest.Core.csproj OpenNest.Core/
 RUN dotnet restore OpenNest.Server/OpenNest.Server.csproj
 
 COPY OpenNest.Server/ OpenNest.Server/
 COPY OpenNest.Data/ OpenNest.Data/
+COPY OpenNest.Core/ OpenNest.Core/
 RUN dotnet publish OpenNest.Server/OpenNest.Server.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
