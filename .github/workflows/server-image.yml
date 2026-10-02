@@ -1,0 +1,287 @@
+name: Server image
+
+on:
+  pull_request:
+    paths:
+      - 'OpenNest.Server/**'
+      - 'OpenNest.Data/**'
+      - 'OpenNest.Core/**'
+      - 'OpenNest.Server.Tests/**'
+      - 'scripts/Server.Tests/**'
+      - 'scripts/Test-ServerContainer.sh'
+      - 'scripts/test_server_container_cleanup.py'
+      - 'scripts/server_image_release.py'
+      - 'scripts/test_server_image_release.py'
+      - '.dockerignore'
+      - 'compose.server.yaml'
+      - '.github/workflows/server-image.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'OpenNest.Server/**'
+      - 'OpenNest.Data/**'
+      - 'OpenNest.Core/**'
+      - 'OpenNest.Server.Tests/**'
+      - 'scripts/Server.Tests/**'
+      - 'scripts/Test-ServerContainer.sh'
+      - 'scripts/test_server_container_cleanup.py'
+      - 'scripts/server_image_release.py'
+      - 'scripts/test_server_image_release.py'
+      - '.dockerignore'
+      - 'compose.server.yaml'
+      - '.github/workflows/server-image.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Approved existing vX.Y.Z tag to publish (dispatch from master only)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+# No tag-push trigger. Windows tag builds produce candidates, not publications.
+jobs:
+  validate:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: '0.0.0'
+      SOURCE_SHA: ${{ github.sha }}
+      LOCAL_IMAGE: opennest-server:ci
+    steps:
+      - name: Isolate logs, safe metadata and ephemeral auth
+        run: |
+          printf 'METADATA_DIR=%s/server-image-metadata\nRESULTS=%s/server-image-results\nDOCKER_CONFIG=%s/server-image-auth\n' \
+            "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet8
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test fail-closed release and cleanup helpers
+        run: |
+          python3 -m unittest discover -s scripts -p test_server_image_release.py -v
+          python3 -m unittest discover -s scripts -p test_server_container_cleanup.py -v
+      - name: Build and test Server
+        run: |
+          dotnet build OpenNest.Server/OpenNest.Server.csproj -c Release
+          dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj -c Release --logger 'trx;LogFileName=server.trx' --results-directory "$RESULTS/tests"
+      - name: Resolve base image digests
+        id: bases
+        run: python3 scripts/server_image_release.py bases
+      - name: Build exact local linux/amd64 image (never cached)
+        id: build
+        env:
+          SDK_IMAGE: ${{ steps.bases.outputs.sdk_image }}
+          RUNTIME_IMAGE: ${{ steps.bases.outputs.runtime_image }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RESULTS"
+          docker build --pull --no-cache --platform linux/amd64 --provenance=false --sbom=false -f OpenNest.Server/Dockerfile \
+            --build-arg VERSION="$VERSION" --build-arg SOURCE_REVISION="$SOURCE_SHA" \
+            --build-arg SDK_IMAGE="$SDK_IMAGE" --build-arg RUNTIME_IMAGE="$RUNTIME_IMAGE" \
+            -t "$LOCAL_IMAGE" . 2>&1 | tee "$RESULTS/build.log"
+          python3 scripts/server_image_release.py local
+      - name: Freeze the inspected image identity for smoke and publication
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.image_id }}
+        run: printf 'LOCAL_IMAGE=%s\n' "$IMAGE_ID" >> "$GITHUB_ENV"
+      - name: Real-client persistence, backup/restore and runtime smoke
+        run: scripts/Test-ServerContainer.sh --image "$LOCAL_IMAGE" --results "$RESULTS/smoke"
+      - name: Retain logs and safe provenance only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: server-image-validation-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/server-image-results/**/*.log
+            ${{ runner.temp }}/server-image-results/tests/*.trx
+            ${{ runner.temp }}/server-image-metadata/bases.json
+            ${{ runner.temp }}/server-image-metadata/local.json
+          retention-days: 14
+
+  publish:
+    if: >-
+      github.repository == 'ajisaacs/OpenNest' &&
+      (github.event_name == 'release' ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: opennest-server-ghcr-publish
+      cancel-in-progress: false
+    env:
+      LOCAL_IMAGE: opennest-server:release
+    outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
+      version: ${{ steps.source.outputs.version }}
+      manifest_digest: ${{ steps.readback.outputs.manifest_digest }}
+      config_digest: ${{ steps.readback.outputs.config_digest }}
+    steps:
+      - name: Isolate logs, safe metadata and ephemeral auth
+        run: |
+          printf 'METADATA_DIR=%s/server-image-metadata\nRESULTS=%s/server-image-results\nDOCKER_CONFIG=%s/server-image-auth\n' \
+            "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve approved tag, release event commit and master ancestry
+        id: source
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: python3 scripts/server_image_release.py source
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.source.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Use immutable source/version for every remaining gate
+        env:
+          VERSION: ${{ steps.source.outputs.version }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          printf 'VERSION=%s\nSOURCE_SHA=%s\n' "$VERSION" "$SOURCE_SHA" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet8
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test fail-closed release and cleanup helpers
+        run: |
+          python3 -m unittest discover -s scripts -p test_server_image_release.py -v
+          python3 -m unittest discover -s scripts -p test_server_container_cleanup.py -v
+      - name: Build and test exact Server source
+        run: |
+          dotnet build OpenNest.Server/OpenNest.Server.csproj -c Release
+          dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj -c Release --logger 'trx;LogFileName=server.trx' --results-directory "$RESULTS/tests"
+      - name: Resolve base image digests
+        id: bases
+        run: python3 scripts/server_image_release.py bases
+      - name: Build exact local linux/amd64 image (never cached)
+        id: build
+        env:
+          SDK_IMAGE: ${{ steps.bases.outputs.sdk_image }}
+          RUNTIME_IMAGE: ${{ steps.bases.outputs.runtime_image }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RESULTS"
+          docker build --pull --no-cache --platform linux/amd64 --provenance=false --sbom=false -f OpenNest.Server/Dockerfile \
+            --build-arg VERSION="$VERSION" --build-arg SOURCE_REVISION="$SOURCE_SHA" \
+            --build-arg SDK_IMAGE="$SDK_IMAGE" --build-arg RUNTIME_IMAGE="$RUNTIME_IMAGE" \
+            -t "$LOCAL_IMAGE" . 2>&1 | tee "$RESULTS/build.log"
+          python3 scripts/server_image_release.py local
+      - name: Freeze the inspected image identity for smoke and publication
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.image_id }}
+        run: printf 'LOCAL_IMAGE=%s\n' "$IMAGE_ID" >> "$GITHUB_ENV"
+      - name: Smoke the same local image before any registry write
+        run: scripts/Test-ServerContainer.sh --image "$LOCAL_IMAGE" --results "$RESULTS/smoke"
+      - name: Refuse unknown visibility, wrong association, and both existing tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/server_image_release.py preflight
+      - name: Login and publish only the two immutable tags (no rebuild)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -m 700 -p "$DOCKER_CONFIG"
+          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          image=ghcr.io/ajisaacs/opennest-server
+          docker tag "$LOCAL_IMAGE" "$image:$VERSION"
+          docker tag "$LOCAL_IMAGE" "$image:sha-$SOURCE_SHA"
+          docker push "$image:$VERSION"
+          docker push "$image:sha-$SOURCE_SHA"
+      - name: Exact registry readback of both tags and smoked image config
+        id: readback
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/server_image_release.py readback
+      - name: Remove ephemeral Docker credentials
+        if: always()
+        run: rm -rf -- "$DOCKER_CONFIG"
+      - name: Retain logs and safe provenance only (not a verification verdict)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: server-image-publication-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/server-image-results/**/*.log
+            ${{ runner.temp }}/server-image-results/tests/*.trx
+            ${{ runner.temp }}/server-image-metadata/source.json
+            ${{ runner.temp }}/server-image-metadata/bases.json
+            ${{ runner.temp }}/server-image-metadata/local.json
+            ${{ runner.temp }}/server-image-metadata/preflight.json
+            ${{ runner.temp }}/server-image-metadata/registry.json
+          retention-days: 14
+
+  verify-published:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
+    env:
+      VERSION: ${{ needs.publish.outputs.version }}
+      SOURCE_SHA: ${{ needs.publish.outputs.source_sha }}
+      MANIFEST_DIGEST: ${{ needs.publish.outputs.manifest_digest }}
+      CONFIG_DIGEST: ${{ needs.publish.outputs.config_digest }}
+    steps:
+      - name: Isolate logs, safe metadata and ephemeral auth
+        run: |
+          printf 'METADATA_DIR=%s/server-image-metadata\nRESULTS=%s/server-image-results\nDOCKER_CONFIG=%s/server-image-auth\n' \
+            "$RUNNER_TEMP" "$RUNNER_TEMP" "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.publish.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet8
+        with:
+          dotnet-version: '8.0.x'
+      - name: Pull returned digest on a clean runner
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -c 'import os,sys; sys.path.insert(0,"scripts"); from server_image_release import sha256,commit,version; sha256(os.environ["MANIFEST_DIGEST"]); sha256(os.environ["CONFIG_DIGEST"]); commit(os.environ["SOURCE_SHA"]); version("v"+os.environ["VERSION"])'
+          mkdir -m 700 -p "$DOCKER_CONFIG"
+          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          image="ghcr.io/ajisaacs/opennest-server@$MANIFEST_DIGEST"
+          docker pull --platform linux/amd64 "$image"
+          printf 'LOCAL_IMAGE=%s\n' "$image" >> "$GITHUB_ENV"
+      - name: Remove ephemeral Docker credentials
+        if: always()
+        run: rm -rf -- "$DOCKER_CONFIG"
+      - name: Verify pulled digest, config, platform and provenance
+        run: python3 scripts/server_image_release.py pulled
+      - name: Real-client persistence smoke of pulled digest
+        run: scripts/Test-ServerContainer.sh --image "$LOCAL_IMAGE" --results "$RESULTS/smoke"
+      - name: Mark verified only after pulled-image smoke passes
+        run: printf 'Verified private server image `%s` from `%s`.\n' "$LOCAL_IMAGE" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain logs and safe pulled-image provenance only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: server-image-pulled-verification-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/server-image-results/**/*.log
+            ${{ runner.temp }}/server-image-metadata/pulled.json
+          retention-days: 14

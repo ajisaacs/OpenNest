@@ -163,14 +163,31 @@ parents). The image has no root entrypoint that changes ownership.
 `OpenNest.Server/server.env.example` to a deployment directory, save the env file
 under a local name such as `server.env`, and set:
 
-- `OPENNEST_SERVER_IMAGE`: a tested version or, preferably, a digest.
+- `OPENNEST_SERVER_IMAGE`: `ghcr.io/ajisaacs/opennest-server:X.Y.Z` or, preferably,
+  `ghcr.io/ajisaacs/opennest-server@sha256:<verified-manifest-digest>` from the
+  successful clean pulled-image verification job. Do not substitute Docker's
+  store-dependent image `Id` or the config blob digest for this verified registry
+  manifest digest; see [server image releases](releasing.md#server-image-separate-from-windows-candidates).
 - `OPENNEST_BIND_ADDRESS`: `127.0.0.1` for testing on the host; this host's
   trusted LAN address for shop PCs. Do not use `0.0.0.0`. The bind address is only
   one layer: verify that the network/firewall admits only trusted clients.
 - `OPENNEST_HOST_PORT` (default 8090) and `OPENNEST_DATA_VOLUME` (default `opennest-data`).
 
+Publication requires an existing verified private package; first-package
+initialization needs separate owner authorization outside the release workflow.
+An authorized deployment operator must obtain a
+`read:packages` token out of band and log in on the deployment host using
+`docker login ghcr.io -u <github-user> --password-stdin`, piping the token from a
+secret manager or a protected prompt (never a token literal in shell history).
+Keep Docker's credentials protected on that host; do not put credentials in
+`server.env`, Compose, the image, or source control. Login/pull success does not
+authorize making the package public. Until an approved image has passed the
+published-digest smoke, the reference below is only a template, not an available
+verified image.
+
 ```sh
 compose="docker compose --env-file server.env -f compose.server.yaml"
+$compose pull || { printf 'STOP: image pull failed\n' >&2; exit 1; }
 $compose up -d
 $compose ps                                       # STATUS shows (healthy)
 curl --fail http://<bind-address>:<port>/healthz  # {"status":"ok"}

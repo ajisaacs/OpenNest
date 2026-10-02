@@ -56,3 +56,73 @@ and discovers posts. It does not replace interactive CAD/nesting acceptance,
 physical CNC/serial verification, GPU execution, or real-model ONNX accuracy.
 Packages are unsigned; code signing and a fuller packaged-post execution test
 remain follow-up hardening.
+
+## Server image (separate from Windows candidates)
+
+`Server image` validates relevant PRs and `master` pushes without registry login,
+package-write permissions, or registry upload. It builds/tests with .NET 8, records pinned
+SDK/runtime base digests, builds a single-platform `linux/amd64` image without cache
+or attestations (`--provenance=false --sbom=false`), and runs the real-client
+container persistence/backup/restore smoke. A Windows `v*` tag build alone never
+publishes a server image.
+
+Publication requires owner-approved release intent: a **published GitHub Release**
+or an explicit `Server image` dispatch **from `master`**, naming an existing strict
+`vX.Y.Z` tag (no prerelease, leading zero, or extra suffix). The tag must resolve to
+a full commit already on `master`. For a published Release, that peeled commit
+must also equal the event's full `GITHUB_SHA`; a retargeted tag is refused. Manual
+dispatch intentionally resolves the approved existing tag, not the workflow's
+`master` SHA. The job checks out that exact source, reruns all
+server/image gates, and pushes the *same smoked image* to
+`ghcr.io/ajisaacs/opennest-server:X.Y.Z` and `:sha-<full-commit>` only. Both tags must
+be absent; retries after even a partial upload stop instead of overwriting. There
+are no `latest`, major, or minor aliases. Do not dispatch just to test publication.
+
+Publication requires an **existing owner-verifiable private package**, linked to
+`ajisaacs/OpenNest`, with repository Actions access (normally inherited from the
+link). The job uses only its scoped `GITHUB_TOKEN`. All package metadata 404s are
+refused: GitHub can mask an inaccessible private package as `Not Found`. Opaque
+registry token success, an empty tag list, or a registry 404 proves neither package
+absence nor privacy and cannot override the metadata check. Explicit reduced
+scope and failed registry read access also stop the job. The job rechecks private
+association after upload.
+
+First-package initialization is a separately owner-authorized prerequisite
+outside this workflow. Until the private package, repository link, and Actions
+access can be verified, publication remains blocked while read-only validation
+can pass. There
+is no automatic bootstrap, extra PAT, absence assertion, or bypass setting. A
+local credential's Packages API 403 proves neither absence nor privacy. No
+workflow changes visibility. Public availability needs separate owner approval
+and a later anonymous-pull check; it is not approved here.
+
+The local gate reads `docker image save` to hash the actual config and verify each
+layer against its ordered uncompressed rootfs digest. It rejects unexpected
+indexes/attestations. Smoke and tagging use the inspected immutable Docker ID,
+not a mutable local tag, and readback must match that pre-smoke identity. Success
+requires exact readback of both manifest digests, `linux/amd64`, OCI labels, config
+bytes, and the full layer/rootfs chain identifying that same smoked image.
+A **separate clean job** pulls the returned manifest digest, independently checks
+its saved config/layers, and repeats the real-client smoke using tools checked out
+from that source commit. Only its pass verifies the image.
+
+Artifacts retain TRX, explicit logs, and safe provenance. Docker's store-dependent
+`Id`, the config blob digest, and the registry manifest digest are separate values:
+classic Docker may use the config digest as `Id`, while containerd may use a
+manifest or index digest. Disabling attestations does not make `Id` a config
+digest. Temporary image-save archives are deleted, never uploaded. Artifacts
+never include smoke state JSON, databases, nest archives, Docker auth configs, or
+credentials.
+A failed publication/verification is not a release acceptance; inspect its logs
+and any partial tags with the owner before choosing a new approved version.
+
+For a local read-only check of the release guards:
+
+```sh
+python3 -m unittest discover -s scripts -p test_server_image_release.py -v
+```
+
+Deployment is deliberately separate; use the verified digest and the
+[private pull/Compose procedure](nest-storage.md#deploying-with-compose). No
+publication, release creation, deployment, or visibility change is implied by
+adding or validating this workflow.
