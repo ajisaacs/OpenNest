@@ -45,7 +45,7 @@ with enums serialized as strings (`JsonSerializerDefaults.Web` +
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| GET | `/healthz` | — | `{ "status": "ok" }` |
+| GET | `/healthz` | — | 200 `{ "status": "ok" }` after a live database query; 503 `{ "status": "unavailable" }` on storage failure (no internal details) |
 | GET | `/api/nests` | — | `NestRecord[]`, newest `savedAt` first |
 | GET | `/api/nests/{id}` | — | `NestRecord` or 404 |
 | GET | `/api/nests/{id}/file` | — | `.nest` archive bytes (`application/zip`) or 404 |
@@ -65,6 +65,18 @@ archive as a `BLOB`. The database file path comes from `--database=<path>`,
 then `OPENNEST_DB`, defaulting to `./data/nests.db`. The server opens the
 database at startup, so an unusable path fails startup rather than the first request.
 
+Run **one service instance with its database on a local filesystem**. Multiple PCs
+may use that instance, but do not share the SQLite file between replicas or place
+it on SMB/NFS storage. A private reentrant lock serializes complete database
+operations (including readers, write readbacks, health checks, and disposal);
+HTTP upload/body reading happens outside that lock. `/healthz` executes `SELECT 1`
+on the live connection; it is a connection check, not a backup, integrity scan,
+or guarantee of future disk capacity.
+
+Concurrent edits of the same record remain **last-writer-wins**: there is no
+optimistic version check or document lock. Coordinate editing with other operators
+to avoid overwriting their changes.
+
 ## Server integration tests
 
 ```sh
@@ -78,7 +90,11 @@ download, same-record update, copy, metadata-only update (archive and `fileSize`
 unchanged), and delete. Missing/invalid upload parts must return 400 and unknown ids
 404, both leaving every stored record and archive hash unchanged. Tests never open
 `data/nests.db` or `OPENNEST_DB`; the temporary directory is removed when the host is
-disposed. The [container smoke](#isolated-container-smoke) remains the image-level check.
+disposed. Concurrent HTTP clients and database-level readers/writers must retain
+exact record membership, metadata, and archive bytes; a monitor-ownership test
+checks every operation without relying on stress timing. Health tests check the
+unchanged success response and a detail-free 503 after the database is disposed.
+The [container smoke](#isolated-container-smoke) remains the image-level check.
 
 ## Running
 

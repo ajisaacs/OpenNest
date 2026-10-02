@@ -11,6 +11,9 @@ namespace OpenNest.Server;
 /// </summary>
 public sealed class NestDatabase : IDisposable
 {
+    // One reentrant monitor owns each complete connection operation, including
+    // readers, nested Get readbacks, health checks, and disposal.
+    private readonly object _sync = new();
     private readonly SqliteConnection _connection;
 
     public NestDatabase(string databasePath)
@@ -46,80 +49,120 @@ public sealed class NestDatabase : IDisposable
 
     public IReadOnlyList<NestRecord> List()
     {
-        using var command = _connection.CreateCommand();
-        command.CommandText =
-            $"SELECT {RecordColumns} FROM nests ORDER BY savedAt DESC";
-        var records = new List<NestRecord>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-            records.Add(ReadRecord(reader));
-        return records;
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText =
+                $"SELECT {RecordColumns} FROM nests ORDER BY savedAt DESC";
+            var records = new List<NestRecord>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                records.Add(ReadRecord(reader));
+            return records;
+        }
     }
 
     public NestRecord? Get(Guid id)
     {
-        using var command = _connection.CreateCommand();
-        command.CommandText = $"SELECT {RecordColumns} FROM nests WHERE id = $id";
-        command.Parameters.AddWithValue("$id", id.ToString());
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadRecord(reader) : null;
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = $"SELECT {RecordColumns} FROM nests WHERE id = $id";
+            command.Parameters.AddWithValue("$id", id.ToString());
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? ReadRecord(reader) : null;
+        }
     }
 
     public byte[]? GetFile(Guid id)
     {
-        using var command = _connection.CreateCommand();
-        command.CommandText = "SELECT file FROM nests WHERE id = $id";
-        command.Parameters.AddWithValue("$id", id.ToString());
-        var value = command.ExecuteScalar();
-        return value is byte[] bytes ? bytes : null;
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = "SELECT file FROM nests WHERE id = $id";
+            command.Parameters.AddWithValue("$id", id.ToString());
+            var value = command.ExecuteScalar();
+            return value is byte[] bytes ? bytes : null;
+        }
     }
 
     public NestRecord Insert(Guid id, NestRecord record, byte[] file)
     {
-        using var command = _connection.CreateCommand();
-        command.CommandText = """
-            INSERT INTO nests (id, name, customer, dateCreated, dateModified, material,
-                thickness, status, plateCount, partCount, comments, madeBy, fileSize,
-                savedAt, file)
-            VALUES ($id, $name, $customer, $dateCreated, $dateModified, $material,
-                $thickness, $status, $plateCount, $partCount, $comments, $madeBy,
-                $fileSize, $savedAt, $file)
-            """;
-        AddRecordParameters(command, id, record, file, updateFile: true);
-        command.ExecuteNonQuery();
-        return Get(id) ?? throw new InvalidOperationException("Insert did not persist.");
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO nests (id, name, customer, dateCreated, dateModified, material,
+                    thickness, status, plateCount, partCount, comments, madeBy, fileSize,
+                    savedAt, file)
+                VALUES ($id, $name, $customer, $dateCreated, $dateModified, $material,
+                    $thickness, $status, $plateCount, $partCount, $comments, $madeBy,
+                    $fileSize, $savedAt, $file)
+                """;
+            AddRecordParameters(command, id, record, file, updateFile: true);
+            command.ExecuteNonQuery();
+            return Get(id) ?? throw new InvalidOperationException("Insert did not persist.");
+        }
     }
 
     public NestRecord? Update(Guid id, NestRecord record, byte[]? file)
     {
-        if (Get(id) is null)
-            return null;
+        lock (_sync)
+        {
+            if (Get(id) is null)
+                return null;
 
-        using var command = _connection.CreateCommand();
-        var fileClause = file is null ? "" : ", file = $file, fileSize = $fileSize";
-        command.CommandText = $"""
-            UPDATE nests SET
-                name = $name, customer = $customer, dateCreated = $dateCreated,
-                dateModified = $dateModified, material = $material,
-                thickness = $thickness, status = $status, plateCount = $plateCount,
-                partCount = $partCount, comments = $comments, madeBy = $madeBy,
-                savedAt = $savedAt{fileClause}
-            WHERE id = $id
-            """;
-        AddRecordParameters(command, id, record, file, updateFile: file is not null);
-        command.ExecuteNonQuery();
-        return Get(id);
+            using var command = _connection.CreateCommand();
+            var fileClause = file is null ? "" : ", file = $file, fileSize = $fileSize";
+            command.CommandText = $"""
+                UPDATE nests SET
+                    name = $name, customer = $customer, dateCreated = $dateCreated,
+                    dateModified = $dateModified, material = $material,
+                    thickness = $thickness, status = $status, plateCount = $plateCount,
+                    partCount = $partCount, comments = $comments, madeBy = $madeBy,
+                    savedAt = $savedAt{fileClause}
+                WHERE id = $id
+                """;
+            AddRecordParameters(command, id, record, file, updateFile: file is not null);
+            command.ExecuteNonQuery();
+            return Get(id);
+        }
     }
 
     public bool Delete(Guid id)
     {
-        using var command = _connection.CreateCommand();
-        command.CommandText = "DELETE FROM nests WHERE id = $id";
-        command.Parameters.AddWithValue("$id", id.ToString());
-        return command.ExecuteNonQuery() > 0;
+        lock (_sync)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = "DELETE FROM nests WHERE id = $id";
+            command.Parameters.AddWithValue("$id", id.ToString());
+            return command.ExecuteNonQuery() > 0;
+        }
     }
 
-    public void Dispose() => _connection.Dispose();
+    /// <summary>Checks the live connection without exposing storage error details.</summary>
+    public bool IsHealthy()
+    {
+        lock (_sync)
+        {
+            try
+            {
+                using var command = _connection.CreateCommand();
+                command.CommandText = "SELECT 1";
+                return command.ExecuteScalar() is long value && value == 1;
+            }
+            catch (Exception ex) when (ex is SqliteException or InvalidOperationException)
+            {
+                return false;
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        lock (_sync)
+            _connection.Dispose();
+    }
 
     private void Execute(string sql)
     {

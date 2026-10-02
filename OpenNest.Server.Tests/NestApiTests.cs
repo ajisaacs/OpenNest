@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using OpenNest.Data;
 using OpenNest.Geometry;
 using OpenNest.IO;
@@ -36,6 +37,30 @@ public sealed class NestApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(File.Exists(factory.DatabasePath));
         Assert.False(File.Exists(defaultPath));
+    }
+
+    [Fact]
+    public async Task Health_WithOpenDatabase_ReturnsExistingSuccessShape()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/healthz");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("{\"status\":\"ok\"}", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Health_WithDisposedDatabase_Returns503WithoutStorageDetails()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        factory.Services.GetRequiredService<NestDatabase>().Dispose();
+
+        using var response = await client.GetAsync("/healthz");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("{\"status\":\"unavailable\"}", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

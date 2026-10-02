@@ -33,7 +33,9 @@ var app = builder.Build();
 // Open the database now so an unusable data path fails startup, not the first request.
 app.Services.GetRequiredService<NestDatabase>();
 
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/healthz", (NestDatabase db) => db.IsHealthy()
+    ? Results.Ok(new { status = "ok" })
+    : Results.Json(new { status = "unavailable" }, statusCode: StatusCodes.Status503ServiceUnavailable));
 
 app.MapGet("/api/nests", (NestDatabase db) => Results.Ok(db.List()));
 
