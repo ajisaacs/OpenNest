@@ -7,8 +7,14 @@ namespace OpenNest.Data;
 /// </summary>
 public interface INestRepository
 {
-    /// <summary>All stored nests, newest saved first.</summary>
+    /// <summary>
+    /// All stored nests, newest saved first. This is the full-enumeration contract for
+    /// backup and verification; browsing uses <see cref="QueryAsync"/>.
+    /// </summary>
     Task<IReadOnlyList<NestRecord>> ListAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>One bounded page of nests matching the query, filtered and ordered by the server.</summary>
+    Task<NestPage> QueryAsync(NestQuery query, CancellationToken cancellationToken = default);
 
     Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default);
 

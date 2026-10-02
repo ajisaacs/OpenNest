@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -57,6 +58,38 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
             .ReadFromJsonAsync<List<NestRecord>>(JsonOptions, cancellationToken);
         return items ?? new List<NestRecord>();
     }
+
+    public async Task<NestPage> QueryAsync(NestQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var error = query.GetValidationError();
+        if (error is not null)
+            throw new ArgumentException(error, nameof(query));
+
+        using var response = await _httpClient.GetAsync(
+            Url("api/nests/query?" + BuildQueryString(query)), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new IOException(
+                "This nest server does not support filtered browsing (HTTP 404). Update the nest server to this OpenNest version.");
+        }
+
+        await EnsureSuccess(response, "query nests", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<NestPage>(JsonOptions, cancellationToken)
+            ?? throw new IOException("Nest server returned an empty page.");
+        if (page.Items.Count > query.Limit)
+        {
+            throw new IOException(
+                $"Nest server returned {page.Items.Count} records for a page limited to {query.Limit}.");
+        }
+
+        return page;
+    }
+
+    private static string BuildQueryString(NestQuery query) =>
+        "search=" + Uri.EscapeDataString(query.NormalizedSearch)
+        + "&offset=" + query.Offset.ToString(CultureInfo.InvariantCulture)
+        + "&limit=" + query.Limit.ToString(CultureInfo.InvariantCulture);
 
     public async Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default)
     {

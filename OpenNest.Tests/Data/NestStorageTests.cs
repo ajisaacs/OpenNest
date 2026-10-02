@@ -220,4 +220,62 @@ public class RemoteNestRepositoryTests
         Assert.Contains("500", ex.Message);
         Assert.Contains("disk on fire", ex.Message);
     }
+
+    [Fact]
+    public async Task QueryAsync_SendsEscapedBoundedQueryAndReadsPage()
+    {
+        var record = SampleRecord();
+        var handler = new StubHandler(_ => StubHandler.Json(new { items = new[] { record }, total = 41, offset = 20, limit = 20 }));
+        using var repo = new RemoteNestRepository(new HttpClient(handler), "http://server:8090/base/");
+
+        var page = await repo.QueryAsync(new NestQuery { Search = "  a&b=c %_\\ ", Offset = 20, Limit = 20 });
+
+        Assert.Equal(HttpMethod.Get, handler.Requests[0].Method);
+        Assert.Equal(
+            "http://server:8090/base/api/nests/query?search=a%26b%3Dc%20%25_%5C&offset=20&limit=20",
+            handler.Requests[0].RequestUri!.AbsoluteUri);
+        Assert.Equal(record.Id, Assert.Single(page.Items).Id);
+        Assert.Equal(41, page.Total);
+        Assert.Equal(20, page.Offset);
+        Assert.Equal(20, page.Limit);
+    }
+
+    public static TheoryData<NestQuery> OutOfBoundsQueries() => new()
+    {
+        new NestQuery { Offset = -1 },
+        new NestQuery { Limit = 0 },
+        new NestQuery { Limit = NestQuery.MaxLimit + 1 },
+        new NestQuery { Search = new string('x', NestQuery.MaxSearchLength + 1) },
+    };
+
+    [Theory]
+    [MemberData(nameof(OutOfBoundsQueries))]
+    public async Task QueryAsync_OutOfBounds_ThrowsWithoutSending(NestQuery query)
+    {
+        var handler = new StubHandler(_ => StubHandler.Json(new { items = Array.Empty<NestRecord>() }));
+        using var repo = new RemoteNestRepository(new HttpClient(handler), "http://s");
+
+        await Assert.ThrowsAsync<ArgumentException>(() => repo.QueryAsync(query));
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task QueryAsync_OldServerWithoutRoute_ReportsServerUpdateNeeded()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+        using var repo = new RemoteNestRepository(new HttpClient(handler), "http://s");
+
+        var ex = await Assert.ThrowsAsync<IOException>(() => repo.QueryAsync(new NestQuery()));
+        Assert.Contains("Update the nest server", ex.Message);
+    }
+
+    [Fact]
+    public async Task QueryAsync_MoreItemsThanRequested_Throws()
+    {
+        var items = new[] { SampleRecord(), SampleRecord(), SampleRecord() };
+        var handler = new StubHandler(_ => StubHandler.Json(new { items, total = 3, offset = 0, limit = 2 }));
+        using var repo = new RemoteNestRepository(new HttpClient(handler), "http://s");
+
+        await Assert.ThrowsAsync<IOException>(() => repo.QueryAsync(new NestQuery { Limit = 2 }));
+    }
 }

@@ -77,6 +77,7 @@ public class NestSaveSessionTests
         }
 
         public Task<IReadOnlyList<NestRecord>> ListAsync(CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<NestPage> QueryAsync(NestQuery query, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<byte[]?> GetFileAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<NestRecord> UpdateMetadataAsync(Guid id, NestRecord record, CancellationToken ct = default) => throw new NotImplementedException();

@@ -46,7 +46,8 @@ with enums serialized as strings (`JsonSerializerDefaults.Web` +
 | Method | Path | Body | Response |
 |---|---|---|---|
 | GET | `/healthz` | — | 200 `{ "status": "ok" }` after a live database query; 503 `{ "status": "unavailable" }` on storage failure (no internal details) |
-| GET | `/api/nests` | — | `NestRecord[]`, newest `savedAt` first |
+| GET | `/api/nests` | — | `NestRecord[]`, newest `savedAt` first. Full, unbounded enumeration for backup manifests, restore checks and the container smoke; browsing uses `/api/nests/query` |
+| GET | `/api/nests/query?search=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
 | GET | `/api/nests/{id}` | — | `NestRecord` or 404 |
 | GET | `/api/nests/{id}/file` | — | `.nest` archive bytes (`application/zip`) or 404 |
 | POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid |
@@ -56,6 +57,26 @@ with enums serialized as strings (`JsonSerializerDefaults.Web` +
 
 There is no authentication; this is a LAN-only service. Do not expose it
 outside the shop network without adding one.
+
+### Browsing query
+
+`GET /api/nests/query` filters, orders and pages in SQLite, so a client receives
+only the requested page of metadata (never archive bytes):
+
+- `search` (optional): trimmed, at most 200 characters; blank means no filter.
+  Case-insensitive substring of the whole text in `name`, `customer`, `material`,
+  `madeBy`, `comments` or the status (`ToBeCut` or the display name `To Be Cut`).
+  `%`, `_` and `\` are literal. Dates and numbers are not matched as text.
+  Case folding is ASCII-only (SQLite `LIKE`).
+- `offset` (default 0, at least 0) and `limit` (default 100, 1 to 500).
+- Order: newest `savedAt` first, then `id`, so pages partition the matches
+  deterministically. `total` counts every match and is read with the page in one
+  database hold. A save between two page requests can move a row across a page
+  boundary.
+- Unknown, repeated, non-integer or out-of-range parameters return 400 instead of
+  being ignored or clamped. `RemoteNestRepository.QueryAsync` checks the same
+  bounds before sending, and reports an HTTP 404 from an older server as a
+  server version that must be updated.
 
 ## Storage
 

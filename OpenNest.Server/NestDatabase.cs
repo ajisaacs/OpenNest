@@ -74,6 +74,44 @@ public sealed class NestDatabase : IDisposable
         }
     }
 
+    /// <summary>
+    /// One bounded page of matching metadata plus the total match count. The count and
+    /// the page are read in the same monitor hold, so they describe one state.
+    /// </summary>
+    public NestPage Query(NestQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var error = query.GetValidationError();
+        if (error is not null)
+            throw new ArgumentException(error, nameof(query));
+
+        var search = query.NormalizedSearch;
+        var where = search.Length == 0 ? "" : SearchPredicate;
+        lock (_sync)
+        {
+            using var count = _connection.CreateCommand();
+            count.CommandText = $"SELECT COUNT(*) FROM nests {where}";
+            AddSearchParameter(count, search);
+            var total = checked((int)(long)count.ExecuteScalar()!);
+
+            using var command = _connection.CreateCommand();
+            command.CommandText = $"""
+                SELECT {RecordColumns} FROM nests {where}
+                ORDER BY savedAt DESC, id DESC
+                LIMIT $limit OFFSET $offset
+                """;
+            AddSearchParameter(command, search);
+            command.Parameters.AddWithValue("$limit", query.Limit);
+            command.Parameters.AddWithValue("$offset", query.Offset);
+            var records = new List<NestRecord>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                records.Add(ReadRecord(reader));
+
+            return new NestPage { Items = records, Total = total, Offset = query.Offset, Limit = query.Limit };
+        }
+    }
+
     public byte[]? GetFile(Guid id)
     {
         lock (_sync)
@@ -175,6 +213,28 @@ public sealed class NestDatabase : IDisposable
         id, name, customer, dateCreated, dateModified, material, thickness,
         status, plateCount, partCount, comments, madeBy, fileSize, savedAt
         """;
+
+    // Case-insensitive (ASCII) substring over the text columns and the status's stored
+    // and display names. The search text is always a bound, escaped LIKE parameter.
+    private const string SearchPredicate = """
+        WHERE name LIKE $pattern ESCAPE '\'
+            OR customer LIKE $pattern ESCAPE '\'
+            OR material LIKE $pattern ESCAPE '\'
+            OR madeBy LIKE $pattern ESCAPE '\'
+            OR comments LIKE $pattern ESCAPE '\'
+            OR status LIKE $pattern ESCAPE '\'
+            OR (CASE status WHEN 'ToBeCut' THEN 'To Be Cut' WHEN 'HasBeenCut' THEN 'Has Been Cut'
+                ELSE status END) LIKE $pattern ESCAPE '\'
+        """;
+
+    private static void AddSearchParameter(SqliteCommand command, string search)
+    {
+        if (search.Length == 0)
+            return;
+
+        var escaped = search.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_");
+        command.Parameters.AddWithValue("$pattern", "%" + escaped + "%");
+    }
 
     private static void AddRecordParameters(
         SqliteCommand command, Guid id, NestRecord record, byte[]? file, bool updateFile)

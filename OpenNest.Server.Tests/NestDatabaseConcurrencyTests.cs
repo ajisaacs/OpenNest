@@ -12,6 +12,7 @@ public sealed class NestDatabaseConcurrencyTests
     // synchronous caller waiting on it, not a sleep or a stress-run timing assumption.
     [Theory]
     [InlineData("List")]
+    [InlineData("Query")]
     [InlineData("Get")]
     [InlineData("GetFile")]
     [InlineData("Insert")]
@@ -39,6 +40,7 @@ public sealed class NestDatabaseConcurrencyTests
                 switch (operation)
                 {
                     case "List": database.List(); break;
+                    case "Query": database.Query(new NestQuery { Search = "fixture" }); break;
                     case "Get": database.Get(id); break;
                     case "GetFile": database.GetFile(id); break;
                     case "Insert": database.Insert(Guid.NewGuid(), record, new byte[] { 4 }); break;
@@ -97,6 +99,7 @@ public sealed class NestDatabaseConcurrencyTests
             [
                 () => database.Insert(id, record, new byte[] { 1 }),
                 () => database.List(),
+                () => database.Query(new NestQuery { Search = "Synthetic", Limit = 1 }),
                 () => database.Get(id),
                 () => database.GetFile(id),
                 () => database.Update(id, record, new byte[] { 2 }),

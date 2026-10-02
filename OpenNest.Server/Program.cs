@@ -37,7 +37,14 @@ app.MapGet("/healthz", (NestDatabase db) => db.IsHealthy()
     ? Results.Ok(new { status = "ok" })
     : Results.Json(new { status = "unavailable" }, statusCode: StatusCodes.Status503ServiceUnavailable));
 
+// Full enumeration (backup manifests, restore checks and the container smoke).
 app.MapGet("/api/nests", (NestDatabase db) => Results.Ok(db.List()));
+
+// Bounded, SQL-filtered page for browsing.
+app.MapGet("/api/nests/query", (HttpRequest request, NestDatabase db) =>
+    NestQueryRequest.TryParse(request.Query, out var query, out var error)
+        ? Results.Ok(db.Query(query))
+        : Results.BadRequest(error));
 
 app.MapGet("/api/nests/{id:guid}", (Guid id, NestDatabase db) =>
     db.Get(id) is { } record ? Results.Ok(record) : Results.NotFound());
