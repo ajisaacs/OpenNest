@@ -49,7 +49,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Solution build failed.' }
       - name: Run all test projects on Windows
         run: |
-          foreach ($project in @('OpenNest.Tests', 'OpenNest.Engine.Tests', 'OpenNest.IO.Tests', 'OpenNest.WinForms.Tests', 'OpenNest.FrontEnd.Tests')) {
+          foreach ($project in @('OpenNest.Tests', 'OpenNest.Engine.Tests', 'OpenNest.IO.Tests', 'OpenNest.Server.Tests', 'OpenNest.WinForms.Tests', 'OpenNest.FrontEnd.Tests')) {
             dotnet test "$project/$project.csproj" -c Release --no-build --logger "trx;LogFileName=$project.trx" --results-directory TestResults
             if ($LASTEXITCODE -ne 0) { throw "$project failed." }
           }

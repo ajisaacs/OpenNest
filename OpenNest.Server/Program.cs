@@ -25,10 +25,13 @@ var databasePath =
     args.FirstOrDefault(a => a.StartsWith("--database=", StringComparison.Ordinal))?.Split('=', 2)[1]
     ?? Environment.GetEnvironmentVariable("OPENNEST_DB")
     ?? Path.Combine("data", "nests.db");
-builder.Services.AddSingleton(new NestDatabase(databasePath));
+builder.Services.AddSingleton(_ => new NestDatabase(databasePath));
 
 // Listen port: --urls or ASPNETCORE_URLS; Dockerfile defaults to 8090.
 var app = builder.Build();
+
+// Open the database now so an unusable data path fails startup, not the first request.
+app.Services.GetRequiredService<NestDatabase>();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 
@@ -127,3 +130,6 @@ internal static class MultipartJson
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 }
+
+// Entry-point type for in-memory integration tests (WebApplicationFactory<Program>).
+public partial class Program { }

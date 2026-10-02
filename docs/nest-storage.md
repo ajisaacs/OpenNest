@@ -62,7 +62,23 @@ outside the shop network without adding one.
 `OpenNest.Server.NestDatabase` uses SQLite (`Microsoft.Data.Sqlite`) with
 `journal_mode=WAL`. Each row holds the metadata columns plus the `.nest`
 archive as a `BLOB`. The database file path comes from `--database=<path>`,
-then `OPENNEST_DB`, defaulting to `./data/nests.db`.
+then `OPENNEST_DB`, defaulting to `./data/nests.db`. The server opens the
+database at startup, so an unusable path fails startup rather than the first request.
+
+## Server integration tests
+
+```sh
+dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj
+```
+
+Cross-platform; runs in both CI workflows. Each test hosts the production routes in
+memory (`WebApplicationFactory`) against its own temporary SQLite file and drives
+them through the real `RemoteNestRepository` and `NestSaveSession`: create, list,
+download, same-record update, copy, metadata-only update (archive and `fileSize`
+unchanged), and delete. Missing/invalid upload parts must return 400 and unknown ids
+404, both leaving every stored record and archive hash unchanged. Tests never open
+`data/nests.db` or `OPENNEST_DB`; the temporary directory is removed when the host is
+disposed. The [container smoke](#isolated-container-smoke) remains the image-level check.
 
 ## Running
 

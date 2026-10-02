@@ -30,3 +30,5 @@ jobs:
           python3 scripts/check-synthetic-nests.py --parallel 2
       - name: Run OpenNest.IO.Tests
         run: dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj
+      - name: Run OpenNest.Server.Tests
+        run: dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj
