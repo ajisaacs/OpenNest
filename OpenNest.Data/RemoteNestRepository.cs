@@ -88,6 +88,8 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
 
     private static string BuildQueryString(NestQuery query) =>
         "search=" + Uri.EscapeDataString(query.NormalizedSearch)
+        + "&sort=" + JsonNamingPolicy.CamelCase.ConvertName(query.Sort.ToString())
+        + "&order=" + (query.Descending ? "desc" : "asc")
         + "&offset=" + query.Offset.ToString(CultureInfo.InvariantCulture)
         + "&limit=" + query.Limit.ToString(CultureInfo.InvariantCulture);
 

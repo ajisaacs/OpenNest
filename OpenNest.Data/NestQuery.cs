@@ -16,6 +16,12 @@ public sealed class NestQuery
     /// </summary>
     public string Search { get; init; } = "";
 
+    /// <summary>Column to order by; ties are broken by id in the same direction.</summary>
+    public NestSortField Sort { get; init; } = NestSortField.SavedAt;
+
+    /// <summary>Largest/newest/Z first when true (the default, newest saved first).</summary>
+    public bool Descending { get; init; } = true;
+
     /// <summary>Number of matching records to skip, zero or greater.</summary>
     public int Offset { get; init; }
 
@@ -28,6 +34,8 @@ public sealed class NestQuery
     /// <summary>The first violated bound, or null when the query may be sent.</summary>
     public string? GetValidationError()
     {
+        if (!Enum.IsDefined(Sort))
+            return "sort must be a supported column.";
         if (Offset < 0)
             return "offset must be zero or greater.";
         if (Limit < 1 || Limit > MaxLimit)

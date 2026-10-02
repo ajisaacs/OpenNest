@@ -232,7 +232,7 @@ public class RemoteNestRepositoryTests
 
         Assert.Equal(HttpMethod.Get, handler.Requests[0].Method);
         Assert.Equal(
-            "http://server:8090/base/api/nests/query?search=a%26b%3Dc%20%25_%5C&offset=20&limit=20",
+            "http://server:8090/base/api/nests/query?search=a%26b%3Dc%20%25_%5C&sort=savedAt&order=desc&offset=20&limit=20",
             handler.Requests[0].RequestUri!.AbsoluteUri);
         Assert.Equal(record.Id, Assert.Single(page.Items).Id);
         Assert.Equal(41, page.Total);
@@ -246,7 +246,21 @@ public class RemoteNestRepositoryTests
         new NestQuery { Limit = 0 },
         new NestQuery { Limit = NestQuery.MaxLimit + 1 },
         new NestQuery { Search = new string('x', NestQuery.MaxSearchLength + 1) },
+        new NestQuery { Sort = (NestSortField)99 },
     };
+
+    [Fact]
+    public async Task QueryAsync_SendsSortColumnAndDirection()
+    {
+        var handler = new StubHandler(_ => StubHandler.Json(new { items = Array.Empty<NestRecord>() }));
+        using var repo = new RemoteNestRepository(new HttpClient(handler), "http://s");
+
+        await repo.QueryAsync(new NestQuery { Sort = NestSortField.PlateCount, Descending = false });
+
+        Assert.EndsWith(
+            "/api/nests/query?search=&sort=plateCount&order=asc&offset=0&limit=100",
+            handler.Requests[0].RequestUri!.AbsoluteUri);
+    }
 
     [Theory]
     [MemberData(nameof(OutOfBoundsQueries))]

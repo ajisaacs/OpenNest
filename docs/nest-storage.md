@@ -47,7 +47,7 @@ with enums serialized as strings (`JsonSerializerDefaults.Web` +
 |---|---|---|---|
 | GET | `/healthz` | — | 200 `{ "status": "ok" }` after a live database query; 503 `{ "status": "unavailable" }` on storage failure (no internal details) |
 | GET | `/api/nests` | — | `NestRecord[]`, newest `savedAt` first. Full, unbounded enumeration for backup manifests, restore checks and the container smoke; browsing uses `/api/nests/query` |
-| GET | `/api/nests/query?search=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
+| GET | `/api/nests/query?search=&sort=&order=&offset=&limit=` | — | `{ "items": NestRecord[], "total", "offset", "limit" }`: one bounded page filtered in SQL (see below), or 400 for an invalid parameter |
 | GET | `/api/nests/{id}` | — | `NestRecord` or 404 |
 | GET | `/api/nests/{id}/file` | — | `.nest` archive bytes (`application/zip`) or 404 |
 | POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid |
@@ -69,7 +69,12 @@ only the requested page of metadata (never archive bytes):
   `%`, `_` and `\` are literal. Dates and numbers are not matched as text.
   Case folding is ASCII-only (SQLite `LIKE`).
 - `offset` (default 0, at least 0) and `limit` (default 100, 1 to 500).
-- Order: newest `savedAt` first, then `id`, so pages partition the matches
+- `sort` (default `savedAt`): one of `savedAt`, `name`, `customer`, `status`,
+  `material`, `dateCreated`, `dateModified`, `thickness`, `plateCount`,
+  `partCount`, `madeBy`, `comments`, `fileSize` (names, case-insensitive; no
+  numbers). Text columns sort case-insensitively (ASCII); dates sort as their
+  stored ISO text. `order` is `asc` or `desc` (default `desc`).
+- Ties are broken by `id` in the same direction, so pages partition the matches
   deterministically. `total` counts every match and is read with the page in one
   database hold. A save between two page requests can move a row across a page
   boundary.

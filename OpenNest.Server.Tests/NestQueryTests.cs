@@ -224,6 +224,68 @@ public sealed class NestQueryTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    public static TheoryData<NestSortField, bool> SortCases()
+    {
+        var data = new TheoryData<NestSortField, bool>();
+        foreach (var field in Enum.GetValues<NestSortField>())
+        {
+            data.Add(field, false);
+            data.Add(field, true);
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(SortCases))]
+    public async Task Query_SortsEachAllowlistedColumnAcrossPages(NestSortField field, bool descending)
+    {
+        var expected = Sorted(Seed(25), field, descending).Select(r => r.Id).ToArray();
+        var collected = new List<Guid>();
+
+        for (var offset = 0; offset < expected.Length; offset += 6)
+        {
+            var page = await _repository.QueryAsync(
+                new NestQuery { Sort = field, Descending = descending, Offset = offset, Limit = 6 });
+            collected.AddRange(page.Items.Select(r => r.Id));
+        }
+
+        Assert.Equal(expected, collected);
+    }
+
+    [Fact]
+    public async Task Query_SortAndOrderNamesAreCaseInsensitive()
+    {
+        var expected = Sorted(Seed(12), NestSortField.PlateCount, descending: false).Select(r => r.Id);
+
+        var body = await _client.GetStringAsync("/api/nests/query?sort=PLATECOUNT&order=ASC");
+        var ids = JsonDocument.Parse(body).RootElement.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid());
+
+        Assert.Equal(expected, ids);
+    }
+
+    [Theory]
+    [InlineData("sort=unknown")]
+    [InlineData("sort=1")]
+    [InlineData("sort=-1")]
+    [InlineData("sort=")]
+    [InlineData("sort=saved_at")]
+    [InlineData("sort=savedAt&sort=name")]
+    [InlineData("order=up")]
+    [InlineData("order=")]
+    [InlineData("order=asc&order=desc")]
+    public async Task Query_InvalidSortOrOrder_Returns400WithoutItems(string queryString)
+    {
+        Seed(3);
+
+        using var response = await _client.GetAsync("/api/nests/query?" + queryString);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.DoesNotContain("items", body);
+    }
+
     [Fact]
     public async Task List_RemainsTheUnboundedFullEnumeration()
     {
@@ -251,19 +313,20 @@ public sealed class NestQueryTests : IDisposable
         {
             var record = new NestRecord
             {
-                Name = $"Synthetic browse nest {index:D2}",
+                // Alternate case so text sorts must fold case rather than order by code point.
+                Name = (index % 2 == 0 ? "Synthetic" : "synthetic") + $" browse nest {index:D2}",
                 Customer = customers[index % customers.Length],
                 DateCreated = new DateTime(2026, 1, 1 + index % 28, 8, 0, 0, DateTimeKind.Unspecified),
                 DateModified = new DateTime(2026, 1, 2 + index % 27, 9, 0, 0, DateTimeKind.Unspecified),
                 Material = index % 3 == 0 ? "Synthetic steel" : "Synthetic alloy",
-                Thickness = 0.25,
+                Thickness = 0.25 + index % 3 * 0.125,
                 Status = statuses[index % statuses.Length],
                 PlateCount = 1 + index % 4,
                 PartCount = 3 + index,
                 Comments = index % 5 == 0 ? "rush" : index % 7 == 1 ? @"Path C:\jobs" : "",
                 MadeBy = index % 2 == 0 ? "Synthetic operator A" : "Synthetic operator B",
             };
-            stored.Add(_database.Insert(Guid.NewGuid(), record, new byte[] { (byte)index, 1, 2 }));
+            stored.Add(_database.Insert(Guid.NewGuid(), record, new byte[3 + index % 4]));
         }
 
         return stored;
@@ -275,6 +338,40 @@ public sealed class NestQueryTests : IDisposable
             .OrderByDescending(r => r.SavedAt)
             .ThenByDescending(r => r.Id.ToString(), StringComparer.Ordinal)
             .ToArray();
+
+    /// <summary>Independent oracle for allowlisted sorts: ASCII case-folded text, then id.</summary>
+    private static IEnumerable<NestRecord> Sorted(IEnumerable<NestRecord> records, NestSortField field, bool descending)
+    {
+        static Comparison<NestRecord> Text(Func<NestRecord, string> value) =>
+            (a, b) => string.CompareOrdinal(value(a).ToLowerInvariant(), value(b).ToLowerInvariant());
+
+        Comparison<NestRecord> compare = field switch
+        {
+            NestSortField.SavedAt => (a, b) => a.SavedAt.CompareTo(b.SavedAt),
+            NestSortField.Name => Text(r => r.Name),
+            NestSortField.Customer => Text(r => r.Customer),
+            NestSortField.Status => Text(r => r.Status.ToString()),
+            NestSortField.Material => Text(r => r.Material),
+            NestSortField.DateCreated => (a, b) => a.DateCreated.CompareTo(b.DateCreated),
+            NestSortField.DateModified => (a, b) => a.DateModified.CompareTo(b.DateModified),
+            NestSortField.Thickness => (a, b) => a.Thickness.CompareTo(b.Thickness),
+            NestSortField.PlateCount => (a, b) => a.PlateCount.CompareTo(b.PlateCount),
+            NestSortField.PartCount => (a, b) => a.PartCount.CompareTo(b.PartCount),
+            NestSortField.MadeBy => Text(r => r.MadeBy),
+            NestSortField.Comments => Text(r => r.Comments),
+            NestSortField.FileSize => (a, b) => a.FileSize.CompareTo(b.FileSize),
+            _ => throw new ArgumentOutOfRangeException(nameof(field)),
+        };
+        var sorted = records.ToList();
+        sorted.Sort((a, b) =>
+        {
+            var result = compare(a, b);
+            if (result == 0)
+                result = string.CompareOrdinal(a.Id.ToString(), b.Id.ToString());
+            return descending ? -result : result;
+        });
+        return sorted;
+    }
 
     private static void AssertSameMetadata(NestRecord expected, NestRecord actual) =>
         Assert.Equal(JsonSerializer.Serialize(expected), JsonSerializer.Serialize(actual));

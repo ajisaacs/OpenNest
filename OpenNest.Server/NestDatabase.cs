@@ -95,9 +95,10 @@ public sealed class NestDatabase : IDisposable
             var total = checked((int)(long)count.ExecuteScalar()!);
 
             using var command = _connection.CreateCommand();
+            var direction = query.Descending ? "DESC" : "ASC";
             command.CommandText = $"""
                 SELECT {RecordColumns} FROM nests {where}
-                ORDER BY savedAt DESC, id DESC
+                ORDER BY {SortColumn(query.Sort)} {direction}, id {direction}
                 LIMIT $limit OFFSET $offset
                 """;
             AddSearchParameter(command, search);
@@ -226,6 +227,25 @@ public sealed class NestDatabase : IDisposable
             OR (CASE status WHEN 'ToBeCut' THEN 'To Be Cut' WHEN 'HasBeenCut' THEN 'Has Been Cut'
                 ELSE status END) LIKE $pattern ESCAPE '\'
         """;
+
+    // Fixed allowlist: request text never reaches the ORDER BY clause.
+    private static string SortColumn(NestSortField field) => field switch
+    {
+        NestSortField.SavedAt => "savedAt",
+        NestSortField.Name => "name COLLATE NOCASE",
+        NestSortField.Customer => "customer COLLATE NOCASE",
+        NestSortField.Status => "status COLLATE NOCASE",
+        NestSortField.Material => "material COLLATE NOCASE",
+        NestSortField.DateCreated => "dateCreated",
+        NestSortField.DateModified => "dateModified",
+        NestSortField.Thickness => "thickness",
+        NestSortField.PlateCount => "plateCount",
+        NestSortField.PartCount => "partCount",
+        NestSortField.MadeBy => "madeBy COLLATE NOCASE",
+        NestSortField.Comments => "comments COLLATE NOCASE",
+        NestSortField.FileSize => "fileSize",
+        _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Unsupported sort column."),
+    };
 
     private static void AddSearchParameter(SqliteCommand command, string search)
     {
