@@ -94,7 +94,18 @@ static async Task<(NestRecord? Record, byte[]? File, IResult? Error)> ReadMultip
     if (!http.Request.HasFormContentType)
         return (null, null, Results.BadRequest("Expected multipart/form-data with metadata and file parts."));
 
-    var form = await http.Request.ReadFormAsync();
+    IFormCollection form;
+    try
+    {
+        form = await http.Request.ReadFormAsync();
+    }
+    catch (Exception ex) when (ex is InvalidDataException || (ex is IOException && ex is not BadHttpRequestException))
+    {
+        // A truncated or malformed multipart body is a client error. BadHttpRequestException
+        // (for example, an oversized body) keeps the status code Kestrel assigns it.
+        return (null, null, Results.BadRequest("Malformed multipart body."));
+    }
+
     var metadataPart = form["metadata"].FirstOrDefault();
     if (string.IsNullOrWhiteSpace(metadataPart))
         return (null, null, Results.BadRequest("Missing 'metadata' part."));

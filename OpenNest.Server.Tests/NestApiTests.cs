@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -151,8 +152,8 @@ public sealed class NestApiTests
         {
             foreach (var body in new[]
                      {
-                         "not multipart", "missing metadata", "invalid metadata JSON", "null metadata",
-                         "missing file", "empty file",
+                         "not multipart", "malformed multipart", "missing boundary", "missing metadata",
+                         "invalid metadata JSON", "null metadata", "missing file", "empty file",
                      })
             {
                 data.Add(route, body);
@@ -276,6 +277,14 @@ public sealed class NestApiTests
         {
             case "not multipart":
                 return new StringContent(metadata, Encoding.UTF8, "application/json");
+            case "malformed multipart":
+                var content = new StringContent("--other-boundary\r\nnot a multipart body");
+                content.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data; boundary=expected-boundary");
+                return content;
+            case "missing boundary":
+                var unbounded = Multipart(metadata, new byte[] { 1 });
+                unbounded.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data");
+                return unbounded;
             case "missing metadata":
                 return Multipart(null, new byte[] { 1 });
             case "invalid metadata JSON":
