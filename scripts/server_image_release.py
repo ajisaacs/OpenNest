@@ -242,10 +242,11 @@ def rootfs(config):
 
 
 def archive_identity(path, local):
-    """Read Docker's saved config/layers, never infer config identity from Id.
+    """Bind verified saved bytes to the inspected immutable store identity.
 
-    containerd save has an OCI layout envelope; its *one referenced image* must
-    be a manifest, not an index. Classic Docker save has only manifest.json.
+    Both stores may save an OCI envelope. Classic Id hashes raw config;
+    containerd Id/Descriptor identify the manifest, whose verified descriptors
+    bind config/layers. Inspect Config is reconstructed, not the saved JSON.
     No archive extraction, and all temporary image bytes are removed by caller.
     """
     try:
@@ -270,6 +271,7 @@ def archive_identity(path, local):
 
             names = archive.getnames()
             require(len(names) == len(set(names)), "duplicate archive members")
+            exported_descriptor = None
             if "index.json" in names:
                 index = json_body(member("index.json").read())
                 require(isinstance(index, dict) and index.get("schemaVersion") == 2 and
@@ -279,6 +281,8 @@ def archive_identity(path, local):
                 require(isinstance(descriptor, dict) and descriptor.get("mediaType") in MANIFEST_TYPES,
                         "unexpected archive image index/attestation")
                 manifest = image_manifest(blob(descriptor).read())
+                require(manifest["mediaType"] == descriptor["mediaType"], "archive manifest media type mismatch")
+                exported_descriptor = descriptor
                 config_body = blob(manifest["config"]).read()
                 layers = manifest["layers"]
                 diffs = [layer_diff_id(blob(layer), layer.get("mediaType")) for layer in layers]
@@ -288,12 +292,24 @@ def archive_identity(path, local):
                         "ambiguous classic image archive")
                 config_body = member(entries[0]["Config"]).read()
                 diffs = [stream_digest(member(name)) for name in entries[0]["Layers"]]
+            config_digest = content_digest(config_body)
+            inspected_descriptor = local.get("Descriptor")
+            if inspected_descriptor is None:
+                require(config_digest == sha256(local.get("Id")),
+                        "saved config does not bind inspected immutable image")
+            else:
+                require(isinstance(inspected_descriptor, dict) and isinstance(exported_descriptor, dict) and
+                        type(inspected_descriptor.get("size")) is int and
+                        all(inspected_descriptor.get(key) == exported_descriptor.get(key)
+                            for key in ("digest", "size", "mediaType")) and
+                        exported_descriptor["digest"] == sha256(local.get("Id")),
+                        "saved manifest does not bind inspected immutable image")
             config = json_body(config_body)
             require(isinstance(config, dict) and config.get("os") == local.get("Os") and
-                    config.get("architecture") == local.get("Architecture") and config.get("config") == local.get("Config"),
-                    "saved config differs from inspected image")
+                    config.get("architecture") == local.get("Architecture") and isinstance(config.get("config"), dict),
+                    "saved config platform mismatch")
             require(diffs == rootfs(config) == local.get("RootFS", {}).get("Layers"), "saved layer/rootfs chain mismatch")
-            return {"config_digest": content_digest(config_body), "rootfs_diff_ids": diffs}
+            return {"config_digest": config_digest, "rootfs_diff_ids": diffs, "image_config": config}
     except (OSError, tarfile.TarError, KeyError, TypeError, AttributeError):
         raise ReleaseError("invalid image archive") from None
 
@@ -353,7 +369,7 @@ def readback(client, release_version, sha, local):
             config_digest == "sha256:" + hashlib.sha256(body).hexdigest(), "config blob readback mismatch")
     remote = json_body(body)
     require(isinstance(remote, dict) and remote.get("os") == "linux" and remote.get("architecture") == "amd64" and
-            remote.get("config") == local["Config"], "remote platform/image config mismatch")
+            remote == local.get("image_config"), "remote platform/image config mismatch")
     diffs = rootfs(remote)
     require(diffs == result["rootfs_diff_ids"] and len(manifests[0]["layers"]) == len(diffs),
             "remote rootfs chain differs from smoked image")

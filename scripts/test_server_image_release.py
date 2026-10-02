@@ -201,7 +201,7 @@ class ReadbackSafety(unittest.TestCase):
         responses[release.registry_path("blobs/" + digest(LAYER_GZIP))] = (200, {}, LAYER_GZIP)
         local = {"Id": digest(blob), "config_digest": digest(blob), "Os": "linux", "Architecture": "amd64",
                  "Config": config()["config"], "RootFS": {"Type": "layers", "Layers": [digest(LAYER)]},
-                 "rootfs_diff_ids": [digest(LAYER)]}
+                 "image_config": config(), "rootfs_diff_ids": [digest(LAYER)]}
         return FakeClient(responses), local
 
     def test_readback_matches_both_tags_and_full_config(self):
@@ -221,7 +221,7 @@ class ReadbackSafety(unittest.TestCase):
             elif mode == "blob":
                 client.responses[release.registry_path("blobs/" + local["Id"])] = (200, {}, b"{}")
             else:
-                local["Config"]["User"] = "0"
+                local["image_config"]["config"]["User"] = "0"
             with self.subTest(mode=mode), self.assertRaises(release.ReleaseError):
                 release.readback(client, "1.2.3", SHA, local)
 
@@ -316,17 +316,119 @@ class ArchiveIdentity(unittest.TestCase):
                 entry.size = len(body)
                 archive.addfile(entry, io.BytesIO(body))
         local["Id"] = digest(manifest_body) if mode == "oci" else digest(config_body)
+        if mode == "oci":
+            local["Descriptor"] = copy.deepcopy(descriptor)
         return local
 
     def test_archive_config_identity_on_classic_and_containerd_stores(self):
-        for mode in ("classic", "oci"):
+        # Classic Moby also exports an OCI envelope in newer versions; its ID
+        # still hashes raw config, not the generated export manifest.
+        for mode in ("classic", "classic-oci", "oci"):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
                 path = pathlib.Path(directory) / "image.tar"
                 local = self.archive(path, mode)
                 identity = release.archive_identity(path, local)
                 self.assertEqual(identity["config_digest"], digest(encoded(config())))
                 self.assertEqual(identity["rootfs_diff_ids"], [digest(LAYER)])
-                self.assertEqual(local["Id"] == identity["config_digest"], mode == "classic")
+                self.assertEqual(local["Id"] == identity["config_digest"], mode != "oci")
+
+    def normalized_inspect(self, local):
+        # Moby v28.0.4 image.NewFromJSON decodes into container.Config and
+        # images.ImageInspect returns that struct, not RawJSON. These fields
+        # lack omitempty (api/types/container/config.go), so inspect emits
+        # their Go zero values even when the saved OCI config omits them.
+        # This is a source-backed fixture, not an invented hosted-run diff.
+        local["Config"] = dict(local["Config"], Hostname="", Domainname="",
+                               AttachStdin=False, AttachStdout=False, AttachStderr=False,
+                               Tty=False, OpenStdin=False, StdinOnce=False, Env=None,
+                               Cmd=None, Image="", Volumes=None, WorkingDir="", OnBuild=None)
+        return local
+
+    def test_normalized_classic_inspect_keeps_exact_saved_config_identity(self):
+        for mode in ("classic", "classic-oci"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                path = pathlib.Path(directory) / "image.tar"
+                local = self.normalized_inspect(self.archive(path, mode))
+                self.assertNotEqual(local["Config"], config()["config"])
+                try:
+                    identity = release.archive_identity(path, local)
+                except release.ReleaseError as error:
+                    self.fail("raw config identity must survive Moby inspect defaults: " + str(error))
+                self.assertEqual(identity["config_digest"], local["Id"])
+                self.assertEqual(identity["image_config"], config())
+                local.update(identity)
+                client, _ = ReadbackSafety().fixture()
+                result = release.readback(client, "1.2.3", SHA, local)
+                self.assertEqual(result["config_digest"], local["Id"])
+
+    def test_readback_uses_saved_config_not_normalized_inspect_config(self):
+        client, local = ReadbackSafety().fixture()
+        self.normalized_inspect(local)
+        try:
+            result = release.readback(client, "1.2.3", SHA, local)
+        except release.ReleaseError as error:
+            self.fail("remote must match saved config bytes, not reconstructed inspect: " + str(error))
+        self.assertEqual(result["config_digest"], digest(encoded(config())))
+
+    def test_classic_export_must_hash_to_inspected_immutable_id(self):
+        for mode in ("classic", "classic-oci"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                path = pathlib.Path(directory) / "image.tar"
+                local = self.archive(path, mode)
+                # Same nested runtime config/platform/rootfs, different raw image
+                # config (created/history/etc.) must not be accepted as the ID.
+                local["Id"] = digest(encoded(dict(config(), created="2000-01-01T00:00:00Z")))
+                with self.assertRaisesRegex(release.ReleaseError, "immutable image"):
+                    release.archive_identity(path, local)
+
+    def test_containerd_export_must_bind_inspected_descriptor_and_id(self):
+        for field, value in (("Id", "sha256:" + "d" * 64),
+                             ("digest", "sha256:" + "d" * 64), ("size", 1),
+                             ("size", True), ("mediaType", release.MANIFEST_TYPES[1]),
+                             ("Descriptor", None), ("Descriptor", {})):
+            with self.subTest(field=field, value=value), tempfile.TemporaryDirectory() as directory:
+                path = pathlib.Path(directory) / "image.tar"
+                local = self.archive(path)
+                if field in ("Id", "Descriptor"):
+                    local[field] = value
+                else:
+                    local["Descriptor"][field] = value
+                with self.assertRaisesRegex(release.ReleaseError, "immutable image"):
+                    release.archive_identity(path, local)
+
+    def test_containerd_descriptor_cannot_use_legacy_archive_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "image.tar"
+            local = self.archive(path, "classic")
+            local["Descriptor"] = {"mediaType": release.MANIFEST_TYPES[0],
+                                   "digest": local["Id"], "size": len(encoded(config()))}
+            with self.assertRaisesRegex(release.ReleaseError, "immutable image"):
+                release.archive_identity(path, local)
+
+    def test_local_identity_exports_immutable_id_and_rejects_tag_retarget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "image.tar"
+            original = self.normalized_inspect(self.archive(path, "classic"))
+
+            def export(*args):
+                self.assertEqual(args[:4], ("docker", "image", "save", "-o"))
+                self.assertEqual(args[5], original["Id"])
+                pathlib.Path(args[4]).write_bytes(path.read_bytes())
+                return ""
+
+            with mock.patch.object(release, "command", side_effect=export), \
+                    mock.patch.object(release, "inspect", return_value=copy.deepcopy(original)) as inspect:
+                try:
+                    local = release.local_identity("retargetable:tag")
+                except release.ReleaseError as error:
+                    self.fail("immutable export must verify with normalized inspect: " + str(error))
+                self.assertEqual(local["image_config"], config())
+                self.assertEqual(inspect.call_args_list, [mock.call("retargetable:tag")] * 2)
+            changed = dict(original, Id="sha256:" + "e" * 64)
+            with mock.patch.object(release, "command", side_effect=export), \
+                    mock.patch.object(release, "inspect", side_effect=[copy.deepcopy(original), changed]):
+                with self.assertRaisesRegex(release.ReleaseError, "changed while inspecting"):
+                    release.local_identity("retargetable:tag")
 
     def test_archive_rejects_indexes_attestations_corruption_and_wrong_rootfs(self):
         for mutation in ("index", "multiple", "blob", "rootfs"):
@@ -388,8 +490,9 @@ class ArchiveIdentity(unittest.TestCase):
         remote = config()
         remote["rootfs"]["diff_ids"] = ["sha256:" + "c" * 64]
         blob = encoded(remote)
-        # Isolate the rootfs guard after the config digest comparison.
+        # Isolate the rootfs guard after the exact saved config comparison.
         local["config_digest"] = digest(blob)
+        local["image_config"] = remote
         manifest = json.loads(client.responses[release.registry_path("manifests/1.2.3")][2])
         manifest["config"].update(digest=digest(blob), size=len(blob))
         body = encoded(manifest)
