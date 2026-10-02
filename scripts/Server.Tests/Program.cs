@@ -29,7 +29,8 @@ internal static class Program
             using var http = new HttpClient(handler)
             {
                 Timeout = TimeSpan.FromSeconds(10),
-                MaxResponseContentBufferSize = 16 * 1024 * 1024,
+                // Only the limits mode downloads its near-cap synthetic archive.
+                MaxResponseContentBufferSize = (options.Mode == "limits" ? 32 : 16) * 1024 * 1024,
             };
             using var repository = new RemoteNestRepository(http, options.Url);
             switch (options.Mode)
@@ -42,6 +43,9 @@ internal static class Program
                     break;
                 case "reject":
                     await Reject(repository, http, options.Url, watchdog.Token);
+                    break;
+                case "limits":
+                    await Limits(repository, http, options.Url, watchdog.Token);
                     break;
             }
             Console.WriteLine($"PASS {options.Mode}; raw camelCase/string-enum responses checked: {handler.CheckedResponses}");
@@ -161,6 +165,77 @@ internal static class Program
         Check(await repository.GetFileAsync(unknown, ct) is null, "Unknown file id must return 404.");
         await CheckSnapshot(repository, before, ct);
         Console.WriteLine("Unknown metadata/file ids: 404; all metadata and hashes unchanged.");
+    }
+
+    // Kestrel's default MaxRequestBodySize (30,000,000 bytes) bounds a whole multipart request.
+    private const int RequestBodyLimit = 30_000_000;
+
+    private static async Task Limits(RemoteNestRepository repository, HttpClient http, string url, CancellationToken ct)
+    {
+        var before = await Snapshot(repository, ct);
+        Check(before.Count > 0, "Limit checks require seeded records on an owned server.");
+
+        // Opaque synthetic bytes (the server does not parse archives) above the 64 KiB form
+        // memory threshold, so the non-root runtime must buffer the part to its temp directory.
+        var accepted = new byte[29_000_000];
+        RandomNumberGenerator.Fill(accepted);
+        var created = await repository.UploadAsync(accepted, new NestRecord
+        {
+            Name = "Synthetic upload-limit probe",
+            Comments = "Random bytes; deleted by the same smoke stage",
+        }, ct);
+        Check(created.Id != Guid.Empty && created.FileSize == accepted.LongLength,
+            "A near-limit upload must be stored with its exact size.");
+        var downloaded = await repository.GetFileAsync(created.Id, ct);
+        Check(downloaded is not null && downloaded.AsSpan().SequenceEqual(accepted),
+            "A near-limit archive must download byte-for-byte.");
+        await CheckMembership(repository, before.Select(s => s.Metadata.Id).Append(created.Id), ct);
+        await repository.DeleteAsync(created.Id, ct);
+        await CheckSnapshot(repository, before, ct);
+        Console.WriteLine($"Accepted, downloaded, and deleted a {accepted.Length}-byte archive; all other records unchanged.");
+
+        // Kestrel rejects an oversized declared length before the app reads the form. With
+        // Expect: 100-continue the client waits for, and must receive, that 413 response.
+        var oversized = new byte[RequestBodyLimit];
+        var oversizedRecord = new NestRecord { Name = "Synthetic oversized upload" };
+        var metadata = JsonSerializer.Serialize(oversizedRecord, JsonOptions);
+        foreach (var method in new[] { HttpMethod.Post, HttpMethod.Put })
+        {
+            var path = method == HttpMethod.Post ? "api/nests" : $"api/nests/{before[0].Metadata.Id}/file";
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(metadata), "metadata");
+            content.Add(new ByteArrayContent(oversized), "file", "synthetic.nest");
+            using var request = new HttpRequestMessage(method, new Uri(new Uri(url + "/"), path)) { Content = content };
+            request.Headers.ExpectContinue = true;
+            using var response = await http.SendAsync(request, ct);
+            Check(response.StatusCode == HttpStatusCode.RequestEntityTooLarge,
+                $"{method} of a request over {RequestBodyLimit} bytes must return 413.");
+            await CheckSnapshot(repository, before, ct);
+            Console.WriteLine($"Rejected {method} over-limit request: 413; all metadata and hashes unchanged.");
+        }
+
+        // RemoteNestRepository streams without Expect: 100-continue, so the server may close the
+        // connection before the client reads the 413. The real client must still report failure.
+        var saves = new (string Name, Func<Task> Save)[]
+        {
+            ("upload", () => repository.UploadAsync(oversized, oversizedRecord, ct)),
+            ("file update", () => repository.UpdateFileAsync(before[0].Metadata.Id, oversized, oversizedRecord, ct)),
+        };
+        foreach (var (name, save) in saves)
+        {
+            var outcome = "succeeded";
+            try
+            {
+                await save();
+            }
+            catch (Exception ex) when (ex is IOException or HttpRequestException)
+            {
+                outcome = ex.GetType().Name;
+            }
+            Check(outcome != "succeeded", $"Real-client oversized {name} must fail.");
+            await CheckSnapshot(repository, before, ct);
+            Console.WriteLine($"Real-client oversized {name} failed ({outcome}); all metadata and hashes unchanged.");
+        }
     }
 
     private static async Task<SavedRecord> ReadSaved(RemoteNestRepository repository, Nest nest,
@@ -310,7 +385,8 @@ internal static class Program
     {
         public static Options Parse(string[] args)
         {
-            Check(args.Length > 0 && args[0] is "seed" or "verify" or "reject", "Mode must be seed, verify, or reject.");
+            Check(args.Length > 0 && args[0] is "seed" or "verify" or "reject" or "limits",
+                "Mode must be seed, verify, reject, or limits.");
             string? url = null;
             string? state = null;
             var allowNonempty = false;
@@ -329,8 +405,8 @@ internal static class Program
                 && uri.Host == "127.0.0.1" && uri.Port > 0 && uri.AbsolutePath == "/"
                 && uri.UserInfo == "" && uri.Query == "" && uri.Fragment == "",
                 "Smoke requires a plain http://127.0.0.1:<port> URL without credentials, path, query, or fragment.");
-            Check(args[0] == "reject" ? state is null && !allowNonempty : !string.IsNullOrWhiteSpace(state),
-                "Seed/verify require --state; reject does not accept state or an override.");
+            Check(args[0] is "reject" or "limits" ? state is null && !allowNonempty : !string.IsNullOrWhiteSpace(state),
+                "Seed/verify require --state; reject/limits do not accept state or an override.");
             Check(args[0] == "seed" || !allowNonempty, "Nonempty override is TEST-only and seed-only.");
             return new Options(args[0], uri!.GetLeftPart(UriPartial.Authority), state, allowNonempty);
         }
@@ -372,8 +448,9 @@ internal static class Program
             var response = await base.SendAsync(request, ct);
             try
             {
-                if (response.IsSuccessStatusCode && !(request.Method == HttpMethod.Get
-                    && request.RequestUri!.AbsolutePath.EndsWith("/file", StringComparison.Ordinal)))
+                if (response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NoContent
+                    && !(request.Method == HttpMethod.Get
+                        && request.RequestUri!.AbsolutePath.EndsWith("/file", StringComparison.Ordinal)))
                 {
                     using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
                     if (json.RootElement.ValueKind == JsonValueKind.Array)

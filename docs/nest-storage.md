@@ -106,6 +106,8 @@ dotnet run --project OpenNest.Server/OpenNest.Server.csproj
 
 Listens on `ASPNETCORE_URLS` (default Kestrel ports) unless overridden.
 
+### Docker image
+
 Docker must be built from the repository root: the server references
 `OpenNest.Data`, which references `OpenNest.Core`. The Dockerfile copies all three
 project files before restore and their source/resources before publish, including
@@ -116,29 +118,155 @@ runtime to run; IO/Engine are used only by the host-side smoke tool, not the ima
 
 ```sh
 docker build --pull -f OpenNest.Server/Dockerfile -t opennest-server:local .
+# A release build stamps its version and exact source commit:
+docker build --pull -f OpenNest.Server/Dockerfile --build-arg VERSION=X.Y.Z \
+  --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" -t opennest-server:X.Y.Z .
 ```
 
-The image listens on `:8090` and keeps `OPENNEST_DB=/app/data/nests.db`. Mount
-`/app/data` to preserve the SQLite database and archive blobs across recreation.
-For an intentional local run (not needed for the isolated tests below):
+Without build arguments the image is labeled version `0.0.0-dev`, revision
+`unknown`: a development build, never a release. The OCI labels are
+`org.opencontainers.image.source`, `version`, `revision` and `base.name`.
+`SDK_IMAGE`/`RUNTIME_IMAGE` build arguments accept digest-pinned base images;
+for a release, record the base digests the build log resolved.
+
+Runtime contract:
+
+- Container port 8090 (`ASPNETCORE_URLS=http://+:8090`). Change the host port
+  mapping, not the container port: the healthcheck probes 8090.
+- Runs as the .NET base image's non-root `app` user (UID/GID 1654). Application
+  files are root-owned and read-only to it; within `/app` only `/app/data` is
+  writable, and a fresh named volume inherits that directory's ownership. The
+  database stays `OPENNEST_DB=/app/data/nests.db`. The server also needs the
+  container's writable `/tmp`: multipart uploads over 64 KiB are buffered there.
+- `HEALTHCHECK` runs `curl --fail http://127.0.0.1:8090/healthz` (interval 30 s,
+  timeout 5 s, start period 10 s, retries 3, and a 2 s start interval during the
+  start period on Docker 25+). curl is in the image only for it.
+- A read-only or unwritable data location fails startup: the process exits
+  rather than serving requests it cannot store.
+- Uploads: Kestrel's default 30,000,000-byte request limit covers the whole
+  multipart request, so an archive must be slightly smaller (the smoke stores a
+  29,000,000-byte one). A larger request gets 413 and nothing is stored. The
+  desktop client streams without `Expect: 100-continue`, so it typically reports
+  a closed connection instead of the 413 status. The save still fails.
+
+Data written by a root-run image or a root-owned bind mount is not writable by
+UID 1654, so startup fails. With the operator's approval, change ownership of
+that data location only, once, for example
+`docker run --rm --user 0 --entrypoint chown -v <volume>:/app/data <image> -R 1654:1654 /app/data`
+(or `chown -R 1654:1654` on the bind-mounted directory itself, never its
+parents). The image has no root entrypoint that changes ownership.
+
+### Deploying with Compose
+
+`compose.server.yaml` runs a published image (no local build) with
+`no-new-privileges`, all capabilities dropped, and a named data volume. Copy it and
+`OpenNest.Server/server.env.example` to a deployment directory, save the env file
+under a local name such as `server.env`, and set:
+
+- `OPENNEST_SERVER_IMAGE`: a tested version or, preferably, a digest.
+- `OPENNEST_BIND_ADDRESS`: `127.0.0.1` for testing on the host; this host's
+  trusted LAN address for shop PCs. Do not use `0.0.0.0`. The bind address is only
+  one layer: verify that the network/firewall admits only trusted clients.
+- `OPENNEST_HOST_PORT` (default 8090) and `OPENNEST_DATA_VOLUME` (default `opennest-data`).
 
 ```sh
-docker run -d -p 127.0.0.1:8090:8090 -v opennest-data:/app/data opennest-server:local
+compose="docker compose --env-file server.env -f compose.server.yaml"
+$compose up -d
+$compose ps                                       # STATUS shows (healthy)
+curl --fail http://<bind-address>:<port>/healthz  # {"status":"ok"}
 ```
 
-This example binds only to loopback. Remote shop clients require an explicitly
-chosen trusted-interface binding and network access controls; do not casually
-replace it with an all-interface publish. The service has no authentication.
-These build/smoke instructions do not establish release readiness, non-root
-hardening, or a production deployment.
+In the desktop app choose **File > Storage Mode...**, Database, and enter the base
+URL `http://<bind-address>:<port>`, without `/healthz` or `/api/nests`.
 
-Point the desktop app's **File > Storage Mode...** server URL at
-`http://<trusted-host>:8090` (or `http://127.0.0.1:8090` for local use).
+### Backup, restore, and upgrade
+
+SQLite runs in WAL mode, so copying `nests.db` from a running service is not a
+backup. Back up during a quiet period with no saves. Each step below is a Bash
+function that checks every command and stops at the first failure, however it is
+called; define them in the shell where `compose` is set:
+
+```bash
+url=http://<bind-address>:<port>
+
+# "<id> <archive SHA-256>" for every record, sorted by id. Fails on any failed request.
+nest_manifest() (
+  set -o pipefail
+  list=$(curl -fsS "$1/api/nests") || exit 1
+  for id in $(printf '%s' "$list" | grep -o '"id":"[0-9a-f-]*"' | cut -d'"' -f4 | sort); do
+    hash=$(curl -fsS "$1/api/nests/$id/file" | sha256sum) || exit 1
+    printf '%s %s\n' "$id" "${hash%% *}"
+  done
+)
+
+# Records the expected manifest and metadata, then archives the stopped data directory.
+# The service is restarted even if the archive fails.
+backup_nests() (  # usage: backup_nests opennest-data-YYYY-MM-DD
+  set -o pipefail
+  fail() { echo "STOP: $*" >&2; exit 1; }
+  [[ ! -e "$1.tar" ]] || fail "$1.tar already exists"
+  nest_manifest "$url" > "$1.manifest" || fail "could not record the manifest"
+  curl -fsS "$url/api/nests" > "$1.metadata.json" || fail "could not record the metadata"
+  $compose stop || fail "could not stop the service"
+  $compose run --rm --no-deps -T --entrypoint tar opennest-server -C /app/data -cf - . > "$1.tar"
+  status=$?
+  $compose start || fail "could not restart the service"
+  curl -fs --retry 30 --retry-all-errors --retry-delay 1 "$url/healthz" > /dev/null \
+    || fail "the restarted service is not healthy"
+  [[ $status == 0 ]] || fail "the archive failed; $1.tar is incomplete"
+  echo "Backed up $(wc -l < "$1.manifest") records to $1.tar"
+)
+
+backup_nests opennest-data-YYYY-MM-DD
+```
+
+Restore only into a volume created for that restore, never into an existing one
+(least of all the active volume). `restore_check` refuses an existing volume,
+extracts the backup into a new one, starts a temporary loopback-only container on
+it, and requires the exact metadata list and every archive hash to match. It
+removes only the container it started; the new volume is kept either way:
+
+```bash
+restore_check() (  # usage: restore_check opennest-data-YYYY-MM-DD <image> [new-volume]
+  set -o pipefail
+  fail() { echo "STOP: $*" >&2; exit 1; }
+  restore=${3:-opennest-data-restore-$(date +%Y%m%d-%H%M%S)}
+  ! docker volume inspect "$restore" > /dev/null 2>&1 || fail "volume $restore already exists"
+  docker volume create "$restore" > /dev/null || fail "could not create volume $restore"
+  echo "Restoring into new volume $restore"
+  docker run --rm -i --network none --entrypoint tar -v "$restore:/app/data" "$2" \
+    -C /app/data -xf - < "$1.tar" || fail "extraction into $restore failed"
+  check=$(docker create -p 127.0.0.1::8090 -v "$restore:/app/data" "$2") \
+    || fail "could not create the check container"
+  trap 'docker rm -f "$check" > /dev/null' EXIT
+  docker start "$check" > /dev/null || fail "the check container did not start"
+  port=$(docker port "$check" 8090/tcp | cut -d: -f2) && [[ -n $port ]] || fail "no check port"
+  curl -fs --retry 30 --retry-all-errors --retry-delay 1 "http://127.0.0.1:$port/healthz" > /dev/null \
+    || fail "the restored service is not healthy"
+  curl -fsS "http://127.0.0.1:$port/api/nests" | cmp - "$1.metadata.json" || fail "metadata differs"
+  nest_manifest "http://127.0.0.1:$port" | diff - "$1.manifest" || fail "archives differ"
+  echo "Verified $restore. Set OPENNEST_DATA_VOLUME=$restore in server.env, then run: \$compose up -d"
+)
+
+restore_check opennest-data-YYYY-MM-DD <image>
+```
+
+Switch only after `restore_check` prints `Verified`. If it stops, inspect or remove
+the new volume it named; the active volume is untouched.
+
+To upgrade, take a stopped-service backup and keep a copy of the current
+`server.env`. Prefer a digest in `OPENNEST_SERVER_IMAGE` so that file records
+exactly what ran; for a tag, record
+`docker image inspect --format '{{join .RepoDigests " "}}' <image>` first. Change
+only `OPENNEST_SERVER_IMAGE` and run `$compose up -d`. To roll back, restore the
+previous `server.env` and run `$compose up -d`; if the new version wrote data the
+old one cannot read, also restore the backup as above. Never run
+`docker compose down -v`: it deletes the data volume.
 
 ## Isolated container smoke
 
 Prerequisites: a local Linux Docker daemon on the default Unix-socket context,
-Bash, curl, GNU `timeout`, `mktemp`, and a .NET SDK able to build `net8.0` projects
+Bash, curl, GNU `timeout`, `mktemp`, `tar`, and a .NET SDK able to build `net8.0` projects
 (.NET 8 or newer). Restore needs NuGet access or cached packages. Run from the
 repository root after building the image:
 
@@ -150,9 +278,17 @@ scripts/Test-ServerContainer.sh --image opennest-server:local --results /path/to
 
 The wrapper accepts an image, not a URL or an existing volume/container. It uses
 only the local default Docker context, creates uniquely labeled disposable
-resources, and publishes to `127.0.0.1` on a Docker-allocated port. It builds the
-smoke tool once into a private temporary directory, honoring `TMPDIR`; readiness,
-HTTP requests, and child commands have watchdogs.
+resources, and publishes to `127.0.0.1` on a Docker-allocated port. Every container
+runs with the Compose example's `--cap-drop ALL` and `no-new-privileges`. It builds
+the smoke tool once into a private temporary directory, honoring `TMPDIR`;
+readiness, HTTP requests, and child commands have watchdogs.
+
+Before starting a container it checks the image's numeric non-root `USER`, the
+documented `HEALTHCHECK` command and timings (including the start interval), and
+the OCI source/version/revision labels. A service is ready only when Docker reports the image's own healthcheck
+`healthy` and the host receives `{"status":"ok"}`. Each service then checks that
+the server process (PID 1) runs as the image user with no effective capabilities,
+owns `nests.db`, and can write `/app/data` but not `/app` or the server DLL.
 
 The test-only `scripts/Server.Tests/Server.Tests.csproj` console exercises the
 existing .NET storage client; it is not included in the server image.
@@ -166,21 +302,33 @@ and counts. `reject` snapshots every record's metadata and archive hash, then
 checks 400 responses for missing/invalid/null metadata and missing/empty files on
 both upload and file-update routes; unknown metadata/file IDs must return 404.
 Every rejected operation must leave the snapshot unchanged.
+`limits` stores, downloads byte-for-byte, and deletes a 29,000,000-byte synthetic
+archive (buffered to disk by the non-root runtime), then requires 413 for a
+request over 30,000,000 bytes sent with `Expect: 100-continue`, and a reported
+failure from the real client's oversized upload and file update. The snapshot
+must be unchanged after each.
 
 The persistence stage stops and removes the first container while retaining its
-named volume, starts a replacement on another allocated loopback port, and runs
+fresh named volume, starts a replacement on another allocated loopback port, and runs
 `verify` against saved IDs, **all** metadata (including server-assigned `savedAt`),
-archive hashes, and exact list membership. A missing/invalid state file or failed
-assertion exits nonzero. Direct tool use is test-only: it accepts plain loopback
-URLs, and `seed` refuses a nonempty server unless `--test-allow-nonempty` is
-explicitly supplied for an owned disposable target. Prefer the wrapper; loopback
-alone is not proof that an existing server is disposable.
+archive hashes, and exact list membership. It then follows the documented
+stopped-service backup: `tar` of the whole data directory through the image,
+restored into a second owned volume whose service must pass the same `verify`.
+The original volume mounted read-only, and a root-owned `tmpfs`, must each make
+the server exit nonzero at startup with a SQLite error and never report healthy.
+
+A missing/invalid state file or failed assertion exits nonzero. Direct tool use is
+test-only: it accepts plain loopback URLs, and `seed` refuses a nonempty server
+unless `--test-allow-nonempty` is explicitly supplied for an owned disposable
+target. Prefer the wrapper; loopback alone is not proof that an existing server is
+disposable.
 
 Each invocation writes a fresh `run.*` results directory containing build, smoke,
-container, ownership, and cleanup logs. On failure those logs remain for diagnosis.
-The exit trap removes only invocation-owned containers and the named volume;
-transient state, synthetic databases, and build artifacts are removed on success
-or failure. It never prunes Docker or alters preexisting services/volumes.
+container, image, runtime, ownership, and cleanup logs. On failure those logs remain
+for diagnosis. The exit trap removes only invocation-owned containers and named
+volumes; transient state, the backup archive, synthetic databases, and build
+artifacts are removed on success or failure. It never prunes Docker or alters
+preexisting services/volumes.
 Cleanup requires successful empty Docker inventory readback, including for an
 already-removed container. Unresolved ownership, lookup, removal, or readback
 errors make the wrapper fail without deleting unproven resources; inspect

@@ -11,5 +11,7 @@
 **/*.db
 **/*.db-*
 **/.env*
+**/*.env
+**/*.env.*
 **/*.user
 **/Properties/launchSettings.json

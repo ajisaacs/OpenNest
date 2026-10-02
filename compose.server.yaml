@@ -1,0 +1,23 @@
+# OpenNest.Server deployment example: one instance, one local data volume, LAN-only.
+# Usage: docker compose --env-file <local-env> -f compose.server.yaml up -d
+# Start from OpenNest.Server/server.env.example. See docs/nest-storage.md before deploying.
+name: opennest-server
+services:
+  opennest-server:
+    image: ${OPENNEST_SERVER_IMAGE:?Set a tested version or digest}
+    restart: unless-stopped
+    ports:
+      - "${OPENNEST_BIND_ADDRESS:?Set 127.0.0.1 for testing or a trusted LAN address}:${OPENNEST_HOST_PORT:-8090}:8090"
+    environment:
+      ASPNETCORE_URLS: http://+:8090
+      OPENNEST_DB: /app/data/nests.db
+    volumes:
+      - opennest-data:/app/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  opennest-data:
+    # A restore switches to a separately verified volume instead of overwriting this one.
+    name: ${OPENNEST_DATA_VOLUME:-opennest-data}

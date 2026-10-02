@@ -20,6 +20,9 @@ CID = "b" * 64
 FIRST_NAME = "cleanup-unit.first"
 NAME = "cleanup-unit.replacement"
 VOLUME = "cleanup-unit-data"
+EXTRA_ID = "c" * 64
+EXTRA_NAME = "cleanup-unit.restored"
+EXTRA_VOLUME = "cleanup-unit-restore"
 
 
 def mock_docker(state_path, args):
@@ -95,7 +98,7 @@ def mock_docker(state_path, args):
 class CleanupTests(unittest.TestCase):
     def run_cleanup(self, *, missing_cidfile=False, absent_first=False,
                     absent_all=False, unowned=False, attempted=True,
-                    original_status=0, **faults):
+                    original_status=0, extra=False, **faults):
         source = Path(__file__).with_name("Test-ServerContainer.sh").read_text()
         # Extract the actual candidate functions, never a copied cleanup implementation.
         functions = source[source.index("owned_container() {"):source.index("trap cleanup EXIT")]
@@ -111,26 +114,48 @@ class CleanupTests(unittest.TestCase):
                 (scratch / "replacement.cid").write_text(CID + "\n")
             if absent_first:
                 (scratch / "first.cid").write_text(FIRST_ID + "\n")
+            if extra:
+                (scratch / "restored.cid").write_text(EXTRA_ID + "\n")
             owner = "someone-else" if unowned else TOKEN
             state_path = root / "virtual-docker.json"
+            containers = {} if absent_all else {CID: {"name": NAME, "owner": owner}}
+            volumes = {} if absent_all else {VOLUME: {"owner": owner}}
+            names = [FIRST_NAME, NAME]
+            cidfiles = [scratch / "first.cid", scratch / "replacement.cid"]
+            container_attempted = [absent_first and attempted, attempted]
+            volume_names = [VOLUME]
+            if extra:
+                containers[EXTRA_ID] = {"name": EXTRA_NAME, "owner": owner}
+                volumes[EXTRA_VOLUME] = {"owner": owner}
+                names.append(EXTRA_NAME)
+                cidfiles.append(scratch / "restored.cid")
+                container_attempted.append(attempted)
+                volume_names.append(EXTRA_VOLUME)
             state = {
-                "containers": {} if absent_all else {CID: {"name": NAME, "owner": owner}},
-                "volumes": {} if absent_all else {VOLUME: {"owner": owner}},
+                "containers": containers,
+                "volumes": volumes,
                 "calls": [], "removals": [], **faults,
             }
             state_path.write_text(json.dumps(state))
             q = shlex.quote
+
+            def bash_array(values):
+                return "(" + " ".join(q(str(value)) for value in values) + ")"
+
+            def bash_flags(values):
+                return "(" + " ".join(str(value).lower() for value in values) + ")"
+
             script = "\n".join([
                 "set -Eeuo pipefail",
                 f"scratch={q(str(scratch))}",
                 f"run_results={q(str(logs))}",
                 "owner_label='com.opennest.server-smoke.owner'",
                 f"token={q(TOKEN)}",
-                f"volume={q(VOLUME)}",
-                f"volume_attempted={str(attempted).lower()}",
-                f"container_attempted=({str(absent_first and attempted).lower()} {str(attempted).lower()})",
-                f"container_names=({q(FIRST_NAME)} {q(NAME)})",
-                f"cidfiles=({q(str(scratch / 'first.cid'))} {q(str(scratch / 'replacement.cid'))})",
+                f"volumes={bash_array(volume_names)}",
+                f"volume_attempted={bash_flags([attempted] * len(volume_names))}",
+                f"container_attempted={bash_flags(container_attempted)}",
+                f"container_names={bash_array(names)}",
+                f"cidfiles={bash_array(cidfiles)}",
                 f'docker_local() {{ {q(sys.executable)} {q(str(Path(__file__).resolve()))} '
                 f'--mock-docker {q(str(state_path))} "$@"; }}',
                 functions,
@@ -234,6 +259,22 @@ class CleanupTests(unittest.TestCase):
         result = self.run_cleanup(original_status=23, fault_kind="container", lookup_status=124)
         self.assert_failed(result, status=23)
         self.assertIn("Injected Docker container lookup failure status=124", result["log"])
+
+    def test_every_attempted_container_and_volume_is_removed(self):
+        result = self.run_cleanup(extra=True)
+        self.assertEqual(0, result["status"], result)
+        self.assertEqual("exit=0 cleanup_failed=0\n", result["outcome"])
+        self.assertEqual([["container", CID], ["container", EXTRA_ID], ["volume", VOLUME],
+                          ["volume", EXTRA_VOLUME]], result["state"]["removals"])
+        self.assertFalse(result["state"]["containers"])
+        self.assertFalse(result["state"]["volumes"])
+
+    def test_one_failed_volume_does_not_skip_or_hide_the_others(self):
+        result = self.run_cleanup(extra=True, fault_kind="volume", remove_mode="error")
+        self.assert_failed(result)
+        self.assertEqual([["container", CID], ["container", EXTRA_ID], ["volume", VOLUME],
+                          ["volume", EXTRA_VOLUME]], result["state"]["removals"])
+        self.assertFalse(result["state"]["containers"])
 
 
 if __name__ == "__main__":
