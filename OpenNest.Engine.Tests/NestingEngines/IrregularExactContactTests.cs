@@ -143,6 +143,72 @@ public class IrregularExactContactTests
         }
     }
 
+    [Theory]
+    [InlineData(0.0, false)]
+    [InlineData(System.Math.PI / 2, false)]
+    [InlineData(System.Math.PI, false)]
+    [InlineData(3 * System.Math.PI / 2, false)]
+    [InlineData(0.0, true)]
+    [InlineData(System.Math.PI / 2, true)]
+    [InlineData(System.Math.PI, true)]
+    [InlineData(3 * System.Math.PI / 2, true)]
+    public void ShortEdgeChainBoundsKeepEveryAnalyticEndpoint(double angle, bool extraOrientation)
+    {
+        var job = Job(new[] { Part("rect", Shapes.Polyline(ShortEdgeChainVertices()), 1,
+            RotationPolicy.Fixed(extraOrientation ? 0 : angle)) }, new[] { Stock("sheet", 20, 20) });
+        var type = PartCatalog.Build(job).Single();
+        var orientation = extraOrientation
+            ? PartCatalog.CreateOrientation(type, 100, angle)!
+            : type.Orientations.Single();
+        Assert.NotNull(orientation);
+
+        var (c, s) = (System.Math.Cos(angle), System.Math.Sin(angle));
+        var endpoints = ShortEdgeChainVertices()
+            .Select(p => (X: p.X * c - p.Y * s, Y: p.X * s + p.Y * c)).ToArray();
+        Assert.Equal(endpoints.Min(p => p.X), orientation.MinX, 12);
+        Assert.Equal(endpoints.Min(p => p.Y), orientation.MinY, 12);
+        Assert.Equal(endpoints.Max(p => p.X), orientation.MaxX, 12);
+        Assert.Equal(endpoints.Max(p => p.Y), orientation.MaxY, 12);
+        Assert.Equal(PartCatalog.ChordTolerance, orientation.Tolerance);
+    }
+
+    [Fact]
+    public void ShortEdgeChainCannotEscapeAnExactWorkArea()
+    {
+        var job = ShortEdgeChainJob(8.5);
+        var result = new IrregularNestingEngine().Solve(job);
+
+        Assert.Empty(NestLayoutCheck.Violations(job, result));
+        AssertUnplaced(job, result);
+    }
+
+    [Fact]
+    public void ShortEdgeChainFitsWhenStockContainsItsTrueExtent()
+    {
+        var job = ShortEdgeChainJob(8.500024);
+        var result = new IrregularNestingEngine().Solve(job);
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal((1, 1, 0), (result.Fulfillment.Single().Requested,
+            result.Fulfillment.Single().Placed, result.Fulfillment.Single().Unplaced));
+        var sheet = Assert.Single(result.Plates);
+        var pose = Assert.Single(sheet.Placements);
+        Assert.True(OracleGaps(sheet.Stock, pose, ShortEdgeChainVertices()).Min() >= Edge - OracleNoise);
+        LayoutAssert.Valid(job, result);
+        Assert.Empty(NestLayoutCheck.Violations(job, result));
+        Validate(job, pose);
+    }
+
+    // Polygon cleanup can collapse these individually short edges, but their accumulated
+    // outward extent is real material and exceeds the unchanged work-area slack.
+    private static (double X, double Y)[] ShortEdgeChainVertices() =>
+        [(0, 0), (0, 3), (8, 3), (8.000008, 2.999992),
+         (8.000016, 2.999984), (8.000024, 2.999976), (8, 0)];
+
+    private static NestJob ShortEdgeChainJob(double length) =>
+        Job(new[] { Part("rect", Shapes.Polyline(ShortEdgeChainVertices()), 1, RotationPolicy.Fixed(0)) },
+            new[] { Stock("sheet", 3.5, length, spacing: Spacing, edge: new Spacing(Edge, Edge, Edge, Edge)) });
+
     private static NestJob RectangleJob(double width, double length, int quadrant, RotationPolicy rotation) =>
         Job(new[] { Rectangle("rect", PartLength, PartWidth, 1, rotation) },
             new[] { Stock("sheet", width, length, spacing: Spacing, edge: new Spacing(Edge, Edge, Edge, Edge), quadrant: quadrant) });
@@ -174,11 +240,15 @@ public class IrregularExactContactTests
 
     /// <summary>Clearance from the rotated nominal rectangle to each physical sheet edge
     /// (left, bottom, right, top), computed from corners and the quadrant's sheet origin.</summary>
-    private static double[] OracleGaps(NestPlateStock stock, NestJobPlacement pose)
+    private static double[] OracleGaps(NestPlateStock stock, NestJobPlacement pose) =>
+        OracleGaps(stock, pose, [(0, 0), (PartLength, 0), (PartLength, PartWidth), (0, PartWidth)]);
+
+    private static double[] OracleGaps(NestPlateStock stock, NestJobPlacement pose,
+        (double X, double Y)[] vertices)
     {
         var (c, s) = (System.Math.Cos(pose.Rotation), System.Math.Sin(pose.Rotation));
-        var corners = new[] { (0.0, 0.0), (PartLength, 0.0), (PartLength, PartWidth), (0.0, PartWidth) }
-            .Select(p => (X: p.Item1 * c - p.Item2 * s + pose.X, Y: p.Item1 * s + p.Item2 * c + pose.Y))
+        var corners = vertices
+            .Select(p => (X: p.X * c - p.Y * s + pose.X, Y: p.X * s + p.Y * c + pose.Y))
             .ToArray();
         var sheetLeft = stock.Quadrant is 1 or 4 ? 0 : -stock.Size.Length;
         var sheetBottom = stock.Quadrant is 1 or 2 ? 0 : -stock.Size.Width;

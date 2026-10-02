@@ -171,9 +171,17 @@ internal static class PartCatalog
         double tolerance, Shape perimeter)
     {
         var bounds = Clipper.GetBounds(outline);
-        // Only flattened arcs deviate from the true perimeter; line vertices are exact, so a
-        // line-only part keeps its nominal material bounds and can fill its work area exactly.
-        var padding = perimeter.Entities.All(e => e.Type == EntityType.Line) ? 0 : tolerance;
+        // Curves retain flattening-error padding. For lines, use analytic endpoint bounds:
+        // polygon cleanup can discard short-edge chains and shrink the material's true extent.
+        var padding = tolerance;
+        if (perimeter.Entities.All(e => e.Type == EntityType.Line))
+        {
+            var nominal = (Shape)perimeter.Clone();
+            nominal.Rotate(angle);
+            var box = nominal.BoundingBox;
+            bounds = new RectD(box.Left, box.Bottom, box.Right, box.Top);
+            padding = 0;
+        }
         return new Orientation
         {
             TypeIndex = typeIndex,

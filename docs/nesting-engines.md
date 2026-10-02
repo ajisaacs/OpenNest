@@ -25,6 +25,13 @@ A free box may absorb a slightly oversized side only at its right/top edge when 
 coincides with the plate work-area boundary. Internal leftover edges keep the strict packing
 tolerance, and actual part dimensions still determine spacing away from the plate boundary.
 
+Irregular keeps nominal orientation bounds for line-only outlines, so an allowed rotation can
+fit exactly between the configured plate-edge gaps. These bounds use original rotated line
+endpoints, retaining material extents even when polygon cleanup discards short-edge chains.
+Curved outlines retain conservative flattening-error padding. This does not relax part-spacing
+footprints, no-fit polygons or layout validation tolerances; a part extending beyond the accepted
+work-area bounds remains invalid.
+
 Irregular fills gaps and open notches using outer profiles; it does not yet place parts inside
 enclosed cutouts. For a part with two or more copies it also offers its best-fit pairs (two copies
 interlocked, as the Best Fit viewer shows them) alongside the single copies, and places a pair
