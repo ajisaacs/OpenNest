@@ -25,7 +25,11 @@ internal sealed class Orientation
     /// <summary>Chord deviation used for arcs; footprints are grown by it to stay conservative.</summary>
     public required double Tolerance { get; init; }
 
-    /// <summary>Outline bounds grown by the tolerance, so they contain the true perimeter.</summary>
+    /// <summary>
+    /// Outline bounds grown by the outline's actual flattening error, so they contain the true
+    /// perimeter: by <see cref="Tolerance"/> when arcs were flattened, not at all for line-only
+    /// outlines, whose vertices are exact. Footprints and NFPs still use <see cref="Tolerance"/>.
+    /// </summary>
     public required double MinX { get; init; }
     public required double MinY { get; init; }
     public required double MaxX { get; init; }
@@ -96,7 +100,7 @@ internal static class PartCatalog
                 var outline = Polygonize(perimeter, angle, tolerance);
                 if (outline.Count < 3)
                     continue;
-                orientations.Add(MakeOrientation(index, orientations.Count, angle, outline, tolerance));
+                orientations.Add(MakeOrientation(index, orientations.Count, angle, outline, tolerance, perimeter));
             }
 
             var area = orientations.Count == 0 ? 0 : System.Math.Abs(Clipper.Area(orientations[0].Outline));
@@ -123,7 +127,7 @@ internal static class PartCatalog
             return null;
         var tolerance = type.Orientations[0].Tolerance;
         var outline = Polygonize(type.Perimeter, angle, tolerance);
-        return outline.Count < 3 ? null : MakeOrientation(type.Index, index, angle, outline, tolerance);
+        return outline.Count < 3 ? null : MakeOrientation(type.Index, index, angle, outline, tolerance, type.Perimeter);
     }
 
     private static Shape? ReadPerimeter(PartGeometrySnapshot geometry) =>
@@ -163,9 +167,21 @@ internal static class PartCatalog
         return path;
     }
 
-    private static Orientation MakeOrientation(int typeIndex, int index, double angle, PathD outline, double tolerance)
+    private static Orientation MakeOrientation(int typeIndex, int index, double angle, PathD outline,
+        double tolerance, Shape perimeter)
     {
         var bounds = Clipper.GetBounds(outline);
+        // Curves retain flattening-error padding. For lines, use analytic endpoint bounds:
+        // polygon cleanup can discard short-edge chains and shrink the material's true extent.
+        var padding = tolerance;
+        if (perimeter.Entities.All(e => e.Type == EntityType.Line))
+        {
+            var nominal = (Shape)perimeter.Clone();
+            nominal.Rotate(angle);
+            var box = nominal.BoundingBox;
+            bounds = new RectD(box.Left, box.Bottom, box.Right, box.Top);
+            padding = 0;
+        }
         return new Orientation
         {
             TypeIndex = typeIndex,
@@ -173,10 +189,10 @@ internal static class PartCatalog
             Rotation = angle,
             Outline = outline,
             Tolerance = tolerance,
-            MinX = bounds.left - tolerance,
-            MinY = bounds.top - tolerance, // Clipper RectD: top is the minimum Y.
-            MaxX = bounds.right + tolerance,
-            MaxY = bounds.bottom + tolerance,
+            MinX = bounds.left - padding,
+            MinY = bounds.top - padding, // Clipper RectD: top is the minimum Y.
+            MaxX = bounds.right + padding,
+            MaxY = bounds.bottom + padding,
         };
     }
 
