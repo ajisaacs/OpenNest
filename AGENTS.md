@@ -18,10 +18,11 @@ OpenNest is a .NET 8 Windows CNC-nesting application with cross-platform librari
 dotnet build OpenNest.sln
 
 # Cross-platform suites: run independently on Linux/macOS/Windows
-dotnet test OpenNest.Tests/OpenNest.Tests.csproj
-dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj
-dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj
-dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj
+# Use Release for routine runs; use Debug explicitly for DEBUG-only work counters.
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release
+dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj -c Release
+dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj -c Release
+dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj -c Release
 
 # Windows runtime tests
 dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
