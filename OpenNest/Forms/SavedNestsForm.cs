@@ -1,7 +1,5 @@
 using System;
-using System.Data;
 using System.Drawing;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Data;
@@ -9,18 +7,26 @@ using OpenNest.Data;
 namespace OpenNest.Forms;
 
 /// <summary>
-/// File &gt; Open (Database mode): lists nests from the shared nest server with
-/// filterable/sortable metadata columns, and lets the operator open or delete one.
+/// File &gt; Open (Database mode): browses nests on the shared nest server one bounded
+/// page at a time. Filtering, sorting and paging run on the server through
+/// <see cref="NestBrowseSession"/>; this form only renders its state.
 /// </summary>
 public sealed class SavedNestsForm : Form
 {
+    private const string IdColumn = "Id";
+    private const string LoadingText = "Loading...";
+
     private readonly INestRepository repository;
+    private readonly NestBrowseSession session;
     private readonly DataGridView grid;
     private readonly TextBox searchBox;
+    private readonly Timer searchTimer;
     private readonly Button openButton;
     private readonly Button deleteButton;
-    private readonly Button refreshButton;
-    private NestRecord[] records = Array.Empty<NestRecord>();
+    private readonly Button previousButton;
+    private readonly Button nextButton;
+    private readonly ToolStripStatusLabel statusLabel;
+    private int pendingRequests;
 
     /// <summary>Set to the chosen record's id when the dialog closes with OK.</summary>
     public Guid SelectedId { get; private set; }
@@ -28,6 +34,7 @@ public sealed class SavedNestsForm : Form
     public SavedNestsForm(INestRepository repository)
     {
         this.repository = repository;
+        session = new NestBrowseSession(repository);
 
         Text = "Open Nest — Database";
         StartPosition = FormStartPosition.CenterParent;
@@ -36,15 +43,37 @@ public sealed class SavedNestsForm : Form
         MaximizeBox = false;
         ShowInTaskbar = false;
 
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(6) };
-        var searchLabel = new Label { Text = "Filter:", AutoSize = true, Location = new Point(6, 10) };
-        searchBox = new TextBox { Location = new Point(50, 6), Width = 300 };
-        searchBox.TextChanged += (_, _) => ApplyFilter();
-        refreshButton = new Button { Text = "Refresh", AutoSize = true, Location = new Point(360, 5) };
-        refreshButton.Click += async (_, _) => await LoadAsync();
+        var topPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 34,
+            Padding = new Padding(3),
+            WrapContents = false,
+        };
+        var searchLabel = new Label { Text = "Filter:", AutoSize = true, Margin = new Padding(3, 7, 0, 0) };
+        searchBox = new TextBox { Width = 300, MaxLength = NestQuery.MaxSearchLength };
+        searchTimer = new Timer { Interval = 300 };
+        searchTimer.Tick += async (_, _) =>
+        {
+            searchTimer.Stop();
+            await RunAsync(() => session.SetSearchAsync(searchBox.Text));
+        };
+        searchBox.TextChanged += (_, _) =>
+        {
+            searchTimer.Stop();
+            searchTimer.Start();
+        };
+        var refreshButton = new Button { Text = "Refresh", AutoSize = true };
+        refreshButton.Click += async (_, _) => await RunAsync(session.RefreshAsync);
+        previousButton = new Button { Text = "< Previous", AutoSize = true, Enabled = false };
+        previousButton.Click += async (_, _) => await RunAsync(session.PreviousPageAsync);
+        nextButton = new Button { Text = "Next >", AutoSize = true, Enabled = false };
+        nextButton.Click += async (_, _) => await RunAsync(session.NextPageAsync);
         topPanel.Controls.Add(searchLabel);
         topPanel.Controls.Add(searchBox);
         topPanel.Controls.Add(refreshButton);
+        topPanel.Controls.Add(previousButton);
+        topPanel.Controls.Add(nextButton);
 
         grid = new DataGridView
         {
@@ -55,6 +84,32 @@ public sealed class SavedNestsForm : Form
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+        };
+        AddColumn("Name", NestSortField.Name, typeof(string));
+        AddColumn("Customer", NestSortField.Customer, typeof(string));
+        AddColumn("Status", NestSortField.Status, typeof(string));
+        AddColumn("Material", NestSortField.Material, typeof(string));
+        AddColumn("Date Created", NestSortField.DateCreated, typeof(DateTime));
+        AddColumn("Date Modified", NestSortField.DateModified, typeof(DateTime));
+        AddColumn("Thickness", NestSortField.Thickness, typeof(double));
+        AddColumn("Plates", NestSortField.PlateCount, typeof(int));
+        AddColumn("Parts", NestSortField.PartCount, typeof(int));
+        AddColumn("Made By", NestSortField.MadeBy, typeof(string));
+        AddColumn("Comments", NestSortField.Comments, typeof(string));
+        AddColumn("File Size", NestSortField.FileSize, typeof(long));
+        AddColumn("Saved", NestSortField.SavedAt, typeof(DateTime));
+        grid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = IdColumn,
+            ValueType = typeof(Guid),
+            Visible = false,
+            SortMode = DataGridViewColumnSortMode.NotSortable,
+        });
+        // Sorting a page locally would misrepresent the archive; the server sorts all matches.
+        grid.ColumnHeaderMouseClick += async (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left && grid.Columns[e.ColumnIndex].Tag is NestSortField field)
+                await RunAsync(() => session.SortByAsync(field));
         };
         grid.CellDoubleClick += (_, e) =>
         {
@@ -78,6 +133,10 @@ public sealed class SavedNestsForm : Form
         buttons.Controls.Add(openButton);
         buttons.Controls.Add(deleteButton);
 
+        var statusStrip = new StatusStrip { SizingGrip = false };
+        statusLabel = new ToolStripStatusLabel { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
+        statusStrip.Items.Add(statusLabel);
+
         grid.SelectionChanged += (_, _) =>
         {
             var hasSelection = grid.SelectedRows.Count > 0;
@@ -88,91 +147,72 @@ public sealed class SavedNestsForm : Form
         Controls.Add(grid);
         Controls.Add(topPanel);
         Controls.Add(buttons);
+        Controls.Add(statusStrip);
         CancelButton = cancel;
 
-        Shown += async (_, _) => await LoadAsync();
+        Shown += async (_, _) => await RunAsync(session.RefreshAsync);
     }
 
-    private async Task LoadAsync()
+    private void AddColumn(string name, NestSortField sortField, Type valueType)
     {
-        Cursor = Cursors.WaitCursor;
+        grid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = name,
+            HeaderText = name,
+            ValueType = valueType,
+            SortMode = DataGridViewColumnSortMode.Programmatic,
+            Tag = sortField,
+        });
+    }
+
+    /// <summary>
+    /// Sends one browse request and renders its page. A request superseded by a newer one
+    /// renders nothing; a failure clears the rows and shows the error in the status line.
+    /// </summary>
+    private async Task RunAsync(Func<Task<bool>> request)
+    {
+        pendingRequests++;
+        UpdateNavigation();
+        statusLabel.Text = LoadingText;
         try
         {
-            var list = await repository.ListAsync();
-            if (IsDisposed)
-                return;
-            records = list.ToArray();
-            ApplyFilter();
+            if (await request() && !IsDisposed)
+                Populate(session.Page);
         }
         catch (Exception ex)
         {
             if (!IsDisposed)
-                MessageBox.Show(
-                    this,
-                    $"Could not load nests from the server: {ex.Message}",
-                    "Open Nest — Database",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
+            {
+                grid.Rows.Clear();
+                statusLabel.Text = $"Could not load nests from the server: {ex.Message}";
+            }
         }
         finally
         {
+            pendingRequests--;
             if (!IsDisposed)
-                Cursor = Cursors.Default;
+            {
+                UpdateNavigation();
+                // A request that was declined or superseded renders nothing of its own.
+                if (pendingRequests == 0 && statusLabel.Text == LoadingText)
+                    statusLabel.Text = session.Summary;
+            }
         }
     }
 
-    private void ApplyFilter()
+    private void UpdateNavigation()
     {
-        var filter = searchBox.Text.Trim();
-        var filtered = string.IsNullOrEmpty(filter)
-            ? records
-            : records
-                .Where(r =>
-                    Contains(r.Name, filter)
-                    || Contains(r.Customer, filter)
-                    || Contains(r.Material, filter)
-                    || Contains(r.MadeBy, filter)
-                    || Contains(r.Comments, filter)
-                    || Contains(r.Status.ToString(), filter)
-                    || Contains(FormatStatus(r.Status), filter)
-                    || Contains(r.DateCreated.ToString("g"), filter)
-                    || Contains(r.DateModified.ToString("g"), filter)
-                    || Contains(r.SavedAt.ToString("g"), filter)
-                    || Contains(r.Thickness.ToString(), filter)
-                    || Contains(r.PlateCount.ToString(), filter)
-                    || Contains(r.PartCount.ToString(), filter)
-                    || Contains(r.FileSize.ToString(), filter)
-                )
-                .ToArray();
-
-        Populate(filtered);
+        var idle = pendingRequests == 0;
+        previousButton.Enabled = idle && session.CanGoPrevious;
+        nextButton.Enabled = idle && session.CanGoNext;
     }
 
-    private static bool Contains(string value, string filter) =>
-        !string.IsNullOrEmpty(value) && value.Contains(filter, StringComparison.OrdinalIgnoreCase);
-
-    private void Populate(NestRecord[] rows)
+    private void Populate(NestPage page)
     {
-        var table = new DataTable();
-        table.Columns.Add("Name", typeof(string));
-        table.Columns.Add("Customer", typeof(string));
-        table.Columns.Add("Status", typeof(string));
-        table.Columns.Add("Material", typeof(string));
-        table.Columns.Add("Date Created", typeof(DateTime));
-        table.Columns.Add("Date Modified", typeof(DateTime));
-        table.Columns.Add("Thickness", typeof(double));
-        table.Columns.Add("Plates", typeof(int));
-        table.Columns.Add("Parts", typeof(int));
-        table.Columns.Add("Made By", typeof(string));
-        table.Columns.Add("Comments", typeof(string));
-        table.Columns.Add("File Size", typeof(long));
-        table.Columns.Add("Saved", typeof(DateTime));
-        table.Columns.Add("Id", typeof(Guid));
-
-        foreach (var record in rows.OrderByDescending(r => r.SavedAt))
+        grid.Rows.Clear();
+        foreach (var record in page.Items)
         {
-            table.Rows.Add(
+            grid.Rows.Add(
                 record.Name,
                 record.Customer,
                 FormatStatus(record.Status),
@@ -190,9 +230,14 @@ public sealed class SavedNestsForm : Form
             );
         }
 
-        grid.DataSource = table;
-        if (grid.Columns.Contains("Id"))
-            grid.Columns["Id"].Visible = false;
+        foreach (DataGridViewColumn column in grid.Columns)
+        {
+            column.HeaderCell.SortGlyphDirection = column.Tag is NestSortField field && field == session.Sort
+                ? session.Descending ? SortOrder.Descending : SortOrder.Ascending
+                : SortOrder.None;
+        }
+
+        statusLabel.Text = session.Summary;
     }
 
     private static string FormatStatus(NestStatus status) => status switch
@@ -207,7 +252,7 @@ public sealed class SavedNestsForm : Form
     {
         if (grid.SelectedRows.Count == 0)
             return;
-        SelectedId = (Guid)grid.SelectedRows[0].Cells["Id"].Value;
+        SelectedId = (Guid)grid.SelectedRows[0].Cells[IdColumn].Value;
         DialogResult = DialogResult.OK;
         Close();
     }
@@ -217,7 +262,7 @@ public sealed class SavedNestsForm : Form
         if (grid.SelectedRows.Count == 0)
             return;
 
-        var id = (Guid)grid.SelectedRows[0].Cells["Id"].Value;
+        var id = (Guid)grid.SelectedRows[0].Cells[IdColumn].Value;
         var name = grid.SelectedRows[0].Cells["Name"].Value?.ToString() ?? "";
 
         var confirm = MessageBox.Show(
@@ -235,7 +280,7 @@ public sealed class SavedNestsForm : Form
         {
             await repository.DeleteAsync(id);
             if (!IsDisposed)
-                await LoadAsync();
+                await RunAsync(session.RefreshAsync);
         }
         catch (Exception ex)
         {
@@ -253,5 +298,16 @@ public sealed class SavedNestsForm : Form
             if (!IsDisposed)
                 deleteButton.Enabled = grid.SelectedRows.Count > 0;
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            searchTimer.Dispose();
+            session.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }

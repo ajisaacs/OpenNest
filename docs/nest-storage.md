@@ -4,9 +4,13 @@ The desktop app can save nests two ways:
 
 - **File mode** (default, unchanged behavior): Save/Save As write a `.nest` ZIP
   archive to disk via the normal file dialog. See [nest-file-format.md](nest-file-format.md).
-- **Database mode**: Open lists server records with filterable metadata and
-  sortable columns; Save creates a record on first save and updates that same
-  record afterward. Save As creates a new record (a copy). A failed save keeps
+- **Database mode**: Open browses server records 100 at a time. The filter box
+  searches name, customer, material, made by, comments and status on the server
+  after a short typing pause; clicking a column header sorts every match on the
+  server (click again to reverse); Previous/Next move between pages and the
+  status line shows the range and total. Dates and numbers are not searched as
+  text; sort their column instead. Save creates a record on first save and
+  updates that same record afterward. Save As creates a new record (a copy). A failed save keeps
   the previous record association; switching server URLs creates a record on the
   new server rather than updating an id from the previous one. Delete in the
   saved-nest list permanently removes the selected server record after confirmation.
