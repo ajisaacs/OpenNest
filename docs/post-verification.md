@@ -84,7 +84,9 @@ The overlap diagnostic's documented numeric/tessellation limits also apply.
 
 Future hardening should inspect a shared post-specific emitted motion stream,
 including controller retracts and final parking, rather than pretending direct XY
-geometry proves physical head clearance.
+geometry proves physical head clearance. The [fixed-program route foundation](cutting-planner.md)
+reuses these motion/completion checks but is not yet a desktop planner or an Apply
+API; its route-only `Ready` result does not replace fresh posting review.
 
 ## Verification on Windows
 

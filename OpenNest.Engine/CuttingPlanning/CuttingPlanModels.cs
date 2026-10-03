@@ -1,0 +1,107 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using OpenNest.CNC.CuttingPlanning;
+using OpenNest.Diagnostics;
+using OpenNest.Geometry;
+
+namespace OpenNest.Engine.CuttingPlanning;
+
+/// <summary>
+/// Caller-side input for a fixed-program, direct-XY route only. Keep all sources stable
+/// during Capture. Both locked and unlocked programs are fixed; this is not an Apply request.
+/// </summary>
+public sealed class CuttingPlanRequest
+{
+    public CuttingPlanRequest(IEnumerable<Part> parts, Vector startPoint = default, int expansionBudget = 20000)
+    {
+        Parts = parts == null ? null : Array.AsReadOnly(parts.ToArray());
+        StartPoint = startPoint;
+        ExpansionBudget = expansionBudget;
+    }
+
+    public IReadOnlyList<Part> Parts { get; }
+    public Vector StartPoint { get; }
+    public int ExpansionBudget { get; }
+}
+
+/// <summary>Owned worker input. SourcePart references are identity handles only, never worker data.</summary>
+public sealed class CuttingPlanSnapshot
+{
+    internal CuttingPlanSnapshot(IEnumerable<FixedProgramPlacement> placements, Vector startPoint,
+        int expansionBudget, CuttingPlanStatus? failure = null, IEnumerable<CuttingPlanFinding> findings = null)
+    {
+        Placements = Array.AsReadOnly(placements.ToArray());
+        StartPoint = startPoint;
+        ExpansionBudget = expansionBudget;
+        Failure = failure;
+        Findings = Array.AsReadOnly((findings ?? []).ToArray());
+    }
+
+    public IReadOnlyList<FixedProgramPlacement> Placements { get; }
+    public Vector StartPoint { get; }
+    public int ExpansionBudget { get; }
+    internal CuttingPlanStatus? Failure { get; }
+    internal IReadOnlyList<CuttingPlanFinding> Findings { get; }
+}
+
+public sealed class FixedProgramPlacement
+{
+    internal FixedProgramPlacement(Part sourcePart, int sourceOrdinal, Vector location,
+        double rotation, bool leadInsLocked, OwnedExecution execution)
+    {
+        SourcePart = sourcePart;
+        SourceOrdinal = sourceOrdinal;
+        Location = location;
+        Rotation = rotation;
+        LeadInsLocked = leadInsLocked;
+        Execution = execution;
+    }
+
+    public Part SourcePart { get; }
+    public int SourceOrdinal { get; }
+    public Vector Location { get; }
+    public double Rotation { get; }
+    public bool LeadInsLocked { get; }
+    public OwnedExecution Execution { get; }
+}
+
+public enum CuttingPlanStatus
+{
+    Ready,
+    ConstraintConflict,
+    UnsupportedGeometry,
+    InvalidInput,
+    NoSolutionWithinBudget,
+    Cancelled
+}
+
+/// <summary>Ordinals are zero-based source positions, not proposed sequence positions.</summary>
+public sealed record CuttingPlanFinding(int? SourceOrdinal, Part SourcePart,
+    int? OtherSourceOrdinal, Part OtherSourcePart, PostVerificationKind? Kind, string Message);
+
+/// <summary>
+/// A checked fixed-program route, not full cutting-plan readiness, posting consent,
+/// physical safety, or an atomic Apply payload. Failures contain no proposed order.
+/// </summary>
+public sealed class CuttingPlanResult
+{
+    internal CuttingPlanResult(CuttingPlanStatus status, IEnumerable<FixedProgramPlacement> order = null,
+        IEnumerable<CuttingPlanFinding> findings = null, int expansions = 0,
+        double rapidDistance = 0, bool independentlyReplayed = false)
+    {
+        Status = status;
+        ProposedOrder = Array.AsReadOnly((order ?? []).ToArray());
+        Findings = Array.AsReadOnly((findings ?? []).ToArray());
+        Expansions = expansions;
+        RapidDistance = rapidDistance;
+        IndependentlyReplayed = independentlyReplayed;
+    }
+
+    public CuttingPlanStatus Status { get; }
+    public IReadOnlyList<FixedProgramPlacement> ProposedOrder { get; }
+    public IReadOnlyList<CuttingPlanFinding> Findings { get; }
+    public int Expansions { get; }
+    public double RapidDistance { get; }
+    public bool IndependentlyReplayed { get; }
+}
