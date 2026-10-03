@@ -1,17 +1,32 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Threading;
 using OpenNest.Math;
 
 namespace OpenNest.Geometry
 {
     public abstract class Entity : IBoundable
     {
+        private static long idCounter;
+        private static readonly Guid idSalt = Guid.NewGuid();
+
         protected Box boundingBox;
 
         protected Entity()
         {
-            Id = Guid.NewGuid();
+            // Retain a process-random prefix; allocate the final six bytes atomically.
+            // IDs are opaque persistence keys, not unpredictable security tokens.
+            var counter = Interlocked.Increment(ref idCounter);
+            if ((ulong)counter > 0xFFFFFFFFFFFFUL)
+                throw new InvalidOperationException("Entity identifier sequence exhausted.");
+            Span<byte> bytes = stackalloc byte[16];
+            idSalt.TryWriteBytes(bytes);
+            Span<byte> counterBytes = stackalloc byte[8];
+            BinaryPrimitives.WriteInt64LittleEndian(counterBytes, counter);
+            counterBytes[..6].CopyTo(bytes[10..]);
+            Id = new Guid(bytes);
             Layer = OpenNest.Geometry.Layer.Default;
             boundingBox = new Box();
         }
