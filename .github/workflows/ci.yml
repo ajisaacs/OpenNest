@@ -9,9 +9,19 @@ permissions:
   contents: read
 
 jobs:
-  tests:
+  unit-tests:
+    name: Unit tests (${{ matrix.project }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        project:
+          - OpenNest.Tests
+          - OpenNest.Engine.Tests
+          - OpenNest.IO.Tests
+          - OpenNest.Server.Tests
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -19,16 +29,41 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: '8.0.x'
-      - name: Run OpenNest.Tests
-        run: dotnet test OpenNest.Tests/OpenNest.Tests.csproj
-      - name: Run OpenNest.Engine.Tests
-        run: dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj
+      - name: Run ${{ matrix.project }}
+        run: dotnet test "${{ matrix.project }}/${{ matrix.project }}.csproj"
+
+  synthetic-nests:
+    name: Six synthetic Irregular nests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test fail-closed final CI check
+        run: python3 scripts/test_ci_results.py -v
       - name: Check six synthetic Irregular nests
         timeout-minutes: 6
         run: |
           python3 scripts/test_check_synthetic_nests.py -v
           python3 scripts/check-synthetic-nests.py --parallel 2
-      - name: Run OpenNest.IO.Tests
-        run: dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj
-      - name: Run OpenNest.Server.Tests
-        run: dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj
+
+  # Preserve the existing check name for required-status consumers.
+  tests:
+    name: tests
+    needs: [unit-tests, synthetic-nests]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Require every test job to succeed
+        env:
+          UNIT_TEST_RESULT: ${{ needs.unit-tests.result }}
+          SYNTHETIC_RESULT: ${{ needs.synthetic-nests.result }}
+        run: bash scripts/check-ci-results.sh "$UNIT_TEST_RESULT" "$SYNTHETIC_RESULT"

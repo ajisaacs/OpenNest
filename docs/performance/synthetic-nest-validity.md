@@ -73,9 +73,21 @@ The unit checks use labeled synthetic CSV rows and a real watchdog process-tree
 probe. The end-to-end command uses actual benchmark results and the production
 independent layout validator. This gate supplements, never replaces, the existing
 geometry, contract, cancellation, sequencing, posting and cross-platform unit suites.
-GitHub's cross-platform workflow runs both the checker tests and the six-fixture gate.
-Windows runtime acceptance is separate; a Linux pass does not certify Windows tree
-termination or desktop/shop interactions.
+GitHub's cross-platform workflow runs both the checker tests and the six-fixture gate
+in a separate job, concurrently with four independent unit-suite jobs (main, Engine,
+IO and Server). Unit jobs retain the default Debug configuration and do not cancel
+siblings on failure. The final `tests` check requires the entire unit matrix and
+synthetic job to succeed; failed, cancelled or skipped dependencies cannot produce
+a green final check. This preserves the existing check name without changing branch
+protection or removing tests. `python3 scripts/test_ci_results.py -v` exercises the
+same fail-closed aggregate command used by CI. The six-minute step limit and
+`--parallel 2` synthetic-runner limit are unchanged.
+
+This fan-out removes inter-suite serialization, not individual geometry-test work.
+It uses additional independent runners and repeats restore/build setup; actual wall
+time depends on the slowest job and runner queueing. It is not a CPU speed claim or
+a reason to skip correctness fixtures. Windows runtime acceptance is separate; a
+Linux pass does not certify Windows tree termination or desktop/shop interactions.
 
 ## Validity is not speed
 
