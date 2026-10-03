@@ -26,7 +26,6 @@ public sealed class SavedNestsForm : Form
     private readonly Button previousButton;
     private readonly Button nextButton;
     private readonly ToolStripStatusLabel statusLabel;
-    private int pendingRequests;
 
     /// <summary>Set to the chosen record's id when the dialog closes with OK.</summary>
     public Guid SelectedId { get; private set; }
@@ -168,15 +167,16 @@ public sealed class SavedNestsForm : Form
     /// <summary>
     /// Sends one browse request and renders its page. A request superseded by a newer one
     /// renders nothing; a failure clears the rows and shows the error in the status line.
+    /// Navigation follows only the latest request (<see cref="NestBrowseSession.IsLoading"/>).
     /// </summary>
     private async Task RunAsync(Func<Task<bool>> request)
     {
-        pendingRequests++;
-        UpdateNavigation();
         statusLabel.Text = LoadingText;
         try
         {
-            if (await request() && !IsDisposed)
+            var started = request();
+            UpdateNavigation();
+            if (await started && !IsDisposed)
                 Populate(session.Page);
         }
         catch (Exception ex)
@@ -189,12 +189,11 @@ public sealed class SavedNestsForm : Form
         }
         finally
         {
-            pendingRequests--;
             if (!IsDisposed)
             {
                 UpdateNavigation();
                 // A request that was declined or superseded renders nothing of its own.
-                if (pendingRequests == 0 && statusLabel.Text == LoadingText)
+                if (!session.IsLoading && statusLabel.Text == LoadingText)
                     statusLabel.Text = session.Summary;
             }
         }
@@ -202,9 +201,8 @@ public sealed class SavedNestsForm : Form
 
     private void UpdateNavigation()
     {
-        var idle = pendingRequests == 0;
-        previousButton.Enabled = idle && session.CanGoPrevious;
-        nextButton.Enabled = idle && session.CanGoNext;
+        previousButton.Enabled = !session.IsLoading && session.CanGoPrevious;
+        nextButton.Enabled = !session.IsLoading && session.CanGoNext;
     }
 
     private void Populate(NestPage page)

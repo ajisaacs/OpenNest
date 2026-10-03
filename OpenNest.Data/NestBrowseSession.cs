@@ -40,6 +40,9 @@ public sealed class NestBrowseSession : IDisposable
     /// <summary>The latest applied page; null before the first result and after a failed request.</summary>
     public NestPage? Page { get; private set; }
 
+    /// <summary>True while the latest request is outstanding; superseded requests do not count.</summary>
+    public bool IsLoading { get; private set; }
+
     public bool CanGoPrevious => Offset > 0;
 
     public bool CanGoNext => Page is { } page && page.Offset + page.Items.Count < page.Total;
@@ -106,14 +109,17 @@ public sealed class NestBrowseSession : IDisposable
     private async Task<bool> RunAsync()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        // Superseded sources are cancelled but not disposed: their request may still observe the token.
-        _pending?.Cancel();
-        var cancellation = new CancellationTokenSource();
+        // Supersede before cancelling: a request that completes synchronously when cancelled
+        // must already see itself as superseded. Each source is released by its own request.
+        var previous = _pending;
+        using var cancellation = new CancellationTokenSource();
         _pending = cancellation;
         var generation = ++_generation;
+        IsLoading = true;
 
         try
         {
+            previous?.Cancel();
             var page = await QueryAsync(cancellation.Token);
             if (generation != _generation)
                 return false;
@@ -139,6 +145,13 @@ public sealed class NestBrowseSession : IDisposable
             Page = null;
             throw;
         }
+        finally
+        {
+            if (ReferenceEquals(_pending, cancellation))
+                _pending = null;
+            if (generation == _generation)
+                IsLoading = false;
+        }
     }
 
     private Task<NestPage> QueryAsync(CancellationToken cancellationToken) =>
@@ -155,7 +168,10 @@ public sealed class NestBrowseSession : IDisposable
 
     private static string Count(int value) => value.ToString("N0", CultureInfo.CurrentCulture);
 
-    /// <summary>Cancels any request in flight; the repository is not owned and stays open.</summary>
+    /// <summary>
+    /// Cancels any request in flight (which releases its own source when it ends);
+    /// the repository is not owned and stays open.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed)
@@ -163,8 +179,9 @@ public sealed class NestBrowseSession : IDisposable
 
         _disposed = true;
         _generation++;
-        _pending?.Cancel();
-        _pending?.Dispose();
+        IsLoading = false;
+        var pending = _pending;
         _pending = null;
+        pending?.Cancel();
     }
 }

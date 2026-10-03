@@ -145,6 +145,79 @@ public class NestBrowseSessionTests
         Assert.Equal("Showing 11-20 of 20 nests", session.Summary);
     }
 
+    [Fact]
+    public async Task SupersededRequest_CompletingSynchronouslyOnCancellation_IsNotReportedAsTheLatestFailure()
+    {
+        var repository = new ControlledRepository { CompleteOnCancellation = true };
+        using var session = new NestBrowseSession(repository);
+        var older = session.SetSearchAsync("a");
+        var newer = session.SetSearchAsync("ab");
+
+        Assert.False(await older);
+        repository.Requests[1].Reply.SetResult(Page("ab result"));
+        Assert.True(await newer);
+
+        Assert.Equal("ab result", Assert.Single(session.Page!.Items).Name);
+    }
+
+    [Fact]
+    public async Task IsLoading_FollowsOnlyTheLatestRequest()
+    {
+        var repository = new ControlledRepository();
+        using var session = new NestBrowseSession(repository, pageSize: 1);
+        Assert.False(session.IsLoading);
+
+        // A superseded request finishing first leaves the latest one loading.
+        var first = session.SetSearchAsync("a");
+        var second = session.SetSearchAsync("ab");
+        repository.Requests[0].Reply.SetResult(Page("a result"));
+        Assert.False(await first);
+        Assert.True(session.IsLoading);
+        repository.Requests[1].Reply.SetResult(Page("ab result"));
+        Assert.True(await second);
+        Assert.False(session.IsLoading);
+
+        // The latest request finishing first ends loading although a superseded one is still out.
+        var third = session.SetSearchAsync("abc");
+        var fourth = session.SetSearchAsync("abcd");
+        var record = new NestRecord { Id = Guid.NewGuid(), Name = "abcd result" };
+        repository.Requests[3].Reply.SetResult(new NestPage { Items = new[] { record }, Total = 3, Limit = 1 });
+        Assert.True(await fourth);
+        Assert.False(session.IsLoading);
+        Assert.True(session.CanGoNext);
+        repository.Requests[2].Reply.SetResult(Page("abc result"));
+        Assert.False(await third);
+        Assert.False(session.IsLoading);
+
+        var failing = session.RefreshAsync();
+        Assert.True(session.IsLoading);
+        repository.Requests[4].Reply.SetException(new IOException("offline"));
+        await Assert.ThrowsAsync<IOException>(() => failing);
+        Assert.False(session.IsLoading);
+    }
+
+    [Fact]
+    public async Task EachRequestsCancellationSource_IsReleasedWhenThatRequestEnds()
+    {
+        var repository = new ControlledRepository();
+        var session = new NestBrowseSession(repository);
+        var older = session.SetSearchAsync("a");
+        var newer = session.SetSearchAsync("ab");
+
+        repository.Requests[1].Reply.SetResult(Page("ab"));
+        await newer;
+        Assert.Throws<ObjectDisposedException>(() => repository.Requests[1].Token.WaitHandle);
+        repository.Requests[0].Reply.SetResult(Page("a"));
+        await older;
+        Assert.Throws<ObjectDisposedException>(() => repository.Requests[0].Token.WaitHandle);
+
+        var pending = session.RefreshAsync();
+        session.Dispose();
+        repository.Requests[2].Reply.SetResult(Page("late"));
+        await pending;
+        Assert.Throws<ObjectDisposedException>(() => repository.Requests[2].Token.WaitHandle);
+    }
+
     [Theory]
     [InlineData("", "No nests on the server.")]
     [InlineData("no such text", "No nests match the filter.")]
@@ -216,14 +289,22 @@ public class NestBrowseSessionTests
         }
     }
 
-    /// <summary>Leaves every query pending until the test completes it.</summary>
+    /// <summary>
+    /// Leaves every query pending until the test completes it. With
+    /// <see cref="CompleteOnCancellation"/>, cancellation completes the query synchronously
+    /// inside the canceller's call, as some HTTP handlers do.
+    /// </summary>
     private sealed class ControlledRepository : RepositoryBase
     {
+        public bool CompleteOnCancellation { get; init; }
+
         public List<(NestQuery Query, TaskCompletionSource<NestPage> Reply, CancellationToken Token)> Requests { get; } = new();
 
         public override Task<NestPage> QueryAsync(NestQuery query, CancellationToken cancellationToken = default)
         {
             var reply = new TaskCompletionSource<NestPage>();
+            if (CompleteOnCancellation)
+                cancellationToken.Register(() => reply.TrySetCanceled(cancellationToken));
             Requests.Add((query, reply, cancellationToken));
             return reply.Task;
         }
