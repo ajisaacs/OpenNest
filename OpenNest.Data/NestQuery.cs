@@ -42,6 +42,9 @@ public sealed class NestQuery
             return $"limit must be between 1 and {MaxLimit}.";
         if (NormalizedSearch.Length > MaxSearchLength)
             return $"search must be at most {MaxSearchLength} characters.";
+        // SQLite LIKE stops at an embedded NUL, which would turn the rest of the text into a wildcard.
+        if (NormalizedSearch.Contains('\0'))
+            return "search must not contain NUL characters.";
         return null;
     }
 }

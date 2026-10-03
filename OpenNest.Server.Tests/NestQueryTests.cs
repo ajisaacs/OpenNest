@@ -201,6 +201,8 @@ public sealed class NestQueryTests : IDisposable
     [InlineData("limit=1&limit=2")]
     [InlineData("serach=beta")]
     [InlineData("status=quote")]
+    [InlineData("search=Alpha%00not-present")]
+    [InlineData("search=%00")]
     public async Task Query_InvalidParameters_Return400WithoutItems(string queryString)
     {
         Seed(3);

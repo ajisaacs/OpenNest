@@ -247,6 +247,7 @@ public class RemoteNestRepositoryTests
         new NestQuery { Limit = NestQuery.MaxLimit + 1 },
         new NestQuery { Search = new string('x', NestQuery.MaxSearchLength + 1) },
         new NestQuery { Sort = (NestSortField)99 },
+        new NestQuery { Search = "Alpha\0not-present" },
     };
 
     [Fact]

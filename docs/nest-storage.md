@@ -67,7 +67,8 @@ outside the shop network without adding one.
 `GET /api/nests/query` filters, orders and pages in SQLite, so a client receives
 only the requested page of metadata (never archive bytes):
 
-- `search` (optional): trimmed, at most 200 characters; blank means no filter.
+- `search` (optional): trimmed, at most 200 characters, no NUL characters;
+  blank means no filter.
   Case-insensitive substring of the whole text in `name`, `customer`, `material`,
   `madeBy`, `comments` or the status (`ToBeCut` or the display name `To Be Cut`).
   `%`, `_` and `\` are literal. Dates and numbers are not matched as text.
