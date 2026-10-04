@@ -26,7 +26,7 @@ namespace OpenNest.Forms
             InitializeComponent();
             _parts = new List<BomPartRow>();
             _groupSettings = new Dictionary<string, GroupSettings>();
-            _defaults = NestDefaults.Load(NestDefaults.DefaultPath);
+            _defaults = MainForm.LoadSavedNestDefaults(out _);
             ApplyDefaults();
         }
 
@@ -465,10 +465,12 @@ namespace OpenNest.Forms
                 var nest = new Nest(nestName);
                 nest.DateCreated = DateTime.Now;
                 nest.DateLastModified = DateTime.Now;
+                // Saved defaults first (units, quadrant, plate), as New does;
+                // then the group's own plate size and spacing.
+                _defaults.ApplyTo(nest);
                 nest.PlateDefaults.Size = new Geometry.Size(plateWidth, plateLength);
                 nest.Thickness = thickness;
                 nest.Material = new Material(material);
-                nest.PlateDefaults.Quadrant = _defaults.Quadrant;
                 nest.PlateDefaults.PartSpacing = partSpacing;
                 nest.PlateDefaults.EdgeSpacing = new Spacing(
                     edgeLeft,

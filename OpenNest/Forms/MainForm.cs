@@ -108,17 +108,12 @@ namespace OpenNest.Forms
         }
 
         /// <summary>
-        /// Loads the persisted nest defaults. When no usable file exists,
-        /// units come from the legacy DefaultUnit setting; a corrupt file
-        /// warns once per session.
+        /// Loads the persisted nest defaults (see <see cref="LoadSavedNestDefaults"/>);
+        /// a corrupt or unreadable file warns once per session.
         /// </summary>
         private NestDefaults LoadNestDefaults()
         {
-            var defaults = NestDefaults.Load(NestDefaults.DefaultPath, out var status);
-            if (status == NestDefaultsStatus.Ok)
-                return defaults;
-
-            defaults.Units = Properties.Settings.Default.DefaultUnit;
+            var defaults = LoadSavedNestDefaults(out var status);
 
             if (status == NestDefaultsStatus.Invalid && !defaultsWarned)
             {
@@ -134,6 +129,19 @@ namespace OpenNest.Forms
         }
 
         private bool defaultsWarned;
+
+        /// <summary>
+        /// The single desktop entry point for persisted nest defaults. Units
+        /// fall back to the legacy DefaultUnit setting whenever the file is
+        /// missing or unusable or has no valid unit, so New, BOM import and
+        /// the defaults dialog always agree.
+        /// </summary>
+        internal static NestDefaults LoadSavedNestDefaults(out NestDefaultsStatus status) =>
+            NestDefaults.Load(
+                NestDefaults.DefaultPath,
+                Properties.Settings.Default.DefaultUnit,
+                out status
+            );
 
         private string GetNestName(DateTime date, int id)
         {
@@ -1155,7 +1163,7 @@ namespace OpenNest.Forms
 
         private void NestDefaults_Click(object sender, EventArgs e)
         {
-            using (var form = new NestDefaultsForm(NestDefaults.Load(NestDefaults.DefaultPath)))
+            using (var form = new NestDefaultsForm(LoadSavedNestDefaults(out _)))
             {
                 if (form.ShowDialog(this) == DialogResult.OK)
                     form.GetDefaults().Save(NestDefaults.DefaultPath);

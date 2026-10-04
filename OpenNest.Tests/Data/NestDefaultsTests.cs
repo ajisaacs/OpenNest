@@ -261,7 +261,7 @@ public class NestDefaultsTests : IDisposable
     [Fact]
     public void ApplyTo_SetsUnitsAndPlateDefaults_AndDoesNotAliasSourceNest()
     {
-        var source = new Nest();
+        var source = new Nest { Units = Units.Millimeters };
         source.PlateDefaults.Size = new Size(48, 96);
         source.PlateDefaults.EdgeSpacing = new Spacing(1.25, 1.25, 1.25, 1.25);
         var defaults = NestDefaults.FromNest(source);
@@ -273,6 +273,8 @@ public class NestDefaultsTests : IDisposable
         var target = new Nest();
         defaults.ApplyTo(target);
 
+        // New and BOM-created nests both take their units from ApplyTo.
+        Assert.Equal(Units.Millimeters, target.Units);
         Assert.Equal(new Size(48, 96), target.PlateDefaults.Size);
         Assert.Equal(
             new Spacing(1.25, 1.25, 1.25, 1.25),
