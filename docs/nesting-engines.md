@@ -60,6 +60,22 @@ or invalid Fill proposal leaves singles and pairs available. Large enclosed-pock
 pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
 remain separate sequencer/verification work.
 
+## Filling cutouts (not yet in production)
+
+Placing parts inside another part's enclosed cutout is being built as a step that runs before any
+engine, so every engine benefits. Nothing calls it yet: a part inside a cutout must be cut before
+the cutout's contour, and the sequencer does not enforce that order.
+
+`CutoutLatticeFill` (`OpenNest.Engine/Jobs/Cutouts/`) fills one closed cutout with copies of one
+part. It runs Default Fill over the cutout's bounds plus one part step on every side, then shifts
+that lattice across a grid of offsets of up to half a step each way. At each offset it keeps the
+copies whose spacing-grown outline lies inside the cutout, using the part's inner-fit region of
+the inscribed, flattened cutout, and the offset keeping the most copies wins. Every returned pose
+is then checked against the frame and the other copies with `NestLayoutCheck.Clears`, the test the
+layout check uses. The method suits many small copies in a large cutout; a few large inserts are
+meant for no-fit-polygon placement. Fill can return different, equally scored lattices on repeated
+calls for some parts, so results are not yet guaranteed identical between runs.
+
 ## Renamed engines
 
 Earlier releases shipped these as plug-ins under other names. The registry maps the old names so
