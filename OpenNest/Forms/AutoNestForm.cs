@@ -158,6 +158,7 @@ namespace OpenNest.Forms
             );
 
             plateGrid.CellValidating += PlateGrid_CellValidating;
+            plateGrid.DataError += PlateGrid_DataError;
         }
 
         private void LoadDrawings(Nest nest)
@@ -214,7 +215,36 @@ namespace OpenNest.Forms
         {
             options = new List<PlateOption>();
             error = null;
-            if (!plateGrid.EndEdit())
+
+            // CellValidating cancels an unparsable size and leaves the cell in edit mode;
+            // calling EndEdit() on that cancelled edit hangs/throws instead of returning
+            // false for it. Catch an unparsable pending edit ourselves first so EndEdit()
+            // is never asked to commit or discard it.
+            if (
+                plateGrid.IsCurrentCellInEditMode
+                && plateGrid.CurrentCell != null
+                && plateGrid.Columns[plateGrid.CurrentCell.ColumnIndex].DataPropertyName == "Size"
+                && plateGrid.EditingControl != null
+            )
+            {
+                var pending = plateGrid.EditingControl.Text;
+                if (!string.IsNullOrWhiteSpace(pending) && !TryParseSize(pending, out _, out _))
+                {
+                    error = $"Invalid stock size '{Preview(pending)}'. Enter positive dimensions as W x L.";
+                    return false;
+                }
+            }
+
+            bool committed;
+            try
+            {
+                committed = plateGrid.EndEdit();
+            }
+            catch (InvalidOperationException)
+            {
+                committed = false;
+            }
+            if (!committed)
             {
                 var value = plateGrid.EditingControl?.Text ?? plateGrid.CurrentCell?.Value?.ToString();
                 error = $"Invalid stock size '{Preview(value)}'. Enter positive dimensions as W x L.";
@@ -422,6 +452,14 @@ namespace OpenNest.Forms
                 "Invalid input. Expected input type is "
                     + partsGrid[e.ColumnIndex, e.RowIndex].ValueType.Name
             );
+        }
+
+        // CellValidating and TryGetPlateOptions already surface invalid sizes to the user;
+        // this only stops the grid from throwing when a commit is forced outside that path
+        // (e.g. a BindingContext change while a cell is mid-edit).
+        private void PlateGrid_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            e.ThrowException = false;
         }
 
         private DataGridViewItem GetDataGridViewItem(Drawing dwg)

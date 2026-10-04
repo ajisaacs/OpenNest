@@ -520,7 +520,7 @@ namespace OpenNest.Forms
 
             if (isJobBusy() || IsReportTargetBusy(nest))
                 throw new InvalidOperationException(
-                    "Finish or cancel the current nesting or plate action before exporting the nest report."
+                    $"Finish or cancel the current nesting or plate action before exporting the report for '{nest.Name}'."
                 );
 
             return new NestReportTargets(nest, $"{nest.Name}.report.pdf");
