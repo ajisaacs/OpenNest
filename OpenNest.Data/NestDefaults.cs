@@ -73,9 +73,26 @@ public sealed class NestDefaults
     /// present but unreadable/invalid, so callers can warn about a corrupt
     /// file while still returning usable values.
     /// </summary>
-    public static NestDefaults Load(string path, out NestDefaultsStatus status)
+    public static NestDefaults Load(string path, out NestDefaultsStatus status) =>
+        Load(path, Fallback.Units, out status);
+
+    /// <summary>
+    /// Loads defaults like <see cref="Load(string, out NestDefaultsStatus)"/>,
+    /// but a missing file, an unusable file, or a missing/undefined unit
+    /// field yields <paramref name="fallbackUnits"/> (the caller's existing
+    /// unit preference) instead of the built-in units. Other valid fields
+    /// still load. An undefined <paramref name="fallbackUnits"/> is ignored.
+    /// </summary>
+    public static NestDefaults Load(
+        string path,
+        Units fallbackUnits,
+        out NestDefaultsStatus status
+    )
     {
         var defaults = Fallback;
+        if (Enum.IsDefined(fallbackUnits))
+            defaults.Units = fallbackUnits;
+
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             status = NestDefaultsStatus.Missing;
@@ -104,10 +121,7 @@ public sealed class NestDefaults
 
         status = NestDefaultsStatus.Ok;
 
-        if (
-            dto.Units is not null
-            && Enum.TryParse<Units>(dto.Units, ignoreCase: true, out var units)
-        )
+        if (TryParseUnits(dto.Units, out var units))
             defaults.Units = units;
 
         if (
@@ -192,7 +206,7 @@ public sealed class NestDefaults
         var dto = new NestDefaultsDto
         {
             Version = CurrentVersion,
-            Units = Units.ToString().ToLowerInvariant(),
+            Units = JsonSerializer.SerializeToElement(Units.ToString().ToLowerInvariant()),
             Size = new SizeDto { Width = Size.Width, Length = Size.Length },
             Quadrant = Quadrant,
             PartSpacing = PartSpacing,
@@ -225,6 +239,30 @@ public sealed class NestDefaults
         }
     }
 
+    /// <summary>
+    /// Accepts only a defined unit name (case-insensitive). Enum.TryParse
+    /// would also accept numeric strings ("7") and comma-joined names,
+    /// producing undefined or unintended values.
+    /// </summary>
+    private static bool TryParseUnits(JsonElement? element, out Units units)
+    {
+        units = default;
+        if (element is not { ValueKind: JsonValueKind.String } value)
+            return false;
+
+        var text = value.GetString();
+        foreach (var candidate in Enum.GetValues<Units>())
+        {
+            if (string.Equals(candidate.ToString(), text, StringComparison.OrdinalIgnoreCase))
+            {
+                units = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static bool IsUnreadableFile(Exception ex) =>
         ex
             is JsonException
@@ -252,7 +290,9 @@ public sealed class NestDefaults
     private sealed record NestDefaultsDto
     {
         public int? Version { get; init; } = CurrentVersion;
-        public string? Units { get; init; }
+        // Read as raw JSON so a wrongly typed unit falls back on its own
+        // instead of failing the whole file.
+        public JsonElement? Units { get; init; }
         public SizeDto? Size { get; init; }
         public int? Quadrant { get; init; }
         public double? PartSpacing { get; init; }

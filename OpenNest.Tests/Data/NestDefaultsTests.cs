@@ -147,6 +147,74 @@ public class NestDefaultsTests : IDisposable
         Assert.Equal(1, loaded.PartSpacing);
     }
 
+    [Theory]
+    [InlineData("\"7\"")]
+    [InlineData("\"1\"")]
+    [InlineData("\"-1\"")]
+    [InlineData("\"inches, millimeters\"")]
+    [InlineData("1")]
+    public void Load_UndefinedOrNumericUnits_FallBackPerField(string unitsJson)
+    {
+        File.WriteAllText(_path, $$"""{ "units": {{unitsJson}}, "partSpacing": 4 }""");
+
+        var loaded = NestDefaults.Load(_path, out var status);
+
+        // Only a defined unit name is accepted; the other fields still load.
+        Assert.Equal(NestDefaultsStatus.Ok, status);
+        Assert.Equal(Units.Inches, loaded.Units);
+        Assert.Equal(4, loaded.PartSpacing);
+    }
+
+    [Theory]
+    [InlineData("""{ "partSpacing": 4 }""")]
+    [InlineData("""{ "units": "7", "partSpacing": 4 }""")]
+    [InlineData("""{ "units": "furlongs", "partSpacing": 4 }""")]
+    [InlineData("""{ "units": null, "partSpacing": 4 }""")]
+    public void Load_MissingOrInvalidUnits_UseCallerFallbackUnits(string json)
+    {
+        File.WriteAllText(_path, json);
+
+        var loaded = NestDefaults.Load(_path, Units.Millimeters, out var status);
+
+        // The caller's existing unit preference survives a readable file
+        // that lacks a usable unit, and the valid fields still load.
+        Assert.Equal(NestDefaultsStatus.Ok, status);
+        Assert.Equal(Units.Millimeters, loaded.Units);
+        Assert.Equal(4, loaded.PartSpacing);
+    }
+
+    [Fact]
+    public void Load_SavedUnits_OverrideCallerFallbackUnits()
+    {
+        new NestDefaults { Units = Units.Inches }.Save(_path);
+
+        var loaded = NestDefaults.Load(_path, Units.Millimeters, out var status);
+
+        Assert.Equal(NestDefaultsStatus.Ok, status);
+        Assert.Equal(Units.Inches, loaded.Units);
+    }
+
+    [Fact]
+    public void Load_MissingOrCorruptFile_UsesCallerFallbackUnits()
+    {
+        var missing = NestDefaults.Load(_path, Units.Millimeters, out var missingStatus);
+        File.WriteAllText(_path, "{ this is not json");
+        var corrupt = NestDefaults.Load(_path, Units.Millimeters, out var corruptStatus);
+
+        Assert.Equal(NestDefaultsStatus.Missing, missingStatus);
+        Assert.Equal(Units.Millimeters, missing.Units);
+        Assert.Equal(NestDefaultsStatus.Invalid, corruptStatus);
+        Assert.Equal(Units.Millimeters, corrupt.Units);
+    }
+
+    [Fact]
+    public void Load_UndefinedCallerFallbackUnits_UseBuiltInUnits()
+    {
+        var loaded = NestDefaults.Load(_path, (Units)7, out _);
+
+        Assert.Equal(Units.Inches, loaded.Units);
+    }
+
     [Fact]
     public void Load_UnknownFieldsAndFutureVersion_Ignored()
     {
