@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using OpenNest.Engine.Fill;
@@ -40,24 +39,27 @@ namespace OpenNest.Engine.Strategies
             IFillComparer comparer = null
         )
         {
-            var results = new ConcurrentBag<(List<Part> Parts, FillScore Score)>();
+            // Slots in angle order, V before H within an angle: ties keep the earliest slot
+            // however the workers finish.
+            var results = new (List<Part> Parts, FillScore Score)[angles.Count * 2];
 
-            Parallel.ForEach(
-                angles,
-                angle =>
+            Parallel.For(
+                0,
+                angles.Count,
+                i =>
                 {
-                    var pattern = BuildRotatedPattern(groupParts, angle);
+                    var pattern = BuildRotatedPattern(groupParts, angles[i]);
 
                     if (pattern.Parts.Count == 0)
                         return;
 
                     var h = engine.Fill(pattern, NestDirection.Horizontal);
                     if (h != null && h.Count > 0)
-                        results.Add((h, comparer == null ? FillScore.Compute(h, workArea) : default));
+                        results[2 * i + 1] = (h, comparer == null ? FillScore.Compute(h, workArea) : default);
 
                     var v = engine.Fill(pattern, NestDirection.Vertical);
                     if (v != null && v.Count > 0)
-                        results.Add((v, comparer == null ? FillScore.Compute(v, workArea) : default));
+                        results[2 * i] = (v, comparer == null ? FillScore.Compute(v, workArea) : default);
                 }
             );
 
@@ -66,6 +68,9 @@ namespace OpenNest.Engine.Strategies
 
             foreach (var res in results)
             {
+                if (res.Parts == null)
+                    continue;
+
                 if (comparer != null)
                 {
                     if (best == null || comparer.IsBetter(res.Parts, best, workArea))

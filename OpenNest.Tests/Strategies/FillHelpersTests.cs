@@ -154,7 +154,7 @@ public class FillHelpersTests
 
         var actual = FillHelpers.FillPattern(engine, group, angles, workArea, comparer);
 
-        // One angle writes H then V on one worker's bag queue; enumeration is V then H.
+        // Within one angle V is considered before H.
         // Pin both arguments and the call count, not just the eventual winning score.
         var call = Assert.Single(comparer.Calls);
         AssertSameLayout(h, call.Candidate);
@@ -173,7 +173,7 @@ public class FillHelpersTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void FillPattern_TiedScores_PreservesBagOrderAndStillCallsCustomComparer(bool acceptCandidate)
+    public void FillPattern_TiedScores_KeepsVerticalBeforeHorizontalAndStillCallsCustomComparer(bool acceptCandidate)
     {
         var drawing = new RectangleShape { Length = 2, Width = 1 }.GetDrawing();
         var group = new List<Part> { new(drawing, new Vector(11, 13)) };
@@ -191,7 +191,7 @@ public class FillHelpersTests
         var byScore = FillHelpers.FillPattern(engine, group, angles, workArea);
         var byComparer = FillHelpers.FillPattern(engine, group, angles, workArea, comparer);
 
-        AssertSameLayout(v, byScore); // Strict > retains the first bag result on a tie.
+        AssertSameLayout(v, byScore); // Strict > retains the earlier (V) result on a tie.
         var call = Assert.Single(comparer.Calls);
         AssertSameLayout(h, call.Candidate);
         AssertSameLayout(v, call.Current);
@@ -200,6 +200,24 @@ public class FillHelpersTests
         AssertSameLayout(acceptCandidate ? h : v, byComparer);
         AssertValidLayout(byScore, workArea);
         AssertValidLayout(byComparer, workArea);
+    }
+
+    [Fact]
+    public void FillPattern_ConsidersAnglesInInputOrderWhateverTheThreadOrder()
+    {
+        var drawing = new RectangleShape { Length = 2, Width = 1 }.GetDrawing();
+        var group = new List<Part> { new(drawing, new Vector(11, 13)) };
+        var workArea = new Box(3, 5, 5, 4);
+        var engine = new FillLinear(workArea, 0.25);
+        // Only the first angle's layouts keep rotation zero. A comparer that never prefers the
+        // candidate keeps whichever result is considered first: the first angle's V.
+        var angles = new List<double> { 0 };
+        angles.AddRange(Enumerable.Repeat(System.Math.PI, 15));
+        var expected = engine.Fill(FillHelpers.BuildRotatedPattern(group, 0), NestDirection.Vertical);
+        var comparer = new RecordingComparer((_, _, _) => false);
+
+        for (var run = 0; run < 50; run++)
+            AssertSameLayout(expected, FillHelpers.FillPattern(engine, group, angles, workArea, comparer));
     }
 
     [Fact]
