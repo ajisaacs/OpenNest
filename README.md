@@ -34,7 +34,7 @@ dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj # console/MCP
 dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (Windows)
 ```
 
-`OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only. Format changed files with `dotnet format OpenNest.sln --include <path>`.
+`OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only; CI runs it and `OpenNest.FrontEnd.Tests` on a GitHub-hosted Windows runner for every master push and pull request. Format changed files with `dotnet format OpenNest.sln --include <path>`.
 
 Shared coding-agent guidance lives in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports it for Claude Code compatibility; make shared instruction changes in AGENTS.md, not in duplicate agent-specific copies.
 
