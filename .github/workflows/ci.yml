@@ -37,7 +37,7 @@ jobs:
     # WinForms tests need a Windows desktop runtime; the Linux job can only
     # cross-compile them. FrontEnd.Tests run here too, alongside the desktop.
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 20
     defaults:
       run:
         shell: pwsh
@@ -52,10 +52,13 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Run Windows desktop and front-end tests
+        # A test silent for 5 minutes is killed and named in the log, with a
+        # mini dump in TestResults, instead of holding the runner until the
+        # job timeout.
         run: |
           $failed = @()
           foreach ($project in @('OpenNest.WinForms.Tests', 'OpenNest.FrontEnd.Tests')) {
-            dotnet test "$project/$project.csproj" -c Release --logger "trx;LogFileName=$project.trx" --results-directory TestResults
+            dotnet test "$project/$project.csproj" -c Release --blame-hang-timeout 5m --blame-hang-dump-type mini --logger "trx;LogFileName=$project.trx" --results-directory TestResults
             if ($LASTEXITCODE -ne 0) { $failed += $project }
           }
           if ($failed.Count -gt 0) { throw "Failed: $($failed -join ', ')" }
@@ -64,6 +67,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-desktop-test-results
-          path: TestResults/*.trx
+          path: TestResults/
           if-no-files-found: warn
           retention-days: 14
