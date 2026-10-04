@@ -2,7 +2,6 @@ using System.Collections;
 using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using OpenNest.Forms;
@@ -231,19 +230,6 @@ public class AutoNestFormStockOptionsTests
     private static void SetValue(object row, string property, object value) =>
         TypeDescriptor.GetProperties(row)[property]!.SetValue(row, value);
 
-    private static void RunSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception ex) { error = ex; }
-        })
-        { IsBackground = true };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(15)), "The STA test did not complete.");
-        if (error != null)
-            ExceptionDispatchInfo.Capture(error).Throw();
-    }
+    private static void RunSta(Action action) =>
+        StaTestThread.Run(action, TimeSpan.FromSeconds(15), "The STA test did not complete.");
 }

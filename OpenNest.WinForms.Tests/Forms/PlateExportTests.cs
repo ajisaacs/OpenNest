@@ -1,7 +1,6 @@
 using System.Drawing;
 using System.Globalization;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using OpenNest.CNC;
 using OpenNest.Data;
 using OpenNest.Forms;
@@ -453,25 +452,6 @@ public class PlateExportTests
         public void Dispose() => Directory.Delete(DirectoryPath, true);
     }
 
-    private static void RunSta(System.Action action)
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-        })
-        { IsBackground = true };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(90)), "The STA test did not complete.");
-        if (failure != null)
-            ExceptionDispatchInfo.Capture(failure).Throw();
-    }
+    private static void RunSta(System.Action action) =>
+        StaTestThread.Run(action, TimeSpan.FromSeconds(90), "The STA test did not complete.");
 }

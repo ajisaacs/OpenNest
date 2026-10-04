@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Windows.Forms;
 using OpenNest.CNC;
 using OpenNest.Controls;
@@ -299,25 +298,6 @@ public class NestReportExportTests
         internal override void ReportSuccess(string destination) => Successes.Add(destination);
     }
 
-    private static void RunSta(System.Action action)
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-        })
-        { IsBackground = true };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(90)), "The STA test did not complete.");
-        if (failure != null)
-            ExceptionDispatchInfo.Capture(failure).Throw();
-    }
+    private static void RunSta(System.Action action) =>
+        StaTestThread.Run(action, TimeSpan.FromSeconds(90), "The STA test did not complete.");
 }

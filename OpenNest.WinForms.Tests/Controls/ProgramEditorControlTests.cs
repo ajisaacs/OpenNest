@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using OpenNest.CNC;
@@ -292,19 +291,6 @@ public class ProgramEditorControlTests
     private static void ApplyHighlighting(ProgramEditorControl control) => typeof(ProgramEditorControl)
         .GetMethod("ApplyHighlighting", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(control, null);
 
-    private static void RunSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception ex) { error = ex; }
-        })
-        { IsBackground = true };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "The STA test did not complete.");
-        if (error != null)
-            ExceptionDispatchInfo.Capture(error).Throw();
-    }
+    private static void RunSta(Action action) =>
+        StaTestThread.Run(action, TimeSpan.FromSeconds(30), "The STA test did not complete.");
 }

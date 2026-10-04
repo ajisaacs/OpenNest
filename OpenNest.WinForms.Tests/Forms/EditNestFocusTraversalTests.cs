@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Windows.Forms;
 using OpenNest.Forms;
 
@@ -146,25 +145,6 @@ public class EditNestFocusTraversalTests
         tabControl.SelectedTab = Assert.IsType<TabPage>(plates.Parent);
     }
 
-    private static void RunSta(System.Action testBody)
-    {
-        Exception? testFailure = null;
-        var staThread = new Thread(() =>
-        {
-            try
-            {
-                testBody();
-            }
-            catch (Exception error)
-            {
-                testFailure = error;
-            }
-        })
-        { IsBackground = true };
-        staThread.SetApartmentState(ApartmentState.STA);
-        staThread.Start();
-        Assert.True(staThread.Join(TimeSpan.FromSeconds(60)), "The focus traversal STA test did not complete.");
-        if (testFailure != null)
-            ExceptionDispatchInfo.Capture(testFailure).Throw();
-    }
+    private static void RunSta(System.Action testBody) =>
+        StaTestThread.Run(testBody, TimeSpan.FromSeconds(60), "The focus traversal STA test did not complete.");
 }

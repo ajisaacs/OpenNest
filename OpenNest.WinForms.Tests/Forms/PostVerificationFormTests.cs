@@ -206,18 +206,6 @@ public class PostVerificationFormTests
         form.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(form, arguments);
 
-    private static void RunSta(System.Action action)
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception ex) { failure = ex; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "STA verification test timed out.");
-        if (failure != null)
-            ExceptionDispatchInfo.Capture(failure).Throw();
-    }
+    private static void RunSta(System.Action action) =>
+        StaTestThread.Run(action, TimeSpan.FromSeconds(30), "STA verification test timed out.");
 }
