@@ -83,6 +83,7 @@ public class EditNestFocusTraversalTests
         outer.Controls.Add(inner);
         form.ShowSidePanel(outer, "Focus regression");
         var plates = PlateList(form);
+        SelectPlatesTab(form, plates); // Drawings is the default tab; the list can't take focus while hidden.
         Assert.True(original.Focus());
         Assert.True(form.ContainsFocus);
         Assert.Same(original, inner.ActiveControl);
@@ -112,6 +113,7 @@ public class EditNestFocusTraversalTests
         using var form = CreateForm();
         form.Show();
         var plates = PlateList(form);
+        SelectPlatesTab(form, plates); // Drawings is the default tab; the list can't take focus while hidden.
         Assert.True(plates.Focus());
 
         form.UpdatePlateList();
@@ -137,6 +139,12 @@ public class EditNestFocusTraversalTests
 
     private static ListView PlateList(EditNestForm form) =>
         Assert.IsType<ListView>(Assert.Single(form.Controls.Find("platesListView", true)));
+
+    private static void SelectPlatesTab(EditNestForm form, ListView plates)
+    {
+        var tabControl = Assert.IsType<TabControl>(Assert.Single(form.Controls.Find("tabControl1", true)));
+        tabControl.SelectedTab = Assert.IsType<TabPage>(plates.Parent);
+    }
 
     private static void RunSta(System.Action testBody)
     {

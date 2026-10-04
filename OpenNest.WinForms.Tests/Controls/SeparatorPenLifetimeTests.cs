@@ -37,8 +37,9 @@ public class SeparatorPenLifetimeTests
 
         control.Dispose();
 
+        // Control.Dispose(bool) re-raises Disposed on every call; only cleanup is idempotent.
         Assert.True(control.IsDisposed);
-        Assert.Equal(1, disposedEvents);
+        Assert.Equal(2, disposedEvents);
         Assert.Throws<ArgumentException>(() => graphics.DrawLine(lightPen, 0, 0, 3, 0));
         Assert.Throws<ArgumentException>(() => graphics.DrawLine(darkPen, 0, 1, 3, 1));
     });

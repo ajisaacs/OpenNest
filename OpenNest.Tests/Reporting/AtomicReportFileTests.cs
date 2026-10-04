@@ -54,7 +54,11 @@ public sealed class AtomicReportFileTests : IDisposable
     {
         var path = Path.Combine(directory, "not-a-file.pdf");
         Directory.CreateDirectory(path);
-        Assert.ThrowsAny<IOException>(() => AtomicReportFile.Write(path, stream => stream.Write("PDF"u8)));
+        // Moving onto a directory target raises IOException on some platforms and
+        // UnauthorizedAccessException on others (observed on Windows); callers treat both alike.
+        var error = Record.Exception(() => AtomicReportFile.Write(path, stream => stream.Write("PDF"u8)));
+        Assert.True(error is IOException or UnauthorizedAccessException,
+            $"Expected IOException or UnauthorizedAccessException, got {error?.GetType()}");
         Assert.True(Directory.Exists(path));
         Assert.Empty(Directory.GetFiles(directory));
     }

@@ -148,6 +148,8 @@ public class NestReportExportTests
         form.PlateView.SetOverlapAutoCheck(null); // Background overlap workers are irrelevant here.
         form.Show();
         form.PlateManager.LoadAt(1);
+        // EnsureSentinel already appended a trailing empty plate behind the two loaded here.
+        var plateCountBeforeExport = nest.Plates.Count;
         var path = Path.Combine(Path.GetTempPath(), $"opennest-report-ok-{Guid.NewGuid():N}.pdf");
         try
         {
@@ -160,7 +162,7 @@ public class NestReportExportTests
             Assert.True(bytes.Length > 1000);
             // Selected plate and job contents are untouched by reporting.
             Assert.Equal(1, form.PlateManager.CurrentIndex);
-            Assert.Equal(2, nest.Plates.Count);
+            Assert.Equal(plateCountBeforeExport, nest.Plates.Count);
             Assert.Single(nest.Plates[0].Parts);
             Assert.Equal(2, nest.Drawings.Count);
         }
