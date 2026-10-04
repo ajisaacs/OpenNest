@@ -88,13 +88,10 @@ public sealed class NestDefaults
             var json = File.ReadAllText(path);
             dto = JsonSerializer.Deserialize<NestDefaultsDto>(json, JsonOptions);
         }
-        catch (JsonException)
+        catch (Exception ex) when (IsUnreadableFile(ex))
         {
-            status = NestDefaultsStatus.Invalid;
-            return defaults;
-        }
-        catch (IOException)
-        {
+            // A file that exists but cannot be read (locked, access-denied)
+            // or parsed must never block creating a nest.
             status = NestDefaultsStatus.Invalid;
             return defaults;
         }
@@ -227,6 +224,14 @@ public sealed class NestDefaults
             }
         }
     }
+
+    private static bool IsUnreadableFile(Exception ex) =>
+        ex
+            is JsonException
+                or IOException
+                or UnauthorizedAccessException
+                or NotSupportedException
+                or System.Security.SecurityException;
 
     private static bool IsValidSize(double width, double length) =>
         !double.IsNaN(width)

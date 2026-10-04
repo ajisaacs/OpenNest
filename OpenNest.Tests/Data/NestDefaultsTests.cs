@@ -75,6 +75,24 @@ public class NestDefaultsTests : IDisposable
         AssertFallback(loaded);
     }
 
+    [SkippableFact]
+    public void Load_ReadDeniedFile_ReturnsFallbackButReportsInvalid()
+    {
+        if (OperatingSystem.IsWindows())
+            throw new SkipException("Unix file modes deny the read on Linux/macOS");
+
+        new NestDefaults { PartSpacing = 4 }.Save(_path);
+        File.SetUnixFileMode(_path, UnixFileMode.None);
+        Skip.If(CanRead(_path), "Process can read a mode-000 file (running as root)");
+
+        // The file is visible to File.Exists, but reading it is denied.
+        Assert.True(File.Exists(_path));
+        var loaded = NestDefaults.Load(_path, out var status);
+
+        Assert.Equal(NestDefaultsStatus.Invalid, status);
+        AssertFallback(loaded);
+    }
+
     [Fact]
     public void Load_PartialFile_MergesPerField()
     {
@@ -196,6 +214,19 @@ public class NestDefaultsTests : IDisposable
         // And the applied target owns its own values too.
         target.PlateDefaults.Size = new Size(2, 2);
         Assert.Equal(new Size(48, 96), defaults.Size);
+    }
+
+    private static bool CanRead(string path)
+    {
+        try
+        {
+            using var _ = File.OpenRead(path);
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static void AssertFallback(NestDefaults loaded)
