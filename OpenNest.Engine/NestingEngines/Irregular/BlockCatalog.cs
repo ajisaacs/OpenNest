@@ -77,24 +77,10 @@ internal sealed class BlockCatalog : IDisposable
     {
         if (!drawings.TryGetValue(type.Index, out var drawing))
             drawings[type.Index] = drawing = DrawingJobMapper.CreateDrawing(type.Part);
-        var plate = new Plate(new Size(rectangle.Width, rectangle.Length)) { PartSpacing = spacing };
         try
         {
-            // The drawing is private: stabilize this cache entry before Fill's candidate pruning.
-            var fits = BestFitCache.GetOrCompute(drawing, plate.Size.Length, plate.Size.Width, spacing);
-            var sorted = fits.OrderBy(f => f.RotatedArea).ThenBy(f => f.Candidate.StrategyIndex)
-                .ThenBy(f => f.Candidate.Part2Rotation).ThenBy(f => f.Candidate.Part2Offset.X)
-                .ThenBy(f => f.Candidate.Part2Offset.Y).ThenBy(f => f.OptimalRotation).ToArray();
-            fits.Clear();
-            fits.AddRange(sorted);
-            var members = PlateFillService.FillItem("Default", plate, new NestItem
-            {
-                Drawing = drawing,
-                Quantity = quantity,
-                RotationStart = type.Part.Rotation.Start,
-                RotationEnd = type.Part.Rotation.End,
-                StepAngle = DrawingJobMapper.LegacyStep(type.Part.Rotation),
-            }, new Box(0, 0, rectangle.Length, rectangle.Width), null!, token);
+            var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, spacing,
+                rectangle.Length, rectangle.Width, quantity, token);
             token.ThrowIfCancellationRequested();
             return Resolve(type, members.Take(quantity).ToArray(), orientations[type.Index], spacing, token);
         }
