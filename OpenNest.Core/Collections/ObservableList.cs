@@ -13,6 +13,9 @@ namespace OpenNest.Collections
         public event EventHandler<ItemRemovedEventArgs<T>> ItemRemoved;
         public event EventHandler<ItemChangedEventArgs<T>> ItemChanged;
 
+        /// <summary>Raised once after <see cref="Reorder"/> (or a cutting commit) installs a new order.</summary>
+        public event EventHandler ItemsReordered;
+
         public ObservableList()
         {
             items = new List<T>();
@@ -62,6 +65,68 @@ namespace OpenNest.Collections
         {
             for (int i = items.Count - 1; i >= 0; --i)
                 RemoveAt(i);
+        }
+
+        /// <summary>
+        /// Changes only the order of the current items. <paramref name="order"/> must hold exactly
+        /// the current non-null items: the same references with the same multiplicity. No
+        /// ItemAdded/ItemRemoved is raised, so quantity accounting is untouched; ItemsReordered is
+        /// raised once after the new order is installed. Invalid input throws before any change.
+        /// </summary>
+        public void Reorder(IEnumerable<T> order)
+        {
+            SetOrder(ValidateReorder(order));
+            ItemsReordered?.Invoke(this, EventArgs.Empty);
+        }
+
+        internal T[] ValidateReorder(IEnumerable<T> order)
+        {
+            ArgumentNullException.ThrowIfNull(order);
+            var proposed = order.ToArray();
+            if (proposed.Length != items.Count)
+                throw new ArgumentException("A reorder must contain exactly the current items.", nameof(order));
+            var comparer = typeof(T).IsValueType
+                ? EqualityComparer<T>.Default
+                : (IEqualityComparer<T>)(object)ReferenceEqualityComparer.Instance;
+            var counts = new Dictionary<T, int>(comparer);
+            foreach (var item in items)
+            {
+                if (item == null)
+                    throw new InvalidOperationException("A list holding null items cannot be reordered.");
+                counts[item] = counts.TryGetValue(item, out var count) ? count + 1 : 1;
+            }
+            foreach (var item in proposed)
+            {
+                if (item == null || !counts.TryGetValue(item, out var count) || count == 0)
+                    throw new ArgumentException("A reorder must contain exactly the current items.", nameof(order));
+                counts[item] = count - 1;
+            }
+            return proposed;
+        }
+
+        // Validated order only; raises nothing so a commit can publish after a whole scope installs.
+        internal void SetOrder(T[] order)
+        {
+            items.Clear();
+            items.AddRange(order);
+        }
+
+        // Invokes every observer even if one throws, so a refresh failure cannot starve the rest.
+        internal void RaiseItemsReordered(ICollection<Exception> errors)
+        {
+            if (ItemsReordered == null)
+                return;
+            foreach (var handler in ItemsReordered.GetInvocationList())
+            {
+                try
+                {
+                    ((EventHandler)handler)(this, EventArgs.Empty);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(ex);
+                }
+            }
         }
 
         public int IndexOf(T item)

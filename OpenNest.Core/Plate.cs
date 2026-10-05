@@ -30,6 +30,17 @@ namespace OpenNest
             remove { Parts.ItemChanged -= value; }
         }
 
+        /// <summary>
+        /// Raised once after the part order changes without adding or removing parts, including
+        /// a committed cutting plan that also installed planned programs. Refresh order- and
+        /// program-derived views; quantity accounting is unchanged.
+        /// </summary>
+        public event EventHandler PartsReordered
+        {
+            add { Parts.ItemsReordered += value; }
+            remove { Parts.ItemsReordered -= value; }
+        }
+
         public Plate()
             : this(60, 120) { }
 

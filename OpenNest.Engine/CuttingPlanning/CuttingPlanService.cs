@@ -23,6 +23,16 @@ public static class CuttingPlanService
         try
         {
             token.ThrowIfCancellationRequested();
+            PlateCuttingState plateState = null;
+            if (request?.Plate != null)
+            {
+                // Exact freshness record first, on the caller thread; the planned list must be it.
+                plateState = PlateCuttingState.Capture(request.Plate, token);
+                if (request.Parts == null || !request.Parts.SequenceEqual(plateState.Order, ReferenceEqualityComparer.Instance))
+                    throw new ArgumentException("The plate's parts changed after the request was created.");
+                if (request.Parts.Count == 0 && request.ExpansionBudget > 0 && request.MaxEntries > 0)
+                    return new([], request.StartPoint, request.ExpansionBudget, plateState: plateState);
+            }
             if (request?.Parts == null || request.Parts.Count == 0 || request.ExpansionBudget <= 0 || request.MaxEntries <= 0)
                 throw new ArgumentException("A nonempty source list and positive expansion budget are required.");
             var eligible = new HashSet<Part>(ReferenceEqualityComparer.Instance);
@@ -80,7 +90,9 @@ public static class CuttingPlanService
             placements[0].Execution.RapidDistanceFrom(request.StartPoint);
             return new(placements, request.StartPoint, request.ExpansionBudget, regeneration: request.ConfirmedParameters != null,
                 preservePartOrder: request.PreservePartOrder, maxEntries: request.MaxEntries,
-                expansionObserver: request.ExpansionObserver);
+                expansionObserver: request.ExpansionObserver, plateState: plateState,
+                ownedParameters: request.ConfirmedParameters == null ? null
+                    : OwnedCuttingParameters.Copy(request.ConfirmedParameters));
         }
         catch (OperationCanceledException)
         {
@@ -106,12 +118,60 @@ public static class CuttingPlanService
     /// <summary>Worker-only planning uses owned values; live identities are never dereferenced.</summary>
     public static CuttingPlanResult Plan(CuttingPlanSnapshot snapshot, CancellationToken token = default)
     {
+        var result = PlanCaptured(snapshot, token);
+        result.Snapshot = snapshot;
+        return result;
+    }
+
+    /// <summary>
+    /// Installs exactly the replayed proposals of Ready plate-scoped results, all or nothing.
+    /// Each plate must still match the state captured with its request; otherwise Stale and
+    /// nothing changes. Run on the thread that owns the plates. Never replans.
+    /// </summary>
+    public static CuttingCommitResult Apply(IEnumerable<CuttingPlanResult> results, CancellationToken token = default) =>
+        Apply(results, token, null);
+
+    // beforeInstall is the commit's install-boundary test seam.
+    internal static CuttingCommitResult Apply(IEnumerable<CuttingPlanResult> results, CancellationToken token,
+        Action<Plate, Part> beforeInstall)
+    {
+        var plans = new List<PlateCuttingPlan>();
+        foreach (var result in results ?? [])
+        {
+            var snapshot = result?.Snapshot;
+            if (result?.Status != CuttingPlanStatus.Ready || !result.IndependentlyReplayed
+                || snapshot?.PlateState == null || result.ProposedOrder.Count != snapshot.Placements.Count)
+                return new(CuttingCommitStatus.InvalidInput,
+                    "Only Ready, independently replayed plate-scoped proposals can be applied.");
+            var programs = new List<PlannedPartProgram>();
+            foreach (var proposal in result.ProposedOrder)
+            {
+                if (!proposal.IsRegenerated)
+                    continue;
+                if (snapshot.OwnedParameters == null)
+                    return new(CuttingCommitStatus.InvalidInput, "A regenerated proposal has no captured settings.",
+                        snapshot.PlateState.Plate);
+                // Fresh owned copies: a result can be applied at most once per captured state,
+                // and nothing installed aliases the proposal or another part's settings.
+                programs.Add(new(proposal.SourcePart, proposal.CopyProgram(),
+                    OwnedCuttingParameters.Copy(snapshot.OwnedParameters)));
+            }
+            plans.Add(new(snapshot.PlateState, result.ProposedOrder.Select(p => p.SourcePart), programs));
+        }
+        return CuttingPlanCommit.Apply(plans, token, beforeInstall);
+    }
+
+    private static CuttingPlanResult PlanCaptured(CuttingPlanSnapshot snapshot, CancellationToken token)
+    {
         if (token.IsCancellationRequested)
             return new(CuttingPlanStatus.Cancelled);
         if (snapshot == null)
             return new(CuttingPlanStatus.InvalidInput);
         if (snapshot.Failure is { } failure)
             return new(failure, findings: snapshot.Findings);
+        if (snapshot.Placements.Count == 0)
+            return snapshot.PlateState == null ? new(CuttingPlanStatus.InvalidInput)
+                : new(CuttingPlanStatus.Ready, independentlyReplayed: true); // Empty plate: unchanged no-op.
         try
         {
             var fixedFindings = new List<CuttingPlanFinding>();

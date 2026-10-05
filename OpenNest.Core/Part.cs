@@ -135,6 +135,39 @@ namespace OpenNest
             return true;
         }
 
+        /// <summary>Exact cutting-state record for freshness and rollback; references are not copied.</summary>
+        internal CNC.CuttingPlanning.PartCuttingState CaptureCuttingState() =>
+            new(Program, ownsProgram, preLeadInRotation, HasManualLeadIns, LeadInsLocked,
+                CuttingParameters, location, BoundingBox);
+
+        /// <summary>Reinstates a state captured from this part, field for field.</summary>
+        internal void RestoreCuttingState(CNC.CuttingPlanning.PartCuttingState state)
+        {
+            Program = state.Program;
+            ownsProgram = state.OwnsProgram;
+            preLeadInRotation = state.PreLeadInRotation;
+            HasManualLeadIns = state.HasManualLeadIns;
+            LeadInsLocked = state.LeadInsLocked;
+            CuttingParameters = state.CuttingParameters;
+            location = state.Location;
+            BoundingBox = state.BoundingBox;
+        }
+
+        /// <summary>
+        /// Installs an owned, prevalidated planned program and its precomputed placed bounds.
+        /// Pose and lock are unchanged; nothing is regenerated or rotated here.
+        /// </summary>
+        internal void InstallPlannedProgram(Program program, Box bounds,
+            CNC.CuttingStrategy.CuttingParameters parameters)
+        {
+            preLeadInRotation = Rotation;
+            Program = program;
+            ownsProgram = true;
+            CuttingParameters = parameters;
+            HasManualLeadIns = true;
+            BoundingBox = bounds;
+        }
+
         public void RemoveLeadIns()
         {
             var rotation = preLeadInRotation;

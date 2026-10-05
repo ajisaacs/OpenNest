@@ -28,6 +28,21 @@ public sealed class CuttingPlanRequest
         MaxEntries = maxEntries;
     }
 
+    /// <summary>
+    /// Plate scope: plans the plate's current parts and captures its exact state, so a Ready
+    /// result can later be applied through <see cref="CuttingPlanService.Apply"/>.
+    /// </summary>
+    public CuttingPlanRequest(Plate plate, Vector startPoint = default, int expansionBudget = 20000,
+        CuttingParameters confirmedParameters = null, IEnumerable<Part> eligibleParts = null,
+        bool preservePartOrder = false, int maxEntries = 16)
+        : this(plate?.Parts, startPoint, expansionBudget, confirmedParameters, eligibleParts,
+            preservePartOrder, maxEntries)
+    {
+        Plate = plate;
+    }
+
+    /// <summary>The plate scope, or null for a detached part list that cannot be applied.</summary>
+    public Plate Plate { get; }
     public CuttingParameters ConfirmedParameters { get; }
     public IReadOnlyList<Part> EligibleParts { get; }
     public bool PreservePartOrder { get; }
@@ -44,8 +59,11 @@ public sealed class CuttingPlanSnapshot
     internal CuttingPlanSnapshot(IEnumerable<FixedProgramPlacement> placements, Vector startPoint,
         int expansionBudget, CuttingPlanStatus? failure = null, IEnumerable<CuttingPlanFinding> findings = null,
         bool regeneration = false, bool preservePartOrder = false, int maxEntries = 16,
-        Action<int> expansionObserver = null)
+        Action<int> expansionObserver = null, PlateCuttingState plateState = null,
+        CuttingParameters ownedParameters = null)
     {
+        PlateState = plateState;
+        OwnedParameters = ownedParameters;
         Placements = Array.AsReadOnly(placements.ToArray());
         StartPoint = startPoint;
         ExpansionBudget = expansionBudget;
@@ -57,6 +75,10 @@ public sealed class CuttingPlanSnapshot
         ExpansionObserver = expansionObserver;
     }
 
+    /// <summary>Exact captured plate state for plate-scoped requests; null for detached part lists.</summary>
+    internal PlateCuttingState PlateState { get; }
+    /// <summary>Owned copy of the confirmed parameters taken at capture; never the caller's object.</summary>
+    internal CuttingParameters OwnedParameters { get; }
     internal bool Regeneration { get; }
     internal bool PreservePartOrder { get; }
     internal int MaxEntries { get; }
@@ -162,4 +184,6 @@ public sealed class CuttingPlanResult
     public int Expansions { get; }
     public double RapidDistance { get; }
     public bool IndependentlyReplayed { get; }
+    /// <summary>The captured input this result was planned from; binds Apply to its freshness record.</summary>
+    internal CuttingPlanSnapshot Snapshot { get; set; }
 }

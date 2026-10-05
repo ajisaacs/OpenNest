@@ -3,8 +3,9 @@
 `OpenNest.Engine.CuttingPlanning.CuttingPlanService` plans contiguous whole-part
 programs. It can retain fixed programs or jointly choose internal contour order,
 entries and whole-part order using explicitly confirmed cutting parameters. It
-returns an owned proposal, not an Apply transaction or a replacement desktop
-command. Existing desktop sequencing, assignment and posting review are unchanged.
+returns an owned proposal; `Apply` installs Ready plate-scoped proposals atomically
+after an exact freshness check. There is no desktop command yet: existing desktop
+sequencing, assignment and posting review are unchanged.
 
 ## Capture before worker planning
 
@@ -14,13 +15,16 @@ programs and settings are stable. Pass that snapshot to `Plan` on a worker;
 defaults to `Vector.Zero`, not a discovered controller position.
 
 ```csharp
-var request = new CuttingPlanRequest(parts, startPoint: start,
+var request = new CuttingPlanRequest(plate, startPoint: start,
     confirmedParameters: parameters, expansionBudget: 20000,
     maxEntries: 16, preservePartOrder: false);
 var snapshot = CuttingPlanService.Capture(request, cancellationToken);
 var result = CuttingPlanService.Plan(snapshot, cancellationToken);
 ```
 
+- A plate-scoped request plans the plate's current parts and records its exact
+  state for `Apply`. A detached part list (`new CuttingPlanRequest(parts, ...)`)
+  plans the same way but can never be applied. An empty plate is a Ready no-op.
 - Omitting `confirmedParameters` preserves the original fixed-program contract:
   locked and unlocked programs stay fixed; only whole-part order may change.
 - Supplying confirmed parameters enables regeneration for unlocked placements.
@@ -38,7 +42,8 @@ Clean geometry accounts for the base program's existing rotation before applying
 placement rotation; placement translation is applied once. Subprogram copying
 must not rotate shared programs through their property setters. No live drawings
 are attached to preview plates, so capture/search do not change quantity accounting.
-The snapshot is historical, not a freshness check against later edits. Original
+Planning works from this historical snapshot; Apply compares it with live state.
+Original
 clean and executable graphs are type/mode-checked before cloning can erase unknown
 semantics. Exact placed/proposed copies preserve authored motion feed/exact-stop
 flags, symbolic bindings and shared subprogram identity; unsupported graphs are
@@ -121,15 +126,41 @@ a malformed emitted arc, is refused, not automatically repaired. Tabbed lead-out
 leave from the trimmed cut end, but a lead-out after an open contour still needs
 manual review of its retention gap, so confirmed-parameters planning refuses it.
 
+## Apply
+
+```csharp
+var commit = CuttingPlanService.Apply(results, cancellationToken); // one result per plate
+```
+
+Call it on the thread that owns the plates, with Ready, independently replayed
+results from plate-scoped requests; anything else is `InvalidInput`. Apply never
+replans. Each plate is compared exactly with the state captured with its request:
+part list instance and order, plate quantity/size/quadrant, cutoff definitions,
+and for every part its program reference and exact content (an in-place edit
+counts), drawing program, pose bits, lead-in/lock flags, settings reference and
+bounds. Any difference on any plate returns `Stale` and changes nothing; a result
+can therefore be applied at most once.
+
+The whole scope is validated and its bounds staged first; cancellation is checked
+immediately before the install. Order changes through `ObservableList.Reorder`
+semantics: same references, no `PartAdded`/`PartRemoved`, so drawing quantities,
+sentinel plates and plate lists are untouched. Regenerated parts receive a fresh
+owned copy of the replayed program and of the settings captured with the request,
+keep their pose and lock, and are marked as having lead-ins. Fixed programs are
+not replaced. An exception during install restores every plate exactly and returns
+`Failed`. After the whole scope is installed, each changed plate raises
+`Plate.PartsReordered` once; an observer exception is reported in `RefreshErrors`
+on an `Applied` result, not as a rollback.
+
 ## Remaining integration boundaries
 
 The service does not establish clean-material non-overlap, inner-part-before-host
 release dependencies, cutoff order or physical retention strength. It does not
-install programs atomically, check freshness at Apply, write CNC, or set posting
-consent. A `Ready` proposal can still be unsuitable for cutting.
+write CNC or set posting consent. A `Ready` proposal can still be unsuitable for
+cutting.
 
-Later slices add containment/cutoff dependencies and exact freshness/atomic Apply,
-then desktop integration and legacy automatic-path retirement. Windows interaction,
+Later slices add containment/cutoff dependencies, then desktop integration
+(including `PartsReordered` refresh hooks) and legacy automatic-path retirement. Windows interaction,
 supplied-job coverage and actual posted order remain separate acceptance gates.
 Fresh [pre-post verification](post-verification.md) is still required; it is not a
 physical safety qualification.
