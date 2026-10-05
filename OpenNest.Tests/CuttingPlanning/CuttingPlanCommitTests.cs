@@ -180,6 +180,49 @@ public class CuttingPlanCommitTests
     }
 
     [Fact]
+    public void Apply_PartSharedByTwoPlates_IsRefusedWithoutChange()
+    {
+        var parameters = ExplicitContourTests.Parameters();
+        var clean = LeadPathValidationTests.Rectangle(0, 0, 2, 2);
+        var prepared = PreparedContours.Capture(clean, parameters);
+        var shared = new Part(new Drawing("same", clean), new Vector(5, 5));
+        Assert.True(shared.RestoreLeadInProgram(prepared.Emit([prepared.ClosestEntry(0, new Vector(3, 1))]), false));
+        var nest = new Nest();
+        var regenerated = nest.CreatePlate();
+        var fixedPlate = nest.CreatePlate();
+        regenerated.Parts.Add(shared);
+        fixedPlate.Parts.Add(shared);
+        var results = new[]
+        {
+            CuttingPlanService.Plan(new CuttingPlanRequest(regenerated, confirmedParameters: parameters)),
+            CuttingPlanService.Plan(new CuttingPlanRequest(fixedPlate))
+        };
+        Assert.All(results, r => Assert.Equal(CuttingPlanStatus.Ready, r.Status));
+        Assert.True(results[0].ProposedOrder[0].IsRegenerated);
+        var program = shared.Program;
+        var states = new[] { regenerated, fixedPlate }.Select(p => PlateCuttingState.Capture(p)).ToArray();
+
+        var commit = CuttingPlanService.Apply(results);
+
+        // Installing through one plate would silently replace the other plate's fixed program.
+        Assert.Equal(CuttingCommitStatus.InvalidInput, commit.Status);
+        Assert.Same(program, shared.Program);
+        Assert.All(states, s => Assert.True(s.IsCurrent(), s.Difference()));
+    }
+
+    [Fact]
+    public void CommitInstaller_IsOnlyReachableThroughTheVerifiedService()
+    {
+        // The installer validates root references only; owned, verified payloads come from
+        // CuttingPlanService.Apply. Public access would accept nested aliases of live programs.
+        Assert.False(typeof(CuttingPlanCommit).IsPublic);
+        Assert.False(typeof(PlateCuttingPlan).IsPublic);
+        Assert.False(typeof(PlannedPartProgram).IsPublic);
+        Assert.True(typeof(CuttingPlanService).GetMethod(nameof(CuttingPlanService.Apply),
+            [typeof(IEnumerable<CuttingPlanResult>), typeof(CancellationToken)])!.IsPublic);
+    }
+
+    [Fact]
     public void Apply_LaterPlateStale_AppliesNothingAnywhere()
     {
         var (_, first, firstParts) = FixedPlate();

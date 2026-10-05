@@ -8,7 +8,7 @@ using OpenNest.Geometry;
 namespace OpenNest.CNC.CuttingPlanning;
 
 /// <summary>An owned planned program for one unlocked part; ownership passes to the part on Apply.</summary>
-public sealed class PlannedPartProgram
+internal sealed class PlannedPartProgram
 {
     public PlannedPartProgram(Part part, Program program, CuttingParameters parameters)
     {
@@ -23,7 +23,7 @@ public sealed class PlannedPartProgram
 }
 
 /// <summary>The verified order and planned programs for one plate, bound to its captured state.</summary>
-public sealed class PlateCuttingPlan
+internal sealed class PlateCuttingPlan
 {
     public PlateCuttingPlan(PlateCuttingState expected, IEnumerable<Part> order,
         IEnumerable<PlannedPartProgram> programs = null)
@@ -75,10 +75,12 @@ public sealed class CuttingCommitResult
 /// Installs verified cutting plans for a whole scope at once. Nothing is searched, emitted,
 /// rotated or regenerated here: inputs are validated and checked for freshness, bounds are
 /// staged, then order and programs are installed synchronously and published once per plate.
+/// Internal: it checks root program references only, so payloads must be owned copies of
+/// independently replayed proposals. CuttingPlanService.Apply is the public entry point.
 /// </summary>
-public static class CuttingPlanCommit
+internal static class CuttingPlanCommit
 {
-    public static CuttingCommitResult Apply(IEnumerable<PlateCuttingPlan> plans, CancellationToken token = default) =>
+    internal static CuttingCommitResult Apply(IEnumerable<PlateCuttingPlan> plans, CancellationToken token = default) =>
         Apply(plans, token, null);
 
     // beforeInstall is a test seam that runs inside the install boundary, before each program.
@@ -113,6 +115,7 @@ public static class CuttingPlanCommit
 
         var staged = new List<Staged>(scope.Length);
         var targets = new HashSet<Part>(ReferenceEqualityComparer.Instance);
+        var members = new HashSet<Part>(ReferenceEqualityComparer.Instance);
         var installed = new HashSet<Program>(ReferenceEqualityComparer.Instance);
         var live = new HashSet<Program>(scope.SelectMany(p => p.Expected.Order).Select(p => p.Program),
             ReferenceEqualityComparer.Instance);
@@ -128,11 +131,14 @@ public static class CuttingPlanCommit
             {
                 return Invalid(plate, "The planned order is not exactly the plate's current parts.");
             }
-            var members = new HashSet<Part>(order, ReferenceEqualityComparer.Instance);
+            // A part on two plates would let one plate's install change the other's verified program.
+            if (order.Any(part => !members.Add(part)))
+                return Invalid(plate, "A part appears on more than one plate in the commit scope.");
+            var onPlate = new HashSet<Part>(order, ReferenceEqualityComparer.Instance);
             var programs = new List<(Part, Program, Box, CuttingParameters)>();
             foreach (var planned in plan.Programs)
             {
-                if (planned?.Part == null || !members.Contains(planned.Part) || !targets.Add(planned.Part))
+                if (planned?.Part == null || !onPlate.Contains(planned.Part) || !targets.Add(planned.Part))
                     return Invalid(plate, "Planned programs must target distinct parts of their own plate.");
                 if (planned.Part.LeadInsLocked)
                     return Invalid(plate, "A locked part's program is retained exactly and cannot be replaced.");
