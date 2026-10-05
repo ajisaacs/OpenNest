@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using OpenNest.CNC.CuttingStrategy;
-using OpenNest.Geometry;
-using OpenNest.Math;
+using OpenNest.Engine.CuttingPlanning;
 
 namespace OpenNest.Engine.Sequencing
 {
@@ -60,7 +59,8 @@ namespace OpenNest.Engine.Sequencing
                         // An orphaned cutoff still must not follow potentially
                         // crossed parts when its nominal span cannot be recovered.
                         if (!definitions.TryGetValue(cut.Part.BaseDrawing, out var definition)
-                            || CrossesBounds(definition, part.BoundingBox, bounds))
+                            || CuttingDependencyGraph.CutOffCrosses(definition.Axis, definition.Position,
+                                definition.StartLimit, definition.EndLimit, part.BoundingBox, bounds))
                         {
                             result.Add(cut.Part);
                             emitted[cut.Index] = true;
@@ -76,27 +76,6 @@ namespace OpenNest.Engine.Sequencing
             }
 
             return result;
-        }
-
-        private static bool CrossesBounds(CutOff cutOff, Box part, Box plate)
-        {
-            var vertical = cutOff.Axis == CutOffAxis.Vertical;
-            var position = vertical ? cutOff.Position.X : cutOff.Position.Y;
-            var acrossMin = vertical ? part.Left : part.Bottom;
-            var acrossMax = vertical ? part.Right : part.Top;
-            var alongMin = vertical ? part.Bottom : part.Left;
-            var alongMax = vertical ? part.Top : part.Right;
-            var start = cutOff.StartLimit ?? (vertical ? plate.Bottom : plate.Left);
-            var end = cutOff.EndLimit ?? (vertical ? plate.Top : plate.Right);
-
-            // Use the nominal line, not its trimmed cutting segments (which
-            // deliberately skip the parts). Bounds conservatively include edge
-            // contacts and concave recesses; limits prevent unrelated dependencies
-            // beyond the cutoff's span. Negative coordinates need no special case.
-            return !(position < acrossMin - Tolerance.Epsilon
-                || position > acrossMax + Tolerance.Epsilon
-                || System.Math.Max(start, end) < alongMin - Tolerance.Epsilon
-                || System.Math.Min(start, end) > alongMax + Tolerance.Epsilon);
         }
     }
 }
