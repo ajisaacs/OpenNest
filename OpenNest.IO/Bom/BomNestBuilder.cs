@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using OpenNest.Geometry;
 
 namespace OpenNest.IO.Bom;
@@ -48,9 +49,9 @@ public static class BomNestBuilder
     /// Creates a nest named "<paramref name="jobName"/> - thickness material".
     /// <paramref name="applySavedDefaults"/> runs first (units, quadrant,
     /// plate), then the group's plate size and spacing, material and
-    /// thickness are set. Each row's drawing is imported with the row's
-    /// quantity (1 when blank). The nest gets one plate when at least one
-    /// drawing imported.
+    /// thickness are set. Each drawing file is imported once, needing the
+    /// total quantity of the rows that name it (a blank quantity counts as
+    /// 1). The nest gets one plate when at least one drawing imported.
     /// </summary>
     public static BomNestBuildResult Build(
         BomImportGroup group,
@@ -83,8 +84,11 @@ public static class BomNestBuilder
             plate.EdgeTop
         );
 
-        foreach (var part in group.Parts)
+        // Rows naming the same drawing file become one drawing that needs
+        // their total: the nest's drawing set is keyed by drawing name.
+        foreach (var rows in group.Parts.GroupBy(p => p.DxfPath, StringComparer.OrdinalIgnoreCase))
         {
+            var part = rows.First();
             if (!File.Exists(part.DxfPath))
             {
                 errors.Add($"{part.FileName}: DXF file not found");
@@ -95,7 +99,7 @@ public static class BomNestBuilder
             {
                 var drawing = CadImporter.ImportDrawing(
                     part.DxfPath,
-                    new CadImportOptions { Quantity = part.Qty ?? 1 }
+                    new CadImportOptions { Quantity = rows.Sum(p => p.Qty ?? 1) }
                 );
                 drawing.Material = new Material(material);
                 nest.Drawings.Add(drawing);

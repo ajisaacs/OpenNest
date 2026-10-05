@@ -62,6 +62,22 @@ public sealed class BomNestBuilderTests : IDisposable
     }
 
     [Fact]
+    public void Build_CombinesRowsThatUseTheSameDrawing()
+    {
+        var first = Row("PT01", qty: 2);
+        var second = Row("PT01", qty: 3);
+        second.FileName = "pt01.dxf";
+
+        var result = BomNestBuilder.Build(Group(first, second, Row("PT02", qty: 1)), Plate(), "Job", null);
+
+        Assert.Empty(result.Errors);
+        var nest = Assert.IsType<Nest>(result.Nest);
+        var drawings = nest.Drawings.OrderBy(d => d.Name).ToList();
+        Assert.Equal(new[] { "PT01", "PT02" }, drawings.Select(d => d.Name));
+        Assert.Equal(new[] { 5, 1 }, drawings.Select(d => d.Quantity.Required));
+    }
+
+    [Fact]
     public void Build_ReportsMissingDrawingAndKeepsTheOthers()
     {
         var missing = Row("PT09");
