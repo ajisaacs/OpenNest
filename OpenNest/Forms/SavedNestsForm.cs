@@ -38,6 +38,7 @@ public sealed class SavedNestsForm : Form
         Text = "Open Nest — Database";
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(880, 480);
+        WindowState = FormWindowState.Maximized;
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = false;
@@ -83,7 +84,22 @@ public sealed class SavedNestsForm : Form
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells,
+            BorderStyle = BorderStyle.None,
+            BackgroundColor = SystemColors.Window,
+            GridColor = Color.FromArgb(230, 230, 230),
+            EnableHeadersVisualStyles = false,
+            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
         };
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(90, 90, 90);
+        grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245);
+        grid.RowHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+        grid.RowHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
+        grid.RowHeadersDefaultCellStyle.ForeColor = Color.FromArgb(90, 90, 90);
+        grid.RowHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(204, 228, 247);
+        grid.RowHeadersDefaultCellStyle.SelectionForeColor = Color.Black;
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(204, 228, 247);
+        grid.DefaultCellStyle.SelectionForeColor = Color.Black;
         AddColumn("Name", NestSortField.Name, typeof(string));
         AddColumn("Customer", NestSortField.Customer, typeof(string));
         AddColumn("Status", NestSortField.Status, typeof(string));
@@ -95,7 +111,7 @@ public sealed class SavedNestsForm : Form
         AddColumn("Parts", NestSortField.PartCount, typeof(int));
         AddColumn("Made By", NestSortField.MadeBy, typeof(string));
         AddColumn("Comments", NestSortField.Comments, typeof(string));
-        AddColumn("File Size", NestSortField.FileSize, typeof(long));
+        AddColumn("File Size", NestSortField.FileSize, typeof(string));
         AddColumn("Saved", NestSortField.SavedAt, typeof(DateTime));
         grid.Columns.Add(new DataGridViewTextBoxColumn
         {
@@ -149,6 +165,11 @@ public sealed class SavedNestsForm : Form
         Controls.Add(statusStrip);
         CancelButton = cancel;
 
+        Load += (_, _) =>
+        {
+            var area = Screen.FromControl(Owner ?? this).WorkingArea;
+            MaximizedBounds = new Rectangle(area.Left, area.Top, area.Width, area.Height - 20);
+        };
         Shown += async (_, _) => await RunAsync(session.RefreshAsync);
     }
 
@@ -222,7 +243,7 @@ public sealed class SavedNestsForm : Form
                 record.PartCount,
                 record.MadeBy,
                 record.Comments,
-                record.FileSize,
+                FormatFileSize(record.FileSize),
                 record.SavedAt,
                 record.Id
             );
@@ -245,6 +266,21 @@ public sealed class SavedNestsForm : Form
         NestStatus.HasBeenCut => "Has Been Cut",
         _ => status.ToString(),
     };
+
+    private static readonly string[] FileSizeUnits = { "B", "KB", "MB", "GB" };
+
+    private static string FormatFileSize(long bytes)
+    {
+        double size = bytes;
+        var unitIndex = 0;
+        while (size >= 1024 && unitIndex < FileSizeUnits.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+
+        return unitIndex == 0 ? $"{size:0} {FileSizeUnits[unitIndex]}" : $"{size:0.#} {FileSizeUnits[unitIndex]}";
+    }
 
     private void Open_Click(object sender, EventArgs e)
     {
