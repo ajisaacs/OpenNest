@@ -439,17 +439,31 @@ namespace OpenNest.CNC.CuttingStrategy
             var tabbed = Parameters.TabsEnabled
                 && Parameters.TabConfig != null
                 && contourType == ContourType.External;
-            if (tabbed)
-                reindexedShape = TrimShapeForTab(reindexedShape, point, Parameters.TabConfig.Size);
 
             // A tab leaves the contour short of the corner; a run-out through it would cut the tab.
+            var leadOutPoint = point;
             var leadOutNormal = normal;
-            if (!tabbed)
+            if (tabbed)
+            {
+                reindexedShape = TrimShapeForTab(reindexedShape, point, Parameters.TabConfig.Size);
+
+                // Leave from where the trimmed cut actually ends, on that entity's normal:
+                // an arc generated at the nominal entry would not start on its own radius.
+                if (reindexedShape.Entities.Count > 0 && reindexedShape.Entities[^1] is Line or Arc)
+                {
+                    var last = reindexedShape.Entities[^1];
+                    leadOutPoint = EntityEndPoint(last);
+                    leadOutNormal = ComputeNormal(leadOutPoint, last, contourType, winding);
+                }
+            }
+            else
+            {
                 leadOut = ResolveLeadOut(shape, point, entity, contourType, leadOut, winding,
                     Parameters.PierceClearance, out leadOutNormal);
+            }
 
             program.Codes.AddRange(ConvertShapeToMoves(reindexedShape, point));
-            program.Codes.AddRange(leadOut.Generate(point, leadOutNormal, winding));
+            program.Codes.AddRange(leadOut.Generate(leadOutPoint, leadOutNormal, winding));
         }
 
         private void EmitScribeContours(Program program, List<Entity> scribeEntities)

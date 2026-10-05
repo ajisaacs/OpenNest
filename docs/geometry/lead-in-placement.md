@@ -42,8 +42,10 @@ corners (the inside corner of an L) use the notch bisector, like cutout corners.
 
 A `LineLeadOut` mirrors this: at a convex perimeter corner it runs straight on past
 the corner along the last-cut edge, with the same clearance fallback to the last-cut
-edge's normal and a bisector at reflex corners. A tabbed perimeter keeps its old
-lead-out. `ContourCuttingStrategy.ResolveLeadIn`/`ResolveLeadOut` own these rules;
+edge's normal and a bisector at reflex corners. A tabbed perimeter gets no run-out:
+every lead-out style leaves from where the trimmed cut actually ends, on that end's
+normal, so an arc lead-out starts on its own radius and the tab gap stays uncut.
+`ContourCuttingStrategy.ResolveLeadIn`/`ResolveLeadOut` own these rules;
 program generation and the manual preview share them. Other lead-in styles are
 unchanged.
 

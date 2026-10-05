@@ -116,8 +116,10 @@ configured tab gaps; stale tab settings do not establish retention. In confirmed
 parameters mode, locked/ineligible programs must cover the complete directed clean
 boundary: an open fixed program has no certified selected tab metadata and is refused,
 not repaired, even if it may have been intentionally tabbed. The no-parameter route
-retains its narrower compatibility contract. A lead-out that may bridge a tab or
-an invalid emitted tabbed arc is refused, not automatically repaired.
+retains its narrower compatibility contract. A lead-out that may bridge a tab, or
+a malformed emitted arc, is refused, not automatically repaired. Tabbed lead-outs
+leave from the trimmed cut end, but a lead-out after an open contour still needs
+manual review of its retention gap, so confirmed-parameters planning refuses it.
 
 ## Remaining integration boundaries
 

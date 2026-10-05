@@ -261,8 +261,9 @@ public class JointCuttingPlanTests
     }
 
     [Fact]
-    public void InvalidTabbedArcCandidate_IsRefusedWithoutRepairOrException()
+    public void TabbedArcCandidate_UncertifiedTabGap_IsRefusedWithoutRepairOrException()
     {
+        // The arc lead-out is now well formed; the open tab gap is still not certified.
         var parameters = ExplicitContourTests.Parameters();
         parameters.TabsEnabled = true; parameters.TabConfig = new NormalTab { Size = 0.2 };
         parameters.ExternalLeadOut = new ArcLeadOut { Radius = 0.2 };
@@ -271,6 +272,7 @@ public class JointCuttingPlanTests
         Assert.Equal(CuttingPlanStatus.NoSolutionWithinBudget, result.Status);
         Assert.Empty(result.ProposedOrder); Assert.True(result.Expansions > 0);
         Assert.Contains(result.Findings, f => f.Kind == PostVerificationKind.Incomplete);
+        Assert.Contains(result.Findings, f => f.Message.Contains("retention gap"));
     }
 
     [Fact]

@@ -138,7 +138,7 @@ public class LeadPathValidationTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void RealStrategyLeadouts_SafePathsOrRefusedMalformedTabbedArc(bool tabs, bool arc)
+    public void RealStrategyLeadouts_SafePathsKeepTheTabGap(bool tabs, bool arc)
     {
         var clean = ExplicitContourTests.Square(false);
         var target = LeadMaterialSnapshot.Capture(clean, Vector.Zero);
@@ -147,13 +147,6 @@ public class LeadPathValidationTests
         parameters.TabConfig = new NormalTab { Size = 0.2 };
         parameters.ExternalLeadOut = arc ? new ArcLeadOut { Radius = 0.2 } : new LineLeadOut { Length = 0.2 };
         var emitted = new ContourCuttingStrategy { Parameters = parameters }.Apply(clean, new Vector(-2, 5));
-        if (tabs && arc)
-        {
-            // The retained emitter generates this arc from nominal closure, not the
-            // actual tab endpoint. Do not fit a different center or bridge the gap.
-            Assert.Throws<ArgumentException>(() => Read(emitted.Program));
-            return;
-        }
         var execution = Read(emitted.Program);
         Assert.NotEmpty(execution.Motions.Where(m => m.Layer == LayerType.Leadout));
         var result = LeadPathValidator.Check(execution, target, []);
@@ -165,6 +158,19 @@ public class LeadPathValidationTests
             Assert.True(cuts[0].Start!.Value.DistanceTo(cuts[^1].End) > 0.1);
             Assert.Equal(cuts[^1].End, leadout.Start);
         }
+    }
+
+    [Fact]
+    public void LegacyTabbedArcFromNominalClosure_IsRefusedNotRefit()
+    {
+        // Former emitter output: the cut stops at the tab (0,4.8), but the arc lead-out was
+        // generated about the nominal entry (0,5). Never recentre the arc or bridge the gap.
+        var p = new Program();
+        p.MoveTo(-1, 5);
+        p.Codes.Add(new LinearMove(0, 5) { Layer = LayerType.Leadin });
+        p.LineTo(0, 10); p.LineTo(10, 10); p.LineTo(10, 0); p.LineTo(0, 0); p.LineTo(0, 4.8);
+        p.Codes.Add(new ArcMove(new Vector(-0.2, 4.8), new Vector(-0.2, 5), RotationType.CW) { Layer = LayerType.Leadout });
+        Assert.Throws<ArgumentException>(() => Read(p));
     }
 
     [Fact]
