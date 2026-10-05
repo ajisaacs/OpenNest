@@ -18,6 +18,13 @@ The desktop app can save nests two ways:
   modes) for producing a local file to share or back up. Export does not change
   the document's file save path or database record association.
 
+Dragging one or more `.nest` files onto the main window (or onto an open
+plate) opens them from disk directly, in either mode — this is the only way
+to open a local file while in Database mode, since Open there browses server
+records instead of showing a file dialog. A document opened this way is not
+bound to a server record, so a subsequent Save in Database mode creates a new
+record on first save, same as any other unbound document.
+
 The mode and server address are stored per-PC at `%APPDATA%\OpenNest\storage.json`
 (`OpenNest.Data.NestStorageSettings`), defaulting to File mode so existing
 installs are unaffected until an operator opts in via **File > Storage Mode...**.

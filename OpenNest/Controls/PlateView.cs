@@ -78,6 +78,12 @@ namespace OpenNest.Controls
         public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
         public event EventHandler StatusChanged;
 
+        /// <summary>
+        /// Raised when files are dropped on the plate and something is listening (see
+        /// <see cref="OnDragEnter"/>); callers decide which paths to act on.
+        /// </summary>
+        public event EventHandler<string[]> FilesDropped;
+
         public event EventHandler SelectionChanged
         {
             add => selection.SelectionChanged += value;
@@ -305,10 +311,18 @@ namespace OpenNest.Controls
         {
             if (drgevent.Data.GetData(typeof(Drawing)) != null)
                 drgevent.Effect = DragDropEffects.Copy;
+            else if (FilesDropped != null && drgevent.Data.GetDataPresent(DataFormats.FileDrop))
+                drgevent.Effect = DragDropEffects.Copy;
         }
 
         protected override void OnDragDrop(DragEventArgs drgevent)
         {
+            if (drgevent.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                FilesDropped?.Invoke(this, (string[])drgevent.Data.GetData(DataFormats.FileDrop));
+                return;
+            }
+
             var dwg = drgevent.Data.GetData(typeof(Drawing)) as Drawing;
 
             if (dwg == null)
