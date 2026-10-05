@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using OpenNest.CNC;
 
-namespace OpenNest.Engine.CuttingPlanning;
+namespace OpenNest.CNC.CuttingPlanning;
 
 /// <summary>Lossless owned copies at the cutting-plan boundary, not a general Clone change.</summary>
 internal static class OwnedProgramCopy
