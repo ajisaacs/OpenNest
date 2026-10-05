@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Geometry;
 
@@ -9,8 +10,9 @@ namespace OpenNest.CNC.CuttingPlanning;
 
 /// <summary>
 /// Exact caller-thread record of everything a cutting proposal for one plate depends on:
-/// part list instance and order, plate quantity/size/quadrant, cutoff definitions, and each
-/// part's complete cutting state with owned copies of its placed and drawing programs.
+/// part list instance and order, plate quantity/size/quadrant/settings, cutoff definitions, and
+/// each part's complete cutting state with owned copies of its placed and drawing programs,
+/// drawing cutoff classification and exact settings content.
 /// A commit compares it with the live plate and refuses when anything differs.
 /// </summary>
 public sealed class PlateCuttingState
@@ -22,11 +24,15 @@ public sealed class PlateCuttingState
     private readonly int quadrant;
     private readonly ObservableList<CutOff> cutOffList;
     private readonly CutOffRecord[] cutOffs;
-    private readonly Dictionary<Drawing, (Program Program, Program Copy)> drawings;
+    private readonly Dictionary<Drawing, (Program Program, Program Copy, bool IsCutOff)> drawings;
+    private readonly Dictionary<CuttingParameters, string> settings;
+    private readonly CuttingParameters plateSettings;
 
-    private PlateCuttingState(Plate plate, PartRecord[] parts,
-        CutOffRecord[] cutOffs, Dictionary<Drawing, (Program, Program)> drawings)
+    private PlateCuttingState(Plate plate, PartRecord[] parts, CutOffRecord[] cutOffs,
+        Dictionary<Drawing, (Program, Program, bool)> drawings, Dictionary<CuttingParameters, string> settings)
     {
+        this.settings = settings;
+        plateSettings = plate.CuttingParameters;
         Plate = plate;
         partList = plate.Parts;
         this.parts = parts;
@@ -53,7 +59,9 @@ public sealed class PlateCuttingState
         ArgumentNullException.ThrowIfNull(plate);
         if (plate.Parts == null || plate.CutOffs == null)
             throw new ArgumentException("Plate part and cutoff lists are required.");
-        var drawings = new Dictionary<Drawing, (Program, Program)>(ReferenceEqualityComparer.Instance);
+        var drawings = new Dictionary<Drawing, (Program, Program, bool)>(ReferenceEqualityComparer.Instance);
+        var settings = new Dictionary<CuttingParameters, string>(ReferenceEqualityComparer.Instance);
+        Fingerprint(plate.CuttingParameters);
         var records = new List<PartRecord>(plate.Parts.Count);
         foreach (var part in plate.Parts)
         {
@@ -63,14 +71,21 @@ public sealed class PlateCuttingState
             var drawing = part.BaseDrawing;
             if (!drawings.ContainsKey(drawing))
                 drawings.Add(drawing, (drawing.Program, drawing.Program == null ? null
-                    : OwnedProgramCopy.Copy(drawing.Program, token)));
+                    : OwnedProgramCopy.Copy(drawing.Program, token), drawing.IsCutOff));
             var state = part.CaptureCuttingState();
+            Fingerprint(state.CuttingParameters);
             records.Add(new(part, state, OwnedProgramCopy.Copy(part.Program, token), BoxValues(state.BoundingBox)));
         }
         var cutOffs = plate.CutOffs.Select(c => c == null
             ? throw new ArgumentException("Plate contains a missing cutoff definition.")
             : new CutOffRecord(c, c.Drawing, c.Axis, c.Position, c.StartLimit, c.EndLimit)).ToArray();
-        return new(plate, records.ToArray(), cutOffs, drawings);
+        return new(plate, records.ToArray(), cutOffs, drawings, settings);
+
+        void Fingerprint(CuttingParameters parameters)
+        {
+            if (parameters != null && !settings.ContainsKey(parameters))
+                settings.Add(parameters, StateFingerprint.Of(parameters));
+        }
     }
 
     /// <summary>True when the live plate still has exactly the captured state.</summary>
@@ -85,6 +100,8 @@ public sealed class PlateCuttingState
         if (plate.Quantity != quantity || !Bits(plate.Size.Width, size.Width)
             || !Bits(plate.Size.Length, size.Length) || plate.Quadrant != quadrant)
             return "Plate quantity, size or quadrant changed.";
+        if (!ReferenceEquals(plate.CuttingParameters, plateSettings) || !SameSettings(plateSettings))
+            return "Plate cutting settings changed.";
         if (plate.Parts.Count != parts.Length)
             return "Parts were added or removed.";
         for (var i = 0; i < parts.Length; i++)
@@ -108,10 +125,14 @@ public sealed class PlateCuttingState
                 return $"Part {i + 1} bounds changed.";
             if (!ProgramContent.Equal(part.Program, record.Program, token))
                 return $"Part {i + 1} program was edited in place.";
-            var (drawingProgram, drawingCopy) = drawings[part.BaseDrawing];
+            if (!SameSettings(live.CuttingParameters))
+                return $"Part {i + 1} cutting settings were edited in place.";
+            var (drawingProgram, drawingCopy, isCutOff) = drawings[part.BaseDrawing];
             if (!ReferenceEquals(part.BaseDrawing.Program, drawingProgram)
                 || !ProgramContent.Equal(drawingProgram, drawingCopy, token))
                 return $"Part {i + 1} drawing program changed.";
+            if (part.BaseDrawing.IsCutOff != isCutOff)
+                return $"Part {i + 1} cutoff classification changed.";
         }
         if (plate.CutOffs.Count != cutOffs.Length)
             return "Cutoffs were added or removed.";
@@ -128,6 +149,21 @@ public sealed class PlateCuttingState
         // Part.Rotation derives from the manual flag, PreLeadInRotation and Program.Rotation,
         // all compared exactly above.
         return null;
+
+        // References were compared already; this catches in-place edits of the same object.
+        bool SameSettings(CuttingParameters parameters)
+        {
+            if (parameters == null)
+                return true;
+            try
+            {
+                return settings.TryGetValue(parameters, out var captured) && captured == StateFingerprint.Of(parameters);
+            }
+            catch (NotSupportedException)
+            {
+                return false; // Grown past the exact fingerprint budget since capture.
+            }
+        }
     }
 
     private static long[] BoxValues(Box box) => box == null ? [] :

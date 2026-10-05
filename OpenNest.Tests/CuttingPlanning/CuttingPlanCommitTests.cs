@@ -45,16 +45,18 @@ public class CuttingPlanCommitTests
     [Fact]
     public void Apply_RegeneratedPlan_InstallsTheExactReplayedProgramWithOwnedSettings()
     {
-        var (nest, plate, part, parameters) = RegeneratedPlate(Vector.Zero);
+        var (nest, plate, part, _) = RegeneratedPlate(Vector.Zero);
         var location = part.Location;
         var rotation = part.Rotation;
         var quantity = part.BaseDrawing.Quantity.Nested;
+        // Caller-confirmed settings are planning input, not plate state: editing them after
+        // capture neither stales the plan nor leaks into what is installed.
+        var parameters = ExplicitContourTests.Parameters();
         var length = ((LineLeadIn)parameters.ExternalLeadIn).Length;
         var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate, confirmedParameters: parameters));
         Assert.Equal(CuttingPlanStatus.Ready, result.Status);
         var proposal = Assert.Single(result.ProposedOrder);
         Assert.True(proposal.IsRegenerated);
-        // Settings edited after capture must not leak into what is installed.
         ((LineLeadIn)parameters.ExternalLeadIn).Length = length * 3;
 
         var commit = CuttingPlanService.Apply([result]);
@@ -91,11 +93,17 @@ public class CuttingPlanCommitTests
     [InlineData("same-name-drawing")]
     [InlineData("list-replaced")]
     [InlineData("added")]
+    [InlineData("cutoff-classification")]
+    [InlineData("part-settings-in-place")]
+    [InlineData("part-settings-nested")]
+    [InlineData("plate-settings-in-place")]
+    [InlineData("plate-settings-replaced")]
     public void Apply_AnyChangeAfterCapture_IsStaleAndChangesNothing(string change)
     {
         var (_, plate, parts) = FixedPlate();
         var cutOff = new CutOff(new Vector(30, 0), CutOffAxis.Vertical);
         plate.CutOffs.Add(cutOff);
+        plate.CuttingParameters = new CuttingParameters();
         var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate));
         Assert.Equal(CuttingPlanStatus.Ready, result.Status);
         switch (change)
@@ -117,6 +125,13 @@ public class CuttingPlanCommitTests
                 foreach (var part in parts) list.Add(part);
                 plate.Parts = list; break;
             case "added": plate.Parts.Add(Rectangle(20, 0, 2, 2)); break;
+            // Classification decides lead, material, obstacle and dependency treatment.
+            case "cutoff-classification": parts[0].BaseDrawing.IsCutOff = true; break;
+            // A regenerated part would otherwise overwrite an edit made after capture.
+            case "part-settings-in-place": parts[0].CuttingParameters.Kerf = 0.125; break;
+            case "part-settings-nested": parts[0].CuttingParameters.Assignment.Preference = "LIAT"; break;
+            case "plate-settings-in-place": plate.CuttingParameters.PierceClearance = 0.25; break;
+            case "plate-settings-replaced": plate.CuttingParameters = new CuttingParameters(); break;
         }
         var after = PlateCuttingState.Capture(plate);
         var events = Watch(plate);
@@ -128,6 +143,40 @@ public class CuttingPlanCommitTests
         Assert.False(string.IsNullOrEmpty(commit.Message));
         Assert.True(after.IsCurrent(), after.Difference());
         Assert.Equal((0, 0, 0), events());
+    }
+
+    [Fact]
+    public void Apply_MalformedLiveProgram_IsStaleInsteadOfThrowing()
+    {
+        var (_, plate, parts) = FixedPlate();
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate));
+        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        parts[1].Program.Codes = null!;
+        var events = Watch(plate);
+
+        var commit = CuttingPlanService.Apply([result]);
+
+        Assert.Equal(CuttingCommitStatus.Stale, commit.Status);
+        Assert.Equal(parts, plate.Parts);
+        Assert.Null(parts[1].Program.Codes);
+        Assert.Equal((0, 0, 0), events());
+    }
+
+    [Fact]
+    public void ProgramContent_ComparesAuthoredKeySpellingExactly()
+    {
+        Program With(string key)
+        {
+            var program = new Program();
+            program.Codes.Add(new LinearMove(1, 0)
+            {
+                VariableRefs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [key] = "v" }
+            });
+            return program;
+        }
+
+        Assert.True(ProgramContent.Equal(With("X"), With("X")));
+        Assert.False(ProgramContent.Equal(With("X"), With("x")));
     }
 
     [Fact]

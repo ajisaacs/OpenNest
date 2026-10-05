@@ -31,6 +31,9 @@ internal static class ProgramContent
             if (!programOwners.Add(b))
                 return false;
             programs.Add(a, b);
+            // Codes is a writable field: a missing list is a difference, never an exception.
+            if (a.Codes == null || b.Codes == null)
+                return a.Codes == null && b.Codes == null && a.GetType() == b.GetType();
             if (a.GetType() != b.GetType() || a.Mode != b.Mode || !Bits(a.Rotation, b.Rotation)
                 || a.Codes.Count != b.Codes.Count || a.SubPrograms.Count != b.SubPrograms.Count
                 || !SameVariables(a.Variables, b.Variables))
@@ -81,7 +84,7 @@ internal static class ProgramContent
     {
         if (a == null || b == null)
             return a == null && b == null;
-        if (a.Count != b.Count || !a.Comparer.Equals(b.Comparer))
+        if (a.Count != b.Count || !a.Comparer.Equals(b.Comparer) || !SameSpelling(a.Keys, b.Keys))
             return false;
         foreach (var (key, value) in a)
             if (!b.TryGetValue(key, out var other) || !string.Equals(value, other, StringComparison.Ordinal))
@@ -89,9 +92,13 @@ internal static class ProgramContent
         return true;
     }
 
+    // A case-insensitive dictionary finds a respelled key; authored spelling must still match.
+    private static bool SameSpelling(IEnumerable<string> a, IEnumerable<string> b) =>
+        new HashSet<string>(a, StringComparer.Ordinal).SetEquals(b);
+
     private static bool SameVariables(Dictionary<string, VariableDefinition> a, Dictionary<string, VariableDefinition> b)
     {
-        if (a.Count != b.Count || !a.Comparer.Equals(b.Comparer))
+        if (a.Count != b.Count || !a.Comparer.Equals(b.Comparer) || !SameSpelling(a.Keys, b.Keys))
             return false;
         foreach (var (key, value) in a)
         {

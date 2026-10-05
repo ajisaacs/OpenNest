@@ -40,6 +40,20 @@ public class CuttingDependencyTests
     }
 
     [Fact]
+    public void Apply_CutOffReclassifiedAfterPlanning_IsStale()
+    {
+        var (_, plate, p, q, cut) = CutOffPlate(ExplicitContourTests.Parameters(), orphan: false);
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate, new Vector(11, 12.5)));
+        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        cut.BaseDrawing.IsCutOff = false;
+
+        var commit = CuttingPlanService.Apply([result]);
+
+        Assert.Equal(CuttingCommitStatus.Stale, commit.Status);
+        Assert.Equal(new[] { p, q, cut }, plate.Parts);
+    }
+
+    [Fact]
     public void Plan_OrphanedCutOff_PrecedesEveryPart()
     {
         var (_, plate, p, q, cut) = CutOffPlate(ExplicitContourTests.Parameters(), orphan: true);
