@@ -15,6 +15,8 @@ namespace OpenNest.Forms
 
         private void InitializeComponent()
         {
+            System.Windows.Forms.DataGridViewCellStyle thicknessCellStyle = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle qtyCellStyle = new System.Windows.Forms.DataGridViewCellStyle();
             grpInput = new System.Windows.Forms.GroupBox();
             tbl = new System.Windows.Forms.TableLayoutPanel();
             lblJobName = new System.Windows.Forms.Label();
@@ -34,6 +36,13 @@ namespace OpenNest.Forms
             tabControl = new System.Windows.Forms.TabControl();
             tabParts = new System.Windows.Forms.TabPage();
             dgvParts = new System.Windows.Forms.DataGridView();
+            colItemNum = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            colFileName = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            colDescription = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            colMaterial = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            colThickness = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            colQty = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            colStatus = new System.Windows.Forms.DataGridViewTextBoxColumn();
             tabGroups = new System.Windows.Forms.TabPage();
             dgvGroups = new System.Windows.Forms.DataGridView();
             pnlBottom = new System.Windows.Forms.Panel();
@@ -265,11 +274,84 @@ namespace OpenNest.Forms
             dgvParts.BackgroundColor = System.Drawing.SystemColors.Window;
             dgvParts.BorderStyle = System.Windows.Forms.BorderStyle.None;
             dgvParts.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dgvParts.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] { colItemNum, colFileName, colDescription, colMaterial, colThickness, colQty, colStatus });
             dgvParts.Dock = System.Windows.Forms.DockStyle.Fill;
             dgvParts.Name = "dgvParts";
             dgvParts.RowHeadersVisible = false;
             dgvParts.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             dgvParts.TabIndex = 0;
+            dgvParts.CellBeginEdit += DgvParts_CellBeginEdit;
+            dgvParts.CellEndEdit += DgvParts_CellEndEdit;
+            dgvParts.CellFormatting += DgvParts_CellFormatting;
+            dgvParts.CellParsing += DgvParts_CellParsing;
+            dgvParts.CellToolTipTextNeeded += DgvParts_CellToolTipTextNeeded;
+            dgvParts.CellValidating += DgvParts_CellValidating;
+            dgvParts.DataError += DgvParts_DataError;
+            //
+            // colItemNum
+            //
+            colItemNum.DataPropertyName = "ItemNum";
+            colItemNum.FillWeight = 40F;
+            colItemNum.HeaderText = "Item #";
+            colItemNum.Name = "colItemNum";
+            colItemNum.ReadOnly = true;
+            colItemNum.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            //
+            // colFileName
+            //
+            colFileName.DataPropertyName = "FileName";
+            colFileName.FillWeight = 120F;
+            colFileName.HeaderText = "File Name";
+            colFileName.Name = "colFileName";
+            colFileName.ReadOnly = true;
+            colFileName.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            //
+            // colDescription
+            //
+            colDescription.DataPropertyName = "Description";
+            colDescription.FillWeight = 150F;
+            colDescription.HeaderText = "Description";
+            colDescription.Name = "colDescription";
+            colDescription.ReadOnly = true;
+            colDescription.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            //
+            // colMaterial
+            //
+            colMaterial.DataPropertyName = "Material";
+            colMaterial.FillWeight = 110F;
+            colMaterial.HeaderText = "Material";
+            colMaterial.Name = "colMaterial";
+            colMaterial.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            //
+            // colThickness
+            //
+            thicknessCellStyle.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleRight;
+            thicknessCellStyle.Format = "0.####";
+            colThickness.DataPropertyName = "Thickness";
+            colThickness.DefaultCellStyle = thicknessCellStyle;
+            colThickness.FillWeight = 70F;
+            colThickness.HeaderText = "Thickness";
+            colThickness.Name = "colThickness";
+            colThickness.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            //
+            // colQty
+            //
+            qtyCellStyle.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleRight;
+            colQty.DataPropertyName = "Qty";
+            colQty.DefaultCellStyle = qtyCellStyle;
+            colQty.FillWeight = 50F;
+            colQty.HeaderText = "Qty";
+            colQty.Name = "colQty";
+            colQty.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
+            //
+            // colStatus
+            //
+            colStatus.DataPropertyName = "StatusText";
+            colStatus.FillWeight = 100F;
+            colStatus.HeaderText = "Status";
+            colStatus.Name = "colStatus";
+            colStatus.ReadOnly = true;
+            colStatus.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.NotSortable;
             //
             // tabGroups
             //
@@ -383,6 +465,13 @@ namespace OpenNest.Forms
         private System.Windows.Forms.TabControl tabControl;
         private System.Windows.Forms.TabPage tabParts;
         private System.Windows.Forms.DataGridView dgvParts;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colItemNum;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colFileName;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colDescription;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colMaterial;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colThickness;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colQty;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colStatus;
         private System.Windows.Forms.TabPage tabGroups;
         private System.Windows.Forms.DataGridView dgvGroups;
         private System.Windows.Forms.Panel pnlBottom;

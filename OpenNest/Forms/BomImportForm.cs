@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.IO;
@@ -12,9 +13,10 @@ namespace OpenNest.Forms
 {
     public partial class BomImportForm : Form
     {
-        private List<BomPartRow> _parts;
+        private static readonly Color NeedsInputBackColor = Color.FromArgb(255, 240, 200);
+
+        private readonly BindingList<BomPartRow> _parts;
         private Dictionary<string, BomGroupPlateSettings> _groupSettings;
-        private bool _suppressRegroup;
         private NestDefaults _defaults;
 
         public Form MdiParentForm { get; set; }
@@ -22,7 +24,10 @@ namespace OpenNest.Forms
         public BomImportForm()
         {
             InitializeComponent();
-            _parts = new List<BomPartRow>();
+            _parts = new BindingList<BomPartRow>();
+            _parts.ListChanged += Parts_ListChanged;
+            dgvParts.AutoGenerateColumns = false;
+            dgvParts.DataSource = _parts;
             _groupSettings = new Dictionary<string, BomGroupPlateSettings>();
             _defaults = MainForm.LoadSavedNestDefaults(out _);
             ApplyDefaults();
@@ -99,11 +104,7 @@ namespace OpenNest.Forms
                 using (var reader = new BomReader(txtBomFile.Text))
                     items = reader.GetItems();
 
-                _parts = BomImportRows.Build(items, txtDxfFolder.Text);
-                _groupSettings.Clear();
-                PopulatePartsGrid();
-                RebuildGroups();
-                UpdateSummary();
+                LoadRows(BomImportRows.Build(items, txtDxfFolder.Text));
                 btnCreateNests.Enabled = true;
                 tabControl.SelectedTab = tabParts;
             }
@@ -122,86 +123,132 @@ namespace OpenNest.Forms
 
         #region Parts Tab
 
-        private void PopulatePartsGrid()
+        /// <summary>
+        /// Shows <paramref name="rows"/> in the Parts table, in their order, and
+        /// rebuilds the groups and summary from them.
+        /// </summary>
+        internal void LoadRows(IEnumerable<BomPartRow> rows)
         {
-            _suppressRegroup = true;
-
-            var table = new DataTable();
-            table.Columns.Add("Item #", typeof(string));
-            table.Columns.Add("File Name", typeof(string));
-            table.Columns.Add("Qty", typeof(string));
-            table.Columns.Add("Description", typeof(string));
-            table.Columns.Add("Material", typeof(string));
-            table.Columns.Add("Thickness", typeof(string));
-            table.Columns.Add("Status", typeof(string));
-
-            foreach (var part in _parts)
-            {
-                table.Rows.Add(
-                    part.ItemNum?.ToString() ?? "",
-                    part.FileName ?? "",
-                    part.Qty?.ToString() ?? "",
-                    part.Description ?? "",
-                    part.Material ?? "",
-                    part.Thickness?.ToString("0.####") ?? "",
-                    part.StatusText
-                );
-            }
-
-            dgvParts.DataSource = table;
-
-            // Make non-editable columns read-only
-            foreach (DataGridViewColumn col in dgvParts.Columns)
-            {
-                if (col.Name != "Material" && col.Name != "Thickness")
-                    col.ReadOnly = true;
-            }
-
-            // Style rows by status
-            for (var i = 0; i < _parts.Count; i++)
-            {
-                if (!_parts[i].IsEditable)
-                {
-                    dgvParts.Rows[i].ReadOnly = true;
-                    dgvParts.Rows[i].DefaultCellStyle.ForeColor = Color.Gray;
-                }
-            }
-
-            dgvParts.CellValueChanged -= DgvParts_CellValueChanged;
-            dgvParts.CellValueChanged += DgvParts_CellValueChanged;
-
-            _suppressRegroup = false;
-        }
-
-        private void DgvParts_CellValueChanged(object sender, DataGridViewCellEventArgs e)
-        {
-            if (_suppressRegroup || e.RowIndex < 0)
-                return;
-
-            var colName = dgvParts.Columns[e.ColumnIndex].Name;
-            if (colName != "Material" && colName != "Thickness")
-                return;
-
-            var part = _parts[e.RowIndex];
-            if (!part.IsEditable)
-                return;
-
-            if (colName == "Material")
-                part.Material = dgvParts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
-
-            if (colName == "Thickness")
-            {
-                var text = dgvParts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
-                part.Thickness = double.TryParse(text, out var t) ? t : (double?)null;
-            }
-
-            _suppressRegroup = true;
-            dgvParts.Rows[e.RowIndex].Cells["Status"].Value = part.StatusText;
-            _suppressRegroup = false;
+            _groupSettings.Clear();
+            _parts.RaiseListChangedEvents = false;
+            _parts.Clear();
+            foreach (var row in rows)
+                _parts.Add(row);
+            _parts.RaiseListChangedEvents = true;
+            _parts.ResetBindings();
 
             RebuildGroups();
             UpdateSummary();
         }
+
+        private BomPartRow PartAt(int rowIndex) =>
+            rowIndex >= 0 && rowIndex < dgvParts.Rows.Count
+                ? dgvParts.Rows[rowIndex].DataBoundItem as BomPartRow
+                : null;
+
+        private void Parts_ListChanged(object sender, ListChangedEventArgs e)
+        {
+            if (e.ListChangedType != ListChangedType.ItemChanged)
+                return;
+
+            switch (e.PropertyDescriptor?.Name)
+            {
+                case nameof(BomPartRow.Material):
+                case nameof(BomPartRow.Thickness):
+                case nameof(BomPartRow.Qty):
+                    RebuildGroups();
+                    UpdateSummary();
+                    break;
+            }
+        }
+
+        private void DgvParts_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
+        {
+            // Rows without a drawing can never be imported, so they stay locked.
+            if (PartAt(e.RowIndex) is not { IsEditable: true })
+                e.Cancel = true;
+        }
+
+        private void DgvParts_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        {
+            if (!dgvParts.IsCurrentCellInEditMode)
+                return;
+
+            var text = e.FormattedValue?.ToString();
+            string error = null;
+
+            if (e.ColumnIndex == colQty.Index && !BomQuantity.TryParse(text, out _))
+                error = "Enter a whole number of 1 or more.";
+            else if (
+                e.ColumnIndex == colThickness.Index
+                && !string.IsNullOrWhiteSpace(text)
+                && !TryParseThickness(text, out _)
+            )
+                error = "Enter a thickness greater than 0, or leave it blank.";
+
+            dgvParts.Rows[e.RowIndex].Cells[e.ColumnIndex].ErrorText = error ?? "";
+            if (error != null)
+                e.Cancel = true;
+        }
+
+        private void DgvParts_CellParsing(object sender, DataGridViewCellParsingEventArgs e)
+        {
+            var text = e.Value?.ToString();
+
+            if (e.ColumnIndex == colQty.Index && BomQuantity.TryParse(text, out var qty))
+            {
+                e.Value = qty;
+                e.ParsingApplied = true;
+            }
+            else if (e.ColumnIndex == colThickness.Index)
+            {
+                e.Value = TryParseThickness(text, out var thickness) ? thickness : null;
+                e.ParsingApplied = true;
+            }
+            else if (e.ColumnIndex == colMaterial.Index)
+            {
+                e.Value = string.IsNullOrWhiteSpace(text) ? null : text;
+                e.ParsingApplied = true;
+            }
+        }
+
+        private void DgvParts_CellEndEdit(object sender, DataGridViewCellEventArgs e)
+        {
+            dgvParts.Rows[e.RowIndex].Cells[e.ColumnIndex].ErrorText = "";
+        }
+
+        private void DgvParts_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            var part = PartAt(e.RowIndex);
+            if (part == null)
+                return;
+
+            if (!part.IsEditable)
+                e.CellStyle.ForeColor = Color.Gray;
+            else if (part.Status != BomRowStatus.Ready)
+                e.CellStyle.BackColor = NeedsInputBackColor;
+        }
+
+        private void DgvParts_CellToolTipTextNeeded(
+            object sender,
+            DataGridViewCellToolTipTextNeededEventArgs e
+        )
+        {
+            if (e.ColumnIndex == colQty.Index && PartAt(e.RowIndex) is { QtyAssumed: true })
+                e.ToolTipText = "The BOM has no quantity for this part; 1 is used.";
+        }
+
+        private void DgvParts_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            // Never show the grid's default error dialog; keep the edit open instead.
+            e.ThrowException = false;
+            e.Cancel = true;
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
+                dgvParts.Rows[e.RowIndex].Cells[e.ColumnIndex].ErrorText = "This value cannot be used.";
+        }
+
+        private static bool TryParseThickness(string text, out double thickness) =>
+            double.TryParse(text, out thickness) && double.IsFinite(thickness) && thickness > 0;
 
         #endregion
 
@@ -319,7 +366,7 @@ namespace OpenNest.Forms
 
         private void CreateNests_Click(object sender, EventArgs e)
         {
-            if (_parts == null || _parts.Count == 0)
+            if (_parts.Count == 0 || !dgvParts.EndEdit())
                 return;
 
             // Save latest group edits
