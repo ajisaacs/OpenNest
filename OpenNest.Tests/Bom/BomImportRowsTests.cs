@@ -62,6 +62,22 @@ public sealed class BomImportRowsTests : IDisposable
     }
 
     [Fact]
+    public void Build_MatchesFileNamesThatIncludeTheExtension()
+    {
+        Touch("PT01.dxf");
+        Touch("PT02.dwg");
+
+        var rows = BomImportRows.Build(
+            new List<BomItem> { Item("PT01.dxf"), Item("PT02.DWG") },
+            folder
+        );
+
+        Assert.All(rows, r => Assert.True(r.IsEditable, r.FileName));
+        Assert.Equal(Path.Combine(folder, "PT01.dxf"), rows[0].DxfPath);
+        Assert.Equal(Path.Combine(folder, "PT02.dwg"), rows[1].DxfPath);
+    }
+
+    [Fact]
     public void Build_WithMissingFolder_FindsNoDrawings()
     {
         var missing = Path.Combine(folder, "missing");

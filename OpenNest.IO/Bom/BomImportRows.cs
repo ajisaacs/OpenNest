@@ -22,7 +22,7 @@ public static class BomImportRows
         foreach (var group in analysis.Groups)
             foreach (var part in group.Parts)
                 if (part.DxfPath != null)
-                    matchedPaths[part.Item.FileName ?? ""] = part.DxfPath;
+                    matchedPaths[LookupName(part.Item.FileName)] = part.DxfPath;
 
         var rows = new List<BomPartRow>();
 
@@ -45,14 +45,7 @@ public static class BomImportRows
             }
             else
             {
-                var lookupName = item.FileName;
-                if (
-                    lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-                    || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
-                )
-                    lookupName = Path.GetFileNameWithoutExtension(lookupName);
-
-                if (matchedPaths.TryGetValue(lookupName, out var dxfPath))
+                if (matchedPaths.TryGetValue(LookupName(item.FileName), out var dxfPath))
                 {
                     row.DxfPath = dxfPath;
                     row.Status = "Matched";
@@ -69,5 +62,20 @@ public static class BomImportRows
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// The drawing name a BOM file name refers to: the name without a
+    /// .dxf or .dwg extension, as <see cref="BomAnalyzer"/> matches it.
+    /// </summary>
+    private static string LookupName(string fileName)
+    {
+        fileName ??= "";
+        if (
+            fileName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
+        )
+            return Path.GetFileNameWithoutExtension(fileName);
+        return fileName;
     }
 }
