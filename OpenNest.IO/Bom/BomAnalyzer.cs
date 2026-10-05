@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 
 namespace OpenNest.IO.Bom
@@ -31,23 +29,8 @@ namespace OpenNest.IO.Bom
         {
             var result = new BomAnalysis();
 
-            // Build a case-insensitive lookup of DXF files in the folder (if it exists)
-            var folderExists = Directory.Exists(dxfFolder);
-            var dxfFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            if (folderExists)
-            {
-                foreach (var file in Directory.GetFiles(dxfFolder, "*.dxf"))
-                {
-                    var nameWithoutExt = Path.GetFileNameWithoutExtension(file);
-                    dxfFiles[nameWithoutExt] = file;
-                }
-                foreach (var file in Directory.GetFiles(dxfFolder, "*.dwg"))
-                {
-                    var nameWithoutExt = Path.GetFileNameWithoutExtension(file);
-                    dxfFiles.TryAdd(nameWithoutExt, file);
-                }
-            }
+            // Case-insensitive lookup of the drawing files in the folder (if it exists)
+            var drawings = DrawingFileIndex.Load(dxfFolder);
 
             // Partition items into: skipped, unmatched, or matched (grouped)
             var matched = new List<MatchedPart>();
@@ -60,20 +43,12 @@ namespace OpenNest.IO.Bom
                     continue;
                 }
 
-                var lookupName = item.FileName;
-
-                if (
-                    lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-                    || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
-                )
-                    lookupName = Path.GetFileNameWithoutExtension(lookupName);
-
-                if (!folderExists)
+                if (!drawings.FolderExists)
                 {
                     // No folder to search — group items without a DXF path
                     matched.Add(new MatchedPart { Item = item, DxfPath = null });
                 }
-                else if (dxfFiles.TryGetValue(lookupName, out var dxfPath))
+                else if (drawings.Find(item.FileName) is { } dxfPath)
                 {
                     matched.Add(new MatchedPart { Item = item, DxfPath = dxfPath });
                 }

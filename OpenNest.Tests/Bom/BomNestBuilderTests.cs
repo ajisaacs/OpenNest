@@ -94,8 +94,6 @@ public sealed class BomNestBuilderTests : IDisposable
             Material = "Stainless",
             Thickness = 0.25,
             DxfPath = WriteSquare(name),
-            Status = "Matched",
-            IsEditable = true,
         };
 
     private static BomImportGroup Group(params BomPartRow[] rows) => new("Stainless", 0.25, rows);

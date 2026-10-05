@@ -35,18 +35,13 @@ public sealed class BomImportGroup
 public static class BomImportGroups
 {
     /// <summary>
-    /// Returns the groups of editable rows that have a drawing, a material
-    /// and a thickness. Material is compared case-insensitively. Groups are
-    /// ordered by material, then thickness.
+    /// Returns the groups of <see cref="BomRowStatus.Ready"/> rows. Material
+    /// is compared case-insensitively. Groups are ordered by material, then
+    /// thickness.
     /// </summary>
     public static List<BomImportGroup> Build(IEnumerable<BomPartRow> rows)
     {
-        return rows.Where(p =>
-                p.IsEditable
-                && !string.IsNullOrWhiteSpace(p.Material)
-                && p.Thickness.HasValue
-                && !string.IsNullOrWhiteSpace(p.DxfPath)
-            )
+        return rows.Where(p => p.Status == BomRowStatus.Ready)
             .GroupBy(p => new
             {
                 Material = p.Material.ToUpperInvariant(),

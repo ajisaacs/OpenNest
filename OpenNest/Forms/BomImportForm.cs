@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.IO;
@@ -145,7 +144,7 @@ namespace OpenNest.Forms
                     part.Description ?? "",
                     part.Material ?? "",
                     part.Thickness?.ToString("0.####") ?? "",
-                    part.Status
+                    part.StatusText
                 );
             }
 
@@ -195,6 +194,10 @@ namespace OpenNest.Forms
                 var text = dgvParts.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
                 part.Thickness = double.TryParse(text, out var t) ? t : (double?)null;
             }
+
+            _suppressRegroup = true;
+            dgvParts.Rows[e.RowIndex].Cells["Status"].Value = part.StatusText;
+            _suppressRegroup = false;
 
             RebuildGroups();
             UpdateSummary();
@@ -307,20 +310,7 @@ namespace OpenNest.Forms
 
         private void UpdateSummary()
         {
-            var skipped = _parts.Count(p => p.Status == "Skipped");
-            var noDxf = _parts.Count(p => p.Status == "No DXF");
-            var matched = _parts.Count(p => p.Status == "Matched");
-
-            var summaryParts = new List<string>();
-            if (skipped > 0)
-                summaryParts.Add($"{skipped} skipped (no file name)");
-            if (noDxf > 0)
-                summaryParts.Add($"{noDxf} no DXF found");
-
-            lblSummary.Text =
-                summaryParts.Count > 0
-                    ? string.Join(", ", summaryParts)
-                    : $"{matched} parts matched";
+            lblSummary.Text = BomImportSummary.Describe(_parts);
         }
 
         #endregion

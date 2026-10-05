@@ -31,17 +31,18 @@ public class BomImportGroupsTests
     [Fact]
     public void Build_LeavesOutRowsThatCannotBeImported()
     {
-        var locked = Row("PT02", "Stainless", 0.25);
-        locked.IsEditable = false;
+        var noFileName = Row("PT02", "Stainless", 0.25);
+        noFileName.FileName = " ";
         var noDrawing = Row("PT05", "Stainless", 0.25);
         noDrawing.DxfPath = null;
         var rows = new List<BomPartRow>
         {
             Row("PT01", "Stainless", 0.25),
-            locked,
+            noFileName,
             Row("PT03", " ", 0.25),
             Row("PT04", "Stainless", null),
             noDrawing,
+            Row("PT06", "Stainless", 0),
         };
 
         var groups = BomImportGroups.Build(rows);
@@ -65,7 +66,5 @@ public class BomImportGroupsTests
             Thickness = thickness,
             Qty = qty,
             DxfPath = $"/drawings/{fileName}.dxf",
-            Status = "Matched",
-            IsEditable = true,
         };
 }
