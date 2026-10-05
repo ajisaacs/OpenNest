@@ -75,6 +75,89 @@ internal static class PostVerificationGeometry
         private double Sweep { get; }
         internal double Length => Center.HasValue ? Radius * System.Math.Abs(Sweep) : Start.DistanceTo(End);
 
+        // Native entities are freshly allocated; the immutable curve never exposes state.
+        internal Entity ToEntity() => Center is { } center
+            ? System.Math.Abs(Sweep) >= TwoPi
+                ? new Circle(center, Radius)
+                : new Arc(center, Radius, Normalize(StartAngle), Normalize(StartAngle + Sweep), Sweep < 0)
+            : new Line(Start, End);
+
+        internal Vector Midpoint => Center is { } center
+            ? new Vector(center.X + Radius * System.Math.Cos(StartAngle + Sweep / 2),
+                center.Y + Radius * System.Math.Sin(StartAngle + Sweep / 2))
+            : (Start + End) * 0.5;
+
+        internal bool SameSupport(Curve other)
+        {
+            if (Center is { } center)
+                return other.Center is { } c && center.DistanceTo(c) <= Epsilon
+                    && System.Math.Abs(Radius - other.Radius) <= Epsilon;
+            if (other.Center.HasValue || Length <= Epsilon || other.Length <= Epsilon)
+                return false;
+            var direction = (End - Start) * (1 / Length);
+            return System.Math.Abs(Cross(other.Start - Start, direction)) <= Epsilon
+                && System.Math.Abs(Cross(other.End - Start, direction)) <= Epsilon;
+        }
+
+        internal bool Contains(Vector point) => ToEntity().ClosestPointTo(point).DistanceTo(point) <= Epsilon;
+
+        internal IReadOnlyList<Vector> Contacts(Curve other, out bool overlap)
+        {
+            var entity = ToEntity();
+            var candidate = other.ToEntity();
+            List<Vector> points;
+            bool intersects;
+            switch (candidate)
+            {
+                case Line line: intersects = entity.Intersects(line, out points); break;
+                case Arc arc: intersects = entity.Intersects(arc, out points); break;
+                case Circle circle: intersects = entity.Intersects(circle, out points); break;
+                default: throw new NotSupportedException("Unsupported native boundary.");
+            }
+            if (!intersects)
+                points.Clear();
+            // Coincident circles produce NaNs in the native discrete-contact query.
+            // Their support overlap is handled separately, without inventing crossings.
+            overlap = SameSupport(other) && (InteriorWitness(Midpoint, other)
+                || InteriorWitness(other.Midpoint, this)
+                || InteriorWitness(Start, other) || InteriorWitness(End, other)
+                || InteriorWitness(other.Start, this) || InteriorWitness(other.End, this));
+            if (SameSupport(other))
+                points.Clear();
+            foreach (var point in points)
+                Validate(point);
+            var nativeContactCount = points.Count;
+            if (Center is { } c && other.Center is { } oc && SameSupport(other)
+                && (c.X != oc.X || c.Y != oc.Y || Radius != other.Radius))
+                overlap = true; // Nearly coincident supports are uncertain, never clear.
+            foreach (var point in new[] { Start, End, other.Start, other.End })
+                if (Contains(point) && other.Contains(point)
+                    && !points.Exists(p => p.DistanceTo(point) <= Epsilon))
+                    points.Add(point);
+            // Existing exact line/ray contact semantics guard native queries which
+            // suppress very short or nearly parallel intersections. Uncertainty refuses.
+            if (Center is null && !SameSupport(other))
+            {
+                var direction = (End - Start) * (1 / Length);
+                if ((other.ContactAfterStart(Start, direction, Length)
+                    || other.ContactAfterStart(End, direction * -1, Length)) && nativeContactCount == 0)
+                    throw new NotSupportedException("Native contact query is numerically uncertain.");
+            }
+            if (other.Center is null && Center.HasValue)
+            {
+                var direction = (other.End - other.Start) * (1 / other.Length);
+                if ((ContactAfterStart(other.Start, direction, other.Length)
+                    || ContactAfterStart(other.End, direction * -1, other.Length)) && nativeContactCount == 0)
+                    throw new NotSupportedException("Native contact query is numerically uncertain.");
+            }
+            return points;
+
+            static bool InteriorWitness(Vector point, Curve curve) => curve.Contains(point)
+                && (curve.Start.DistanceTo(curve.End) <= Epsilon
+                    || (point.DistanceTo(curve.Start) > Epsilon && point.DistanceTo(curve.End) > Epsilon));
+        }
+
+
         internal static Curve Create(Vector start, Vector end, Vector? center, bool clockwise)
         {
             if (center is not { } c)
