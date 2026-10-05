@@ -227,6 +227,37 @@ public class StripeFillerTests
         }
     }
 
+    private static List<Part> StripeFill(int maxQuantity, NestDirection axis)
+    {
+        var plate = new Plate(60, 120) { PartSpacing = 0.5 };
+        var drawing = MakeRectDrawing(20, 10);
+        var context = new OpenNest.Engine.Strategies.FillContext
+        {
+            Item = new NestItem { Drawing = drawing, Quantity = maxQuantity },
+            WorkArea = new Box(0, 0, 120, 60),
+            Plate = plate,
+            Token = System.Threading.CancellationToken.None,
+            MaxQuantity = maxQuantity,
+        };
+        context.SharedState["BestFits"] = MakeSideBySideBestFits(drawing, 0.5);
+        return new StripeFiller(context, axis).Fill();
+    }
+
+    [Theory]
+    [InlineData(NestDirection.Horizontal)]
+    [InlineData(NestDirection.Vertical)]
+    public void Fill_WithMaxQuantity_StopsOnceTheQuantityIsHeld(NestDirection axis)
+    {
+        var full = StripeFill(0, axis);
+        var capped = StripeFill(6, axis);
+
+        Assert.True(full.Count > 6, $"Control fill should exceed the cap, got {full.Count}");
+        Assert.InRange(capped.Count, 6, full.Count - 1);
+        var plate = new Plate(60, 120) { PartSpacing = 0.5 };
+        plate.Parts.AddRange(capped);
+        Assert.False(plate.HasOverlappingParts(out _), "Capped stripe fill overlaps");
+    }
+
     [Fact]
     public void Fill_ReturnsEmpty_WhenNoBestFits()
     {

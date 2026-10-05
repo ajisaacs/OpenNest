@@ -17,6 +17,10 @@ namespace OpenNest.Engine.Strategies
         public CancellationToken Token { get; init; }
         public IProgress<NestProgress> Progress { get; init; }
         public FillPolicy Policy { get; init; } = new FillPolicy(new DefaultFillComparer());
+        /// <summary>
+        /// When positive, strategies may stop placing parts once a candidate holds this
+        /// many (see <see cref="FillLinear.MaxParts"/>). Zero fills the whole work area.
+        /// </summary>
         public int MaxQuantity { get; init; }
         public PartType PartType { get; set; }
 

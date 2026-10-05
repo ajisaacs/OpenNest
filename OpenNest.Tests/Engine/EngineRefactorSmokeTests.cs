@@ -70,6 +70,27 @@ public class EngineRefactorSmokeTests
         Assert.True(parts.Count > 0, "ForceFullAngleSweep should still produce results");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DefaultPlateFiller_StopAtQuantity_StillDeliversExactlyTheQuantity(bool stopAtQuantity)
+    {
+        var plate = new Plate(60, 120) { PartSpacing = 0.5 };
+        var filler = new DefaultPlateFiller(plate) { StopAtQuantity = stopAtQuantity };
+        var item = new NestItem { Drawing = MakeRectDrawing(7, 3), Quantity = 23 };
+
+        var parts = filler.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
+
+        Assert.Equal(23, parts.Count);
+        plate.Parts.AddRange(parts);
+        Assert.False(plate.HasOverlappingParts(out _), "Fill overlaps");
+        var area = plate.WorkArea();
+        Assert.All(parts, p => Assert.True(
+            p.BoundingBox.Left >= area.Left - 1e-6 && p.BoundingBox.Right <= area.Right + 1e-6
+                && p.BoundingBox.Bottom >= area.Bottom - 1e-6 && p.BoundingBox.Top <= area.Top + 1e-6,
+            "Part outside the work area"));
+    }
+
     [Fact]
     public void StripPlateFiller_Nest_ProducesResults()
     {

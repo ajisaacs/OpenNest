@@ -53,6 +53,13 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         public string Label { get; set; }
 
+        /// <summary>
+        /// When positive, grid fills stop adding perpendicular rows once they hold at least
+        /// this many parts; a first row that already holds them is returned on its own. The
+        /// first row is always complete. Zero fills the whole work area.
+        /// </summary>
+        public int MaxParts { get; init; }
+
         private static Vector MakeOffset(NestDirection direction, double distance)
         {
             return direction == NestDirection.Horizontal
@@ -195,7 +202,12 @@ namespace OpenNest.Engine.Fill
         /// patterns, also adds individual parts from the next incomplete copy
         /// that still fit within the work area.
         /// </summary>
-        private List<Part> TilePattern(Pattern basePattern, NestDirection direction, OffsetPerimeterCache cache)
+        private List<Part> TilePattern(
+            Pattern basePattern,
+            NestDirection direction,
+            OffsetPerimeterCache cache,
+            int maxParts = 0
+        )
         {
             var copyDistance = FindPatternCopyDistance(basePattern, direction, cache);
 
@@ -211,7 +223,10 @@ namespace OpenNest.Engine.Fill
 
             var count = 1;
 
-            while (true)
+            // maxParts counts the base pattern too: stop once the tiling holds that many.
+            bool Full() => maxParts > 0 && basePattern.Parts.Count + result.Count >= maxParts;
+
+            while (!Full())
             {
                 var nextPos = start + copyDistance * count;
 
@@ -230,7 +245,7 @@ namespace OpenNest.Engine.Fill
             // next copy that didn't fit as a whole. This handles cases where
             // e.g. a 2-part pair only partially fits — one part may still be
             // within the work area even though the full pattern exceeds it.
-            if (basePattern.Parts.Count > 1)
+            if (basePattern.Parts.Count > 1 && !Full())
             {
                 var offset = MakeOffset(direction, copyDistance * count);
 
@@ -383,7 +398,7 @@ namespace OpenNest.Engine.Fill
             // If primary tiling didn't produce copies, just tile along perpendicular
             if (row.Count <= pattern.Parts.Count)
             {
-                row.AddRange(TilePattern(pattern, perpAxis, cache));
+                row.AddRange(TilePattern(pattern, perpAxis, cache, MaxParts));
 
                 if (pattern.Parts.Count > 1 && HasOverlappingParts(row, out var a2, out var b2))
                 {
@@ -395,13 +410,19 @@ namespace OpenNest.Engine.Fill
                 return row;
             }
 
+            // A capped fill whose first row already holds enough parts needs no more rows.
+            // Step 2's check could only switch perpendicular tiling to the bbox fallback; it
+            // never repairs the row itself, so returning the row loses no protection.
+            if (MaxParts > 0 && row.Count >= MaxParts)
+                return row;
+
             // Step 2: Build row pattern and tile along perpendicular axis
             var rowPattern = new Pattern();
             rowPattern.Parts.AddRange(row);
             rowPattern.UpdateBounds();
 
             var gridResult = new List<Part>(rowPattern.Parts);
-            gridResult.AddRange(TilePattern(rowPattern, perpAxis, cache));
+            gridResult.AddRange(TilePattern(rowPattern, perpAxis, cache, MaxParts));
 
             // Only the unchanged row is covered by Step 1's clean verdict: skip Step 2
             // only when the perpendicular tiling appended zero parts, so gridResult

@@ -68,14 +68,16 @@ public class StripeFiller
                     sheetSpan,
                     spacing,
                     axis,
-                    _context.Token
+                    _context.Token,
+                    _context.MaxQuantity
                 );
                 var shrinkResult = ConvergeStripeAngleShrink(
                     pairParts,
                     sheetSpan,
                     spacing,
                     axis,
-                    _context.Token
+                    _context.Token,
+                    _context.MaxQuantity
                 );
 
                 foreach (var (angle, waste, count) in new[] { expandResult, shrinkResult })
@@ -127,7 +129,11 @@ public class StripeFiller
         if (!_dedup.TryAdd(rotatedPattern.BoundingBox, workArea, primaryAxis))
             return null;
 
-        var stripeEngine = new FillLinear(stripeBox, spacing) { Label = "Stripe" };
+        var stripeEngine = new FillLinear(stripeBox, spacing)
+        {
+            Label = "Stripe",
+            MaxParts = _context.MaxQuantity,
+        };
         var stripeParts = stripeEngine.Fill(rotatedPattern, primaryAxis);
 
         if (stripeParts == null || stripeParts.Count == 0)
@@ -144,7 +150,11 @@ public class StripeFiller
         stripePattern.Parts.AddRange(stripeParts);
         stripePattern.UpdateBounds();
 
-        var gridEngine = new FillLinear(workArea, spacing) { Label = "Stripe-Grid" };
+        var gridEngine = new FillLinear(workArea, spacing)
+        {
+            Label = "Stripe-Grid",
+            MaxParts = _context.MaxQuantity,
+        };
         var gridParts = gridEngine.Fill(stripePattern, perpAxis);
 
         if (gridParts == null || gridParts.Count == 0)
@@ -178,6 +188,10 @@ public class StripeFiller
         }
 
         var allParts = new List<Part>(gridParts);
+
+        // A capped fill that already holds the quantity needs no remnant parts.
+        if (_context.MaxQuantity > 0 && gridParts.Count >= _context.MaxQuantity)
+            return allParts;
 
         var remnantParts = FillRemnant(gridParts, primaryAxis);
         if (remnantParts != null)
@@ -351,18 +365,20 @@ public class StripeFiller
     /// <summary>
     /// Iteratively finds the rotation angle where N copies of the pattern
     /// span the given dimension with minimal waste by expanding pair width.
-    /// Returns (angle, waste, pairCount).
+    /// Returns (angle, waste, pairCount). A positive <paramref name="maxParts"/> caps
+    /// the estimate rows like <see cref="FillLinear.MaxParts"/>.
     /// </summary>
     public static (double Angle, double Waste, int Count) ConvergeStripeAngle(
         List<Part> patternParts,
         double sheetSpan,
         double spacing,
         NestDirection axis,
-        CancellationToken token = default
+        CancellationToken token = default,
+        int maxParts = 0
     )
     {
         var startAngle = OrientShortSideAlong(patternParts, axis);
-        return ConvergeFromAngle(patternParts, startAngle, sheetSpan, spacing, axis, token);
+        return ConvergeFromAngle(patternParts, startAngle, sheetSpan, spacing, axis, token, maxParts);
     }
 
     /// <summary>
@@ -374,7 +390,8 @@ public class StripeFiller
         double sheetSpan,
         double spacing,
         NestDirection axis,
-        CancellationToken token = default
+        CancellationToken token = default,
+        int maxParts = 0
     )
     {
         var baseAngle = OrientShortSideAlong(patternParts, axis);
@@ -392,7 +409,7 @@ public class StripeFiller
             return (0, double.MaxValue, 0);
 
         var startAngle = FindAngleForTargetSpan(patternParts, targetSpan, axis);
-        return ConvergeFromAngle(patternParts, startAngle, sheetSpan, spacing, axis, token);
+        return ConvergeFromAngle(patternParts, startAngle, sheetSpan, spacing, axis, token, maxParts);
     }
 
     private static (double Angle, double Waste, int Count) ConvergeFromAngle(
@@ -401,7 +418,8 @@ public class StripeFiller
         double sheetSpan,
         double spacing,
         NestDirection axis,
-        CancellationToken token
+        CancellationToken token,
+        int maxParts
     )
     {
         var bestWaste = double.MaxValue;
@@ -428,7 +446,11 @@ public class StripeFiller
                 axis == NestDirection.Horizontal
                     ? new Box(0, 0, sheetSpan, perpDim)
                     : new Box(0, 0, perpDim, sheetSpan);
-            var engine = new FillLinear(stripeBox, spacing) { Label = "Stripe-EstimateRow" };
+            var engine = new FillLinear(stripeBox, spacing)
+            {
+                Label = "Stripe-EstimateRow",
+                MaxParts = maxParts,
+            };
             var filled = engine.Fill(rotated, axis);
             var n = filled?.Count ?? 0;
 

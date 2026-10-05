@@ -28,6 +28,13 @@ internal class DefaultPlateFiller : PlateFillerBase
         set => angleBuilder.ForceFullSweep = value;
     }
 
+    /// <summary>
+    /// When true, a positive item quantity lets supporting strategies stop adding rows once a
+    /// candidate holds the quantity. Other strategies still fill the work area; the winner is
+    /// trimmed to the quantity. Off by default, so ordinary fills are unchanged.
+    /// </summary>
+    internal bool StopAtQuantity { get; init; }
+
     public override List<double> BuildAngles(
         NestItem item,
         ClassificationResult classification,
@@ -338,7 +345,7 @@ internal class DefaultPlateFiller : PlateFillerBase
             Token = token,
             Progress = progress,
             Policy = BuildPolicy(),
-            MaxQuantity = item.Quantity,
+            MaxQuantity = StopAtQuantity ? System.Math.Max(0, item.Quantity) : 0,
         };
         RunPipeline(context);
 

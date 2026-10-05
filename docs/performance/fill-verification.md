@@ -11,6 +11,33 @@ Only the exact value `1` enables these tests; otherwise they skip. In PowerShell
 
 The category covers comparer, group-pattern, rotated-pattern, extents-column, feature-extraction, no-model angle, and FillLinear offset-geometry workloads; individual filters match benchmark method names in `FillPerformanceTests.cs`. Overlap checks are measured separately by `OverlapCheck_ReportsPolygonPairsAndGridChecks` in `OpenNest.Tests/Fill/OverlapCheckPerformanceTests.cs` (same category). Keep harness, inputs, warmups and batches identical before/after; exclude setup/assertions from timing. Comparer/extents allocations are synchronous and current-thread only; parallel group fills omit allocation totals. No timing CI gates or whole-job speedup claims. Keep raw results and run-specific reports outside source control; this guide documents the reusable verification procedure.
 
+### Quantity-limited private fills
+
+Irregular's private block proposals opt into quantity-limited Row/Column stripe fills.
+`FillLinear.MaxParts` is a soft row limit: the first primary row stays complete, and
+perpendicular copies stop after reaching the requested count. The final fill still
+trims its winner to the exact quantity. Existing overlap fallbacks and block spacing
+certification remain active; fallback tiling can exceed the soft limit. Nonpositive
+limits remain uncapped. Ordinary Default fills and the zero-quantity cutout lattice
+keep their full-area behavior.
+
+This can change which private block candidate wins; it is not a promise of identical
+Irregular layouts. Verify fulfillment, bounds, spacing and rotation policy through
+the full pipeline, rather than treating a faster cancelled run as acceptance.
+
+```sh
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~FillLinearMaxPartsTests|FullyQualifiedName~StripeFillerTests|FullyQualifiedName~EngineRefactorSmokeTests'
+dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj -c Release \
+  --filter 'FullyQualifiedName~IrregularBlockTests|FullyQualifiedName~CutoutLatticeFillTests'
+python3 scripts/check-synthetic-nests.py
+```
+
+For a supplied slow job, retain a bounded before/after trace, rebuilt probe and input
+hashes, and a completion run with all demand placed and zero independent validation
+violations. Bound cancellation and the outer process watchdog separately. Do not
+extend a known unchanged timeout just to obtain a baseline duration.
+
 ### FillLinear unchanged-row validation baseline
 
 ```bash

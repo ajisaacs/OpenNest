@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs.Placement;
@@ -29,7 +30,10 @@ internal static class PrivatePlateFill
             .ThenBy(f => f.Candidate.Part2Offset.Y).ThenBy(f => f.OptimalRotation).ToArray();
         fits.Clear();
         fits.AddRange(sorted);
-        return PlateFillService.FillItem("Default", plate, new NestItem
+        // A positive quantity lets supporting strategies avoid surplus rows. Zero still
+        // fills the whole area (the cutout lattice caller requires an uncapped lattice).
+        var filler = new DefaultPlateFiller(plate) { StopAtQuantity = true };
+        return filler.Fill(new NestItem
         {
             Drawing = drawing,
             Quantity = quantity,
