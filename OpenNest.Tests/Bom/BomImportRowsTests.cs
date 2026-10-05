@@ -1,0 +1,93 @@
+using OpenNest.IO.Bom;
+
+namespace OpenNest.Tests.Bom;
+
+public sealed class BomImportRowsTests : IDisposable
+{
+    private readonly string folder = Path.Combine(
+        Path.GetTempPath(),
+        "bom-rows-" + Guid.NewGuid().ToString("N")
+    );
+
+    public BomImportRowsTests()
+    {
+        Directory.CreateDirectory(folder);
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(folder))
+            Directory.Delete(folder, recursive: true);
+    }
+
+    [Fact]
+    public void Build_MatchesRowsToDrawingFilesInBomOrder()
+    {
+        Touch("PT01.dxf");
+        Touch("PT03.dwg");
+        var items = new List<BomItem>
+        {
+            Item("PT01", qty: 2, itemNum: 1, description: "Gusset"),
+            Item("PT02", qty: 3, itemNum: 2),
+            Item(null, qty: 4, itemNum: 3),
+            Item("PT03", qty: null, itemNum: 4),
+        };
+
+        var rows = BomImportRows.Build(items, folder);
+
+        Assert.Equal(new[] { 1, 2, 3, 4 }, rows.Select(r => r.ItemNum ?? 0));
+        Assert.Equal(new[] { "Matched", "No DXF", "Skipped", "Matched" }, rows.Select(r => r.Status));
+        Assert.Equal(new[] { true, false, false, true }, rows.Select(r => r.IsEditable));
+        Assert.Equal(Path.Combine(folder, "PT01.dxf"), rows[0].DxfPath);
+        Assert.Null(rows[1].DxfPath);
+        Assert.Null(rows[2].DxfPath);
+        Assert.Equal(Path.Combine(folder, "PT03.dwg"), rows[3].DxfPath);
+
+        Assert.Equal("Gusset", rows[0].Description);
+        Assert.Equal(2, rows[0].Qty);
+        Assert.Null(rows[3].Qty);
+        Assert.Equal("Stainless", rows[0].Material);
+        Assert.Equal(0.25, rows[0].Thickness);
+    }
+
+    [Fact]
+    public void Build_MatchesFileNamesIgnoringCase()
+    {
+        Touch("PT01.dxf");
+
+        var rows = BomImportRows.Build(new List<BomItem> { Item("pt01") }, folder);
+
+        Assert.Equal("Matched", rows[0].Status);
+        Assert.Equal(Path.Combine(folder, "PT01.dxf"), rows[0].DxfPath);
+    }
+
+    [Fact]
+    public void Build_WithMissingFolder_FindsNoDrawings()
+    {
+        var missing = Path.Combine(folder, "missing");
+
+        var rows = BomImportRows.Build(new List<BomItem> { Item("PT01") }, missing);
+
+        Assert.Equal("No DXF", rows[0].Status);
+        Assert.False(rows[0].IsEditable);
+        Assert.Null(rows[0].DxfPath);
+    }
+
+    private void Touch(string name) => File.WriteAllText(Path.Combine(folder, name), "");
+
+    private static BomItem Item(
+        string? fileName,
+        int? qty = 1,
+        int? itemNum = null,
+        string? description = null
+    ) =>
+        new()
+        {
+            ItemNum = itemNum,
+            FileName = fileName,
+            Qty = qty,
+            Description = description,
+            Material = "Stainless",
+            Thickness = 0.25,
+        };
+}

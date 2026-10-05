@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Data;
-using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.IO.Bom;
 
@@ -15,7 +14,7 @@ namespace OpenNest.Forms
     public partial class BomImportForm : Form
     {
         private List<BomPartRow> _parts;
-        private Dictionary<string, GroupSettings> _groupSettings;
+        private Dictionary<string, BomGroupPlateSettings> _groupSettings;
         private bool _suppressRegroup;
         private NestDefaults _defaults;
 
@@ -25,7 +24,7 @@ namespace OpenNest.Forms
         {
             InitializeComponent();
             _parts = new List<BomPartRow>();
-            _groupSettings = new Dictionary<string, GroupSettings>();
+            _groupSettings = new Dictionary<string, BomGroupPlateSettings>();
             _defaults = MainForm.LoadSavedNestDefaults(out _);
             ApplyDefaults();
         }
@@ -101,8 +100,8 @@ namespace OpenNest.Forms
                 using (var reader = new BomReader(txtBomFile.Text))
                     items = reader.GetItems();
 
-                var analysis = BomAnalyzer.Analyze(items, txtDxfFolder.Text);
-                BuildPartRows(items, analysis);
+                _parts = BomImportRows.Build(items, txtDxfFolder.Text);
+                _groupSettings.Clear();
                 PopulatePartsGrid();
                 RebuildGroups();
                 UpdateSummary();
@@ -118,62 +117,6 @@ namespace OpenNest.Forms
                     MessageBoxIcon.Error
                 );
             }
-        }
-
-        private void BuildPartRows(List<BomItem> items, BomAnalysis analysis)
-        {
-            var matchedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var group in analysis.Groups)
-                foreach (var part in group.Parts)
-                    if (part.DxfPath != null)
-                        matchedPaths[part.Item.FileName ?? ""] = part.DxfPath;
-
-            _parts = new List<BomPartRow>();
-
-            foreach (var item in items)
-            {
-                var row = new BomPartRow
-                {
-                    ItemNum = item.ItemNum,
-                    FileName = item.FileName,
-                    Qty = item.Qty,
-                    Description = item.Description,
-                    Material = item.Material,
-                    Thickness = item.Thickness,
-                };
-
-                if (string.IsNullOrWhiteSpace(item.FileName))
-                {
-                    row.Status = "Skipped";
-                    row.IsEditable = false;
-                }
-                else
-                {
-                    var lookupName = item.FileName;
-                    if (
-                        lookupName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase)
-                        || lookupName.EndsWith(".dwg", StringComparison.OrdinalIgnoreCase)
-                    )
-                        lookupName = Path.GetFileNameWithoutExtension(lookupName);
-
-                    if (matchedPaths.TryGetValue(lookupName, out var dxfPath))
-                    {
-                        row.DxfPath = dxfPath;
-                        row.Status = "Matched";
-                        row.IsEditable = true;
-                    }
-                    else
-                    {
-                        row.Status = "No DXF";
-                        row.IsEditable = false;
-                    }
-                }
-
-                _parts.Add(row);
-            }
-
-            _groupSettings.Clear();
         }
 
         #endregion
@@ -273,18 +216,7 @@ namespace OpenNest.Forms
                 ? l
                 : _defaults.Size.Length;
 
-            var groups = _parts
-                .Where(p =>
-                    p.IsEditable && !string.IsNullOrWhiteSpace(p.Material) && p.Thickness.HasValue
-                )
-                .GroupBy(p => new
-                {
-                    Material = p.Material.ToUpperInvariant(),
-                    Thickness = p.Thickness.Value,
-                })
-                .OrderBy(g => g.First().Material)
-                .ThenBy(g => g.Key.Thickness)
-                .ToList();
+            var groups = BomImportGroups.Build(_parts);
 
             var table = new DataTable();
             table.Columns.Add("Material", typeof(string));
@@ -301,17 +233,13 @@ namespace OpenNest.Forms
 
             foreach (var group in groups)
             {
-                var material = group.First().Material;
-                var thickness = group.Key.Thickness;
-                var key = GroupKey(material, thickness);
-
-                var existing = _groupSettings.TryGetValue(key, out var gs);
+                var existing = _groupSettings.TryGetValue(group.Key, out var gs);
 
                 table.Rows.Add(
-                    material,
-                    thickness,
-                    group.Count(),
-                    group.Sum(p => p.Qty ?? 0),
+                    group.Material,
+                    group.Thickness,
+                    group.Parts.Count,
+                    group.TotalQty,
                     existing ? gs.PlateWidth : defaultWidth,
                     existing ? gs.PlateLength : defaultLength,
                     existing ? gs.PartSpacing : _defaults.PartSpacing,
@@ -346,9 +274,9 @@ namespace OpenNest.Forms
             {
                 var material = row["Material"]?.ToString() ?? "";
                 var thickness = row["Thickness"] is double t ? t : 0;
-                var key = GroupKey(material, thickness);
+                var key = BomImportGroups.Key(material, thickness);
 
-                _groupSettings[key] = new GroupSettings
+                _groupSettings[key] = new BomGroupPlateSettings
                 {
                     PlateWidth = row["Plate Width"] is double pw
                         ? pw
@@ -372,9 +300,6 @@ namespace OpenNest.Forms
                 };
             }
         }
-
-        private static string GroupKey(string material, double thickness) =>
-            $"{material?.ToUpperInvariant()}|{thickness}";
 
         #endregion
 
@@ -417,19 +342,7 @@ namespace OpenNest.Forms
                 ? dl
                 : _defaults.Size.Length;
 
-            var groups = _parts
-                .Where(p =>
-                    p.IsEditable
-                    && !string.IsNullOrWhiteSpace(p.Material)
-                    && p.Thickness.HasValue
-                    && !string.IsNullOrWhiteSpace(p.DxfPath)
-                )
-                .GroupBy(p => new
-                {
-                    Material = p.Material.ToUpperInvariant(),
-                    Thickness = p.Thickness.Value,
-                })
-                .ToList();
+            var groups = BomImportGroups.Build(_parts);
 
             if (groups.Count == 0)
             {
@@ -448,66 +361,27 @@ namespace OpenNest.Forms
 
             foreach (var group in groups)
             {
-                var material = group.First().Material;
-                var thickness = group.Key.Thickness;
-                var key = GroupKey(material, thickness);
-
-                var hasSettings = _groupSettings.TryGetValue(key, out var gs);
-                var plateWidth = hasSettings ? gs.PlateWidth : defaultWidth;
-                var plateLength = hasSettings ? gs.PlateLength : defaultLength;
-                var partSpacing = hasSettings ? gs.PartSpacing : _defaults.PartSpacing;
-                var edgeLeft = hasSettings ? gs.EdgeLeft : _defaults.EdgeSpacing.Left;
-                var edgeBottom = hasSettings ? gs.EdgeBottom : _defaults.EdgeSpacing.Bottom;
-                var edgeRight = hasSettings ? gs.EdgeRight : _defaults.EdgeSpacing.Right;
-                var edgeTop = hasSettings ? gs.EdgeTop : _defaults.EdgeSpacing.Top;
-
-                var nestName = $"{jobName} - {thickness:0.###} {material}";
-                var nest = new Nest(nestName);
-                nest.DateCreated = DateTime.Now;
-                nest.DateLastModified = DateTime.Now;
-                // Saved defaults first (units, quadrant, plate), as New does;
-                // then the group's own plate size and spacing.
-                _defaults.ApplyTo(nest);
-                nest.PlateDefaults.Size = new Geometry.Size(plateWidth, plateLength);
-                nest.Thickness = thickness;
-                nest.Material = new Material(material);
-                nest.PlateDefaults.PartSpacing = partSpacing;
-                nest.PlateDefaults.EdgeSpacing = new Spacing(
-                    edgeLeft,
-                    edgeBottom,
-                    edgeRight,
-                    edgeTop
-                );
-
-                foreach (var part in group)
+                if (!_groupSettings.TryGetValue(group.Key, out var plate))
                 {
-                    if (!File.Exists(part.DxfPath))
+                    plate = new BomGroupPlateSettings
                     {
-                        importErrors.Add($"{part.FileName}: DXF file not found");
-                        continue;
-                    }
-
-                    try
-                    {
-                        var drawing = CadImporter.ImportDrawing(
-                            part.DxfPath,
-                            new CadImportOptions { Quantity = part.Qty ?? 1 }
-                        );
-                        drawing.Material = new Material(material);
-                        nest.Drawings.Add(drawing);
-                    }
-                    catch (Exception ex)
-                    {
-                        importErrors.Add($"{part.FileName}: {ex.Message}");
-                    }
+                        PlateWidth = defaultWidth,
+                        PlateLength = defaultLength,
+                        PartSpacing = _defaults.PartSpacing,
+                        EdgeLeft = _defaults.EdgeSpacing.Left,
+                        EdgeBottom = _defaults.EdgeSpacing.Bottom,
+                        EdgeRight = _defaults.EdgeSpacing.Right,
+                        EdgeTop = _defaults.EdgeSpacing.Top,
+                    };
                 }
 
-                if (nest.Drawings.Count == 0)
+                var result = BomNestBuilder.Build(group, plate, jobName, _defaults.ApplyTo);
+                importErrors.AddRange(result.Errors);
+
+                if (result.Nest == null)
                     continue;
 
-                nest.CreatePlate();
-
-                var editForm = new EditNestForm(nest);
+                var editForm = new EditNestForm(result.Nest);
                 editForm.MdiParent = MdiParentForm;
                 editForm.Show();
                 editForm.PlateView.ZoomToFit();
@@ -537,29 +411,5 @@ namespace OpenNest.Forms
         {
             Close();
         }
-    }
-
-    internal class BomPartRow
-    {
-        public int? ItemNum { get; set; }
-        public string FileName { get; set; }
-        public int? Qty { get; set; }
-        public string Description { get; set; }
-        public string Material { get; set; }
-        public double? Thickness { get; set; }
-        public string DxfPath { get; set; }
-        public string Status { get; set; }
-        public bool IsEditable { get; set; }
-    }
-
-    internal class GroupSettings
-    {
-        public double PlateWidth { get; set; }
-        public double PlateLength { get; set; }
-        public double PartSpacing { get; set; }
-        public double EdgeLeft { get; set; }
-        public double EdgeBottom { get; set; }
-        public double EdgeRight { get; set; }
-        public double EdgeTop { get; set; }
     }
 }
