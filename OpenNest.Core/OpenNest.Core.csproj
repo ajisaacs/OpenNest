@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="OpenNest.Tests" />
+    <InternalsVisibleTo Include="OpenNest.Engine" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Clipper2" Version="2.0.0" />

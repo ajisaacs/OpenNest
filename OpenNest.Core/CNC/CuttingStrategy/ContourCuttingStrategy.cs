@@ -234,6 +234,21 @@ namespace OpenNest.CNC.CuttingStrategy
             return null;
         }
 
+        internal Program EmitPrepared(Shape[] shapes, List<Entity> scribes,
+            IReadOnlyList<CuttingPlanning.ContourChoice> choices)
+        {
+            var result = new Program(Mode.Absolute);
+            EmitScribeContours(result, scribes);
+            foreach (var choice in choices)
+            {
+                var shape = shapes[choice.ContourOrdinal];
+                EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
+                    choice.ContourOrdinal == shapes.Length - 1 ? ContourType.External : null);
+            }
+            result.Mode = Mode.Incremental;
+            return result;
+        }
+
         private void EmitRawContour(Program program, Shape shape)
         {
             var startPoint = GetShapeStartPoint(shape);
