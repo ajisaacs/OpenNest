@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using OpenNest.Data;
 using OpenNest.Geometry;
 using Timer = System.Timers.Timer;
 
@@ -238,7 +239,7 @@ namespace OpenNest.Forms
             nest.DateCreated = DateCreated;
             nest.DateLastModified = DateLastModified;
             nest.Thickness = Thickness;
-            nest.Material = new Material(MaterialName);
+            nest.Material = NestMaterialSelection.Apply(nest.Material, MaterialName);
             nest.Status = Status;
             nest.MadeBy = MadeBy;
             nest.PlateDefaults.Size = OpenNest.Geometry.Size.Parse(SizeString);
