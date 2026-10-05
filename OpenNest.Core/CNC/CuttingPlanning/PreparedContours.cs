@@ -38,8 +38,7 @@ public sealed class PreparedContours
     {
         token.ThrowIfCancellationRequested();
         var ownedParameters = OwnedCuttingParameters.Copy(parameters);
-        ExecutionMotionReader.Read(program, Vector.Zero, null, token);
-        ValidateProgramTypes(program, token);
+        ExecutionMotionReader.ReadSupported(program, Vector.Zero, null, token);
         // ToGeometry constructs fresh native entities. Normalize an owned motion graph
         // to incremental mode so absolute subprograms retain their frame offsets too.
         // Retain execution boundaries: ShapeBuilder can join duplicate closed contours.
@@ -229,20 +228,4 @@ public sealed class PreparedContours
         }
     }
 
-    private static void ValidateProgramTypes(Program program, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        if (program.GetType() != typeof(Program) || !Enum.IsDefined(program.Mode))
-            throw new NotSupportedException("Unsupported program runtime type or mode.");
-        foreach (var code in program.Codes)
-        {
-            token.ThrowIfCancellationRequested();
-            var type = code.GetType();
-            if (type != typeof(RapidMove) && type != typeof(LinearMove) && type != typeof(ArcMove)
-                && type != typeof(SubProgramCall) && type != typeof(Comment) && type != typeof(Feedrate) && type != typeof(Kerf))
-                throw new NotSupportedException("Unsupported instruction runtime type.");
-            if (code is SubProgramCall call)
-                ValidateProgramTypes(call.Program, token);
-        }
-    }
 }

@@ -27,7 +27,7 @@ public sealed class LeadMaterialSnapshot
     {
         try
         {
-            var execution = ExecutionMotionReader.Read(cleanProgram, location, null, token);
+            var execution = ExecutionMotionReader.ReadSupported(cleanProgram, location, null, token);
             var rings = new List<PostVerificationGeometry.Curve[]>();
             var chain = new List<PostVerificationGeometry.Curve>();
             foreach (var motion in execution.Motions)

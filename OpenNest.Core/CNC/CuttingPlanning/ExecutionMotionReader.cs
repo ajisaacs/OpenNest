@@ -12,6 +12,17 @@ public static class ExecutionMotionReader
 {
     public static OwnedExecution Read(Program program, Vector origin, Vector? previous,
         CancellationToken token)
+        => ReadCore(program, origin, previous, token, false);
+
+    /// <summary>Read only exact built-in runtime types and defined program modes.
+    /// Validate the original graph before cloning: Clone can erase unsupported subclasses.
+    /// Inputs must remain stable during this bounded, cancellation-aware read.</summary>
+    public static OwnedExecution ReadSupported(Program program, Vector origin, Vector? previous,
+        CancellationToken token = default)
+        => ReadCore(program, origin, previous, token, true);
+
+    private static OwnedExecution ReadCore(Program program, Vector origin, Vector? previous,
+        CancellationToken token, bool requireSupportedTypes)
     {
         var moves = new List<ExecutionMotion>();
         var visiting = new HashSet<Program>(ReferenceEqualityComparer.Instance);
@@ -25,6 +36,8 @@ public static class ExecutionMotionReader
             PostVerificationGeometry.Validate(frame);
             if (current?.Codes == null || !visiting.Add(current) || visiting.Count > 64)
                 throw new ArgumentException("Missing, recursive or excessively nested program.");
+            if (requireSupportedTypes && (current.GetType() != typeof(Program) || !Enum.IsDefined(current.Mode)))
+                throw new NotSupportedException("Unsupported program runtime type or mode.");
             var pos = frame;
             var first = true;
             var countBefore = moves.Count;
@@ -35,6 +48,13 @@ public static class ExecutionMotionReader
                     throw new ArgumentException("Program expansion exceeds the verification limit.");
                 if (code == null)
                     throw new ArgumentException("Program contains a missing instruction.");
+                if (requireSupportedTypes)
+                {
+                    var type = code.GetType();
+                    if (type != typeof(RapidMove) && type != typeof(LinearMove) && type != typeof(ArcMove)
+                        && type != typeof(SubProgramCall) && type != typeof(Comment) && type != typeof(Feedrate) && type != typeof(Kerf))
+                        throw new NotSupportedException("Unsupported instruction runtime type.");
+                }
                 if (code is SubProgramCall call)
                 {
                     if (!double.IsFinite(call.Rotation))
