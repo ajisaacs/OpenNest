@@ -16,11 +16,26 @@ public class BomImportSummaryTests
             Row("PT05", "Steel", null),
             Row("PT06", "Steel", 0.25, dxfPath: null),
             Row(null, "Steel", 0.25),
+            Row("PT08", "Steel", 0.25, qty: 0),
         };
 
         Assert.Equal(
-            "2 ready, 1 needs a material, 2 need a thickness, 1 no drawing found, 1 no file name",
+            "2 ready, 1 needs a material, 2 need a thickness, 1 needs a quantity, 1 no drawing found, 1 no file name",
             BomImportSummary.Describe(rows)
+        );
+    }
+
+    [Fact]
+    public void Describe_CountsImportableRowsWhoseQuantityWasAssumed()
+    {
+        var assumed = Row("PT01", "Steel", 0.25);
+        assumed.QtyAssumed = true;
+        var noDrawing = Row("PT02", "Steel", 0.25, dxfPath: null);
+        noDrawing.QtyAssumed = true;
+
+        Assert.Equal(
+            "1 ready, 1 no drawing found, 1 had no BOM quantity (1 used)",
+            BomImportSummary.Describe(new[] { assumed, noDrawing })
         );
     }
 
@@ -35,7 +50,8 @@ public class BomImportSummaryTests
         string? fileName,
         string? material,
         double? thickness,
-        string? dxfPath = "/d/part.dxf"
+        string? dxfPath = "/d/part.dxf",
+        int qty = 1
     ) =>
         new()
         {
@@ -43,5 +59,6 @@ public class BomImportSummaryTests
             Material = material,
             Thickness = thickness,
             DxfPath = dxfPath,
+            Qty = qty,
         };
 }

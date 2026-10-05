@@ -11,7 +11,8 @@ public static class BomImportRows
     /// <summary>
     /// Returns one row per BOM item, in BOM order. Every row with a file
     /// name gets the drawing it matches in <paramref name="dxfFolder"/>,
-    /// whether or not its material and thickness are filled in.
+    /// whether or not its material and thickness are filled in. A blank
+    /// BOM quantity becomes 1, marked as assumed.
     /// </summary>
     public static List<BomPartRow> Build(List<BomItem> items, string dxfFolder)
     {
@@ -25,7 +26,9 @@ public static class BomImportRows
                 {
                     ItemNum = item.ItemNum,
                     FileName = item.FileName,
-                    Qty = item.Qty,
+                    BomQty = item.Qty,
+                    Qty = item.Qty ?? 1,
+                    QtyAssumed = item.Qty == null,
                     Description = item.Description,
                     Material = item.Material,
                     Thickness = item.Thickness,

@@ -54,7 +54,11 @@ public sealed class BomImportRowsTests : IDisposable
 
         Assert.Equal("Gusset", rows[0].Description);
         Assert.Equal(2, rows[0].Qty);
-        Assert.Null(rows[3].Qty);
+        Assert.Equal(2, rows[0].BomQty);
+        Assert.False(rows[0].QtyAssumed);
+        Assert.Equal(1, rows[3].Qty);
+        Assert.Null(rows[3].BomQty);
+        Assert.True(rows[3].QtyAssumed);
         Assert.Equal("Stainless", rows[0].Material);
         Assert.Equal(0.25, rows[0].Thickness);
     }
@@ -111,6 +115,20 @@ public sealed class BomImportRowsTests : IDisposable
 
         Assert.True(rows[0].IsEditable);
         Assert.Equal(BomRowStatus.NeedsMaterial, rows[0].Status);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void Build_RowWithBomQuantityBelowOne_NeedsAQuantity(int bomQty)
+    {
+        Touch("PT01.dxf");
+
+        var rows = BomImportRows.Build(new List<BomItem> { Item("PT01", qty: bomQty) }, folder);
+
+        Assert.Equal(bomQty, rows[0].Qty);
+        Assert.False(rows[0].QtyAssumed);
+        Assert.Equal(BomRowStatus.NeedsQuantity, rows[0].Status);
     }
 
     [Fact]

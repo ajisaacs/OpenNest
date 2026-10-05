@@ -22,7 +22,7 @@ public sealed class BomImportGroup
 
     public IReadOnlyList<BomPartRow> Parts { get; }
 
-    /// <summary>Sum of the rows' quantities; a blank quantity counts as 0.</summary>
+    /// <summary>Sum of the rows' quantities.</summary>
     public int TotalQty => Parts.Sum(p => p.Qty ?? 0);
 
     public string Key => BomImportGroups.Key(Material, Thickness);

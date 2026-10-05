@@ -11,7 +11,7 @@ public class BomImportGroupsTests
         {
             Row("PT01", "Stainless", 0.25, qty: 2),
             Row("PT02", "Aluminum", 0.125, qty: 1),
-            Row("PT03", "STAINLESS", 0.25, qty: null),
+            Row("PT03", "STAINLESS", 0.25, qty: 3),
             Row("PT04", "Stainless", 0.125, qty: 4),
             Row("PT05", "Aluminum", 0.0625, qty: 3),
         };
@@ -24,7 +24,7 @@ public class BomImportGroupsTests
         );
         var stainless = groups[3];
         Assert.Equal(new[] { "PT01", "PT03" }, stainless.Parts.Select(p => p.FileName));
-        Assert.Equal(2, stainless.TotalQty);
+        Assert.Equal(5, stainless.TotalQty);
         Assert.Equal(BomImportGroups.Key("stainless", 0.25), stainless.Key);
     }
 
@@ -43,6 +43,8 @@ public class BomImportGroupsTests
             Row("PT04", "Stainless", null),
             noDrawing,
             Row("PT06", "Stainless", 0),
+            Row("PT07", "Stainless", 0.25, qty: 0),
+            Row("PT08", "Stainless", 0.25, qty: null),
         };
 
         var groups = BomImportGroups.Build(rows);
