@@ -58,9 +58,10 @@ internal static class JointCuttingPlanSearch
 
         IEnumerable<Edge> Expand(Node node)
         {
+            var finished = node.Order.Select(o => o.SourceOrdinal).ToHashSet();
             var sources = node.Active is { } active ? new[] { active.Source }
-                : snapshot.Placements.Where(p => !node.Order.Any(o => o.SourceOrdinal == p.SourceOrdinal)
-                    && snapshot.Dependencies.IsReady(p.SourceOrdinal, node.Order.Select(o => o.SourceOrdinal).ToArray())
+                : snapshot.Placements.Where(p => !finished.Contains(p.SourceOrdinal)
+                    && snapshot.Dependencies.IsReady(p.SourceOrdinal, finished)
                     && (!snapshot.PreservePartOrder || p.SourceOrdinal == node.Order.Length));
             foreach (var source in sources)
             {
