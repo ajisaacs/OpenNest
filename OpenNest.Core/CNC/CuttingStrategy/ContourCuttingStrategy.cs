@@ -243,7 +243,8 @@ namespace OpenNest.CNC.CuttingStrategy
             {
                 var shape = shapes[choice.ContourOrdinal];
                 EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
-                    choice.ContourOrdinal == shapes.Length - 1 ? ContourType.External : null);
+                    choice.ContourOrdinal == shapes.Length - 1 ? ContourType.External : null,
+                    exactCirclePrograms: true);
             }
             result.Mode = Mode.Incremental;
             return result;
@@ -315,12 +316,57 @@ namespace OpenNest.CNC.CuttingStrategy
             return HashCode.Combine(r, a);
         }
 
+        // Prepared emission compares the actual resolved, generated motions, not a
+        // rounded geometry hash. Labels are deterministic encounter-order identifiers;
+        // legacy Apply/ApplySingle retain their existing cache and labels unchanged.
+        private static int RegisterPreparedCircleProgram(Program owner, Program generated)
+        {
+            CuttingPlanning.ExecutionMotionReader.ReadSupported(generated, Vector.Zero, null);
+            if (generated.Variables.Count != 0 || generated.SubPrograms.Count != 0)
+                throw new NotSupportedException("Unsupported generated circle program metadata.");
+            foreach (var code in generated.Codes)
+                if (code is not (RapidMove or LinearMove or ArcMove) || ((Motion)code).VariableRefs != null)
+                    throw new NotSupportedException("Unsupported generated circle instruction.");
+            foreach (var pair in owner.SubPrograms)
+                if (SameGeneratedCircleProgram(pair.Value, generated))
+                    return pair.Key;
+            var key = checked(owner.SubPrograms.Count + 1);
+            owner.SubPrograms.Add(key, generated);
+            return key;
+        }
+
+        private static bool SameGeneratedCircleProgram(Program a, Program b)
+        {
+            if (a.Mode != b.Mode || !SameBits(a.Rotation, b.Rotation) || a.Codes.Count != b.Codes.Count)
+                return false;
+            for (var i = 0; i < a.Codes.Count; i++)
+            {
+                var left = (Motion)a.Codes[i];
+                var right = (Motion)b.Codes[i];
+                if (left.GetType() != right.GetType() || left.Suppressed != right.Suppressed
+                    || left.UseExactStop != right.UseExactStop || left.Feedrate != right.Feedrate
+                    || !SameVector(left.EndPoint, right.EndPoint))
+                    return false;
+                if (left is LinearMove line && line.Layer != ((LinearMove)right).Layer)
+                    return false;
+                if (left is ArcMove arc && (arc.Layer != ((ArcMove)right).Layer
+                    || arc.Rotation != ((ArcMove)right).Rotation
+                    || !SameVector(arc.CenterPoint, ((ArcMove)right).CenterPoint)))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool SameVector(Vector a, Vector b) => SameBits(a.X, b.X) && SameBits(a.Y, b.Y);
+        private static bool SameBits(double a, double b) => BitConverter.DoubleToInt64Bits(a) == BitConverter.DoubleToInt64Bits(b);
+
         private void EmitContour(
             Program program,
             Shape shape,
             Vector point,
             Entity entity,
-            ContourType? forceType = null
+            ContourType? forceType = null,
+            bool exactCirclePrograms = false
         )
         {
             var contourType = forceType ?? DetectContourType(shape);
@@ -366,7 +412,9 @@ namespace OpenNest.CNC.CuttingStrategy
                 subPgm.Mode = Mode.Incremental;
 
                 // Deduplicate: check if an identical sub-program already exists
-                var key = ComputeSubProgramKey(circle.Radius, normal);
+                var key = exactCirclePrograms
+                    ? RegisterPreparedCircleProgram(program, subPgm)
+                    : ComputeSubProgramKey(circle.Radius, normal);
                 if (!program.SubPrograms.ContainsKey(key))
                     program.SubPrograms[key] = subPgm;
 
