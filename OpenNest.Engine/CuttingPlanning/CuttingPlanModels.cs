@@ -1,25 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.CuttingPlanning;
 
 /// <summary>
-/// Caller-side input for a fixed-program, direct-XY route only. Keep all sources stable
-/// during Capture. Both locked and unlocked programs are fixed; this is not an Apply request.
+/// Caller-side direct-XY input. Regeneration requires explicit confirmed parameters.
+/// Keep sources/settings stable during Capture. This is not an Apply request.
 /// </summary>
 public sealed class CuttingPlanRequest
 {
-    public CuttingPlanRequest(IEnumerable<Part> parts, Vector startPoint = default, int expansionBudget = 20000)
+    public CuttingPlanRequest(IEnumerable<Part> parts, Vector startPoint = default, int expansionBudget = 20000,
+        CuttingParameters confirmedParameters = null, IEnumerable<Part> eligibleParts = null,
+        bool preservePartOrder = false, int maxEntries = 16)
     {
         Parts = parts == null ? null : Array.AsReadOnly(parts.ToArray());
         StartPoint = startPoint;
         ExpansionBudget = expansionBudget;
+        ConfirmedParameters = confirmedParameters;
+        EligibleParts = eligibleParts == null ? null : Array.AsReadOnly(eligibleParts.ToArray());
+        PreservePartOrder = preservePartOrder;
+        MaxEntries = maxEntries;
     }
 
+    public CuttingParameters ConfirmedParameters { get; }
+    public IReadOnlyList<Part> EligibleParts { get; }
+    public bool PreservePartOrder { get; }
+    public int MaxEntries { get; }
+    internal Action<int> ExpansionObserver { get; init; }
     public IReadOnlyList<Part> Parts { get; }
     public Vector StartPoint { get; }
     public int ExpansionBudget { get; }
@@ -29,15 +42,25 @@ public sealed class CuttingPlanRequest
 public sealed class CuttingPlanSnapshot
 {
     internal CuttingPlanSnapshot(IEnumerable<FixedProgramPlacement> placements, Vector startPoint,
-        int expansionBudget, CuttingPlanStatus? failure = null, IEnumerable<CuttingPlanFinding> findings = null)
+        int expansionBudget, CuttingPlanStatus? failure = null, IEnumerable<CuttingPlanFinding> findings = null,
+        bool regeneration = false, bool preservePartOrder = false, int maxEntries = 16,
+        Action<int> expansionObserver = null)
     {
         Placements = Array.AsReadOnly(placements.ToArray());
         StartPoint = startPoint;
         ExpansionBudget = expansionBudget;
         Failure = failure;
         Findings = Array.AsReadOnly((findings ?? []).ToArray());
+        Regeneration = regeneration;
+        PreservePartOrder = preservePartOrder;
+        MaxEntries = maxEntries;
+        ExpansionObserver = expansionObserver;
     }
 
+    internal bool Regeneration { get; }
+    internal bool PreservePartOrder { get; }
+    internal int MaxEntries { get; }
+    internal Action<int> ExpansionObserver { get; }
     public IReadOnlyList<FixedProgramPlacement> Placements { get; }
     public Vector StartPoint { get; }
     public int ExpansionBudget { get; }
@@ -48,7 +71,9 @@ public sealed class CuttingPlanSnapshot
 public sealed class FixedProgramPlacement
 {
     internal FixedProgramPlacement(Part sourcePart, int sourceOrdinal, Vector location,
-        double rotation, bool leadInsLocked, OwnedExecution execution)
+        double rotation, bool leadInsLocked, OwnedExecution execution, Program program = null,
+        PreparedContours prepared = null, LeadMaterialSnapshot material = null,
+        IReadOnlyList<ContourChoice> choices = null)
     {
         SourcePart = sourcePart;
         SourceOrdinal = sourceOrdinal;
@@ -56,7 +81,21 @@ public sealed class FixedProgramPlacement
         Rotation = rotation;
         LeadInsLocked = leadInsLocked;
         Execution = execution;
+        this.program = program;
+        Prepared = prepared;
+        Material = material;
+        ContourChoices = Array.AsReadOnly((choices ?? []).ToArray());
     }
+
+    private readonly Program program;
+    internal PreparedContours Prepared { get; }
+    internal LeadMaterialSnapshot Material { get; }
+    public IReadOnlyList<ContourChoice> ContourChoices { get; }
+    public bool IsRegenerated => ContourChoices.Count != 0;
+    /// <summary>Returns an independent deep copy; never an alias to captured/proposed code.</summary>
+    public Program CopyProgram() => program == null ? null : (Program)program.Clone();
+    internal FixedProgramPlacement Propose(Program proposed, OwnedExecution execution, IReadOnlyList<ContourChoice> choices) =>
+        new(SourcePart, SourceOrdinal, Location, Rotation, LeadInsLocked, execution, proposed, Prepared, Material, choices);
 
     public Part SourcePart { get; }
     public int SourceOrdinal { get; }
@@ -81,8 +120,8 @@ public sealed record CuttingPlanFinding(int? SourceOrdinal, Part SourcePart,
     int? OtherSourceOrdinal, Part OtherSourcePart, PostVerificationKind? Kind, string Message);
 
 /// <summary>
-/// A checked fixed-program route, not full cutting-plan readiness, posting consent,
-/// physical safety, or an atomic Apply payload. Failures contain no proposed order.
+/// A replayed direct-XY proposal, optionally with regenerated programs. Not physical
+/// safety, posting consent, dependency readiness or an atomic Apply payload. Failures contain no proposals.
 /// </summary>
 public sealed class CuttingPlanResult
 {

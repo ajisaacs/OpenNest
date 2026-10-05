@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
@@ -11,8 +12,8 @@ namespace OpenNest.Engine.CuttingPlanning;
 public static class CuttingPlanService
 {
     /// <summary>
-    /// Read stable caller-owned sources once, before dispatching worker work. No Program.Clone,
-    /// private Plates, settings aliases, quantity updates, or subcall rebinding are involved.
+    /// Read stable caller-owned sources once into privately owned programs and geometry.
+    /// No private Plates, settings aliases, quantity updates or source subcall rebinding.
     /// </summary>
     public static CuttingPlanSnapshot Capture(CuttingPlanRequest request, CancellationToken token = default)
     {
@@ -22,8 +23,17 @@ public static class CuttingPlanService
         try
         {
             token.ThrowIfCancellationRequested();
-            if (request?.Parts == null || request.Parts.Count == 0 || request.ExpansionBudget <= 0)
+            if (request?.Parts == null || request.Parts.Count == 0 || request.ExpansionBudget <= 0 || request.MaxEntries <= 0)
                 throw new ArgumentException("A nonempty source list and positive expansion budget are required.");
+            var eligible = new HashSet<Part>(ReferenceEqualityComparer.Instance);
+            if (request.EligibleParts != null)
+            {
+                if (request.ConfirmedParameters == null)
+                    throw new ArgumentException("Eligibility requires confirmed cutting parameters.");
+                foreach (var part in request.EligibleParts)
+                    if (part == null || !request.Parts.Any(p => ReferenceEquals(p, part)) || !eligible.Add(part))
+                        throw new ArgumentException("Foreign or duplicate eligible placement.");
+            }
             // Reuse the reader's coordinate validation without publishing its native kernel.
             var identities = new HashSet<Part>(ReferenceEqualityComparer.Instance);
             for (var index = 0; index < request.Parts.Count; index++)
@@ -42,11 +52,29 @@ public static class CuttingPlanService
                 var execution = ExecutionMotionReader.Read(source.Program, source.Location, request.StartPoint, token);
                 if (!execution.HasCuttingContour)
                     throw new ArgumentException("Placed program has no nonzero cutting contour motions.");
-                placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked, execution));
+                ValidateCloneGraph(source.Program, token);
+                var ownedProgram = (Program)source.Program.Clone();
+                PreparedContours prepared = null;
+                LeadMaterialSnapshot material = null;
+                if (request.ConfirmedParameters != null)
+                {
+                    ValidateCloneGraph(source.BaseDrawing.Program, token);
+                    var ownedClean = (Program)source.BaseDrawing.Program.Clone();
+                    ownedClean.Rotate(source.Rotation - source.BaseDrawing.Program.Rotation);
+                    material = LeadMaterialSnapshot.Capture(ownedClean, source.Location, token);
+                    if (!material.IsComplete)
+                        throw new NotSupportedException(material.Reason);
+                    if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
+                        prepared = PreparedContours.Capture(ownedClean, request.ConfirmedParameters, token);
+                }
+                placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
+                    execution, ownedProgram, prepared, material));
             }
             // The start can be invalid even when the first rapid has no cutting geometry.
             placements[0].Execution.RapidDistanceFrom(request.StartPoint);
-            return new(placements, request.StartPoint, request.ExpansionBudget);
+            return new(placements, request.StartPoint, request.ExpansionBudget, regeneration: request.ConfirmedParameters != null,
+                preservePartOrder: request.PreservePartOrder, maxEntries: request.MaxEntries,
+                expansionObserver: request.ExpansionObserver);
         }
         catch (OperationCanceledException)
         {
@@ -84,6 +112,8 @@ public static class CuttingPlanService
             foreach (var placement in snapshot.Placements)
             {
                 token.ThrowIfCancellationRequested();
+                if (placement.Prepared != null)
+                    continue; // An eligible old crossing is precisely what regeneration may repair.
                 // Ignore only the unknown incoming rapid. Every fixed internal motion is checked.
                 var findings = new ReleasedContourState().Check(placement.Execution, null,
                     placement.SourceOrdinal + 1, token);
@@ -94,6 +124,13 @@ public static class CuttingPlanService
                     ? CuttingPlanStatus.UnsupportedGeometry : CuttingPlanStatus.ConstraintConflict,
                     findings: fixedFindings);
 
+            if (snapshot.Regeneration)
+            {
+                var joint = JointCuttingPlanSearch.Run(snapshot, token);
+                if (joint.Status != CuttingPlanStatus.Ready)
+                    return new(joint.Status, findings: joint.Findings, expansions: joint.Expansions);
+                return ReplayPrograms(snapshot, joint.Order, joint.Expansions, token);
+            }
             var search = FixedProgramSearch.Run(snapshot, token);
             if (search.Status != CuttingPlanStatus.Ready)
                 return new(search.Status, findings: Map(snapshot, search.Findings), expansions: search.Expansions);
@@ -131,6 +168,129 @@ public static class CuttingPlanService
                 findings: Map(snapshot, findings), expansions: expansions);
         return new(CuttingPlanStatus.Ready, order.Select(index => snapshot.Placements[index]),
             expansions: expansions, rapidDistance: distance, independentlyReplayed: true);
+    }
+
+    // Re-read EXACT selected programs with a fresh checker and native lead validation.
+    // No emission/regeneration or cached branch verdict is used here.
+    internal static CuttingPlanResult ReplayPrograms(CuttingPlanSnapshot snapshot,
+        IReadOnlyList<FixedProgramPlacement> order, int expansions, CancellationToken token)
+    {
+        if (order == null || order.Count != snapshot.Placements.Count
+            || order.Any(p => p == null || p.SourceOrdinal < 0 || p.SourceOrdinal >= snapshot.Placements.Count)
+            || order.Select(p => p.SourceOrdinal).Distinct().Count() != order.Count)
+            return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
+        var checker = new ReleasedContourState();
+        var position = snapshot.StartPoint;
+        var distance = 0.0;
+        var findings = new List<CuttingPlanFinding>();
+        var materials = snapshot.Placements.Select(p => p.Material).ToArray();
+        foreach (var proposal in order)
+        {
+            token.ThrowIfCancellationRequested();
+            var source = snapshot.Placements[proposal.SourceOrdinal];
+            if (!ReferenceEquals(source.SourcePart, proposal.SourcePart) || source.Location != proposal.Location
+                || source.Rotation != proposal.Rotation || source.LeadInsLocked != proposal.LeadInsLocked
+                || !ReferenceEquals(source.Prepared, proposal.Prepared) || !ReferenceEquals(source.Material, proposal.Material)
+                || snapshot.PreservePartOrder && proposal.SourceOrdinal != order.TakeWhile(p => !ReferenceEquals(p, proposal)).Count())
+                return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
+            if (source.Prepared == null)
+            {
+                if (!ReferenceEquals(source, proposal))
+                    return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
+            }
+            else if (proposal.ContourChoices.Count != source.Prepared.Count
+                || proposal.ContourChoices.Any(c => !ReferenceEquals(c.Owner, source.Prepared)
+                    || c.ContourOrdinal < 0 || c.ContourOrdinal >= source.Prepared.Count)
+                || proposal.ContourChoices.Select(c => c.ContourOrdinal).Distinct().Count() != source.Prepared.Count
+                || proposal.ContourChoices[^1].ContourOrdinal != source.Prepared.PerimeterOrdinal)
+                return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
+            OwnedExecution execution;
+            try
+            {
+                execution = ExecutionMotionReader.Read(proposal.CopyProgram(), proposal.Location, position, token);
+                if (source.Prepared != null && !HasCompleteContourAccounting(execution, source.Material, token))
+                    return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+            {
+                return new(CuttingPlanStatus.UnsupportedGeometry,
+                    findings: [JointCuttingPlanSearch.Finding(source, PostVerificationKind.Incomplete, ex.Message)], expansions: expansions);
+            }
+            findings.AddRange(JointCuttingPlanSearch.Map(snapshot,
+                checker.Check(execution, position, source.SourceOrdinal + 1, token)));
+            var lead = LeadPathValidator.Check(execution, source.Material, materials, token);
+            if (!lead.IsComplete || !lead.IsClear)
+                findings.Add(JointCuttingPlanSearch.Finding(source,
+                    lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
+            distance += execution.RapidDistanceFrom(position);
+            position = execution.DeparturePoint;
+        }
+        token.ThrowIfCancellationRequested();
+        if (findings.Count != 0)
+            return new(findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
+                ? CuttingPlanStatus.UnsupportedGeometry : CuttingPlanStatus.ConstraintConflict,
+                findings: findings, expansions: expansions);
+        return new(CuttingPlanStatus.Ready, order, expansions: expansions,
+            rapidDistance: distance, independentlyReplayed: true);
+    }
+
+    private static bool HasCompleteContourAccounting(OwnedExecution execution, LeadMaterialSnapshot material, CancellationToken token)
+    {
+        var visited = new HashSet<int>();
+        var current = -1;
+        var budget = 1000000;
+        foreach (var move in execution.Motions)
+        {
+            token.ThrowIfCancellationRequested();
+            if (move.Rapid || move.Layer is not (LayerType.Cut or LayerType.Display))
+            {
+                current = -1;
+                continue;
+            }
+            var ring = -1;
+            for (var i = 0; i < material.Rings.Count; i++)
+                if (material.Rings[i].Any(c => Matches(c, move)))
+                {
+                    ring = i;
+                    break;
+                }
+            if (ring < 0 || current >= 0 && ring != current || current < 0 && !visited.Add(ring))
+                return false;
+            current = ring;
+        }
+        return visited.Count == material.Rings.Count;
+
+        bool Matches(PostVerificationGeometry.Curve curve, ExecutionMotion move)
+        {
+            token.ThrowIfCancellationRequested();
+            if (--budget < 0) throw new NotSupportedException("Replay contour accounting exceeds the native query limit.");
+            return curve.SameSupport(move.Curve) && curve.Contains(move.Curve.Start)
+                && curve.Contains(move.End) && curve.Contains(move.Curve.Midpoint)
+                && move.Length <= curve.Length + PostVerificationGeometry.Epsilon;
+        }
+    }
+
+    private static void ValidateCloneGraph(Program program, CancellationToken token)
+    {
+        var active = new HashSet<Program>(ReferenceEqualityComparer.Instance);
+        var done = new HashSet<Program>(ReferenceEqualityComparer.Instance);
+        Visit(program);
+        void Visit(Program current)
+        {
+            token.ThrowIfCancellationRequested();
+            if (current == null || active.Contains(current) || active.Count >= 64)
+                throw new ArgumentException("Missing, recursive or excessively nested clone graph.");
+            if (done.Contains(current)) return;
+            // The reader already validated the executed graph. Inactive registered
+            // subprograms may be motionless; preserve them exactly, but guard Clone traversal.
+            if (current.Codes == null || current.Codes.Any(c => c == null))
+                throw new ArgumentException("Missing clone graph instructions.");
+            active.Add(current);
+            foreach (var child in current.SubPrograms.Values.Concat(current.Codes.OfType<SubProgramCall>().Select(c => c.Program)))
+                Visit(child);
+            active.Remove(current);
+            done.Add(current);
+        }
     }
 
     private static IEnumerable<CuttingPlanFinding> Map(CuttingPlanSnapshot snapshot,

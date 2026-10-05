@@ -47,7 +47,8 @@ internal static class FixedProgramSearch
         return new(CuttingPlanStatus.ConstraintConflict, [], rejected.ToArray(), expansions);
 
         Frame Create(int[] order, Vector position, ReleasedContourState checker) => new(order, position, checker,
-            Enumerable.Range(0, snapshot.Placements.Count).Where(index => !order.Contains(index))
+            Enumerable.Range(0, snapshot.Placements.Count).Where(index => !order.Contains(index)
+                    && (!snapshot.PreservePartOrder || index == order.Length))
                 .OrderBy(index => snapshot.Placements[index].Execution.RapidDistanceFrom(position))
                 .ThenBy(index => snapshot.Placements[index].SourceOrdinal).ToArray());
     }
