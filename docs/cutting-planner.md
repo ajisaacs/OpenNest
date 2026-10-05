@@ -164,7 +164,14 @@ difference on any plate returns `Stale` and changes nothing, so a proposal that
 changes a plate can be applied once; an unchanged (no-op) proposal stays current.
 A malformed live program is also `Stale`, not an exception. A part repeated on
 two plates of one scope is `InvalidInput`. Caller-confirmed planning settings are
-input, not plate state: editing them after capture does not stale the result.
+input, not plate state: editing a separate confirmed-settings object after
+capture does not stale the result (confirmed settings that are also a part's or
+the plate's live settings are live state, and editing them does). Settings state
+whose exact capture would require executing foreign code — custom property
+getters, behavioral enumerables, structures beyond the capture limits — is
+recorded as refused at capture: the plate stays plannable, but every commit
+against it reports `Stale`, and capture or commit never runs or enumerates
+foreign code.
 
 The whole scope is validated and its bounds staged first; cancellation is checked
 immediately before the install. Order changes through `ObservableList.Reorder`

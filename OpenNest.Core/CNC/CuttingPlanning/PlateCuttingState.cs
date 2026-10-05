@@ -52,7 +52,9 @@ public sealed class PlateCuttingState
 
     /// <summary>
     /// Captures on the caller thread. Unsupported or malformed programs throw
-    /// <see cref="ArgumentException"/> or <see cref="NotSupportedException"/>.
+    /// <see cref="ArgumentException"/> or <see cref="NotSupportedException"/>. Settings whose
+    /// authored state cannot be captured exactly are recorded as refused: the plate stays
+    /// plannable but every later commit against it reports <c>Stale</c>.
     /// </summary>
     public static PlateCuttingState Capture(Plate plate, CancellationToken token = default)
     {
@@ -83,6 +85,8 @@ public sealed class PlateCuttingState
 
         void Fingerprint(CuttingParameters parameters)
         {
+            // A refused capture is stored as-is; Difference treats it as never current, so
+            // every Apply for such settings is Stale and no foreign code ever runs at Apply.
             if (parameters != null && !settings.ContainsKey(parameters))
                 settings.Add(parameters, StateFingerprint.Of(parameters));
         }
@@ -94,6 +98,9 @@ public sealed class PlateCuttingState
     /// <summary>Null when current; otherwise the first observed difference.</summary>
     public string Difference(CancellationToken token = default)
     {
+        const string Current = "current";
+        const string Stale = "stale";
+        var checkedSettings = new Dictionary<CuttingParameters, string>(ReferenceEqualityComparer.Instance);
         var plate = Plate;
         if (!ReferenceEquals(plate.Parts, partList) || !ReferenceEquals(plate.CutOffs, cutOffList))
             return "The plate's part or cutoff list was replaced.";
@@ -151,18 +158,31 @@ public sealed class PlateCuttingState
         return null;
 
         // References were compared already; this catches in-place edits of the same object.
+        // Each distinct settings object is fingerprinted at most once per check. A refused
+        // capture (Invalid) is never current: the state cannot be proven unchanged, and the
+        // live object is deliberately not re-read. A fingerprint that fails on re-read is
+        // likewise stale, never an escaping exception (cancellation stays distinct).
         bool SameSettings(CuttingParameters parameters)
         {
             if (parameters == null)
                 return true;
-            try
+            if (checkedSettings.TryGetValue(parameters, out var decision))
+                return decision == Current;
+            var current = false;
+            if (settings.TryGetValue(parameters, out var captured)
+                && captured != StateFingerprint.Invalid)
             {
-                return settings.TryGetValue(parameters, out var captured) && captured == StateFingerprint.Of(parameters);
+                try
+                {
+                    current = captured == StateFingerprint.Of(parameters);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    current = false;
+                }
             }
-            catch (NotSupportedException)
-            {
-                return false; // Grown past the exact fingerprint budget since capture.
-            }
+            checkedSettings[parameters] = current ? Current : Stale;
+            return current;
         }
     }
 
