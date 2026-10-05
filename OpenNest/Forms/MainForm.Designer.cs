@@ -73,27 +73,14 @@
             mnuTools = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsMeasureArea = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsBestFitViewer = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsPatternTile = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsExpandSpacing = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsAlign = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsAlignLeft = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsAlignRight = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsAlignTop = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsAlignBottom = new System.Windows.Forms.ToolStripMenuItem();
-            toolStripMenuItem11 = new System.Windows.Forms.ToolStripSeparator();
-            mnuToolsAlignHorizontal = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsAlignVertically = new System.Windows.Forms.ToolStripMenuItem();
-            toolStripMenuItem8 = new System.Windows.Forms.ToolStripSeparator();
-            mnuToolsEvenlySpaceHorizontal = new System.Windows.Forms.ToolStripMenuItem();
-            mnuToolsEvenlySpaceVertical = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem14 = new System.Windows.Forms.ToolStripSeparator();
-            mnuSetOffsetIncrement = new System.Windows.Forms.ToolStripMenuItem();
-            mnuSetRotationIncrement = new System.Windows.Forms.ToolStripMenuItem();
-            toolStripMenuItem15 = new System.Windows.Forms.ToolStripSeparator();
             mnuToolsMachineConfig = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsNestDefaults = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsSaveCurrentAsDefaults = new System.Windows.Forms.ToolStripMenuItem();
             mnuToolsOptions = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem15 = new System.Windows.Forms.ToolStripSeparator();
+            mnuSetOffsetIncrement = new System.Windows.Forms.ToolStripMenuItem();
+            mnuSetRotationIncrement = new System.Windows.Forms.ToolStripMenuItem();
             mnuNest = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestEdit = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestImportDrawing = new System.Windows.Forms.ToolStripMenuItem();
@@ -129,19 +116,34 @@
             mnuPlateRotate180 = new System.Windows.Forms.ToolStripMenuItem();
             mnuResizeToFitParts = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem13 = new System.Windows.Forms.ToolStripSeparator();
-            mnuPlateViewInCad = new System.Windows.Forms.ToolStripMenuItem();
-            toolStripMenuItem20 = new System.Windows.Forms.ToolStripSeparator();
+            mnuPlateArrange = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateAlignLeft = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateAlignRight = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateAlignTop = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateAlignBottom = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem11 = new System.Windows.Forms.ToolStripSeparator();
+            mnuPlateAlignHorizontal = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateAlignVertically = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem8 = new System.Windows.Forms.ToolStripSeparator();
+            mnuPlateEvenlySpaceHorizontal = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateEvenlySpaceVertical = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem23 = new System.Windows.Forms.ToolStripSeparator();
+            centerPartsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem24 = new System.Windows.Forms.ToolStripSeparator();
+            mnuPlatePatternTile = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateExpandSpacing = new System.Windows.Forms.ToolStripMenuItem();
             mnuSequenceParts = new System.Windows.Forms.ToolStripMenuItem();
             autoSequenceCurrentPlateToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             manualSequenceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             calculateCutTimeToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            centerPartsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            mnuPlateCutOff = new System.Windows.Forms.ToolStripMenuItem();
-            mnuPlateAutomaticCutOff = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem21 = new System.Windows.Forms.ToolStripSeparator();
             mnuPlateAssignLeadIns = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlatePlaceLeadIn = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRemoveLeadIns = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripMenuItem20 = new System.Windows.Forms.ToolStripSeparator();
+            mnuPlateViewInCad = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateCutOff = new System.Windows.Forms.ToolStripMenuItem();
+            mnuPlateAutomaticCutOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindow = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindowCascade = new System.Windows.Forms.ToolStripMenuItem();
             mnuWindowTileVertical = new System.Windows.Forms.ToolStripMenuItem();
@@ -492,7 +494,7 @@
             // 
             // mnuTools
             // 
-            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, mnuToolsPatternTile, mnuToolsExpandSpacing, mnuToolsAlign, toolStripMenuItem14, mnuSetOffsetIncrement, mnuSetRotationIncrement, toolStripMenuItem15, mnuToolsMachineConfig, mnuToolsNestDefaults, mnuToolsSaveCurrentAsDefaults, mnuToolsOptions });
+            mnuTools.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsMeasureArea, mnuToolsBestFitViewer, toolStripMenuItem14, mnuToolsMachineConfig, mnuToolsNestDefaults, mnuToolsSaveCurrentAsDefaults, mnuToolsOptions, toolStripMenuItem15, mnuSetOffsetIncrement, mnuSetRotationIncrement });
             mnuTools.Name = "mnuTools";
             mnuTools.Size = new System.Drawing.Size(47, 20);
             mnuTools.Text = "&Tools";
@@ -511,93 +513,6 @@
             mnuToolsBestFitViewer.Text = "Best-Fit Viewer";
             mnuToolsBestFitViewer.Click += BestFitViewer_Click;
             //
-            // mnuToolsPatternTile
-            //
-            this.mnuToolsPatternTile.Name = "mnuToolsPatternTile";
-            this.mnuToolsPatternTile.Size = new System.Drawing.Size(214, 22);
-            this.mnuToolsPatternTile.Text = "Pattern Tile";
-            this.mnuToolsPatternTile.Click += PatternTile_Click;
-            //
-            // mnuToolsExpandSpacing
-            //
-            this.mnuToolsExpandSpacing.Name = "mnuToolsExpandSpacing";
-            this.mnuToolsExpandSpacing.Size = new System.Drawing.Size(214, 22);
-            this.mnuToolsExpandSpacing.Text = "Expand Spacing";
-            this.mnuToolsExpandSpacing.Click += ExpandSpacing_Click;
-            //
-            // mnuToolsAlign
-            //
-            mnuToolsAlign.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuToolsAlignLeft, mnuToolsAlignRight, mnuToolsAlignTop, mnuToolsAlignBottom, toolStripMenuItem11, mnuToolsAlignHorizontal, mnuToolsAlignVertically, toolStripMenuItem8, mnuToolsEvenlySpaceHorizontal, mnuToolsEvenlySpaceVertical });
-            mnuToolsAlign.Name = "mnuToolsAlign";
-            mnuToolsAlign.Size = new System.Drawing.Size(214, 22);
-            mnuToolsAlign.Text = "Align Selected";
-            // 
-            // mnuToolsAlignLeft
-            // 
-            mnuToolsAlignLeft.Name = "mnuToolsAlignLeft";
-            mnuToolsAlignLeft.Size = new System.Drawing.Size(209, 22);
-            mnuToolsAlignLeft.Text = "Left";
-            mnuToolsAlignLeft.Click += AlignLeft_Click;
-            // 
-            // mnuToolsAlignRight
-            // 
-            mnuToolsAlignRight.Name = "mnuToolsAlignRight";
-            mnuToolsAlignRight.Size = new System.Drawing.Size(209, 22);
-            mnuToolsAlignRight.Text = "Right";
-            mnuToolsAlignRight.Click += AlignRight_Click;
-            // 
-            // mnuToolsAlignTop
-            // 
-            mnuToolsAlignTop.Name = "mnuToolsAlignTop";
-            mnuToolsAlignTop.Size = new System.Drawing.Size(209, 22);
-            mnuToolsAlignTop.Text = "Top";
-            mnuToolsAlignTop.Click += AlignTop_Click;
-            // 
-            // mnuToolsAlignBottom
-            // 
-            mnuToolsAlignBottom.Name = "mnuToolsAlignBottom";
-            mnuToolsAlignBottom.Size = new System.Drawing.Size(209, 22);
-            mnuToolsAlignBottom.Text = "Bottom";
-            mnuToolsAlignBottom.Click += AlignBottom_Click;
-            // 
-            // toolStripMenuItem11
-            // 
-            toolStripMenuItem11.Name = "toolStripMenuItem11";
-            toolStripMenuItem11.Size = new System.Drawing.Size(206, 6);
-            // 
-            // mnuToolsAlignHorizontal
-            // 
-            mnuToolsAlignHorizontal.Name = "mnuToolsAlignHorizontal";
-            mnuToolsAlignHorizontal.Size = new System.Drawing.Size(209, 22);
-            mnuToolsAlignHorizontal.Text = "Horizontally";
-            mnuToolsAlignHorizontal.Click += AlignHorizontal_Click;
-            // 
-            // mnuToolsAlignVertically
-            // 
-            mnuToolsAlignVertically.Name = "mnuToolsAlignVertically";
-            mnuToolsAlignVertically.Size = new System.Drawing.Size(209, 22);
-            mnuToolsAlignVertically.Text = "Vertically";
-            mnuToolsAlignVertically.Click += AlignVertical_Click;
-            // 
-            // toolStripMenuItem8
-            // 
-            toolStripMenuItem8.Name = "toolStripMenuItem8";
-            toolStripMenuItem8.Size = new System.Drawing.Size(206, 6);
-            // 
-            // mnuToolsEvenlySpaceHorizontal
-            // 
-            mnuToolsEvenlySpaceHorizontal.Name = "mnuToolsEvenlySpaceHorizontal";
-            mnuToolsEvenlySpaceHorizontal.Size = new System.Drawing.Size(209, 22);
-            mnuToolsEvenlySpaceHorizontal.Text = "Evenly Space Horizontally";
-            mnuToolsEvenlySpaceHorizontal.Click += EvenlySpaceHorizontally_Click;
-            // 
-            // mnuToolsEvenlySpaceVertical
-            // 
-            mnuToolsEvenlySpaceVertical.Name = "mnuToolsEvenlySpaceVertical";
-            mnuToolsEvenlySpaceVertical.Size = new System.Drawing.Size(209, 22);
-            mnuToolsEvenlySpaceVertical.Text = "Evenly Space Vertically";
-            mnuToolsEvenlySpaceVertical.Click += EvenlySpaceVertically_Click;
-            // 
             // toolStripMenuItem14
             // 
             toolStripMenuItem14.Name = "toolStripMenuItem14";
@@ -796,8 +711,8 @@
             mnuNestRemoveLeadIns.Click += NestRemoveLeadIns_Click;
             //
             // mnuPlate
-            // 
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem, toolStripMenuItem21, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns });
+            //
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateArrange, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, toolStripMenuItem21, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns, toolStripMenuItem20, mnuPlateViewInCad });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -892,64 +807,149 @@
             mnuPlateRotate180.Click += Rotate180_Click;
             // 
             // mnuResizeToFitParts
-            // 
+            //
             mnuResizeToFitParts.Name = "mnuResizeToFitParts";
             mnuResizeToFitParts.ShortcutKeys = System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.P;
             mnuResizeToFitParts.Size = new System.Drawing.Size(177, 22);
             mnuResizeToFitParts.Text = "Resize to Fit";
             mnuResizeToFitParts.Click += ResizeToFitParts_Click;
-            // 
+            //
             // toolStripMenuItem13
-            // 
+            //
             toolStripMenuItem13.Name = "toolStripMenuItem13";
             toolStripMenuItem13.Size = new System.Drawing.Size(174, 6);
-            // 
-            // mnuPlateViewInCad
-            // 
-            mnuPlateViewInCad.Name = "mnuPlateViewInCad";
-            mnuPlateViewInCad.Size = new System.Drawing.Size(177, 22);
-            mnuPlateViewInCad.Text = "View in CAD";
-            mnuPlateViewInCad.Click += OpenInExternalCad_Click;
-            // 
-            // toolStripMenuItem20
-            // 
-            toolStripMenuItem20.Name = "toolStripMenuItem20";
-            toolStripMenuItem20.Size = new System.Drawing.Size(174, 6);
-            // 
+            //
+            // mnuPlateArrange
+            //
+            mnuPlateArrange.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateAlignLeft, mnuPlateAlignRight, mnuPlateAlignTop, mnuPlateAlignBottom, toolStripMenuItem11, mnuPlateAlignHorizontal, mnuPlateAlignVertically, toolStripMenuItem8, mnuPlateEvenlySpaceHorizontal, mnuPlateEvenlySpaceVertical, toolStripMenuItem23, centerPartsToolStripMenuItem, toolStripMenuItem24, mnuPlatePatternTile, mnuPlateExpandSpacing });
+            mnuPlateArrange.Name = "mnuPlateArrange";
+            mnuPlateArrange.Size = new System.Drawing.Size(177, 22);
+            mnuPlateArrange.Text = "Arrange";
+            //
+            // mnuPlateAlignLeft
+            //
+            mnuPlateAlignLeft.Name = "mnuPlateAlignLeft";
+            mnuPlateAlignLeft.Size = new System.Drawing.Size(209, 22);
+            mnuPlateAlignLeft.Text = "Left";
+            mnuPlateAlignLeft.Click += AlignLeft_Click;
+            //
+            // mnuPlateAlignRight
+            //
+            mnuPlateAlignRight.Name = "mnuPlateAlignRight";
+            mnuPlateAlignRight.Size = new System.Drawing.Size(209, 22);
+            mnuPlateAlignRight.Text = "Right";
+            mnuPlateAlignRight.Click += AlignRight_Click;
+            //
+            // mnuPlateAlignTop
+            //
+            mnuPlateAlignTop.Name = "mnuPlateAlignTop";
+            mnuPlateAlignTop.Size = new System.Drawing.Size(209, 22);
+            mnuPlateAlignTop.Text = "Top";
+            mnuPlateAlignTop.Click += AlignTop_Click;
+            //
+            // mnuPlateAlignBottom
+            //
+            mnuPlateAlignBottom.Name = "mnuPlateAlignBottom";
+            mnuPlateAlignBottom.Size = new System.Drawing.Size(209, 22);
+            mnuPlateAlignBottom.Text = "Bottom";
+            mnuPlateAlignBottom.Click += AlignBottom_Click;
+            //
+            // toolStripMenuItem11
+            //
+            toolStripMenuItem11.Name = "toolStripMenuItem11";
+            toolStripMenuItem11.Size = new System.Drawing.Size(206, 6);
+            //
+            // mnuPlateAlignHorizontal
+            //
+            mnuPlateAlignHorizontal.Name = "mnuPlateAlignHorizontal";
+            mnuPlateAlignHorizontal.Size = new System.Drawing.Size(209, 22);
+            mnuPlateAlignHorizontal.Text = "Horizontally";
+            mnuPlateAlignHorizontal.Click += AlignHorizontal_Click;
+            //
+            // mnuPlateAlignVertically
+            //
+            mnuPlateAlignVertically.Name = "mnuPlateAlignVertically";
+            mnuPlateAlignVertically.Size = new System.Drawing.Size(209, 22);
+            mnuPlateAlignVertically.Text = "Vertically";
+            mnuPlateAlignVertically.Click += AlignVertical_Click;
+            //
+            // toolStripMenuItem8
+            //
+            toolStripMenuItem8.Name = "toolStripMenuItem8";
+            toolStripMenuItem8.Size = new System.Drawing.Size(206, 6);
+            //
+            // mnuPlateEvenlySpaceHorizontal
+            //
+            mnuPlateEvenlySpaceHorizontal.Name = "mnuPlateEvenlySpaceHorizontal";
+            mnuPlateEvenlySpaceHorizontal.Size = new System.Drawing.Size(209, 22);
+            mnuPlateEvenlySpaceHorizontal.Text = "Evenly Space Horizontally";
+            mnuPlateEvenlySpaceHorizontal.Click += EvenlySpaceHorizontally_Click;
+            //
+            // mnuPlateEvenlySpaceVertical
+            //
+            mnuPlateEvenlySpaceVertical.Name = "mnuPlateEvenlySpaceVertical";
+            mnuPlateEvenlySpaceVertical.Size = new System.Drawing.Size(209, 22);
+            mnuPlateEvenlySpaceVertical.Text = "Evenly Space Vertically";
+            mnuPlateEvenlySpaceVertical.Click += EvenlySpaceVertically_Click;
+            //
+            // toolStripMenuItem23
+            //
+            toolStripMenuItem23.Name = "toolStripMenuItem23";
+            toolStripMenuItem23.Size = new System.Drawing.Size(206, 6);
+            //
+            // centerPartsToolStripMenuItem
+            //
+            centerPartsToolStripMenuItem.Name = "centerPartsToolStripMenuItem";
+            centerPartsToolStripMenuItem.Size = new System.Drawing.Size(209, 22);
+            centerPartsToolStripMenuItem.Text = "Center Parts";
+            centerPartsToolStripMenuItem.Click += centerPartsToolStripMenuItem_Click;
+            //
+            // toolStripMenuItem24
+            //
+            toolStripMenuItem24.Name = "toolStripMenuItem24";
+            toolStripMenuItem24.Size = new System.Drawing.Size(206, 6);
+            //
+            // mnuPlatePatternTile
+            //
+            mnuPlatePatternTile.Name = "mnuPlatePatternTile";
+            mnuPlatePatternTile.Size = new System.Drawing.Size(209, 22);
+            mnuPlatePatternTile.Text = "Pattern Tile";
+            mnuPlatePatternTile.Click += PatternTile_Click;
+            //
+            // mnuPlateExpandSpacing
+            //
+            mnuPlateExpandSpacing.Name = "mnuPlateExpandSpacing";
+            mnuPlateExpandSpacing.Size = new System.Drawing.Size(209, 22);
+            mnuPlateExpandSpacing.Text = "Expand Spacing";
+            mnuPlateExpandSpacing.Click += ExpandSpacing_Click;
+            //
             // mnuSequenceParts
-            // 
+            //
             mnuSequenceParts.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { autoSequenceCurrentPlateToolStripMenuItem, manualSequenceToolStripMenuItem });
             mnuSequenceParts.Name = "mnuSequenceParts";
             mnuSequenceParts.Size = new System.Drawing.Size(177, 22);
             mnuSequenceParts.Text = "Sequence Parts";
-            // 
+            //
             // autoSequenceCurrentPlateToolStripMenuItem
-            // 
+            //
             autoSequenceCurrentPlateToolStripMenuItem.Name = "autoSequenceCurrentPlateToolStripMenuItem";
             autoSequenceCurrentPlateToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
             autoSequenceCurrentPlateToolStripMenuItem.Text = "Auto Sequence";
             autoSequenceCurrentPlateToolStripMenuItem.Click += AutoSequenceCurrentPlate_Click;
-            // 
+            //
             // manualSequenceToolStripMenuItem
-            // 
+            //
             manualSequenceToolStripMenuItem.Name = "manualSequenceToolStripMenuItem";
             manualSequenceToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
             manualSequenceToolStripMenuItem.Text = "Manual Sequence";
             manualSequenceToolStripMenuItem.Click += ManualSequenceParts_Click;
-            // 
+            //
             // calculateCutTimeToolStripMenuItem1
-            // 
+            //
             calculateCutTimeToolStripMenuItem1.Name = "calculateCutTimeToolStripMenuItem1";
             calculateCutTimeToolStripMenuItem1.Size = new System.Drawing.Size(177, 22);
             calculateCutTimeToolStripMenuItem1.Text = "Calculate Cut Time";
             calculateCutTimeToolStripMenuItem1.Click += CalculatePlateCutTime_Click;
-            // 
-            // centerPartsToolStripMenuItem
-            // 
-            centerPartsToolStripMenuItem.Name = "centerPartsToolStripMenuItem";
-            centerPartsToolStripMenuItem.Size = new System.Drawing.Size(177, 22);
-            centerPartsToolStripMenuItem.Text = "Center Parts";
-            centerPartsToolStripMenuItem.Click += centerPartsToolStripMenuItem_Click;
             //
             // toolStripMenuItem21
             //
@@ -976,6 +976,18 @@
             mnuPlateRemoveLeadIns.Size = new System.Drawing.Size(177, 22);
             mnuPlateRemoveLeadIns.Text = "Remove Lead-ins";
             mnuPlateRemoveLeadIns.Click += PlateRemoveLeadIns_Click;
+            //
+            // toolStripMenuItem20
+            //
+            toolStripMenuItem20.Name = "toolStripMenuItem20";
+            toolStripMenuItem20.Size = new System.Drawing.Size(174, 6);
+            //
+            // mnuPlateViewInCad
+            //
+            mnuPlateViewInCad.Name = "mnuPlateViewInCad";
+            mnuPlateViewInCad.Size = new System.Drawing.Size(177, 22);
+            mnuPlateViewInCad.Text = "View in CAD";
+            mnuPlateViewInCad.Click += OpenInExternalCad_Click;
             //
             // mnuWindow
             // 
@@ -1378,17 +1390,19 @@
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomToPlate;
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomToSelected;
         private System.Windows.Forms.ToolStripMenuItem mnuResizeToFitParts;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsAlign;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsAlignLeft;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsAlignRight;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsAlignTop;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsAlignBottom;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateArrange;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateAlignLeft;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateAlignRight;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateAlignTop;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateAlignBottom;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem11;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsAlignHorizontal;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsAlignVertically;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateAlignHorizontal;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateAlignVertically;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem8;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsEvenlySpaceHorizontal;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsEvenlySpaceVertical;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateEvenlySpaceHorizontal;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateEvenlySpaceVertical;
+        private System.Windows.Forms.ToolStripSeparator toolStripMenuItem23;
+        private System.Windows.Forms.ToolStripSeparator toolStripMenuItem24;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem12;
         private System.Windows.Forms.ToolStripMenuItem mnuNestPost;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem13;
@@ -1424,8 +1438,8 @@
         private System.Windows.Forms.ToolStripMenuItem autoSequenceAllPlatesToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsMeasureArea;
         private System.Windows.Forms.ToolStripMenuItem mnuToolsBestFitViewer;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsPatternTile;
-        private System.Windows.Forms.ToolStripMenuItem mnuToolsExpandSpacing;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlatePatternTile;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlateExpandSpacing;
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;

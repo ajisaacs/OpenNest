@@ -232,9 +232,7 @@ namespace OpenNest.Forms
             mnuNest.Visible = hasValue;
             mnuPlate.Visible = hasValue;
             mnuWindow.Visible = hasValue;
-            mnuToolsAlign.Visible = hasValue;
             mnuToolsMeasureArea.Visible = hasValue;
-            mnuToolsExpandSpacing.Visible = hasValue;
             mnuToolsSaveCurrentAsDefaults.Visible = hasValue;
 
             toolStripMenuItem14.Visible = hasValue;
