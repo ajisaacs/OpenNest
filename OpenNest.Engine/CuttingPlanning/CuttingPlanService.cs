@@ -97,8 +97,11 @@ public static class CuttingPlanService
                 // Exact placed/proposed payloads still use lossless OwnedProgramCopy.
                 var ownedClean = (Program)source.BaseDrawing.Program.Clone();
                 ownedClean.Rotate(source.Rotation - source.BaseDrawing.Program.Rotation);
-                var cleanBounds = ownedClean.BoundingBox();
-                cleanBounds.Offset(source.Location);
+                // Material extent only: remote rapids and scribe marks must not widen it, or a
+                // genuine insert could fail the containment prefilter.
+                var cleanBounds = ExecutionMotionReader.ReadSupported(ownedClean, source.Location, null, token).Motions
+                    .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
+                    .Select(m => m.Curve.ToEntity().BoundingBox).ToList().GetBoundingBox();
                 var location = source.Location;
                 if (request.ConfirmedParameters != null)
                 {

@@ -138,6 +138,22 @@ public class CuttingDependencyTests
     }
 
     [Fact]
+    public void Dependencies_NonmaterialMotionsCannotHideANestedPart()
+    {
+        // Same insert as above plus a remote rapid and scribe mark: material is unchanged, so
+        // the inner-before-host prerequisite must not depend on whole-program bounds.
+        var (plate, host, inner) = NestedPlate(Marked(Rectangle(2.7, 2.7, 0.6, 0.6)));
+        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(plate));
+        Assert.Null(snapshot.Findings.FirstOrDefault()?.Message);
+        Assert.True(inner.BoundingBox.Left < host.BoundingBox.Left);
+
+        Assert.Equal(new[] { 1 }, snapshot.Dependencies.PrerequisitesOf(0));
+        var result = CuttingPlanService.Plan(snapshot);
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.Equal(new[] { inner, host }, result.ProposedOrder.Select(o => o.SourcePart));
+    }
+
+    [Fact]
     public void Capture_PartStraddlingAHostCutoutEdge_IsAmbiguousContainment()
     {
         var (plate, host, inner) = NestedPlate(Rectangle(3.6, 2.8, 0.8, 0.4));
@@ -232,6 +248,23 @@ public class CuttingDependencyTests
         plate.Parts.Add(host);
         plate.Parts.Add(inner);
         return (plate, host, inner);
+    }
+
+    // Prefixes a remote rapid and scribe mark to both the clean and placed programs.
+    private static Part Marked(Part part)
+    {
+        static Program Prefix(Program source)
+        {
+            var program = new Program();
+            program.Codes.Add(new RapidMove(-20, -20));
+            program.Codes.Add(new LinearMove(-19, -20) { Layer = LayerType.Scribe });
+            program.Codes.AddRange(source.Codes);
+            return program;
+        }
+
+        var marked = new Part(new Drawing("same", Prefix(part.BaseDrawing.Program)), part.Location);
+        Assert.True(marked.RestoreLeadInProgram(Prefix(part.Program), false));
+        return marked;
     }
 
     // A U-shaped part open at the top between x 3 and 7, lead on its right edge.
