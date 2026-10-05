@@ -48,20 +48,20 @@ public static class CuttingPlanService
                     throw new NotSupportedException("Cutoff dependency ordering is outside the fixed-program route slice.");
                 // Validate both original graphs before Clone or any virtual transform can
                 // erase unsupported runtime semantics, including fixed/ineligible targets.
-                ValidateCloneGraph(source.BaseDrawing.Program, token);
-                ValidateCloneGraph(source.Program, token);
+                OwnedProgramCopy.Validate(source.BaseDrawing.Program, token);
+                OwnedProgramCopy.Validate(source.Program, token);
                 var clean = ExecutionMotionReader.ReadSupported(source.BaseDrawing.Program, Vector.Zero, null, token);
                 if (!clean.HasCuttingContour)
                     throw new NotSupportedException("Scribe-only or noncutting source drawings are outside this route slice.");
                 var execution = ExecutionMotionReader.ReadSupported(source.Program, source.Location, request.StartPoint, token);
                 if (!execution.HasCuttingContour)
                     throw new ArgumentException("Placed program has no nonzero cutting contour motions.");
-                var ownedProgram = (Program)source.Program.Clone();
+                var ownedProgram = OwnedProgramCopy.Copy(source.Program, token);
                 PreparedContours prepared = null;
                 LeadMaterialSnapshot material = null;
                 if (request.ConfirmedParameters != null)
                 {
-                    var ownedClean = (Program)source.BaseDrawing.Program.Clone();
+                    var ownedClean = OwnedProgramCopy.Copy(source.BaseDrawing.Program, token);
                     ownedClean.Rotate(source.Rotation - source.BaseDrawing.Program.Rotation);
                     material = LeadMaterialSnapshot.Capture(ownedClean, source.Location, token);
                     if (!material.IsComplete)
@@ -269,51 +269,6 @@ public static class CuttingPlanService
             return curve.SameSupport(move.Curve) && curve.Contains(move.Curve.Start)
                 && curve.Contains(move.End) && curve.Contains(move.Curve.Midpoint)
                 && move.Length <= curve.Length + PostVerificationGeometry.Epsilon;
-        }
-    }
-
-    private static void ValidateCloneGraph(Program program, CancellationToken token)
-    {
-        var active = new HashSet<Program>(ReferenceEqualityComparer.Instance);
-        var done = new HashSet<Program>(ReferenceEqualityComparer.Instance);
-        var budget = 1000000;
-        Visit(program);
-        void Visit(Program current)
-        {
-            token.ThrowIfCancellationRequested();
-            if (current == null || active.Contains(current) || active.Count >= 64)
-                throw new ArgumentException("Missing, recursive or excessively nested clone graph.");
-            if (done.Contains(current)) return;
-            // Inactive registered subprograms may be motionless, but Clone still
-            // traverses them. Refuse unknown semantics without invoking virtual Clone.
-            if (current.GetType() != typeof(Program) || !Enum.IsDefined(current.Mode))
-                throw new NotSupportedException("Unsupported program runtime type or mode.");
-            if (current.Codes == null)
-                throw new ArgumentException("Missing clone graph instructions.");
-            active.Add(current);
-            foreach (var code in current.Codes)
-            {
-                token.ThrowIfCancellationRequested();
-                if (--budget < 0)
-                    throw new ArgumentException("Clone graph exceeds the verification limit.");
-                if (code == null)
-                    throw new ArgumentException("Missing clone graph instruction.");
-                var type = code.GetType();
-                if (type != typeof(RapidMove) && type != typeof(LinearMove) && type != typeof(ArcMove)
-                    && type != typeof(SubProgramCall) && type != typeof(Comment) && type != typeof(Feedrate) && type != typeof(Kerf))
-                    throw new NotSupportedException("Unsupported instruction runtime type.");
-                if (code is SubProgramCall call)
-                    Visit(call.Program);
-            }
-            foreach (var child in current.SubPrograms.Values)
-            {
-                token.ThrowIfCancellationRequested();
-                if (--budget < 0)
-                    throw new ArgumentException("Clone graph exceeds the verification limit.");
-                Visit(child);
-            }
-            active.Remove(current);
-            done.Add(current);
         }
     }
 

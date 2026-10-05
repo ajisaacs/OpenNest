@@ -93,9 +93,9 @@ public sealed class FixedProgramPlacement
     public IReadOnlyList<ContourChoice> ContourChoices { get; }
     public bool IsRegenerated => ContourChoices.Count != 0;
     /// <summary>Returns an independent deep copy; never an alias to captured/proposed code.</summary>
-    public Program CopyProgram() => program == null ? null : (Program)program.Clone();
+    public Program CopyProgram() => program == null ? null : OwnedProgramCopy.Copy(program);
     internal FixedProgramPlacement Propose(Program proposed, OwnedExecution execution, IReadOnlyList<ContourChoice> choices) =>
-        new(SourcePart, SourceOrdinal, Location, Rotation, LeadInsLocked, execution, proposed, Prepared, Material, choices);
+        new(SourcePart, SourceOrdinal, Location, Rotation, LeadInsLocked, execution, OwnedProgramCopy.Copy(proposed), Prepared, Material, choices);
 
     public Part SourcePart { get; }
     public int SourceOrdinal { get; }
