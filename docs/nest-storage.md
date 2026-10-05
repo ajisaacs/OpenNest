@@ -4,19 +4,24 @@ The desktop app can save nests two ways:
 
 - **File mode** (default, unchanged behavior): Save/Save As write a `.nest` ZIP
   archive to disk via the normal file dialog. See [nest-file-format.md](nest-file-format.md).
-- **Database mode**: Open browses server records 100 at a time. The filter box
+- **Database mode**: Open browses server records 100 at a time. The Find box
   searches name, customer, material, made by, comments and status on the server
-  after a short typing pause; clicking a column header sorts every match on the
-  server (click again to reverse); Previous/Next move between pages and the
-  status line shows the range and total. Dates and numbers are not searched as
-  text; sort their column instead. Save creates a record on first save and
-  updates that same record afterward. Save As creates a new record (a copy). A failed save keeps
-  the previous record association; switching server URLs creates a record on the
-  new server rather than updating an id from the previous one. Delete in the
-  saved-nest list permanently removes the selected server record after confirmation.
-  A separate **File > Export .nest...** command is always available (in both
-  modes) for producing a local file to share or back up. Export does not change
-  the document's file save path or database record association.
+  after a short typing pause (Enter in the box searches at once); clicking a
+  column header sorts every match on the server (click again to reverse); the
+  arrow buttons move between pages and the title and find bar show the range and
+  total. Dates and numbers are not searched as text; sort their column instead.
+  Below the list, the **Details** tabs show the highlighted nest's plates
+  (duplicates, size, parts, drawings, utilization) and drawings (required, nested,
+  remaining, area); they are read from that nest's archive, which is downloaded
+  shortly after the highlight stops moving. Enter or a double-click opens the
+  highlighted nest and Esc closes. Save creates a record on first save and updates
+  that same record afterward. Save As creates a new record (a copy). A failed save
+  keeps the previous record association; switching server URLs creates a record on
+  the new server rather than updating an id from the previous one. Delete on the
+  Open dialog's right-click menu permanently removes the highlighted server record
+  after confirmation. A separate **File > Export .nest...** command is always
+  available (in both modes) for producing a local file to share or back up. Export
+  does not change the document's file save path or database record association.
 
 The mode and server address are stored per-PC at `%APPDATA%\OpenNest\storage.json`
 (`OpenNest.Data.NestStorageSettings`), defaulting to File mode so existing

@@ -602,7 +602,7 @@ namespace OpenNest.Forms
             try
             {
                 var repository = NestStorage.CreateRepository();
-                using var dlg = new SavedNestsForm(repository);
+                using var dlg = new SavedNestsForm(repository, NestStorage.Settings.ServerUrl);
                 if (dlg.ShowDialog(this) != DialogResult.OK)
                     return;
 
