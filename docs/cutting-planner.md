@@ -38,7 +38,10 @@ Clean geometry accounts for the base program's existing rotation before applying
 placement rotation; placement translation is applied once. Subprogram copying
 must not rotate shared programs through their property setters. No live drawings
 are attached to preview plates, so capture/search do not change quantity accounting.
-The snapshot is historical, not a freshness check against later edits.
+The snapshot is historical, not a freshness check against later edits. Original
+clean and executable graphs are type/mode-checked before cloning can erase unknown
+semantics. Owned copies preserve authored motion feed/exact-stop flags, symbolic
+bindings and shared subprogram identity; unsupported graphs are refused.
 
 ## Search and exact output
 
@@ -70,6 +73,12 @@ unranked fallback or a proof of geometric impossibility.
 
 Selected programs are replayed from the beginning with a fresh checker and fresh
 lead validation, without regenerating them or trusting cached search verdicts.
+Before replay, expected-emission geometry is independently built from the owned
+choices/settings, not from the candidate payload. Replay checks actual selected
+code against it and independently accounts for directed native boundary coverage:
+no partial, duplicated, retraced or reversed cuts, except the exact selected tab.
+Equivalent subdivisions and merged collinear moves remain valid. Captured source
+identity and pose binding use exact scalar bits, not geometric tolerance.
 Arrival positions use actual departures, including lead-outs and subprograms.
 `ProposedOrder` retains source identities/poses; `CopyProgram()` returns an
 independent deep copy of each exact captured/generated program. `ContourChoices`
@@ -100,8 +109,12 @@ sequence positions. A non-ready result contains no proposed order or unsafe fall
 - `Cancelled`: capture, search or replay cancelled without live mutation.
 
 Malformed original executed graphs are refused, not salvaged. Valid but incomplete
-old programs can regenerate from clean geometry. Genuine tab gaps are retained;
-stale tab settings do not establish retention. A lead-out that may bridge a tab or
+old programs can regenerate from clean geometry. Regenerated programs retain genuine
+configured tab gaps; stale tab settings do not establish retention. In confirmed-
+parameters mode, locked/ineligible programs must cover the complete directed clean
+boundary: an open fixed program has no certified selected tab metadata and is refused,
+not repaired, even if it may have been intentionally tabbed. The no-parameter route
+retains its narrower compatibility contract. A lead-out that may bridge a tab or
 an invalid emitted tabbed arc is refused, not automatically repaired.
 
 ## Remaining integration boundaries
