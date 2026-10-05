@@ -1,84 +1,130 @@
-# Fixed-program cutting-route foundation
+# Unified cutting planner: direct-XY proposals
 
-`OpenNest.Engine.CuttingPlanning.CuttingPlanService` currently plans a direct-XY
-route through fixed, contiguous whole-part programs. This is the first foundation
-of the unified cutting planner, not a replacement desktop command or an Apply API.
-Existing desktop sequencing, lead assignment and per-attempt posting review are
-unchanged.
+`OpenNest.Engine.CuttingPlanning.CuttingPlanService` plans contiguous whole-part
+programs. It can retain fixed programs or jointly choose internal contour order,
+entries and whole-part order using explicitly confirmed cutting parameters. It
+returns an owned proposal, not an Apply transaction or a replacement desktop
+command. Existing desktop sequencing, assignment and posting review are unchanged.
 
-## Calling the service
+## Capture before worker planning
 
-Create a `CuttingPlanRequest` from source placements and an explicit modeled start
-point, then call `Capture` while their order, programs and poses are stable. Pass
-the resulting `CuttingPlanSnapshot` to `Plan` on a worker. `Plan(request)` combines
-both steps for synchronous callers. The default start is `Vector.Zero`; this is
-not a discovered controller position. The diagnostic overload
-`PostVerificationAnalyzer.Analyze(nest, startPoint)` uses the same modeled start.
+Create a `CuttingPlanRequest`, then call `Capture` while source placements,
+programs and settings are stable. Pass that snapshot to `Plan` on a worker;
+`Plan(request)` combines these steps synchronously. The modeled starting point
+defaults to `Vector.Zero`, not a discovered controller position.
 
-Capture reads absolute/incremental instructions and shared subprogram calls into
-owned immutable motion values. Placed rotations are already baked into programs;
-placement translation is applied once. It does not clone recursive graphs, rebind
-subcalls through rotating setters, or attach live drawings to preview plates.
-Source `Part` references are identity handles only; worker planning never reads
-their mutable state. A captured snapshot is deliberately historical, not a
-freshness check against later edits.
+```csharp
+var request = new CuttingPlanRequest(parts, startPoint: start,
+    confirmedParameters: parameters, expansionBudget: 20000,
+    maxEntries: 16, preservePartOrder: false);
+var snapshot = CuttingPlanService.Capture(request, cancellationToken);
+var result = CuttingPlanService.Plan(snapshot, cancellationToken);
+```
 
-Both locked and unlocked programs remain fixed. Search changes only the proposed
-whole-part order and never edits source order, programs, settings, locks, poses or
-quantity accounting. Branches are ranked by modeled rapid distance and source
-ordinal, with bounded deterministic backtracking. The expansion budget defaults
-to 20,000 attempted placements. Actual departure motions, including lead-outs and
-subprograms, determine the next approach.
+- Omitting `confirmedParameters` preserves the original fixed-program contract:
+  locked and unlocked programs stay fixed; only whole-part order may change.
+- Supplying confirmed parameters enables regeneration for unlocked placements.
+  `eligibleParts` can restrict it to an explicit reference-based subset; an empty
+  subset retains all programs but still checks their leads against owned material.
+  Locked placements never regenerate. Foreign or duplicate eligible identities
+  are invalid; eligibility without confirmed parameters is invalid.
+- `preservePartOrder` fixes whole-part order, not eligible internal contour choices.
+- Parameters are caller-confirmed inputs. The service does not recover missing
+  operator settings or silently change lead styles to find a solution.
+
+Capture owns clean geometry, placed programs and required settings. Source `Part`
+references are identity handles only: workers never read their mutable state.
+Clean geometry accounts for the base program's existing rotation before applying
+placement rotation; placement translation is applied once. Subprogram copying
+must not rotate shared programs through their property setters. No live drawings
+are attached to preview plates, so capture/search do not change quantity accounting.
+The snapshot is historical, not a freshness check against later edits.
+
+## Search and exact output
+
+With regeneration, the bounded deterministic search considers whole-part order,
+internal contour order and native entry candidates together. Internal contours
+precede their own perimeter; parts remain contiguous. Backtracking can revisit
+an earlier entry when a later part cannot be reached safely.
+
+Candidates use native closest points, vertices, midpoints and circle angles in
+stable order, capped by `maxEntries`. Circle rounding, clamping, corner resolution
+and tab trimming happen during emission. Validation uses the actual emitted
+motions, never the nominal entry point alone. Existing lead styles are not
+shortened, disabled or substituted as a search fallback.
+
+Every candidate rapid is checked against contours already completed, including
+earlier holes in the same part. Future contours are not yet obstacles. Actual
+lead-in and lead-out line/arc paths must stay in target scrap and avoid other
+placed material; holes in other parts remain scrap. Tangent/coincident contacts
+outside the genuine target contour joint and numerically uncertain queries refuse.
+Material capture supports a simple closed perimeter minus disjoint, non-nested
+holes; unsupported topology is not a bounding-box approximation.
+
+Candidates rank by actual modeled rapid distance with stable source/contour/entry
+ordinals. Hash values and drawing names are not tie breakers. The expansion budget
+counts rejected candidates and frontier ranking as well as accepted moves, before
+emission; it is not a wall-clock timeout. Callers can cancel. Exhaustion may occur
+before already-generated siblings are traversed; it returns a refusal, not an
+unranked fallback or a proof of geometric impossibility.
+
+Selected programs are replayed from the beginning with a fresh checker and fresh
+lead validation, without regenerating them or trusting cached search verdicts.
+Arrival positions use actual departures, including lead-outs and subprograms.
+`ProposedOrder` retains source identities/poses; `CopyProgram()` returns an
+independent deep copy of each exact captured/generated program. `ContourChoices`
+are nominal choice metadata, not a substitute for reading actual execution.
+Neither obtaining a proposal nor copying its programs installs them on live parts.
 
 ## Results and refusal
 
-`Ready` means only that every captured placement occurs once and the full
-fixed-program route was replayed with a fresh completed-contour checker without
-rapid, missing-lead or incomplete-motion findings. `IndependentlyReplayed` records
-that replay; it does not certify final NC or machine safety. Result ordinals and
-finding identities refer to the original zero-based source list, not the proposed
-sequence positions.
+`Ready` and `IndependentlyReplayed` describe the modeled proposal only. In the
+no-parameter fixed route, replay checks rapid crossings, missing leads and
+incomplete retention; it does not add regeneration-mode material/lead checks.
+In regeneration mode, replay also checks actual lead paths and contour accounting
+against owned clean material. Neither mode certifies final NC, production cutting
+readiness or physical machine safety.
 
-The checker uses the same native line/arc contact, contour completion and actual
-gap semantics as pre-post diagnostics. Future contours are not yet obstacles;
-completed holes in the same part are obstacles immediately. Stale tab settings
-are not evidence of retention.
+Findings and source ordinals use the original zero-based source list, not proposed
+sequence positions. A non-ready result contains no proposed order or unsafe fallback.
 
-- `ConstraintConflict`: a fixed internal program or all explored whole-part orders
-  violate the modeled route constraints. Reordering cannot repair a fixed rapid
-  crossing its own completed hole.
-- `UnsupportedGeometry`: unsupported motion semantics or incomplete retention
-  checks. Cutoff dependencies and scribe-only drawings are outside this slice.
-- `InvalidInput`: malformed/missing/duplicate placements, empty input, invalid
-  geometry or a nonpositive budget.
-- `NoSolutionWithinBudget`: search reached its bound, not proof that no route exists.
-- `Cancelled`: capture or worker cancellation, with no live mutation.
+- `ConstraintConflict`: fixed programs or explored fixed routing violate the
+  modeled constraints. Locked internal crossings cannot be repaired by regeneration.
+- `UnsupportedGeometry`: unsupported motion/material semantics or an incomplete
+  check. Open nominal outlines, ambiguous release states, cutoff dependencies and
+  scribe-only source drawings are not silently accepted.
+- `InvalidInput`: malformed/missing/duplicate placements or settings, invalid
+  geometry, empty input, invalid eligibility or nonpositive bounds.
+- `NoSolutionWithinBudget`: the bounded/capped search found no complete proposal;
+  it does not prove no possible geometric route exists.
+- `Cancelled`: capture, search or replay cancelled without live mutation.
 
-Every non-ready result has no proposed order and no unsafe fallback.
+Malformed original executed graphs are refused, not salvaged. Valid but incomplete
+old programs can regenerate from clean geometry. Genuine tab gaps are retained;
+stale tab settings do not establish retention. A lead-out that may bridge a tab or
+an invalid emitted tabbed arc is refused, not automatically repaired.
 
-## Limits and next hardening
+## Remaining integration boundaries
 
-This service does not check clean-material overlap, enclosing-hole/insert
-release dependencies, contour coverage against clean geometry, lead paths through
-other material, cutoff order, or physical retention strength. It does not generate
-entries/leads, change internal contour order, install programs atomically, check
-staleness at Apply, write CNC, or set posting consent. A `Ready` fixed-program route
-can still be unsuitable for cutting. Do not apply it as a complete cutting plan.
+The service does not establish clean-material non-overlap, inner-part-before-host
+release dependencies, cutoff order or physical retention strength. It does not
+install programs atomically, check freshness at Apply, write CNC, or set posting
+consent. A `Ready` proposal can still be unsuitable for cutting.
 
-Next slices must add explicit contour emission and lead validation, containment
-and cutoff dependencies, exact freshness/atomic application, then desktop caller
-migration and legacy retirement. Native Windows interaction, supplied-job routing
-coverage and actual posted order remain separate acceptance gates. Fresh
-[pre-post verification](post-verification.md) is still required at posting
-boundaries, and it is not a physical safety qualification.
+Later slices add containment/cutoff dependencies and exact freshness/atomic Apply,
+then desktop integration and legacy automatic-path retirement. Windows interaction,
+supplied-job coverage and actual posted order remain separate acceptance gates.
+Fresh [pre-post verification](post-verification.md) is still required; it is not a
+physical safety qualification.
 
 ## Portable regression gate
 
 ```sh
-dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~CuttingPlanning|FullyQualifiedName~PostVerificationAnalyzerTests'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release --filter 'FullyQualifiedName~CuttingPlanning|FullyQualifiedName~PostVerificationAnalyzerTests'
 ```
 
-The synthetic three-part fixture starts with A,B,C crossing completed A; B,A,C
-replays without findings. Controls cover a locked internal-hole crossing,
-backtracking, native shared-hole motions, bounded refusal, cancellation, immutable
-ownership, source-reference identity and complete-proposal replay rejection.
+Synthetic fixtures exercise whole-part routing and internal-hole crossing repair,
+locked/ineligible refusal, actual native lead paths, shared subprograms, ownership,
+entry/whole-part backtracking, deterministic budgets, cancellation and fresh replay
+rejection. Retained emission characterizations cover styles, winding, corner rules,
+circle rounding/clamping and tabs; unsupported cases remain explicit refusals.
