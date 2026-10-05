@@ -122,8 +122,11 @@ public class ExplicitContourTests
         };
         return new CuttingParameters
         {
-            ExternalLeadIn = lead, InternalLeadIn = lead, ArcCircleLeadIn = lead,
-            ExternalLeadOut = new NoLeadOut(), InternalLeadOut = new NoLeadOut(),
+            ExternalLeadIn = lead,
+            InternalLeadIn = lead,
+            ArcCircleLeadIn = lead,
+            ExternalLeadOut = new NoLeadOut(),
+            InternalLeadOut = new NoLeadOut(),
             PierceClearance = 0.05
         };
     }
