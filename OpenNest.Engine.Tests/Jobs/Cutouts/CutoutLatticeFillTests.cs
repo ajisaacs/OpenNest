@@ -53,6 +53,23 @@ public class CutoutLatticeFillTests
         AssertValidLayout(Ring(), Squares(1, 5), poses);
     }
 
+    // Both cases fail intermittently; unskip when Project Memory opennest issue c98c21bd is fixed.
+    private const string FillNondeterminism = "Open defect (Project Memory opennest c98c21bd): Default Fill can "
+        + "return different, equally scored lattices between identical calls.";
+
+    [Theory]
+    [InlineData(1.0, 1.0, Skip = FillNondeterminism)]
+    [InlineData(1.5, 0.75, Skip = FillNondeterminism)]
+    public void RepeatedCallsReturnIdenticalPoses(double length, double width)
+    {
+        var part = JobBuilder.Part("part", TestShapes.Rectangle(length, width), 100);
+
+        var first = CutoutLatticeFill.Fill(Ring(), 0, part, 100, Spacing);
+        var second = CutoutLatticeFill.Fill(Ring(), 0, part, 100, Spacing);
+
+        Assert.Equal(first, second);
+    }
+
     /// <summary>Places the ring 1" in from the sheet corner, moves the copies with it and runs
     /// the production layout check over the whole sheet.</summary>
     private static void AssertValidLayout(NestJobPart frame, NestJobPart insert, IReadOnlyList<NestJobPlacement> poses)
