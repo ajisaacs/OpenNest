@@ -11,7 +11,8 @@ namespace OpenNest.Engine.CuttingPlanning;
 
 /// <summary>
 /// Caller-side direct-XY input. Regeneration requires explicit confirmed parameters.
-/// Keep sources/settings stable during Capture. This is not an Apply request.
+/// Keep sources/settings stable during Capture. Only plate-scoped requests (<see cref="ForPlate"/>)
+/// record the state that CuttingPlanService.Apply checks; a detached part list cannot be applied.
 /// </summary>
 public sealed class CuttingPlanRequest
 {
@@ -30,19 +31,18 @@ public sealed class CuttingPlanRequest
 
     /// <summary>
     /// Plate scope: plans the plate's current parts and captures its exact state, so a Ready
-    /// result can later be applied through <see cref="CuttingPlanService.Apply"/>.
+    /// result can later be applied through CuttingPlanService.Apply. A factory rather than a
+    /// constructor overload, so <c>new CuttingPlanRequest(null)</c> stays unambiguous.
     /// </summary>
-    public CuttingPlanRequest(Plate plate, Vector startPoint = default, int expansionBudget = 20000,
+    public static CuttingPlanRequest ForPlate(Plate plate, Vector startPoint = default, int expansionBudget = 20000,
         CuttingParameters confirmedParameters = null, IEnumerable<Part> eligibleParts = null,
-        bool preservePartOrder = false, int maxEntries = 16)
-        : this(plate?.Parts, startPoint, expansionBudget, confirmedParameters, eligibleParts,
+        bool preservePartOrder = false, int maxEntries = 16) =>
+        new(plate?.Parts, startPoint, expansionBudget, confirmedParameters, eligibleParts,
             preservePartOrder, maxEntries)
-    {
-        Plate = plate;
-    }
+        { Plate = plate };
 
     /// <summary>The plate scope, or null for a detached part list that cannot be applied.</summary>
-    public Plate Plate { get; }
+    public Plate Plate { get; private init; }
     public CuttingParameters ConfirmedParameters { get; }
     public IReadOnlyList<Part> EligibleParts { get; }
     public bool PreservePartOrder { get; }
@@ -167,8 +167,9 @@ public sealed record CuttingPlanFinding(int? SourceOrdinal, Part SourcePart,
     int? OtherSourceOrdinal, Part OtherSourcePart, PostVerificationKind? Kind, string Message);
 
 /// <summary>
-/// A replayed direct-XY proposal, optionally with regenerated programs. Not physical
-/// safety, posting consent, dependency readiness or an atomic Apply payload. Failures contain no proposals.
+/// A replayed direct-XY proposal, optionally with regenerated programs, that respects the
+/// captured cutoff/containment prerequisites. Not physical safety or posting consent. Apply
+/// installs it only for a plate-scoped request whose plate is unchanged. Failures contain no proposals.
 /// </summary>
 public sealed class CuttingPlanResult
 {

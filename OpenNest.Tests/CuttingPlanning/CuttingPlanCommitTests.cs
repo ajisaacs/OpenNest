@@ -21,7 +21,7 @@ public class CuttingPlanCommitTests
         Assert.Contains(PostVerificationAnalyzer.Analyze(nest, Vector.Zero).Findings,
             f => f.Kind == PostVerificationKind.RapidCrossing);
 
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate));
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate));
         Assert.Equal(CuttingPlanStatus.Ready, result.Status);
         Assert.Equal(parts, plate.Parts); // Planning never mutates.
         var commit = CuttingPlanService.Apply([result]);
@@ -53,7 +53,7 @@ public class CuttingPlanCommitTests
         // capture neither stales the plan nor leaks into what is installed.
         var parameters = ExplicitContourTests.Parameters();
         var length = ((LineLeadIn)parameters.ExternalLeadIn).Length;
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate, confirmedParameters: parameters));
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, confirmedParameters: parameters));
         Assert.Equal(CuttingPlanStatus.Ready, result.Status);
         var proposal = Assert.Single(result.ProposedOrder);
         Assert.True(proposal.IsRegenerated);
@@ -104,7 +104,7 @@ public class CuttingPlanCommitTests
         var cutOff = new CutOff(new Vector(30, 0), CutOffAxis.Vertical);
         plate.CutOffs.Add(cutOff);
         plate.CuttingParameters = new CuttingParameters();
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate));
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate));
         Assert.Equal(CuttingPlanStatus.Ready, result.Status);
         switch (change)
         {
@@ -149,7 +149,7 @@ public class CuttingPlanCommitTests
     public void Apply_MalformedLiveProgram_IsStaleInsteadOfThrowing()
     {
         var (_, plate, parts) = FixedPlate();
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate));
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate));
         Assert.Equal(CuttingPlanStatus.Ready, result.Status);
         parts[1].Program.Codes = null!;
         var events = Watch(plate);
@@ -194,8 +194,8 @@ public class CuttingPlanCommitTests
         fixedPlate.Parts.Add(shared);
         var results = new[]
         {
-            CuttingPlanService.Plan(new CuttingPlanRequest(regenerated, confirmedParameters: parameters)),
-            CuttingPlanService.Plan(new CuttingPlanRequest(fixedPlate))
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(regenerated, confirmedParameters: parameters)),
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(fixedPlate))
         };
         Assert.All(results, r => Assert.Equal(CuttingPlanStatus.Ready, r.Status));
         Assert.True(results[0].ProposedOrder[0].IsRegenerated);
@@ -229,8 +229,8 @@ public class CuttingPlanCommitTests
         var (_, second, secondParts) = FixedPlate();
         var results = new[]
         {
-            CuttingPlanService.Plan(new CuttingPlanRequest(first)),
-            CuttingPlanService.Plan(new CuttingPlanRequest(second))
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(first)),
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(second))
         };
         secondParts[0].LeadInsLocked = true;
         var firstState = PlateCuttingState.Capture(first);
@@ -253,9 +253,9 @@ public class CuttingPlanCommitTests
         var (_, third, thirdPart, thirdParameters) = RegeneratedPlate(Vector.Zero);
         var results = new[]
         {
-            CuttingPlanService.Plan(new CuttingPlanRequest(first)),
-            CuttingPlanService.Plan(new CuttingPlanRequest(second, confirmedParameters: parameters)),
-            CuttingPlanService.Plan(new CuttingPlanRequest(third, confirmedParameters: thirdParameters))
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(first)),
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(second, confirmedParameters: parameters)),
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(third, confirmedParameters: thirdParameters))
         };
         Assert.All(results, r => Assert.Equal(CuttingPlanStatus.Ready, r.Status));
         var states = new[] { first, second, third }.Select(p => PlateCuttingState.Capture(p)).ToArray();
@@ -287,7 +287,7 @@ public class CuttingPlanCommitTests
     public void Apply_CancelledBeforeCommit_ChangesNothing()
     {
         var (_, plate, parts) = FixedPlate();
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate));
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate));
         var state = PlateCuttingState.Capture(plate);
         var events = Watch(plate);
         using var cancel = new CancellationTokenSource();
@@ -308,8 +308,8 @@ public class CuttingPlanCommitTests
         var (_, second, secondParts) = FixedPlate();
         var results = new[]
         {
-            CuttingPlanService.Plan(new CuttingPlanRequest(first)),
-            CuttingPlanService.Plan(new CuttingPlanRequest(second))
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(first)),
+            CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(second))
         };
         var failure = new InvalidOperationException("view refresh");
         var seen = new List<string>();
@@ -339,8 +339,8 @@ public class CuttingPlanCommitTests
         CuttingPlanResult[] results = fault switch
         {
             "detached" => [CuttingPlanService.Plan(new CuttingPlanRequest(parts))],
-            "not-ready" => [CuttingPlanService.Plan(new CuttingPlanRequest(plate, preservePartOrder: true))],
-            "duplicate" => Enumerable.Repeat(CuttingPlanService.Plan(new CuttingPlanRequest(plate)), 2).ToArray(),
+            "not-ready" => [CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, preservePartOrder: true))],
+            "duplicate" => Enumerable.Repeat(CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate)), 2).ToArray(),
             _ => []
         };
         if (fault == "detached")
@@ -357,6 +357,14 @@ public class CuttingPlanCommitTests
     }
 
     [Fact]
+    public void Request_NullDetachedListStaysUnambiguousAndInvalid()
+    {
+        // A plate overload of the constructor made this existing call ambiguous (CS0121).
+        Assert.Equal(CuttingPlanStatus.InvalidInput, CuttingPlanService.Plan(new CuttingPlanRequest(null)).Status);
+        Assert.Equal(CuttingPlanStatus.InvalidInput, CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(null)).Status);
+    }
+
+    [Fact]
     public void Apply_AllPlatesWithEmptySentinel_KeepsSentinelAndPlateList()
     {
         var nest = new Nest();
@@ -370,7 +378,7 @@ public class CuttingPlanCommitTests
         var listChanges = 0;
         manager.PlateListChanged += (_, _) => listChanges++;
         var sentinelEvents = Watch(sentinel);
-        var results = nest.Plates.ToArray().Select(p => CuttingPlanService.Plan(new CuttingPlanRequest(p))).ToArray();
+        var results = nest.Plates.ToArray().Select(p => CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(p))).ToArray();
         Assert.All(results, r => Assert.Equal(CuttingPlanStatus.Ready, r.Status));
         Assert.Empty(results[1].ProposedOrder);
 

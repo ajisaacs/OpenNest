@@ -18,7 +18,7 @@ public class CuttingDependencyTests
     {
         var parameters = ExplicitContourTests.Parameters();
         var (_, plate, p, q, cut) = CutOffPlate(parameters, orphan: false);
-        var request = new CuttingPlanRequest(plate, new Vector(11, 12.5),
+        var request = CuttingPlanRequest.ForPlate(plate, new Vector(11, 12.5),
             confirmedParameters: regenerate ? parameters : null);
         var snapshot = CuttingPlanService.Capture(request);
         Assert.Equal(new[] { 2 }, snapshot.Dependencies.PrerequisitesOf(0));
@@ -43,7 +43,7 @@ public class CuttingDependencyTests
     public void Apply_CutOffReclassifiedAfterPlanning_IsStale()
     {
         var (_, plate, p, q, cut) = CutOffPlate(ExplicitContourTests.Parameters(), orphan: false);
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate, new Vector(11, 12.5)));
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(11, 12.5)));
         Assert.Equal(CuttingPlanStatus.Ready, result.Status);
         cut.BaseDrawing.IsCutOff = false;
 
@@ -57,7 +57,7 @@ public class CuttingDependencyTests
     public void Plan_OrphanedCutOff_PrecedesEveryPart()
     {
         var (_, plate, p, q, cut) = CutOffPlate(ExplicitContourTests.Parameters(), orphan: true);
-        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(plate, new Vector(11, 12.5)));
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate, new Vector(11, 12.5)));
         Assert.Equal(new[] { 2 }, snapshot.Dependencies.PrerequisitesOf(0));
         Assert.Equal(new[] { 2 }, snapshot.Dependencies.PrerequisitesOf(1));
 
@@ -72,7 +72,7 @@ public class CuttingDependencyTests
     {
         var (_, plate, p, _, cut) = CutOffPlate(ExplicitContourTests.Parameters(), orphan: false);
 
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate, new Vector(11, 12.5), preservePartOrder: true));
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(11, 12.5), preservePartOrder: true));
 
         Assert.Equal(CuttingPlanStatus.ConstraintConflict, result.Status);
         Assert.Empty(result.ProposedOrder);
@@ -89,7 +89,7 @@ public class CuttingDependencyTests
     {
         var parameters = ExplicitContourTests.Parameters();
         var (_, plate, _, _, _) = CutOffPlate(parameters, orphan: false);
-        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(plate, new Vector(11, 12.5),
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate, new Vector(11, 12.5),
             confirmedParameters: regenerate ? parameters : null));
         var ready = CuttingPlanService.Plan(snapshot);
         Assert.Equal(CuttingPlanStatus.Ready, ready.Status);
@@ -120,7 +120,7 @@ public class CuttingDependencyTests
     public void Plan_PartInsideAHostCutout_IsCutBeforeTheHost()
     {
         var (plate, host, inner) = NestedPlate(Rectangle(2.7, 2.7, 0.6, 0.6));
-        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(plate));
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate));
         Assert.Equal(new[] { 1 }, snapshot.Dependencies.PrerequisitesOf(0));
         Assert.Empty(snapshot.Dependencies.PrerequisitesOf(1));
 
@@ -129,7 +129,7 @@ public class CuttingDependencyTests
         Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
         Assert.Equal(new[] { inner, host }, result.ProposedOrder.Select(o => o.SourcePart));
 
-        var preserved = CuttingPlanService.Plan(new CuttingPlanRequest(plate, preservePartOrder: true));
+        var preserved = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, preservePartOrder: true));
         Assert.Equal(CuttingPlanStatus.ConstraintConflict, preserved.Status);
         var finding = Assert.Single(preserved.Findings);
         Assert.Same(host, finding.SourcePart);
@@ -143,7 +143,7 @@ public class CuttingDependencyTests
         // Same insert as above plus a remote rapid and scribe mark: material is unchanged, so
         // the inner-before-host prerequisite must not depend on whole-program bounds.
         var (plate, host, inner) = NestedPlate(Marked(Rectangle(2.7, 2.7, 0.6, 0.6)));
-        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(plate));
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate));
         Assert.Null(snapshot.Findings.FirstOrDefault()?.Message);
         Assert.True(inner.BoundingBox.Left < host.BoundingBox.Left);
 
@@ -158,7 +158,7 @@ public class CuttingDependencyTests
     {
         var (plate, host, inner) = NestedPlate(Rectangle(3.6, 2.8, 0.8, 0.4));
 
-        var result = CuttingPlanService.Plan(new CuttingPlanRequest(plate));
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate));
 
         Assert.Equal(CuttingPlanStatus.UnsupportedGeometry, result.Status);
         var finding = Assert.Single(result.Findings);
@@ -177,7 +177,7 @@ public class CuttingDependencyTests
         plate.Parts.Add(host);
         plate.Parts.Add(inner);
 
-        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(plate));
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate));
 
         Assert.Null(snapshot.Findings.FirstOrDefault()?.Message);
         Assert.Empty(snapshot.Dependencies.PrerequisitesOf(0));

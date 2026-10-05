@@ -15,15 +15,15 @@ programs and settings are stable. Pass that snapshot to `Plan` on a worker;
 defaults to `Vector.Zero`, not a discovered controller position.
 
 ```csharp
-var request = new CuttingPlanRequest(plate, startPoint: start,
+var request = CuttingPlanRequest.ForPlate(plate, startPoint: start,
     confirmedParameters: parameters, expansionBudget: 20000,
     maxEntries: 16, preservePartOrder: false);
 var snapshot = CuttingPlanService.Capture(request, cancellationToken);
 var result = CuttingPlanService.Plan(snapshot, cancellationToken);
 ```
 
-- A plate-scoped request plans the plate's current parts and records its exact
-  state for `Apply`. A detached part list (`new CuttingPlanRequest(parts, ...)`)
+- A plate-scoped request (`CuttingPlanRequest.ForPlate`) plans the plate's current
+  parts and records its exact state for `Apply`. A detached part list (`new CuttingPlanRequest(parts, ...)`)
   plans the same way but can never be applied. An empty plate is a Ready no-op.
 - Omitting `confirmedParameters` preserves the original fixed-program contract:
   locked and unlocked programs stay fixed; only whole-part order may change.
