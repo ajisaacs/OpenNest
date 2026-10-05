@@ -63,8 +63,8 @@ the final replay enforce them:
   material for lead validation and, being open cuts, never become rapid obstacles.
   Rapids into and out of them are still checked.
 - A part whose perimeter lies strictly inside a cutout of another part precedes
-  that host. Bounds only select candidate pairs; containment is proven on native
-  clean material. Touching or crossing boundaries, or material that cannot be
+  that host. Material bounds (never rapids or scribe marks) only select candidate
+  pairs; containment is proven on native clean material. Touching or crossing boundaries, or material that cannot be
   captured, refuse as `UnsupportedGeometry` naming both parts. A part in a concave
   pocket outside the host's material has no dependency.
 - A preserved manual order that violates a prerequisite, or a cycle, is a
@@ -156,11 +156,15 @@ var commit = CuttingPlanService.Apply(results, cancellationToken); // one result
 Call it on the thread that owns the plates, with Ready, independently replayed
 results from plate-scoped requests; anything else is `InvalidInput`. Apply never
 replans. Each plate is compared exactly with the state captured with its request:
-part list instance and order, plate quantity/size/quadrant, cutoff definitions,
-and for every part its program reference and exact content (an in-place edit
-counts), drawing program, pose bits, lead-in/lock flags, settings reference and
-bounds. Any difference on any plate returns `Stale` and changes nothing; a result
-can therefore be applied at most once.
+part list instance and order, plate quantity/size/quadrant and settings, cutoff
+definitions, and for every part its program reference and exact content (an
+in-place edit counts), drawing program and cutoff classification, pose bits,
+lead-in/lock flags, settings (reference and exact content) and bounds. Any
+difference on any plate returns `Stale` and changes nothing, so a proposal that
+changes a plate can be applied once; an unchanged (no-op) proposal stays current.
+A malformed live program is also `Stale`, not an exception. A part repeated on
+two plates of one scope is `InvalidInput`. Caller-confirmed planning settings are
+input, not plate state: editing them after capture does not stale the result.
 
 The whole scope is validated and its bounds staged first; cancellation is checked
 immediately before the install. Order changes through `ObservableList.Reorder`
@@ -169,7 +173,9 @@ sentinel plates and plate lists are untouched. Regenerated parts receive a fresh
 owned copy of the replayed program and of the settings captured with the request,
 keep their pose and lock, and are marked as having lead-ins. Fixed programs are
 not replaced. An exception during install restores every plate exactly and returns
-`Failed`. After the whole scope is installed, each changed plate raises
+`Failed`. The installer itself is internal: it trusts these owned payloads and
+checks only root program references, so `CuttingPlanService.Apply` is the only
+public path. After the whole scope is installed, each changed plate raises
 `Plate.PartsReordered` once; an observer exception is reported in `RefreshErrors`
 on an `Applied` result, not as a rollback.
 
