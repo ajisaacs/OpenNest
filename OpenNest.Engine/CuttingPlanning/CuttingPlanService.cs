@@ -190,8 +190,9 @@ public static class CuttingPlanService
         {
             token.ThrowIfCancellationRequested();
             var source = snapshot.Placements[proposal.SourceOrdinal];
-            if (!ReferenceEquals(source.SourcePart, proposal.SourcePart) || source.Location != proposal.Location
-                || source.Rotation != proposal.Rotation || source.LeadInsLocked != proposal.LeadInsLocked
+            if (!ReferenceEquals(source.SourcePart, proposal.SourcePart)
+                || !SameBits(source.Location.X, proposal.Location.X) || !SameBits(source.Location.Y, proposal.Location.Y)
+                || !SameBits(source.Rotation, proposal.Rotation) || source.LeadInsLocked != proposal.LeadInsLocked
                 || !ReferenceEquals(source.Prepared, proposal.Prepared) || !ReferenceEquals(source.Material, proposal.Material)
                 || snapshot.PreservePartOrder && proposal.SourceOrdinal != order.TakeWhile(p => !ReferenceEquals(p, proposal)).Count())
                 return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
@@ -271,6 +272,9 @@ public static class CuttingPlanService
                 && move.Length <= curve.Length + PostVerificationGeometry.Epsilon;
         }
     }
+
+    private static bool SameBits(double source, double proposed) =>
+        BitConverter.DoubleToInt64Bits(source) == BitConverter.DoubleToInt64Bits(proposed);
 
     private static IEnumerable<CuttingPlanFinding> Map(CuttingPlanSnapshot snapshot,
         IEnumerable<PostVerificationFinding> findings) => findings.Select(finding =>
