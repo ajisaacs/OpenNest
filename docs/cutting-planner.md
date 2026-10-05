@@ -166,12 +166,14 @@ A malformed live program is also `Stale`, not an exception. A part repeated on
 two plates of one scope is `InvalidInput`. Caller-confirmed planning settings are
 input, not plate state: editing a separate confirmed-settings object after
 capture does not stale the result (confirmed settings that are also a part's or
-the plate's live settings are live state, and editing them does). Settings state
-whose exact capture would require executing foreign code — custom property
-getters, behavioral enumerables, structures beyond the capture limits — is
-recorded as refused at capture: the plate stays plannable, but every commit
-against it reports `Stale`, and capture or commit never runs or enumerates
-foreign code.
+the plate's live settings are live state, and editing them does). Settings are
+compared member by member, and only the exact built-in settings types are
+supported (the same set regeneration copies): a plate-scoped request whose part
+or plate settings, or any lead-in, lead-out, tab, sequencing or assignment
+object inside them, is another type (a subclass included) returns
+`UnsupportedGeometry` without running that type's code. A settings object
+replaced by such a type after capture makes `Apply` return `Stale`. Detached
+part-list requests do not capture settings and are unaffected.
 
 The whole scope is validated and its bounds staged first; cancellation is checked
 immediately before the install. Order changes through `ObservableList.Reorder`
