@@ -50,6 +50,27 @@ flags, symbolic bindings and shared subprogram identity; unsupported graphs are
 refused. The geometry-only clean transform uses per-parent copies so legacy rotation
 does not visit a globally shared descendant twice; it never changes the fixed payload.
 
+## Cutting dependencies
+
+Capture builds whole-part prerequisites from owned values, and both the search and
+the final replay enforce them:
+
+- A cutoff precedes every part its nominal line crosses within its span, using the
+  same rule as automatic sequencing: nominal position and limits against the part's
+  placed bounds, matched by drawing reference, never by name or trimmed segments. A
+  cutoff whose definition is missing precedes every part. Cutoffs need a
+  plate-scoped request; they are always fixed programs, need no lead-in, are not
+  material for lead validation and, being open cuts, never become rapid obstacles.
+  Rapids into and out of them are still checked.
+- A part whose perimeter lies strictly inside a cutout of another part precedes
+  that host. Bounds only select candidate pairs; containment is proven on native
+  clean material. Touching or crossing boundaries, or material that cannot be
+  captured, refuse as `UnsupportedGeometry` naming both parts. A part in a concave
+  pocket outside the host's material has no dependency.
+- A preserved manual order that violates a prerequisite, or a cycle, is a
+  `ConstraintConflict`. Replay rechecks the captured prerequisites and refuses a
+  violating order rather than trusting the search.
+
 ## Search and exact output
 
 With regeneration, the bounded deterministic search considers whole-part order,
@@ -107,8 +128,8 @@ sequence positions. A non-ready result contains no proposed order or unsafe fall
 - `ConstraintConflict`: fixed programs or explored fixed routing violate the
   modeled constraints. Locked internal crossings cannot be repaired by regeneration.
 - `UnsupportedGeometry`: unsupported motion/material semantics or an incomplete
-  check. Open nominal outlines, ambiguous release states, cutoff dependencies and
-  scribe-only source drawings are not silently accepted.
+  check. Open nominal outlines, ambiguous release states or containment, cutoffs
+  in a detached part list and scribe-only source drawings are not silently accepted.
 - `InvalidInput`: malformed/missing/duplicate placements or settings, invalid
   geometry, empty input, invalid eligibility or nonpositive bounds.
 - `NoSolutionWithinBudget`: the bounded/capped search found no complete proposal;
@@ -154,13 +175,12 @@ on an `Applied` result, not as a rollback.
 
 ## Remaining integration boundaries
 
-The service does not establish clean-material non-overlap, inner-part-before-host
-release dependencies, cutoff order or physical retention strength. It does not
-write CNC or set posting consent. A `Ready` proposal can still be unsuitable for
-cutting.
+The service does not establish clean-material non-overlap, scrap release by open
+cutoff cuts or sheet edges, or physical retention strength. It does not write CNC
+or set posting consent. A `Ready` proposal can still be unsuitable for cutting.
 
-Later slices add containment/cutoff dependencies, then desktop integration
-(including `PartsReordered` refresh hooks) and legacy automatic-path retirement. Windows interaction,
+Later slices add desktop integration (including `PartsReordered` refresh hooks)
+and legacy automatic-path retirement. Windows interaction,
 supplied-job coverage and actual posted order remain separate acceptance gates.
 Fresh [pre-post verification](post-verification.md) is still required; it is not a
 physical safety qualification.

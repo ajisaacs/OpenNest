@@ -21,7 +21,14 @@ public sealed class ReleasedContourState
 
     /// <summary>Consumes one whole owned program; part numbers are caller identity keys.</summary>
     public IReadOnlyList<PostVerificationFinding> Check(OwnedExecution execution, Vector? arrival,
-        int partNumber, CancellationToken token = default)
+        int partNumber, CancellationToken token = default) => Check(execution, arrival, partNumber, false, token);
+
+    /// <summary>
+    /// As the analyzer does for cutoffs: rapids are checked, but cutoff cuts need no lead-in and,
+    /// being open, never become obstacles.
+    /// </summary>
+    public IReadOnlyList<PostVerificationFinding> Check(OwnedExecution execution, Vector? arrival,
+        int partNumber, bool cutoff, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(execution);
         if (arrival is { } point)
@@ -29,7 +36,7 @@ public sealed class ReleasedContourState
         var moves = execution.Motions.ToArray();
         moves[0] = moves[0].WithStart(arrival);
         var findings = new List<PostVerificationFinding>();
-        AnalyzeMoves(moves, false, findings, 1, partNumber, token);
+        AnalyzeMoves(moves, cutoff, findings, 1, partNumber, token);
         return findings.AsReadOnly();
     }
 

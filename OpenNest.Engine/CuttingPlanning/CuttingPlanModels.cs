@@ -60,11 +60,12 @@ public sealed class CuttingPlanSnapshot
         int expansionBudget, CuttingPlanStatus? failure = null, IEnumerable<CuttingPlanFinding> findings = null,
         bool regeneration = false, bool preservePartOrder = false, int maxEntries = 16,
         Action<int> expansionObserver = null, PlateCuttingState plateState = null,
-        CuttingParameters ownedParameters = null)
+        CuttingParameters ownedParameters = null, CuttingDependencyGraph dependencies = null)
     {
         PlateState = plateState;
         OwnedParameters = ownedParameters;
         Placements = Array.AsReadOnly(placements.ToArray());
+        Dependencies = dependencies ?? CuttingDependencyGraph.Empty(Placements.Count);
         StartPoint = startPoint;
         ExpansionBudget = expansionBudget;
         Failure = failure;
@@ -75,6 +76,8 @@ public sealed class CuttingPlanSnapshot
         ExpansionObserver = expansionObserver;
     }
 
+    /// <summary>Whole-part prerequisites by source ordinal (cutoffs, inner parts before hosts).</summary>
+    internal CuttingDependencyGraph Dependencies { get; }
     /// <summary>Exact captured plate state for plate-scoped requests; null for detached part lists.</summary>
     internal PlateCuttingState PlateState { get; }
     /// <summary>Owned copy of the confirmed parameters taken at capture; never the caller's object.</summary>
@@ -135,8 +138,11 @@ public sealed class FixedProgramPlacement
         }
         return new(SourcePart, SourceOrdinal, Location, Rotation, LeadInsLocked, execution,
             OwnedProgramCopy.Copy(proposed, token), Prepared, Material, choices)
-        { SelectedProgram = selected };
+        { SelectedProgram = selected, IsCutOff = IsCutOff };
     }
+
+    /// <summary>A cutoff: always a fixed open-cut program, never material or regenerated.</summary>
+    public bool IsCutOff { get; internal init; }
 
     public Part SourcePart { get; }
     public int SourceOrdinal { get; }

@@ -44,6 +44,12 @@ public static class CuttingPlanService
                     if (part == null || !request.Parts.Any(p => ReferenceEquals(p, part)) || !eligible.Add(part))
                         throw new ArgumentException("Foreign or duplicate eligible placement.");
             }
+            // Cutoff definitions by drawing reference, as automatic sequencing matches them.
+            var definitions = new Dictionary<Drawing, CutOff>(ReferenceEqualityComparer.Instance);
+            foreach (var cutOff in request.Plate?.CutOffs ?? [])
+                if (cutOff?.Drawing != null)
+                    definitions[cutOff.Drawing] = cutOff;
+            var nodes = new List<DependencyNode>();
             // Reuse the reader's coordinate validation without publishing its native kernel.
             var identities = new HashSet<Part>(ReferenceEqualityComparer.Instance);
             for (var index = 0; index < request.Parts.Count; index++)
@@ -54,12 +60,28 @@ public static class CuttingPlanService
                 if (source?.BaseDrawing == null || source.Program == null || !double.IsFinite(source.Rotation)
                     || !identities.Add(source))
                     throw new ArgumentException("Missing/duplicate source placement or invalid pose.");
-                if (source.BaseDrawing.IsCutOff)
-                    throw new NotSupportedException("Cutoff dependency ordering is outside the fixed-program route slice.");
                 // Validate both original graphs before Clone or any virtual transform can
                 // erase unsupported runtime semantics, including fixed/ineligible targets.
                 OwnedProgramCopy.Validate(source.BaseDrawing.Program, token);
                 OwnedProgramCopy.Validate(source.Program, token);
+                if (source.BaseDrawing.IsCutOff)
+                {
+                    // A cutoff is a fixed open cut: never material, never regenerated.
+                    if (request.Plate == null)
+                        throw new NotSupportedException("Cutoff dependencies require a plate-scoped request.");
+                    if (eligible.Contains(source))
+                        throw new ArgumentException("A cutoff cannot be eligible for regeneration.");
+                    var cut = ExecutionMotionReader.ReadSupported(source.Program, source.Location, request.StartPoint, token);
+                    if (!cut.HasCuttingContour)
+                        throw new ArgumentException("Placed cutoff program has no nonzero cutting motions.");
+                    nodes.Add(new(true, definitions.TryGetValue(source.BaseDrawing, out var definition)
+                        ? new(definition.Axis, definition.Position, definition.StartLimit, definition.EndLimit) : null,
+                        source.BoundingBox, null, null));
+                    placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
+                        cut, OwnedProgramCopy.Copy(source.Program, token))
+                    { IsCutOff = true });
+                    continue;
+                }
                 var clean = ExecutionMotionReader.ReadSupported(source.BaseDrawing.Program, Vector.Zero, null, token);
                 if (!clean.HasCuttingContour)
                     throw new NotSupportedException("Scribe-only or noncutting source drawings are outside this route slice.");
@@ -69,34 +91,51 @@ public static class CuttingPlanService
                 var ownedProgram = OwnedProgramCopy.Copy(source.Program, token);
                 PreparedContours prepared = null;
                 LeadMaterialSnapshot material = null;
+                // Geometry-only transform: original graphs were strictly validated and
+                // clone expansion bounded above. Legacy Rotate visits per parent, so
+                // retain Clone's per-parent sharing here instead of restoring diamonds.
+                // Exact placed/proposed payloads still use lossless OwnedProgramCopy.
+                var ownedClean = (Program)source.BaseDrawing.Program.Clone();
+                ownedClean.Rotate(source.Rotation - source.BaseDrawing.Program.Rotation);
+                var cleanBounds = ownedClean.BoundingBox();
+                cleanBounds.Offset(source.Location);
+                var location = source.Location;
                 if (request.ConfirmedParameters != null)
                 {
-                    // Geometry-only transform: original graphs were strictly validated and
-                    // clone expansion bounded above. Legacy Rotate visits per parent, so
-                    // retain Clone's per-parent sharing here instead of restoring diamonds.
-                    // Exact placed/proposed payloads still use lossless OwnedProgramCopy.
-                    var ownedClean = (Program)source.BaseDrawing.Program.Clone();
-                    ownedClean.Rotate(source.Rotation - source.BaseDrawing.Program.Rotation);
-                    material = LeadMaterialSnapshot.Capture(ownedClean, source.Location, token);
+                    material = LeadMaterialSnapshot.Capture(ownedClean, location, token);
                     if (!material.IsComplete)
                         throw new NotSupportedException(material.Reason);
                     if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
                         prepared = PreparedContours.Capture(ownedClean, request.ConfirmedParameters, token);
                 }
+                var captured = material;
+                // Fixed-route material is captured only for a pair whose bounds admit containment.
+                nodes.Add(new(false, null, source.BoundingBox, cleanBounds,
+                    () => captured ?? LeadMaterialSnapshot.Capture(ownedClean, location, token)));
                 placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
                     execution, ownedProgram, prepared, material));
             }
             // The start can be invalid even when the first rapid has no cutting geometry.
             placements[0].Execution.RapidDistanceFrom(request.StartPoint);
+            source = null;
+            ordinal = null;
+            var dependencies = CuttingDependencyGraph.Build(nodes, request.Plate?.BoundingBox(includeParts: false), token);
             return new(placements, request.StartPoint, request.ExpansionBudget, regeneration: request.ConfirmedParameters != null,
                 preservePartOrder: request.PreservePartOrder, maxEntries: request.MaxEntries,
                 expansionObserver: request.ExpansionObserver, plateState: plateState,
                 ownedParameters: request.ConfirmedParameters == null ? null
-                    : OwnedCuttingParameters.Copy(request.ConfirmedParameters));
+                    : OwnedCuttingParameters.Copy(request.ConfirmedParameters),
+                dependencies: dependencies);
         }
         catch (OperationCanceledException)
         {
             return Failure(CuttingPlanStatus.Cancelled, "Capture cancelled.");
+        }
+        catch (CuttingDependencyException exception)
+        {
+            var other = exception.Other is { } index ? request.Parts[index] : null;
+            return new(placements, request.StartPoint, request.ExpansionBudget, exception.Status,
+                [new(exception.Ordinal, request.Parts[exception.Ordinal], exception.Other, other, null, exception.Message)]);
         }
         catch (NotSupportedException exception)
         {
@@ -172,6 +211,10 @@ public static class CuttingPlanService
         if (snapshot.Placements.Count == 0)
             return snapshot.PlateState == null ? new(CuttingPlanStatus.InvalidInput)
                 : new(CuttingPlanStatus.Ready, independentlyReplayed: true); // Empty plate: unchanged no-op.
+        if (snapshot.PreservePartOrder
+            && snapshot.Dependencies.FirstViolation(Enumerable.Range(0, snapshot.Placements.Count).ToArray()) is { } manual)
+            return new(CuttingPlanStatus.ConstraintConflict,
+                findings: [DependencyFinding(snapshot, manual, "The preserved part order")]);
         try
         {
             var fixedFindings = new List<CuttingPlanFinding>();
@@ -182,7 +225,7 @@ public static class CuttingPlanService
                     continue; // An eligible old crossing is precisely what regeneration may repair.
                 // Ignore only the unknown incoming rapid. Every fixed internal motion is checked.
                 var findings = new ReleasedContourState().Check(placement.Execution, null,
-                    placement.SourceOrdinal + 1, token);
+                    placement.SourceOrdinal + 1, placement.IsCutOff, token);
                 fixedFindings.AddRange(Map(snapshot, findings));
             }
             if (fixedFindings.Count != 0)
@@ -215,6 +258,10 @@ public static class CuttingPlanService
         if (order.Count != snapshot.Placements.Count || order.Distinct().Count() != order.Count
             || order.Any(index => index < 0 || index >= snapshot.Placements.Count))
             return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
+        // Dependencies are rechecked from the captured graph, not trusted from the search.
+        if (snapshot.Dependencies.FirstViolation(order) is { } violation)
+            return new(CuttingPlanStatus.InvalidInput,
+                findings: [DependencyFinding(snapshot, violation, "The proposed order")], expansions: expansions);
         var checker = new ReleasedContourState();
         var position = snapshot.StartPoint;
         var distance = 0.0;
@@ -223,7 +270,8 @@ public static class CuttingPlanService
         {
             token.ThrowIfCancellationRequested();
             var placement = snapshot.Placements[index];
-            findings.AddRange(checker.Check(placement.Execution, position, placement.SourceOrdinal + 1, token));
+            findings.AddRange(checker.Check(placement.Execution, position, placement.SourceOrdinal + 1,
+                placement.IsCutOff, token));
             distance += placement.Execution.RapidDistanceFrom(position);
             position = placement.Execution.DeparturePoint;
         }
@@ -245,11 +293,14 @@ public static class CuttingPlanService
             || order.Any(p => p == null || p.SourceOrdinal < 0 || p.SourceOrdinal >= snapshot.Placements.Count)
             || order.Select(p => p.SourceOrdinal).Distinct().Count() != order.Count)
             return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
+        if (snapshot.Dependencies.FirstViolation(order.Select(p => p.SourceOrdinal).ToArray()) is { } violation)
+            return new(CuttingPlanStatus.InvalidInput,
+                findings: [DependencyFinding(snapshot, violation, "The proposed order")], expansions: expansions);
         var checker = new ReleasedContourState();
         var position = snapshot.StartPoint;
         var distance = 0.0;
         var findings = new List<CuttingPlanFinding>();
-        var materials = snapshot.Placements.Select(p => p.Material).ToArray();
+        var materials = snapshot.Placements.Where(p => !p.IsCutOff).Select(p => p.Material).ToArray();
         foreach (var proposal in order)
         {
             token.ThrowIfCancellationRequested();
@@ -258,6 +309,7 @@ public static class CuttingPlanService
                 || !SameBits(source.Location.X, proposal.Location.X) || !SameBits(source.Location.Y, proposal.Location.Y)
                 || !SameBits(source.Rotation, proposal.Rotation) || source.LeadInsLocked != proposal.LeadInsLocked
                 || !ReferenceEquals(source.Prepared, proposal.Prepared) || !ReferenceEquals(source.Material, proposal.Material)
+                || source.IsCutOff != proposal.IsCutOff
                 || snapshot.PreservePartOrder && proposal.SourceOrdinal != order.TakeWhile(p => !ReferenceEquals(p, proposal)).Count())
                 return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
             if (source.Prepared == null)
@@ -273,7 +325,9 @@ public static class CuttingPlanService
             try
             {
                 execution = ExecutionMotionReader.Read(proposal.CopyProgram(), proposal.Location, position, token);
-                complete = ContourProgramVerifier.Verify(execution, source.Material, proposal.SelectedProgram, token);
+                // A cutoff is an open cut with no material; it is retained exactly (checked above).
+                complete = source.IsCutOff
+                    || ContourProgramVerifier.Verify(execution, source.Material, proposal.SelectedProgram, token);
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
             {
@@ -281,8 +335,9 @@ public static class CuttingPlanService
                     findings: [JointCuttingPlanSearch.Finding(source, PostVerificationKind.Incomplete, ex.Message)], expansions: expansions);
             }
             findings.AddRange(JointCuttingPlanSearch.Map(snapshot,
-                checker.Check(execution, position, source.SourceOrdinal + 1, token)));
-            var lead = LeadPathValidator.Check(execution, source.Material, materials, token);
+                checker.Check(execution, position, source.SourceOrdinal + 1, source.IsCutOff, token)));
+            var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
+                : LeadPathValidator.Check(execution, source.Material, materials, token);
             if (!lead.IsComplete || !lead.IsClear)
                 findings.Add(JointCuttingPlanSearch.Finding(source,
                     lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
@@ -301,6 +356,16 @@ public static class CuttingPlanService
                 findings: findings, expansions: expansions);
         return new(CuttingPlanStatus.Ready, order, expansions: expansions,
             rapidDistance: distance, independentlyReplayed: true);
+    }
+
+    private static CuttingPlanFinding DependencyFinding(CuttingPlanSnapshot snapshot,
+        (int Part, int Prerequisite) violation, string subject)
+    {
+        var part = snapshot.Placements[violation.Part];
+        var prerequisite = snapshot.Placements[violation.Prerequisite];
+        var reason = prerequisite.IsCutOff ? "the cutoff crossing it" : "the part nested in its cutout";
+        return new(part.SourceOrdinal, part.SourcePart, prerequisite.SourceOrdinal, prerequisite.SourcePart, null,
+            $"{subject} cuts part {part.SourceOrdinal + 1} before {reason} (part {prerequisite.SourceOrdinal + 1}).");
     }
 
     private static bool SameBits(double source, double proposed) =>

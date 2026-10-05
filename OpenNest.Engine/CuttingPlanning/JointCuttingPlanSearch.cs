@@ -19,7 +19,7 @@ internal static class JointCuttingPlanSearch
     {
         var expansions = 0;
         var rejected = new List<CuttingPlanFinding>();
-        var materials = snapshot.Placements.Select(p => p.Material).ToArray();
+        var materials = snapshot.Placements.Where(p => !p.IsCutOff).Select(p => p.Material).ToArray();
         var stack = new Stack<Frame>();
         stack.Push(new(new([], snapshot.StartPoint, new ReleasedContourState(), null)));
         try
@@ -60,6 +60,7 @@ internal static class JointCuttingPlanSearch
         {
             var sources = node.Active is { } active ? new[] { active.Source }
                 : snapshot.Placements.Where(p => !node.Order.Any(o => o.SourceOrdinal == p.SourceOrdinal)
+                    && snapshot.Dependencies.IsReady(p.SourceOrdinal, node.Order.Select(o => o.SourceOrdinal).ToArray())
                     && (!snapshot.PreservePartOrder || p.SourceOrdinal == node.Order.Length));
             foreach (var source in sources)
             {
@@ -129,9 +130,11 @@ internal static class JointCuttingPlanSearch
 
         bool Check(FixedProgramPlacement source, OwnedExecution execution, Vector arrival, ReleasedContourState checker)
         {
-            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, token);
+            var findings = checker.Check(execution, arrival, source.SourceOrdinal + 1, source.IsCutOff, token);
             rejected.AddRange(Map(snapshot, findings));
-            var lead = LeadPathValidator.Check(execution, source.Material, materials, token);
+            // A fixed cutoff has no material or leads to certify; its rapids are still checked.
+            var lead = source.IsCutOff ? new LeadPathValidationResult(true, true, null)
+                : LeadPathValidator.Check(execution, source.Material, materials, token);
             if (!lead.IsComplete || !lead.IsClear)
                 rejected.Add(Finding(source, lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
             return findings.Count == 0 && lead.IsComplete && lead.IsClear;

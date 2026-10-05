@@ -36,7 +36,8 @@ internal static class FixedProgramSearch
             expansions++;
             var placement = snapshot.Placements[candidate];
             var checker = frame.Checker.Copy();
-            var findings = checker.Check(placement.Execution, frame.Position, placement.SourceOrdinal + 1, token);
+            var findings = checker.Check(placement.Execution, frame.Position, placement.SourceOrdinal + 1,
+                placement.IsCutOff, token);
             if (findings.Count != 0)
             {
                 rejected.UnionWith(findings);
@@ -48,6 +49,7 @@ internal static class FixedProgramSearch
 
         Frame Create(int[] order, Vector position, ReleasedContourState checker) => new(order, position, checker,
             Enumerable.Range(0, snapshot.Placements.Count).Where(index => !order.Contains(index)
+                    && snapshot.Dependencies.IsReady(index, order)
                     && (!snapshot.PreservePartOrder || index == order.Length))
                 .OrderBy(index => snapshot.Placements[index].Execution.RapidDistanceFrom(position))
                 .ThenBy(index => snapshot.Placements[index].SourceOrdinal).ToArray());
