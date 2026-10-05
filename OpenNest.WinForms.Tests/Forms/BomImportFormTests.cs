@@ -76,6 +76,30 @@ public class BomImportFormTests
         });
     }
 
+    [Theory]
+    [InlineData("colQty", "0")]
+    [InlineData("colQty", "abc")]
+    [InlineData("colThickness", "-1")]
+    [InlineData("colThickness", "abc")]
+    public void ProgrammaticCommitOfInvalidText_KeepsTheRowsValue(string column, string text)
+    {
+        RunSta(() =>
+        {
+            using var form = Show(out var parts);
+            var part = Ready("PT01", qty: 2);
+            form.LoadRows(new[] { part });
+
+            parts.CurrentCell = parts.Rows[0].Cells[column];
+            Assert.True(parts.BeginEdit(selectAll: true));
+            parts.EditingControl!.Text = text;
+            Assert.True(parts.EndEdit());
+
+            Assert.Equal(2, part.Qty);
+            Assert.Equal(0.25, part.Thickness);
+            Assert.Equal(BomRowStatus.Ready, part.Status);
+        });
+    }
+
     [Fact]
     public void Edits_ChangeThePartShownInThatRow_AfterTheRowsAreReloadedInAnotherOrder()
     {
@@ -131,7 +155,7 @@ public class BomImportFormTests
             form.LoadRows(new[] { first, second });
 
             Assert.True(Edit(parts, 0, "colMaterial", " "));
-            Assert.Null(first.Material);
+            Assert.Equal("", first.Material);
             Assert.Equal("Needs material", parts.Rows[0].Cells["colStatus"].Value);
 
             Assert.False(Edit(parts, 1, "colThickness", "abc"));
@@ -156,12 +180,22 @@ public class BomImportFormTests
         return form;
     }
 
+    /// <summary>
+    /// Types <paramref name="text"/> into the cell and presses Enter, which
+    /// validates the cell the way the operator's commit does. Returns true
+    /// when the edit was accepted (the cell left edit mode).
+    /// </summary>
     private static bool Edit(DataGridView grid, int row, string column, string text)
     {
         grid.CurrentCell = grid.Rows[row].Cells[column];
         Assert.True(grid.BeginEdit(selectAll: true));
         grid.EditingControl!.Text = text;
-        return grid.EndEdit();
+        var processEnterKey = typeof(DataGridView).GetMethod(
+            "ProcessEnterKey",
+            BindingFlags.Instance | BindingFlags.NonPublic
+        )!;
+        processEnterKey.Invoke(grid, new object[] { Keys.Enter });
+        return !grid.IsCurrentCellInEditMode;
     }
 
     private static DataTable GroupsTable(BomImportForm form) =>

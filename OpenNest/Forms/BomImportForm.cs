@@ -181,7 +181,7 @@ namespace OpenNest.Forms
                 error = "Enter a whole number of 1 or more.";
             else if (
                 e.ColumnIndex == colThickness.Index
-                && !string.IsNullOrWhiteSpace(text)
+                && !string.IsNullOrEmpty(text)
                 && !TryParseThickness(text, out _)
             )
                 error = "Enter a thickness greater than 0, or leave it blank.";
@@ -191,25 +191,40 @@ namespace OpenNest.Forms
                 e.Cancel = true;
         }
 
+        // CellValidating refuses bad text when the operator commits a cell. A
+        // programmatic EndEdit() skips validation, so parsing keeps the row's
+        // current value rather than storing text validation would refuse. The
+        // grid ignores a null parsed value, so a blank thickness is left to the
+        // column's DataSourceNullValue (null).
         private void DgvParts_CellParsing(object sender, DataGridViewCellParsingEventArgs e)
         {
-            var text = e.Value?.ToString();
+            var text = e.Value?.ToString() ?? "";
+            var part = PartAt(e.RowIndex);
 
-            if (e.ColumnIndex == colQty.Index && BomQuantity.TryParse(text, out var qty))
+            if (e.ColumnIndex == colQty.Index)
             {
-                e.Value = qty;
-                e.ParsingApplied = true;
+                if (BomQuantity.TryParse(text, out var qty))
+                    Parsed(e, qty);
+                else if (part?.Qty is int current)
+                    Parsed(e, current);
             }
-            else if (e.ColumnIndex == colThickness.Index)
+            else if (e.ColumnIndex == colThickness.Index && text.Length > 0)
             {
-                e.Value = TryParseThickness(text, out var thickness) ? thickness : null;
-                e.ParsingApplied = true;
+                if (TryParseThickness(text, out var thickness))
+                    Parsed(e, thickness);
+                else if (part?.Thickness is double current)
+                    Parsed(e, current);
             }
             else if (e.ColumnIndex == colMaterial.Index)
             {
-                e.Value = string.IsNullOrWhiteSpace(text) ? null : text;
-                e.ParsingApplied = true;
+                Parsed(e, text.Trim());
             }
+        }
+
+        private static void Parsed(DataGridViewCellParsingEventArgs e, object value)
+        {
+            e.Value = value;
+            e.ParsingApplied = true;
         }
 
         private void DgvParts_CellEndEdit(object sender, DataGridViewCellEventArgs e)

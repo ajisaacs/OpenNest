@@ -326,6 +326,7 @@ namespace OpenNest.Forms
             // colThickness
             //
             thicknessCellStyle.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleRight;
+            thicknessCellStyle.DataSourceNullValue = null;
             thicknessCellStyle.Format = "0.####";
             colThickness.DataPropertyName = "Thickness";
             colThickness.DefaultCellStyle = thicknessCellStyle;
@@ -337,6 +338,7 @@ namespace OpenNest.Forms
             // colQty
             //
             qtyCellStyle.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleRight;
+            qtyCellStyle.DataSourceNullValue = null;
             colQty.DataPropertyName = "Qty";
             colQty.DefaultCellStyle = qtyCellStyle;
             colQty.FillWeight = 50F;
