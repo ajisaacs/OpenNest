@@ -17,7 +17,9 @@ permissions:
 jobs:
   windows:
     runs-on: windows-2022
-    timeout-minutes: 30
+    # The suites have roughly doubled since the v0.3.0 run (7.5 min); the hang
+    # guard below names a stuck test long before this cap.
+    timeout-minutes: 45
     defaults:
       run:
         shell: pwsh
@@ -48,12 +50,15 @@ jobs:
           dotnet build OpenNest.sln -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Solution build failed.' }
       - name: Run all test projects on Windows
+        # A test silent for 5 minutes is killed and named in the log, with a
+        # mini dump in TestResults, instead of holding the runner until the
+        # job timeout.
         run: |
           foreach ($project in @('OpenNest.Tests', 'OpenNest.Engine.Tests', 'OpenNest.IO.Tests', 'OpenNest.Server.Tests', 'OpenNest.WinForms.Tests', 'OpenNest.FrontEnd.Tests')) {
-            dotnet test "$project/$project.csproj" -c Release --no-build --logger "trx;LogFileName=$project.trx" --results-directory TestResults
+            dotnet test "$project/$project.csproj" -c Release --no-build --blame-hang-timeout 5m --blame-hang-dump-type mini --logger "trx;LogFileName=$project.trx" --results-directory TestResults
             if ($LASTEXITCODE -ne 0) { throw "$project failed." }
           }
-          dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --logger 'trx;LogFileName=OpenNest.Tests.Debug.trx' --results-directory TestResults
+          dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Debug --blame-hang-timeout 5m --blame-hang-dump-type mini --logger 'trx;LogFileName=OpenNest.Tests.Debug.trx' --results-directory TestResults
           if ($LASTEXITCODE -ne 0) { throw 'Debug tests failed.' }
       - name: Publish and verify Windows package
         run: ./scripts/Publish-Windows.ps1 -Version $env:RELEASE_VERSION
@@ -85,6 +90,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-test-results
-          path: TestResults/*.trx
+          path: TestResults/
           if-no-files-found: warn
           retention-days: 14
