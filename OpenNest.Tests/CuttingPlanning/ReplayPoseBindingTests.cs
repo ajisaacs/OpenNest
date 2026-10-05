@@ -37,7 +37,8 @@ public class ReplayPoseBindingTests
             && BitConverter.DoubleToInt64Bits(source.Rotation) == BitConverter.DoubleToInt64Bits(rotation);
         Assert.Equal(fault == "matching-bits", sameBits);
         var selected = new FixedProgramPlacement(source.SourcePart, source.SourceOrdinal, new Vector(x, y), rotation,
-            source.LeadInsLocked, proposal.Execution, proposal.CopyProgram(), source.Prepared, source.Material, proposal.ContourChoices);
+            source.LeadInsLocked, proposal.Execution, proposal.CopyProgram(), source.Prepared, source.Material, proposal.ContourChoices)
+            .Propose(proposal.CopyProgram(), proposal.Execution, proposal.ContourChoices);
         var replay = CuttingPlanService.ReplayPrograms(snapshot, [selected], 0, default);
         Assert.Equal(sameBits ? CuttingPlanStatus.Ready : CuttingPlanStatus.InvalidInput, replay.Status);
         Assert.Equal(sameBits, replay.IndependentlyReplayed);

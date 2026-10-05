@@ -201,18 +201,15 @@ public static class CuttingPlanService
                 if (!ReferenceEquals(source, proposal))
                     return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
             }
-            else if (proposal.ContourChoices.Count != source.Prepared.Count
-                || proposal.ContourChoices.Any(c => !ReferenceEquals(c.Owner, source.Prepared)
-                    || c.ContourOrdinal < 0 || c.ContourOrdinal >= source.Prepared.Count)
-                || proposal.ContourChoices.Select(c => c.ContourOrdinal).Distinct().Count() != source.Prepared.Count
-                || proposal.ContourChoices[^1].ContourOrdinal != source.Prepared.PerimeterOrdinal)
+            else if (proposal.SelectedProgram == null
+                || !proposal.SelectedProgram.Matches(source.Prepared, proposal.ContourChoices))
                 return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
             OwnedExecution execution;
+            bool complete;
             try
             {
                 execution = ExecutionMotionReader.Read(proposal.CopyProgram(), proposal.Location, position, token);
-                if (source.Prepared != null && !HasCompleteContourAccounting(execution, source.Material, token))
-                    return new(CuttingPlanStatus.InvalidInput, expansions: expansions);
+                complete = ContourProgramVerifier.Verify(execution, source.Material, proposal.SelectedProgram, token);
             }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
             {
@@ -225,6 +222,11 @@ public static class CuttingPlanService
             if (!lead.IsComplete || !lead.IsClear)
                 findings.Add(JointCuttingPlanSearch.Finding(source,
                     lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
+            if (!complete && findings.Count == 0)
+                return new(CuttingPlanStatus.InvalidInput,
+                    findings: [JointCuttingPlanSearch.Finding(source, null,
+                        "Selected program does not preserve complete directed contours, certified tabs or selected entry/style geometry.")],
+                    expansions: expansions);
             distance += execution.RapidDistanceFrom(position);
             position = execution.DeparturePoint;
         }
@@ -235,42 +237,6 @@ public static class CuttingPlanService
                 findings: findings, expansions: expansions);
         return new(CuttingPlanStatus.Ready, order, expansions: expansions,
             rapidDistance: distance, independentlyReplayed: true);
-    }
-
-    private static bool HasCompleteContourAccounting(OwnedExecution execution, LeadMaterialSnapshot material, CancellationToken token)
-    {
-        var visited = new HashSet<int>();
-        var current = -1;
-        var budget = 1000000;
-        foreach (var move in execution.Motions)
-        {
-            token.ThrowIfCancellationRequested();
-            if (move.Rapid || move.Layer is not (LayerType.Cut or LayerType.Display))
-            {
-                current = -1;
-                continue;
-            }
-            var ring = -1;
-            for (var i = 0; i < material.Rings.Count; i++)
-                if (material.Rings[i].Any(c => Matches(c, move)))
-                {
-                    ring = i;
-                    break;
-                }
-            if (ring < 0 || current >= 0 && ring != current || current < 0 && !visited.Add(ring))
-                return false;
-            current = ring;
-        }
-        return visited.Count == material.Rings.Count;
-
-        bool Matches(PostVerificationGeometry.Curve curve, ExecutionMotion move)
-        {
-            token.ThrowIfCancellationRequested();
-            if (--budget < 0) throw new NotSupportedException("Replay contour accounting exceeds the native query limit.");
-            return curve.SameSupport(move.Curve) && curve.Contains(move.Curve.Start)
-                && curve.Contains(move.End) && curve.Contains(move.Curve.Midpoint)
-                && move.Length <= curve.Length + PostVerificationGeometry.Epsilon;
-        }
     }
 
     private static bool SameBits(double source, double proposed) =>

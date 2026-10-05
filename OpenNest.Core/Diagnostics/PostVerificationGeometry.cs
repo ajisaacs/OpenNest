@@ -99,6 +99,26 @@ internal static class PostVerificationGeometry
                 && System.Math.Abs(Cross(other.End - Start, direction)) <= Epsilon;
         }
 
+        // Directed native arc-length coordinates for contour replay, not collision queries.
+        internal bool SameDirection(Curve other) => SameSupport(other)
+            && (Center.HasValue ? System.Math.Sign(Sweep) == System.Math.Sign(other.Sweep)
+                : Dot(End - Start, other.End - other.Start) > 0);
+
+        internal double DistanceAlong(Vector point) => Center is { } center
+            ? point.DistanceTo(Start) <= Epsilon ? 0
+                : Travel(System.Math.Atan2(point.Y - center.Y, point.X - center.X)) * Radius
+            : Dot(point - Start, (End - Start) * (1 / Length));
+
+        internal Vector PointAtLength(double distance)
+        {
+            if (distance <= 0) return Start;
+            if (distance >= Length) return End;
+            return Center is { } center
+                ? center + new Vector(System.Math.Cos(StartAngle + System.Math.Sign(Sweep) * distance / Radius),
+                    System.Math.Sin(StartAngle + System.Math.Sign(Sweep) * distance / Radius)) * Radius
+                : Start + (End - Start) * (distance / Length);
+        }
+
         internal bool Contains(Vector point) => ToEntity().ClosestPointTo(point).DistanceTo(point) <= Epsilon;
 
         internal IReadOnlyList<Vector> Contacts(Curve other, out bool overlap)

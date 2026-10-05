@@ -94,8 +94,27 @@ public sealed class FixedProgramPlacement
     public bool IsRegenerated => ContourChoices.Count != 0;
     /// <summary>Returns an independent deep copy; never an alias to captured/proposed code.</summary>
     public Program CopyProgram() => program == null ? null : OwnedProgramCopy.Copy(program);
-    internal FixedProgramPlacement Propose(Program proposed, OwnedExecution execution, IReadOnlyList<ContourChoice> choices) =>
-        new(SourcePart, SourceOrdinal, Location, Rotation, LeadInsLocked, execution, OwnedProgramCopy.Copy(proposed), Prepared, Material, choices);
+    internal SelectedContourProgram SelectedProgram { get; private init; }
+
+    internal FixedProgramPlacement Propose(Program proposed, OwnedExecution execution, IReadOnlyList<ContourChoice> choices,
+        System.Threading.CancellationToken token = default)
+    {
+        SelectedContourProgram selected = null;
+        try
+        {
+            // The expected program is constructed from owned choices/settings, NEVER
+            // from proposed or its cached execution. Counterfeit payloads remain subject
+            // to independent final checks, including callers of this internal test seam.
+            selected = Prepared?.CaptureSelectedProgram(choices, Location, token);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or InvalidOperationException or ArithmeticException)
+        {
+            // Invalid metadata is a refused proposal, not an exception from final replay.
+        }
+        return new(SourcePart, SourceOrdinal, Location, Rotation, LeadInsLocked, execution,
+            OwnedProgramCopy.Copy(proposed, token), Prepared, Material, choices)
+        { SelectedProgram = selected };
+    }
 
     public Part SourcePart { get; }
     public int SourceOrdinal { get; }

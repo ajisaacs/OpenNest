@@ -105,7 +105,7 @@ internal static class JointCuttingPlanSearch
                         if (!Check(source, execution, arrival, checker)) continue;
                         var distance = execution.RapidDistanceFrom(arrival);
                         var next = prefix.Length == prepared.Count
-                            ? new Node([.. node.Order, source.Propose(program, execution, prefix)], execution.DeparturePoint, checker, null)
+                            ? new Node([.. node.Order, source.Propose(program, execution, prefix, token)], execution.DeparturePoint, checker, null)
                             : new Node(node.Order, execution.DeparturePoint, checker,
                                 new(source, prefix, arrival, before, distance));
                         yield return new(next, distance - (node.Active?.Distance ?? 0), source.SourceOrdinal, contour, entry);

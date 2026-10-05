@@ -171,6 +171,18 @@ public sealed class PreparedContours
             shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choices);
     }
 
+    internal void ValidateCompleteChoices(IReadOnlyList<ContourChoice> choices) => Validate(choices, true);
+
+    // Build expected-emission metadata independently of the selected payload BEFORE
+    // replay. Final verification only reads this immutable execution and clean geometry.
+    internal SelectedContourProgram CaptureSelectedProgram(IReadOnlyList<ContourChoice> choices,
+        Vector location, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var expected = ExecutionMotionReader.ReadSupported(Emit(choices), location, null, token);
+        return new(this, choices, expected, parameters.TabsEnabled ? parameters.TabConfig.Size : 0);
+    }
+
     private void Validate(IReadOnlyList<ContourChoice> choices, bool complete)
     {
         if (choices == null || (complete && choices.Count != Count) || choices.Count > Count)
