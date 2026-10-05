@@ -139,8 +139,10 @@ public sealed class SavedNestsForm : Form
         AddColumn(platesGrid, "Utilization", "Utilization", 90, typeof(double), alignRight: true, format: "P1");
         platesGrid.SelectionChanged += (_, _) =>
         {
-            if (platesGrid.CurrentRow is { } row)
-                ShowPlate(row.Index);
+            // Read the selected row: while this event runs, CurrentRow still names the
+            // previously current row.
+            if (SelectedPlateRow() is var row and >= 0)
+                ShowPlate(row);
         };
 
         drawingsGrid = CreateGrid();
@@ -641,9 +643,11 @@ public sealed class SavedNestsForm : Form
         plateLabel.Text = $"Plate {index + 1:N0} of {previewPlates.Count:N0}";
         previousPlateButton.Enabled = index > 0;
         nextPlateButton.Enabled = index < previewPlates.Count - 1;
-        if (index < platesGrid.Rows.Count && platesGrid.CurrentRow?.Index != index)
+        if (index < platesGrid.Rows.Count && SelectedPlateRow() != index)
             platesGrid.CurrentCell = platesGrid.Rows[index].Cells[0];
     }
+
+    private int SelectedPlateRow() => platesGrid.SelectedRows.Count > 0 ? platesGrid.SelectedRows[0].Index : -1;
 
     private void OpenSelected()
     {

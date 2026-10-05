@@ -85,6 +85,7 @@ public class SavedNestsFormTests
                 Assert.Equal("Plate 2 of 2", label.Text);
                 Assert.Single(preview.Plate.Parts);
                 Assert.Equal(1, plates.CurrentRow!.Index);
+                Assert.Equal(1, plates.SelectedRows[0].Index);
                 Assert.True(previous.Enabled);
                 Assert.False(next.Enabled);
 
