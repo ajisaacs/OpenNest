@@ -105,6 +105,20 @@ internal static class PostVerificationGeometry
         {
             var entity = ToEntity();
             var candidate = other.ToEntity();
+            // Native arc filters discard NaN supporting-circle intersections. Inspect
+            // both unfiltered queries first: roundoff can differ by operand direction.
+            // Coincident supports have separate overlap handling below.
+            if (Center is { } center && other.Center is { } otherCenter && !SameSupport(other))
+            {
+                var support = new Circle(center, Radius);
+                var otherSupport = new Circle(otherCenter, other.Radius);
+                support.Intersects(otherSupport, out var forward);
+                otherSupport.Intersects(support, out var reverse);
+                foreach (var point in forward)
+                    Validate(point);
+                foreach (var point in reverse)
+                    Validate(point);
+            }
             List<Vector> points;
             bool intersects;
             switch (candidate)
