@@ -61,7 +61,11 @@ public static class CuttingPlanService
                 LeadMaterialSnapshot material = null;
                 if (request.ConfirmedParameters != null)
                 {
-                    var ownedClean = OwnedProgramCopy.Copy(source.BaseDrawing.Program, token);
+                    // Geometry-only transform: original graphs were strictly validated and
+                    // clone expansion bounded above. Legacy Rotate visits per parent, so
+                    // retain Clone's per-parent sharing here instead of restoring diamonds.
+                    // Exact placed/proposed payloads still use lossless OwnedProgramCopy.
+                    var ownedClean = (Program)source.BaseDrawing.Program.Clone();
                     ownedClean.Rotate(source.Rotation - source.BaseDrawing.Program.Rotation);
                     material = LeadMaterialSnapshot.Capture(ownedClean, source.Location, token);
                     if (!material.IsComplete)

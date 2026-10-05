@@ -40,8 +40,10 @@ must not rotate shared programs through their property setters. No live drawings
 are attached to preview plates, so capture/search do not change quantity accounting.
 The snapshot is historical, not a freshness check against later edits. Original
 clean and executable graphs are type/mode-checked before cloning can erase unknown
-semantics. Owned copies preserve authored motion feed/exact-stop flags, symbolic
-bindings and shared subprogram identity; unsupported graphs are refused.
+semantics. Exact placed/proposed copies preserve authored motion feed/exact-stop
+flags, symbolic bindings and shared subprogram identity; unsupported graphs are
+refused. The geometry-only clean transform uses per-parent copies so legacy rotation
+does not visit a globally shared descendant twice; it never changes the fixed payload.
 
 ## Search and exact output
 
