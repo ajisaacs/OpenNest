@@ -55,6 +55,23 @@ public class NestDetailsTests
     }
 
     [Fact]
+    public void FromNest_KeepsEachPlateForThePreview_InNestOrder()
+    {
+        var nest = new Nest("Job");
+        var first = nest.CreatePlate();
+        var second = nest.CreatePlate();
+        var third = nest.CreatePlate();
+
+        var details = NestDetails.FromNest(nest);
+
+        Assert.Collection(
+            details.PlateLayouts,
+            plate => Assert.Same(first, plate),
+            plate => Assert.Same(second, plate),
+            plate => Assert.Same(third, plate));
+    }
+
+    [Fact]
     public void FromNest_CountsNestedDrawingsAcrossPlateDuplicates_AndSkipsCutoffs()
     {
         var nest = new Nest("Job");

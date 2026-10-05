@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.IO;
 using Timer = System.Windows.Forms.Timer;
@@ -15,8 +17,8 @@ namespace OpenNest.Forms;
 /// File &gt; Open (Database mode). The upper list browses saved nests on the shared nest
 /// server one bounded page at a time; filtering, sorting and paging run on the server
 /// through <see cref="NestBrowseSession"/>. The lower tabs show the plates and drawings of
-/// the highlighted nest, read from its archive through <see cref="NestDetailsSession"/>.
-/// This form only renders their state.
+/// the highlighted nest, read from its archive through <see cref="NestDetailsSession"/>,
+/// beside a preview of one of its plates. This form only renders their state.
 /// </summary>
 public sealed class SavedNestsForm : Form
 {
@@ -38,6 +40,11 @@ public sealed class SavedNestsForm : Form
     private readonly DataGridView platesGrid;
     private readonly DataGridView drawingsGrid;
     private readonly TabControl detailsTabs;
+    private readonly SplitContainer detailsSplit;
+    private readonly PlateView platePreview;
+    private readonly Button previousPlateButton;
+    private readonly Button nextPlateButton;
+    private readonly Label plateLabel;
     private readonly Label detailsStatus;
     private readonly TextBox searchBox;
     private readonly Timer searchTimer;
@@ -48,6 +55,8 @@ public sealed class SavedNestsForm : Form
     private readonly ToolStripMenuItem openMenuItem;
     private readonly ToolStripMenuItem deleteMenuItem;
     private bool deleting;
+    private IReadOnlyList<Plate> previewPlates = Array.Empty<Plate>();
+    private int previewIndex = -1;
 
     /// <summary>Set to the chosen record's id when the dialog closes with OK.</summary>
     public Guid SelectedId { get; private set; }
@@ -128,6 +137,11 @@ public sealed class SavedNestsForm : Form
         AddColumn(platesGrid, "Parts", "Parts", 70, typeof(int), alignRight: true);
         AddColumn(platesGrid, "Drawings", "Drawings", 80, typeof(int), alignRight: true);
         AddColumn(platesGrid, "Utilization", "Utilization", 90, typeof(double), alignRight: true, format: "P1");
+        platesGrid.SelectionChanged += (_, _) =>
+        {
+            if (platesGrid.CurrentRow is { } row)
+                ShowPlate(row.Index);
+        };
 
         drawingsGrid = CreateGrid();
         drawingsGrid.RowHeadersVisible = false;
@@ -141,6 +155,46 @@ public sealed class SavedNestsForm : Form
         detailsTabs = new TabControl { Dock = DockStyle.Fill };
         detailsTabs.TabPages.Add(CreateTab("Plates", platesGrid));
         detailsTabs.TabPages.Add(CreateTab("Drawings", drawingsGrid));
+
+        // Preview of one plate beside the tables; the buttons below it step through the plates.
+        platePreview = new PlateView
+        {
+            Dock = DockStyle.Fill,
+            AllowSelect = false,
+            AllowDrop = false,
+            DrawOrigin = false,
+            Cursor = Cursors.Default,
+            TabStop = false,
+            Visible = false,
+        };
+        platePreview.SizeChanged += (_, _) =>
+        {
+            if (platePreview.Visible)
+                platePreview.ZoomToFit();
+        };
+        previousPlateButton = new Button { Text = "\u25C0", Width = 32, Enabled = false, AccessibleName = "Previous plate" };
+        previousPlateButton.Click += (_, _) => ShowPlate(previewIndex - 1);
+        nextPlateButton = new Button { Text = "\u25B6", Width = 32, Enabled = false, AccessibleName = "Next plate" };
+        nextPlateButton.Click += (_, _) => ShowPlate(previewIndex + 1);
+        plateLabel = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, AutoEllipsis = true };
+
+        var plateBar = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 3, RowCount = 1 };
+        plateBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        plateBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        plateBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        plateBar.Controls.Add(previousPlateButton, 0, 0);
+        plateBar.Controls.Add(plateLabel, 1, 0);
+        plateBar.Controls.Add(nextPlateButton, 2, 0);
+
+        detailsSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            SplitterWidth = 6,
+        };
+        detailsSplit.Panel1.Controls.Add(detailsTabs);
+        detailsSplit.Panel2.Controls.Add(platePreview);
+        detailsSplit.Panel2.Controls.Add(plateBar);
 
         detailsStatus = new Label
         {
@@ -161,7 +215,7 @@ public sealed class SavedNestsForm : Form
         };
         split.Panel1.Controls.Add(nestGrid);
         split.Panel1.Controls.Add(SectionLabel("Nests", DockStyle.Top));
-        split.Panel2.Controls.Add(detailsTabs);
+        split.Panel2.Controls.Add(detailsSplit);
         split.Panel2.Controls.Add(detailsHeader);
 
         // Find bar and paging.
@@ -226,6 +280,9 @@ public sealed class SavedNestsForm : Form
             split.Panel1MinSize = 120;
             split.Panel2MinSize = 120;
             split.SplitterDistance = System.Math.Max(split.Panel1MinSize, split.Height * 3 / 5);
+            detailsSplit.Panel1MinSize = 240;
+            detailsSplit.Panel2MinSize = 160;
+            detailsSplit.SplitterDistance = System.Math.Max(detailsSplit.Panel1MinSize, detailsSplit.Width * 3 / 5);
         };
         Shown += async (_, _) =>
         {
@@ -518,6 +575,13 @@ public sealed class SavedNestsForm : Form
 
     private void ShowDetailsMessage(string message)
     {
+        previewPlates = Array.Empty<Plate>();
+        previewIndex = -1;
+        platePreview.Visible = false;
+        plateLabel.Text = "";
+        previousPlateButton.Enabled = false;
+        nextPlateButton.Enabled = false;
+
         platesGrid.Rows.Clear();
         drawingsGrid.Rows.Clear();
         detailsStatus.Text = message;
@@ -531,6 +595,7 @@ public sealed class SavedNestsForm : Form
 
         ShowDetailsMessage(
             $"{nestDetails.Plates.Count:N0} plate(s), {nestDetails.Drawings.Count:N0} drawing(s)");
+        previewPlates = nestDetails.PlateLayouts;
         foreach (var plate in nestDetails.Plates)
         {
             platesGrid.Rows.Add(
@@ -552,6 +617,32 @@ public sealed class SavedNestsForm : Form
                 drawing.Remaining,
                 drawing.Area);
         }
+
+        ShowPlate(0);
+    }
+
+    /// <summary>
+    /// Shows one plate of the highlighted nest in the preview and highlights its row in the
+    /// Plates table. Plate buttons and row selection both come through here.
+    /// </summary>
+    private void ShowPlate(int index)
+    {
+        if (index < 0 || index >= previewPlates.Count)
+            return;
+
+        if (index != previewIndex)
+        {
+            previewIndex = index;
+            platePreview.Plate = previewPlates[index];
+            platePreview.Visible = true;
+            platePreview.ZoomToFit();
+        }
+
+        plateLabel.Text = $"Plate {index + 1:N0} of {previewPlates.Count:N0}";
+        previousPlateButton.Enabled = index > 0;
+        nextPlateButton.Enabled = index < previewPlates.Count - 1;
+        if (index < platesGrid.Rows.Count && platesGrid.CurrentRow?.Index != index)
+            platesGrid.CurrentCell = platesGrid.Rows[index].Cells[0];
     }
 
     private void OpenSelected()

@@ -21,8 +21,8 @@ public class SavedNestsFormTests
                 var first = Record("First job");
                 var second = Record("Second job");
                 var repository = new FakeRepository(first, second);
-                repository.Files[first.Id] = NestFile(plateQuantity: 2, partsOnPlate: 3);
-                repository.Files[second.Id] = NestFile(plateQuantity: 1, partsOnPlate: 1);
+                repository.Files[first.Id] = NestFile((Quantity: 2, Parts: 3));
+                repository.Files[second.Id] = NestFile((Quantity: 1, Parts: 1));
 
                 using var form = new SavedNestsForm(repository, "http://nest-server:5000");
                 form.Show();
@@ -57,6 +57,46 @@ public class SavedNestsFormTests
     }
 
     [Fact]
+    public void PlatePreview_StepsThroughThePlates_AndFollowsThePlatesTable()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                var job = Record("Two plates");
+                var repository = new FakeRepository(job);
+                repository.Files[job.Id] = NestFile((Quantity: 1, Parts: 3), (Quantity: 1, Parts: 1));
+
+                using var form = new SavedNestsForm(repository);
+                form.Show();
+                var plates = Field<DataGridView>(form, "platesGrid");
+                var preview = Field<OpenNest.Controls.PlateView>(form, "platePreview");
+                var label = Field<Label>(form, "plateLabel");
+                var previous = Field<Button>(form, "previousPlateButton");
+                var next = Field<Button>(form, "nextPlateButton");
+
+                PumpUntil(() => plates.Rows.Count == 2, "the nest's plates");
+                Assert.True(preview.Visible);
+                Assert.Equal("Plate 1 of 2", label.Text);
+                Assert.Equal(3, preview.Plate.Parts.Count);
+                Assert.False(previous.Enabled);
+                Assert.True(next.Enabled);
+
+                next.PerformClick();
+                Assert.Equal("Plate 2 of 2", label.Text);
+                Assert.Single(preview.Plate.Parts);
+                Assert.Equal(1, plates.CurrentRow!.Index);
+                Assert.True(previous.Enabled);
+                Assert.False(next.Enabled);
+
+                plates.CurrentCell = plates.Rows[0].Cells[0];
+                Assert.Equal("Plate 1 of 2", label.Text);
+                Assert.Equal(3, preview.Plate.Parts.Count);
+            },
+            TestTimeout,
+            "The saved-nest dialog test did not complete.");
+    }
+
+    [Fact]
     public void MissingArchive_ShowsTheErrorInTheDetailsLine_AndEscapeCancels()
     {
         StaTestThread.Run(
@@ -69,6 +109,8 @@ public class SavedNestsFormTests
 
                 PumpUntil(() => status.Text.Contains("no longer exists"), "the missing-nest message");
                 Assert.Equal(0, Field<DataGridView>(form, "platesGrid").Rows.Count);
+                Assert.False(Field<OpenNest.Controls.PlateView>(form, "platePreview").Visible);
+                Assert.Equal("", Field<Label>(form, "plateLabel").Text);
 
                 Assert.True(ProcessKey(form, Keys.Escape));
                 Assert.Equal(DialogResult.Cancel, form.DialogResult);
@@ -81,7 +123,7 @@ public class SavedNestsFormTests
     private static NestRecord Record(string name) =>
         new() { Id = Guid.NewGuid(), Name = name, SavedAt = DateTime.Now };
 
-    private static byte[] NestFile(int plateQuantity, int partsOnPlate)
+    private static byte[] NestFile(params (int Quantity, int Parts)[] plates)
     {
         var nest = new Nest("Job") { Units = Units.Inches };
         var program = new OpenNest.CNC.Program();
@@ -94,11 +136,14 @@ public class SavedNestsFormTests
         drawing.Quantity.Required = 10;
         nest.Drawings.Add(drawing);
 
-        var plate = nest.CreatePlate();
-        plate.Size = new OpenNest.Geometry.Size(48, 96);
-        plate.Quantity = plateQuantity;
-        for (var i = 0; i < partsOnPlate; i++)
-            plate.Parts.Add(new Part(drawing, new Vector(i * 12, 0)));
+        foreach (var (quantity, parts) in plates)
+        {
+            var plate = nest.CreatePlate();
+            plate.Size = new OpenNest.Geometry.Size(48, 96);
+            plate.Quantity = quantity;
+            for (var i = 0; i < parts; i++)
+                plate.Parts.Add(new Part(drawing, new Vector(i * 12, 0)));
+        }
 
         using var stream = new MemoryStream();
         new NestWriter(nest).Write(stream);

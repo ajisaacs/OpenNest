@@ -17,6 +17,12 @@ public sealed class NestDetails
     /// <summary>One row per drawing (cutoffs excluded), in nest order.</summary>
     public IReadOnlyList<NestDrawingDetail> Drawings { get; init; } = Array.Empty<NestDrawingDetail>();
 
+    /// <summary>
+    /// The plates themselves, in the same order as <see cref="Plates"/>, for the plate
+    /// preview. They belong to the downloaded copy of the nest, never to an open document.
+    /// </summary>
+    public IReadOnlyList<Plate> PlateLayouts { get; init; } = Array.Empty<Plate>();
+
     public static NestDetails FromNest(Nest nest)
     {
         ArgumentNullException.ThrowIfNull(nest);
@@ -52,7 +58,13 @@ public sealed class NestDetails
                 Area: drawing.Area))
             .ToList();
 
-        return new NestDetails { Units = nest.Units, Plates = plates, Drawings = drawings };
+        return new NestDetails
+        {
+            Units = nest.Units,
+            Plates = plates,
+            Drawings = drawings,
+            PlateLayouts = nest.Plates.ToList(),
+        };
     }
 }
 
