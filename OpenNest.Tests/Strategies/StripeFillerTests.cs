@@ -1,9 +1,9 @@
 using System.Collections.Generic;
+using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Fill;
 using OpenNest.Engine.Strategies;
 using OpenNest.Geometry;
-using OpenNest.Engine;
 
 namespace OpenNest.Tests.Strategies;
 

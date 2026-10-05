@@ -1,6 +1,6 @@
-using OpenNest.Geometry;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs.Placement.Fillers;
+using OpenNest.Geometry;
 
 namespace OpenNest.Tests.Engine;
 
