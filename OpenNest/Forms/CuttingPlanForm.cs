@@ -25,6 +25,7 @@ public partial class CuttingPlanForm : Form
     private readonly Func<bool> isOperationBusy;
     private readonly string unit;
     private readonly PlateView preview;
+    private readonly SynchronizationContext uiContext;
     private CuttingParameters parameters;
     private CancellationTokenSource planning;
     private CuttingPlanProposal proposal;
@@ -53,6 +54,10 @@ public partial class CuttingPlanForm : Form
         this.isOperationBusy = isOperationBusy;
         unit = UnitsHelper.GetShortString(nest.Units);
         InitializeComponent();
+        // Captured once: when Application.DoEvents ends the outermost message loop, WinForms
+        // uninstalls its ambient context, so progress and results must not depend on whichever
+        // context is current when planning starts.
+        uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
 
         preview = new PlateView
         {
@@ -160,51 +165,53 @@ public partial class CuttingPlanForm : Form
         }
 
         var source = new CancellationTokenSource();
+        var token = source.Token;
         planning = source;
         var run = ++generation;
         SetPlanning(true);
         summaryBox.Text = string.Empty;
         statusLabel.Text = "Planning…";
-        var progress = new Progress<CuttingPlanProgress>(value =>
+        var progress = new PostingProgress(uiContext, value =>
         {
             if (run == generation && ReferenceEquals(planning, source) && !IsDisposed)
                 statusLabel.Text = ProgressText(value);
         });
-        PlanningTask = RunPlanningAsync(batch, progress, source, run);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        PlanningTask = completion.Task;
+        Task.Run(() => batch.Plan(progress, token)).ContinueWith(
+            work => uiContext.Post(_ => FinishPlanning(work, source, run, completion), null),
+            CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     }
 
-    private async Task RunPlanningAsync(CuttingPlanBatch batch, IProgress<CuttingPlanProgress> progress,
-        CancellationTokenSource source, int run)
+    // Runs on the dialog's thread once the worker has stopped.
+    private void FinishPlanning(Task<CuttingPlanProposal> work, CancellationTokenSource source, int run,
+        TaskCompletionSource completion)
     {
-        CuttingPlanProposal result = null;
-        Exception error = null;
         try
-        {
-            result = await Task.Run(() => batch.Plan(progress, source.Token));
-        }
-        catch (Exception ex)
-        {
-            error = ex;
-        }
-        finally
         {
             if (ReferenceEquals(planning, source))
                 planning = null;
             source.Dispose();
-        }
 
-        if (run != generation || IsDisposed)
-            return;
-        SetPlanning(false);
-        if (closeRequested)
-        {
-            Close();
-            return;
+            if (run != generation || IsDisposed)
+                return;
+            SetPlanning(false);
+            if (closeRequested)
+            {
+                Close();
+                return;
+            }
+            if (work.IsFaulted)
+                ShowMessage($"Planning failed: {work.Exception.GetBaseException().Message}");
+            else if (work.IsCanceled)
+                ShowMessage("Planning was cancelled. Nothing has changed.");
+            else
+                ShowProposal(work.Result);
         }
-        if (error != null)
-            ShowMessage($"Planning failed: {error.Message}");
-        else
-            ShowProposal(result);
+        finally
+        {
+            completion.TrySetResult();
+        }
     }
 
     private void ShowProposal(CuttingPlanProposal result)
@@ -286,6 +293,12 @@ public partial class CuttingPlanForm : Form
     private void KeepOrderCheckBox_CheckedChanged(object sender, EventArgs e) => StartPlanning();
 
     private void PlanButton_Click(object sender, EventArgs e) => StartPlanning();
+
+    private sealed class PostingProgress(SynchronizationContext context, Action<CuttingPlanProgress> handler)
+        : IProgress<CuttingPlanProgress>
+    {
+        public void Report(CuttingPlanProgress value) => context.Post(_ => handler(value), null);
+    }
 
     private void ApplyButton_Click(object sender, EventArgs e)
     {

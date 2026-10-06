@@ -138,6 +138,9 @@ public class CuttingPlanFormTests
         Assert.Null(form.Proposal);
         Assert.Contains("Wait for the current nesting or plate action", Control<TextBox>(form, "summaryBox").Text);
         busy = false;
+        // Ending a DoEvents loop uninstalls WinForms' ambient context; planning started outside a
+        // message loop must still report progress and results on the dialog's thread.
+        Application.DoEvents();
         Invoke(form, "StartPlanning");
         PumpUntil(() => form.Proposal != null, "the plan");
         Assert.True(Control<Button>(form, "applyButton").Enabled);
