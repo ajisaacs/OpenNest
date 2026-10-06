@@ -501,6 +501,64 @@ public class PlateOverlapAnalyzerTests
         Assert.Equal(y, pair.Centroid.Y, 7);
     }
 
+    [Theory]
+    [InlineData(Mode.Absolute)]
+    [InlineData(Mode.Incremental)]
+    public void Analyze_SubprogramHolesKeepTheirCallOffsetsInEitherMode(Mode mode)
+    {
+        var hole = new Program();
+        hole.MoveTo(1, 0);
+        hole.Codes.Add(new ArcMove(1, 0, 0, 0) { Rotation = RotationType.CCW });
+        hole.Mode = mode;
+        var clean = new Program();
+        clean.MoveTo(0, 0);
+        clean.LineTo(0, 10);
+        clean.LineTo(10, 10);
+        clean.LineTo(10, 0);
+        clean.LineTo(0, 0);
+        clean.SubPrograms[-1] = hole;
+        clean.Codes.Add(new SubProgramCall { Program = hole, Offset = new Vector(3, 3), Id = -1 });
+        clean.Codes.Add(new SubProgramCall { Program = hole, Offset = new Vector(7, 3), Id = -1 });
+        clean.Mode = mode;
+        var host = new Part(new Drawing("host", clean));
+        var insert = Rectangle(2.75, 2.75, 0.5, 0.5); // Inside the hole called at (3, 3).
+
+        var report = PlateOverlapAnalyzer.Analyze(new[] { host, insert });
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues.Select(issue => issue.Message)));
+        Assert.Empty(report.Pairs);
+    }
+
+    [Fact]
+    public void Analyze_NullOrUnsupportedInstructionsAreIncompleteWithoutRunningThem()
+    {
+        var missing = Rectangle(0, 0, 1, 1);
+        missing.BaseDrawing.Program.Codes = null;
+        var unsupported = Rectangle(5, 0, 1, 1);
+        var code = new CountingCode();
+        unsupported.BaseDrawing.Program.Codes.Add(code);
+        var clear = Rectangle(10, 0, 1, 1);
+
+        var report = PlateOverlapAnalyzer.Analyze(new[] { missing, unsupported, clear });
+
+        Assert.Equal(new[] { 0, 1 }, report.Issues.Select(issue => issue.PartAId).OrderBy(id => id));
+        Assert.Empty(report.Pairs);
+        Assert.Equal(0, code.Clones);
+    }
+
+    // Reports a built-in type but is not one: conversion must refuse it rather than cast or clone it.
+    private sealed class CountingCode : ICode
+    {
+        public int Clones { get; private set; }
+        public CodeType Type => CodeType.LinearMove;
+
+        public ICode Clone()
+        {
+            Clones++;
+            return this;
+        }
+    }
+
     private static Part Rectangle(double x, double y, double width, double height) =>
         new(WithContours(new[] { new Vector(0, 0), new Vector(width, 0),
             new Vector(width, height), new Vector(0, height) }).BaseDrawing, new Vector(x, y));

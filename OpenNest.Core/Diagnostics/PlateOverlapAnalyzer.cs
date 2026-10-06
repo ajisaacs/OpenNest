@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 
@@ -72,9 +73,11 @@ public static class PlateOverlapAnalyzer
         try
         {
             ValidateProgram(program, new HashSet<Program>(ReferenceEqualityComparer.Instance));
-            // Conversion creates fresh geometry, including expanded shared hole calls;
-            // no cloning/rotation of a live program or subprogram is necessary.
-            return new OverlapSource(program, ConvertProgram.ToGeometry(program)
+            // Convert an incremental-mode copy: the converter adds call offsets to incremental moves
+            // only, so absolute subprogram holes would otherwise land at their frame origin. The
+            // copy is owned; the live program is neither converted in place nor rotated.
+            var geometry = PreparedContours.CopyForGeometry(program, CancellationToken.None);
+            return new OverlapSource(program, ConvertProgram.ToGeometry(geometry)
                 .Where(entity => SpecialLayers.IsMaterial(entity.Layer)
                     && entity.Layer != SpecialLayers.Leadin
                     && entity.Layer != SpecialLayers.Leadout).ToList(), null);
@@ -267,14 +270,26 @@ public static class PlateOverlapAnalyzer
     internal static bool IsGeometryFailure(Exception exception) => exception is
         ArgumentException or InvalidOperationException or NotSupportedException or ArithmeticException;
 
+    // Exact built-in instruction types. Anything else, subclasses included, is refused before the
+    // graph is copied or converted, so no unknown Clone or cast runs.
+    private static readonly HashSet<Type> SupportedCodeTypes =
+    [
+        typeof(RapidMove), typeof(LinearMove), typeof(ArcMove), typeof(SubProgramCall),
+        typeof(Comment), typeof(Feedrate), typeof(Kerf),
+    ];
+
     private static void ValidateProgram(Program program, HashSet<Program> visiting)
     {
         if (program == null || !visiting.Add(program) || visiting.Count > 64)
             throw new ArgumentException("Missing, recursive, or excessively nested subprogram.");
+        if (program.Codes == null)
+            throw new ArgumentException("Program has no instruction list.");
         foreach (var code in program.Codes)
         {
             if (code == null)
                 throw new ArgumentException("Program contains a missing instruction.");
+            if (!SupportedCodeTypes.Contains(code.GetType()))
+                throw new NotSupportedException("Program contains an unsupported instruction.");
             if (code is Motion motion && !OverlapMaterial.IsFinite(motion.EndPoint)
                 || code is ArcMove arc && !OverlapMaterial.IsFinite(arc.CenterPoint))
                 throw new ArgumentException("Program coordinates must be finite.");

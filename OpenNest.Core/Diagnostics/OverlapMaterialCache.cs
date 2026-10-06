@@ -43,7 +43,7 @@ internal sealed class OverlapSource
 
     internal OverlapSource(Program program, List<Entity> entities, string error)
     {
-        codeCount = program.Codes.Count;
+        codeCount = CodeCount(program);
         rotation = BitConverter.DoubleToInt64Bits(program.Rotation);
         Entities = entities;
         Error = error;
@@ -54,7 +54,10 @@ internal sealed class OverlapSource
     internal string Error { get; }
 
     internal bool Matches(Program program) =>
-        program.Codes.Count == codeCount && BitConverter.DoubleToInt64Bits(program.Rotation) == rotation;
+        CodeCount(program) == codeCount && BitConverter.DoubleToInt64Bits(program.Rotation) == rotation;
+
+    // Program.Codes is a writable field; a missing list is a refused source, not a crash.
+    private static int CodeCount(Program program) => program.Codes?.Count ?? -1;
 
     /// <summary>
     /// Prepares once and shares the result. A geometry failure is cached like a success;

@@ -215,7 +215,12 @@ public sealed class PreparedContours
     private static Vector Start(Entity entity) => entity is Line line ? line.StartPoint : ((Arc)entity).StartPoint();
     private static Vector End(Entity entity) => entity is Line line ? line.EndPoint : ((Arc)entity).EndPoint();
 
-    private static Program CopyForGeometry(Program source, CancellationToken token)
+    /// <summary>
+    /// Owned copy of a validated graph with every program in incremental mode, so
+    /// <see cref="ConvertProgram.ToGeometry"/> keeps absolute subprogram frame offsets. Shared
+    /// subprograms stay shared. Validate exact instruction types first: this clones every code.
+    /// </summary>
+    internal static Program CopyForGeometry(Program source, CancellationToken token)
     {
         var copies = new Dictionary<Program, Program>(ReferenceEqualityComparer.Instance);
         return Copy(source);

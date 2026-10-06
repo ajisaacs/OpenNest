@@ -95,6 +95,46 @@ public class CuttingPlanBatchTests
         Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
     }
 
+    [Theory]
+    [InlineData(Mode.Absolute)]
+    [InlineData(Mode.Incremental)]
+    public void Plan_SubprogramHolesInEitherMode_AreNotFalseOverlaps(Mode mode)
+    {
+        var hole = new Program();
+        hole.MoveTo(1, 0);
+        hole.Codes.Add(new ArcMove(1, 0, 0, 0) { Rotation = RotationType.CCW });
+        hole.Mode = mode;
+        var clean = ExplicitContourTests.Square(false);
+        clean.SubPrograms[-1] = hole;
+        clean.Codes.Add(new SubProgramCall { Program = hole, Offset = new Vector(3, 3), Id = -1 });
+        clean.Codes.Add(new SubProgramCall { Program = hole, Offset = new Vector(7, 3), Id = -1 });
+        clean.Mode = mode;
+        var nest = new Nest();
+        var plate = Plate(nest, new Part(new Drawing("holes", clean), new Vector(1, 1)));
+
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
+
+        var planned = Assert.Single(proposal.Plates);
+        Assert.True(planned.IsOverlapClear, string.Join("; ", planned.Overlap.Issues.Select(i => i.Message)));
+        Assert.True(planned.IsReady);
+    }
+
+    [Fact]
+    public void Capture_RefusedGraphs_BlockThePlateInsteadOfThrowing()
+    {
+        var nest = new Nest();
+        var missing = Clean("missing", 1, 1);
+        missing.BaseDrawing.Program.Codes = null;
+        var plate = Plate(nest, missing);
+
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
+
+        var planned = Assert.Single(proposal.Plates);
+        Assert.False(planned.IsReady);
+        Assert.False(proposal.CanApply);
+        Assert.Null(proposal.BuildPreview(0));
+    }
+
     [Fact]
     public void Plan_FreeSearchOutOfBudget_KeepsTheCurrentOrderAndSaysSo()
     {
