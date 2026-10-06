@@ -145,6 +145,16 @@ public class NearbyMaterialCheckTests
         Assert.Contains("uncertain", result.Reason);
     }
 
+    [Fact]
+    public void ExtentWithANaNBound_IsNeverSeparated()
+    {
+        var partial = new PostVerificationGeometry.Extent(double.NaN, 0, double.NaN, 1);
+        var other = new PostVerificationGeometry.Extent(0, 4, 1, 5);
+
+        Assert.False(partial.IsSeparatedFrom(other, 1e-6));
+        Assert.False(other.IsSeparatedFrom(partial, 1e-6));
+    }
+
     private static Program CleanCircle(double radius)
     {
         var p = new Program();

@@ -27,11 +27,16 @@ internal static class PostVerificationGeometry
 
         /// <summary>
         /// True only when the extents are farther apart than <paramref name="margin"/> on some axis,
-        /// so nothing inside one can touch or enter the other. NaN bounds are never separated.
+        /// so nothing inside one can touch or enter the other. An extent with any nonfinite bound
+        /// (including the empty one) is never separated.
         /// </summary>
-        internal bool IsSeparatedFrom(Extent other, double margin) =>
-            MaxX + margin < other.MinX || other.MaxX + margin < MinX
-            || MaxY + margin < other.MinY || other.MaxY + margin < MinY;
+        internal bool IsSeparatedFrom(Extent other, double margin) => IsFinite && other.IsFinite
+            && double.IsFinite(margin)
+            && (MaxX + margin < other.MinX || other.MaxX + margin < MinX
+                || MaxY + margin < other.MinY || other.MaxY + margin < MinY);
+
+        private bool IsFinite => double.IsFinite(MinX) && double.IsFinite(MinY)
+            && double.IsFinite(MaxX) && double.IsFinite(MaxY);
     }
 
     internal static void Validate(Vector point)
