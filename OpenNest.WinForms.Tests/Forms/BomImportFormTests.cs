@@ -117,7 +117,15 @@ public class BomImportFormTests
                     if (className.ToString() != "#32770")
                         return true;
 
+                    // An OK-only native MessageBox can assign its button the
+                    // IDCANCEL id (2), not IDOK (1). Find its sole real button
+                    // instead of assuming an id, and keep polling until ready.
+                    var ok = FindWindowEx(window, IntPtr.Zero, "Button", null);
+                    if (ok == IntPtr.Zero || FindWindowEx(window, ok, "Button", null) != IntPtr.Zero)
+                        return true;
+
                     dialogTitle = WindowText(window);
+                    dialogText = "";
                     var text = FindWindowEx(window, IntPtr.Zero, "Static", null);
                     while (text != IntPtr.Zero)
                     {
@@ -126,10 +134,10 @@ public class BomImportFormTests
                             dialogText += value;
                         text = FindWindowEx(window, text, "Static", null);
                     }
-                    var ok = GetDlgItem(window, 1);
-                    okPosted = ok != IntPtr.Zero && PostMessage(ok, 0x00F5, IntPtr.Zero, IntPtr.Zero);
-                    dismiss.Stop();
-                    return false;
+                    okPosted = PostMessage(ok, 0x00F5, IntPtr.Zero, IntPtr.Zero);
+                    if (okPosted)
+                        dismiss.Stop();
+                    return !okPosted;
                 }, IntPtr.Zero);
                 if (DateTime.UtcNow >= deadline && !okPosted)
                     throw new TimeoutException("The Create Nests result dialog could not be acknowledged.");
@@ -198,9 +206,6 @@ public class BomImportFormTests
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string? title);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetDlgItem(IntPtr dialog, int id);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]

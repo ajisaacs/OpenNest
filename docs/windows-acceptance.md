@@ -51,8 +51,13 @@ run when updating an individual task.
 ## Repeat locally on Windows
 
 Use a clean, committed checkout, .NET 8 and Python 3. Run from the repository root
-in PowerShell. Always use a new results directory so stale TRX files cannot stand
-in for a failed build. Do not reuse downloaded CI results as a new local run.
+in PowerShell in a logged-in Windows desktop session: an OpenSSH/service session
+(session 0) cannot show the real native completion dialogs these tests exercise.
+A remote interactive-session launch should use an explicitly approved temporary
+scheduled task, without saved passwords, and remove that task after completion.
+Test windows may appear briefly; do not manually acknowledge them during a run.
+Always use a new results directory so stale TRX files cannot stand in for a failed
+build. Do not reuse downloaded CI results as a new local run.
 
 ```powershell
 $results = Join-Path 'TestResults' ([guid]::NewGuid().ToString())
