@@ -9,7 +9,7 @@ public class PlateFillServiceTests
 {
     private static readonly string[] Strategies =
     [
-        "Default",
+        "Fill",
         "Strip",
         "Vertical Remnant",
         "Horizontal Remnant",
@@ -44,7 +44,7 @@ public class PlateFillServiceTests
         var drawing = new Drawing("part", TestDrawingFactory.Rectangle(6, 4));
 
         var parts = PlateFillService.FillItem(
-            "Default",
+            "Fill",
             plate,
             new NestItem { Drawing = drawing, Quantity = 6 },
             plate.WorkArea(),
@@ -120,7 +120,7 @@ public class PlateFillServiceTests
         // The plateNumber overload reports the caller's plate index like the legacy
         // engine's PlateNumber did for interactive multi-plate loops.
         var progress = new CapturingProgress();
-        var parts = PlateFillService.Nest("Default", plate, items, 3, progress, CancellationToken.None);
+        var parts = PlateFillService.Nest("Fill", plate, items, 3, progress, CancellationToken.None);
 
         Assert.NotEmpty(parts);
         Assert.NotEmpty(progress.Reports);
@@ -217,7 +217,7 @@ public class PlateFillServiceTests
         var drawing = new Drawing("part", TestDrawingFactory.Rectangle(6, 4));
 
         Assert.Throws<ArgumentNullException>(() =>
-            PlateFillService.FillItem("Default", null!, new NestItem { Drawing = drawing, Quantity = 1 }, new Box(0, 0, 10, 10), null, CancellationToken.None)
+            PlateFillService.FillItem("Fill", null!, new NestItem { Drawing = drawing, Quantity = 1 }, new Box(0, 0, 10, 10), null, CancellationToken.None)
         );
     }
 

@@ -100,7 +100,7 @@ internal static class CutoutLatticeFill
             .Select((p, index) => p with { InstanceIndex = index }).ToArray();
     }
 
-    /// <summary>Default Fill over the cutout's bounds grown by one step on every side, in frame
+    /// <summary>Fill over the cutout's bounds grown by one step on every side, in frame
     /// coordinates. Fill places whole parts only, so the margin keeps every offset covered.</summary>
     private static List<NestJobPlacement> Lattice(NestJobPart insert, Box bounds, double step, double spacing,
         CancellationToken token)

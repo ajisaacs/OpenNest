@@ -28,7 +28,7 @@ public class EngineOverlapTests
     }
 
     [Theory]
-    [InlineData("Default")]
+    [InlineData("Fill")]
     [InlineData("Strip")]
     [InlineData("Vertical Remnant")]
     [InlineData("Horizontal Remnant")]

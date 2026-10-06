@@ -15,7 +15,8 @@ public static class PlateNesterFactory
         ArgumentNullException.ThrowIfNull(strategy);
         return strategy switch
         {
-            "Default" => new DefaultPlateNester(),
+            // "Default" is the strategy's name in earlier releases.
+            "Fill" or "Default" => new DefaultPlateNester(),
             "Strip" => new StripPlateNester(),
             "Vertical Remnant" => RemnantPlateNester.Vertical(),
             "Horizontal Remnant" => RemnantPlateNester.Horizontal(),

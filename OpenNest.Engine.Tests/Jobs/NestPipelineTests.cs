@@ -43,7 +43,7 @@ public class NestPipelineTests
         var item = Item("bracket", 10);
         var codes = item.Drawing.Program.Codes.Count;
 
-        var result = NestPipeline.Run(Request("Default", item));
+        var result = NestPipeline.Run(Request("Fill", item));
 
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
         Assert.True(result.CanKeep);
@@ -240,7 +240,7 @@ public class NestPipelineTests
             NestPipeline.Run(Request("Mystery Engine", Item("bracket", 1)))
         );
 
-        Assert.Contains("Default", error.Message);
+        Assert.Contains("Fill", error.Message);
     }
 
     [Fact]
@@ -265,7 +265,7 @@ public class NestPipelineTests
         cts.Cancel();
 
         Assert.ThrowsAny<OperationCanceledException>(() =>
-            NestPipeline.Run(Request("Default", Item("bracket", 1)), null, cts.Token)
+            NestPipeline.Run(Request("Fill", Item("bracket", 1)), null, cts.Token)
         );
     }
 }

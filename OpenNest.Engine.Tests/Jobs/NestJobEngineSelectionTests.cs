@@ -27,7 +27,7 @@ public class NestJobEngineSelectionTests
     [Fact]
     public void FactoryResolvesEachNamedBuiltInStrategy()
     {
-        var defaultNester = PlateNesterFactory.Create("Default");
+        var defaultNester = PlateNesterFactory.Create("Fill");
         var stripNester = PlateNesterFactory.Create("Strip");
         var verticalNester = PlateNesterFactory.Create("Vertical Remnant");
         var horizontalNester = PlateNesterFactory.Create("Horizontal Remnant");

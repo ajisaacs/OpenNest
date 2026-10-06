@@ -79,10 +79,8 @@ static class NestConsole
         // single-plate placement strategy. Unknown names exit with the valid choices.
         if (options.AutoNest)
         {
-            var isJobsEngine = NestingEngineRegistry.AvailableEngines.Any(e =>
-                e.Name.Equals(options.Engine, StringComparison.OrdinalIgnoreCase)
-            );
-            if (!isJobsEngine)
+            // ResolveName also accepts renamed engines' old names (for example Default).
+            if (NestingEngineRegistry.ResolveName(options.Engine) == null)
             {
                 Console.Error.WriteLine(
                     $"Error: unknown engine '{options.Engine}'. Jobs engines: {string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name))}"
@@ -764,8 +762,8 @@ static class NestConsole
               --template <path>      Nest template for plate defaults (thickness, quadrant, material, spacing)
               --autonest             Validated whole-job nesting onto one sheet; replaces only after acceptance
               --allow-invalid        Explicitly keep representable invalid autonest layouts (default: reject, exit 2)
-              --engine <name>        With --autonest: jobs engine (default: Default; also StockLadder, Strip, ...).
-                                     Without --autonest: fill strategy (Default, Strip, Vertical Remnant, Horizontal Remnant)
+              --engine <name>        With --autonest: jobs engine (default: Default; also Irregular, Rectangles, Fill, ...).
+                                     Without --autonest: fill strategy (Fill (default), Strip, Vertical Remnant, Horizontal Remnant)
               --keep-parts           Don't clear existing parts before filling
               --check-overlaps       Run overlap detection after fill (exit code 1 if found)
               --no-save              Skip saving output file

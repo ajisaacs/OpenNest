@@ -61,8 +61,8 @@ public class AreaPackerTests
         var area = plate.WorkArea();
         var items = new List<NestItem> { Item("panel", 10 + SheetPacker.OverhangAllowance * 0.8, 4, 2) };
 
-        var parts = PlateFillService.PackArea("Default", plate, area, items, null, CancellationToken.None);
-        var again = PlateFillService.PackArea("Default", plate, area, items, null, CancellationToken.None);
+        var parts = PlateFillService.PackArea("Fill", plate, area, items, null, CancellationToken.None);
+        var again = PlateFillService.PackArea("Fill", plate, area, items, null, CancellationToken.None);
 
         Assert.Equal(2, parts.Count);
         Assert.Equal(parts.Select(p => (p.Location, p.Rotation)), again.Select(p => (p.Location, p.Rotation)));
@@ -92,7 +92,7 @@ public class AreaPackerTests
         };
         var area = plate.WorkArea();
         var items = new List<NestItem> { Item("panel", 4, 10 + SheetPacker.OverhangAllowance * 0.8, 2) };
-        var parts = PlateFillService.PackArea("Default", plate, area, items, null, CancellationToken.None);
+        var parts = PlateFillService.PackArea("Fill", plate, area, items, null, CancellationToken.None);
 
         Assert.Equal(2, parts.Count);
         Assert.All(parts, p =>
@@ -117,7 +117,7 @@ public class AreaPackerTests
         var items = new List<NestItem> { rotated ? Item("panel", 6 + excess, 10 + excess, 1)
             : Item("panel", 10 + excess, 6 + excess, 1) };
 
-        var part = Assert.Single(PlateFillService.PackArea("Default", plate, plate.WorkArea(), items, null, CancellationToken.None));
+        var part = Assert.Single(PlateFillService.PackArea("Fill", plate, plate.WorkArea(), items, null, CancellationToken.None));
 
         Assert.True(part.BoundingBox.Right <= 10 + NestTolerances.WorkAreaSlack);
         Assert.True(part.BoundingBox.Top <= 6 + NestTolerances.WorkAreaSlack);
@@ -130,7 +130,7 @@ public class AreaPackerTests
     {
         var plate = new Plate(new Size(6, 10)) { PartSpacing = spacing };
         var items = new List<NestItem> { Item("panel", 10 + NestTolerances.WorkAreaSlack * 1.1, 4, 1) };
-        Assert.Empty(PlateFillService.PackArea("Default", plate, plate.WorkArea(), items, null, CancellationToken.None));
+        Assert.Empty(PlateFillService.PackArea("Fill", plate, plate.WorkArea(), items, null, CancellationToken.None));
     }
 
     [Theory]
@@ -144,7 +144,7 @@ public class AreaPackerTests
         var area = new Box(x, y, w, h);
         var excess = SheetPacker.OverhangAllowance * 0.8;
         var items = new List<NestItem> { w == 5 ? Item("panel", w + excess, h - 0.25, 1) : Item("panel", 8, h + excess, 1) };
-        var parts = PlateFillService.PackArea("Default", plate, area, items, null, CancellationToken.None);
+        var parts = PlateFillService.PackArea("Fill", plate, area, items, null, CancellationToken.None);
         Assert.Equal(fits ? 1 : 0, parts.Count);
     }
 
@@ -181,7 +181,7 @@ public class AreaPackerTests
         var area = new Box(0, 0, 12, 12);
         var items = new List<NestItem> { Item("tall", 5, 7, 3), Item("small", 4, 3, 2) };
 
-        var parts = PlateFillService.PackArea("Default", plate, area, items, null, CancellationToken.None);
+        var parts = PlateFillService.PackArea("Fill", plate, area, items, null, CancellationToken.None);
 
         Assert.Equal(5, parts.Count);
         Assert.Equal(3, parts.Count(p => p.BaseDrawing.Name == "tall"));

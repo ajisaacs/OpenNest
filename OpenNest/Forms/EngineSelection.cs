@@ -13,7 +13,7 @@ namespace OpenNest.Forms
     /// App-scoped nesting-engine selection. The selected name addresses a whole-job
     /// INestingEngine resolved through NestingEngineRegistry at call time; single-plate
     /// interactive fill uses FillStrategy, which maps a built-in engine to its placement
-    /// strategy and falls back to Default for jobs-only engines (StockLadder, plug-ins).
+    /// strategy and falls back to Fill for jobs-only engines (StockLadder, plug-ins).
     /// </summary>
     public static class EngineSelection
     {
@@ -67,8 +67,8 @@ namespace OpenNest.Forms
                 .ToList();
 
         /// <summary>Placement strategy for single-plate fill: the selection when it names a
-        /// built-in strategy, otherwise Default.</summary>
-        public static string FillStrategy => IsFillStrategy(engineName) ? engineName : DefaultEngineName;
+        /// built-in strategy, otherwise Fill.</summary>
+        public static string FillStrategy => IsFillStrategy(engineName) ? engineName : PlateFillService.DefaultStrategy;
 
         public static bool IsFillStrategy(string name) =>
             !string.IsNullOrWhiteSpace(name)

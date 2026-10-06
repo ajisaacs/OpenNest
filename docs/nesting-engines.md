@@ -14,7 +14,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
 | StockLadder | Caller-supplied stock ladders | Constrained-first fill with equivalent-demand area repacking |
-| Default, Strip, Vertical Remnant, Horizontal Remnant | Single-strategy fills | The fixed placement strategies behind interactive fill |
+| Fill, Strip, Vertical Remnant, Horizontal Remnant | Single-strategy fills | The fixed placement strategies behind interactive fill; Fill is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder) |
 
 Rectangles places irregular parts validly, but only as their bounding boxes; it never nests into a
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
@@ -44,8 +44,8 @@ with a single boundary/containment union.
 Any remaining numerical hole is filled only when its entire ring is certified to lie in forbidden
 space, preserving genuine enclosed placement pockets without changing spacing tolerances.
 
-When remaining demand exceeds two, Irregular also offers Default Fill patterns as optional
-multi-member candidates, not as solid bounding boxes or a whole-job Default fallback. It searches
+When remaining demand exceeds two, Irregular also offers Fill patterns as optional
+multi-member candidates, not as solid bounding boxes or a whole-job Fill fallback. It searches
 the empty work area and physical leftover space for up to two high-area rectangles. Occupied
 outlines are expanded by part spacing before rectangle search. Each sheet prepares blocks initially
 and after its first placement, for up to four high-demand-area types; each type has at most eight
@@ -67,7 +67,7 @@ engine, so every engine benefits. Nothing calls it yet: a part inside a cutout m
 the cutout's contour, and the sequencer does not enforce that order.
 
 `CutoutLatticeFill` (`OpenNest.Engine/Jobs/Cutouts/`) fills one closed cutout with copies of one
-part. It runs Default Fill over the cutout's bounds plus one part step on every side, then shifts
+part. It runs Fill over the cutout's bounds plus one part step on every side, then shifts
 that lattice across a grid of offsets of up to half a step each way. At each offset it keeps the
 copies whose spacing-grown outline lies inside the cutout, using the part's inner-fit region of
 the inscribed, flattened cutout, and the offset keeping the most copies wins. Every returned pose
@@ -78,16 +78,20 @@ calls for some parts, so results are not yet guaranteed identical between runs.
 
 ## Renamed engines
 
-Earlier releases shipped these as plug-ins under other names. The registry maps the old names so
-saved desktop selections, scripts and API requests keep working:
+The registry maps names used by earlier releases (the first two shipped as plug-ins) so saved
+desktop selections, scripts and API requests keep working:
 
 | Old name | Now |
 |---|---|
 | `Opus55NestingEngine` | Irregular |
 | `RectanglesNestingEngine` | Rectangles |
+| `Default` | Fill |
+
+Fill strategy calls (interactive fill, `PlateFillService`, console fill without `--autonest`, MCP fill
+tools) also accept `Default` as Fill.
 
 Gpt6Astra and Qwen38FlashNext are no longer shipped and have no alias. A saved selection of either
-falls back to Default with the usual status-bar warning.
+falls back to the default engine with the usual status-bar warning.
 
 ## Changing an engine
 

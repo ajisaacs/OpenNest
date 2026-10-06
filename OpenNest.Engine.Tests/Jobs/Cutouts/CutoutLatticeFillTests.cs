@@ -54,7 +54,7 @@ public class CutoutLatticeFillTests
     }
 
     // Both cases fail intermittently; unskip when Project Memory opennest issue c98c21bd is fixed.
-    private const string FillNondeterminism = "Open defect (Project Memory opennest c98c21bd): Default Fill can "
+    private const string FillNondeterminism = "Open defect (Project Memory opennest c98c21bd): Fill can "
         + "return different, equally scored lattices between identical calls.";
 
     [Theory]

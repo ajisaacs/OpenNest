@@ -63,7 +63,7 @@ public class ActionSelectAreaCutOffTests
             program.LineTo(3, 0);
             program.LineTo(0, 0);
             // ActionFillArea passes SelectedArea directly to this service.
-            var parts = PlateFillService.FillItem("Default", plate,
+            var parts = PlateFillService.FillItem("Fill", plate,
                 new NestItem { Drawing = new Drawing("square", program) }, area, null, CancellationToken.None);
             Assert.NotEmpty(parts);
             Assert.All(parts, part =>

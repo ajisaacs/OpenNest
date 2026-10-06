@@ -38,7 +38,7 @@ public class NativeUClearanceTests
             PartSpacing = 0.25,
             EdgeSpacing = new Spacing(1, 1),
         };
-        var parts = PlateFillService.FillItem("Default", plate,
+        var parts = PlateFillService.FillItem("Fill", plate,
             new NestItem { Drawing = drawing, Quantity = quantity }, plate.WorkArea(),
             null, CancellationToken.None);
 

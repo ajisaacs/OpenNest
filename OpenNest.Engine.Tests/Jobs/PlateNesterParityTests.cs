@@ -22,7 +22,7 @@ public class PlateNesterParityTests
     private static NestJob Job(
         IReadOnlyList<NestJobPart> parts,
         int? stockQuantity = 3,
-        string strategy = "Default"
+        string strategy = "Fill"
     )
     {
         var stock = new NestPlateStock("stock", PlateSize, stockQuantity, 1, Edge);
@@ -97,7 +97,7 @@ public class PlateNesterParityTests
     [Fact]
     public void Builtins_AreResolvedByProductionFactory()
     {
-        Assert.IsType<DefaultPlateNester>(PlateNesterFactory.Create("Default"));
+        Assert.IsType<DefaultPlateNester>(PlateNesterFactory.Create("Fill"));
         Assert.IsType<StripPlateNester>(PlateNesterFactory.Create("Strip"));
         Assert.IsType<RemnantPlateNester>(PlateNesterFactory.Create("Vertical Remnant"));
         Assert.IsType<RemnantPlateNester>(PlateNesterFactory.Create("Horizontal Remnant"));
@@ -234,7 +234,7 @@ public class PlateNesterParityTests
     [Fact]
     public void RemnantRestrictedRotation_NeverTouchesFiller()
     {
-        // Same safety rule for the remnant nester, whose fillers inherit the Default pipeline's
+        // Same safety rule for the remnant nester, whose fillers inherit the Fill pipeline's
         // automatic-rotation limitation. The throwing factory proves the filler is never
         // constructed; completion at the locked angle proves OrderedPlateNester handled it.
         var part = new NestJobPart(

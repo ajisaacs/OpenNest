@@ -22,7 +22,7 @@ public class FixedStrategyNestingEngineTests
     [Fact]
     public void PreservesJobMaxPlates()
     {
-        var engine = new FixedStrategyNestingEngine("Default");
+        var engine = new FixedStrategyNestingEngine("Fill");
         var part = new NestJobPart(
             "part",
             PartGeometrySnapshot.FromProgram(TestDrawingFactory.Rectangle(100, 100)),
@@ -39,7 +39,7 @@ public class FixedStrategyNestingEngineTests
         var job = new NestJob(
             new[] { part },
             new[] { stock },
-            new NestJobOptions("Default", maxPlates: 1)
+            new NestJobOptions("Fill", maxPlates: 1)
         );
 
         var result = engine.Solve(job);

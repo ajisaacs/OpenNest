@@ -8,7 +8,7 @@ namespace OpenNest.Engine.Tests.Jobs;
 public class PlateFillerContractTests
 {
     [Theory]
-    [InlineData("Default")]
+    [InlineData("Fill")]
     [InlineData("Vertical Remnant")]
     [InlineData("Horizontal Remnant")]
     public void StandardPlateFiller_Fill_ReturnsPartsBoundToInputDrawing(string strategy)
@@ -353,7 +353,7 @@ public class PlateFillerContractTests
 
     private static PlateFillerBase CreateFiller(string strategy, Plate plate) => strategy switch
     {
-        "Default" => new DefaultPlateFiller(plate),
+        "Fill" => new DefaultPlateFiller(plate),
         "Vertical Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical),
         "Horizontal Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal),
         _ => throw new ArgumentOutOfRangeException(nameof(strategy)),

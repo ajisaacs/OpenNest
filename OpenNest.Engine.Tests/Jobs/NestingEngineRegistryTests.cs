@@ -12,7 +12,7 @@ public class NestingEngineRegistryTests
 
         Assert.Contains("Rectangles", names);
         Assert.Contains("Irregular", names);
-        Assert.Contains("Default", names);
+        Assert.Contains("Fill", names);
         Assert.Contains("Strip", names);
         Assert.Contains("Vertical Remnant", names);
         Assert.Contains("Horizontal Remnant", names);
@@ -43,7 +43,7 @@ public class NestingEngineRegistryTests
         var before = NestingEngineRegistry.AvailableEngines.Count;
 
         NestingEngineRegistry.Register("Opus55NestingEngine", "stale plug-in",
-            () => new FixedStrategyNestingEngine("Default"));
+            () => new FixedStrategyNestingEngine("Fill"));
 
         Assert.Equal(before, NestingEngineRegistry.AvailableEngines.Count);
         Assert.Equal("Irregular", NestingEngineRegistry.ResolveName("Opus55NestingEngine"));
@@ -67,9 +67,9 @@ public class NestingEngineRegistryTests
         var before = NestingEngineRegistry.AvailableEngines.Count;
 
         NestingEngineRegistry.Register(
-            "Default",
+            "Fill",
             "duplicate",
-            () => new FixedStrategyNestingEngine("Default")
+            () => new FixedStrategyNestingEngine("Fill")
         );
 
         Assert.Equal(before, NestingEngineRegistry.AvailableEngines.Count);
@@ -78,7 +78,7 @@ public class NestingEngineRegistryTests
     [Fact]
     public void CreateResolvesKnownNamesCaseInsensitivelyAndRejectsUnknown()
     {
-        Assert.NotNull(NestingEngineRegistry.Create("default"));
+        Assert.NotNull(NestingEngineRegistry.Create("fill"));
         Assert.NotNull(NestingEngineRegistry.Create("Vertical Remnant"));
         Assert.NotNull(NestingEngineRegistry.Create("stockladder"));
 

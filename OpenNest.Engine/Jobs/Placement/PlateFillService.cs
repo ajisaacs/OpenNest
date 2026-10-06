@@ -15,10 +15,16 @@ namespace OpenNest.Engine.Jobs.Placement;
 /// </summary>
 public static class PlateFillService
 {
+    /// <summary>Strategy used when a caller selection names none.</summary>
+    public const string DefaultStrategy = "Fill";
+
+    /// <summary>Name of the Fill strategy in earlier releases; accepted as an alias.</summary>
+    private const string LegacyFillName = "Default";
+
     /// <summary>The four built-in strategy names, in registry display order.</summary>
     public static IReadOnlyList<string> BuiltInStrategies { get; } =
     [
-        "Default",
+        "Fill",
         "Strip",
         "Vertical Remnant",
         "Horizontal Remnant",
@@ -91,9 +97,10 @@ public static class PlateFillService
     }
 
     /// <summary>
-    /// Resolves a caller-supplied strategy name: null or empty means "Default"; otherwise the name
+    /// Resolves a caller-supplied strategy name: null or empty means "Fill"; otherwise the name
     /// must match a built-in strategy, matched case-insensitively like the legacy registry's
-    /// ActiveEngineName so tolerant interactive callers keep working. Returns the canonical name;
+    /// ActiveEngineName so tolerant interactive callers keep working. "Default", the Fill
+    /// strategy's name in earlier releases, still resolves to "Fill". Returns the canonical name;
     /// unknown names throw <see cref="NotSupportedException"/>.
     /// </summary>
     public static string ResolveStrategy(string strategy) => ResolveStrategy(strategy, true);
@@ -105,12 +112,14 @@ public static class PlateFillService
         if (string.IsNullOrWhiteSpace(strategy))
         {
             if (allowEmpty)
-                return "Default";
+                return DefaultStrategy;
             throw new NotSupportedException(
                 $"Unknown placement strategy: '{strategy}'. Known strategies: {string.Join(", ", BuiltInStrategies)}."
             );
         }
 
+        if (strategy.Equals(LegacyFillName, StringComparison.OrdinalIgnoreCase))
+            return DefaultStrategy;
         foreach (var candidate in BuiltInStrategies)
         {
             if (candidate.Equals(strategy, StringComparison.OrdinalIgnoreCase))
@@ -122,13 +131,13 @@ public static class PlateFillService
         );
     }
 
-    /// <summary>Builds the filler for an optional strategy (null/empty = Default).</summary>
+    /// <summary>Builds the filler for an optional strategy (null/empty = Fill).</summary>
     private static PlateFillerBase CreateFiller(string strategy, Plate plate)
     {
         ArgumentNullException.ThrowIfNull(plate);
         return ResolveStrategy(strategy) switch
         {
-            "Default" => new DefaultPlateFiller(plate),
+            "Fill" => new DefaultPlateFiller(plate),
             "Strip" => new StripPlateFiller(plate),
             "Vertical Remnant" => new RemnantPlateFiller(plate, RemnantFillPolicy.Vertical),
             _ => new RemnantPlateFiller(plate, RemnantFillPolicy.Horizontal),
@@ -140,7 +149,7 @@ public static class PlateFillService
     {
         ArgumentNullException.ThrowIfNull(strategy);
         // An explicit empty string is an unknown strategy; only ResolveStrategy(string),
-        // used for caller selections, maps null/empty to Default.
+        // used for caller selections, maps null/empty to Fill.
         ResolveStrategy(strategy, allowEmpty: false);
         return CreateFiller(strategy, plate);
     }

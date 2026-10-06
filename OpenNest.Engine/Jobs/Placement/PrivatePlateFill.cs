@@ -10,7 +10,7 @@ using OpenNest.Geometry;
 namespace OpenNest.Engine.Jobs.Placement;
 
 /// <summary>
-/// Runs the Default Fill for one private drawing on a private plate, for callers that turn the
+/// Runs the Fill strategy for one private drawing on a private plate, for callers that turn the
 /// result into job poses. The caller owns the drawing and must call
 /// <see cref="BestFitCache.Invalidate"/> for it when finished.
 /// </summary>

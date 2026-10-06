@@ -260,7 +260,7 @@ public class NestJobGeometryTests
     }
 
     [Theory]
-    [InlineData("Default")]
+    [InlineData("Fill")]
     [InlineData("Strip")]
     public void RealEngineSmokeCasesPreserveInputAndProduceSafeAccounting(string strategy)
     {

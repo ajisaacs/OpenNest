@@ -10,7 +10,7 @@ public class NestLayoutCheckEquivalenceTests
 {
     [Theory]
     [InlineData("StockLadder")]
-    [InlineData("Default")]
+    [InlineData("Fill")]
     [InlineData("Strip")]
     [InlineData("Vertical Remnant")]
     [InlineData("Horizontal Remnant")]

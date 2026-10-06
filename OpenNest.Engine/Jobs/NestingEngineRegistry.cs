@@ -28,6 +28,7 @@ public static class NestingEngineRegistry
     {
         ["Opus55NestingEngine"] = "Irregular",
         ["RectanglesNestingEngine"] = "Rectangles",
+        ["Default"] = "Fill",
     };
 
     static NestingEngineRegistry()
@@ -51,9 +52,9 @@ public static class NestingEngineRegistry
         );
 
         Register(
-            "Default",
+            "Fill",
             "Multi-phase nesting (Linear, Pairs, RectBestFit, Remainder)",
-            () => new FixedStrategyNestingEngine("Default")
+            () => new FixedStrategyNestingEngine("Fill")
         );
 
         Register(

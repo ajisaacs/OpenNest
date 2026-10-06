@@ -26,9 +26,9 @@ public class ExplicitPlacementStrategyTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void ResolveStrategy_UnsetMeansDefault(string strategy)
+    public void ResolveStrategy_UnsetMeansFill(string strategy)
     {
-        Assert.Equal("Default", PlateFillService.ResolveStrategy(strategy));
+        Assert.Equal("Fill", PlateFillService.ResolveStrategy(strategy));
     }
 
     [Theory]

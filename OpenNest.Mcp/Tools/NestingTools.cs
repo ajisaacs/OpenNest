@@ -31,7 +31,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Index of the plate to fill")] int plateIndex,
             [Description("Name of the drawing to fill with")] string drawingName,
             [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0,
-            [Description("Placement strategy: Default, Strip, Vertical Remnant, Horizontal Remnant")]
+            [Description("Placement strategy: Fill, Strip, Vertical Remnant, Horizontal Remnant")]
                 string engine = null
         )
         {
@@ -84,7 +84,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Width of the area")] double width,
             [Description("Length of the area")] double length,
             [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0,
-            [Description("Placement strategy: Default, Strip, Vertical Remnant, Horizontal Remnant")]
+            [Description("Placement strategy: Fill, Strip, Vertical Remnant, Horizontal Remnant")]
                 string engine = null
         )
         {
@@ -134,7 +134,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Index of the plate")] int plateIndex,
             [Description("Name of the drawing to fill with")] string drawingName,
             [Description("Maximum quantity per remnant (0 = unlimited)")] int quantity = 0,
-            [Description("Placement strategy: Default, Strip, Vertical Remnant, Horizontal Remnant")]
+            [Description("Placement strategy: Fill, Strip, Vertical Remnant, Horizontal Remnant")]
                 string engine = null
         )
         {
@@ -197,7 +197,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Index of the plate")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
             [Description("Comma-separated quantities for each drawing")] string quantities,
-            [Description("Placement strategy: Default, Strip, Vertical Remnant, Horizontal Remnant")]
+            [Description("Placement strategy: Fill, Strip, Vertical Remnant, Horizontal Remnant")]
                 string engine = null
         )
         {

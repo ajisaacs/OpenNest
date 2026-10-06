@@ -105,7 +105,7 @@ public class NestJobRunnerTests
         Assert.Equal(100, job.Plates[0].Size.Width);
         Assert.Equal(1, job.Plates[0].EdgeSpacing.Left);
         Assert.Equal(0, job.Plates[0].Quantity);
-        Assert.Equal("Default", job.Options.PlacementStrategy);
+        Assert.Equal("Fill", job.Options.PlacementStrategy);
         Assert.Throws<NotSupportedException>(() => ((IList<NestJobPart>)job.Parts).Clear());
     }
 

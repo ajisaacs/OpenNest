@@ -13,8 +13,8 @@ namespace OpenNest.Engine.Jobs.Placement;
 /// <see cref="DefaultPlateNester"/>.
 /// </summary>
 /// <remarks>
-/// The remnant fillers share the Default pipeline's automatic-rotation limitation, so non-automatic
-/// requirements route through <see cref="OrderedPlateNester"/> exactly as they do for Default.
+/// The remnant fillers share the Fill pipeline's automatic-rotation limitation, so non-automatic
+/// requirements route through <see cref="OrderedPlateNester"/> exactly as they do for Fill.
 /// </remarks>
 public sealed class RemnantPlateNester : IPlateNester
 {
@@ -45,7 +45,7 @@ public sealed class RemnantPlateNester : IPlateNester
         ArgumentNullException.ThrowIfNull(request);
         token.ThrowIfCancellationRequested();
 
-        // Same safety rule as DefaultPlateNester: the remnant fillers inherit the Default pipeline's
+        // Same safety rule as DefaultPlateNester: the remnant fillers inherit the Fill pipeline's
         // automatic-rotation limitation, so any non-automatic requirement goes to the policy-aware
         // ordered nester.
         if (request.Parts.Any(part => part.Rotation.Kind != RotationPolicyKind.Automatic))

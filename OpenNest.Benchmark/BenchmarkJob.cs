@@ -83,7 +83,7 @@ namespace OpenNest.Benchmark
                 parts,
                 stock,
                 new NestJobOptions(
-                    "Default",
+                    "Fill",
                     maxPlates,
                     salvageRate ?? SalvageRate,
                     minimumSalvageDimension ?? 0

@@ -145,7 +145,7 @@ public class NestJobExampleTests
                     quadrant: 1
                 ),
             },
-            new NestJobOptions("Default", maxPlates: 1)
+            new NestJobOptions("Fill", maxPlates: 1)
         );
 
         var result = new NestJobRunner(PlateNesterFactory.Create).Solve(job);
@@ -172,7 +172,7 @@ public class NestJobExampleTests
         var item = new NestItem { Drawing = drawing, Quantity = 1 };
 
         var parts = PlateFillService.Nest(
-            "Default",
+            "Fill",
             plate,
             new List<NestItem> { item },
             progress: null,

@@ -165,7 +165,7 @@ public class GoldenLayoutTests
     [Fact]
     public void Default_MixedJob_GoldenLayout()
     {
-        var result = SolveStable(new NestJobRunner(PlateNesterFactory.Create), MixedJob("Default"));
+        var result = SolveStable(new NestJobRunner(PlateNesterFactory.Create), MixedJob("Fill"));
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(20, result.Plates.Sum(p => p.Placements.Count));
         AssertGolden(
@@ -299,7 +299,7 @@ public class GoldenLayoutTests
     [Fact]
     public void OrderedViaStockLadder_MixedJob_GoldenLayout()
     {
-        var result = SolveStable(new StockLadderNestingEngine(), MixedJob("Default"));
+        var result = SolveStable(new StockLadderNestingEngine(), MixedJob("Fill"));
         Assert.Equal(NestJobStatus.Complete, result.Status);
         AssertGolden(
             result,
@@ -338,7 +338,7 @@ public class GoldenLayoutTests
                 new NestPlateStock("small", new Size(14, 14), 4, 1, new Spacing(1, 1, 1, 1)),
                 new NestPlateStock("large", new Size(30, 24), 3, 1, new Spacing(1, 1, 1, 1)),
             },
-            new NestJobOptions("Default")
+            new NestJobOptions("Fill")
         );
 
     private sealed record AuthoritativeStage(
@@ -408,7 +408,7 @@ public class GoldenLayoutTests
     {
         var stages = new List<AuthoritativeStage>();
         var legacyPhases = new SortedSet<string>();
-        var result = new FixedStrategyNestingEngine("Default").Solve(
+        var result = new FixedStrategyNestingEngine("Fill").Solve(
             ProgressJob(),
             new StageCollector(stages, legacyPhases)
         );

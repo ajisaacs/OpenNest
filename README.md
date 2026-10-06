@@ -64,7 +64,7 @@ Key options: `--size WxL`, `--autonest` (validated single-sheet whole-job nestin
 
 ```bash
 dotnet run --project OpenNest.Benchmark -- ./benchmark-jobs \
-  --sheet-sizes 48x96,60x120,72x120 --engines Default,StockLadder --csv results.csv
+  --sheet-sizes 48x96,60x120,72x120 --engines Irregular,Rectangles --csv results.csv
 ```
 
 Layouts are validated (bounds, spacing, quantity, rotation, stock match); invalid runs place nothing and pay the penalty. `--parallel` (default 3) speeds up scoring but inflates `Time(ms)` — use `--parallel 1` when comparing speed. Pass `--sheet-sizes` for an unbiased run; otherwise only each file's original sizes are offered. `--progress` logs each solve's start, the engine's `NestJobProgress` (plate evaluations throttled to one line per 2 s, every plate commit) and its finish. Custom engines drop in as DLLs implementing `INestingEngine` (public parameterless constructor) in an `Engines/` folder next to the benchmark. Built-in engines and how to change them: [nesting engines](docs/nesting-engines.md).
@@ -93,7 +93,7 @@ Engines implement `INestingEngine.Solve(NestJob)`. Desktop Auto Nest, console au
 |--------|-------------|
 | **Rectangles** | Plain and near-rectangular plates: maximal-rectangles box packing |
 | **Irregular** | Irregular profiles: no-fit-polygon frontier packing |
-| **Default** | Multi-phase: linear fill → pairs → rect best-fit → extents |
+| **Fill** | Multi-phase: linear fill → pairs → rect best-fit → extents (named Default in earlier releases) |
 | **Strip** | Iterative shrink-fill for mixed-drawing layouts |
 | **Vertical / Horizontal Remnant** | Optimizes a clean remnant drop on one edge |
 | **StockLadder** | Whole-job, stock-constrained baseline with salvage-credit ranking |

@@ -18,7 +18,7 @@ Fresh-process import/cache/materialization probes used a 24-by-24 sheet, one-inc
 | --- | --- | --- |
 | Smallest-envelope kept pair, minimum raw clearance | 0.22548054744486495 | 0.24999929486961545 |
 | `PairFiller`, 70 parts, minimum raw clearance | 0.22548054744486434 | 0.24999929486961417 |
-| `PlateFillService.FillItem("Default")`, 70 parts, minimum raw clearance | 0.2254805474448648 | 0.24999929486961447 |
+| `PlateFillService.FillItem("Fill")`, 70 parts, minimum raw clearance | 0.2254805474448648 | 0.24999929486961447 |
 
 Measurements use raw material outlines tessellated at 1e-6 chord tolerance and independent Shapely boundary distances, not the slide solver or its offset contours. The roughly 7e-7 shortfall is within tessellation error. These specific pair/grid polygons were valid; no geometry repair was applied. The corrected top pair passes the existing validator. The full grids do **not** pass it; see below.
 
