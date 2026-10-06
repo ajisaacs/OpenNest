@@ -13,13 +13,6 @@ public sealed record LeadPathValidationResult(bool IsComplete, bool IsClear, str
 /// <summary>Certifies actual emitted native lead paths against owned nominal material.</summary>
 public static class LeadPathValidator
 {
-    /// <summary>
-    /// Relative separation beyond which another material is skipped. Scaled by coordinate size,
-    /// it stays far above both the contact tolerance and the rounding of the extents themselves,
-    /// so a lead touching a boundary within tolerance is always checked.
-    /// </summary>
-    internal const double ClearanceMargin = 1e-6;
-
     public static LeadPathValidationResult Check(OwnedExecution execution, LeadMaterialSnapshot target,
         IReadOnlyList<LeadMaterialSnapshot> otherMaterials, CancellationToken token = default)
     {
@@ -92,13 +85,12 @@ public static class LeadPathValidator
                 if (failure != null)
                     return new(true, false, $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure}).");
                 var reach = move.Curve.Extent;
-                var margin = ClearanceMargin * (1 + reach.Magnitude);
                 foreach (var material in otherMaterials)
                 {
                     token.ThrowIfCancellationRequested();
                     // Material lies within its extent, so a lead well clear of that extent can
                     // neither touch it nor lie inside it.
-                    if (ReferenceEquals(material, target) || reach.IsSeparatedFrom(material.Extent, margin))
+                    if (ReferenceEquals(material, target) || reach.IsClearOf(material.Extent))
                         continue;
                     if (CheckMaterial(material, null) != null)
                         return new(true, false, "Lead contacts or enters another placed material.");

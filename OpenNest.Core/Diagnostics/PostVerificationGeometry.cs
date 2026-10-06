@@ -21,22 +21,34 @@ internal static class PostVerificationGeometry
         internal Extent Union(Extent other) => new(System.Math.Min(MinX, other.MinX),
             System.Math.Min(MinY, other.MinY), System.Math.Max(MaxX, other.MaxX), System.Math.Max(MaxY, other.MaxY));
 
-        /// <summary>The largest absolute coordinate, for scaling tolerances; NaN when any bound is.</summary>
-        internal double Magnitude => System.Math.Max(System.Math.Max(System.Math.Abs(MinX), System.Math.Abs(MaxX)),
-            System.Math.Max(System.Math.Abs(MinY), System.Math.Abs(MaxY)));
+        /// <summary>
+        /// The gap two extents need before their checks may be skipped: ten times the widest
+        /// absolute band any native contact query allows beyond an extent (the 0.00001 bounding-box
+        /// allowance of native intersections, the 0.0001 contact reach of tiny arcs).
+        /// </summary>
+        internal const double ClearMargin = 1e-3;
 
         /// <summary>
-        /// True only when the extents are farther apart than <paramref name="margin"/> on some axis,
-        /// so nothing inside one can touch or enter the other. An extent with any nonfinite bound
-        /// (including the empty one) is never separated.
+        /// Coordinates up to which extents may be skipped at all. Within it rounding stays far below
+        /// <see cref="ClearMargin"/>; beyond it, where rounding of large supports can exceed any fixed
+        /// margin, every check runs.
         /// </summary>
-        internal bool IsSeparatedFrom(Extent other, double margin) => IsFinite && other.IsFinite
-            && double.IsFinite(margin)
-            && (MaxX + margin < other.MinX || other.MaxX + margin < MinX
-                || MaxY + margin < other.MinY || other.MaxY + margin < MinY);
+        internal const double WellConditionedLimit = 1e6;
 
-        private bool IsFinite => double.IsFinite(MinX) && double.IsFinite(MinY)
-            && double.IsFinite(MaxX) && double.IsFinite(MaxY);
+        /// <summary>
+        /// True only when both extents are finite, lie within <see cref="WellConditionedLimit"/> and
+        /// are more than <see cref="ClearMargin"/> apart on some axis, so no native query can count
+        /// anything in one as touching or entering the other. Everything else must be checked.
+        /// </summary>
+        internal bool IsClearOf(Extent other) => IsWellConditioned && other.IsWellConditioned
+            && (MaxX + ClearMargin < other.MinX || other.MaxX + ClearMargin < MinX
+                || MaxY + ClearMargin < other.MinY || other.MaxY + ClearMargin < MinY);
+
+        // Math.Max propagates NaN and no comparison with NaN holds, so NaN and infinite bounds
+        // (including the empty extent's) fail this test too.
+        private bool IsWellConditioned =>
+            System.Math.Max(System.Math.Max(System.Math.Abs(MinX), System.Math.Abs(MaxX)),
+                System.Math.Max(System.Math.Abs(MinY), System.Math.Abs(MaxY))) <= WellConditionedLimit;
     }
 
     internal static void Validate(Vector point)

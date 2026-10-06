@@ -146,13 +146,87 @@ public class NearbyMaterialCheckTests
     }
 
     [Fact]
+    public void LeadEndingWithinTheNativeBoxAllowanceOfAnotherPart_IsRefused()
+    {
+        // The other part lies 0.000003 above the lead: outside both extents, but within the
+        // 0.00001 allowance the native line intersection grants its bounding boxes.
+        var target = LeadMaterialSnapshot.Capture(LeadPathValidationTests.Rectangle(0, -2, 2, 0), Vector.Zero);
+        var other = LeadMaterialSnapshot.Capture(LeadPathValidationTests.Rectangle(-1, 0.000003, -0.25, 1), Vector.Zero);
+        Assert.True(other.IsComplete, other.Reason);
+        var lead = new Program();
+        lead.MoveTo(-0.5, 0);
+        lead.Codes.Add(new LinearMove(0, 0) { Layer = LayerType.Leadin });
+        lead.LineTo(0, -2);
+
+        var result = LeadPathValidator.Check(Read(lead), target, [target, other]);
+
+        Assert.True(result.IsComplete, result.Reason);
+        Assert.False(result.IsClear);
+    }
+
+    [Fact]
+    public void RapidBesideAHugeCompletedCircle_IsStillACrossing()
+    {
+        // Radius 5e11 about (5e11, 0): its extent starts at x = 0, but at this size rounding lets
+        // the native query count a rapid at x = -0.00001 as touching it.
+        var state = new ReleasedContourState();
+        state.Check(Read(HugeCircle()), null, 1);
+        var rapid = new Program();
+        rapid.MoveTo(-1e-5, 1);
+
+        var findings = state.Check(Read(rapid), new Vector(-1e-5, -1), 2);
+
+        Assert.Contains(findings, f => f.Kind == PostVerificationKind.RapidCrossing && f.OtherPartNumber == 1);
+    }
+
+    [Fact]
+    public void LeadBesideAHugeCircle_IsRefused()
+    {
+        var huge = LeadMaterialSnapshot.Capture(HugeCircle(), Vector.Zero);
+        Assert.True(huge.IsComplete, huge.Reason);
+        var target = LeadMaterialSnapshot.Capture(LeadPathValidationTests.Rectangle(-2, -1, -0.002, -0.5), Vector.Zero);
+        var lead = new Program();
+        lead.MoveTo(-1e-5, 1);
+        lead.Codes.Add(new LinearMove(-1e-5, -0.5) { Layer = LayerType.Leadin });
+        lead.Codes.Add(new LinearMove(-0.002, -0.5) { Layer = LayerType.Leadin });
+        lead.LineTo(-2, -0.5);
+
+        var result = LeadPathValidator.Check(Read(lead), target, [target, huge]);
+
+        Assert.True(result.IsComplete, result.Reason);
+        Assert.False(result.IsClear);
+    }
+
+    [Theory]
+    [InlineData(2.002, 0, true)] // 0.002 apart: clear of the 0.001 margin.
+    [InlineData(2.0005, 0, false)] // 0.0005 apart: inside the margin.
+    [InlineData(2.002, 2e6, false)] // Clear, but beyond the well-conditioned range: always checked.
+    public void IsClearOf_OnlyWellApartAndWellConditionedExtentsAreSkipped(double left, double offset, bool clear)
+    {
+        var a = new PostVerificationGeometry.Extent(offset, offset, offset + 2, offset + 2);
+        var b = new PostVerificationGeometry.Extent(offset + left, offset, offset + left + 1, offset + 1);
+
+        Assert.Equal(clear, a.IsClearOf(b));
+        Assert.Equal(clear, b.IsClearOf(a));
+    }
+
+    [Fact]
     public void ExtentWithANaNBound_IsNeverSeparated()
     {
         var partial = new PostVerificationGeometry.Extent(double.NaN, 0, double.NaN, 1);
         var other = new PostVerificationGeometry.Extent(0, 4, 1, 5);
 
-        Assert.False(partial.IsSeparatedFrom(other, 1e-6));
-        Assert.False(other.IsSeparatedFrom(partial, 1e-6));
+        Assert.False(partial.IsClearOf(other));
+        Assert.False(other.IsClearOf(partial));
+        Assert.False(PostVerificationGeometry.Extent.None.IsClearOf(other)); // Infinite bounds.
+    }
+
+    private static Program HugeCircle()
+    {
+        var p = new Program();
+        p.MoveTo(0, 0);
+        p.Codes.Add(new ArcMove(Vector.Zero, new Vector(5e11, 0), RotationType.CCW));
+        return p;
     }
 
     private static Program CleanCircle(double radius)
