@@ -43,6 +43,21 @@
           "project": "OpenNest.WinForms.Tests",
           "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.RowsWithoutADrawing_CannotEnterEditMode",
           "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.FileNameWithDxfExtension_RealRowBuilderShowsReady",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.BlankThickness_RealRowBuilderResolvesDrawingAndGridEditMakesReadyGroup",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.DuplicateRows_CreateNestsButtonImportsOneDrawingWithCombinedQuantity",
+          "minimum_cases": 1
         }
       ],
       "remaining_acceptance": [
@@ -61,6 +76,16 @@
         {
           "project": "OpenNest.WinForms.Tests",
           "method": "OpenNest.WinForms.Tests.Forms.EditNestInfoFormTests.SaveWithUnchangedMaterial_KeepsGradeAndDensity",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestInfoFormTests.ShownEditorOk_FileRoundTripPreservesUnchangedMaterialGradeAndDensity",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestInfoFormTests.ShownEditorOk_FileRoundTripClearsOldMetadataWhenMaterialNameChanges",
           "minimum_cases": 1
         }
       ],
