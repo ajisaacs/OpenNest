@@ -102,9 +102,12 @@ shortened, disabled or substituted as a search fallback.
 
 Every candidate rapid is checked against contours already completed, including
 earlier holes in the same part. Future contours are not yet obstacles. Rapid and
-lead checks skip contours and material whose extents (an arc's whole supporting
-circle) are more than 1e-6 x (1 + coordinate size) clear of the motion; anything
-closer, touching included, gets the full native check. Actual
+lead checks skip contours and material whose extents are more than 1e-6 x
+(1 + coordinate size) clear of the motion; anything closer, touching included, gets
+the full native check. An arc's extent is its whole supporting circle widened to
+the distance at which the native contact query still counts it as touched (for a
+very small arc up to 1e-4 beyond its radius), and an extent with any nonfinite
+bound is never skipped. Actual
 lead-in and lead-out line/arc paths must stay in target scrap and avoid other
 placed material; holes in other parts remain scrap. Tangent/coincident contacts
 outside the genuine target contour joint and numerically uncertain queries refuse.
