@@ -41,6 +41,25 @@ def read_suite(path):
             "detail": "\n".join(output.itertext()).strip() if output is not None else "",
         })
     summary = root.find("{*}ResultSummary")
+    validation_errors = []
+    try:
+        validate_summary(path, summary, results)
+    except (ValueError, KeyError) as exc:
+        validation_errors.append(str(exc))
+    output = summary.find("{*}Output") if summary is not None else None
+    return {
+        "file": path.name,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "total": len(results),
+        "outcomes": dict(sorted(Counter(r["outcome"] for r in results).items())),
+        "results": results,
+        "summary_outcome": summary.attrib.get("outcome") if summary is not None else None,
+        "summary_output": "\n".join(output.itertext()).strip() if output is not None else "",
+        "validation_errors": validation_errors,
+    }
+
+
+def validate_summary(path, summary, results):
     if summary is None or summary.attrib.get("outcome") not in ("Completed", "Passed"):
         raise ValueError(f"{path.name}: missing or unsuccessful run summary")
     counters = summary.find("{*}Counters")
@@ -64,13 +83,6 @@ def read_suite(path):
         raise ValueError(f"{path.name}: notExecuted counter does not match skip rows")
     if values.get("completed", 0) not in (0, values["executed"]):
         raise ValueError(f"{path.name}: completed counter does not match executed rows")
-    return {
-        "file": path.name,
-        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "total": len(results),
-        "outcomes": dict(sorted(outcomes.items())),
-        "results": results,
-    }
 
 
 def evaluate(manifest, results_dir):
@@ -92,6 +104,7 @@ def evaluate(manifest, results_dir):
         except (OSError, ET.ParseError, ValueError, KeyError) as exc:
             errors.append(f"{project}: {exc}")
     for project, suite in suites.items():
+        errors.extend(f"{project}: {error}" for error in suite["validation_errors"])
         for result in suite["results"]:
             if result["outcome"] not in ("Passed", "NotExecuted"):
                 errors.append(f"{project}: {result['name']} => {result['outcome']}")
@@ -101,6 +114,9 @@ def evaluate(manifest, results_dir):
         if not requirements:
             raise ValueError(f"{group['id']}: empty required test list")
         failures, matched = [], []
+        required_projects = {r["project"] for r in requirements}
+        for project in sorted(required_projects):
+            failures.extend(suites.get(project, {}).get("validation_errors", []))
         seen = set()
         for requirement in requirements:
             project, method, minimum = (

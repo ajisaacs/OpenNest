@@ -123,6 +123,37 @@ class WindowsAcceptanceTests(unittest.TestCase):
         self.write_trx(summary="Aborted")
         self.assertEqual("failed", self.evaluate()["automated_status"])
 
+    def test_failed_summary_and_bad_counters_retain_readable_evidence(self):
+        rows = self.rows + [("Example.Tests.Other.Failure", "Failed"),
+                            ("Example.Tests.Other.Optional", "NotExecuted")]
+        for mode in ("Failed", "Aborted", "bad-counter", "missing-summary"):
+            with self.subTest(mode=mode):
+                path = self.write_trx(rows, summary=mode if mode in ("Failed", "Aborted") else "Completed")
+                tree = ET.parse(path)
+                root = tree.getroot()
+                summary = root.find("{*}ResultSummary")
+                assert summary is not None
+                if mode == "bad-counter":
+                    counters = summary.find("{*}Counters")
+                    assert counters is not None
+                    counters.set("total", "999")
+                ET.SubElement(ET.SubElement(summary, "Output"), "StdOut").text = "runner failure detail"
+                if mode == "missing-summary":
+                    root.remove(summary)
+                tree.write(path, encoding="utf-8", xml_declaration=True)
+                report = self.evaluate()
+                self.assertEqual("failed", report["automated_status"])
+                self.assertIn("Example.Tests", report["suites"])
+                suite = report["suites"]["Example.Tests"]
+                self.assertEqual(4, suite["total"])
+                self.assertEqual({"Passed": 2, "Failed": 1, "NotExecuted": 1}, suite["outcomes"])
+                self.assertTrue(suite["validation_errors"])
+                self.assertEqual("fixture reason", suite["results"][2]["detail"])
+                self.assertEqual("fixture reason", suite["results"][3]["detail"])
+                if mode != "missing-summary":
+                    self.assertIn("runner failure detail", suite["summary_output"])
+                self.assertEqual("failed", report["groups"][0]["automated_status"])
+
     def test_duplicate_or_unmapped_execution_fails(self):
         for old, new in (('executionId="1"', 'executionId="0"'),
                          ('testId="1"', 'testId="not-defined"'), ('id="1"', 'id="0"')):
