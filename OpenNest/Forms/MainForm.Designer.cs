@@ -113,6 +113,7 @@
             calculateCutTimeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem22 = new System.Windows.Forms.ToolStripSeparator();
             mnuNestAutomaticCutOff = new System.Windows.Forms.ToolStripMenuItem();
+            mnuNestPlanCutting = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestAssignLeadIns = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestRemoveLeadIns = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlate = new System.Windows.Forms.ToolStripMenuItem();
@@ -139,6 +140,7 @@
             mnuPlateCutOff = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateAutomaticCutOff = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem21 = new System.Windows.Forms.ToolStripSeparator();
+            mnuPlatePlanCutting = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateAssignLeadIns = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlatePlaceLeadIn = new System.Windows.Forms.ToolStripMenuItem();
             mnuPlateRemoveLeadIns = new System.Windows.Forms.ToolStripMenuItem();
@@ -654,7 +656,7 @@
             // 
             // mnuNest
             // 
-            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestImportDrawing, mnuNestShapeLibrary, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAutomaticCutOff, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
+            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestImportDrawing, mnuNestShapeLibrary, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAutomaticCutOff, mnuNestPlanCutting, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
             mnuNest.Name = "mnuNest";
             mnuNest.Size = new System.Drawing.Size(43, 20);
             mnuNest.Text = "&Nest";
@@ -781,6 +783,13 @@
             mnuNestAutomaticCutOff.Text = "Automatic Scrap Cutoffs (All Plates)...";
             mnuNestAutomaticCutOff.Click += NestAutomaticCutOff_Click;
             //
+            // mnuNestPlanCutting
+            //
+            mnuNestPlanCutting.Name = "mnuNestPlanCutting";
+            mnuNestPlanCutting.Size = new System.Drawing.Size(205, 22);
+            mnuNestPlanCutting.Text = "Plan Cutting (All Plates)...";
+            mnuNestPlanCutting.Click += NestPlanCutting_Click;
+            //
             // mnuNestAssignLeadIns
             //
             mnuNestAssignLeadIns.Name = "mnuNestAssignLeadIns";
@@ -797,7 +806,7 @@
             //
             // mnuPlate
             // 
-            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem, toolStripMenuItem21, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns });
+            mnuPlate.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuPlateEdit, mnuPlateSetAsDefault, toolStripMenuItem18, mnuPlateAdd, mnuPlateRemove, toolStripMenuItem16, mnuPlateCutOff, mnuPlateAutomaticCutOff, mnuPlateRotate, mnuResizeToFitParts, toolStripMenuItem13, mnuPlateViewInCad, toolStripMenuItem20, mnuSequenceParts, calculateCutTimeToolStripMenuItem1, centerPartsToolStripMenuItem, toolStripMenuItem21, mnuPlatePlanCutting, mnuPlateAssignLeadIns, mnuPlatePlaceLeadIn, mnuPlateRemoveLeadIns });
             mnuPlate.Name = "mnuPlate";
             mnuPlate.Size = new System.Drawing.Size(45, 20);
             mnuPlate.Text = "&Plate";
@@ -955,6 +964,13 @@
             //
             toolStripMenuItem21.Name = "toolStripMenuItem21";
             toolStripMenuItem21.Size = new System.Drawing.Size(174, 6);
+            //
+            // mnuPlatePlanCutting
+            //
+            mnuPlatePlanCutting.Name = "mnuPlatePlanCutting";
+            mnuPlatePlanCutting.Size = new System.Drawing.Size(177, 22);
+            mnuPlatePlanCutting.Text = "Plan Cutting...";
+            mnuPlatePlanCutting.Click += PlatePlanCutting_Click;
             //
             // mnuPlateAssignLeadIns
             //
@@ -1440,11 +1456,13 @@
         private System.Windows.Forms.ToolStripMenuItem mnuPlateCutOff;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateAutomaticCutOff;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem21;
+        private System.Windows.Forms.ToolStripMenuItem mnuPlatePlanCutting;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateAssignLeadIns;
         private System.Windows.Forms.ToolStripMenuItem mnuPlatePlaceLeadIn;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateRemoveLeadIns;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem22;
         private System.Windows.Forms.ToolStripMenuItem mnuNestAutomaticCutOff;
+        private System.Windows.Forms.ToolStripMenuItem mnuNestPlanCutting;
         private System.Windows.Forms.ToolStripMenuItem mnuNestAssignLeadIns;
         private System.Windows.Forms.ToolStripMenuItem mnuNestRemoveLeadIns;
     }

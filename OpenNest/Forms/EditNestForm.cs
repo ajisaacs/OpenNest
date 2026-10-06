@@ -69,6 +69,7 @@ namespace OpenNest.Forms
             PlateView.Enter += PlateView_Enter;
             PlateView.PartAdded += PlateView_PartAdded;
             PlateView.PartRemoved += PlateView_PartRemoved;
+            PlateView.PartsReordered += PlateView_PartsReordered;
             PlateView.Dock = DockStyle.Fill;
 
             InitializeComponent();
@@ -860,6 +861,32 @@ namespace OpenNest.Forms
             CalculateCurrentPlateCutTime();
         }
 
+        /// <summary>
+        /// Opens the cutting planner for the active plate or every plate. The planner applies its
+        /// plan itself, all or nothing; on success the confirmed settings become the saved defaults.
+        /// </summary>
+        public bool PlanCutting(bool allPlates, Func<bool> isOperationBusy, IWin32Window owner)
+        {
+            if (PlateView?.Plate == null || Nest == null)
+                return false;
+
+            // The form edits its own copy; the plate's live settings are plate state the plan checks.
+            var parameters = CuttingParametersSerializer.Deserialize(
+                CuttingParametersSerializer.Serialize(LoadOrDefaultParameters(PlateView.Plate.CuttingParameters)));
+            using var form = new CuttingPlanForm(PlateView, Nest, allPlates, parameters, isOperationBusy);
+            if (form.ShowDialog(owner) != DialogResult.OK)
+                return false;
+
+            SaveCuttingParameters(form.ConfirmedParameters);
+            UpdatePlateList();
+            if (form.CommitResult?.RefreshErrors.Count > 0)
+                MessageBox.Show(owner,
+                    "The cutting plan was applied, but part of the display did not refresh: "
+                        + form.CommitResult.RefreshErrors[0].Message,
+                    "Plan Cutting", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return true;
+        }
+
         public void AssignLeadIns_Click(object sender, EventArgs e)
         {
             if (PlateView?.Plate == null)
@@ -1163,6 +1190,12 @@ namespace OpenNest.Forms
         }
 
         private void PlateView_PartAdded(object sender, ItemAddedEventArgs<Part> e)
+        {
+            updateDrawingListTimer.Stop();
+            updateDrawingListTimer.Start();
+        }
+
+        private void PlateView_PartsReordered(object sender, EventArgs e)
         {
             updateDrawingListTimer.Stop();
             updateDrawingListTimer.Start();

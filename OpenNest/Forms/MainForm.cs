@@ -1789,6 +1789,42 @@ namespace OpenNest.Forms
             }
         }
 
+        private void PlatePlanCutting_Click(object sender, EventArgs e) => ShowCuttingPlan(allPlates: false);
+
+        private void NestPlanCutting_Click(object sender, EventArgs e) => ShowCuttingPlan(allPlates: true);
+
+        private void ShowCuttingPlan(bool allPlates)
+        {
+            var editForm = activeForm;
+            if (editForm?.PlateView?.Plate == null)
+                return;
+
+            var nest = editForm.Nest;
+            var views = MdiChildren.OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, nest))
+                .Select(form => form.PlateView).ToArray();
+            // A closed progress window can still have a fill awaiting completion/commit.
+            bool IsBusy() => nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
+                || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true);
+            if (IsBusy())
+            {
+                MessageBox.Show(this, "Finish or cancel the current nesting or plate action first.",
+                    "Plan Cutting", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                foreach (var plateView in views)
+                    plateView.SetAction(typeof(ActionSelect));
+                editForm.PlanCutting(allPlates, IsBusy, this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "Plan Cutting", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void PlateAssignLeadIns_Click(object sender, EventArgs e)
         {
             if (activeForm == null)

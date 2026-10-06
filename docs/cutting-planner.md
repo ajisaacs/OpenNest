@@ -4,8 +4,9 @@
 programs. It can retain fixed programs or jointly choose internal contour order,
 entries and whole-part order using explicitly confirmed cutting parameters. It
 returns an owned proposal; `Apply` installs Ready plate-scoped proposals atomically
-after an exact freshness check. There is no desktop command yet: existing desktop
-sequencing, assignment and posting review are unchanged.
+after an exact freshness check. The desktop opens it from `Plate > Plan Cutting...` and
+`Nest > Plan Cutting (All Plates)...` (see [Desktop workflow](#desktop-workflow)); the older
+automatic sequencing and lead-in assignment commands remain until they are retired.
 
 ## Capture before worker planning
 
@@ -188,14 +189,44 @@ public path. After the whole scope is installed, each changed plate raises
 `Plate.PartsReordered` once; an observer exception is reported in `RefreshErrors`
 on an `Applied` result, not as a rollback.
 
+## Desktop workflow
+
+`Plate > Plan Cutting...` plans the active plate and `Nest > Plan Cutting (All Plates)...`
+plans every plate that has parts. Both open one dialog built on
+`OpenNest.Engine.CuttingPlanning.CuttingPlanBatch`:
+
+- The dialog starts from the plate's cutting settings (or the last-used settings) and plans
+  at once. `Cutting Settings...` edits them and `Keep the current part order` fixes the
+  whole-part order; either change replans. The settings are confirmed parameters: every
+  unlocked part's lead-ins are regenerated, and locked parts keep programs that must
+  already pass the checks.
+- Every plate is captured on the UI thread and planned on a worker. A free-order search
+  that ends `NoSolutionWithinBudget` is retried once with the current part order, and the
+  summary says the order was kept. A kept order is allowed 400 expansions per part (at
+  least the default 20000), because it still searches contour order and entries.
+- The summary lists every plate: ready plates with part counts and rapid travel, others
+  with their status and findings. Finding part numbers are the plate's current order. The
+  preview shows the active plate detached from the nest (quantity zero, so drawing
+  quantities do not change): the proposed order and programs when ready, otherwise its
+  current parts.
+- Apply is enabled only when every plate is ready, and it is all or nothing through
+  `CuttingPlanService.Apply`. After it applies, each plate keeps its own copy of the
+  confirmed settings, which also become the saved defaults. `Stale` keeps the dialog open
+  and asks for a replan; nothing changes.
+- Closing or cancelling while planning cancels the worker and keeps the dialog open until
+  it stops. Planning and Apply refuse to start while a nesting or plate operation runs.
+- `PlateView` follows `Plate.PartsReordered`: it redraws parts in the plate's order (the
+  numbers it draws are the cutting order), rebuilds their graphics and marks the overlap
+  check out of date.
+
 ## Remaining integration boundaries
 
 The service does not establish clean-material non-overlap, scrap release by open
 cutoff cuts or sheet edges, or physical retention strength. It does not write CNC
 or set posting consent. A `Ready` proposal can still be unsuitable for cutting.
 
-Later slices add desktop integration (including `PartsReordered` refresh hooks)
-and legacy automatic-path retirement. Windows interaction,
+Later slices route the lead-in side panel's automatic assignment through the planner
+and retire the legacy automatic paths. Windows interaction,
 supplied-job coverage and actual posted order remain separate acceptance gates.
 Fresh [pre-post verification](post-verification.md) is still required; it is not a
 physical safety qualification.

@@ -1,0 +1,244 @@
+using System.Reflection;
+using System.Windows.Forms;
+using OpenNest.CNC;
+using OpenNest.CNC.CuttingPlanning;
+using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Controls;
+using OpenNest.Forms;
+using OpenNest.Geometry;
+
+namespace OpenNest.WinForms.Tests.Forms;
+
+// Shown forms and Application.OpenForms-based guards share this collection with the fill tests.
+[Collection("Fill operation lifetime")]
+public class CuttingPlanFormTests
+{
+    [Fact]
+    public void PlanThenApply_InstallsThePlanAndRedrawsTheEditorInPlateOrder() => RunSta(() =>
+    {
+        var (nest, view) = CreateView(Square("a", 12, 1), Square("b", 1, 1));
+        using var editor = view;
+        var plate = view.Plate;
+        using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
+        form.Show();
+        PumpUntil(() => form.Proposal != null, "the plan");
+
+        Assert.True(Control<Button>(form, "applyButton").Enabled);
+        Assert.StartsWith("Ready to apply to 1 plate", Control<TextBox>(form, "summaryBox").Text);
+        var preview = Field<PlateView>(form, "preview");
+        Assert.True(preview.Visible);
+        Assert.NotSame(plate, preview.Plate);
+        Assert.Equal(2, preview.Plate.Parts.Count);
+        Assert.All(preview.Plate.Parts, part => Assert.DoesNotContain(part, plate.Parts));
+        Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns)); // The preview is detached.
+
+        var reordered = 0;
+        view.PartsReordered += (_, _) => reordered++;
+        Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+
+        Assert.Equal(DialogResult.OK, form.DialogResult);
+        Assert.Equal(CuttingCommitStatus.Applied, form.CommitResult!.Status);
+        Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
+        Assert.NotNull(plate.CuttingParameters);
+        Assert.NotSame(form.ConfirmedParameters, plate.CuttingParameters);
+        Assert.Equal(1, reordered);
+        Assert.Equal(plate.Parts, view.LayoutParts.Select(layout => layout.BasePart));
+        Assert.All(view.LayoutParts, layout => Assert.True(layout.IsDirty));
+    });
+
+    [Fact]
+    public void BlockedPlate_KeepsApplyDisabledAndShowsTheCurrentParts() => RunSta(() =>
+    {
+        var locked = Square("locked", 1, 1);
+        locked.LeadInsLocked = true; // A locked program is never regenerated: no lead-in blocks it.
+        var (nest, view) = CreateView(locked);
+        using var editor = view;
+        using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
+        form.Show();
+        PumpUntil(() => form.Proposal != null, "the plan");
+
+        Assert.False(Control<Button>(form, "applyButton").Enabled);
+        var summary = Control<TextBox>(form, "summaryBox").Text;
+        Assert.Contains("Plate 1: blocked", summary);
+        Assert.Contains("Part 1 (locked)", summary);
+        var preview = Field<PlateView>(form, "preview");
+        Assert.Single(preview.Plate.Parts);
+        Assert.Equal(locked.Location, preview.Plate.Parts[0].Location);
+        Assert.Null(view.Plate.CuttingParameters);
+    });
+
+    [Fact]
+    public void ClosingWhilePlanning_CancelsAndWaitsForTheWorker() => RunSta(() =>
+    {
+        var (nest, view) = CreateView(Grid(64));
+        using var editor = view;
+        var programs = view.Plate.Parts.Select(part => part.Program).ToArray();
+        var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
+        try
+        {
+            form.Show();
+            PumpUntil(() => form.IsPlanning, "planning to start");
+
+            form.Close();
+
+            // The worker still holds the plan; the dialog stays up, cancelling, until it stops.
+            Assert.False(form.IsDisposed);
+            Assert.True(form.Visible);
+            Assert.False(Control<Button>(form, "cancelButton").Enabled);
+            Assert.False(Control<Button>(form, "planButton").Enabled);
+            PumpUntil(() => form.IsDisposed, "the dialog to close after cancelling");
+            Assert.True(form.PlanningTask.IsCompleted);
+            Assert.Equal(programs, view.Plate.Parts.Select(part => part.Program));
+            Assert.All(view.Plate.Parts, part => Assert.False(part.HasManualLeadIns));
+            Assert.Null(view.Plate.CuttingParameters);
+        }
+        finally
+        {
+            form.Dispose();
+        }
+    });
+
+    [Fact]
+    public void ApplyAfterALiveEdit_ChangesNothingAndReplanRecovers() => RunSta(() =>
+    {
+        var (nest, view) = CreateView(Square("a", 1, 1), Square("b", 12, 1));
+        using var editor = view;
+        using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
+        form.Show();
+        PumpUntil(() => form.Proposal != null, "the plan");
+        var programs = view.Plate.Parts.Select(part => part.Program).ToArray();
+
+        view.Plate.Parts[1].Offset(0, 1);
+        Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+
+        Assert.False(form.IsDisposed);
+        Assert.Equal(DialogResult.None, form.DialogResult);
+        Assert.Equal(CuttingCommitStatus.Stale, form.CommitResult!.Status);
+        Assert.Contains("changed after planning", Control<TextBox>(form, "summaryBox").Text);
+        Assert.False(Control<Button>(form, "applyButton").Enabled);
+        Assert.Equal(programs, view.Plate.Parts.Select(part => part.Program));
+        Assert.Null(view.Plate.CuttingParameters);
+
+        Invoke(form, "PlanButton_Click", null, EventArgs.Empty);
+        PumpUntil(() => form.Proposal != null && !form.IsPlanning, "the replan");
+        Assert.True(Control<Button>(form, "applyButton").Enabled);
+    });
+
+    [Fact]
+    public void BusyEditor_DoesNotStartPlanningUntilItIsFree() => RunSta(() =>
+    {
+        var busy = true;
+        var (nest, view) = CreateView(Square("a", 1, 1));
+        using var editor = view;
+        using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters(), () => busy);
+
+        Invoke(form, "StartPlanning");
+
+        Assert.False(form.IsPlanning);
+        Assert.Null(form.Proposal);
+        Assert.Contains("Wait for the current nesting or plate action", Control<TextBox>(form, "summaryBox").Text);
+        busy = false;
+        Invoke(form, "StartPlanning");
+        PumpUntil(() => form.Proposal != null, "the plan");
+        Assert.True(Control<Button>(form, "applyButton").Enabled);
+    });
+
+    [Fact]
+    public void AllPlates_SkipsEmptyPlatesAndRefusesTheBatchWhenOnePlateIsBlocked() => RunSta(() =>
+    {
+        var nest = new Nest();
+        var first = nest.CreatePlate();
+        first.Parts.Add(Square("open", 1, 1));
+        var second = nest.CreatePlate();
+        var locked = Square("locked", 1, 1);
+        locked.LeadInsLocked = true;
+        second.Parts.Add(locked);
+        nest.CreatePlate(); // An empty plate, like the editor's trailing plate.
+        using var view = new PlateView { Plate = first };
+        using var form = new CuttingPlanForm(view, nest, allPlates: true, Parameters());
+        form.Show();
+        PumpUntil(() => form.Proposal != null, "the plan");
+
+        Assert.Equal("Plan Cutting — All Plates", form.Text);
+        Assert.Equal(2, form.Proposal!.Plates.Count);
+        var summary = Control<TextBox>(form, "summaryBox").Text;
+        Assert.Contains("Plate 1: ready.", summary);
+        Assert.Contains("Plate 2: blocked", summary);
+        Assert.DoesNotContain("Plate 3", summary);
+        Assert.False(Control<Button>(form, "applyButton").Enabled);
+        Assert.All(first.Parts, part => Assert.False(part.HasManualLeadIns));
+    });
+
+    private static (Nest Nest, PlateView View) CreateView(params Part[] parts)
+    {
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(100, 100);
+        foreach (var part in parts)
+            plate.Parts.Add(part);
+        return (nest, new PlateView { Plate = plate });
+    }
+
+    private static CuttingParameters Parameters() => new()
+    {
+        ExternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
+        InternalLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
+        ArcCircleLeadIn = new LineLeadIn { Length = 0.3, ApproachAngle = 45 },
+        ExternalLeadOut = new NoLeadOut(),
+        InternalLeadOut = new NoLeadOut(),
+        ArcCircleLeadOut = new NoLeadOut(),
+    };
+
+    private static Part Square(string name, double x, double y) =>
+        new(new Drawing(name, SquareProgram(holes: false)), new Vector(x, y));
+
+    private static Part[] Grid(int count)
+    {
+        var drawing = new Drawing("grid", SquareProgram(holes: true));
+        var side = (int)System.Math.Ceiling(System.Math.Sqrt(count));
+        return Enumerable.Range(0, count)
+            .Select(i => new Part(drawing, new Vector(1 + i % side * 11, 1 + i / side * 11)))
+            .ToArray();
+    }
+
+    private static CNC.Program SquareProgram(bool holes)
+    {
+        var program = new CNC.Program();
+        program.MoveTo(0, 0);
+        program.LineTo(0, 10);
+        program.LineTo(10, 10);
+        program.LineTo(10, 0);
+        program.LineTo(0, 0);
+        if (holes)
+            foreach (var x in new[] { 3.0, 7.0 })
+            {
+                program.MoveTo(x + 1, 3);
+                program.ArcTo(x + 1, 3, x, 3, RotationType.CCW);
+            }
+        return program;
+    }
+
+    private static void PumpUntil(Func<bool> condition, string what)
+    {
+        var until = DateTime.UtcNow.AddSeconds(60);
+        while (!condition() && DateTime.UtcNow < until)
+        {
+            Application.DoEvents();
+            Thread.Sleep(10);
+        }
+        Assert.True(condition(), $"Timed out waiting for {what}.");
+    }
+
+    private static T Control<T>(Form form, string name) where T : Control =>
+        Assert.IsType<T>(form.Controls.Find(name, true).Single());
+
+    private static T Field<T>(object owner, string name) =>
+        (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(owner)!;
+
+    private static void Invoke(CuttingPlanForm form, string method, params object?[] arguments) =>
+        typeof(CuttingPlanForm).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(form, arguments);
+
+    private static void RunSta(System.Action action) =>
+        StaTestThread.Run(action, TimeSpan.FromMinutes(3), "The STA test did not complete.");
+}
