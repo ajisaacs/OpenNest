@@ -74,10 +74,21 @@ the final replay enforce them:
 
 ## Search and exact output
 
-With regeneration, the bounded deterministic search considers whole-part order,
-internal contour order and native entry candidates together. Internal contours
-precede their own perimeter; parts remain contiguous. Backtracking can revisit
-an earlier entry when a later part cannot be reached safely.
+With regeneration, the bounded deterministic search plans internal contour order
+and native entry candidates part by part along a whole-part order. Internal
+contours precede their own perimeter; parts remain contiguous. Backtracking can
+revisit an earlier entry when a later part cannot be reached safely.
+
+A preserved order is followed as given. Otherwise the order is an open
+travelling-salesman path over part centres from the start point: nearest neighbour,
+then 2-opt reversals and Or-opt moves of one to three parts, never placing a part
+before a cutoff or nested-part prerequisite. If a part on that order cannot be
+reached without crossing parts already cut, the search learns "cut this part
+before those", backs up to just before the earliest of them and re-plans the rest
+from the tool position there; parts cut before that point are kept. An attempt
+stops backtracking after a stall of 8 x entries x contours expansions without
+getting further, so it learns instead of retrying every entry combination of the
+parts before it. When nothing new can be learned the result is a refusal.
 
 Candidates use native closest points, vertices, midpoints and circle angles in
 stable order, capped by `maxEntries`. Circle rounding, clamping, corner resolution

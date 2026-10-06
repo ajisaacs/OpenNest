@@ -1,0 +1,153 @@
+using OpenNest.CNC;
+using OpenNest.CNC.CuttingPlanning;
+using OpenNest.Diagnostics;
+using OpenNest.Engine.CuttingPlanning;
+using OpenNest.Geometry;
+
+namespace OpenNest.Tests.CuttingPlanning;
+
+/// <summary>Whole-part order chosen by the planner itself (the part order is not preserved).</summary>
+public class ReorderSearchTests
+{
+    [Theory]
+    [InlineData(16, false)]
+    [InlineData(16, true)]
+    [InlineData(36, false)]
+    [InlineData(36, true)]
+    public void FreeOrder_DenseGrid_IsReadyWithinTheDefaultBudget(int count, bool shuffled)
+    {
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(100, 100);
+        foreach (var part in Grid(count, shuffled))
+            plate.Parts.Add(part);
+        var parts = plate.Parts.ToArray();
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters()));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        Assert.True(result.Expansions <= 20000);
+        Assert.Equal(parts.OrderBy(Key), result.ProposedOrder.Select(p => p.SourcePart).OrderBy(Key));
+        Assert.All(result.ProposedOrder, p => Assert.True(p.IsRegenerated));
+        Assert.Equal(parts, plate.Parts); // Planning alone never reorders the live plate.
+    }
+
+    [Fact]
+    public void FreeOrder_BlockedApproach_LearnsToCutThatPartFirst()
+    {
+        // Locked programs lead in and out on each part's left side, so leaving a cut part to the
+        // right crosses it. The shortest tour B, A, C is blocked at A (crossing B); with A before B
+        // it is A, B, C, blocked at C (crossing A and B). Only right to left is safe.
+        var a = LeftLeadRectangle("A", 4, 0, 4, 4);
+        var b = LeftLeadRectangle("B", 0, 1, 2, 2);
+        var c = LeftLeadRectangle("C", 14, 1, 2, 2);
+        Assert.Contains(Analyze(b, a, c).Findings, f => f.Kind == PostVerificationKind.RapidCrossing);
+        Assert.Contains(Analyze(a, b, c).Findings, f => f.Kind == PostVerificationKind.RapidCrossing);
+
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest([a, b, c],
+            confirmedParameters: ExplicitContourTests.Parameters()));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        Assert.Equal(new[] { c, a, b }, result.ProposedOrder.Select(p => p.SourcePart));
+        Assert.All(result.ProposedOrder, p => Assert.False(p.IsRegenerated));
+        Assert.Empty(Analyze(c, a, b).Findings);
+    }
+
+    [Fact]
+    public void FreeOrder_BlockedAfterRegeneratedParts_LearnsBeforeRetryingTheirEntries()
+    {
+        // Two regenerated parts come first; then the locked trio blocks as above. Retrying every
+        // entry combination of the two parts (over a million) before learning would exhaust the budget.
+        var drawing = new Drawing("holes", PreparedContourTests.Holes());
+        var first = new Part(drawing, new Vector(1, 1));
+        var second = new Part(drawing, new Vector(12, 1));
+        var a = LeftLeadRectangle("A", 44, 0, 4, 4);
+        var b = LeftLeadRectangle("B", 40, 1, 2, 2);
+        var c = LeftLeadRectangle("C", 54, 1, 2, 2);
+
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest([first, second, a, b, c],
+            confirmedParameters: ExplicitContourTests.Parameters()));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.Equal(new[] { first, second, c, a, b }, result.ProposedOrder.Select(p => p.SourcePart));
+        Assert.True(result.IndependentlyReplayed);
+    }
+
+    [Fact]
+    public void FreeOrder_NoSafeOrder_RefusesWithTheCrossing()
+    {
+        // Leads on the far sides: whichever part is cut first, reaching the other crosses it.
+        var left = LeftLeadRectangle("left", 0, 0, 2, 2);
+        var right = LeftLeadRectangle("right", 4, 0, 2, 2, mirror: true);
+
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest([left, right],
+            confirmedParameters: ExplicitContourTests.Parameters()));
+
+        Assert.Equal(CuttingPlanStatus.ConstraintConflict, result.Status);
+        Assert.Empty(result.ProposedOrder);
+        Assert.Contains(result.Findings, f => f.Kind == PostVerificationKind.RapidCrossing);
+    }
+
+    private static Part[] Grid(int count, bool shuffled)
+    {
+        var drawing = new Drawing("grid", PreparedContourTests.Holes());
+        var side = (int)System.Math.Ceiling(System.Math.Sqrt(count));
+        var parts = Enumerable.Range(0, count)
+            .Select(i => new Part(drawing, new Vector(1 + i % side * 11, 1 + i / side * 11)))
+            .ToArray();
+        if (!shuffled)
+            return parts;
+        var random = new Random(7);
+        return parts.OrderBy(_ => random.Next()).ToArray();
+    }
+
+    private static (double, double) Key(Part part) => (part.Location.X, part.Location.Y);
+
+    // A locked rectangle whose lead-in and lead-out sit 0.25 outside its left edge (its right
+    // edge when mirrored), so the tool departs on that side.
+    private static Part LeftLeadRectangle(string name, double x, double y, double width, double height,
+        bool mirror = false)
+    {
+        var clean = LeadPathValidationTests.Rectangle(0, 0, width, height);
+        var part = new Part(new Drawing(name, clean), new Vector(x, y));
+        var edge = mirror ? width : 0;
+        var outside = mirror ? width + 0.25 : -0.25;
+        var placed = new Program();
+        placed.MoveTo(outside, height / 2);
+        placed.Codes.Add(new LinearMove(edge, height / 2) { Layer = LayerType.Leadin });
+        // Same direction as the clean outline, which runs clockwise from its corner at the origin.
+        if (mirror)
+        {
+            placed.LineTo(width, 0); placed.LineTo(0, 0); placed.LineTo(0, height);
+            placed.LineTo(width, height);
+        }
+        else
+        {
+            placed.LineTo(0, height); placed.LineTo(width, height); placed.LineTo(width, 0);
+            placed.LineTo(0, 0);
+        }
+        placed.LineTo(edge, height / 2);
+        placed.Codes.Add(new LinearMove(outside, height / 2) { Layer = LayerType.Leadout });
+        Assert.True(part.RestoreLeadInProgram(placed, true));
+        return part;
+    }
+
+    private static PostVerificationReport Analyze(params Part[] parts)
+    {
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        foreach (var source in parts)
+        {
+            var copy = new Part(new Drawing("replay", (Program)source.BaseDrawing.Program.Clone()), source.Location);
+            Assert.True(copy.RestoreLeadInProgram((Program)source.Program.Clone(), source.LeadInsLocked));
+            plate.Parts.Add(copy);
+        }
+        return PostVerificationAnalyzer.Analyze(nest, Vector.Zero);
+    }
+
+    private static string Describe(CuttingPlanResult r) =>
+        $"{r.Status}, expanded {r.Expansions}: " + string.Join("; ", r.Findings.Select(f => f.Message).Take(5));
+}
