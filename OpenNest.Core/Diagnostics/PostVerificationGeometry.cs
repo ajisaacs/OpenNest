@@ -11,6 +11,29 @@ internal static class PostVerificationGeometry
     internal const double Epsilon = 1e-8;
     private const double TwoPi = 2 * System.Math.PI;
 
+    /// <summary>An axis-aligned extent used only to skip queries that cannot meet.</summary>
+    internal readonly record struct Extent(double MinX, double MinY, double MaxX, double MaxY)
+    {
+        /// <summary>No extent: unions with anything give the other extent.</summary>
+        internal static Extent None => new(double.PositiveInfinity, double.PositiveInfinity,
+            double.NegativeInfinity, double.NegativeInfinity);
+
+        internal Extent Union(Extent other) => new(System.Math.Min(MinX, other.MinX),
+            System.Math.Min(MinY, other.MinY), System.Math.Max(MaxX, other.MaxX), System.Math.Max(MaxY, other.MaxY));
+
+        /// <summary>The largest absolute coordinate, for scaling tolerances; NaN when any bound is.</summary>
+        internal double Magnitude => System.Math.Max(System.Math.Max(System.Math.Abs(MinX), System.Math.Abs(MaxX)),
+            System.Math.Max(System.Math.Abs(MinY), System.Math.Abs(MaxY)));
+
+        /// <summary>
+        /// True only when the extents are farther apart than <paramref name="margin"/> on some axis,
+        /// so nothing inside one can touch or enter the other. NaN bounds are never separated.
+        /// </summary>
+        internal bool IsSeparatedFrom(Extent other, double margin) =>
+            MaxX + margin < other.MinX || other.MaxX + margin < MinX
+            || MaxY + margin < other.MinY || other.MaxY + margin < MinY;
+    }
+
     internal static void Validate(Vector point)
     {
         if (!double.IsFinite(point.X) || !double.IsFinite(point.Y)
@@ -81,6 +104,15 @@ internal static class PostVerificationGeometry
                 ? new Circle(center, Radius)
                 : new Arc(center, Radius, Normalize(StartAngle), Normalize(StartAngle + Sweep), Sweep < 0)
             : new Line(Start, End);
+
+        /// <summary>
+        /// A conservative axis-aligned extent: an arc's whole supporting circle, a line's endpoints.
+        /// Nonfinite geometry yields NaN bounds, which no separation test can pass.
+        /// </summary>
+        internal Extent Extent => Center is { } center
+            ? new(center.X - Radius, center.Y - Radius, center.X + Radius, center.Y + Radius)
+            : new(System.Math.Min(Start.X, End.X), System.Math.Min(Start.Y, End.Y),
+                System.Math.Max(Start.X, End.X), System.Math.Max(Start.Y, End.Y));
 
         internal Vector Midpoint => Center is { } center
             ? new Vector(center.X + Radius * System.Math.Cos(StartAngle + Sweep / 2),

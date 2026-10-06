@@ -10,6 +10,12 @@ namespace OpenNest.CNC.CuttingPlanning;
 /// <summary>Direct XY completed-contour checker. This is not physical machine safety.</summary>
 public sealed class ReleasedContourState
 {
+    /// <summary>
+    /// Relative separation beyond which a completed contour is skipped. Scaled by coordinate size,
+    /// it stays far above the contact tolerance and the rounding of the extents themselves.
+    /// </summary>
+    internal const double ClearanceMargin = 1e-6;
+
     private readonly List<Obstacle> obstacles = new();
 
     public ReleasedContourState Copy()
@@ -56,9 +62,16 @@ public sealed class ReleasedContourState
                 hasLead = false;
                 if (move.Start is not { } start || start.DistanceTo(move.End) <= PostVerificationGeometry.Epsilon)
                     continue;
+                var reach = new PostVerificationGeometry.Extent(System.Math.Min(start.X, move.End.X),
+                    System.Math.Min(start.Y, move.End.Y), System.Math.Max(start.X, move.End.X),
+                    System.Math.Max(start.Y, move.End.Y));
+                var margin = ClearanceMargin * (1 + reach.Magnitude);
                 foreach (var obstacle in obstacles)
                 {
                     token.ThrowIfCancellationRequested();
+                    // A rapid well clear of a contour's extent can neither cross nor touch it.
+                    if (reach.IsSeparatedFrom(obstacle.Extent, margin))
+                        continue;
                     if (PostVerificationGeometry.Crosses(start, move.End, obstacle.Curves, token))
                         findings.Add(new(PostVerificationKind.RapidCrossing, plate, part, obstacle.Part,
                             $"Direct XY rapid crosses or touches completed untabbed contour {obstacle.Contour} " +
@@ -127,5 +140,9 @@ public sealed class ReleasedContourState
         }
     }
 
-    private sealed record Obstacle(int Part, int Contour, IReadOnlyList<PostVerificationGeometry.Curve> Curves);
+    private sealed record Obstacle(int Part, int Contour, IReadOnlyList<PostVerificationGeometry.Curve> Curves)
+    {
+        internal PostVerificationGeometry.Extent Extent { get; } =
+            Curves.Aggregate(PostVerificationGeometry.Extent.None, (extent, curve) => extent.Union(curve.Extent));
+    }
 }
