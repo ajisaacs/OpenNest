@@ -121,6 +121,30 @@ public class SavedNestsFormTests
             "The saved-nest dialog test did not complete.");
     }
 
+    [Fact]
+    public void OpensAsALargeNormalWindowInsideTheOwnersScreen()
+    {
+        StaTestThread.Run(
+            () =>
+            {
+                using var owner = new Form { StartPosition = FormStartPosition.Manual, Bounds = new(40, 40, 400, 300) };
+                owner.Show();
+                using var form = new SavedNestsForm(new FakeRepository());
+                form.Show(owner);
+                var area = Screen.FromControl(owner).WorkingArea;
+
+                // A maximized dialog with fixed MaximizedBounds landed off-screen on a secondary
+                // monitor, hiding the modal dialog behind a disabled main window.
+                Assert.Equal(FormWindowState.Normal, form.WindowState);
+                Assert.True(area.Contains(form.Bounds), $"Dialog bounds {form.Bounds} are outside the working area {area}.");
+                Assert.True(
+                    form.Width >= area.Width * 8 / 10 && form.Height >= area.Height * 8 / 10,
+                    $"Dialog size {form.Size} is small for the working area {area}.");
+            },
+            TestTimeout,
+            "The saved-nest dialog test did not complete.");
+    }
+
     private static NestRecord Record(string name) =>
         new() { Id = Guid.NewGuid(), Name = name, SavedAt = DateTime.Now };
 

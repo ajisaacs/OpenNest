@@ -69,10 +69,10 @@ public sealed class SavedNestsForm : Form
         details = new NestDetailsSession(LoadDetailsAsync);
 
         Text = WindowTitle;
-        StartPosition = FormStartPosition.CenterParent;
+        // Placed on the owner's screen in Load; see FitToScreen.
+        StartPosition = FormStartPosition.Manual;
         ClientSize = new Size(1280, 800);
         MinimumSize = new Size(800, 560);
-        WindowState = FormWindowState.Maximized;
         MinimizeBox = false;
         ShowInTaskbar = false;
 
@@ -278,9 +278,7 @@ public sealed class SavedNestsForm : Form
 
         Load += (_, _) =>
         {
-            // Keep a maximized dialog's bottom row clear of the taskbar.
-            var area = Screen.FromControl(Owner ?? this).WorkingArea;
-            MaximizedBounds = new Rectangle(area.Left, area.Top, area.Width, area.Height - 20);
+            FitToScreen();
 
             // Minimum sizes are applied once the container has its real height; setting them
             // on the default-sized container throws.
@@ -318,6 +316,25 @@ public sealed class SavedNestsForm : Form
         }
 
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    /// <summary>
+    /// Opens the dialog as a large normal window centered in the working area of the owner's
+    /// screen, so its bottom row stays clear of the taskbar. It is deliberately not maximized
+    /// with fixed <see cref="Form.MaximizedBounds"/>: Windows reads those relative to the
+    /// monitor, so bounds taken from a secondary screen moved the modal dialog off-screen there
+    /// and left the main window unusable.
+    /// </summary>
+    private void FitToScreen()
+    {
+        var area = Screen.FromControl(Owner ?? this).WorkingArea;
+        var width = System.Math.Max(MinimumSize.Width, area.Width * 9 / 10);
+        var height = System.Math.Max(MinimumSize.Height, area.Height * 9 / 10);
+        Bounds = new Rectangle(
+            System.Math.Max(area.Left, area.Left + (area.Width - width) / 2),
+            System.Math.Max(area.Top, area.Top + (area.Height - height) / 2),
+            width,
+            height);
     }
 
     private static DataGridView CreateGrid()
