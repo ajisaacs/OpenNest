@@ -99,7 +99,11 @@ public sealed class CuttingPlanBatch
             var reorder = preservePartOrder ? null : CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
                 expansionBudget: reorderBudget ?? budget, confirmedParameters: confirmedParameters), token);
             var overlap = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(), token);
-            entries[index] = new(plate, plateNumbers?[index] ?? index + 1, reorder, keepOrder, overlap);
+            var fallback = reorder ?? keepOrder;
+            if (fallback.Failure == CuttingPlanStatus.UnsupportedGeometry)
+                fallback = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+                    confirmedParameters: confirmedParameters, preservePartOrder: preservePartOrder), token, bestEffort: true);
+            entries[index] = new(plate, plateNumbers?[index] ?? index + 1, reorder, keepOrder, overlap, fallback);
         }
         return new(entries, owned);
     }
@@ -112,7 +116,8 @@ public sealed class CuttingPlanBatch
     /// Checks and plans every plate from its captured snapshots. Safe on a worker: live plates are
     /// not read. Overlapping material blocks a plate whatever its route. A free search that ends
     /// without a complete plan within its budget is retried with the current order; the proposal
-    /// reports that it kept the order.
+    /// reports that it kept the order. Incomplete geometry also gets a separately labelled,
+    /// unverified fallback when supported closed contours can still be emitted.
     /// </summary>
     public CuttingPlanProposal Plan(IProgress<CuttingPlanProgress> progress = null,
         CancellationToken token = default)
@@ -140,19 +145,31 @@ public sealed class CuttingPlanBatch
                 reorder = CuttingPlanService.Plan(entry.Reorder, token);
                 if (reorder.Status != CuttingPlanStatus.NoSolutionWithinBudget)
                 {
-                    plans[index] = new(entry.Plate, entry.Number, reorder, null, overlap);
+                    plans[index] = new(entry.Plate, entry.Number, WithFallback(entry, reorder, token), null, overlap);
                     continue;
                 }
             }
             progress?.Report(new(index, entries.Length, entry.Number, CuttingPlanPhase.KeepingOrder));
-            plans[index] = new(entry.Plate, entry.Number, CuttingPlanService.Plan(entry.KeepOrder, token), reorder,
-                overlap);
+            plans[index] = new(entry.Plate, entry.Number,
+                WithFallback(entry, CuttingPlanService.Plan(entry.KeepOrder, token), token), reorder, overlap);
         }
         return new(plans, ownedParameters);
     }
 
+    private static CuttingPlanResult WithFallback(Entry entry, CuttingPlanResult strict, CancellationToken token)
+    {
+        if (strict.Status != CuttingPlanStatus.UnsupportedGeometry || entry.Fallback.Failure != null)
+            return strict;
+        var fallback = BestEffortCuttingPlan.Plan(entry.Fallback, token);
+        if (fallback.Status != CuttingPlanStatus.BestEffort)
+            return fallback.Status == CuttingPlanStatus.Cancelled ? fallback : strict;
+        return new(CuttingPlanStatus.BestEffort, fallback.ProposedOrder,
+            strict.Findings.Concat(fallback.Findings).Distinct(), rapidDistance: fallback.RapidDistance)
+        { Snapshot = entry.Fallback };
+    }
+
     private sealed record Entry(Plate Plate, int Number, CuttingPlanSnapshot Reorder, CuttingPlanSnapshot KeepOrder,
-        PlateOverlapSnapshot Overlap);
+        PlateOverlapSnapshot Overlap, CuttingPlanSnapshot Fallback);
 }
 
 /// <summary>One plate's outcome inside a <see cref="CuttingPlanProposal"/>.</summary>
@@ -188,6 +205,10 @@ public sealed class CuttingPlanPlateResult
 
     public bool IsOverlapClear => Overlap is { IsComplete: true } && Overlap.Pairs.Count == 0;
     public bool IsReady => IsRouteReady && IsOverlapClear;
+
+    /// <summary>Owned readable output is available, but not all geometric checks passed.</summary>
+    public bool CanApplyWithWarnings => Overlap != null && Overlap.Pairs.Count == 0
+        && (IsRouteReady || Result.Status == CuttingPlanStatus.BestEffort);
     public int PartCount => Result.ProposedOrder.Count;
     public int RegeneratedCount => Result.ProposedOrder.Count(p => p.IsRegenerated);
 
@@ -196,7 +217,7 @@ public sealed class CuttingPlanPlateResult
 }
 
 /// <summary>
-/// The outcome of a batch. Apply is all-or-nothing and is offered only when every plate is ready.
+/// The outcome of a batch. Apply is all-or-nothing. Unverified output needs explicit acceptance.
 /// </summary>
 public sealed class CuttingPlanProposal
 {
@@ -216,17 +237,26 @@ public sealed class CuttingPlanProposal
     public bool CanApply => Plates.Count > 0 && !IsCancelled && ownedParameters != null
         && Plates.All(p => p.IsReady);
 
+    /// <summary>All plates have usable output, possibly requiring explicit warning acceptance.</summary>
+    public bool CanApplyWithWarnings => Plates.Count > 0 && !IsCancelled && ownedParameters != null
+        && Plates.All(p => p.CanApplyWithWarnings);
+
+    public bool RequiresWarningAcceptance => CanApplyWithWarnings && !CanApply;
+
     /// <summary>
     /// Installs every plate's replayed proposal through <see cref="CuttingPlanService.Apply"/>, on the
     /// thread that owns the plates. Only after every plate is applied does each one keep an owned copy
     /// of the confirmed parameters as its cutting settings; any other status changes nothing.
     /// </summary>
-    public CuttingCommitResult Apply(CancellationToken token = default)
+    public CuttingCommitResult Apply(CancellationToken token = default) => Apply(false, token);
+
+    /// <summary>Explicit per-proposal acceptance; never grants consent to post CNC output.</summary>
+    public CuttingCommitResult Apply(bool acceptWarnings, CancellationToken token = default)
     {
-        if (!CanApply)
+        if (!(CanApply || acceptWarnings && CanApplyWithWarnings))
             return new(CuttingCommitStatus.InvalidInput,
                 "Every plate must have a ready plan before anything is applied.");
-        var commit = CuttingPlanService.Apply(Plates.Select(p => p.Result), token);
+        var commit = CuttingPlanService.Apply(Plates.Select(p => p.Result), token, null, acceptWarnings);
         if (commit.Status == CuttingCommitStatus.Applied)
             foreach (var plate in Plates)
                 plate.Plate.CuttingParameters = OwnedCuttingParameters.Copy(ownedParameters);
@@ -234,18 +264,17 @@ public sealed class CuttingPlanProposal
     }
 
     /// <summary>
-    /// A detached copy of a ready plate for display, in the proposed order with the proposed
-    /// programs, or null. A refused plate is not previewed: its program graphs may be unsafe to
-    /// copy. Neither is a plate that changed after planning, which would draw replayed programs at
-    /// poses that were never checked. The copy has quantity zero, so drawing quantities stay put.
+    /// A detached copy of a ready or explicitly unverified proposal for display, or null.
+    /// Refused graphs are never cloned. Changed plates are not previewed at uncaptured poses.
+    /// The copy has quantity zero, so drawing quantities stay put.
     /// Call it on the thread that owns the plates.
     /// </summary>
     public Plate BuildPreview(int index)
     {
         var planned = Plates[index];
-        if (!planned.IsReady || planned.Result.Snapshot?.PlateState?.IsCurrent() != true)
+        if (!planned.CanApplyWithWarnings || planned.Result.Snapshot?.PlateState?.IsCurrent() != true)
             return null;
-        // Unchanged since capture: live poses, plate and programs are the validated, replayed ones.
+        // Unchanged since capture: graphs are supported and the preview uses the exact proposal.
         var source = planned.Plate;
         var preview = new Plate(source.Size)
         {
@@ -274,6 +303,9 @@ public sealed class CuttingPlanProposal
             lines.Add($"Ready to apply to {Count(Plates.Count, "plate")}: "
                 + $"{Count(Plates.Count(p => p.OrderChanged), "plate")} with a new part order, "
                 + $"{Count(Plates.Sum(p => p.RegeneratedCount), "part program")} regenerated.");
+        else if (RequiresWarningAcceptance)
+            lines.Add("Best-effort plan available. Review the warnings and accept the unverified plan to apply. "
+                + "This is not approval to cut or post CNC output.");
         else
             lines.Add($"Apply is unavailable: {Plates.Count - ready} of {Count(Plates.Count, "plate")} could not "
                 + "be planned. No plate changes until every plate is ready.");
@@ -304,6 +336,17 @@ public sealed class CuttingPlanProposal
             yield return heading + $"ready. {Count(plate.PartCount, "part")}, {plate.RegeneratedCount} "
                 + $"regenerated, {kept} kept as is; rapid travel "
                 + $"{result.RapidDistance.ToString("0.##", CultureInfo.CurrentCulture)} {unit}. {order}";
+            yield break;
+        }
+
+        if (plate.CanApplyWithWarnings)
+        {
+            yield return heading + $"best-effort, unverified. {Count(plate.PartCount, "part")}, "
+                + $"{plate.RegeneratedCount} regenerated; review lead-ins and cutting order.";
+            foreach (var line in Limit(DescribeOverlap(plate.Overlap)))
+                yield return line;
+            foreach (var line in Limit(result.Findings.Select(DescribeFinding)))
+                yield return line;
             yield break;
         }
 

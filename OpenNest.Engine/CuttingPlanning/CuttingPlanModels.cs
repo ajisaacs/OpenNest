@@ -60,8 +60,9 @@ public sealed class CuttingPlanSnapshot
         int expansionBudget, CuttingPlanStatus? failure = null, IEnumerable<CuttingPlanFinding> findings = null,
         bool regeneration = false, bool preservePartOrder = false, int maxEntries = 16,
         Action<int> expansionObserver = null, PlateCuttingState plateState = null,
-        CuttingParameters ownedParameters = null, CuttingDependencyGraph dependencies = null)
+        CuttingParameters ownedParameters = null, CuttingDependencyGraph dependencies = null, bool bestEffort = false)
     {
+        BestEffort = bestEffort;
         PlateState = plateState;
         OwnedParameters = ownedParameters;
         Placements = Array.AsReadOnly(placements.ToArray());
@@ -82,6 +83,7 @@ public sealed class CuttingPlanSnapshot
     internal PlateCuttingState PlateState { get; }
     /// <summary>Owned copy of the confirmed parameters taken at capture; never the caller's object.</summary>
     internal CuttingParameters OwnedParameters { get; }
+    internal bool BestEffort { get; }
     internal bool Regeneration { get; }
     internal bool PreservePartOrder { get; }
     internal int MaxEntries { get; }
@@ -159,7 +161,9 @@ public enum CuttingPlanStatus
     UnsupportedGeometry,
     InvalidInput,
     NoSolutionWithinBudget,
-    Cancelled
+    Cancelled,
+    /// <summary>Usable owned programs, but geometric safety checks did not pass. Never Ready.</summary>
+    BestEffort
 }
 
 /// <summary>Ordinals are zero-based source positions, not proposed sequence positions.</summary>
@@ -169,7 +173,8 @@ public sealed record CuttingPlanFinding(int? SourceOrdinal, Part SourcePart,
 /// <summary>
 /// A replayed direct-XY proposal, optionally with regenerated programs, that respects the
 /// captured cutoff/containment prerequisites. Not physical safety or posting consent. Apply
-/// installs it only for a plate-scoped request whose plate is unchanged. Failures contain no proposals.
+/// installs it only for a plate-scoped request whose plate is unchanged. BestEffort is explicitly
+/// unverified and requires batch warning acceptance; other failures contain no proposals.
 /// </summary>
 public sealed class CuttingPlanResult
 {

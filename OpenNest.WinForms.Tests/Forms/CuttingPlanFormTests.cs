@@ -202,6 +202,41 @@ public class CuttingPlanFormTests
         Assert.All(first.Parts, part => Assert.False(part.HasManualLeadIns));
     });
 
+    [Fact]
+    public void UnverifiedPlan_RequiresAcceptanceAndReplanClearsIt() => RunSta(() =>
+    {
+        var program = SquareProgram();
+        program.MoveTo(2, 2); program.LineTo(4, 2); program.LineTo(4, 4);
+        program.LineTo(2, 4); program.LineTo(2, 2);
+        program.MoveTo(4, 2); program.LineTo(6, 2); program.LineTo(6, 4);
+        program.LineTo(4, 4); program.LineTo(4, 2);
+        var part = new Part(new Drawing("touching contours", program), new Vector(1, 1));
+        var (nest, view) = CreateView(part);
+        using var editor = view;
+        using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
+        form.Show();
+        WaitForPlan(form);
+        var accept = Control<CheckBox>(form, "acceptWarningsCheckBox");
+        Assert.True(accept.Visible);
+        Assert.False(accept.Checked);
+        Assert.False(Control<Button>(form, "applyButton").Enabled);
+        Assert.True(Field<PlateView>(form, "preview").Visible);
+        Assert.Contains("UNVERIFIED", Control<Label>(form, "previewLabel").Text);
+        Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+        Assert.Null(form.CommitResult);
+        Assert.False(part.HasManualLeadIns);
+        accept.Checked = true;
+        Assert.True(Control<Button>(form, "applyButton").Enabled);
+        Invoke(form, "PlanButton_Click", null, EventArgs.Empty);
+        WaitForPlan(form);
+        Assert.False(accept.Checked);
+        Assert.False(Control<Button>(form, "applyButton").Enabled);
+        accept.Checked = true;
+        Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+        Assert.Equal(CuttingCommitStatus.Applied, form.CommitResult!.Status);
+        Assert.True(part.HasManualLeadIns);
+    });
+
     private static (Nest Nest, PlateView View) CreateView(params Part[] parts)
     {
         var nest = new Nest();

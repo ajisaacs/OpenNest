@@ -236,7 +236,11 @@ public partial class CuttingPlanForm : Form
     {
         proposal = result;
         summaryBox.Text = string.Join(Environment.NewLine, result.Describe(unit));
-        statusLabel.Text = result.CanApply ? "Review the plan, then apply it." : "Nothing can be applied.";
+        acceptWarningsCheckBox.Checked = false;
+        acceptWarningsCheckBox.Visible = result.RequiresWarningAcceptance;
+        statusLabel.Text = result.CanApply ? "Review the plan, then apply it."
+            : result.RequiresWarningAcceptance ? "Unverified plan: review and accept the warnings to apply."
+            : "Nothing can be applied.";
         applyButton.Enabled = result.CanApply;
         var index = Array.IndexOf(plates, activePlate);
         var plate = index < 0 ? null : result.BuildPreview(index);
@@ -247,7 +251,7 @@ public partial class CuttingPlanForm : Form
                     + "match the editor.";
             return;
         }
-        previewLabel.Text = previewText;
+        previewLabel.Text = result.Plates[index].IsReady ? previewText : "UNVERIFIED — " + previewText;
         preview.Plate = plate;
         preview.Visible = true;
         preview.ZoomToFit();
@@ -256,6 +260,8 @@ public partial class CuttingPlanForm : Form
     private void ClearProposal()
     {
         proposal = null;
+        acceptWarningsCheckBox.Checked = false;
+        acceptWarningsCheckBox.Visible = false;
         applyButton.Enabled = false;
         preview.Visible = false;
         previewLabel.Text = previewText;
@@ -272,6 +278,7 @@ public partial class CuttingPlanForm : Form
     {
         settingsButton.Enabled = !running;
         keepOrderCheckBox.Enabled = !running;
+        acceptWarningsCheckBox.Enabled = !running;
         planButton.Enabled = !running;
         if (running)
             applyButton.Enabled = false;
@@ -329,9 +336,15 @@ public partial class CuttingPlanForm : Form
         public void Report(CuttingPlanProgress value) => context.Post(_ => handler(value), null);
     }
 
+    private bool CanApplyProposal => proposal?.CanApply == true
+        || proposal?.CanApplyWithWarnings == true && acceptWarningsCheckBox.Checked;
+
+    private void AcceptWarningsCheckBox_CheckedChanged(object sender, EventArgs e) =>
+        applyButton.Enabled = planning == null && CanApplyProposal;
+
     private void ApplyButton_Click(object sender, EventArgs e)
     {
-        if (planning != null || proposal?.CanApply != true)
+        if (planning != null || !CanApplyProposal)
             return;
         if (!TryCheckCanChange(out var reason))
         {
@@ -339,7 +352,7 @@ public partial class CuttingPlanForm : Form
             return;
         }
 
-        var commit = proposal.Apply();
+        var commit = proposal.Apply(acceptWarningsCheckBox.Checked);
         CommitResult = commit;
         switch (commit.Status)
         {
