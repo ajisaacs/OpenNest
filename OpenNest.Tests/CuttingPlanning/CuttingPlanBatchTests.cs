@@ -273,8 +273,24 @@ public class CuttingPlanBatchTests
     [InlineData(10, 20000)]
     [InlineData(100, 40000)]
     [InlineData(6_000_000, int.MaxValue)]
-    public void KeepOrderBudget_ScalesWithPartCountFromTheDefault(int parts, int expected) =>
-        Assert.Equal(expected, CuttingPlanBatch.KeepOrderBudget(parts));
+    public void PlateBudget_ScalesWithPartCountFromTheDefault(int parts, int expected) =>
+        Assert.Equal(expected, CuttingPlanBatch.PlateBudget(parts));
+
+    [Fact]
+    public void Plan_LargeGrid_FindsANewOrderWithinThePlateBudget()
+    {
+        // Row-major 10 x 10 needs more than the 20000 default to reorder (about 26000).
+        var nest = new Nest();
+        var plate = Plate(nest, Grid(100));
+        plate.Size = new Size(120, 120);
+
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
+
+        var planned = Assert.Single(proposal.Plates);
+        Assert.True(planned.IsReady, string.Join("\n", proposal.Describe("in")));
+        Assert.False(planned.KeptCurrentOrder);
+        Assert.Equal(100, planned.PartCount);
+    }
 
     [Fact]
     public void Capture_RejectsMissingDuplicateOrMisnumberedPlates()

@@ -219,8 +219,8 @@ plans every plate that has parts. Both open one dialog built on
   an incomplete check (see [pre-post verification](post-verification.md)) block that plate
   whatever its route. A free-order search that ends
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
-  says the order was kept. A kept order is allowed 400 expansions per part (at
-  least the default 20000), because it still searches contour order and entries.
+  says the order was kept. Both are allowed 400 expansions per part (at least the
+  default 20000), because both still plan contour order and entries for every part.
 - The summary lists every plate: ready plates with part counts and rapid travel, others
   with their status and findings. Finding part numbers are the plate's current order, as the
   editor numbers them. The preview shows the active plate detached from the nest (quantity

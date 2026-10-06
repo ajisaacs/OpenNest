@@ -33,14 +33,15 @@ public sealed record CuttingPlanProgress(int PlateIndex, int PlateCount, int Pla
 /// </summary>
 public sealed class CuttingPlanBatch
 {
-    /// <summary>Budget of a free-order search, the service default.</summary>
-    public const int ReorderExpansionBudget = 20000;
+    /// <summary>The smallest budget a plate gets, the service default.</summary>
+    public const int MinimumExpansionBudget = 20000;
 
     /// <summary>
-    /// Expansions allowed per part when the order is kept. Measured near 210 per part on a dense
-    /// grid; the margin keeps 100-150 part plates inside the budget.
+    /// Expansions allowed per part, whether or not the order is kept: both still choose contour
+    /// order and entries for every part. Dense grids measured near 260 per part with a new order
+    /// and 210 when kept; the margin keeps 100-150 part plates inside the budget.
     /// </summary>
-    public const int KeepOrderExpansionsPerPart = 400;
+    public const int ExpansionsPerPart = 400;
 
     private readonly Entry[] entries;
     private readonly CuttingParameters ownedParameters;
@@ -61,10 +62,11 @@ public sealed class CuttingPlanBatch
     /// </summary>
     public static CuttingPlanBatch Capture(IReadOnlyList<Plate> plates, CuttingParameters confirmedParameters,
         bool preservePartOrder, IReadOnlyList<int> plateNumbers = null, CancellationToken token = default) =>
-        Capture(plates, confirmedParameters, preservePartOrder, plateNumbers, ReorderExpansionBudget, token);
+        Capture(plates, confirmedParameters, preservePartOrder, plateNumbers, null, token);
 
+    /// <param name="reorderBudget">Overrides the new-order budget (tests); null gives <see cref="PlateBudget"/>.</param>
     internal static CuttingPlanBatch Capture(IReadOnlyList<Plate> plates, CuttingParameters confirmedParameters,
-        bool preservePartOrder, IReadOnlyList<int> plateNumbers, int reorderBudget, CancellationToken token)
+        bool preservePartOrder, IReadOnlyList<int> plateNumbers, int? reorderBudget, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(plates);
         ArgumentNullException.ThrowIfNull(confirmedParameters);
@@ -90,21 +92,21 @@ public sealed class CuttingPlanBatch
         for (var index = 0; index < plates.Count; index++)
         {
             var plate = plates[index];
-            var keepOrderBudget = KeepOrderBudget(plate.Parts.Count);
+            var budget = PlateBudget(plate.Parts.Count);
             var keepOrder = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
-                expansionBudget: keepOrderBudget, confirmedParameters: confirmedParameters,
+                expansionBudget: budget, confirmedParameters: confirmedParameters,
                 preservePartOrder: true), token);
             var reorder = preservePartOrder ? null : CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
-                expansionBudget: reorderBudget, confirmedParameters: confirmedParameters), token);
+                expansionBudget: reorderBudget ?? budget, confirmedParameters: confirmedParameters), token);
             var overlap = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(), token);
             entries[index] = new(plate, plateNumbers?[index] ?? index + 1, reorder, keepOrder, overlap);
         }
         return new(entries, owned);
     }
 
-    internal static int KeepOrderBudget(int partCount) =>
+    internal static int PlateBudget(int partCount) =>
         (int)System.Math.Min(int.MaxValue,
-            System.Math.Max((long)ReorderExpansionBudget, (long)partCount * KeepOrderExpansionsPerPart));
+            System.Math.Max((long)MinimumExpansionBudget, (long)partCount * ExpansionsPerPart));
 
     /// <summary>
     /// Checks and plans every plate from its captured snapshots. Safe on a worker: live plates are
