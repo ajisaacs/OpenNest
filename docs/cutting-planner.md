@@ -116,7 +116,10 @@ lead-in and lead-out line/arc paths must stay in target scrap and avoid other
 placed material; holes in other parts remain scrap. Tangent/coincident contacts
 outside the genuine target contour joint and numerically uncertain queries refuse.
 Material capture supports a simple closed perimeter minus disjoint, non-nested
-holes; unsupported topology is not a bounding-box approximation.
+holes; unsupported topology is not a bounding-box approximation. A line meeting a
+tangent arc at a shared vertex, such as a fillet, is an ordinary joint: an exact
+contact that the native query rounds away is not uncertain at a line endpoint the
+other curve already touches, while a contact anywhere else on the line still refuses.
 
 Candidates rank by actual modeled rapid distance with stable source/contour/entry
 ordinals. Hash values and drawing names are not tie breakers. The expansion budget

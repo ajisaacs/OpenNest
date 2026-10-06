@@ -1,6 +1,7 @@
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Diagnostics;
+using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
 
 namespace OpenNest.Tests.CuttingPlanning;
@@ -66,5 +67,85 @@ public class NativeContactRegressionTests
         var snapshot = LeadMaterialSnapshot.Capture(source, Vector.Zero);
         Assert.False(snapshot.IsComplete);
         Assert.NotNull(snapshot.Reason);
+    }
+
+    // A line meeting a fillet arc tangentially at their shared vertex: rounding can drop the
+    // tangent root of the native line/circle quadratic, and the exact ray from the line's far end
+    // then rediscovered the already-recorded vertex as a missed contact.
+    [Theory]
+    [InlineData(0.125, 7, 0, 0)]
+    [InlineData(1.0, 33, 55.6, 4.8)]
+    [InlineData(0.5, 61, 110.3, 57.1)]
+    [InlineData(0.25, 80, 0, 0)]
+    public void TangentFilletRing_CertifiesAsSimpleMaterial(double radius, double degrees, double x, double y)
+    {
+        var snapshot = LeadMaterialSnapshot.Capture(
+            RoundedRectangle(7, 3, radius, degrees * System.Math.PI / 180, new Vector(x, y)), Vector.Zero);
+
+        Assert.True(snapshot.IsComplete, snapshot.Reason);
+    }
+
+    [Fact]
+    public void RotatedFilletedPart_PlansReadyOnAPlate()
+    {
+        var plate = new Nest().CreatePlate();
+        plate.Size = new Size(100, 100);
+        plate.Parts.Add(new Part(new Drawing("filleted",
+            RoundedRectangle(7, 3, 1, 33 * System.Math.PI / 180, Vector.Zero)), new Vector(20, 20)));
+
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
+
+        Assert.True(proposal.CanApply, string.Join(Environment.NewLine, proposal.Describe("in")));
+    }
+
+    // The line ends 0.0000015 above a radius-0.003 circle: inside the circle's exact contact band,
+    // where the native query finds nothing. That end is not a recorded contact, so the ray that
+    // reaches it from the other end must still run.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LineEndingInsideACircleContactBand_StaysUncertain(bool reversed)
+    {
+        const double radius = 0.003;
+        var near = new Vector(0, radius + 0.0000015);
+        var far = new Vector(-0.01, near.Y);
+        var line = reversed
+            ? PostVerificationGeometry.Curve.Create(near, far, null, false)
+            : PostVerificationGeometry.Curve.Create(far, near, null, false);
+        var circle = PostVerificationGeometry.Curve.Create(new Vector(radius, 0), new Vector(radius, 0), Vector.Zero, false);
+        Assert.False(circle.Contains(near));
+
+        Assert.Throws<NotSupportedException>(() => line.Contacts(circle, out _));
+        Assert.Throws<NotSupportedException>(() => circle.Contacts(line, out _));
+    }
+
+    private static Program RoundedRectangle(double width, double height, double radius, double angle, Vector at)
+    {
+        var cos = System.Math.Cos(angle);
+        var sin = System.Math.Sin(angle);
+        Vector Place(double x, double y) => new(at.X + x * cos - y * sin, at.Y + x * sin + y * cos);
+        var program = new Program();
+        var start = Place(radius, 0);
+        program.MoveTo(start.X, start.Y);
+        void Line(double x, double y)
+        {
+            var end = Place(x, y);
+            program.LineTo(end.X, end.Y);
+        }
+        void Fillet(double x, double y, double cx, double cy)
+        {
+            var end = Place(x, y);
+            var center = Place(cx, cy);
+            program.ArcTo(end.X, end.Y, center.X, center.Y, RotationType.CCW);
+        }
+        Line(width - radius, 0);
+        Fillet(width, radius, width - radius, radius);
+        Line(width, height - radius);
+        Fillet(width - radius, height, width - radius, height - radius);
+        Line(radius, height);
+        Fillet(0, height - radius, radius, height - radius);
+        Line(0, radius);
+        Fillet(radius, 0, radius, radius);
+        return program;
     }
 }

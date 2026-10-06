@@ -221,25 +221,34 @@ internal static class PostVerificationGeometry
                     points.Add(point);
             // Existing exact line/ray contact semantics guard native queries which
             // suppress very short or nearly parallel intersections. Uncertainty refuses.
-            if (Center is null && !SameSupport(other))
-            {
-                var direction = (End - Start) * (1 / Length);
-                if ((other.ContactAfterStart(Start, direction, Length)
-                    || other.ContactAfterStart(End, direction * -1, Length)) && nativeContactCount == 0)
-                    throw new NotSupportedException("Native contact query is numerically uncertain.");
-            }
-            if (other.Center is null && Center.HasValue)
-            {
-                var direction = (other.End - other.Start) * (1 / other.Length);
-                if ((ContactAfterStart(other.Start, direction, other.Length)
-                    || ContactAfterStart(other.End, direction * -1, other.Length)) && nativeContactCount == 0)
-                    throw new NotSupportedException("Native contact query is numerically uncertain.");
-            }
+            if (Center is null && !SameSupport(other) && nativeContactCount == 0 && ExactLineContact(this, other))
+                throw new NotSupportedException("Native contact query is numerically uncertain.");
+            if (other.Center is null && Center.HasValue && nativeContactCount == 0 && ExactLineContact(other, this))
+                throw new NotSupportedException("Native contact query is numerically uncertain.");
             return points;
 
             static bool InteriorWitness(Vector point, Curve curve) => curve.Contains(point)
                 && (curve.Start.DistanceTo(curve.End) <= Epsilon
                     || (point.DistanceTo(curve.Start) > Epsilon && point.DistanceTo(curve.End) > Epsilon));
+        }
+
+        /// <summary>
+        /// Whether exact ray semantics find <paramref name="curve"/> touching <paramref name="line"/>
+        /// anywhere except at a line endpoint the curve contains, which is already a recorded contact.
+        /// Rays from both ends together cover the whole line. A ray stops short of a contained
+        /// endpoint (both stop half-way when both endpoints are contained): a line meeting a
+        /// tangent arc at their shared vertex is otherwise rediscovered there as a contact the
+        /// native query missed, because rounding can drop the tangent root of its quadratic.
+        /// </summary>
+        private static bool ExactLineContact(Curve line, Curve curve)
+        {
+            var direction = (line.End - line.Start) * (1 / line.Length);
+            var startRecorded = curve.Contains(line.Start);
+            var endRecorded = curve.Contains(line.End);
+            var forward = endRecorded ? startRecorded ? line.Length / 2 : 0 : line.Length;
+            var backward = startRecorded ? endRecorded ? line.Length / 2 : 0 : line.Length;
+            return (forward > 0 && curve.ContactAfterStart(line.Start, direction, forward))
+                || (backward > 0 && curve.ContactAfterStart(line.End, direction * -1, backward));
         }
 
 
