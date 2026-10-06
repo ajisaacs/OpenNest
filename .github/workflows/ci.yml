@@ -97,6 +97,11 @@ jobs:
             if ($LASTEXITCODE -ne 0) { $failed += $project }
           }
           if ($failed.Count -gt 0) { throw "Failed: $($failed -join ', ')" }
+      - name: Test acceptance evidence checker
+        run: python scripts/test_windows_acceptance.py -v
+      - name: Verify named Windows acceptance coverage
+        if: always()
+        run: python scripts/windows_acceptance.py --results TestResults
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

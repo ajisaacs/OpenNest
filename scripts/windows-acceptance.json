@@ -1,0 +1,986 @@
+{
+  "schema_version": 1,
+  "projects": [
+    "OpenNest.FrontEnd.Tests",
+    "OpenNest.WinForms.Tests"
+  ],
+  "groups": [
+    {
+      "id": "bom-import",
+      "title": "BOM import and editable row identity",
+      "required_tests": [
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.BlankingMaterialOrThickness_MarksTheRowAndDropsItFromTheGroups",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.EditingQty_ChangesThatPartAndTheGroupTotal",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.Edits_ChangeThePartShownInThatRow_AfterTheRowsAreReloadedInAnotherOrder",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.InvalidQty_IsRefusedAndTheOldValueKept",
+          "minimum_cases": 5
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.PartColumns_KeepBomOrderAndOnlyMaterialThicknessAndQtyAreEditable",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.ProgrammaticCommitOfInvalidText_KeepsTheRowsValue",
+          "minimum_cases": 4
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BomImportFormTests.RowsWithoutADrawing_CannotEnterEditMode",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "Visual appearance of disabled rows; additional material-dropdown behavior is not covered."
+      ]
+    },
+    {
+      "id": "nest-material",
+      "title": "Nest Info material preservation",
+      "required_tests": [
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestInfoFormTests.SaveWithChangedMaterial_GetsNameOnly",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestInfoFormTests.SaveWithUnchangedMaterial_KeepsGradeAndDensity",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "Shared-material selection requires its separate implementation."
+      ]
+    },
+    {
+      "id": "database-browser",
+      "title": "Saved-nest browser",
+      "required_tests": [
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.SavedNestsFormTests.HighlightedNestShowsItsPlatesAndDrawings_AndEnterOpensIt",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.SavedNestsFormTests.MissingArchive_ShowsTheErrorInTheDetailsLine_AndEscapeCancels",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.SavedNestsFormTests.OpensAsALargeNormalWindowInsideTheOwnersScreen",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.SavedNestsFormTests.PlatePreview_StepsThroughThePlates_AndFollowsThePlatesTable",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "Real HTTP/SQLite save/update/copy, server switching, outage/recovery, paging/sort/search/debounce, empty-last-page deletion, and two-PC checks are not established by the fake-repository form tests.",
+        "Multi-monitor and DPI appearance need operator acceptance."
+      ]
+    },
+    {
+      "id": "nesting-pipeline",
+      "title": "Nesting controls and front-end commit policy",
+      "required_tests": [
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.DefaultEngineSelectionTests.ConsoleAutonestWithoutAnEngineUsesDefault",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.DefaultEngineSelectionTests.McpAutonestEngineDescriptionNamesEveryBuiltInEngine",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.DefaultEngineSelectionTests.McpAutonestWithoutAnEngineUsesDefault",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.DefaultEngineSelectionTests.McpFillToolsWithoutAnEngineUseFill",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Api_PluginSelectionDerivesCountsPreservesIdsAndReportsValidation",
+          "minimum_cases": 5
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Api_UnknownEngineAndCancellationPropagate",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_CancelledOrdinaryFillDoesNotOverwriteOutput",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_CancelledSolveDoesNotSave",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_EmptyResultDoesNotOverwriteOutputOrOriginal",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_KeepPartsOnOccupiedSheetRejectsBeforeSolve",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_RefusesInvalidWithoutOverwritingUnlessFaithfullyKeepable",
+          "minimum_cases": 5
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Console_ValidCommitPreservesSettingsAndUsesOnePhysicalSheet",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Mcp_CancellationDoesNotCommit",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Mcp_OccupiedSheetRejectsBeforeSolve",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Mcp_OnlyCommitsFaithfulSingleSheet",
+          "minimum_cases": 6
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.Mcp_SessionGateSerializesCallsBeforeCheckingOccupiedTarget",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.NestingPipelineTests.UnknownEngineDoesNotWriteOrCommit",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.ActionSelectAreaCutOffTests.SelectedAreaAndFillStayOnSelectedSideOfCutOff",
+          "minimum_cases": 16
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.BlankAndCancelledRowsDoNotBecomeStockOptions",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.FractionalStockSizesRoundTripUnderCommaDecimalCulture",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.InvalidPendingEditCannotPublishOldBoundValue",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.NonblankInvalidRowRejectsWholeCollection",
+          "minimum_cases": 5
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.StockOptionsKeepAnAddRowAfterAddingAPlate",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.StockSizeRegexHasExplicitTimeout",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutoNestFormStockOptionsTests.TimeoutAfterValidRowPublishesNoPrefixAndDoesNotAcceptDialog",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestValidationFormTests.ClosingWholeJobProgressWaitsForWorkerAndRequestsCancellation",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestValidationFormTests.CompletionClosesWithoutCancellingSuccessfulJob",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestValidationFormTests.DiscardIsDefaultAndMalformedOutputCannotBeKept",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateViewFillLifetimeTests.ClosedProgressWindowStaysBusyThroughCommitAndCleanup",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateViewFillLifetimeTests.QueuedProgressCannotOverwriteNewPreviewEvenDuringAnotherFill",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateViewFillLifetimeTests.SetupFailureReleasesGuardAndClosesProgressWindow",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateViewFillLifetimeTests.WorkerFailureReleasesGuardAndDiscardsPreview",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "Interactive engine preference/fallback and every group/area-fill path still need their specific operator checks."
+      ]
+    },
+    {
+      "id": "pdf-report",
+      "title": "Desktop PDF export",
+      "required_tests": [
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.BusyAfterDialogRejectsWriteWithoutTouchingDestination",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.BusyPlateActionOnAnyViewOfTheNestRejects",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.CancelWritesNothingAndNotifiesNothing",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.InteractiveFillOnAnyViewOfTheNestRejects",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.InvalidNestNameRejectsBeforeAnyDialog",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.JobBusyRejectsBeforeAnyDialog",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.MenuFollowsActiveDocument",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.RenderFailureLeavesExistingDestinationUnchanged",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.SuccessfulExportWritesPdfAndLeavesJobStateUntouched",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.NestReportExportTests.WriteRejectsAStaleTargetFromAnotherDocument",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "Packaged-build fonts/notices, physical print output, and report visual readability are not verified by these development-build tests."
+      ]
+    },
+    {
+      "id": "cutting-planner",
+      "title": "Current/all-plate cutting dialog",
+      "required_tests": [
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.PlateViewReorderTests.DisposedViewIgnoresItsRetainedPlate",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.PlateViewReorderTests.FollowsAnInPlaceReorderOfItsCurrentPlateOnly",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.PlateViewReorderTests.KeepsOneLayoutPerOccurrenceOfARepeatedPart",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.AllPlates_SkipsEmptyPlatesAndRefusesTheBatchWhenOnePlateIsBlocked",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.ApplyAfterALiveEdit_ChangesNothingAndReplanRecovers",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.BlockedPlate_KeepsApplyDisabledAndShowsTheCurrentParts",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.BusyEditor_DoesNotStartPlanningUntilItIsFree",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.ClosingWhilePlanning_CancelsAndWaitsForTheWorker",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.Constructor_PlansWithItsOwnCopyOfTheSettings",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.PlanThenApply_InstallsThePlanAndRedrawsTheEditorInPlateOrder",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "Selected-part side-panel migration and legacy automatic-path retirement are separate unfinished work.",
+        "Actual job and NC/controller safety are not certified."
+      ]
+    },
+    {
+      "id": "automatic-cutoffs",
+      "title": "Automatic cutoff dialogs",
+      "required_tests": [
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.ApplyRecomputesWithCurrentPartsAndSettingsAndRegeneratesOnce",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.ApplyRefusesEmptyPlate",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.ApplyRefusesNewBlockingConflictSincePreview",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.CloseCallbackClearsPreviewWithoutApplying",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.FailedRegenerationRestoresDefinitionsProgramsAndPartSequence",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.InitialSpacingUsesNestUnitsAndActualSheetWidth",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.InvalidMinimumTailBlocksApply",
+          "minimum_cases": 3
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.MinimumTailChangeClearsPreviewAndApplyUsesCurrentValue",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.NestApply_LaterConflictBlocksEntireNest",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.NestApply_PreviewsWithoutMutationAndAppliesEveryPlate",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.NestApply_RechecksOperationGuardAfterPreview",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.NestPreview_DisposeLeavesEveryPlateUntouched",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.PreviewIsDetachedAndDisposeClearsIt",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.AutomaticCutOffFormTests.SpacingChangeAndInvalidPreviewClearOldOverlay",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "Full saved-job cutting-state persistence and operator corner-lead checks remain separate."
+      ]
+    },
+    {
+      "id": "overlap-posting",
+      "title": "Overlap display and posting consent",
+      "required_tests": [
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.LeadInSidePanelTests.PanelClosesWithoutEscapeReopeningIt",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PostVerificationFormTests.ClearReportIsDisplayedAndCancelIsDefault",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PostVerificationFormTests.ClosingDuringVerificationWaitsForWorkerAndDiscardsLateResult",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PostVerificationFormTests.DisposalIsIdempotent",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PostVerificationFormTests.RealModalCancellationKeepsOwnerDisabledUntilWorkerStops",
+          "minimum_cases": 3
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PostVerificationFormTests.UnexpectedFailureCannotBeOverridden",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PostVerificationFormTests.WarningsRequireFreshAcknowledgmentAndUncheckingRevokesPermission",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.AppendingPartRetainsTheExistingPairsPathButInvalidatesTheFullReport",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.AutoCheckKeepsDisplayOffButManualCheckStillShowsAreasAndReportsToStatusBar",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.AutoCheckRunsOnceTheLayoutSettlesAndRechecksAfterADrag",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.AutoCheckSupersedesARunningCheckWhenTheLayoutChanges",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.AutoCheckWaitsForInteractionsAndRespectsCancel",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.BothRetainsAreaPathAndCoincidentHoverListsEveryPairWithoutChangingSelection",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.CentroidMarkerUsesGraphCoordinatesAndFixedScreenSizeAcrossZoom",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.CheckCommandCapturesUnitsAndNamesUntilTheNextCheck",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.CleanupReleasesDequeuedWorkersEvenWithoutCompleteOrFail",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.CompletedPathIsReleasedOnHandleRecreationAndCannotReappear",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.CrowdedHoverPagesStayInViewportAndReachLastPairWithoutSelectionOrWheelCapture",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.DefaultAnalyzerRechecksIncrementallyAndEditorsDropTheCache",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.DisplayPanZoomAndPreviewDoNotAnalyzeOrChangeCommittedParts",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.EditNestFormEnablesAutoCheck",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.EditOrPlateSwitchRejectsPendingReport",
+          "minimum_cases": 7
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.FailureAndIncompleteAreVisibleAndNeverReportedAsClear",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.HandleDestructionOrDisposalNeverResurrectsRequests",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.HoverClearsBeforeStaleDetailsCanBeShown",
+          "minimum_cases": 11
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.LongNameAndTinyViewNeverSilentlyElideTheOnlyPair",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.MarkerAndHoverUsePairMaterialCentroidRatherThanBoundsCenter",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.MenusFollowMdiActivationDocumentDisplayAndRunningState",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.MovingDirectlyToAnotherCoincidentGroupStartsItsFirstPage",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.PagingResetsWithHoverLifetimeAndInactiveKeysAreNotConsumed",
+          "minimum_cases": 9
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.PaintChecksFreshnessEvenWhenDisplayIsOff",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.PairDetailsOnlySuppressNormalTooltipWhileVisible",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.RecheckPreservesEachVisibleModeAndDisplayOnlyRepaints",
+          "minimum_cases": 3
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.RestartAndCancelRejectLateCompletionsOnTheUiThread",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.RetainedPathClearsOnHardInvalidationOrRequestFailure",
+          "minimum_cases": 3
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.SlotChangingCollectionEventsImmediatelyDiscardCurrentReportAndPath",
+          "minimum_cases": 3
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.SnapshotKeepsOriginalLabelsWhenLiveNamesChange",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.TripleOverlapUsesOneFillAndGraphCoordinatesDoNotDoublePan",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.PlateOverlapOverlayTests.UnchangedPairStaysVisibleDuringMotionAndPendingRecheck",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "DPI/visual appearance, full lead/tab/lock save-reopen-edit-post lifecycle, and actual machine qualification remain separate."
+      ]
+    },
+    {
+      "id": "ui-lifetime",
+      "title": "UI lifetime, focus and disposal",
+      "required_tests": [
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.SeparatorPenLifetimeTests.DisposeReleasesBothPensAndDisposesTheControlOnlyOnce",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.SeparatorPenLifetimeTests.PaintingKeepsOrientationColorsStylesAndResizeBehavior",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BestFitViewerOperationLifetimeTests.CloseOrDisposalRejectsLateResultsAndErrorsWithoutTouchingControls",
+          "minimum_cases": 4
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BestFitViewerOperationLifetimeTests.CurrentComputeOrRenderFailureReportsOnceAndClearsPartialAndPreviousResults",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BestFitViewerOperationLifetimeTests.DispatcherDrainsPendingCallbacksWhenCompletionAlreadyHolds",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BestFitViewerOperationLifetimeTests.DispatcherObservesAsyncVoidFailureAfterOperationCompletes",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BestFitViewerOperationLifetimeTests.OldCompletionCannotPublishReportOrResetNewerOperation",
+          "minimum_cases": 4
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BestFitViewerOperationLifetimeTests.OnlyRequestedCancellationIsExpectedAndNonmodal",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.BestFitViewerOperationLifetimeTests.ShownAndSelectionPublishCompleteResultsWithPagingAndSourceSelection",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestFocusTraversalTests.NestedActiveContainersReturnTheirLeaf",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestFocusTraversalTests.NestedContainerWithoutActiveControlIsReturned",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestFocusTraversalTests.NoActiveControlReturnsTheForm",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestFocusTraversalTests.OrdinaryActiveControlIsReturnedUnchanged",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestFocusTraversalTests.PlateListRefreshKeepsFocusOnThePlateList",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.EditNestFocusTraversalTests.PlateListRefreshRestoresTheOriginalNestedLeaf",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.StaTestThreadTests.QueuedCallbackExceptionFailsTheTestInsteadOfOpeningADialog",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.StaTestThreadTests.WithoutThrowExceptionModeTheCallbackExceptionNeverReachesTheTestBody",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": []
+    },
+    {
+      "id": "import-export",
+      "title": "Import/export failures and highlighting",
+      "required_tests": [
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.RegexImportFailureTests.Api_TimeoutRetainsInnerExceptionAndNeverSolvesOrReturnsResponse",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.RegexImportFailureTests.Console_TimeoutExitsOneWithoutOutputEvenAfterEarlierImport",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.RegexImportFailureTests.Mcp_TimeoutReturnsErrorWithoutAddingDrawingOrChangingEarlierDrawing",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.ArchUnitsTests.ArchitecturalRegexHasExplicitTimeout",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.ArchUnitsTests.InvalidFieldIsRedAndNaNAndCorrectionRestoresIt",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.ArchUnitsTests.OrdinaryArchitecturalInputsKeepTheirMeaning",
+          "minimum_cases": 5
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.ProgramEditorControlTests.OrdinaryHighlightingPreservesAllColorsAndUnmatchedCoordinateText",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.ProgramEditorControlTests.ReverseAndReorderFinishModelPreviewAndEventsWithOrWithoutTimeout",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.ProgramEditorControlTests.SuccessfulRetryAndClearRemoveTheNonmodalTimeoutIndication",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.ProgramEditorControlTests.TimeoutDuringInitialLoadKeepsCompleteTextAndBaseColorWithoutAParentHandle",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.ProgramEditorControlTests.UnexpectedApplicationFailureStillRestoresSelectionAndResumesLayout",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Controls.ProgramEditorControlTests.UnexpectedMatchingFailureIsNotSwallowed",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CadConverterImportFailureTests.ExtractionTimeoutPublishesNeitherRawTextNorPartialFile",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CadConverterImportFailureTests.MTextRegexHasExplicitTimeout",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CadConverterImportFailureTests.MTextStrippingKeepsItsExistingRules",
+          "minimum_cases": 4
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CadConverterImportFailureTests.SuccessfulExtractionPreservesTextAndControlCodeSemantics",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.CancelWritesNothingAndNotifiesNothing",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.CoordinateExportLeavesDocumentAndJobStateUntouched",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.CoordinatesPreserveFormatAndReleaseFile",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.ExportAllStopsAtFirstWriteFailure",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.ExportAllStopsWhenSecondDialogIsCanceled",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.ExportAllWritesEveryPlateOnceAndAdvancesToLast",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.FailureAfterPartialWriteIsNotSuccess",
+          "minimum_cases": 3
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.FlushFailureDuringWriterDisposalIsNotSuccess",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.JpegRendersShownPlateAndReleasesFile",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.MissingParentDirectoryReportsOneFailure",
+          "minimum_cases": 3
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.PlateExportTests.UnsupportedFilterReportsFailureWithoutCreatingFile",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.ShapeLibraryFormTests.FriendlyNameRegexHasExplicitTimeout",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.ShapeLibraryFormTests.FriendlyNameTimeoutDiscardsPartialFormatting",
+          "minimum_cases": 2
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.ShapeLibraryFormTests.FriendlyNamesKeepSuffixAndWordBoundaryBehavior",
+          "minimum_cases": 4
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.ShapeLibraryFormTests.InvalidShapeInputClearsOldPreviewAndBlocksAddUntilCorrected",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": [
+        "Atomic replacement of existing plate-export destinations is a separate hardening task, not a guarantee of truthful failure reporting."
+      ]
+    },
+    {
+      "id": "mcp-process",
+      "title": "Windows child-process lifetime",
+      "required_tests": [
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.AlreadyCancelled_DoesNotStartChild",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.Arguments_PreserveSpacesAndQuotes",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.Cancellation_StopsOwnedLiveTreeWithoutKillingUnrelatedProcess",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.Completed_PreservesStderrAndNonzeroStatus",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.ConcurrentDrains_PreserveFullOutputBeyondPipeCapacity",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.Deadline_BoundsHungChildAndReapsIt",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.Deadline_BoundsPipeDrainAfterParentExits",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.InvalidConfiguration_FailsClearlyWithoutStartingChild",
+          "minimum_cases": 5
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.MissingNest_FailsClearly",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.FrontEnd.Tests",
+          "method": "OpenNest.FrontEnd.Tests.McpEngineHarnessProcessTests.Normal_ReachesPrivateChild",
+          "minimum_cases": 1
+        }
+      ],
+      "remaining_acceptance": []
+    }
+  ]
+}
