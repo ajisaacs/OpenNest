@@ -13,7 +13,8 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// Plans whole parts and their emitted contour prefixes along a part order. A preserved order is
 /// followed with full backtracking. Otherwise the order comes from <see cref="CuttingPartOrder"/>;
 /// when a part on it cannot be reached without crossing parts already cut, the search learns
-/// "cut this part before those", keeps the parts cut before them and re-plans the rest.
+/// "cut this part before those", keeps the parts cut before them and re-plans the rest. Once
+/// nothing new can be learned, the remaining budget goes to a full search over every ready part.
 /// </summary>
 internal static class JointCuttingPlanSearch
 {
@@ -52,7 +53,12 @@ internal static class JointCuttingPlanSearch
                 if (attempt.Order != null)
                     return walk.Ready(attempt.Order);
                 if (!Learn(attempt, prerequisites))
-                    return walk.Exhausted();
+                {
+                    // "Cut before" rules are a heuristic: a part blocked straight after another can
+                    // still be reachable via a third. Search every order with what budget remains.
+                    var full = walk.Follow(null, null, null);
+                    return full.Order != null ? walk.Ready(full.Order) : walk.Exhausted();
+                }
                 // Back up to just before the earliest part the blocked approach crossed, keep the
                 // parts cut before it, and re-plan the rest from where the tool is at that point.
                 var back = attempt.Crossed.Min(part => Array.IndexOf(sequence, part));
@@ -154,7 +160,8 @@ internal static class JointCuttingPlanSearch
         }
 
         /// <summary>
-        /// Follows <paramref name="sequence"/> from <paramref name="resume"/> (or the start point).
+        /// Follows <paramref name="sequence"/> from <paramref name="resume"/> (or the start point);
+        /// a null sequence tries every dependency-ready part, nearest first.
         /// With a stall limit the attempt ends once that many expansions pass without getting
         /// further along the order; it never backtracks behind its starting node.
         /// </summary>
@@ -199,8 +206,11 @@ internal static class JointCuttingPlanSearch
             else
             {
                 var finished = node.Order.Select(o => o.SourceOrdinal).ToHashSet();
-                var next = snapshot.Placements[sequence[node.Order.Length]];
-                sources = snapshot.Dependencies.IsReady(next.SourceOrdinal, finished) ? [next] : [];
+                sources = sequence == null
+                    ? snapshot.Placements.Where(p => !finished.Contains(p.SourceOrdinal)
+                        && snapshot.Dependencies.IsReady(p.SourceOrdinal, finished))
+                    : snapshot.Dependencies.IsReady(sequence[node.Order.Length], finished)
+                        ? [snapshot.Placements[sequence[node.Order.Length]]] : [];
             }
             foreach (var source in sources)
             {
@@ -296,7 +306,7 @@ internal static class JointCuttingPlanSearch
         private Node Deepest { get; set; }
 
         /// <summary>The ordinal of the part the attempt could not get past, or null.</summary>
-        internal int? Blocked => Deepest == null || Deepest.Order.Length >= sequence.Length ? null
+        internal int? Blocked => sequence == null || Deepest == null || Deepest.Order.Length >= sequence.Length ? null
             : sequence[Deepest.Order.Length];
 
         /// <summary>Parts whose completed contours the blocked part's motions crossed (it can be among them).</summary>

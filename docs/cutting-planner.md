@@ -88,7 +88,11 @@ before those", backs up to just before the earliest of them and re-plans the res
 from the tool position there; parts cut before that point are kept. An attempt
 stops backtracking after a stall of 8 x entries x contours expansions without
 getting further, so it learns instead of retrying every entry combination of the
-parts before it. When nothing new can be learned the result is a refusal.
+parts before it. A rule that would contradict an order already required is skipped.
+"Cut before" rules are a heuristic (a part blocked straight after another may be
+reachable via a third), so once nothing new can be learned the remaining budget
+goes to a full search that tries every ready part, nearest first; only when that
+also fails is the result a refusal.
 
 Candidates use native closest points, vertices, midpoints and circle angles in
 stable order, capped by `maxEntries`. Circle rounding, clamping, corner resolution

@@ -77,6 +77,24 @@ public class ReorderSearchTests
     }
 
     [Fact]
+    public void FreeOrder_LearnedOrderContradicts_FallsBackToTheFullSearch()
+    {
+        // Left leads on its left, right on its right: right straight after left crosses left, and
+        // left straight after right crosses right, so "cut before" rules contradict each other.
+        // Going via the part above, which leaves downward, reaches right safely.
+        var left = LeftLeadRectangle("left", 0, 0, 2, 2);
+        var right = LeftLeadRectangle("right", 4, 0, 2, 2, mirror: true);
+        var via = LeftLeadRectangle("via", -1, 5, 2, 2, departure: new Vector(-0.25, -0.25));
+
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest([left, right, via],
+            confirmedParameters: ExplicitContourTests.Parameters()));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        Assert.Equal(new[] { left, via, right }, result.ProposedOrder.Select(p => p.SourcePart));
+    }
+
+    [Fact]
     public void FreeOrder_NoSafeOrder_RefusesWithTheCrossing()
     {
         // Leads on the far sides: whichever part is cut first, reaching the other crosses it.
@@ -107,9 +125,9 @@ public class ReorderSearchTests
     private static (double, double) Key(Part part) => (part.Location.X, part.Location.Y);
 
     // A locked rectangle whose lead-in and lead-out sit 0.25 outside its left edge (its right
-    // edge when mirrored), so the tool departs on that side.
+    // edge when mirrored), so the tool departs on that side unless a final rapid moves it on.
     private static Part LeftLeadRectangle(string name, double x, double y, double width, double height,
-        bool mirror = false)
+        bool mirror = false, Vector? departure = null)
     {
         var clean = LeadPathValidationTests.Rectangle(0, 0, width, height);
         var part = new Part(new Drawing(name, clean), new Vector(x, y));
@@ -131,6 +149,8 @@ public class ReorderSearchTests
         }
         placed.LineTo(edge, height / 2);
         placed.Codes.Add(new LinearMove(outside, height / 2) { Layer = LayerType.Leadout });
+        if (departure is { } end)
+            placed.MoveTo(end.X, end.Y);
         Assert.True(part.RestoreLeadInProgram(placed, true));
         return part;
     }
