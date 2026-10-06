@@ -116,6 +116,7 @@ internal sealed class OverlapOverlayController : IDisposable
             observedParts.ItemAdded += PartAdded;
             observedParts.ItemRemoved += PartRemoved;
             observedParts.ItemChanged += PartChanged;
+            observedParts.ItemsReordered += PartsReordered;
         }
         NotifyChanged();
     }
@@ -333,6 +334,7 @@ internal sealed class OverlapOverlayController : IDisposable
     private void PartAdded(object sender, ItemAddedEventArgs<Part> e) => Invalidate();
     private void PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => Invalidate();
     private void PartChanged(object sender, ItemChangedEventArgs<Part> e) => Invalidate();
+    private void PartsReordered(object sender, EventArgs e) => Invalidate();
 
     private void Unsubscribe()
     {
@@ -341,6 +343,7 @@ internal sealed class OverlapOverlayController : IDisposable
         observedParts.ItemAdded -= PartAdded;
         observedParts.ItemRemoved -= PartRemoved;
         observedParts.ItemChanged -= PartChanged;
+        observedParts.ItemsReordered -= PartsReordered;
         observedParts = null;
     }
 

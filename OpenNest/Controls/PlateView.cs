@@ -76,6 +76,12 @@ namespace OpenNest.Controls
 
         public event EventHandler<ItemAddedEventArgs<Part>> PartAdded;
         public event EventHandler<ItemRemovedEventArgs<Part>> PartRemoved;
+
+        /// <summary>
+        /// Raised after the plate's parts were reordered in place, for example by an applied cutting
+        /// plan that also installed new programs. The view has already redrawn its parts in the new order.
+        /// </summary>
+        public event EventHandler PartsReordered;
         public event EventHandler StatusChanged;
 
         public event EventHandler SelectionChanged
@@ -200,6 +206,7 @@ namespace OpenNest.Controls
             {
                 plate.PartAdded -= plate_PartAdded;
                 plate.PartRemoved -= plate_PartRemoved;
+                plate.PartsReordered -= plate_PartsReordered;
                 parts.Clear();
                 previewManager.Clear();
                 selection.Clear();
@@ -208,6 +215,7 @@ namespace OpenNest.Controls
             plate = p;
             plate.PartAdded += plate_PartAdded;
             plate.PartRemoved += plate_PartRemoved;
+            plate.PartsReordered += plate_PartsReordered;
 
             foreach (var part in plate.Parts)
                 parts.Add(LayoutPart.Create(part, this));
@@ -816,6 +824,25 @@ namespace OpenNest.Controls
                 PartRemoved.Invoke(this, e);
 
             parts.RemoveAll(p => p.BasePart == e.Item);
+        }
+
+        private void plate_PartsReordered(object sender, EventArgs e)
+        {
+            // Part numbers are drawn from the layout order, and an applied cutting plan can also
+            // replace programs, so follow the plate's order and rebuild every part's graphics.
+            var layouts = new Dictionary<Part, LayoutPart>(ReferenceEqualityComparer.Instance);
+            foreach (var layout in parts)
+                layouts.TryAdd(layout.BasePart, layout);
+            var reordered = plate.Parts
+                .Select(part => layouts.TryGetValue(part, out var layout) ? layout : LayoutPart.Create(part, this))
+                .ToList();
+            parts.Clear();
+            parts.AddRange(reordered);
+            foreach (var layout in parts)
+                layout.IsDirty = true;
+
+            PartsReordered?.Invoke(this, EventArgs.Empty);
+            Invalidate();
         }
 
         public void DeselectAll() => selection.DeselectAll();
