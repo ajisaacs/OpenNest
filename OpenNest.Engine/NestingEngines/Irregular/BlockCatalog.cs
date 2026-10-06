@@ -17,6 +17,8 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 internal sealed class BlockCatalog : IDisposable
 {
     private readonly double spacing;
+    private readonly WorkCounter counter;
+    private readonly long budget;
     private readonly Dictionary<int, Drawing> drawings = new();
     private readonly Dictionary<int, List<Orientation>> orientations = new();
     private readonly Dictionary<int, int> attempts = new();
@@ -24,9 +26,11 @@ internal sealed class BlockCatalog : IDisposable
     private readonly Dictionary<(int Type, int Quantity, double Length, double Width), IReadOnlyList<Placed>> cache = new();
 
     public BlockCatalog(double spacing, IReadOnlyList<PartType> types,
-        IReadOnlyDictionary<int, IReadOnlyList<PairPose>> pairs)
+        IReadOnlyDictionary<int, IReadOnlyList<PairPose>> pairs, WorkCounter counter, long budget)
     {
         this.spacing = spacing;
+        this.counter = counter;
+        this.budget = budget;
         foreach (var type in types)
         {
             var poses = type.Orientations.ToList();
@@ -65,7 +69,7 @@ internal sealed class BlockCatalog : IDisposable
         var key = (type.Index, quantity, rectangle.Length, rectangle.Width);
         if (cache.TryGetValue(key, out var cached))
             return cached;
-        if (rectangle.Area() < 3 * type.Area || attempts.GetValueOrDefault(type.Index) >= 8)
+        if (rectangle.Area() < 3 * type.Area || attempts.GetValueOrDefault(type.Index) >= 8 || counter.Value >= budget)
             return Array.Empty<Placed>();
         attempts[type.Index] = attempts.GetValueOrDefault(type.Index) + 1;
         var result = Build(type, quantity, rectangle, token);
@@ -75,6 +79,11 @@ internal sealed class BlockCatalog : IDisposable
 
     private IReadOnlyList<Placed> Build(PartType type, int quantity, Box rectangle, CancellationToken token)
     {
+        // PrivatePlateFill.Run below is a full independent NFP-based pack whose own operations
+        // never touch this solve's effort meter; charge it here using the same factors - demand
+        // and outline complexity - that drive its real cost, so the shared budget actually sees it.
+        var vertices = type.Orientations.Count > 0 ? type.Orientations[0].Outline.Count : 1;
+        counter.Add((long)quantity * quantity * System.Math.Max(1, vertices));
         if (!drawings.TryGetValue(type.Index, out var drawing))
             drawings[type.Index] = drawing = DrawingJobMapper.CreateDrawing(type.Part);
         try

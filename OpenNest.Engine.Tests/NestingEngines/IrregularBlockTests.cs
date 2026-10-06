@@ -19,7 +19,7 @@ public class IrregularBlockTests
         var job = Job(new[] { Part("ell", LShape(9, 7, 3), quantity, RotationPolicy.Automatic) },
             new[] { Stock("sheet", 40, 60, spacing: 0.25) });
         var types = PartCatalog.Build(job);
-        using var catalog = new BlockCatalog(0.25, types, NoPairs);
+        using var catalog = new BlockCatalog(0.25, types, NoPairs, new WorkCounter(), long.MaxValue);
         Assert.Empty(catalog.Get(types[0], quantity, new Box(0, 0, 60, 40), CancellationToken.None));
         Assert.Equal(0, catalog.PreparationCount);
     }
@@ -31,7 +31,7 @@ public class IrregularBlockTests
             new[] { Stock("sheet", 40, 60, spacing: 0.25) });
         var types = PartCatalog.Build(job);
         var original = types[0].Orientations.ToArray();
-        using var catalog = new BlockCatalog(0.25, types, NoPairs);
+        using var catalog = new BlockCatalog(0.25, types, NoPairs, new WorkCounter(), long.MaxValue);
         var block = catalog.Get(types[0], 7, new Box(0, 0, 60, 40), CancellationToken.None);
         Assert.Equal(7, block.Count);
         Assert.Equal(original, types[0].Orientations);
@@ -79,7 +79,7 @@ public class IrregularBlockTests
         var job = Job(new[] { Part("ell", LShape(9, 7, 3), 44, RotationPolicy.Automatic) }, new[] { stock });
         var types = PartCatalog.Build(job);
         var pairs = PairCatalog.Build(types, 0.25, 40, 30, CancellationToken.None);
-        using var blocks = new BlockCatalog(0.25, types, pairs);
+        using var blocks = new BlockCatalog(0.25, types, pairs, new WorkCounter(), long.MaxValue);
         var before = new FrontierPacker(types, new NoFitCache(0.25), pairs, stock,
             PackAxis.X, 1, new WorkCounter()).Fill(new[] { 44 }, CancellationToken.None);
         var after = new FrontierPacker(types, new NoFitCache(0.25), pairs, stock,
@@ -97,7 +97,7 @@ public class IrregularBlockTests
         var stock = Stock("sheet", 3, 3, spacing: 0.25);
         var job = Job(new[] { Rectangle("box", 2, 2, 3) }, new[] { stock });
         var types = PartCatalog.Build(job);
-        using var blocks = new BlockCatalog(0.25, types, NoPairs);
+        using var blocks = new BlockCatalog(0.25, types, NoPairs, new WorkCounter(), long.MaxValue);
         Assert.Empty(blocks.Get(types[0], 3, new Box(0, 0, 3, 3), CancellationToken.None));
         Assert.Equal(0, blocks.PreparationCount);
         var fill = new FrontierPacker(types, new NoFitCache(0.25), NoPairs, stock,
@@ -158,7 +158,7 @@ public class IrregularBlockTests
     {
         var job = Job(new[] { Rectangle("box", 2, 2, 3) }, new[] { Stock("sheet", 10, 20) });
         var types = PartCatalog.Build(job);
-        using var catalog = new BlockCatalog(0.25, types, NoPairs);
+        using var catalog = new BlockCatalog(0.25, types, NoPairs, new WorkCounter(), long.MaxValue);
         Assert.Throws<OperationCanceledException>(() =>
             catalog.Get(types[0], 3, new Box(0, 0, 20, 10), new CancellationToken(true)));
     }

@@ -48,7 +48,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, progress, token);
+        using var solver = new Solver(job, types, progress, token, WorkBudget);
 
         // Pair-only orientations may fit stock even when the sampled single poses do not.
         // Demand that neither a single nor a pair can fit is reported unplaced.
@@ -86,7 +86,8 @@ public sealed class IrregularNestingEngine : INestingEngine
         NestJob job,
         IReadOnlyList<PartType> types,
         IProgress<NestJobProgress>? progress,
-        CancellationToken token
+        CancellationToken token,
+        long workBudget
     ) : IDisposable
     {
         public void Dispose()
@@ -104,7 +105,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         {
             var spacing = System.Math.Max(0, stock.PartSpacing);
             if (!blocks.TryGetValue(spacing, out var found))
-                blocks[spacing] = found = new BlockCatalog(spacing, types, PairsFor(stock));
+                blocks[spacing] = found = new BlockCatalog(spacing, types, PairsFor(stock), Work, workBudget);
             return found;
         }
 

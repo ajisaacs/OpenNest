@@ -72,6 +72,7 @@ public sealed class SavedNestsForm : Form
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(1280, 800);
         MinimumSize = new Size(800, 560);
+        WindowState = FormWindowState.Maximized;
         MinimizeBox = false;
         ShowInTaskbar = false;
 
@@ -277,6 +278,10 @@ public sealed class SavedNestsForm : Form
 
         Load += (_, _) =>
         {
+            // Keep a maximized dialog's bottom row clear of the taskbar.
+            var area = Screen.FromControl(Owner ?? this).WorkingArea;
+            MaximizedBounds = new Rectangle(area.Left, area.Top, area.Width, area.Height - 20);
+
             // Minimum sizes are applied once the container has its real height; setting them
             // on the default-sized container throws.
             split.Panel1MinSize = 120;
@@ -327,23 +332,27 @@ public sealed class SavedNestsForm : Form
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-            BackgroundColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle,
-            GridColor = Color.Silver,
+            BackgroundColor = SystemColors.Window,
+            BorderStyle = BorderStyle.None,
+            GridColor = Color.FromArgb(230, 230, 230),
             EnableHeadersVisualStyles = false,
+            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
+            RowHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
             RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.DisableResizing,
             StandardTab = true,
         };
         grid.RowTemplate.Height = 22;
-        grid.DefaultCellStyle.SelectionBackColor = Color.Black;
-        grid.DefaultCellStyle.SelectionForeColor = Color.White;
-        grid.ColumnHeadersDefaultCellStyle.BackColor = SystemColors.Control;
-        grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = SystemColors.Control;
+        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(204, 228, 247);
+        grid.DefaultCellStyle.SelectionForeColor = Color.Black;
+        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
+        grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(90, 90, 90);
+        grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245);
         grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-        grid.RowHeadersDefaultCellStyle.BackColor = SystemColors.Control;
-        grid.RowHeadersDefaultCellStyle.SelectionBackColor = Color.Black;
-        grid.RowHeadersDefaultCellStyle.SelectionForeColor = Color.White;
+        grid.RowHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
+        grid.RowHeadersDefaultCellStyle.ForeColor = Color.FromArgb(90, 90, 90);
+        grid.RowHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(204, 228, 247);
+        grid.RowHeadersDefaultCellStyle.SelectionForeColor = Color.Black;
         grid.RowHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         return grid;
     }
@@ -505,8 +514,20 @@ public sealed class SavedNestsForm : Form
     private static string FormatDate(DateTime value) =>
         value == default ? "" : value.ToString("g", CultureInfo.CurrentCulture);
 
-    private static string FormatFileSize(long bytes) =>
-        $"{System.Math.Ceiling(bytes / 1024.0).ToString("N0", CultureInfo.CurrentCulture)} KB";
+    private static readonly string[] FileSizeUnits = { "B", "KB", "MB", "GB" };
+
+    private static string FormatFileSize(long bytes)
+    {
+        double size = bytes;
+        var unitIndex = 0;
+        while (size >= 1024 && unitIndex < FileSizeUnits.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+
+        return unitIndex == 0 ? $"{size:0} {FileSizeUnits[unitIndex]}" : $"{size:0.#} {FileSizeUnits[unitIndex]}";
+    }
 
     private Guid? SelectedNestId() =>
         nestGrid.SelectedRows.Count > 0 && nestGrid.SelectedRows[0].Cells[IdColumn].Value is Guid id ? id : null;

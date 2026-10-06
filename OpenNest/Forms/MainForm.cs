@@ -69,6 +69,7 @@ namespace OpenNest.Forms
             clickUpdateLocation = true;
 
             this.SetBevel(false);
+            AllowDrop = true;
 
             LoadPosts();
             EnableCheck();
@@ -173,6 +174,7 @@ namespace OpenNest.Forms
             if (remoteId != Guid.Empty)
                 editForm.Document.BindRemote(remoteId, serverUrl);
             editForm.MdiParent = this;
+            editForm.PlateView.FilesDropped += (sender, paths) => OpenDroppedNestFiles(paths);
             editForm.PlateChanged += (sender, e) =>
             {
                 NavigationEnableCheck();
@@ -232,9 +234,7 @@ namespace OpenNest.Forms
             mnuNest.Visible = hasValue;
             mnuPlate.Visible = hasValue;
             mnuWindow.Visible = hasValue;
-            mnuToolsAlign.Visible = hasValue;
             mnuToolsMeasureArea.Visible = hasValue;
-            mnuToolsExpandSpacing.Visible = hasValue;
             mnuToolsSaveCurrentAsDefaults.Visible = hasValue;
 
             toolStripMenuItem14.Visible = hasValue;
@@ -552,6 +552,43 @@ namespace OpenNest.Forms
 
             Settings.Default.NestTemplatePath = "";
             Settings.Default.Save();
+        }
+
+        protected override void OnDragEnter(DragEventArgs e)
+        {
+            base.OnDragEnter(e);
+            e.Effect = HasDroppedNestFile(e.Data) ? DragDropEffects.Copy : DragDropEffects.None;
+        }
+
+        protected override void OnDragDrop(DragEventArgs e)
+        {
+            base.OnDragDrop(e);
+            if (e.Data.GetData(DataFormats.FileDrop) is string[] paths)
+                OpenDroppedNestFiles(paths);
+        }
+
+        private static bool HasDroppedNestFile(IDataObject data) =>
+            data.GetData(DataFormats.FileDrop) is string[] paths
+            && paths.Any(path => string.Equals(
+                Path.GetExtension(path), NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// Opens dropped .nest files locally regardless of storage mode. Loaded documents are
+        /// not bound to a server record, so Save/Save As follow the normal storage-mode rules
+        /// (File mode writes to disk; Database mode creates a new record on first save).
+        /// </summary>
+        private void OpenDroppedNestFiles(IEnumerable<string> paths)
+        {
+            foreach (var path in paths)
+            {
+                if (!string.Equals(Path.GetExtension(path), NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var reader = new NestReader(path);
+                var nest = reader.Read();
+                LoadNest(nest);
+                ShowNestWarnings(reader);
+            }
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
