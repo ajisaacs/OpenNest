@@ -200,21 +200,27 @@ plans every plate that has parts. Both open one dialog built on
   whole-part order; either change replans. The settings are confirmed parameters: every
   unlocked part's lead-ins are regenerated, and locked parts keep programs that must
   already pass the checks.
-- Every plate is captured on the UI thread and planned on a worker. A free-order search
-  that ends `NoSolutionWithinBudget` is retried once with the current part order, and the
-  summary says the order was kept. A kept order is allowed 400 expansions per part (at
+- Every plate is captured on the UI thread and checked and planned on a worker. Clean part
+  material is checked for overlaps with the pre-post overlap analyzer; overlapping parts or
+  an incomplete check block that plate whatever its route. A free-order search that ends
+  `NoSolutionWithinBudget` is retried once with the current part order, and the summary
+  says the order was kept. A kept order is allowed 400 expansions per part (at
   least the default 20000), because it still searches contour order and entries.
 - The summary lists every plate: ready plates with part counts and rapid travel, others
-  with their status and findings. Finding part numbers are the plate's current order. The
-  preview shows the active plate detached from the nest (quantity zero, so drawing
-  quantities do not change): the proposed order and programs when ready, otherwise its
-  current parts.
+  with their status and findings. Finding part numbers are the plate's current order, as the
+  editor numbers them. The preview shows the active plate detached from the nest (quantity
+  zero, so drawing quantities do not change) in the proposed order with the proposed
+  programs. It is shown only for a ready plate that still matches what was planned: a
+  refused plate may hold program graphs that are unsafe to copy, and a changed one would
+  draw replayed programs at poses that were never checked.
 - Apply is enabled only when every plate is ready, and it is all or nothing through
   `CuttingPlanService.Apply`. After it applies, each plate keeps its own copy of the
   confirmed settings, which also become the saved defaults. `Stale` keeps the dialog open
   and asks for a replan; nothing changes.
 - Closing or cancelling while planning cancels the worker and keeps the dialog open until
   it stops. Planning and Apply refuse to start while a nesting or plate operation runs.
+  The dialog plans with its own copy of the settings, and posts progress and results to
+  the thread it was created on rather than to whichever context is current.
 - `PlateView` follows `Plate.PartsReordered`: it redraws parts in the plate's order (the
   numbers it draws are the cutting order), rebuilds their graphics and marks the overlap
   check out of date.

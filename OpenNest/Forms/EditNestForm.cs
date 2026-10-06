@@ -870,9 +870,8 @@ namespace OpenNest.Forms
             if (PlateView?.Plate == null || Nest == null)
                 return false;
 
-            // The form edits its own copy; the plate's live settings are plate state the plan checks.
-            var parameters = CuttingParametersSerializer.Deserialize(
-                CuttingParametersSerializer.Serialize(LoadOrDefaultParameters(PlateView.Plate.CuttingParameters)));
+            // The form plans with its own copy; the plate's live settings stay plate state.
+            var parameters = LoadOrDefaultParameters(PlateView.Plate.CuttingParameters);
             using var form = new CuttingPlanForm(PlateView, Nest, allPlates, parameters, isOperationBusy);
             if (form.ShowDialog(owner) != DialogResult.OK)
                 return false;

@@ -26,6 +26,7 @@ public partial class CuttingPlanForm : Form
     private readonly string unit;
     private readonly PlateView preview;
     private readonly SynchronizationContext uiContext;
+    private readonly string previewText;
     private CuttingParameters parameters;
     private CancellationTokenSource planning;
     private CuttingPlanProposal proposal;
@@ -42,7 +43,9 @@ public partial class CuttingPlanForm : Form
     {
         this.plateView = plateView ?? throw new ArgumentNullException(nameof(plateView));
         ArgumentNullException.ThrowIfNull(nest);
-        this.parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+        ArgumentNullException.ThrowIfNull(parameters);
+        // An owned copy: later edits to the caller's settings objects cannot change this plan.
+        this.parameters = CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(parameters));
         activePlate = plateView.Plate ?? throw new ArgumentException("An active plate is required.", nameof(plateView));
         var all = nest.Plates.ToList();
         if (!all.Contains(activePlate))
@@ -83,9 +86,10 @@ public partial class CuttingPlanForm : Form
             applyButton.Text = "&Apply to All Plates";
         }
         var activeNumber = all.IndexOf(activePlate) + 1;
-        previewLabel.Text = plates.Contains(activePlate)
+        previewText = plates.Contains(activePlate)
             ? $"Plate {activeNumber} of {all.Count}, numbered in cutting order:"
             : $"Plate {activeNumber} has no parts; plates with parts are listed on the right.";
+        previewLabel.Text = previewText;
         ShowSettings();
     }
 
@@ -100,6 +104,9 @@ public partial class CuttingPlanForm : Form
     internal CuttingPlanProposal Proposal => proposal;
 
     internal bool IsPlanning => planning != null;
+
+    /// <summary>Test seam: runs on the worker, before planning, with the run's cancellation token.</summary>
+    internal Action<CancellationToken> BeforePlan { get; set; }
 
     protected override void OnLoad(EventArgs e)
     {
@@ -178,7 +185,12 @@ public partial class CuttingPlanForm : Form
         });
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         PlanningTask = completion.Task;
-        Task.Run(() => batch.Plan(progress, token)).ContinueWith(
+        var beforePlan = BeforePlan;
+        Task.Run(() =>
+        {
+            beforePlan?.Invoke(token);
+            return batch.Plan(progress, token);
+        }).ContinueWith(
             work => uiContext.Post(_ => FinishPlanning(work, source, run, completion), null),
             CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     }
@@ -208,6 +220,11 @@ public partial class CuttingPlanForm : Form
             else
                 ShowProposal(work.Result);
         }
+        catch (Exception ex) when (!IsDisposed)
+        {
+            // A plan that cannot be presented must not leave a stale preview or an enabled Apply.
+            ShowMessage($"Unable to show the plan: {ex.Message}");
+        }
         finally
         {
             completion.TrySetResult();
@@ -221,9 +238,16 @@ public partial class CuttingPlanForm : Form
         statusLabel.Text = result.CanApply ? "Review the plan, then apply it." : "Nothing can be applied.";
         applyButton.Enabled = result.CanApply;
         var index = Array.IndexOf(plates, activePlate);
-        if (index < 0)
+        var plate = index < 0 ? null : result.BuildPreview(index);
+        if (plate == null)
+        {
+            if (index >= 0)
+                previewLabel.Text = "No preview: this plate's plan is not ready. Part numbers in the summary "
+                    + "match the editor.";
             return;
-        preview.Plate = result.BuildPreview(index);
+        }
+        previewLabel.Text = previewText;
+        preview.Plate = plate;
         preview.Visible = true;
         preview.ZoomToFit();
     }
@@ -233,6 +257,7 @@ public partial class CuttingPlanForm : Form
         proposal = null;
         applyButton.Enabled = false;
         preview.Visible = false;
+        previewLabel.Text = previewText;
     }
 
     private void ShowMessage(string message)
@@ -256,9 +281,12 @@ public partial class CuttingPlanForm : Form
         var plate = progress.PlateCount == 1
             ? $"plate {progress.PlateNumber}"
             : $"plate {progress.PlateNumber} ({progress.PlateIndex + 1} of {progress.PlateCount})";
-        return progress.Phase == CuttingPlanPhase.Reordering
-            ? $"Planning {plate}: searching for a part order…"
-            : $"Planning {plate} with the current part order…";
+        return progress.Phase switch
+        {
+            CuttingPlanPhase.CheckingOverlap => $"Checking {plate} for overlapping parts…",
+            CuttingPlanPhase.Reordering => $"Planning {plate}: searching for a part order…",
+            _ => $"Planning {plate} with the current part order…",
+        };
     }
 
     private void ShowSettings()

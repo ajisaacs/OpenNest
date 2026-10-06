@@ -73,6 +73,29 @@ public class CuttingPlanBatchTests
     }
 
     [Fact]
+    public void Plan_OverlappingParts_BlocksApplyAndNamesBothParts()
+    {
+        var nest = new Nest();
+        var plate = Plate(nest, Clean("first", 1, 1), Clean("second", 6, 6));
+        var programs = plate.Parts.Select(p => p.Program).ToArray();
+
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
+
+        var planned = Assert.Single(proposal.Plates);
+        Assert.Equal(CuttingPlanStatus.Ready, planned.Result.Status); // The route alone is fine...
+        var pair = Assert.Single(planned.Overlap.Pairs);
+        Assert.Equal((0, 1), (pair.PartAId, pair.PartBId));
+        Assert.False(planned.IsReady); // ...but overlapping material blocks the plate.
+        Assert.False(proposal.CanApply);
+        var text = string.Join("\n", proposal.Describe("in"));
+        Assert.Contains("Plate 1: blocked: parts overlap or could not be checked for overlap.", text);
+        Assert.Contains("- Part 1 (first) overlaps part 2 (second).", text);
+        Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
+        Assert.Equal(programs, plate.Parts.Select(p => p.Program));
+        Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
+    }
+
+    [Fact]
     public void Plan_FreeSearchOutOfBudget_KeepsTheCurrentOrderAndSaysSo()
     {
         var nest = new Nest();
@@ -105,7 +128,7 @@ public class CuttingPlanBatchTests
         var planned = Assert.Single(proposal.Plates);
         Assert.True(planned.IsReady);
         Assert.False(planned.KeptCurrentOrder);
-        Assert.Equal(new[] { CuttingPlanPhase.KeepingOrder }, phases);
+        Assert.Equal(new[] { CuttingPlanPhase.CheckingOverlap, CuttingPlanPhase.KeepingOrder }, phases);
     }
 
     [Fact]
@@ -146,22 +169,18 @@ public class CuttingPlanBatchTests
     }
 
     [Fact]
-    public void BuildPreview_IsDetachedAndShowsTheProposalOrTheCurrentParts()
+    public void BuildPreview_ReadyPlate_IsDetachedAndShowsTheProposal()
     {
         var nest = new Nest();
         var plate = Plate(nest, Grid(4));
         plate.Quantity = 3;
-        var locked = Clean("locked", 1, 1);
-        locked.LeadInsLocked = true;
-        var blocked = Plate(nest, locked, Clean("free", 12, 1));
         var drawing = plate.Parts[0].BaseDrawing;
         var nested = drawing.Quantity.Nested;
         var liveParts = plate.Parts.ToArray();
         var livePrograms = liveParts.Select(p => p.Program).ToArray();
-        var proposal = CuttingPlanBatch.Capture([plate, blocked], ExplicitContourTests.Parameters(), false).Plan();
+        var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
 
         var preview = proposal.BuildPreview(0);
-        var current = proposal.BuildPreview(1);
 
         Assert.Equal(0, preview.Quantity);
         Assert.Equal(plate.Size, preview.Size);
@@ -177,8 +196,27 @@ public class CuttingPlanBatchTests
         }
         Assert.Equal(liveParts, plate.Parts);
         Assert.Equal(livePrograms, plate.Parts.Select(p => p.Program));
-        Assert.Equal(blocked.Parts.Select(p => p.Location), current.Parts.Select(p => p.Location));
-        Assert.All(current.Parts, part => Assert.DoesNotContain(part, blocked.Parts));
+    }
+
+    [Fact]
+    public void BuildPreview_NotReadyOrChangedPlate_ShowsNothing()
+    {
+        var nest = new Nest();
+        var ready = Plate(nest, Clean("a", 1, 1));
+        var locked = Clean("locked", 1, 1);
+        locked.LeadInsLocked = true;
+        var blocked = Plate(nest, locked);
+        var proposal = CuttingPlanBatch.Capture([ready, blocked], ExplicitContourTests.Parameters(), false).Plan();
+        Assert.True(proposal.Plates[0].IsReady);
+        Assert.False(proposal.Plates[1].IsReady);
+
+        // A refused plate may hold graphs that are unsafe to copy, so it is never previewed.
+        Assert.Null(proposal.BuildPreview(1));
+        Assert.NotNull(proposal.BuildPreview(0));
+
+        // A moved part would draw the replayed program somewhere it was never checked.
+        ready.Parts[0].Offset(25, 0);
+        Assert.Null(proposal.BuildPreview(0));
     }
 
     [Theory]

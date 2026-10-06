@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Windows.Forms;
-using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Controls;
@@ -21,7 +20,7 @@ public class CuttingPlanFormTests
         var plate = view.Plate;
         using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
         form.Show();
-        PumpUntil(() => form.Proposal != null, "the plan");
+        WaitForPlan(form);
 
         Assert.True(Control<Button>(form, "applyButton").Enabled);
         Assert.StartsWith("Ready to apply to 1 plate", Control<TextBox>(form, "summaryBox").Text);
@@ -55,47 +54,78 @@ public class CuttingPlanFormTests
         using var editor = view;
         using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
         form.Show();
-        PumpUntil(() => form.Proposal != null, "the plan");
+        WaitForPlan(form);
 
         Assert.False(Control<Button>(form, "applyButton").Enabled);
         var summary = Control<TextBox>(form, "summaryBox").Text;
         Assert.Contains("Plate 1: blocked", summary);
         Assert.Contains("Part 1 (locked)", summary);
-        var preview = Field<PlateView>(form, "preview");
-        Assert.Single(preview.Plate.Parts);
-        Assert.Equal(locked.Location, preview.Plate.Parts[0].Location);
+        // A refused plate is never previewed; the editor already shows its part numbers.
+        Assert.False(Field<PlateView>(form, "preview").Visible);
+        Assert.StartsWith("No preview", Control<Label>(form, "previewLabel").Text);
         Assert.Null(view.Plate.CuttingParameters);
     });
 
     [Fact]
     public void ClosingWhilePlanning_CancelsAndWaitsForTheWorker() => RunSta(() =>
     {
-        var (nest, view) = CreateView(Grid(64));
+        var (nest, view) = CreateView(Square("a", 1, 1), Square("b", 12, 1));
         using var editor = view;
         var programs = view.Plate.Parts.Select(part => part.Program).ToArray();
-        var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var cancelled = false;
+        var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters())
+        {
+            // Hold the worker until the close request has been checked.
+            BeforePlan = token =>
+            {
+                entered.Set();
+                release.Wait(TimeSpan.FromSeconds(30));
+                cancelled = token.IsCancellationRequested;
+            },
+        };
         try
         {
             form.Show();
             PumpUntil(() => form.IsPlanning, "planning to start");
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(30)), "The worker did not start.");
 
             form.Close();
 
             // The worker still holds the plan; the dialog stays up, cancelling, until it stops.
             Assert.False(form.IsDisposed);
             Assert.True(form.Visible);
+            Assert.True(form.IsPlanning);
             Assert.False(Control<Button>(form, "cancelButton").Enabled);
             Assert.False(Control<Button>(form, "planButton").Enabled);
+            release.Set();
             PumpUntil(() => form.IsDisposed, "the dialog to close after cancelling");
-            Assert.True(form.PlanningTask.IsCompleted);
+            Observe(form);
+            Assert.True(cancelled);
             Assert.Equal(programs, view.Plate.Parts.Select(part => part.Program));
             Assert.All(view.Plate.Parts, part => Assert.False(part.HasManualLeadIns));
             Assert.Null(view.Plate.CuttingParameters);
         }
         finally
         {
+            release.Set();
             form.Dispose();
         }
+    });
+
+    [Fact]
+    public void Constructor_PlansWithItsOwnCopyOfTheSettings() => RunSta(() =>
+    {
+        var (nest, view) = CreateView(Square("a", 1, 1));
+        using var editor = view;
+        var parameters = Parameters();
+        using var form = new CuttingPlanForm(view, nest, allPlates: false, parameters);
+
+        ((LineLeadIn)parameters.ExternalLeadIn).Length = 5;
+
+        Assert.NotSame(parameters, form.ConfirmedParameters);
+        Assert.Equal(0.3, ((LineLeadIn)form.ConfirmedParameters.ExternalLeadIn).Length);
     });
 
     [Fact]
@@ -105,7 +135,7 @@ public class CuttingPlanFormTests
         using var editor = view;
         using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
         form.Show();
-        PumpUntil(() => form.Proposal != null, "the plan");
+        WaitForPlan(form);
         var programs = view.Plate.Parts.Select(part => part.Program).ToArray();
 
         view.Plate.Parts[1].Offset(0, 1);
@@ -120,7 +150,7 @@ public class CuttingPlanFormTests
         Assert.Null(view.Plate.CuttingParameters);
 
         Invoke(form, "PlanButton_Click", null, EventArgs.Empty);
-        PumpUntil(() => form.Proposal != null && !form.IsPlanning, "the replan");
+        WaitForPlan(form);
         Assert.True(Control<Button>(form, "applyButton").Enabled);
     });
 
@@ -142,7 +172,7 @@ public class CuttingPlanFormTests
         // message loop must still report progress and results on the dialog's thread.
         Application.DoEvents();
         Invoke(form, "StartPlanning");
-        PumpUntil(() => form.Proposal != null, "the plan");
+        WaitForPlan(form);
         Assert.True(Control<Button>(form, "applyButton").Enabled);
     });
 
@@ -160,7 +190,7 @@ public class CuttingPlanFormTests
         using var view = new PlateView { Plate = first };
         using var form = new CuttingPlanForm(view, nest, allPlates: true, Parameters());
         form.Show();
-        PumpUntil(() => form.Proposal != null, "the plan");
+        WaitForPlan(form);
 
         Assert.Equal("Plan Cutting — All Plates", form.Text);
         Assert.Equal(2, form.Proposal!.Plates.Count);
@@ -193,18 +223,9 @@ public class CuttingPlanFormTests
     };
 
     private static Part Square(string name, double x, double y) =>
-        new(new Drawing(name, SquareProgram(holes: false)), new Vector(x, y));
+        new(new Drawing(name, SquareProgram()), new Vector(x, y));
 
-    private static Part[] Grid(int count)
-    {
-        var drawing = new Drawing("grid", SquareProgram(holes: true));
-        var side = (int)System.Math.Ceiling(System.Math.Sqrt(count));
-        return Enumerable.Range(0, count)
-            .Select(i => new Part(drawing, new Vector(1 + i % side * 11, 1 + i / side * 11)))
-            .ToArray();
-    }
-
-    private static CNC.Program SquareProgram(bool holes)
+    private static CNC.Program SquareProgram()
     {
         var program = new CNC.Program();
         program.MoveTo(0, 0);
@@ -212,14 +233,17 @@ public class CuttingPlanFormTests
         program.LineTo(10, 10);
         program.LineTo(10, 0);
         program.LineTo(0, 0);
-        if (holes)
-            foreach (var x in new[] { 3.0, 7.0 })
-            {
-                program.MoveTo(x + 1, 3);
-                program.ArcTo(x + 1, 3, x, 3, RotationType.CCW);
-            }
         return program;
     }
+
+    private static void WaitForPlan(CuttingPlanForm form)
+    {
+        PumpUntil(() => form.Proposal != null && !form.IsPlanning, "the plan");
+        Observe(form);
+    }
+
+    // The planning task is already complete here; this rethrows anything its completion raised.
+    private static void Observe(CuttingPlanForm form) => form.PlanningTask.GetAwaiter().GetResult();
 
     private static void PumpUntil(Func<bool> condition, string what)
     {

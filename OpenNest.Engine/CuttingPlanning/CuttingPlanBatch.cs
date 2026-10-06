@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Diagnostics;
 
 namespace OpenNest.Engine.CuttingPlanning;
 
@@ -16,6 +17,9 @@ public enum CuttingPlanPhase
 
     /// <summary>Planning with the plate's current part order.</summary>
     KeepingOrder,
+
+    /// <summary>Checking the plate's clean part material for overlaps.</summary>
+    CheckingOverlap,
 }
 
 /// <summary>Worker progress: zero-based position in the batch, the plate's display number and phase.</summary>
@@ -50,9 +54,10 @@ public sealed class CuttingPlanBatch
     public int PlateCount => entries.Length;
 
     /// <summary>
-    /// Captures every plate's exact state with an owned copy of <paramref name="confirmedParameters"/>.
-    /// When the order may change, the current-order request is captured too, so a free search that
-    /// runs out of budget can be retried on the worker without reading live plates again.
+    /// Captures every plate's exact state with an owned copy of <paramref name="confirmedParameters"/>,
+    /// and its clean part material for the overlap check. When the order may change, the
+    /// current-order request is captured too, so a free search that runs out of budget can be
+    /// retried on the worker without reading live plates again.
     /// </summary>
     public static CuttingPlanBatch Capture(IReadOnlyList<Plate> plates, CuttingParameters confirmedParameters,
         bool preservePartOrder, IReadOnlyList<int> plateNumbers = null, CancellationToken token = default) =>
@@ -91,7 +96,8 @@ public sealed class CuttingPlanBatch
                 preservePartOrder: true), token);
             var reorder = preservePartOrder ? null : CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
                 expansionBudget: reorderBudget, confirmedParameters: confirmedParameters), token);
-            entries[index] = new(plate, plateNumbers?[index] ?? index + 1, reorder, keepOrder);
+            var overlap = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(), token);
+            entries[index] = new(plate, plateNumbers?[index] ?? index + 1, reorder, keepOrder, overlap);
         }
         return new(entries, owned);
     }
@@ -101,9 +107,10 @@ public sealed class CuttingPlanBatch
             System.Math.Max((long)ReorderExpansionBudget, (long)partCount * KeepOrderExpansionsPerPart));
 
     /// <summary>
-    /// Plans every plate from its captured snapshot. Safe on a worker: live plates are not read.
-    /// A free search that ends without a complete plan within its budget is retried with the
-    /// current order; the proposal reports that it kept the order.
+    /// Checks and plans every plate from its captured snapshots. Safe on a worker: live plates are
+    /// not read. Overlapping material blocks a plate whatever its route. A free search that ends
+    /// without a complete plan within its budget is retried with the current order; the proposal
+    /// reports that it kept the order.
     /// </summary>
     public CuttingPlanProposal Plan(IProgress<CuttingPlanProgress> progress = null,
         CancellationToken token = default)
@@ -112,6 +119,18 @@ public sealed class CuttingPlanBatch
         for (var index = 0; index < entries.Length; index++)
         {
             var entry = entries[index];
+            progress?.Report(new(index, entries.Length, entry.Number, CuttingPlanPhase.CheckingOverlap));
+            PlateOverlapReport overlap;
+            try
+            {
+                overlap = PlateOverlapAnalyzer.Analyze(entry.Overlap, token);
+            }
+            catch (OperationCanceledException)
+            {
+                plans[index] = new(entry.Plate, entry.Number, new(CuttingPlanStatus.Cancelled), null, null);
+                continue;
+            }
+
             CuttingPlanResult reorder = null;
             if (entry.Reorder != null)
             {
@@ -119,29 +138,32 @@ public sealed class CuttingPlanBatch
                 reorder = CuttingPlanService.Plan(entry.Reorder, token);
                 if (reorder.Status != CuttingPlanStatus.NoSolutionWithinBudget)
                 {
-                    plans[index] = new(entry.Plate, entry.Number, reorder, null);
+                    plans[index] = new(entry.Plate, entry.Number, reorder, null, overlap);
                     continue;
                 }
             }
             progress?.Report(new(index, entries.Length, entry.Number, CuttingPlanPhase.KeepingOrder));
-            plans[index] = new(entry.Plate, entry.Number, CuttingPlanService.Plan(entry.KeepOrder, token), reorder);
+            plans[index] = new(entry.Plate, entry.Number, CuttingPlanService.Plan(entry.KeepOrder, token), reorder,
+                overlap);
         }
         return new(plans, ownedParameters);
     }
 
-    private sealed record Entry(Plate Plate, int Number, CuttingPlanSnapshot Reorder, CuttingPlanSnapshot KeepOrder);
+    private sealed record Entry(Plate Plate, int Number, CuttingPlanSnapshot Reorder, CuttingPlanSnapshot KeepOrder,
+        PlateOverlapSnapshot Overlap);
 }
 
 /// <summary>One plate's outcome inside a <see cref="CuttingPlanProposal"/>.</summary>
 public sealed class CuttingPlanPlateResult
 {
     internal CuttingPlanPlateResult(Plate plate, int plateNumber, CuttingPlanResult result,
-        CuttingPlanResult reorderAttempt)
+        CuttingPlanResult reorderAttempt, PlateOverlapReport overlap)
     {
         Plate = plate;
         PlateNumber = plateNumber;
         Result = result;
         ReorderAttempt = reorderAttempt;
+        Overlap = overlap;
     }
 
     /// <summary>The live plate. Read it only on the thread that owns it.</summary>
@@ -154,8 +176,16 @@ public sealed class CuttingPlanPlateResult
     /// <summary>The free-order attempt that ran out of budget before the current order was kept; else null.</summary>
     public CuttingPlanResult ReorderAttempt { get; }
 
+    /// <summary>The clean-material overlap check (part ids are current part positions); null if cancelled first.</summary>
+    public PlateOverlapReport Overlap { get; }
+
     public bool KeptCurrentOrder => ReorderAttempt != null;
-    public bool IsReady => Result.Status == CuttingPlanStatus.Ready && Result.IndependentlyReplayed;
+
+    /// <summary>The route was replayed and the overlap check completed without overlaps.</summary>
+    public bool IsRouteReady => Result.Status == CuttingPlanStatus.Ready && Result.IndependentlyReplayed;
+
+    public bool IsOverlapClear => Overlap is { IsComplete: true } && Overlap.Pairs.Count == 0;
+    public bool IsReady => IsRouteReady && IsOverlapClear;
     public int PartCount => Result.ProposedOrder.Count;
     public int RegeneratedCount => Result.ProposedOrder.Count(p => p.IsRegenerated);
 
@@ -202,13 +232,18 @@ public sealed class CuttingPlanProposal
     }
 
     /// <summary>
-    /// A detached copy of one plate for display: ready plates show the proposed order and programs,
-    /// others the current parts in their current order (finding part numbers refer to it). The copy
-    /// has quantity zero, so adding its parts leaves drawing quantities unchanged.
+    /// A detached copy of a ready plate for display, in the proposed order with the proposed
+    /// programs, or null. A refused plate is not previewed: its program graphs may be unsafe to
+    /// copy. Neither is a plate that changed after planning, which would draw replayed programs at
+    /// poses that were never checked. The copy has quantity zero, so drawing quantities stay put.
+    /// Call it on the thread that owns the plates.
     /// </summary>
     public Plate BuildPreview(int index)
     {
         var planned = Plates[index];
+        if (!planned.IsReady || planned.Result.Snapshot?.PlateState?.IsCurrent() != true)
+            return null;
+        // Unchanged since capture: live poses, plate and programs are the validated, replayed ones.
         var source = planned.Plate;
         var preview = new Plate(source.Size)
         {
@@ -217,12 +252,6 @@ public sealed class CuttingPlanProposal
             PartSpacing = source.PartSpacing,
             EdgeSpacing = source.EdgeSpacing,
         };
-        if (!planned.IsReady)
-        {
-            foreach (var part in source.Parts)
-                preview.Parts.Add((Part)part.Clone());
-            return preview;
-        }
         foreach (var proposal in planned.Result.ProposedOrder)
         {
             var part = (Part)proposal.SourcePart.Clone();
@@ -276,14 +305,39 @@ public sealed class CuttingPlanProposal
             yield break;
         }
 
-        yield return heading + StatusText(result.Status);
+        yield return heading + (plate.IsRouteReady
+            ? "blocked: parts overlap or could not be checked for overlap."
+            : StatusText(result.Status));
+        foreach (var line in Limit(DescribeOverlap(plate.Overlap)))
+            yield return line;
+        if (plate.IsRouteReady)
+            yield break;
         if (plate.KeptCurrentOrder)
             yield return "  No new part order was found within the search limit, and planning with the "
                 + "current order was refused:";
-        foreach (var finding in result.Findings.Take(FindingsPerPlate))
-            yield return "  - " + DescribeFinding(finding);
-        if (result.Findings.Count > FindingsPerPlate)
-            yield return $"  ... and {result.Findings.Count - FindingsPerPlate} more.";
+        foreach (var line in Limit(result.Findings.Select(DescribeFinding)))
+            yield return line;
+    }
+
+    private static IEnumerable<string> Limit(IEnumerable<string> lines)
+    {
+        var all = lines.ToList();
+        foreach (var line in all.Take(FindingsPerPlate))
+            yield return "  - " + line;
+        if (all.Count > FindingsPerPlate)
+            yield return $"  ... and {all.Count - FindingsPerPlate} more.";
+    }
+
+    private static IEnumerable<string> DescribeOverlap(PlateOverlapReport overlap)
+    {
+        if (overlap == null)
+            yield break;
+        foreach (var pair in overlap.Pairs)
+            yield return $"Part {pair.PartAId + 1}{Name(pair.PartAName)} overlaps part "
+                + $"{pair.PartBId + 1}{Name(pair.PartBName)}.";
+        foreach (var issue in overlap.Issues)
+            yield return $"Overlap check incomplete for part {issue.PartAId + 1}"
+                + (issue.PartBId is int other ? $" and part {other + 1}" : string.Empty) + $": {issue.Message}";
     }
 
     private static string StatusText(CuttingPlanStatus status) => status switch
@@ -307,8 +361,9 @@ public sealed class CuttingPlanProposal
         return text;
     }
 
-    private static string Name(Part part) =>
-        string.IsNullOrWhiteSpace(part?.BaseDrawing?.Name) ? string.Empty : $" ({part.BaseDrawing.Name})";
+    private static string Name(Part part) => Name(part?.BaseDrawing?.Name);
+
+    private static string Name(string name) => string.IsNullOrWhiteSpace(name) ? string.Empty : $" ({name})";
 
     private static string Count(int count, string noun) => $"{count} {noun}{(count == 1 ? string.Empty : "s")}";
 }
