@@ -46,10 +46,24 @@ def read_suite(path):
     counters = summary.find("{*}Counters")
     if counters is None or not results or int(counters.attrib["total"]) != len(results):
         raise ValueError(f"{path.name}: empty results or total does not match enumerated results")
+    values = {key: int(value) for key, value in counters.attrib.items()}
+    for key, value in values.items():
+        if value < 0 or value > len(results):
+            raise ValueError(f"{path.name}: impossible {key} counter")
+        if key not in ("total", "executed", "passed", "failed", "notExecuted", "completed") and value:
+            raise ValueError(f"{path.name}: nonzero failure/incomplete counter {key}")
     outcomes = Counter(r["outcome"] for r in results)
-    for key, outcome in (("passed", "Passed"), ("failed", "Failed")):
-        if int(counters.attrib[key]) != outcomes[outcome]:
+    expected = {"passed": outcomes["Passed"], "failed": outcomes["Failed"],
+                "executed": len(results) - outcomes["NotExecuted"]}
+    for key, value in expected.items():
+        if values[key] != value:
             raise ValueError(f"{path.name}: {key} counter does not match result rows")
+    # xUnit can emit skip rows with notExecuted=0. No other contradiction
+    # gets that exception, and required skips still fail in evaluate().
+    if values.get("notExecuted", 0) not in (0, outcomes["NotExecuted"]):
+        raise ValueError(f"{path.name}: notExecuted counter does not match skip rows")
+    if values.get("completed", 0) not in (0, values["executed"]):
+        raise ValueError(f"{path.name}: completed counter does not match executed rows")
     return {
         "file": path.name,
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),

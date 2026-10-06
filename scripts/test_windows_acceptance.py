@@ -42,6 +42,7 @@ class WindowsAcceptanceTests(unittest.TestCase):
                 ET.SubElement(ET.SubElement(result, "Output"), "StdOut").text = "fixture reason"
         result_summary = ET.SubElement(root, "ResultSummary", outcome=summary)
         ET.SubElement(result_summary, "Counters", total=str(len(rows) if total is None else total),
+                      executed=str(sum(r[1] != "NotExecuted" for r in rows)),
                       passed=str(sum(r[1] == "Passed" for r in rows)),
                       failed=str(sum(r[1] == "Failed" for r in rows)), notExecuted="0")
         path = self.path / "Example.Tests.trx"
@@ -97,6 +98,26 @@ class WindowsAcceptanceTests(unittest.TestCase):
         path = self.write_trx()
         path.write_text(path.read_text().replace('passed="2"', 'passed="1"'))
         self.assertEqual("failed", self.evaluate()["automated_status"])
+
+    def test_contradictory_or_incomplete_counters_fail(self):
+        changes = [("executed", "999"), ("executed", "-1"), ("executed", "0"),
+                   ("executed", "bad"), ("executed", None), ("notExecuted", "1"),
+                   ("completed", "999")]
+        changes += [(key, "1") for key in ("aborted", "error", "timeout", "inconclusive",
+                    "passedButRunAborted", "notRunnable", "disconnected", "warning",
+                    "inProgress", "pending", "unknownCounter")]
+        for key, value in changes:
+            with self.subTest(counter=key, value=value):
+                path = self.write_trx()
+                tree = ET.parse(path)
+                counters = tree.getroot().find(".//{*}Counters")
+                assert counters is not None
+                if value is None:
+                    counters.attrib.pop(key)
+                else:
+                    counters.set(key, value)
+                tree.write(path, encoding="utf-8", xml_declaration=True)
+                self.assertEqual("failed", self.evaluate()["automated_status"])
 
     def test_aborted_run_fails_even_with_passed_rows(self):
         self.write_trx(summary="Aborted")
