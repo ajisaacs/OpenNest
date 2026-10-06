@@ -627,6 +627,13 @@ namespace OpenNest.Controls
         {
             if (disposing)
             {
+                // A plate can outlive its view; stop it calling back into a disposed one.
+                if (plate != null)
+                {
+                    plate.PartAdded -= plate_PartAdded;
+                    plate.PartRemoved -= plate_PartRemoved;
+                    plate.PartsReordered -= plate_PartsReordered;
+                }
                 overlapOverlay?.Dispose();
                 hoverTimer?.Dispose();
                 hoverTimer = null;
@@ -830,11 +837,18 @@ namespace OpenNest.Controls
         {
             // Part numbers are drawn from the layout order, and an applied cutting plan can also
             // replace programs, so follow the plate's order and rebuild every part's graphics.
-            var layouts = new Dictionary<Part, LayoutPart>(ReferenceEqualityComparer.Instance);
+            // A reorder keeps repeated references, so reuse each existing layout once.
+            var layouts = new Dictionary<Part, Queue<LayoutPart>>(ReferenceEqualityComparer.Instance);
             foreach (var layout in parts)
-                layouts.TryAdd(layout.BasePart, layout);
+            {
+                if (!layouts.TryGetValue(layout.BasePart, out var queue))
+                    layouts.Add(layout.BasePart, queue = new Queue<LayoutPart>());
+                queue.Enqueue(layout);
+            }
             var reordered = plate.Parts
-                .Select(part => layouts.TryGetValue(part, out var layout) ? layout : LayoutPart.Create(part, this))
+                .Select(part => layouts.TryGetValue(part, out var queue) && queue.Count > 0
+                    ? queue.Dequeue()
+                    : LayoutPart.Create(part, this))
                 .ToList();
             parts.Clear();
             parts.AddRange(reordered);
