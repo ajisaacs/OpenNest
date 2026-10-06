@@ -9,9 +9,9 @@ namespace OpenNest.Mcp
         public List<Drawing> Drawings { get; } = new();
 
         /// <summary>
-        /// Session-default engine/strategy name used by nesting tools when a call does not pass
-        /// an explicit <c>engine</c> argument. Instance state only — the process-global legacy
-        /// registry is never read or written.
+        /// Whole-job engine <c>autonest_plate</c> uses when a call does not pass an explicit
+        /// <c>engine</c> argument; fill tools default to the Fill strategy instead. Instance state
+        /// only — the process-global legacy registry is never read or written.
         /// </summary>
         public string DefaultEngineName { get; set; } = "Default";
 

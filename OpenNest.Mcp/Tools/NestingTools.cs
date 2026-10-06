@@ -18,6 +18,22 @@ namespace OpenNest.Mcp.Tools
     {
         private readonly NestSession _session;
 
+        private const string FillStrategies =
+            "Placement strategy: Fill (default; lattice fill of repeated copies), Strip, "
+            + "Vertical Remnant (keeps a right-side drop), Horizontal Remnant (keeps a top-side drop)";
+
+        /// <summary>Built-in engines with what each suits; a test keeps this in step with the registry.</summary>
+        private const string JobEngines =
+            "Whole-job engine. Default (used when omitted): suits any job; runs Irregular and Rectangles "
+            + "and keeps the cheapest valid layout. "
+            + "Irregular: irregular profiles; no-fit-polygon packing into notches and gaps, best-fit pairs. "
+            + "Rectangles: plain and near-rectangular parts; packs each part as its bounding box, fastest. "
+            + "Fill: many copies of few drawings; lattice fill with pairs and rectangle best-fit. "
+            + "Strip: Fill variant laying mixed drawings in strips. "
+            + "Vertical Remnant, Horizontal Remnant: Fill variants keeping a right-side or top-side drop. "
+            + "StockLadder: constrained parts first, then area repacking; meant for several stock sizes. "
+            + "Plug-ins loaded from Engines/ use their class name.";
+
         public NestingTools(NestSession session)
         {
             _session = session;
@@ -31,7 +47,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Index of the plate to fill")] int plateIndex,
             [Description("Name of the drawing to fill with")] string drawingName,
             [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0,
-            [Description("Placement strategy: Fill, Strip, Vertical Remnant, Horizontal Remnant")]
+            [Description(FillStrategies)]
                 string engine = null
         )
         {
@@ -84,7 +100,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Width of the area")] double width,
             [Description("Length of the area")] double length,
             [Description("Maximum quantity to place (0 = unlimited)")] int quantity = 0,
-            [Description("Placement strategy: Fill, Strip, Vertical Remnant, Horizontal Remnant")]
+            [Description(FillStrategies)]
                 string engine = null
         )
         {
@@ -134,7 +150,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Index of the plate")] int plateIndex,
             [Description("Name of the drawing to fill with")] string drawingName,
             [Description("Maximum quantity per remnant (0 = unlimited)")] int quantity = 0,
-            [Description("Placement strategy: Fill, Strip, Vertical Remnant, Horizontal Remnant")]
+            [Description(FillStrategies)]
                 string engine = null
         )
         {
@@ -197,7 +213,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Index of the plate")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
             [Description("Comma-separated quantities for each drawing")] string quantities,
-            [Description("Placement strategy: Fill, Strip, Vertical Remnant, Horizontal Remnant")]
+            [Description(FillStrategies)]
                 string engine = null
         )
         {
@@ -255,7 +271,7 @@ namespace OpenNest.Mcp.Tools
             [Description("Index of the empty plate")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
             [Description("Comma-separated positive quantities")] string quantities,
-            [Description("Registered jobs engine name, including loaded plug-ins")] string engine = null,
+            [Description(JobEngines)] string engine = null,
             [Description("Explicitly keep representable layouts despite validation violations")] bool allow_invalid = false,
             CancellationToken cancellationToken = default
         )
@@ -323,18 +339,14 @@ namespace OpenNest.Mcp.Tools
         }
 
         /// <summary>
-        /// Resolves the requested fill strategy, falling back to the session default. Returns null
-        /// when the name is not a single-plate placement strategy.
+        /// Resolves the requested fill strategy; an omitted name means Fill. Returns null when the
+        /// name is not a single-plate placement strategy.
         /// </summary>
-        private string ResolveStrategy(string engine)
+        private static string ResolveStrategy(string engine)
         {
-            var requested = string.IsNullOrWhiteSpace(engine)
-                ? _session.DefaultEngineName
-                : engine.Trim();
-
             try
             {
-                return PlateFillService.ResolveStrategy(requested);
+                return PlateFillService.ResolveStrategy(engine?.Trim());
             }
             catch (NotSupportedException)
             {
@@ -342,10 +354,7 @@ namespace OpenNest.Mcp.Tools
             }
         }
 
-        private string EngineError(string engine) =>
-            UnknownEngineMessage(
-                string.IsNullOrWhiteSpace(engine) ? _session.DefaultEngineName : engine.Trim()
-            );
+        private static string EngineError(string engine) => UnknownEngineMessage(engine.Trim());
 
         private static string UnknownEngineMessage(string engineName)
         {

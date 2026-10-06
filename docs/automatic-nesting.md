@@ -46,7 +46,7 @@ Console `--autonest` uses the jobs engine named by `--engine` (Default when omit
 
 Invalid output is printed and rejected with exit code 2 without saving or posting. `--allow-invalid` explicitly accepts representable layout violations. Malformed output, multiple returned sheets, and zero placements are never saved by this path. Unknown engines exit 1. `--autonest --keep-parts` rejects an occupied target: use the plain interactive fill path for existing obstacles instead.
 
-MCP `autonest_plate` requires an empty target. The stdio server serializes all tool calls sharing its mutable session, so another request cannot change drawings or occupy a target during a solve. `allow_invalid` defaults to false. It reports violations and makes no changes on rejection, including with an override when the output is unrepresentable or contains multiple sheets. Existing fill tools remain separate. Console and MCP load jobs plug-ins from `Engines/` beside their executable.
+MCP `autonest_plate` requires an empty target. The stdio server serializes all tool calls sharing its mutable session, so another request cannot change drawings or occupy a target during a solve. `allow_invalid` defaults to false. It reports violations and makes no changes on rejection, including with an override when the output is unrepresentable or contains multiple sheets. `engine` defaults to Default, and its description lists the built-in engines with what each suits. Fill tools (`fill_plate`, `fill_area`, `fill_remnants`, `pack_plate`) remain separate and default to the Fill strategy. Console and MCP load jobs plug-ins from `Engines/` beside their executable.
 
 ### MCP engine development harness
 
