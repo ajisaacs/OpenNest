@@ -79,7 +79,7 @@ static class NestConsole
         // single-plate placement strategy. Unknown names exit with the valid choices.
         if (options.AutoNest)
         {
-            // ResolveName also accepts renamed engines' old names (for example Default).
+            // ResolveName also accepts renamed engines' old names (for example Opus55NestingEngine).
             if (NestingEngineRegistry.ResolveName(options.Engine) == null)
             {
                 Console.Error.WriteLine(

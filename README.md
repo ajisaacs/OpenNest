@@ -91,6 +91,7 @@ Engines implement `INestingEngine.Solve(NestJob)`. Desktop Auto Nest, console au
 
 | Engine | Description |
 |--------|-------------|
+| **Default** | Any job: runs Irregular and Rectangles and keeps the cheapest valid layout |
 | **Rectangles** | Plain and near-rectangular plates: maximal-rectangles box packing |
 | **Irregular** | Irregular profiles: no-fit-polygon frontier packing |
 | **Fill** | Multi-phase: linear fill → pairs → rect best-fit → extents (named Default in earlier releases) |

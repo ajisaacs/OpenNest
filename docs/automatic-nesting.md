@@ -42,7 +42,7 @@ The pre-pipeline multi-plate orchestrator and plate-size optimizer have been rem
 
 ## Console and MCP
 
-Console `--autonest` uses the selected jobs engine against one physical sheet. The selected plate's old parts are replaced only after acceptance; other plates are unchanged. Default demand is still one of each drawing unless `--quantity` is supplied. A partially fulfilled, valid result may be saved; a successful placement is not a claim that all demand was met.
+Console `--autonest` uses the jobs engine named by `--engine` (Default when omitted) against one physical sheet. The selected plate's old parts are replaced only after acceptance; other plates are unchanged. Default demand is still one of each drawing unless `--quantity` is supplied. A partially fulfilled, valid result may be saved; a successful placement is not a claim that all demand was met.
 
 Invalid output is printed and rejected with exit code 2 without saving or posting. `--allow-invalid` explicitly accepts representable layout violations. Malformed output, multiple returned sheets, and zero placements are never saved by this path. Unknown engines exit 1. `--autonest --keep-parts` rejects an occupied target: use the plain interactive fill path for existing obstacles instead.
 

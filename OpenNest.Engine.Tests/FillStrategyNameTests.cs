@@ -1,23 +1,25 @@
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Engine.NestingEngines.Default;
 using OpenNest.Engine.Tests.Jobs;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests;
 
 /// <summary>
-/// The fill engine and placement strategy are named "Fill"; the old name "Default" remains a
-/// hidden alias so saved selections, scripts and API requests keep their behavior.
+/// The multi-phase fill engine and placement strategy are named "Fill". "Default" names the
+/// router engine; fill-strategy callers still read "Default" as Fill.
 /// </summary>
 public class FillStrategyNameTests
 {
     [Fact]
-    public void FillIsListedAndDefaultIsNot()
+    public void FillIsListedBesideTheDefaultRouter()
     {
         var engines = NestingEngineRegistry.AvailableEngines.Select(e => e.Name).ToList();
 
+        Assert.Equal("Default", engines[0]);
         Assert.Contains("Fill", engines);
-        Assert.DoesNotContain("Default", engines, StringComparer.OrdinalIgnoreCase);
+        Assert.IsType<FixedStrategyNestingEngine>(NestingEngineRegistry.Create("Fill"));
         Assert.Equal(new[] { "Fill", "Strip", "Vertical Remnant", "Horizontal Remnant" },
             PlateFillService.BuiltInStrategies);
     }
@@ -25,22 +27,21 @@ public class FillStrategyNameTests
     [Theory]
     [InlineData("Default")]
     [InlineData(" default ")]
-    public void LegacyDefaultEngineNameResolvesToFill(string name)
+    public void DefaultNamesTheRouter(string name)
     {
-        Assert.Equal("Fill", NestingEngineRegistry.ResolveName(name));
-        Assert.IsType<FixedStrategyNestingEngine>(NestingEngineRegistry.Create(name));
-        Assert.Equal(NestJobStatus.Complete, NestingEngineRegistry.Create(name).Solve(FiniteStockJobTests.Job(1)).Status);
+        Assert.Equal("Default", NestingEngineRegistry.ResolveName(name));
+        Assert.IsType<DefaultNestingEngine>(NestingEngineRegistry.Create(name));
     }
 
     [Fact]
-    public void PlugInNamedDefaultCannotShadowFill()
+    public void PlugInNamedDefaultCannotReplaceTheRouter()
     {
         var before = NestingEngineRegistry.AvailableEngines.Count;
 
         NestingEngineRegistry.Register("Default", "stale plug-in", () => new FixedStrategyNestingEngine("Strip"));
 
         Assert.Equal(before, NestingEngineRegistry.AvailableEngines.Count);
-        Assert.Equal("Fill", NestingEngineRegistry.ResolveName("Default"));
+        Assert.IsType<DefaultNestingEngine>(NestingEngineRegistry.Create("Default"));
     }
 
     [Theory]

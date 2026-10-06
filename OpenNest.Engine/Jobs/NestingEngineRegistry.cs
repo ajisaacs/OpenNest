@@ -5,14 +5,16 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using OpenNest.Engine.NestingEngines.Default;
 using OpenNest.Engine.NestingEngines.Irregular;
 using OpenNest.Engine.NestingEngines.Rectangles;
 
 namespace OpenNest.Engine.Jobs;
 
 /// <summary>
-/// Registry of whole-job <see cref="INestingEngine"/> implementations. The four production
-/// strategies are exposed through <see cref="FixedStrategyNestingEngine"/>. Callers choose an
+/// Registry of whole-job <see cref="INestingEngine"/> implementations. "Default" chooses among the
+/// built-in engines per job; the four fill strategies are exposed through
+/// <see cref="FixedStrategyNestingEngine"/>. Callers choose an
 /// engine explicitly from <see cref="AvailableEngines"/>; there is no process-global active
 /// selection. Plug-ins loaded from an Engines/ folder register under their CLR type name.
 /// </summary>
@@ -28,11 +30,17 @@ public static class NestingEngineRegistry
     {
         ["Opus55NestingEngine"] = "Irregular",
         ["RectanglesNestingEngine"] = "Rectangles",
-        ["Default"] = "Fill",
     };
 
     static NestingEngineRegistry()
     {
+        // Listed first: the engine front ends use when the caller names none.
+        Register(
+            "Default",
+            "Any job: runs Irregular and Rectangles and keeps the cheapest valid layout",
+            () => new DefaultNestingEngine()
+        );
+
         Register(
             "Rectangles",
             "Plain and near-rectangular parts: maximal-rectangles box packing",

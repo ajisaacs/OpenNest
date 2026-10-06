@@ -11,10 +11,17 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 
 | Engine | Best for | Method |
 |---|---|---|
+| Default | Any job; used when no engine is named | Runs Irregular, then Rectangles, checks both layouts with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost; ties keep Irregular |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; stock chosen sheet by sheet by salvage-credited look-ahead cost |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants and a tail re-plan |
 | StockLadder | Caller-supplied stock ladders | Constrained-first fill with equivalent-demand area repacking |
 | Fill, Strip, Vertical Remnant, Horizontal Remnant | Single-strategy fills | The fixed placement strategies behind interactive fill; Fill is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder) |
+
+Neither Irregular nor Rectangles wins every job, even within its own lane, so Default runs both
+rather than choosing by part shape; Rectangles adds little time and is also the fallback when an
+Irregular layout fails the check. A candidate that throws is skipped. Default routes the whole job:
+engines cannot share a sheet, so a job mixing plain and irregular parts goes to both engines whole.
+A future circle/ring engine joins Default as another candidate.
 
 Rectangles places irregular parts validly, but only as their bounding boxes; it never nests into a
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
@@ -85,10 +92,11 @@ desktop selections, scripts and API requests keep working:
 |---|---|
 | `Opus55NestingEngine` | Irregular |
 | `RectanglesNestingEngine` | Rectangles |
-| `Default` | Fill |
 
-Fill strategy calls (interactive fill, `PlateFillService`, console fill without `--autonest`, MCP fill
-tools) also accept `Default` as Fill.
+In v0.3.0 and earlier, `Default` was the multi-phase fill engine now named Fill. `Default` now names the
+choosing engine above, so saved selections, scripts and API requests that name it get that
+engine. Fill-strategy calls (interactive fill, `PlateFillService`, console fill without
+`--autonest`, MCP fill tools) still read `Default` as Fill.
 
 Gpt6Astra and Qwen38FlashNext are no longer shipped and have no alias. A saved selection of either
 falls back to the default engine with the usual status-bar warning.
