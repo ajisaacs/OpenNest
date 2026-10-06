@@ -165,8 +165,9 @@ public partial class CuttingPlanForm : Form
         {
             batch = CuttingPlanBatch.Capture(plates, parameters, keepOrderCheckBox.Checked, plateNumbers);
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException)
+        catch (Exception ex)
         {
+            // Capture runs inside the dialog's message loop: report a failure, never crash the editor.
             ShowMessage($"Unable to start planning: {ex.Message}");
             return;
         }
