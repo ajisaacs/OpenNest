@@ -98,7 +98,7 @@ public class CuttingPlanBatchTests
     [Theory]
     [InlineData(Mode.Absolute)]
     [InlineData(Mode.Incremental)]
-    public void Plan_SubprogramHolesInEitherMode_AreNotFalseOverlaps(Mode mode)
+    public void Plan_SubprogramHoles_AreNeverAFalseOverlap(Mode mode)
     {
         var hole = new Program();
         hole.MoveTo(1, 0);
@@ -115,8 +115,17 @@ public class CuttingPlanBatchTests
         var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
 
         var planned = Assert.Single(proposal.Plates);
-        Assert.True(planned.IsOverlapClear, string.Join("; ", planned.Overlap.Issues.Select(i => i.Message)));
-        Assert.True(planned.IsReady);
+        Assert.True(planned.IsRouteReady);
+        Assert.Empty(planned.Overlap.Pairs);
+        if (mode == Mode.Incremental)
+            Assert.True(planned.IsReady, string.Join("; ", planned.Overlap.Issues.Select(i => i.Message)));
+        else
+        {
+            // The overlap check cannot read absolute subprograms yet: blocked as unchecked, not as overlapping.
+            Assert.False(planned.IsReady);
+            Assert.Contains("Overlap check incomplete for part 1: Absolute-mode subprograms",
+                string.Join("\n", proposal.Describe("in")));
+        }
     }
 
     [Fact]

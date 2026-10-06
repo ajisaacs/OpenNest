@@ -504,7 +504,7 @@ public class PlateOverlapAnalyzerTests
     [Theory]
     [InlineData(Mode.Absolute)]
     [InlineData(Mode.Incremental)]
-    public void Analyze_SubprogramHolesKeepTheirCallOffsetsInEitherMode(Mode mode)
+    public void Analyze_IncrementalHolesKeepTheirOffsetsAndAbsoluteOnesAreRefused(Mode mode)
     {
         var hole = new Program();
         hole.MoveTo(1, 0);
@@ -525,8 +525,37 @@ public class PlateOverlapAnalyzerTests
 
         var report = PlateOverlapAnalyzer.Analyze(new[] { host, insert });
 
-        Assert.True(report.IsComplete, string.Join("; ", report.Issues.Select(issue => issue.Message)));
+        // Never a false overlap: incremental holes are read at their call offsets, and an absolute
+        // subprogram, which the converter would read at its frame origin, is an incomplete check.
         Assert.Empty(report.Pairs);
+        if (mode == Mode.Incremental)
+            Assert.True(report.IsComplete, string.Join("; ", report.Issues.Select(issue => issue.Message)));
+        else
+        {
+            var issue = Assert.Single(report.Issues);
+            Assert.Equal((0, (int?)null), (issue.PartAId, issue.PartBId));
+            Assert.Contains("Absolute-mode subprograms", issue.Message);
+        }
+    }
+
+    [Fact]
+    public void Analyze_AbsoluteCoordinatesFarFromTheMaterialAreReadExactly()
+    {
+        // Rebuilding absolute endpoints from incremental deltas after a rapid at 1e12 moves the
+        // contour by about 2.4e-5, enough to hide this 2e-5 wide overlap.
+        var far = new Program(Mode.Absolute);
+        far.Codes.Add(new RapidMove(new Vector(1e12, 0)));
+        far.Codes.Add(new RapidMove(new Vector(0.1, 0)));
+        foreach (var point in new[] { new Vector(1.1, 0), new Vector(1.1, 10), new Vector(0.1, 10), new Vector(0.1, 0) })
+            far.Codes.Add(new LinearMove(point));
+        var first = new Part(new Drawing("far rapid", far));
+        var second = Rectangle(1.09998, 0, 1, 10);
+
+        var report = PlateOverlapAnalyzer.Analyze(new[] { first, second });
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues.Select(issue => issue.Message)));
+        var pair = Assert.Single(report.Pairs);
+        Assert.Equal(2e-4, pair.Area, 6);
     }
 
     [Fact]

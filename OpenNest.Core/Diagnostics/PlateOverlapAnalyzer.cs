@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.CNC;
-using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 
@@ -72,12 +71,10 @@ public static class PlateOverlapAnalyzer
     {
         try
         {
-            ValidateProgram(program, new HashSet<Program>(ReferenceEqualityComparer.Instance));
-            // Convert an incremental-mode copy: the converter adds call offsets to incremental moves
-            // only, so absolute subprogram holes would otherwise land at their frame origin. The
-            // copy is owned; the live program is neither converted in place nor rotated.
-            var geometry = PreparedContours.CopyForGeometry(program, CancellationToken.None);
-            return new OverlapSource(program, ConvertProgram.ToGeometry(geometry)
+            ValidateProgram(program, new HashSet<Program>(ReferenceEqualityComparer.Instance), false);
+            // Conversion creates fresh geometry, including expanded shared hole calls;
+            // no cloning/rotation of a live program or subprogram is necessary.
+            return new OverlapSource(program, ConvertProgram.ToGeometry(program)
                 .Where(entity => SpecialLayers.IsMaterial(entity.Layer)
                     && entity.Layer != SpecialLayers.Leadin
                     && entity.Layer != SpecialLayers.Leadout).ToList(), null);
@@ -278,12 +275,18 @@ public static class PlateOverlapAnalyzer
         typeof(Comment), typeof(Feedrate), typeof(Kerf),
     ];
 
-    private static void ValidateProgram(Program program, HashSet<Program> visiting)
+    private static void ValidateProgram(Program program, HashSet<Program> visiting, bool subprogram)
     {
         if (program == null || !visiting.Add(program) || visiting.Count > 64)
             throw new ArgumentException("Missing, recursive, or excessively nested subprogram.");
         if (program.Codes == null)
             throw new ArgumentException("Program has no instruction list.");
+        // The converter adds a call's frame offset to incremental moves only, so an absolute
+        // subprogram would be read at its frame origin. Converting it exactly needs a lossless
+        // frame transform; until then it is refused rather than misread (OpenNest writes hole
+        // subprograms in incremental mode).
+        if (subprogram && program.Mode == Mode.Absolute)
+            throw new NotSupportedException("Absolute-mode subprograms are not supported by the overlap check.");
         foreach (var code in program.Codes)
         {
             if (code == null)
@@ -297,7 +300,7 @@ public static class PlateOverlapAnalyzer
             {
                 if (!OverlapMaterial.IsFinite(call.Offset) || !double.IsFinite(call.Rotation))
                     throw new ArgumentException("Subprogram pose must be finite.");
-                ValidateProgram(call.Program, visiting);
+                ValidateProgram(call.Program, visiting, true);
             }
         }
         visiting.Remove(program);

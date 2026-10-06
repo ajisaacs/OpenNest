@@ -17,7 +17,10 @@ shows all three check categories, even when there are no findings:
 
 Findings identify the plate and part's position in the cutting sequence. Read the
 scrollable report, cancel to fix the nest, then post again to rerun verification.
-Uncheckable geometry is reported as incomplete, not passed. Multiple interrupted
+Uncheckable geometry is reported as incomplete, not passed. The overlap check reads
+clean drawing programs made of the built-in instructions only; a missing instruction
+list, any other instruction type, or a hole stored as an absolute-mode subprogram
+(OpenNest writes them incremental) makes that part's check incomplete. Multiple interrupted
 cut fragments, or a lead-out after an open contour that might cut through a tab,
 also require manual review rather than being assumed retained.
 
