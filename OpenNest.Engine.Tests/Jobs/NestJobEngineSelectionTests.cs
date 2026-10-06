@@ -1,6 +1,6 @@
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests.Jobs;
 

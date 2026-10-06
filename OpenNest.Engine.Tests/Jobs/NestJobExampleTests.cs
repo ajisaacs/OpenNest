@@ -1,8 +1,8 @@
 using OpenNest.CNC;
-using OpenNest.Geometry;
-using Xunit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
+using OpenNest.Geometry;
+using Xunit;
 
 namespace OpenNest.Engine.Tests.Jobs;
 

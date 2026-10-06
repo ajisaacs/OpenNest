@@ -1,8 +1,7 @@
 using System.Threading;
-using OpenNest.Geometry;
-
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Engine.Tests.Jobs;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests;
 

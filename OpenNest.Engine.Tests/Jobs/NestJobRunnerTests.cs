@@ -1,6 +1,6 @@
 using OpenNest.CNC;
-using OpenNest.Geometry;
 using OpenNest.Engine.Jobs;
+using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Tests.Jobs;
 

@@ -298,8 +298,8 @@ public class NestJobGeometryTests
                     }
                 );
                 for (var left = 0; left < plate.Parts.Count; left++)
-                for (var right = left + 1; right < plate.Parts.Count; right++)
-                    Assert.False(plate.Parts[left].Intersects(plate.Parts[right], out _));
+                    for (var right = left + 1; right < plate.Parts.Count; right++)
+                        Assert.False(plate.Parts[left].Intersects(plate.Parts[right], out _));
             }
         );
     }

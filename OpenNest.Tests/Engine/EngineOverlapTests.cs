@@ -1,9 +1,9 @@
 using OpenNest.Converters;
+using OpenNest.Engine;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using Xunit.Abstractions;
-using OpenNest.Engine;
-using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Tests.Engine;
 
