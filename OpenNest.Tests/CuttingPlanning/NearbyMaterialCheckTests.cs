@@ -80,6 +80,89 @@ public class NearbyMaterialCheckTests
         Assert.Contains(findings, f => f.Kind == PostVerificationKind.RapidCrossing && f.OtherPartNumber == 1);
     }
 
+    [Fact]
+    public void RapidJustOutsideASmallCompletedCircle_IsStillACrossing()
+    {
+        // A circle of radius 0.001 counts as touched up to sqrt(r^2 + 1e-8) from its centre, beyond
+        // its radius; the rapid passes 0.000002 outside the radius, inside that band.
+        var state = new ReleasedContourState();
+        Assert.Empty(state.Check(Read(Circle(0.001)), Vector.Zero, 1)
+            .Where(f => f.Kind == PostVerificationKind.RapidCrossing));
+        var next = new Program();
+        next.MoveTo(0.001002, 0.002);
+
+        var findings = state.Check(Read(next), new Vector(0.001002, -0.002), 2);
+
+        Assert.Contains(findings, f => f.Kind == PostVerificationKind.RapidCrossing && f.OtherPartNumber == 1);
+    }
+
+    [Fact]
+    public void PrePostReview_RapidJustOutsideASmallCircle_IsStillReported()
+    {
+        const double radius = 0.003;
+        const double y = radius + 0.0000015;
+        var first = new Part(new Drawing("circle", CleanCircle(radius)));
+        var circle = Circle(radius);
+        circle.Codes.Add(new LinearMove(-0.01, y) { Layer = LayerType.Scribe }); // Ends left of the circle.
+        Assert.True(first.RestoreLeadInProgram(circle, true));
+        var second = new Part(new Drawing("square",
+            LeadPathValidationTests.Rectangle(0.01, y + 0.0002, 0.02, y + 0.0102)));
+        var square = new Program();
+        square.MoveTo(0.01, y);
+        square.Codes.Add(new LinearMove(0.01, y + 0.0002) { Layer = LayerType.Leadin });
+        square.LineTo(0.01, y + 0.0102); square.LineTo(0.02, y + 0.0102);
+        square.LineTo(0.02, y + 0.0002); square.LineTo(0.01, y + 0.0002);
+        Assert.True(second.RestoreLeadInProgram(square, true));
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Parts.Add(first);
+        plate.Parts.Add(second);
+
+        var report = PostVerificationAnalyzer.Analyze(nest);
+
+        Assert.Contains(report.Findings, f => f.Kind == PostVerificationKind.RapidCrossing
+            && f.PartNumber == 2 && f.OtherPartNumber == 1);
+    }
+
+    [Fact]
+    public void LeadGrazingASmallCircle_StaysAnUncertainCheck()
+    {
+        // The lead passes 0.0000015 outside a radius-0.003 circle: inside its native contact band,
+        // where the native query cannot certify contact either way.
+        const double radius = 0.003;
+        const double y = radius + 0.0000015;
+        var target = LeadMaterialSnapshot.Capture(LeadPathValidationTests.Rectangle(0.01, y, 0.02, y + 0.01), Vector.Zero);
+        var other = LeadMaterialSnapshot.Capture(CleanCircle(radius), Vector.Zero);
+        Assert.True(other.IsComplete, other.Reason);
+        var lead = new Program();
+        lead.MoveTo(-0.01, y);
+        lead.Codes.Add(new LinearMove(0.01, y) { Layer = LayerType.Leadin });
+        lead.LineTo(0.01, y + 0.01);
+
+        var result = LeadPathValidator.Check(Read(lead), target, [target, other]);
+
+        Assert.False(result.IsComplete);
+        Assert.Contains("uncertain", result.Reason);
+    }
+
+    private static Program CleanCircle(double radius)
+    {
+        var p = new Program();
+        p.MoveTo(radius, 0);
+        p.Codes.Add(new ArcMove(new Vector(radius, 0), Vector.Zero, RotationType.CCW));
+        return p;
+    }
+
+    // A full circle about the origin cut after a lead-in from 0.0002 outside it.
+    private static Program Circle(double radius)
+    {
+        var p = new Program();
+        p.MoveTo(radius + 0.0002, 0);
+        p.Codes.Add(new LinearMove(radius, 0) { Layer = LayerType.Leadin });
+        p.Codes.Add(new ArcMove(new Vector(radius, 0), Vector.Zero, RotationType.CCW));
+        return p;
+    }
+
     // A 2 x 2 square at (x, y) with a lead-in from 0.5 below its corner, optionally preceded by
     // a rapid to a given point.
     private static Program Square(double x, double y, Vector? via = null)

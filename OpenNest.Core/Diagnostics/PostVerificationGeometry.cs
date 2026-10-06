@@ -106,11 +106,13 @@ internal static class PostVerificationGeometry
             : new Line(Start, End);
 
         /// <summary>
-        /// A conservative axis-aligned extent: an arc's whole supporting circle, a line's endpoints.
-        /// Nonfinite geometry yields NaN bounds, which no separation test can pass.
+        /// A conservative axis-aligned extent of everything a native query may count as touching
+        /// this curve: for an arc, its whole supporting circle widened by the contact band of
+        /// <see cref="ContactAfterStart"/>; for a line, its endpoints. Nonfinite geometry yields NaN
+        /// bounds, which no separation test can pass.
         /// </summary>
         internal Extent Extent => Center is { } center
-            ? new(center.X - Radius, center.Y - Radius, center.X + Radius, center.Y + Radius)
+            ? new(center.X - ContactReach, center.Y - ContactReach, center.X + ContactReach, center.Y + ContactReach)
             : new(System.Math.Min(Start.X, End.X), System.Math.Min(Start.Y, End.Y),
                 System.Math.Max(Start.X, End.X), System.Math.Max(Start.Y, End.Y));
 
@@ -246,6 +248,13 @@ internal static class PostVerificationGeometry
             point.X - Center.Value.X)) <= System.Math.Abs(Sweep) + Epsilon / Radius
             || point.DistanceTo(Start) <= Epsilon || point.DistanceTo(End) <= Epsilon;
 
+        // How far past r^2 a squared distance from the centre still counts as touching the arc.
+        // For small arcs this band reaches well beyond the radius (sqrt(1e-8) = 1e-4 as r -> 0).
+        private double ContactSlack => Epsilon * System.Math.Max(1, Radius * 2);
+
+        // The largest distance from the centre that ContactAfterStart can count as contact.
+        private double ContactReach => System.Math.Sqrt(Radius * Radius + ContactSlack);
+
         internal bool ContactAfterStart(Vector origin, Vector direction, double length)
         {
             if (Center is { } center)
@@ -256,7 +265,7 @@ internal static class PostVerificationGeometry
                 var projection = Dot(relative, direction);
                 var perpendicular = Cross(relative, direction);
                 var square = Radius * Radius - perpendicular * perpendicular;
-                if (square < -Epsilon * System.Math.Max(1, Radius * 2))
+                if (square < -ContactSlack)
                     return false;
                 var offset = System.Math.Sqrt(System.Math.Max(0, square));
                 return Hit(projection - offset) || Hit(projection + offset);
