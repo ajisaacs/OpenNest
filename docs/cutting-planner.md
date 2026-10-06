@@ -101,10 +101,13 @@ motions, never the nominal entry point alone. Existing lead styles are not
 shortened, disabled or substituted as a search fallback.
 
 Every candidate rapid is checked against contours already completed, including
-earlier holes in the same part. Future contours are not yet obstacles. Rapid and
-lead checks skip contours and material whose extents are more than 0.001 clear
-of the motion, ten times the widest band any native contact query allows beyond an
-extent; anything closer, touching included, gets the full native check. An arc's
+earlier holes in the same part. Future contours are not yet obstacles. Rapid
+checks skip completed contours whose extents are more than 0.001 clear of the
+rapid, ten times the widest band any native contact query allows beyond an
+extent; anything closer, touching included, gets the full native check. Lead
+checks examine every other part's material: native line/circle queries can report
+rounding contacts for long leads far from small circles, and leads keep those
+results. An arc's
 extent is its whole supporting circle widened to the distance at which the native
 contact query still counts it as touched (for a very small arc up to 0.0001 beyond
 its radius). Nothing is skipped when either extent has a nonfinite bound or reaches

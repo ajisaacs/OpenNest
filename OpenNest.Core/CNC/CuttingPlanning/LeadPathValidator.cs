@@ -84,13 +84,10 @@ public static class LeadPathValidator
                 var failure = CheckMaterial(target, allowed);
                 if (failure != null)
                     return new(true, false, $"Lead motion {i} contacts or enters target material outside its adjacent contour joint ({failure}).");
-                var reach = move.Curve.Extent;
                 foreach (var material in otherMaterials)
                 {
                     token.ThrowIfCancellationRequested();
-                    // Material lies within its extent, so a lead well clear of that extent can
-                    // neither touch it nor lie inside it.
-                    if (ReferenceEquals(material, target) || reach.IsClearOf(material.Extent))
+                    if (ReferenceEquals(material, target))
                         continue;
                     if (CheckMaterial(material, null) != null)
                         return new(true, false, "Lead contacts or enters another placed material.");

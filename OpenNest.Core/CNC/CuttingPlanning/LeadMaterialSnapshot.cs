@@ -14,19 +14,11 @@ public sealed class LeadMaterialSnapshot
     {
         Rings = rings;
         Reason = reason;
-        var extent = PostVerificationGeometry.Extent.None;
-        foreach (var ring in rings)
-            foreach (var curve in ring)
-                extent = extent.Union(curve.Extent);
-        Extent = extent;
     }
 
     public bool IsComplete => Reason == null;
     public string Reason { get; }
     internal IReadOnlyList<PostVerificationGeometry.Curve[]> Rings { get; }
-
-    /// <summary>A conservative extent of every boundary; material lies within it.</summary>
-    internal PostVerificationGeometry.Extent Extent { get; }
 
     /// <summary>Capture a stable, clean, rotation-baked program, applying location once.
     /// Unsupported or malformed geometry produces an incomplete snapshot; cancellation throws.</summary>

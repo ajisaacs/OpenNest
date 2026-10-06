@@ -6,8 +6,9 @@ using OpenNest.Geometry;
 namespace OpenNest.Tests.CuttingPlanning;
 
 /// <summary>
-/// The lead and rapid checks skip material and contours whose extents are well clear of the
-/// motion. These cases sit just inside that skip and must still be checked.
+/// Rapid checks skip completed contours whose extents are well clear of the motion; lead checks
+/// examine every other part's material. These cases sit just inside the skip, or show that lead
+/// checks are never filtered, and must keep the native result.
 /// </summary>
 public class NearbyMaterialCheckTests
 {
@@ -78,6 +79,31 @@ public class NearbyMaterialCheckTests
         var findings = state.Check(Read(Square(3, 3, new Vector(2, 2))), new Vector(5, -1), 2);
 
         Assert.Contains(findings, f => f.Kind == PostVerificationKind.RapidCrossing && f.OtherPartNumber == 1);
+    }
+
+    [Fact]
+    public void LeadCheck_ExaminesMaterialWellClearOfTheLead()
+    {
+        // A 900000-long lead passes 0.0021 from a radius-0.0001 circle: far more than any skip
+        // margin, yet rounding in the native line/circle query reports a contact. Lead checks keep
+        // that native result rather than skipping the circle.
+        var target = LeadMaterialSnapshot.Capture(LeadPathValidationTests.Rectangle(0, -2, 2, 0.0021), Vector.Zero);
+        var circle = new Program();
+        circle.MoveTo(-1 + 0.0001, 0);
+        circle.Codes.Add(new ArcMove(new Vector(-1 + 0.0001, 0), new Vector(-1, 0), RotationType.CCW));
+        var far = LeadMaterialSnapshot.Capture(circle, Vector.Zero);
+        Assert.True(far.IsComplete, far.Reason);
+        var lead = new Program();
+        lead.MoveTo(-900000, 0.0021);
+        lead.Codes.Add(new LinearMove(0, 0.0021) { Layer = LayerType.Leadin });
+        lead.LineTo(0, -2);
+        var execution = Read(lead);
+        Assert.True(LeadPathValidator.Check(execution, target, [target]).IsClear);
+
+        var result = LeadPathValidator.Check(execution, target, [target, far]);
+
+        Assert.True(result.IsComplete, result.Reason);
+        Assert.False(result.IsClear);
     }
 
     [Fact]
