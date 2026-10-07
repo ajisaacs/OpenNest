@@ -85,10 +85,15 @@ public partial class CuttingPlanForm : Form
             Text = "Plan Cutting — All Plates";
             applyButton.Text = "&Apply to All Plates";
         }
-        var activeNumber = all.IndexOf(activePlate) + 1;
-        previewText = plates.Contains(activePlate)
-            ? $"Plate {activeNumber} of {all.Count}, numbered in cutting order:"
-            : $"Plate {activeNumber} has no parts; plates with parts are listed on the right.";
+        // Display-only numbering: the trailing empty new-plate sentinel is excluded from the
+        // "of M" total; plateNumbers keep real collection positions for the batch summary.
+        var displayCount = PlateDisplayNumbering.DisplayedPlateCount(all);
+        var activeNumber = PlateDisplayNumbering.DisplayedPlateNumber(all, all.IndexOf(activePlate));
+        previewText = activeNumber == null
+            ? "New plate (empty) has no parts; plates with parts are listed on the right."
+            : plates.Contains(activePlate)
+                ? $"Plate {activeNumber} of {displayCount}, numbered in cutting order:"
+                : $"Plate {activeNumber} has no parts; plates with parts are listed on the right.";
         previewLabel.Text = previewText;
         ShowSettings();
     }
