@@ -147,6 +147,74 @@ public class NestDetailsSessionTests
         await Assert.ThrowsAsync<ObjectDisposedException>(() => session.LoadAsync(Guid.NewGuid()));
     }
 
+    [Fact]
+    public async Task Prefetch_ThenLoad_ResolvesFromTheCacheWithoutASecondRequest()
+    {
+        var requested = new List<Guid>();
+        var details = new NestDetails();
+        using var session = new NestDetailsSession((id, _) =>
+        {
+            requested.Add(id);
+            return Task.FromResult(details);
+        });
+        var nestId = Guid.NewGuid();
+
+        session.Prefetch(nestId);
+        Assert.Equal(new[] { nestId }, requested);
+
+        Assert.True(await session.LoadAsync(nestId));
+        Assert.Same(details, session.Details);
+        Assert.Equal(new[] { nestId }, requested);
+    }
+
+    [Fact]
+    public async Task Prefetch_SkipsWhenAlreadyTheCurrentNest_OrAlreadyCached()
+    {
+        var requested = new List<Guid>();
+        using var session = new NestDetailsSession((id, _) =>
+        {
+            requested.Add(id);
+            return Task.FromResult(new NestDetails());
+        });
+        var nestId = Guid.NewGuid();
+
+        await session.LoadAsync(nestId);
+        Assert.Equal(new[] { nestId }, requested);
+
+        // Already the current nest.
+        session.Prefetch(nestId);
+        Assert.Equal(new[] { nestId }, requested);
+
+        // No longer current, but its earlier load is still cached.
+        session.Clear();
+        session.Prefetch(nestId);
+        Assert.Equal(new[] { nestId }, requested);
+    }
+
+    [Fact]
+    public async Task Clear_CancelsAnInFlightPrefetch_SoItsResultIsNeverCached()
+    {
+        var loads = new ControlledLoads();
+        using var session = new NestDetailsSession(loads.Load);
+        var nestId = Guid.NewGuid();
+
+        session.Prefetch(nestId);
+        Assert.False(loads.Tokens[0].IsCancellationRequested);
+
+        session.Clear();
+        Assert.True(loads.Tokens[0].IsCancellationRequested);
+        loads.Results[0].SetResult(new NestDetails());
+
+        // Whether or not the cancelled prefetch's continuation has run yet, it must not have
+        // populated the cache, so loading the same nest issues a fresh request.
+        var fresh = new NestDetails();
+        var load = session.LoadAsync(nestId);
+        Assert.Equal(2, loads.Results.Count);
+        loads.Results[1].SetResult(fresh);
+        Assert.True(await load);
+        Assert.Same(fresh, session.Details);
+    }
+
     /// <summary>Each load waits for its own result, which the test completes explicitly.</summary>
     private sealed class ControlledLoads
     {

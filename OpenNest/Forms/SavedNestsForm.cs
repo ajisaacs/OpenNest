@@ -22,6 +22,11 @@ namespace OpenNest.Forms;
 /// </summary>
 public sealed class SavedNestsForm : Form
 {
+    // Rows this far before/after the highlight are warmed in the background once the
+    // highlighted nest's own details are showing, so arrowing through the page mostly
+    // hits the NestDetailsSession cache instead of downloading each nest on demand.
+    private const int PrefetchWindow = 5;
+
     private const string IdColumn = "Id";
     private const string PlateSizeColumn = "PlateSize";
     private const string AreaColumn = "Area";
@@ -571,6 +576,7 @@ public sealed class SavedNestsForm : Form
             if (details.Details != null)
             {
                 PopulateDetails(details.Details);
+                PrefetchNearby(id.Value);
                 return;
             }
 
@@ -590,13 +596,51 @@ public sealed class SavedNestsForm : Form
         try
         {
             if (await details.LoadAsync(id) && !IsDisposed)
+            {
                 PopulateDetails(details.Details);
+                PrefetchNearby(id);
+            }
         }
         catch (Exception ex)
         {
             if (!IsDisposed)
                 ShowDetailsMessage($"Could not load details: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Warms the cache for the rows around the highlighted one (<see cref="PrefetchWindow"/>
+    /// on each side) so arrowing to a nearby nest resolves from <see cref="NestDetailsSession"/>'s
+    /// cache instead of a fresh download. Only the current page's rows are candidates.
+    /// </summary>
+    private void PrefetchNearby(Guid id)
+    {
+        var index = -1;
+        for (var i = 0; i < nestGrid.Rows.Count; i++)
+        {
+            if (nestGrid.Rows[i].Cells[IdColumn].Value is Guid rowId && rowId == id)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0)
+            return;
+
+        for (var offset = 1; offset <= PrefetchWindow; offset++)
+        {
+            PrefetchRow(index - offset);
+            PrefetchRow(index + offset);
+        }
+    }
+
+    private void PrefetchRow(int index)
+    {
+        if (index < 0 || index >= nestGrid.Rows.Count)
+            return;
+        if (nestGrid.Rows[index].Cells[IdColumn].Value is Guid id)
+            details.Prefetch(id);
     }
 
     /// <summary>Downloads one nest's archive and reads its plates and drawings off the UI thread.</summary>
