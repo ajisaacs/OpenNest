@@ -94,11 +94,12 @@ public class AutomaticCornerClassificationTests
 
     [Theory]
     [MemberData(nameof(CcwSquareCorners))]
-    public void TraversedBackwards_SquareCornersStayConvex(Vector corner)
+    public void TraversedBackwards_SquareCornersStayConvex(Vector corner, int entityIndex)
     {
         var shape = CwSquare();
-        // Same geometric corners; entity order is reversed, so look the vertex up by position.
-        var (entity, point) = NearestVertex(shape, corner);
+        // Same geometric corners; entity order is reversed, so look the vertex up by position
+        // and alternate between the two entities adjacent to it.
+        var (entity, point) = AdjacentToVertex(shape, corner, entityIndex);
 
         Assert.True(ContourCuttingStrategy.TryClassifyAutomaticStartCorner(
             shape, point, entity, out var found));
@@ -230,6 +231,17 @@ public class AutomaticCornerClassificationTests
         return ContourCuttingStrategy.TryClassifyAutomaticStartCorner(shape, point, entity, out var found)
             ? found.Kind
             : null;
+    }
+
+    private static (Entity Entity, Vector Point) AdjacentToVertex(Shape shape, Vector vertex, int entityIndex)
+    {
+        // The two entities of the reversed contour that touch this geometric vertex;
+        // entityIndex alternates between them so both edge selections are covered.
+        var adjacent = shape.Entities
+            .Where(e => StartOf(e).DistanceTo(vertex) <= 1e-9 || EndOf(e).DistanceTo(vertex) <= 1e-9)
+            .ToList();
+        Assert.Equal(2, adjacent.Count);
+        return (adjacent[entityIndex % 2], vertex);
     }
 
     private static (Entity Entity, Vector Point) NearestVertex(Shape shape, Vector approximate)
