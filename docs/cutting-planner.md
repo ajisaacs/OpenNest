@@ -303,7 +303,10 @@ plans every plate that has parts. Both open one dialog built on
   the thread it was created on rather than to whichever context is current.
 - `PlateView` follows `Plate.PartsReordered`: it redraws parts in the plate's order (the
   numbers it draws are the cutting order), rebuilds their graphics and marks the overlap
-  check out of date.
+  check out of date. Both the editor and preview build outlines and lead paths in the
+  drawing-local frame, then apply the part placement once. Absolute (G90) programs
+  therefore follow moves and clones just like incremental (G91) programs; displaying a
+  part does not rewrite its program or coordinate mode.
 
 ## Remaining integration boundaries
 

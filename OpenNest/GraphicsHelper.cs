@@ -20,10 +20,12 @@ namespace OpenNest
 
         public static GraphicsPath GetGraphicsPath(this Program pgm, Vector origin)
         {
-            var path = new GraphicsPath();
-            var curpos = origin;
-
-            AddProgram(path, pgm, pgm.Mode, ref curpos);
+            // Program coordinates are drawing-local in either mode. Translate the
+            // finished path so absolute moves cannot discard the part placement.
+            var path = pgm.GetGraphicsPath();
+            using var translation = new Matrix();
+            translation.Translate((float)origin.X, (float)origin.Y);
+            path.Transform(translation);
 
             return path;
         }
@@ -100,9 +102,14 @@ namespace OpenNest
         {
             cutPath = new GraphicsPath();
             leadPath = new GraphicsPath();
-            var curpos = origin;
+            var curpos = Vector.Zero;
 
             AddProgramSplit(cutPath, leadPath, pgm, pgm.Mode, ref curpos);
+
+            using var translation = new Matrix();
+            translation.Translate((float)origin.X, (float)origin.Y);
+            cutPath.Transform(translation);
+            leadPath.Transform(translation);
         }
 
         private static void AddProgramSplit(
