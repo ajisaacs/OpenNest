@@ -89,11 +89,13 @@ internal static class PreferredContourEntries
     /// first non-rapid motion (lead-in when present — that is where the next rapid must
     /// arrive), which reflects native rounding and clamping of a nominal entry.
     /// </summary>
-    private static Vector Pierce(PreparedContours prepared, ContourChoice choice, CancellationToken token)
+    internal static Vector Pierce(PreparedContours prepared, ContourChoice choice, CancellationToken token)
     {
         var program = prepared.EmitCandidateForValidation(choice);
         var execution = ExecutionMotionReader.Read(program, Vector.Zero, null, token);
-        var first = execution.Motions.First(m => !m.Rapid);
+        // The diagnostic emission includes the part's scribes before the selected contour.
+        // Those marks are not the downstream cut's pierce.
+        var first = execution.Motions.First(m => !m.Rapid && m.Layer != LayerType.Scribe);
         return first.Start ?? first.End;
     }
 }

@@ -202,6 +202,24 @@ public class PreferredContourEntriesTests
     }
 
     [Fact]
+    public void ScribesDoNotBecomeTheDownstreamPierceTarget()
+    {
+        var clean = RectHolesProgram((3, 3, 5, 5), (7, 3, 9, 5));
+        var centres = new[] { new Vector(4, 4), new Vector(8, 4), new Vector(5, 5) };
+        var prepared = PreparedContours.Capture(clean, ExplicitContourTests.Parameters());
+        var entry = prepared.Entry(2, 2, new Vector(10, 4));
+        var baseline = PreferredContourEntries.TryPlan(prepared, entry, new[] { 0, 1 },
+            centres, Arrival, _ => new(ContourFeasibilityStatus.Clear, null));
+        clean.MoveTo(-20, -20);
+        clean.Codes.Add(new LinearMove(-19, -19) { Layer = LayerType.Scribe });
+        var marked = PreparedContours.Capture(clean, ExplicitContourTests.Parameters());
+        var actual = PreferredContourEntries.TryPlan(marked, marked.Entry(2, 2, new Vector(10, 4)),
+            new[] { 0, 1 }, centres, Arrival, _ => new(ContourFeasibilityStatus.Clear, null));
+        Assert.True(actual.IsPreferred, actual.Reason);
+        Assert.Equal(baseline.HoleChoices.Select(c => c.Point), actual.HoleChoices.Select(c => c.Point));
+    }
+
+    [Fact]
     public void ChainingIsDeterministic()
     {
         // Whatever native rounding a nominal circle candidate emits, backward chaining must
