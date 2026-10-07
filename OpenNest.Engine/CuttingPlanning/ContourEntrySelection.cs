@@ -46,7 +46,7 @@ internal sealed record ContourSelectionResult(
 /// <summary>
 /// Bounded, lazy selection of lead-feasible entry candidates for ONE contour. Greedy global
 /// rank order until the cap (default 16) fills or the finite catalogue ends — rejected and
-/// incomplete candidates never consume a slot. When the cap can afford it (5+), one
+/// incomplete candidates never consume a slot. When the cap can afford it (4+), one
 /// corrective scan makes sure every side of the candidate bounding rectangle that HAS a
 /// feasible candidate is represented, replacing the worst selected candidate only when
 /// every other covered side survives; one corner may cover two sides. The cap is never
@@ -101,9 +101,9 @@ internal static class ContourEntrySelection
 
         ContourFeasibilityVerdict Verdict(ContourEntryCandidate candidate)
         {
+            token.ThrowIfCancellationRequested();
             if (!verdicts.TryGetValue(candidate.GeometryKey, out var known))
             {
-                token.ThrowIfCancellationRequested();
                 known = evaluate(candidate);
                 verdicts[candidate.GeometryKey] = known;
                 evaluated.Add(candidate);
@@ -128,8 +128,9 @@ internal static class ContourEntrySelection
                 selected.Add(candidates[index]);
         }
 
-        // Phase 2: side coverage when the cap affords it. Every missing side with an
-        // unexamined tail is chased lazily; a clear candidate on that side is appended when
+        // Phase 2: reconsider the globally ranked catalogue for each missing side, reusing
+        // verdicts passed while chasing earlier sides and evaluating the tail lazily.
+        // A clear candidate on that side is appended when
         // a slot remains, otherwise it replaces the worst selected candidate whose removal
         // keeps every other covered side covered.
         var coverage = maxEntries >= SideCoverageMinCap && selected.Count > 0;
@@ -138,7 +139,7 @@ internal static class ContourEntrySelection
             {
                 if (selected.Any(c => Sides(c, box).Contains(side)))
                     continue;
-                for (; index < candidates.Count; index++)
+                for (index = 0; index < candidates.Count; index++)
                 {
                     var verdict = Verdict(candidates[index]);
                     if (verdict.Status == ContourFeasibilityStatus.Incomplete)
@@ -151,6 +152,9 @@ internal static class ContourEntrySelection
                     if (!verdict.IsClear || !Sides(candidates[index], box).Contains(side))
                         continue;
                     TryPlace(selected, candidates[index], box, maxEntries);
+                    // A reused candidate can outrank an earlier replacement. Keep the
+                    // safe-victim scan in global rank order for the next missing side.
+                    selected.Sort((a, b) => candidates.IndexOf(a).CompareTo(candidates.IndexOf(b)));
                     break;
                 }
             }
@@ -185,8 +189,7 @@ internal static class ContourEntrySelection
         }
 
         var ordered = selected
-            .OrderBy(c => evaluated.FindIndex(x => x.GeometryKey == c.GeometryKey) is var e && e >= 0
-                ? e : candidates.FindIndex(x => x.GeometryKey == c.GeometryKey))
+            .OrderBy(c => candidates.IndexOf(c))
             .Select(c => c.Choice)
             .ToList();
         return new(ordered, evaluated.Count,

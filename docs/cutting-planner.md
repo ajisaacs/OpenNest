@@ -141,8 +141,13 @@ unranked fallback or a proof of geometric impossibility.
 An unlocked part's outside entry is chosen automatically toward the NEXT cut: the ranker orders the native candidate
 catalogue by the facing side(s) of the next part's placed-material centre, and
 the shared lead validator certifies each emitted lead lazily until up to
-`maxEntries` feasible candidates remain (side coverage when the cap affords
-it). The next cut is the next unfinished part in a supplied order — recomputed
+`maxEntries` feasible candidates remain. At caps of four or more, a corrective
+scan reconsiders memoized clear candidates for each missing side before evaluating
+more of the catalogue; a later side cannot lose a usable point merely because
+an earlier side's scan passed it. Replacements preserve other covered sides and
+global rank, never exceed the cap, and stop evaluating the tail once coverage
+settles. Smaller caps retain rank priority rather than promising all-side coverage.
+The next cut is the next unfinished part in a supplied order — recomputed
 after every learned-order replan — or, in the full fallback search, the nearest
 dependency-ready remaining part, stable-ordinal ties; the last part has no
 target and ranks by tier then distance to the tool's arrival. Between source
