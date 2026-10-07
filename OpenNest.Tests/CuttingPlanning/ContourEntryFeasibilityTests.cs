@@ -134,6 +134,41 @@ public class ContourEntryFeasibilityTests
             && (m.Layer == LayerType.Leadin || m.Layer == LayerType.Leadout)));
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ForeignChoiceCannotReuseOrPoisonAnOwnedVerdict(bool foreignFirst, bool unowned)
+    {
+        var (prepared, choice, own) = PreparedSquare();
+        var (_, otherChoice, _) = PreparedSquare();
+        var foreign = unowned
+            ? new ContourChoice(choice.ContourOrdinal, choice.EntityOrdinal, choice.Point)
+            : otherChoice;
+        Assert.Throws<ArgumentException>(() => prepared.Emit([foreign]));
+        var adapter = new ContourEntryFeasibility(prepared, At, own, []);
+        var cold = new ContourEntryFeasibility(prepared, At, own, []).Check(foreign);
+        Assert.Equal(ContourFeasibilityStatus.Incomplete, cold.Status);
+
+        if (foreignFirst)
+            Assert.Equal(cold, adapter.Check(foreign));
+        else
+            Assert.True(adapter.Check(choice).IsClear);
+
+        var refused = adapter.Check(foreign);
+        Assert.Equal(cold, refused);
+        Assert.Contains("Foreign contour choice", refused.Reason);
+        Assert.True(adapter.Check(choice).IsClear);
+        Assert.True(adapter.Check(choice with { }).IsClear);
+        Assert.Equal(1, adapter.EvaluationCount);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        Assert.ThrowsAny<OperationCanceledException>(() => adapter.Check(foreign, token: cancelled.Token));
+        Assert.True(adapter.Check(choice).IsClear);
+        Assert.Equal(1, adapter.EvaluationCount);
+    }
+
     [Fact]
     public void MalformedEmissionRefusesWithReasonInsteadOfCrashing()
     {

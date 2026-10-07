@@ -83,6 +83,11 @@ public sealed class ContourEntryFeasibility
         token.ThrowIfCancellationRequested();
         if (choice == null)
             throw new ArgumentException("A contour choice is required.", nameof(choice));
+        // Ownership is an input boundary, not part of a memoized geometric verdict.
+        // Reject before lookup so neither a warm hit nor a foreign first call can
+        // substitute for the isolated emitter's owned-choice check.
+        if (!ReferenceEquals(choice.Owner, prepared))
+            return new(ContourFeasibilityStatus.Incomplete, "Foreign contour choice.");
         var key = new Key(choice.ContourOrdinal, choice.EntityOrdinal,
             choice.Point.X, choice.Point.Y, nodeContext ?? string.Empty);
         if (cache.TryGetValue(key, out var known))
