@@ -77,7 +77,14 @@ the final replay enforce them:
 With regeneration, the bounded deterministic search plans internal contour order
 and native entry candidates part by part along a whole-part order. Internal
 contours precede their own perimeter; parts remain contiguous. Backtracking can
-revisit an earlier entry when a later part cannot be reached safely.
+revisit an earlier entry when a later part cannot be reached safely. For multi-part
+requests containing regenerated holes, it first tries one ranked hole chain for
+each outside endpoint. This lets a later blocked approach change the previous
+part's departure without first exhausting combinations of its earlier holes.
+This preferred pass uses the same emitted-motion checks, shared expansion budget
+and stall limit as the retained search; on failure the full entry/hole-order
+backtracking pass remains available. Single-part and no-hole requests keep their
+existing search order.
 
 A preserved order is followed as given. Otherwise the order is an open
 travelling-salesman path over part centres from the start point: nearest neighbour,

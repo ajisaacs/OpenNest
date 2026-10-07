@@ -10,8 +10,9 @@ using OpenNest.Geometry;
 namespace OpenNest.Engine.CuttingPlanning;
 
 /// <summary>
-/// Plans whole parts and their emitted contour prefixes along a part order. A preserved order is
-/// followed with full backtracking. Otherwise the order comes from <see cref="CuttingPartOrder"/>;
+/// Plans whole parts and their emitted contour prefixes along a part order. Multi-part holed
+/// requests first try one ranked hole chain per endpoint, then retain full backtracking.
+/// A preserved order stays fixed. Otherwise the order comes from <see cref="CuttingPartOrder"/>;
 /// when a part on it cannot be reached without crossing parts already cut, the search learns
 /// "cut this part before those", keeps the parts cut before them and re-plans the rest. Once
 /// nothing new can be learned, the remaining budget goes to a full search over every ready part.
@@ -32,24 +33,39 @@ internal static class JointCuttingPlanSearch
     {
         var walk = new Walk(snapshot, token);
         var count = snapshot.Placements.Count;
+        var maxContours = snapshot.Placements.Max(p => p.Prepared?.Count ?? 1);
+        var stall = StallExpansionsPerEntry * snapshot.MaxEntries * maxContours;
+        var preferEndpoints = count > 1 && maxContours > 1;
         try
         {
             if (snapshot.PreservePartOrder)
             {
-                var kept = walk.Follow(Enumerable.Range(0, count).ToArray(), null, null);
+                var keptSequence = Enumerable.Range(0, count).ToArray();
+                if (preferEndpoints)
+                {
+                    var preferred = walk.Follow(keptSequence, stall, null, preferredOnly: true);
+                    if (preferred.Order != null)
+                        return walk.Ready(preferred.Order);
+                }
+                var kept = walk.Follow(keptSequence, null, null);
                 return kept.Order != null ? walk.Ready(kept.Order) : walk.Exhausted();
             }
 
             var centres = snapshot.Placements.Select(Centre).ToArray();
             var prerequisites = Enumerable.Range(0, count)
                 .Select(i => new HashSet<int>(snapshot.Dependencies.PrerequisitesOf(i))).ToArray();
-            var maxContours = snapshot.Placements.Max(p => p.Prepared?.Count ?? 1);
-            var stall = StallExpansionsPerEntry * snapshot.MaxEntries * maxContours;
+
             var sequence = CuttingPartOrder.Plan(Enumerable.Range(0, count).ToArray(), centres,
                 snapshot.StartPoint, prerequisites, token);
             Node resume = null;
             while (true)
             {
+                if (preferEndpoints)
+                {
+                    var preferred = walk.Follow(sequence, stall, resume, preferredOnly: true);
+                    if (preferred.Order != null)
+                        return walk.Ready(preferred.Order);
+                }
                 var attempt = walk.Follow(sequence, stall, resume);
                 if (attempt.Order != null)
                     return walk.Ready(attempt.Order);
@@ -173,7 +189,7 @@ internal static class JointCuttingPlanSearch
         /// With a stall limit the attempt ends once that many expansions pass without getting
         /// further along the order; it never backtracks behind its starting node.
         /// </summary>
-        internal Attempt Follow(int[] sequence, int? stall, Node resume)
+        internal Attempt Follow(int[] sequence, int? stall, Node resume, bool preferredOnly = false)
         {
             var root = resume ?? new Node([], snapshot.StartPoint, new ReleasedContourState(), null, null);
             var attempt = new Attempt(sequence);
@@ -194,7 +210,7 @@ internal static class JointCuttingPlanSearch
                     progressExpansions = Expansions;
                 else if (stall is int limit && Expansions - progressExpansions > limit)
                     return attempt;
-                frame.Children ??= OrderedChildren(node, sequence, attempt);
+                frame.Children ??= OrderedChildren(node, sequence, attempt, preferredOnly);
                 if (frame.Next == frame.Children.Length)
                 {
                     stack.Pop();
@@ -243,9 +259,9 @@ internal static class JointCuttingPlanSearch
         /// one part and contour stage the automatic rank leads — OrderBy(Distance) alone
         /// would undo the look-ahead facing. Legacy (unranked) children keep distance order.
         /// </summary>
-        private Edge[] OrderedChildren(Node node, int[] sequence, Attempt attempt)
+        private Edge[] OrderedChildren(Node node, int[] sequence, Attempt attempt, bool preferredOnly)
         {
-            var edges = Expand(node, sequence, attempt).ToList();
+            var edges = Expand(node, sequence, attempt, preferredOnly).ToList();
             if (edges.Count <= 1)
                 return edges.ToArray();
             // Stable source order: the minimum incremental rapid per source, ties ordinal.
@@ -263,7 +279,7 @@ internal static class JointCuttingPlanSearch
                 .ToArray();
         }
 
-        private IEnumerable<Edge> Expand(Node node, int[] sequence, Attempt attempt)
+        private IEnumerable<Edge> Expand(Node node, int[] sequence, Attempt attempt, bool preferredOnly)
         {
             IEnumerable<FixedProgramPlacement> sources;
             if (node.Active is { } active)
@@ -315,6 +331,11 @@ internal static class JointCuttingPlanSearch
                 var boundary = node.Active?.Boundary ?? node;
                 var contours = choices.Length == prepared.Count - 1 ? new[] { prepared.PerimeterOrdinal }
                     : Enumerable.Range(0, prepared.PerimeterOrdinal).Where(c => !choices.Any(e => e.ContourOrdinal == c));
+                // First try one ranked hole chain per endpoint. A later-part failure then
+                // changes the endpoint before replaying all earlier hole combinations.
+                // The retained pass below still searches every entry and hole order.
+                if (preferredOnly && preference != null)
+                    contours = contours.OrderBy(c => Array.IndexOf(preference.Route, c)).Take(1);
                 foreach (var contour in contours)
                 {
                     token.ThrowIfCancellationRequested();
@@ -346,7 +367,8 @@ internal static class JointCuttingPlanSearch
                     }
                     if (entries.Count == 0)
                         continue;
-                    for (var entry = 0; entry < entries.Count; entry++)
+                    var entryCount = preferredOnly && node.Active?.Perimeter != null ? System.Math.Min(1, entries.Count) : entries.Count;
+                    for (var entry = 0; entry < entryCount; entry++)
                     {
                         CountExpansion(source); // Before emission/native queries, including rejected candidates.
                         var prefix = choices.Append(entries[entry]).ToArray();
