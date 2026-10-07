@@ -425,6 +425,25 @@ public sealed class PreparedContours
         return EmitPrefix(choices);
     }
 
+    /// <summary>
+    /// Diagnostic seam: emit exactly ONE owned contour — with its normal lead-in and
+    /// lead-out and its ORIGINAL contour type (the perimeter keeps External even when no
+    /// holes precede it) — so a candidate's emitted leads can be validated before the hole
+    /// choices exist. The result is a throwaway probe, not a plan: it must never be
+    /// installed on a Part or accepted as complete output. Normal <see cref="Emit"/> and
+    /// <see cref="EmitPrefix"/> keep the perimeter-last rule untouched.
+    /// </summary>
+    internal Program EmitCandidateForValidation(ContourChoice choice)
+    {
+        if (choice == null || !ReferenceEquals(choice.Owner, this))
+            throw new ArgumentException("Foreign contour choice.");
+        ValidateChoice(choice);
+        // Same owned clones as a real emission; the source shapes/settings are never used
+        // directly, so the probe cannot drift the preparation or mutate it.
+        return new ContourCuttingStrategy { Parameters = parameters }.EmitCandidateIsolated(
+            shapes.Select(s => (Shape)s.Clone()).ToArray(), scribes.Select(e => e.Clone()).ToList(), choice);
+    }
+
     // Each prefix is a standalone owned program, including the same scribes once.
     internal Program EmitPrefix(IReadOnlyList<ContourChoice> choices)
     {
