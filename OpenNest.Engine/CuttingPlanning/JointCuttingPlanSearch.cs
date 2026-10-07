@@ -24,8 +24,9 @@ internal static class JointCuttingPlanSearch
     /// </summary>
     internal const int StallExpansionsPerEntry = 8;
 
+    /// <summary>LeadPrechecks counts S07 adapter evaluations — bounded work tracked separately from expansions.</summary>
     internal sealed record Outcome(CuttingPlanStatus Status, IReadOnlyList<FixedProgramPlacement> Order,
-        IReadOnlyList<CuttingPlanFinding> Findings, int Expansions);
+        IReadOnlyList<CuttingPlanFinding> Findings, int Expansions, int LeadPrechecks = 0);
 
     internal static Outcome Run(CuttingPlanSnapshot snapshot, CancellationToken token)
     {
@@ -69,11 +70,11 @@ internal static class JointCuttingPlanSearch
         }
         catch (BudgetExceededException)
         {
-            return new(CuttingPlanStatus.NoSolutionWithinBudget, [], walk.Rejected, walk.Expansions);
+            return new(CuttingPlanStatus.NoSolutionWithinBudget, [], walk.Rejected, walk.Expansions, walk.LeadPrechecks);
         }
         catch (OperationCanceledException)
         {
-            return new(CuttingPlanStatus.Cancelled, [], [], walk.Expansions);
+            return new(CuttingPlanStatus.Cancelled, [], [], walk.Expansions, walk.LeadPrechecks);
         }
     }
 
@@ -141,13 +142,20 @@ internal static class JointCuttingPlanSearch
         private readonly List<CuttingPlanFinding> rejected = [];
         private readonly LeadMaterialSnapshot[] materials =
             snapshot.Placements.Where(p => !p.IsCutOff).Select(p => p.Material).ToArray();
+        // One feasibility adapter per source part per captured planning attempt: verdicts
+        // memoize per owned choice for the attempt, never statically or across attempts.
+        private readonly Dictionary<int, ContourEntryFeasibility> feasibility = [];
+        private readonly HashSet<int> reportedNoFit = [];
 
         internal int Expansions { get; private set; }
+
+        /// <summary>Lead precheck evaluations, tracked apart from DFS expansions: they are work, not free.</summary>
+        internal int LeadPrechecks { get; private set; }
 
         internal IReadOnlyList<CuttingPlanFinding> Rejected => rejected.Distinct().ToArray();
 
         internal Outcome Ready(IReadOnlyList<FixedProgramPlacement> order) =>
-            new(CuttingPlanStatus.Ready, order, [], Expansions);
+            new(CuttingPlanStatus.Ready, order, [], Expansions, LeadPrechecks);
 
         // Entries are capped; exhaustion is not a proof over all possible entries.
         internal Outcome Exhausted()
@@ -156,7 +164,7 @@ internal static class JointCuttingPlanSearch
                 ? CuttingPlanStatus.NoSolutionWithinBudget
                 : rejected.Any(f => f.Kind == PostVerificationKind.Incomplete)
                     ? CuttingPlanStatus.UnsupportedGeometry : CuttingPlanStatus.ConstraintConflict;
-            return new(status, [], Rejected, Expansions);
+            return new(status, [], Rejected, Expansions, LeadPrechecks);
         }
 
         /// <summary>
@@ -186,8 +194,7 @@ internal static class JointCuttingPlanSearch
                     progressExpansions = Expansions;
                 else if (stall is int limit && Expansions - progressExpansions > limit)
                     return attempt;
-                frame.Children ??= Expand(node, sequence, attempt).OrderBy(c => c.Distance)
-                    .ThenBy(c => c.Ordinal).ThenBy(c => c.Contour).ThenBy(c => c.Entry).ToArray();
+                frame.Children ??= OrderedChildren(node, sequence, attempt);
                 if (frame.Next == frame.Children.Length)
                 {
                     stack.Pop();
@@ -196,6 +203,63 @@ internal static class JointCuttingPlanSearch
                 stack.Push(new(frame.Children[frame.Next++].Node));
             }
             return attempt;
+        }
+
+        /// <summary>
+        /// The NEXT cut's centre that the outside entry should face, or null for the last
+        /// part. Supplied order: the next not-yet-finished part in that order (the sequence
+        /// is re-read after every learned-order replan). Sequence-free fallback: nearest
+        /// dependency-ready remaining part once the current part counts as finished, stable
+        /// ordinal ties. Never the current or a finished part. Global coordinates.
+        /// </summary>
+        private Vector? LookAheadCentre(Node node, int[] sequence, FixedProgramPlacement source)
+        {
+            var finished = node.Order.Select(o => o.SourceOrdinal).ToHashSet();
+            finished.Add(source.SourceOrdinal);
+            if (sequence != null)
+                for (var i = node.Order.Length + 1; i < sequence.Length; i++)
+                    if (!finished.Contains(sequence[i]))
+                        return Centre(snapshot.Placements[sequence[i]]);
+            var from = Centre(source);
+            Vector? best = null;
+            var bestDistance = double.PositiveInfinity;
+            foreach (var candidate in snapshot.Placements
+                         .Where(p => !finished.Contains(p.SourceOrdinal)
+                             && snapshot.Dependencies.IsReady(p.SourceOrdinal, finished))
+                         .OrderBy(p => p.SourceOrdinal))
+            {
+                var distance = Centre(candidate).DistanceTo(from);
+                if (distance < bestDistance - 1e-9)
+                {
+                    bestDistance = distance;
+                    best = Centre(candidate);
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Nearest-first BETWEEN source parts (fallback search keeps its tour), but inside
+        /// one part and contour stage the automatic rank leads — OrderBy(Distance) alone
+        /// would undo the look-ahead facing. Legacy (unranked) children keep distance order.
+        /// </summary>
+        private Edge[] OrderedChildren(Node node, int[] sequence, Attempt attempt)
+        {
+            var edges = Expand(node, sequence, attempt).ToList();
+            if (edges.Count <= 1)
+                return edges.ToArray();
+            // Stable source order: the minimum incremental rapid per source, ties ordinal.
+            var sourceOrder = edges.GroupBy(e => e.Ordinal)
+                .OrderBy(g => g.Min(e => e.Distance)).ThenBy(g => g.Key)
+                .SelectMany((g, rank) => g.Select(e => (Edge: e, Rank: rank)))
+                .ToDictionary(x => x.Edge, x => x.Rank);
+            return edges
+                .OrderBy(e => sourceOrder[e])
+                .ThenBy(e => e.Contour)
+                .ThenBy(e => e.Rank)
+                .ThenBy(e => e.Distance)
+                .ThenBy(e => e.Entry)
+                .ToArray();
         }
 
         private IEnumerable<Edge> Expand(Node node, int[] sequence, Attempt attempt)
@@ -234,7 +298,20 @@ internal static class JointCuttingPlanSearch
                 foreach (var contour in contours)
                 {
                     token.ThrowIfCancellationRequested();
-                    var entries = prepared.Entries(contour, node.Position - source.Location, snapshot.MaxEntries, token);
+                    // No-hole parts: the single outside contour gets the automatic entry
+                    // pipeline, facing the next cut (S03-S08). Holed parts keep the legacy
+                    // nearest-entry path until S12 wires hole look-ahead.
+                    var automatic = prepared.Count == 1;
+                    IReadOnlyList<ContourChoice> entries;
+                    if (!automatic)
+                        entries = prepared.Entries(contour, node.Position - source.Location, snapshot.MaxEntries, token);
+                    else
+                    {
+                        CountExpansion(source); // The catalogue/validator pipeline is search work, counted here.
+                        entries = AutomaticEntries(node, sequence, source, contour);
+                        if (entries.Count == 0)
+                            continue; // the S08 finding (when complete) is already recorded
+                    }
                     for (var entry = 0; entry < entries.Count; entry++)
                     {
                         CountExpansion(source); // Before emission/native queries, including rejected candidates.
@@ -261,10 +338,53 @@ internal static class JointCuttingPlanSearch
                                 execution.DeparturePoint, checker, null, boundary)
                             : new Node(node.Order, execution.DeparturePoint, checker,
                                 new(source, prefix, arrival, before, distance, boundary), null);
-                        yield return new(next, distance - (node.Active?.Distance ?? 0), source.SourceOrdinal, contour, entry);
+                        yield return new(next, distance - (node.Active?.Distance ?? 0), source.SourceOrdinal,
+                            contour, entry, automatic ? entry : int.MinValue);
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// The S03-S08 pipeline for one outside contour, in prepared LOCAL coordinates
+        /// converted exactly once: rank the (fallback-complemented) catalogue toward the
+        /// next cut, lazily filter through the shared validator adapter, cap at MaxEntries
+        /// with side coverage. Empty ONLY when the finite catalogue was fully evaluated and
+        /// nothing fits — then the honest part/contour finding is recorded once.
+        /// </summary>
+        private IReadOnlyList<ContourChoice> AutomaticEntries(Node node, int[] sequence,
+            FixedProgramPlacement source, int contour)
+        {
+            var prepared = source.Prepared!;
+            var arrival = node.Position - source.Location;
+            // One global->local conversion of target and arrival; geometry is already rotated.
+            Vector? local = LookAheadCentre(node, sequence, source) is { } target
+                ? target - source.Location : null;
+            var preferred = prepared.AutomaticEntryCandidates(contour, token);
+            var catalogue = preferred.Count > 0
+                ? preferred
+                : prepared.AutomaticEntryCandidatesWithFallbacks(contour, local, token);
+            var ordered = catalogue.RankTowardNextCut(local, arrival);
+            var adapter = feasibility.TryGetValue(source.SourceOrdinal, out var known)
+                ? known
+                : feasibility[source.SourceOrdinal] = new ContourEntryFeasibility(
+                    prepared, source.Location, source.Material, materials);
+            var before = adapter.EvaluationCount;
+            var selection = ContourEntrySelection.Select(ordered,
+                candidate => adapter.Check(candidate.Choice, token: token), snapshot.MaxEntries, token);
+            LeadPrechecks += adapter.EvaluationCount - before;
+            if (selection.Shortfall == ContourSelectionShortfall.Incomplete && selection.UncertainChoices.Count == 0)
+                rejected.Add(Finding(source, PostVerificationKind.Incomplete,
+                    $"Contour {contour}: {selection.Reason}"));
+            else if (selection.Choices.Count == 0 && selection.UncertainChoices.Count == 0
+                && reportedNoFit.Add(source.SourceOrdinal * 1000 + contour))
+                rejected.Add(Finding(source, null,
+                    $"No tested lead-in fits on part {source.SourceOrdinal}, contour {contour}: {selection.Reason}"));
+            // Uncertain candidates are NOT refused by the precheck: they reach the emitted-
+            // prefix Check and complete replay, which remain the authority on them.
+            return selection.Choices.Count == 0
+                ? selection.UncertainChoices
+                : [.. selection.Choices, .. selection.UncertainChoices];
         }
 
         private void CountExpansion(FixedProgramPlacement source)
@@ -352,7 +472,8 @@ internal static class JointCuttingPlanSearch
     /// <summary>A search state; Previous links a whole-part boundary to the boundary before it.</summary>
     private sealed record Node(FixedProgramPlacement[] Order, Vector Position, ReleasedContourState Checker,
         ActivePart Active, Node Previous);
-    private sealed record Edge(Node Node, double Distance, int Ordinal, int Contour, int Entry);
+    /// <summary>Rank is the automatic selection slot (entry order) inside its contour stage; int.MinValue for legacy children.</summary>
+    private sealed record Edge(Node Node, double Distance, int Ordinal, int Contour, int Entry, int Rank = int.MinValue);
     private sealed class Frame(Node node)
     {
         internal Node Node { get; } = node;

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,13 +31,15 @@ internal enum ContourSelectionShortfall
 
 /// <summary>
 /// Outcome of one bounded selection: selected choices in global rank order, how many
-/// distinct candidates were evaluated, which ones (in catalogue order, for cost tests), and
-/// why the selection stopped.
+/// distinct candidates were evaluated, which ones (in catalogue order, for cost tests),
+/// which evaluated uncertain (never refused — the caller's full check stays the authority
+/// on those), and why the selection stopped.
 /// </summary>
 internal sealed record ContourSelectionResult(
     IReadOnlyList<ContourChoice> Choices,
     int EvaluatedCount,
     IReadOnlyList<(long, long)> EvaluatedKeys,
+    IReadOnlyList<ContourChoice> UncertainChoices,
     ContourSelectionShortfall Shortfall,
     string? Reason);
 
@@ -91,7 +94,9 @@ internal static class ContourEntrySelection
         var box = Box(candidates);
 
         var selected = new List<ContourEntryCandidate>();
+        var uncertain = new List<ContourEntryCandidate>();
         var sawIncomplete = false;
+        string? incompleteReason = null;
         var index = 0;
 
         ContourFeasibilityVerdict Verdict(ContourEntryCandidate candidate)
@@ -112,8 +117,12 @@ internal static class ContourEntrySelection
             var verdict = Verdict(candidates[index]);
             if (verdict.Status == ContourFeasibilityStatus.Incomplete)
             {
+                // Uncertain is not refused: it never takes a selected slot, but the scan
+                // continues and the caller's full check stays the authority on it.
                 sawIncomplete = true;
-                break;
+                incompleteReason ??= verdict.Reason;
+                uncertain.Add(candidates[index]);
+                continue;
             }
             if (verdict.IsClear)
                 selected.Add(candidates[index]);
@@ -124,7 +133,7 @@ internal static class ContourEntrySelection
         // a slot remains, otherwise it replaces the worst selected candidate whose removal
         // keeps every other covered side covered.
         var coverage = maxEntries >= SideCoverageMinCap && selected.Count > 0;
-        if (coverage && !sawIncomplete)
+        if (coverage)
             for (var side = 0; side < 4 && !sawIncomplete; side++)
             {
                 if (selected.Any(c => Sides(c, box).Contains(side)))
@@ -135,7 +144,9 @@ internal static class ContourEntrySelection
                     if (verdict.Status == ContourFeasibilityStatus.Incomplete)
                     {
                         sawIncomplete = true;
-                        break;
+                        incompleteReason ??= verdict.Reason;
+                        uncertain.Add(candidates[index]);
+                        continue;
                     }
                     if (!verdict.IsClear || !Sides(candidates[index], box).Contains(side))
                         continue;
@@ -150,7 +161,8 @@ internal static class ContourEntrySelection
         if (sawIncomplete)
         {
             shortfall = ContourSelectionShortfall.Incomplete;
-            reason = "At least one lead check could not complete; this is not a geometric verdict and nothing is proven impossible.";
+            reason = "At least one lead check could not complete; this is not a geometric verdict and nothing is proven impossible."
+                + (incompleteReason == null ? "" : $" First reason: {incompleteReason}");
         }
         else if (selected.Count >= maxEntries)
         {
@@ -178,7 +190,8 @@ internal static class ContourEntrySelection
             .Select(c => c.Choice)
             .ToList();
         return new(ordered, evaluated.Count,
-            evaluated.Select(c => c.GeometryKey).ToList(), shortfall, reason);
+            evaluated.Select(c => c.GeometryKey).ToList(),
+            uncertain.Select(c => c.Choice).ToList(), shortfall, reason);
     }
 
     private static (double MinX, double MinY, double MaxX, double MaxY) Box(

@@ -128,6 +128,27 @@ emission; it is not a wall-clock timeout. Callers can cancel. Exhaustion may occ
 before already-generated siblings are traversed; it returns a refusal, not an
 unranked fallback or a proof of geometric impossibility.
 
+## Automatic outside entries and look-ahead
+
+For a part whose only contour is its outside (no holes), the entry is chosen
+automatically toward the NEXT cut: the ranker orders the native candidate
+catalogue by the facing side(s) of the next part's placed-material centre, and
+the shared lead validator certifies each emitted lead lazily until up to
+`maxEntries` feasible candidates remain (side coverage when the cap affords
+it). The next cut is the next unfinished part in a supplied order — recomputed
+after every learned-order replan — or, in the full fallback search, the nearest
+dependency-ready remaining part, stable-ordinal ties; the last part has no
+target and ranks by tier then distance to the tool's arrival. Between source
+parts the tour stays nearest-first; the look-ahead rank only orders the entries
+inside one part's contour stage, so distance sorting cannot undo the facing.
+Uncertain (numerically incomplete) validator answers are never precheck-refused:
+those candidates reach the emitted-prefix check and complete replay unchanged. A
+part/contour with no fitting lead in its fully evaluated catalogue is reported
+as "No tested lead-in fits on part N, contour M"; budget exhaustion stays a
+budget finding and incomplete checks are never presented as geometric
+impossibility. Lead prechecks are tracked separately from expansions. Hole
+parts keep the legacy nearest-entry path.
+
 Selected programs are replayed from the beginning with a fresh checker and fresh
 lead validation, without regenerating them or trusting cached search verdicts.
 Before replay, expected-emission geometry is independently built from the owned
