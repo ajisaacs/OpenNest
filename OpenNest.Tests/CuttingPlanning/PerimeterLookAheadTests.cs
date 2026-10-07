@@ -87,6 +87,38 @@ public class PerimeterLookAheadTests
     }
 
     [Fact]
+    public void ManyVertices_FacingCornerSurvivesBeyondTheDrawingOrderEntryCap()
+    {
+        // Start at the leftmost vertex and travel clockwise. The initial sixteen
+        // drawing-order catalogue entries only cover the upper-left part of the ring;
+        // the useful lower-right corner appears later and must survive until ranking.
+        var source = new Program();
+        var vertices = Enumerable.Range(0, 32).Select(i =>
+        {
+            var angle = System.Math.PI - i * 2 * System.Math.PI / 32;
+            return new Vector(10 + 10 * System.Math.Cos(angle), 10 + 10 * System.Math.Sin(angle));
+        }).ToArray();
+        source.MoveTo(vertices[0].X, vertices[0].Y);
+        foreach (var point in vertices.Skip(1).Append(vertices[0]))
+            source.LineTo(point.X, point.Y);
+        var parameters = Parameters();
+        var polygon = new Part(new Drawing("many-vertex", source)) { CuttingParameters = parameters };
+        var next = Square(25, parameters);
+        var before = ExplicitContourTests.Fingerprint(polygon.Program);
+
+        var result = CuttingPlanService.Plan(Request([polygon, next], parameters));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        Assert.Equal(new[] { 0, 1 }, result.ProposedOrder.Select(p => p.SourceOrdinal));
+        var chosen = result.ProposedOrder[0];
+        var entry = Assert.Single(chosen.ContourChoices).Point + chosen.Location;
+        Assert.True(entry.X > 15 && entry.Y < 5, $"entry {entry} lost the lower-right facing corner to an early cap");
+        Assert.Contains(vertices, vertex => vertex.DistanceTo(entry) < 1e-6);
+        Assert.Equal(before, ExplicitContourTests.Fingerprint(polygon.Program));
+    }
+
+    [Fact]
     public void EmittedRapidsNoWorseThanTheMeasuredLegacyLayout()
     {
         var parameters = Parameters();
