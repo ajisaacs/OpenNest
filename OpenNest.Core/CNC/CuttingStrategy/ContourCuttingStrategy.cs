@@ -636,12 +636,44 @@ namespace OpenNest.CNC.CuttingStrategy
             }
         }
 
-        private enum CornerKind
+        internal enum CornerKind
         {
             Convex,
             Reflex,
             Smooth,
             Cusp,
+        }
+
+        /// <summary>
+        /// A vertex classified for automatic start-point planning: what kind of turn the
+        /// contour makes there, and the travel tangents of the two edges it joins. Read-only
+        /// so callers cannot mutate the contour; winding is derived the same way
+        /// <see cref="EmitContour"/> derives it, so the kind matches actual emission.
+        /// </summary>
+        internal readonly record struct AutomaticCorner(CornerKind Kind, Vector TangentIn, Vector TangentOut);
+
+        /// <summary>
+        /// Classification query shared with entry planning: the turn at <paramref name="point"/>
+        /// on a closed line/arc contour, using the same corner geometry and winding derivation
+        /// as emission. False when <paramref name="point"/> is not a shared vertex of two
+        /// chainable entities (an interior point, an open contour, a degenerate or non-finite
+        /// corner). Lead generation itself is not involved.
+        /// </summary>
+        internal static bool TryClassifyAutomaticStartCorner(
+            Shape shape,
+            Vector point,
+            Entity entity,
+            out AutomaticCorner corner)
+        {
+            if (!TryGetCorner(shape, point, entity, out var raw))
+            {
+                corner = default;
+                return false;
+            }
+
+            corner = new AutomaticCorner(
+                ClassifyCorner(raw, DetermineWinding(shape)), raw.TangentIn, raw.TangentOut);
+            return true;
         }
 
         /// <summary>A contour vertex: the entity cut into it and the one cut away from it.</summary>
