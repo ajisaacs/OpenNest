@@ -279,6 +279,14 @@ plans every plate that has parts. Both open one dialog built on
   whole-part order; either change replans. The settings are confirmed parameters: every
   unlocked part's lead-ins are regenerated, and locked parts keep programs that must
   already pass the checks.
+- A missing or zero-length lead-in is reported directly, rather than as a search-limit
+  failure. Open `Cutting Settings...`, choose a lead-in other than `None` with a nonzero
+  length on the affected `External`, `Internal`, or `Arc / Circle` tab, then replan.
+  Locked programs require manual lead editing or unlocking before regeneration.
+  When a lead hits another part, the finding suggests more spacing or a shorter lead;
+  when no tested entry fits, it suggests reducing lead-in length and, if neighbours
+  obstruct it, spacing the parts farther apart. These are suggestions, not guaranteed
+  fixes: replanning runs the same checks, and Apply stays blocked until every plate is ready.
 - Every plate is captured on the UI thread and checked and planned on a worker. Clean part
   material is checked for overlaps with the pre-post overlap analyzer; overlapping parts or
   an incomplete check (see [pre-post verification](post-verification.md)) block that plate

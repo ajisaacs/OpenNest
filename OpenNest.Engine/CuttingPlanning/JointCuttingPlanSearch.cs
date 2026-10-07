@@ -451,7 +451,9 @@ internal static class JointCuttingPlanSearch
             else if (selection.Choices.Count == 0 && selection.UncertainChoices.Count == 0
                 && reportedNoFit.Add(source.SourceOrdinal * 1000 + contour))
                 rejected.Add(Finding(source, null,
-                    $"No tested lead-in fits on part {source.SourceOrdinal}, contour {contour}: {selection.Reason}"));
+                    $"No tested lead-in fits on cutting contour {contour + 1}: {selection.Reason} "
+                    + "Try reducing the lead-in length in Cutting Settings...; if nearby parts obstruct the lead-in, "
+                    + "space the parts farther apart. Replan to check the changes."));
             // Uncertain candidates are NOT refused by the precheck: they reach the emitted-
             // prefix Check and complete replay, which remain the authority on them.
             return selection.Choices.Concat(selection.UncertainChoices).Take(snapshot.MaxEntries).ToArray();
