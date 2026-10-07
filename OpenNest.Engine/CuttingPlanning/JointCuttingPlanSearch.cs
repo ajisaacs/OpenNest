@@ -255,6 +255,7 @@ internal static class JointCuttingPlanSearch
                 .ToDictionary(x => x.Edge, x => x.Rank);
             return edges
                 .OrderBy(e => sourceOrder[e])
+                .ThenBy(e => e.ContourRank)
                 .ThenBy(e => e.Contour)
                 .ThenBy(e => e.Rank)
                 .ThenBy(e => e.Distance)
@@ -289,6 +290,25 @@ internal static class JointCuttingPlanSearch
                     continue;
                 }
                 var prepared = source.Prepared;
+                if (prepared.Count > 1 && node.Active == null)
+                {
+                    // Selecting an endpoint does not cut it. Each endpoint owns a separate
+                    // branch, whose holes are still emitted first and checked normally.
+                    CountExpansion(source);
+                    var perimeters = AutomaticEntries(node, sequence, source, prepared.PerimeterOrdinal);
+                    for (var index = 0; index < perimeters.Count; index++)
+                    {
+                        CountExpansion(source);
+                        var state = new ActivePart(source, [], node.Position, node.Checker, 0, node,
+                            perimeters[index]);
+                        yield return new(new(node.Order, node.Position, node.Checker, state, null),
+                            Centre(source).DistanceTo(node.Position), source.SourceOrdinal, -1, index, index);
+                    }
+                    continue;
+                }
+                var preference = node.Active?.Preference;
+                if (node.Active?.Perimeter is { } outside && preference == null)
+                    preference = PlanHoles(node.Active, outside);
                 var choices = node.Active?.Choices ?? [];
                 var arrival = node.Active?.Arrival ?? node.Position;
                 var before = node.Active?.Before ?? node.Checker;
@@ -298,20 +318,34 @@ internal static class JointCuttingPlanSearch
                 foreach (var contour in contours)
                 {
                     token.ThrowIfCancellationRequested();
-                    // No-hole parts: the single outside contour gets the automatic entry
-                    // pipeline, facing the next cut (S03-S08). Holed parts keep the legacy
-                    // nearest-entry path until S12 wires hole look-ahead.
-                    var automatic = prepared.Count == 1;
                     IReadOnlyList<ContourChoice> entries;
-                    if (!automatic)
-                        entries = prepared.Entries(contour, node.Position - source.Location, snapshot.MaxEntries, token);
+                    var contourRank = 0;
+                    if (node.Active?.Perimeter is { } perimeter)
+                    {
+                        if (contour == prepared.PerimeterOrdinal)
+                            entries = [perimeter];
+                        else
+                        {
+                            contourRank = Array.IndexOf(preference.Route, contour);
+                            var downstream = preference.Route.Skip(contourRank + 1)
+                                .FirstOrDefault(c => !choices.Any(e => e.ContourOrdinal == c), -1);
+                            var target = downstream < 0 ? preference.PerimeterPierce
+                                : preference.Pierces[downstream];
+                            entries = SelectEntries(source, contour, target, node.Position - source.Location);
+                            // Preference only reorders retained candidates. Neither a failed
+                            // preferred entry nor an alternate hole order prunes this branch.
+                            if (preference.Entries.TryGetValue(contour, out var preferred))
+                                entries = entries.OrderBy(e => e.Point.DistanceTo(preferred.Point)
+                                    <= PostVerificationGeometry.Epsilon ? 0 : 1).ToArray();
+                        }
+                    }
                     else
                     {
-                        CountExpansion(source); // The catalogue/validator pipeline is search work, counted here.
+                        CountExpansion(source);
                         entries = AutomaticEntries(node, sequence, source, contour);
-                        if (entries.Count == 0)
-                            continue; // the S08 finding (when complete) is already recorded
                     }
+                    if (entries.Count == 0)
+                        continue;
                     for (var entry = 0; entry < entries.Count; entry++)
                     {
                         CountExpansion(source); // Before emission/native queries, including rejected candidates.
@@ -337,9 +371,10 @@ internal static class JointCuttingPlanSearch
                             ? new Node([.. node.Order, source.Propose(program, execution, prefix, token)],
                                 execution.DeparturePoint, checker, null, boundary)
                             : new Node(node.Order, execution.DeparturePoint, checker,
-                                new(source, prefix, arrival, before, distance, boundary), null);
+                                new(source, prefix, arrival, before, distance, boundary,
+                                    node.Active?.Perimeter, preference), null);
                         yield return new(next, distance - (node.Active?.Distance ?? 0), source.SourceOrdinal,
-                            contour, entry, automatic ? entry : int.MinValue);
+                            contour, entry, entry, contourRank);
                     }
                 }
             }
@@ -360,19 +395,31 @@ internal static class JointCuttingPlanSearch
             // One global->local conversion of target and arrival; geometry is already rotated.
             Vector? local = LookAheadCentre(node, sequence, source) is { } target
                 ? target - source.Location : null;
-            var preferred = prepared.AutomaticEntryCandidates(contour, token);
-            var catalogue = preferred.Count > 0
-                ? preferred
-                : prepared.AutomaticEntryCandidatesWithFallbacks(contour, local, token);
-            var ordered = catalogue.RankTowardNextCut(local, arrival);
-            var adapter = feasibility.TryGetValue(source.SourceOrdinal, out var known)
-                ? known
+            return SelectEntries(source, contour, local, arrival);
+        }
+
+        private ContourEntryFeasibility Adapter(FixedProgramPlacement source) =>
+            feasibility.TryGetValue(source.SourceOrdinal, out var known) ? known
                 : feasibility[source.SourceOrdinal] = new ContourEntryFeasibility(
-                    prepared, source.Location, source.Material, materials);
+                    source.Prepared, source.Location, source.Material, materials);
+
+        private ContourFeasibilityVerdict Evaluate(FixedProgramPlacement source, ContourEntryCandidate candidate)
+        {
+            CountExpansion(source);
+            var adapter = Adapter(source);
             var before = adapter.EvaluationCount;
-            var selection = ContourEntrySelection.Select(ordered,
-                candidate => adapter.Check(candidate.Choice, token: token), snapshot.MaxEntries, token);
+            var verdict = adapter.Check(candidate.Choice, token: token);
             LeadPrechecks += adapter.EvaluationCount - before;
+            return verdict;
+        }
+
+        private IReadOnlyList<ContourChoice> SelectEntries(FixedProgramPlacement source, int contour,
+            Vector? target, Vector arrival)
+        {
+            var catalogue = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target, token);
+            var ordered = catalogue.RankTowardNextCut(target, arrival);
+            var selection = ContourEntrySelection.Select(ordered,
+                candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
             if (selection.Shortfall == ContourSelectionShortfall.Incomplete && selection.UncertainChoices.Count == 0)
                 rejected.Add(Finding(source, PostVerificationKind.Incomplete,
                     $"Contour {contour}: {selection.Reason}"));
@@ -382,9 +429,46 @@ internal static class JointCuttingPlanSearch
                     $"No tested lead-in fits on part {source.SourceOrdinal}, contour {contour}: {selection.Reason}"));
             // Uncertain candidates are NOT refused by the precheck: they reach the emitted-
             // prefix Check and complete replay, which remain the authority on them.
-            return selection.Choices.Count == 0
-                ? selection.UncertainChoices
-                : [.. selection.Choices, .. selection.UncertainChoices];
+            return selection.Choices.Concat(selection.UncertainChoices).Take(snapshot.MaxEntries).ToArray();
+        }
+
+        private HolePreference PlanHoles(ActivePart active, ContourChoice perimeter)
+        {
+            var source = active.Source;
+            var prepared = source.Prepared;
+            var centres = prepared.HoleCentres(token).Select(c => c ?? Vector.Zero).ToArray();
+            var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
+            var localArrival = active.Arrival - source.Location;
+            var endpoint = perimeter.Point;
+            var entries = new Dictionary<int, ContourChoice>();
+            var pierces = holes.ToDictionary(h => h, h => centres[h]);
+            var route = holes;
+            try
+            {
+                CountExpansion(source);
+                endpoint = PreferredContourEntries.Pierce(prepared, perimeter, token);
+                route = CuttingHoleOrder.Plan(holes, centres, localArrival, endpoint, token).ToArray();
+                var proposal = PreferredContourEntries.TryPlan(prepared, perimeter, route, centres,
+                    localArrival, candidate => Evaluate(source, candidate), token);
+                if (proposal.IsPreferred)
+                    foreach (var choice in proposal.HoleChoices)
+                    {
+                        CountExpansion(source);
+                        entries.Add(choice.ContourOrdinal, choice);
+                        pierces[choice.ContourOrdinal] = PreferredContourEntries.Pierce(prepared, choice, token);
+                    }
+                else
+                    rejected.Add(Finding(source, proposal.Shortfall == ContourSelectionShortfall.Incomplete
+                        ? PostVerificationKind.Incomplete : null, proposal.Reason ?? "No preferred hole path."));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or ArithmeticException or NotSupportedException)
+            {
+                // A proposal is not a gate. Unknown emissions still reach prefix/final
+                // replay through retained candidates; never label an uncertain probe clear.
+                rejected.Add(Finding(source, PostVerificationKind.Incomplete,
+                    $"Preferred hole path unavailable: {ex.Message}"));
+            }
+            return new(route, entries, pierces, endpoint);
         }
 
         private void CountExpansion(FixedProgramPlacement source)
@@ -467,13 +551,18 @@ internal static class JointCuttingPlanSearch
     }
 
     private sealed class BudgetExceededException : Exception;
+    // Every endpoint branch owns its preference; all retained entries/orders remain searchable.
+    private sealed record HolePreference(int[] Route, IReadOnlyDictionary<int, ContourChoice> Entries,
+        IReadOnlyDictionary<int, Vector> Pierces, Vector PerimeterPierce);
     private sealed record ActivePart(FixedProgramPlacement Source, ContourChoice[] Choices, Vector Arrival,
-        ReleasedContourState Before, double Distance, Node Boundary);
+        ReleasedContourState Before, double Distance, Node Boundary,
+        ContourChoice Perimeter = null, HolePreference Preference = null);
     /// <summary>A search state; Previous links a whole-part boundary to the boundary before it.</summary>
     private sealed record Node(FixedProgramPlacement[] Order, Vector Position, ReleasedContourState Checker,
         ActivePart Active, Node Previous);
     /// <summary>Rank is the automatic selection slot (entry order) inside its contour stage; int.MinValue for legacy children.</summary>
-    private sealed record Edge(Node Node, double Distance, int Ordinal, int Contour, int Entry, int Rank = int.MinValue);
+    private sealed record Edge(Node Node, double Distance, int Ordinal, int Contour, int Entry,
+        int Rank = int.MinValue, int ContourRank = 0);
     private sealed class Frame(Node node)
     {
         internal Node Node { get; } = node;

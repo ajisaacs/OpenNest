@@ -493,6 +493,23 @@ public sealed class PreparedContours
     private Shape GetShape(int ordinal) => ordinal < 0 || ordinal >= Count
         ? throw new ArgumentException("Foreign contour ordinal.") : shapes[ordinal];
 
+    /// <summary>
+    /// Representative POINTS per contour ordinal (bounding-box centre) for hole routing
+    /// only — the S10 <c>CuttingHoleOrder</c> proxy. The perimeter has no entry; it is the
+    /// route's fixed endpoint, not a stop. These are ordering proxies, never cut points.
+    /// </summary>
+    internal IReadOnlyList<Vector?> HoleCentres(CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        var centres = new Vector?[Count];
+        for (var contour = 0; contour < PerimeterOrdinal; contour++)
+        {
+            token.ThrowIfCancellationRequested();
+            centres[contour] = GetShape(contour).BoundingBox.Center;
+        }
+        return centres;
+    }
+
     private static Vector Start(Entity entity) => entity is Line line ? line.StartPoint : ((Arc)entity).StartPoint();
     private static Vector End(Entity entity) => entity is Line line ? line.EndPoint : ((Arc)entity).EndPoint();
 

@@ -121,8 +121,9 @@ tangent arc at a shared vertex, such as a fillet, is an ordinary joint: an exact
 contact that the native query rounds away is not uncertain at a line endpoint the
 other curve already touches, while a contact anywhere else on the line still refuses.
 
-Candidates rank by actual modeled rapid distance with stable source/contour/entry
-ordinals. Hash values and drawing names are not tie breakers. The expansion budget
+Source parts rank by modeled travel (material-centre distance at a holed-part
+boundary); within a part, preferred contour order and facing-entry rank precede
+travel. Ties use stable source/contour/entry ordinals. Hash values and drawing names are not tie breakers. The expansion budget
 counts rejected candidates and frontier ranking as well as accepted moves, before
 emission; it is not a wall-clock timeout. Callers can cancel. Exhaustion may occur
 before already-generated siblings are traversed; it returns a refusal, not an
@@ -130,8 +131,7 @@ unranked fallback or a proof of geometric impossibility.
 
 ## Automatic outside entries and look-ahead
 
-For a part whose only contour is its outside (no holes), the entry is chosen
-automatically toward the NEXT cut: the ranker orders the native candidate
+An unlocked part's outside entry is chosen automatically toward the NEXT cut: the ranker orders the native candidate
 catalogue by the facing side(s) of the next part's placed-material centre, and
 the shared lead validator certifies each emitted lead lazily until up to
 `maxEntries` feasible candidates remain (side coverage when the cap affords
@@ -141,13 +141,31 @@ dependency-ready remaining part, stable-ordinal ties; the last part has no
 target and ranks by tier then distance to the tool's arrival. Between source
 parts the tour stays nearest-first; the look-ahead rank only orders the entries
 inside one part's contour stage, so distance sorting cannot undo the facing.
-Uncertain (numerically incomplete) validator answers are never precheck-refused:
-those candidates reach the emitted-prefix check and complete replay unchanged. A
+Uncertain (numerically incomplete) validator answers are not geometric refusals:
+those candidates can fill remaining retained slots for emitted-prefix checking and
+complete replay. The total retained entry count stays within `maxEntries`. A
 part/contour with no fitting lead in its fully evaluated catalogue is reported
 as "No tested lead-in fits on part N, contour M"; budget exhaustion stays a
 budget finding and incomplete checks are never presented as geometric
-impossibility. Lead prechecks are tracked separately from expansions. Hole
-parts keep the legacy nearest-entry path.
+impossibility. Lead prechecks are reported separately and their requests also consume
+the shared expansion budget before native work.
+
+For a holed part, the search chooses an outside endpoint before cutting any hole.
+Each endpoint branch builds an open hole-centre route from the original arrival to
+that endpoint, using bounded nearest-neighbour, 2-opt and Or-opt improvement.
+Preferred hole entries are then resolved backward from the outside's actual emitted
+pierce, ignoring scribe marks: each hole faces the following contour's actual pierce.
+Convex corners lead the preference tiers, then straight midpoints/tangent joints,
+then native fallbacks. Reflex/cusp corners remain manual-only.
+
+This preference orders the search; it never certifies a rapid or prunes alternate
+retained entries or hole orders. A different outside endpoint recomputes its hole
+preference. Every standalone emitted prefix is replayed from the original part
+arrival and a copy of the checker from before that part, not from the previous
+prefix (which would double-consume holes and scribes). Holes are cut once, the
+outside last, and scribes once. Locked programs remain exact. A crossed preferred
+route must recover through checked backtracking or return a refusal, never unsafe
+`Ready`.
 
 Selected programs are replayed from the beginning with a fresh checker and fresh
 lead validation, without regenerating them or trusting cached search verdicts.
