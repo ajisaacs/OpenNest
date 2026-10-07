@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Drawing.Drawing2D;
 using OpenNest.CNC;
 using OpenNest.Geometry;
@@ -354,23 +354,23 @@ namespace OpenNest
                         break;
 
                     case CodeType.SubProgramCall:
-                    {
-                        Flush();
-                        var tmpmode = mode;
-                        var subpgm = (SubProgramCall)code;
-
-                        if (subpgm.Program != null)
                         {
-                            curpos = new Vector(
-                                frameOrigin.X + subpgm.Offset.X,
-                                frameOrigin.Y + subpgm.Offset.Y
-                            );
-                            AddProgram(path, subpgm.Program, mode, ref curpos);
-                        }
+                            Flush();
+                            var tmpmode = mode;
+                            var subpgm = (SubProgramCall)code;
 
-                        mode = tmpmode;
-                        break;
-                    }
+                            if (subpgm.Program != null)
+                            {
+                                curpos = new Vector(
+                                    frameOrigin.X + subpgm.Offset.X,
+                                    frameOrigin.Y + subpgm.Offset.Y
+                                );
+                                AddProgram(path, subpgm.Program, mode, ref curpos);
+                            }
+
+                            mode = tmpmode;
+                            break;
+                        }
                 }
             }
 
