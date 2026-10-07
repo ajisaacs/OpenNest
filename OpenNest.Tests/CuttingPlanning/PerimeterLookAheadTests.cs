@@ -152,6 +152,47 @@ public class PerimeterLookAheadTests
             $"last entry {lastEntry} is nearer the plate origin than the arrival {arrival}");
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(100, -50)]
+    public void LastCircleIncludesTheExactClosestArrivalFallback(double x, double y)
+    {
+        var source = new Program();
+        source.MoveTo(2, 0);
+        source.ArcTo(2, 0, 0, 0, RotationType.CW);
+        var location = new Vector(x, y);
+        var part = new Part(new Drawing("circle", source), location);
+        var parameters = Parameters();
+        parameters.RoundLeadInAngles = false;
+        parameters.PierceClearance = 0;
+        parameters.ArcCircleLeadIn = new LineLeadIn { Length = 0.15, ApproachAngle = 90 };
+        var arrival = location + new Vector(20, 8);
+        var before = ExplicitContourTests.Fingerprint(part.Program);
+        var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest([part], arrival,
+            confirmedParameters: parameters, preservePartOrder: true));
+        var captured = snapshot.Placements[0];
+        var prepared = captured.Prepared;
+        var closest = prepared.ClosestEntry(0, arrival - location);
+        Assert.True(closest.Point.DistanceTo(new Vector(2, 0)) > 0.5);
+        var adapter = new ContourEntryFeasibility(prepared, location, captured.Material, []);
+        Assert.True(adapter.Check(closest).IsClear);
+        var witnessProgram = prepared.Emit([closest]);
+        var execution = ExecutionMotionReader.Read(witnessProgram, location, arrival, default);
+        var witness = CuttingPlanService.ReplayPrograms(snapshot,
+            [captured.Propose(witnessProgram, execution, [closest])], 0, default);
+        Assert.Equal(CuttingPlanStatus.Ready, witness.Status);
+        Assert.True(witness.IndependentlyReplayed);
+
+        var result = CuttingPlanService.Plan(snapshot);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        var chosen = Assert.Single(Assert.Single(result.ProposedOrder).ContourChoices);
+        Assert.True(chosen.Point.DistanceTo(closest.Point) < 1e-6,
+            $"last entry {chosen.Point} omitted the feasible closest-arrival point {closest.Point}");
+        Assert.Equal(before, ExplicitContourTests.Fingerprint(part.Program));
+    }
+
     [Fact]
     public void RotatedAndTranslatedLayout_FacingIsInGlobalSpace()
     {

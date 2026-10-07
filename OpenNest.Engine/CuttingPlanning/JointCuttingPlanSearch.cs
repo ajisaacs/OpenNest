@@ -438,7 +438,10 @@ internal static class JointCuttingPlanSearch
         private IReadOnlyList<ContourChoice> SelectEntries(FixedProgramPlacement source, int contour,
             Vector? target, Vector arrival)
         {
-            var catalogue = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target, token);
+            // Last contour has no downstream target, but still needs its exact native
+            // closest-arrival fallback. Keep target null in the ranker: arrival is not
+            // a next cut and must not acquire facing-side priority.
+            var catalogue = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target ?? arrival, token);
             var ordered = catalogue.RankTowardNextCut(target, arrival);
             var selection = ContourEntrySelection.Select(ordered,
                 candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
