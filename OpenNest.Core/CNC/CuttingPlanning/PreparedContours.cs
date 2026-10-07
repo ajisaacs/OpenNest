@@ -156,6 +156,93 @@ public sealed class PreparedContours
         return choice;
     }
 
+    /// <summary>
+    /// The uncapped preferred automatic start catalogue for one contour, in preference then
+    /// contour-travel order: convex corners of the contour's own winding, then straight-edge
+    /// midpoints, then tangent line/arc joints. Reflex and cusp vertices, collinear
+    /// line/line splits, circles and interior points never appear; each geometric point is
+    /// reported once, keeping the most preferred kind. A pure-arc contour can have no
+    /// preferred point at all — the S04 fallback catalogue supplies those. Manual entry
+    /// through <see cref="Entry"/> / <see cref="ClosestEntry"/> is unaffected.
+    /// </summary>
+    internal IReadOnlyList<ContourEntryCandidate> AutomaticEntryCandidates(int contourOrdinal, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        var shape = GetShape(contourOrdinal);
+        if (shape.Entities.Count == 1 && shape.Entities[0] is Circle)
+            throw new ArgumentException("Circles have no preferred corners or joints; use the fallback catalogue.");
+        if (shape.Entities.Count < 2)
+            throw new ArgumentException("Contour has no vertex to classify.");
+
+        // Collect EVERY eligible candidate first, then deduplicate geometrically; at equal
+        // points the most preferred kind wins regardless of which entity supplied it.
+        var found = new List<ContourEntryCandidate>();
+        var count = shape.Entities.Count;
+        for (var i = 0; i < count; i++)
+        {
+            token.ThrowIfCancellationRequested();
+            var entity = shape.Entities[i];
+
+            // Vertex reached by travelling along entity i (its end point), reported under
+            // entity i. The closed contour guarantees every vertex appears exactly once this
+            // way; each is classified from the contour's own winding.
+            var vertex = End(entity);
+            if (ContourCuttingStrategy.TryClassifyAutomaticStartCorner(shape, vertex, entity, out var corner))
+            {
+                switch (corner.Kind)
+                {
+                    case ContourCuttingStrategy.CornerKind.Convex:
+                        Add(i, vertex, AutomaticEntryKind.ConvexCorner);
+                        break;
+                    case ContourCuttingStrategy.CornerKind.Smooth
+                        when entity is Line && Next(i) is Arc:
+                        // A line leaving into an arc: the tangent joint. The reverse travel
+                        // order classifies the same joint from the arc, matched below.
+                        Add(i, vertex, AutomaticEntryKind.TangentJoint);
+                        break;
+                    // Reflex, cusp, collinear splits (smooth line→line) and arc→line joins
+                    // of a plain straight edge are not preferred automatic starts here.
+                    case ContourCuttingStrategy.CornerKind.Smooth
+                        when entity is Arc && Next(i) is Line:
+                        Add(i, vertex, AutomaticEntryKind.TangentJoint);
+                        break;
+                }
+            }
+
+            if (entity is Line line)
+                Add(i, line.MidPoint, AutomaticEntryKind.StraightMidpoint);
+        }
+        token.ThrowIfCancellationRequested();
+
+        // Deduplicate: at equal points the most preferred metadata wins, independent of
+        // which entity supplied it; the winner's own ordinal and point are kept.
+        var byPoint = new Dictionary<(long, long), ContourEntryCandidate>();
+        var order = new List<(long, long)>();
+        foreach (var candidate in found)
+        {
+            var key = candidate.GeometryKey;
+            if (!byPoint.TryGetValue(key, out var existing))
+            {
+                byPoint[key] = candidate;
+                order.Add(key);
+            }
+            else if (candidate.Kind < existing.Kind)
+                byPoint[key] = candidate;
+        }
+        return order
+            .OrderBy(key => byPoint[key].Kind)
+            .ThenBy(key => byPoint[key].Choice.EntityOrdinal)
+            .Select(key => byPoint[key])
+            .ToList();
+
+        Entity Next(int index) => shape.Entities[(index + 1) % count];
+
+        void Add(int entityOrdinal, Vector point, AutomaticEntryKind kind)
+        {
+            found.Add(new ContourEntryCandidate(Entry(contourOrdinal, entityOrdinal, point), kind));
+        }
+    }
+
     /// <summary>Emits every contour once in caller order, holes before perimeter, with scribes once.</summary>
     public Program Emit(IReadOnlyList<ContourChoice> choices)
     {
