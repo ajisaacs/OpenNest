@@ -231,5 +231,191 @@ public class ContourEntryCandidateTests
         Assert.Equal(candidates.Count, candidates.Select(c => c.GeometryKey).Distinct().Count());
     }
 
+    // --- S04 fallback tier ------------------------------------------------------
+
+    private static IReadOnlyList<ContourEntryCandidate> WithFallbacks(
+        Program program, Vector? lookAhead = null, string style = "line") =>
+        PreparedContours.Capture(program, ExplicitContourTests.Parameters(style))
+            .AutomaticEntryCandidatesWithFallbacks(0, lookAhead);
+
+    [Fact]
+    public void Circle_FallbacksAreCompassPointsAndTargetFacing()
+    {
+        var p = new Program();
+        p.MoveTo(5, 3);
+        p.ArcTo(5, 3, 3, 3, RotationType.CCW); // end (5,3), center (3,3), radius 2
+
+        // The preferred catalogue still refuses a whole circle...
+        Assert.Throws<ArgumentException>(() => Capture(p).AutomaticEntryCandidates(0));
+
+        // ...but the fallback catalogue makes it usable: the eight native compass points.
+        var plain = WithFallbacks(p);
+        Assert.Equal(8, plain.Count);
+        Assert.All(plain, c => Assert.Equal(AutomaticEntryKind.CircleCompass, c.Kind));
+        for (var angle = 0; angle < 8; angle++)
+        {
+            var expected = new Vector(3, 3) +
+                new Vector(System.Math.Cos(angle * System.Math.PI / 4), System.Math.Sin(angle * System.Math.PI / 4)) * 2;
+            Assert.Contains(plain, c => Distance(c.Choice.Point, expected) < 1e-9);
+        }
+
+        // With a look-ahead the exact target-facing closest point joins the set. The
+        // look-ahead is off-compass so the merge cannot deduplicate it away.
+        var ahead = new Vector(4, -1);
+        var facing = WithFallbacks(p, ahead);
+        Assert.Equal(9, facing.Count);
+        var target = Assert.Single(facing, c => c.Kind == AutomaticEntryKind.TargetFacing);
+        var facingPoint = new Vector(3, 3) + (ahead - new Vector(3, 3)).Normalize() * 2;
+        Assert.Equal(facingPoint.X, target.Choice.Point.X, 6);
+        Assert.Equal(facingPoint.Y, target.Choice.Point.Y, 6);
+    }
+
+    [Fact]
+    public void FilletArcMidpoint_IsTier3_KeepsJointPreferred()
+    {
+        // Half-circle bump on the top edge: joints (0,10),(10,10); arc midpoint (5,15).
+        var p = new Program();
+        p.MoveTo(0, 0);
+        p.LineTo(10, 0);
+        p.LineTo(10, 10);
+        p.ArcTo(new Vector(0, 10), new Vector(5, 10), RotationType.CCW);
+        p.LineTo(0, 0);
+
+        // The preferred tier has no arc midpoint at all.
+        Assert.DoesNotContain(Capture(p).AutomaticEntryCandidates(0),
+            c => c.Kind == AutomaticEntryKind.ArcMidpoint);
+
+        var withFallbacks = WithFallbacks(p);
+        var mid = Assert.Single(withFallbacks, c => c.Kind == AutomaticEntryKind.ArcMidpoint);
+        Assert.Equal(5, mid.Choice.Point.X, 9);
+        Assert.Equal(15, mid.Choice.Point.Y, 9);
+        // Tier 3: strictly after every preferred kind in catalogue order.
+        var lastPreferred = withFallbacks.Select(c => c.Kind).ToList()
+            .FindLastIndex(k => k <= AutomaticEntryKind.TangentJoint);
+        var midpointIndex = withFallbacks.ToList().IndexOf(mid);
+        Assert.True(midpointIndex > lastPreferred);
+    }
+
+    [Fact]
+    public void LongEdge_GetsNearCornerPointsAtTwoTimesLeadIn()
+    {
+        // 10x10 square, default LineLeadIn Length 0.3 -> inset 0.6 on each incident edge.
+        var candidates = WithFallbacks(ExplicitContourTests.Square(false));
+        var near = candidates.Where(c => c.Kind == AutomaticEntryKind.NearCorner).ToList();
+
+        Assert.Equal(8, near.Count); // 4 convex corners x 2 incident straight edges
+        Assert.Contains(near, c => Distance(c.Choice.Point, new Vector(0.6, 0)) < 1e-9);
+        Assert.Contains(near, c => Distance(c.Choice.Point, new Vector(9.4, 0)) < 1e-9);
+        Assert.Contains(near, c => Distance(c.Choice.Point, new Vector(10, 9.4)) < 1e-9);
+        Assert.All(near, c => Assert.True(c.Kind > AutomaticEntryKind.TangentJoint));
+    }
+
+    [Fact]
+    public void ShortEdge_OmitsNearCornerInsteadOfExtrapolating()
+    {
+        // 10 x 0.4 rectangle: every convex corner's vertical edge (0.4) is shorter than
+        // 2 x lead-in (0.6), so only the horizontal edges carry near-corner points.
+        var p = ClosedContour(new[]
+        {
+            new Vector(0, 0), new Vector(10, 0), new Vector(10, 0.4), new Vector(0, 0.4),
+        });
+        var near = WithFallbacks(p).Where(c => c.Kind == AutomaticEntryKind.NearCorner).ToList();
+
+        Assert.Equal(4, near.Count);
+        // Every point stays strictly inside a horizontal edge of the rectangle — never
+        // extrapolated onto a vertical edge or past an endpoint.
+        Assert.All(near, c =>
+        {
+            var onBottom = Distance(c.Choice.Point, new Vector(c.Choice.Point.X, 0)) < 1e-9
+                && c.Choice.Point.X > 0 && c.Choice.Point.X < 10;
+            var onTop = Distance(c.Choice.Point, new Vector(c.Choice.Point.X, 0.4)) < 1e-9
+                && c.Choice.Point.X > 0 && c.Choice.Point.X < 10;
+            Assert.True(onBottom || onTop);
+        });
+        Assert.Contains(near, c => Distance(c.Choice.Point, new Vector(0.6, 0)) < 1e-9);
+        Assert.Contains(near, c => Distance(c.Choice.Point, new Vector(9.4, 0.4)) < 1e-9);
+    }
+
+    [Fact]
+    public void InsetExactlyTwoLeadInsFromAReflexCorner_IsOmitted()
+    {
+        // Boundary notch 0.6 deep — exactly 2 x lead-in. The inset from each convex
+        // opening corner lands exactly on the reflex inner corner, so neither inner
+        // corner may appear in the automatic catalogue at all.
+        var p = ClosedContour(new[]
+        {
+            new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(0, 10),
+            new Vector(0, 4.6), new Vector(0.6, 4.6), new Vector(0.6, 4), new Vector(0, 4),
+        });
+        var candidates = WithFallbacks(p);
+
+        Assert.DoesNotContain(candidates, c => Distance(c.Choice.Point, new Vector(0.6, 4.6)) < 1e-9);
+        Assert.DoesNotContain(candidates, c => Distance(c.Choice.Point, new Vector(0.6, 4)) < 1e-9);
+    }
+
+    [Fact]
+    public void TargetExactlyAtReflexVertex_IsNotAnAutomaticStart()
+    {
+        // L-outline; (5,5) is reflex for its own travel. The raw closest point from that
+        // position lands exactly on the reflex vertex and must be dropped.
+        var p = ClosedContour(new[]
+        {
+            new Vector(0, 0), new Vector(10, 0), new Vector(10, 10), new Vector(5, 10),
+            new Vector(5, 5), new Vector(0, 5),
+        });
+
+        var reflex = new Vector(5, 5);
+        var candidates = WithFallbacks(p, reflex);
+
+        // The forbidden closest point is dropped entirely...
+        Assert.DoesNotContain(candidates, c => Distance(c.Choice.Point, reflex) < 1e-9);
+        Assert.DoesNotContain(candidates, c => c.Kind == AutomaticEntryKind.TargetFacing);
+        // ...and the catalogue stays usable through the other fallbacks.
+        Assert.Contains(candidates, c => c.Kind == AutomaticEntryKind.NearCorner);
+    }
+
+    [Fact]
+    public void TargetFacingAtSharedPoint_KeepsThePreferredCorner()
+    {
+        // Look-ahead straight at corner (10,10): closest point IS the convex corner, so
+        // the geometric merge keeps the more preferred kind at that single point.
+        var candidates = WithFallbacks(ExplicitContourTests.Square(false), new Vector(10, 10));
+
+        var atCorner = candidates.Where(c => Distance(c.Choice.Point, new Vector(10, 10)) < 1e-9).ToList();
+        var corner = Assert.Single(atCorner);
+        Assert.Equal(AutomaticEntryKind.ConvexCorner, corner.Kind);
+    }
+
+    [Fact]
+    public void FallbackCatalogue_IsNonEmptyForEveryShape_AndHonoursCancellation()
+    {
+        // All-rounded contour (bump square) stays usable; cancellation is honoured.
+        var bump = new Program();
+        bump.MoveTo(0, 0);
+        bump.LineTo(10, 0);
+        bump.LineTo(10, 10);
+        bump.ArcTo(new Vector(0, 10), new Vector(5, 10), RotationType.CCW);
+        bump.LineTo(0, 0);
+        Assert.NotEmpty(WithFallbacks(bump));
+
+        var prepared = PreparedContours.Capture(ExplicitContourTests.Square(false), ExplicitContourTests.Parameters());
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        Assert.Throws<OperationCanceledException>(() =>
+            prepared.AutomaticEntryCandidatesWithFallbacks(0, new Vector(1, 1), cancelled.Token));
+    }
+
+    [Theory]
+    [InlineData("arc")]
+    [InlineData("linearc")]
+    [InlineData("clean")]
+    public void NonLengthLeadIns_OmitNearCornerInsteadOfApproximating(string style)
+    {
+        // Only lead-in styles with a straight length feed the inset; others contribute 0
+        // and the near-corner fallback is omitted entirely — no invented setting.
+        var candidates = WithFallbacks(ExplicitContourTests.Square(false), style: style);
+        Assert.DoesNotContain(candidates, c => c.Kind == AutomaticEntryKind.NearCorner);
+    }
+
     private static double Distance(Vector a, Vector b) => a.DistanceTo(b);
 }
