@@ -60,8 +60,9 @@ public class HoleLookAheadTests
     [Fact]
     public void CrossingPreferredHolePathBacktracksToACheckedAlternative()
     {
-        // Calibrated: the preferred rapid from hole 1 to hole 2 touches already-cut hole 3.
-        var centres = new[] { new Vector(3, 3), new Vector(7, 15), new Vector(3, 7), new Vector(3, 11) };
+        // Calibrated for next-facing circle entries: the preferred rapid from hole 1
+        // to hole 2 touches already-cut hole 3; retain checked entry backtracking.
+        var centres = new[] { new Vector(3, 3), new Vector(6, 15), new Vector(3, 7), new Vector(3, 11) };
         var clean = LeadPathValidationTests.Rectangle(0, 0, 18, 18);
         foreach (var c in centres)
         {

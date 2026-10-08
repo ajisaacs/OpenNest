@@ -107,6 +107,22 @@ and tab trimming happen during emission. Validation uses the actual emitted
 motions, never the nominal entry point alone. Existing lead styles are not
 shortened, disabled or substituted as a search fallback.
 
+Whole-circle candidates rank by distance to their next-cut target; for a hole,
+that is the next contour's actual pierce. They do not reward a diagonal point as
+if it were a bounding-box corner. All eight
+compass options remain available, including the four polar points at 0°, 90°,
+180° and 270°, and every alternative still passes the emitted-lead and rapid checks.
+Without a next-cut target, the arrival-based rule is unchanged. Polygon corner
+preferences are unchanged.
+
+`Round Lead-In Angles` remains an explicit cutting setting: a 90° increment snaps
+circular-hole starts to the four polar directions; 45° also permits diagonals.
+Snapping can increase reuse of identical hole subprograms and reduce output for
+posts that support that reuse, at the cost of a less direct departure. It is not
+a clearance exemption or a guaranteed file-size reduction. The planner does not
+silently enable rounding, change the increment, or bypass checks on the rounded
+motions.
+
 Every candidate rapid is checked against contours already completed, including
 earlier holes in the same part. Future contours are not yet obstacles. Rapid
 checks skip completed contours whose extents are more than 0.001 clear of the

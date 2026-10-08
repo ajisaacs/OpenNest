@@ -8,7 +8,8 @@ namespace OpenNest.CNC.CuttingPlanning;
 
 /// <summary>
 /// Pure deterministic ordering of the automatic entry catalogue toward the next cut:
-/// facing sides first, then tier, then travel, then a stable geometric key. It adds no
+/// circles rank by outgoing distance; other contours use facing sides, tier and travel,
+/// then a stable geometric key. It adds no
 /// candidates, mutates nothing, runs no lead checks and applies no cap — feasibility
 /// filtering and the bounded selection belong to S07/S08, the wiring to S09.
 /// </summary>
@@ -32,6 +33,19 @@ internal static class ContourEntryRanking
         if (arrival.HasValue) PostVerificationGeometry.Validate(arrival.Value);
         if (candidates.Count == 0)
             return new List<ContourEntryCandidate>();
+
+        // Whole circles have no corners. A diagonal compass point is equally near two
+        // bounding-box sides, but must not gain the two-side bonus of a real corner.
+        // Rank outgoing travel first so arrival cannot pull the start away from the next
+        // cut. Retain every compass/polar alternative for feasibility and rapid checks;
+        // configured angle rounding remains the emitter's responsibility.
+        if (target is { } next && candidates.Any(c => c.Kind == AutomaticEntryKind.CircleCompass)
+            && candidates.All(c => c.Kind is AutomaticEntryKind.CircleCompass or AutomaticEntryKind.TargetFacing))
+            return candidates.OrderBy(c => c.Choice.Point.DistanceTo(next))
+                .ThenBy(c => arrival is { } from ? c.Choice.Point.DistanceTo(from) : 0.0)
+                .ThenBy(c => c.GeometryKey.X)
+                .ThenBy(c => c.GeometryKey.Y)
+                .ToList();
 
         // Candidate bounding rectangle in the contour's local coordinates; every candidate
         // lies on the contour, so distances to the four side lines order side proximity.
