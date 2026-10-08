@@ -37,6 +37,11 @@ public sealed class NestPdfWriterTests : IDisposable
     public void Write_PdfTextCarriesDocumentLocalIdsQuantitiesAndPageNumbers()
     {
         var path = WriteReport(NestReportTestData.CreateNest());
+        if (OperatingSystem.IsWindows() && Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
+        {
+            Directory.CreateDirectory("TestResults");
+            File.Copy(path, Path.Combine("TestResults", "pdf-report-text-diagnostic.pdf"), overwrite: true);
+        }
         var summary = ReportPdf.Text(path, 1);
         var plate = ReportPdf.Text(path, 2);
 
