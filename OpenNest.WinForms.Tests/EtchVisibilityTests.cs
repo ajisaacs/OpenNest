@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Reflection;
 using OpenNest.CNC;
 using OpenNest.Controls;
 using OpenNest.Geometry;
@@ -38,6 +39,36 @@ public class EtchVisibilityTests
             if (!includeCut)
                 Assert.Equal(0, layout.Path.PointCount);
         }, TimeSpan.FromMinutes(1), "Panned etch test timed out.");
+
+    [Fact]
+    public void EtchOnlyPart_RemainsSelectableAndHoverableWithoutCutMaterial()
+        => StaTestThread.Run(() =>
+        {
+            var program = new CNC.Program();
+            AddSquare(program, 100, LayerType.Scribe);
+            var part = new Part(new Drawing("etch-only", program));
+            using var view = new PannedView();
+            view.Plate.Parts.Add(part);
+            var layout = Assert.Single(view.LayoutParts);
+            Assert.Equal(0, layout.Path.PointCount);
+            Assert.True(layout.EtchPath.PointCount > 0);
+
+            Assert.Same(layout, view.Selection.GetPartAtGraphPoint(new PointF(110, 110)));
+            Assert.Null(view.Selection.GetPartAtGraphPoint(new PointF(50, 50)));
+            Assert.Contains(layout, view.Selection.GetPartsFromWindow(
+                new RectangleF(105, 105, 10, 10), SelectionType.Intersect));
+            Assert.Contains(layout, view.Selection.GetPartsFromWindow(
+                new RectangleF(95, 95, 30, 30), SelectionType.Contains));
+
+            typeof(PlateView).GetField("hoverPending", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(view, true);
+            typeof(PlateView).GetField("hoverPoint", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(view, new Point(15, 15));
+            typeof(PlateView).GetMethod("HoverCheck", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(view, null);
+            Assert.Same(layout, typeof(PlateView).GetField("hoveredPart",
+                BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(view));
+        }, TimeSpan.FromMinutes(1), "Etch selection test timed out.");
 
     private static void AddSquare(CNC.Program program, double origin, LayerType layer)
     {

@@ -208,7 +208,7 @@ namespace OpenNest.Controls
             var parts = view.LayoutParts;
             for (var i = parts.Count - 1; i >= 0; --i)
             {
-                if (parts[i].Path.IsVisible(pt))
+                if (parts[i].SelectionPath?.IsVisible(pt) == true)
                     return parts[i];
             }
             return null;
@@ -230,10 +230,12 @@ namespace OpenNest.Controls
                 for (var i = 0; i < parts.Count; ++i)
                 {
                     var part = parts[i];
-                    var region = new Region(part.Path);
+                    var path = part.SelectionPath;
+                    if (path == null)
+                        continue;
+                    using var region = new Region(path);
                     if (region.IsVisible(rect))
                         list.Add(part);
-                    region.Dispose();
                 }
             }
             else
@@ -241,8 +243,8 @@ namespace OpenNest.Controls
                 for (var i = 0; i < parts.Count; ++i)
                 {
                     var part = parts[i];
-                    var bounds = part.Path.GetBounds();
-                    if (rect.Contains(bounds))
+                    var path = part.SelectionPath;
+                    if (path != null && rect.Contains(path.GetBounds()))
                         list.Add(part);
                 }
             }

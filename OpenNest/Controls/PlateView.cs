@@ -816,7 +816,8 @@ namespace OpenNest.Controls
 
             for (var i = parts.Count - 1; i >= 0; --i)
             {
-                if (parts[i].Path.GetBounds().Contains(graphPt) && parts[i].Path.IsVisible(graphPt))
+                var path = parts[i].SelectionPath;
+                if (path?.GetBounds().Contains(graphPt) == true && path.IsVisible(graphPt))
                 {
                     hitPart = parts[i];
                     break;

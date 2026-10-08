@@ -23,7 +23,9 @@ custom or saved fill colors; open a saved nest before applying Workshop to recol
 
 In plate views and drawing thumbnails, scribe/etch motions have a separate stroke
 from material cuts. A closed etched circle or lettering does not make a hole in
-the displayed part fill. Selection changes the part highlight, not the etch color.
+the displayed part fill. An etch-only part remains selectable by its closed
+mark in the plate view; etch lines still do not become cut material. Selection
+changes the part highlight, not the etch color.
 Lead-in/out strokes keep their existing orange-red appearance. Preview placements
 show etches too. A cut coincident with an etch is drawn over the etch, so it is not
 hidden by the mark.

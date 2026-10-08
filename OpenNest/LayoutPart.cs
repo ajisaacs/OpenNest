@@ -60,6 +60,10 @@ namespace OpenNest
 
         public GraphicsPath EtchPath { get; private set; }
 
+        // Etch-only parts have no material path, but their visible closed mark must
+        // remain hit-testable without treating scribe geometry as a cut or fill.
+        internal GraphicsPath SelectionPath => Path?.PointCount > 0 ? Path : EtchPath;
+
         internal RectangleF DisplayBounds { get; private set; }
 
         public Color Color
