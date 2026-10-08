@@ -28,22 +28,36 @@ public static class ReportPdf
         }
     }
 
-    /// <summary>Layout text of one page; skipped where poppler-utils is not installed.</summary>
+    /// <summary>Visual-row text of one page; bbox coordinates avoid platform-specific -layout order.</summary>
     public static string Text(string path, int page) =>
-        Regex.Replace(Run("pdftotext", "-layout", "-f", Page(page), "-l", Page(page), path, "-"), "[ \t]+\n", "\n");
+        LayoutPage(Run("pdftotext", "-bbox", "-f", Page(page), "-l", Page(page), path, "-"));
 
-    /// <summary>Every page's layout text, in order.</summary>
+    /// <summary>Every page's visual-row text, in order.</summary>
     public static string[] Pages(string path)
     {
-        var pages = Run("pdftotext", "-layout", path, "-").Split('\f');
-        // pdftotext terminates the last page with a form feed.
-        return pages.Take(pages.Length - 1).Select(page => Regex.Replace(page, "[ \t]+\n", "\n")).ToArray();
+        var html = Run("pdftotext", "-bbox", path, "-");
+        return Regex.Matches(html, @"<page\b[^>]*>.*?</page>", RegexOptions.Singleline)
+            .Select(match => LayoutPage(match.Value)).ToArray();
+    }
+
+    private static string LayoutPage(string html)
+    {
+        var rows = new List<(double Top, List<(double Left, string Text)> Words)>();
+        foreach (var word in ParseWords(html).OrderBy(word => word.Top).ThenBy(word => word.Left))
+        {
+            if (rows.Count == 0 || System.Math.Abs(word.Top - rows[^1].Top) > 1.5)
+                rows.Add((word.Top, []));
+            rows[^1].Words.Add((word.Left, word.Text));
+        }
+        return string.Join("\n", rows.Select(row => string.Join(" ", row.Words.OrderBy(word => word.Left).Select(word => word.Text)))) + "\n";
     }
 
     /// <summary>Words with page-space boxes (points, Y down).</summary>
-    public static List<(double Left, double Top, double Right, double Bottom, string Text)> Words(string path, int page)
+    public static List<(double Left, double Top, double Right, double Bottom, string Text)> Words(string path, int page) =>
+        ParseWords(Run("pdftotext", "-bbox", "-f", Page(page), "-l", Page(page), path, "-"));
+
+    private static List<(double Left, double Top, double Right, double Bottom, string Text)> ParseWords(string xml)
     {
-        var xml = Run("pdftotext", "-bbox", "-f", Page(page), "-l", Page(page), path, "-");
         return Regex.Matches(xml, "<word xMin=\"([\\d.]+)\" yMin=\"([\\d.]+)\" xMax=\"([\\d.]+)\" yMax=\"([\\d.]+)\">([^<]*)</word>")
             .Select(match => (Number(match.Groups[1].Value), Number(match.Groups[2].Value), Number(match.Groups[3].Value),
                 Number(match.Groups[4].Value), System.Net.WebUtility.HtmlDecode(match.Groups[5].Value)))
