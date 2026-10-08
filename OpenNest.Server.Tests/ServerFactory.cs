@@ -15,6 +15,7 @@ namespace OpenNest.Server.Tests;
 public sealed class ServerFactory : WebApplicationFactory<global::Program>
 {
     private bool _cleanedUp;
+    private NestDatabase? _database;
 
     public ServerFactory(string? databasePath = null)
     {
@@ -33,7 +34,8 @@ public sealed class ServerFactory : WebApplicationFactory<global::Program>
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<NestDatabase>();
-            services.AddSingleton(_ => new NestDatabase(DatabasePath, pooling: false));
+            // Register an externally owned instance; this factory closes it before deleting its file.
+            services.AddSingleton(_database = new NestDatabase(DatabasePath, pooling: false));
         });
     }
 
@@ -44,6 +46,7 @@ public sealed class ServerFactory : WebApplicationFactory<global::Program>
             return;
 
         _cleanedUp = true;
+        _database?.Dispose();
         if (Directory.Exists(DirectoryPath))
             Directory.Delete(DirectoryPath, recursive: true);
     }
