@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Forms;
@@ -178,11 +178,7 @@ namespace OpenNest.Actions
                         break;
                 }
 
-                Compactor.PushBoundingBox(movingParts, plateView.Plate, hDir);
-                Compactor.PushBoundingBox(movingParts, plateView.Plate, vDir);
-
-                Compactor.Push(movingParts, plateView.Plate, hDir);
-                Compactor.Push(movingParts, plateView.Plate, vDir);
+                Compactor.SettlePlacement(movingParts, plateView.Plate, hDir, vDir);
 
                 parts.ForEach(p => p.IsDirty = true);
                 plateView.Invalidate();

@@ -528,6 +528,72 @@ namespace OpenNest.Tests.Fill
         }
 
         [Fact]
+        public void SettlePlacement_RepeatsAfterVerticalMovementOpensHorizontalPath()
+        {
+            var plate = new Plate(100, 100);
+            plate.Parts.Add(MakeRectPart(20, 20, 20, 30));
+            var moving = MakeRectPart(60, 35, 10, 10);
+
+            Compactor.SettlePlacement(new List<Part> { moving }, plate,
+                PushDirection.Left, PushDirection.Down);
+
+            Assert.Equal(0, moving.BoundingBox.Left, 6);
+            Assert.Equal(0, moving.BoundingBox.Bottom, 6);
+            Assert.False(moving.Intersects(plate.Parts[0], out _));
+        }
+
+        [Fact]
+        public void SettlePlacement_MovesCopiedGroupTogether()
+        {
+            var plate = new Plate(100, 100);
+            var left = MakeRectPart(40, 40, 5, 5);
+            var right = MakeRectPart(50, 40, 5, 5);
+            var originalGap = right.Location.X - left.Location.X;
+
+            Compactor.SettlePlacement(new List<Part> { left, right }, plate,
+                PushDirection.Left, PushDirection.Down);
+
+            Assert.Equal(0, left.BoundingBox.Left, 6);
+            Assert.Equal(0, left.BoundingBox.Bottom, 6);
+            Assert.Equal(originalGap, right.Location.X - left.Location.X, 6);
+        }
+
+        [Fact]
+        public void SettlePlacement_GeometryRepeatsWhenInitialBoxPassIsSkipped()
+        {
+            var plate = new Plate(100, 100);
+            plate.Parts.Add(MakeRectPart(20, 20, 20, 30));
+            // Its bounding box covers the start, but its material is above it.
+            plate.Parts.Add(MakeTrianglePart(new Vector(0, 100),
+                new Vector(100, 100), new Vector(100, 40)));
+            var moving = MakeRectPart(60, 35, 10, 10);
+
+            Compactor.SettlePlacement(new List<Part> { moving }, plate,
+                PushDirection.Left, PushDirection.Down);
+
+            Assert.Equal(0, moving.BoundingBox.Left, 6);
+            Assert.Equal(0, moving.BoundingBox.Bottom, 6);
+            Assert.All(plate.Parts, obstacle => Assert.False(moving.Intersects(obstacle, out _)));
+        }
+
+        [Fact]
+        public void SettlePlacement_SkipsBoxPassWhenAlreadyInsideObstacleBounds()
+        {
+            // Triangle material sits below the diagonal; the free pocket at (25,25)
+            // is within its bounding box. A box-only slide would falsely block it.
+            var plate = new Plate(100, 100);
+            plate.Parts.Add(MakeTrianglePart(new Vector(0, 0),
+                new Vector(40, 0), new Vector(0, 40)));
+            var moving = MakeRectPart(25, 25, 5, 5);
+            var start = moving.Location;
+
+            Compactor.SettlePlacement(new List<Part> { moving }, plate,
+                PushDirection.Left, PushDirection.Down, maxIterations: 0);
+
+            Assert.Equal(start, moving.Location);
+        }
+
+        [Fact]
         public void PushBoundingBox_Left_MovesPartTowardEdge()
         {
             var workArea = new Box(0, 0, 100, 100);

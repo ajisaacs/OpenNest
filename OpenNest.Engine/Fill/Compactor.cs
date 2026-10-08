@@ -291,6 +291,63 @@ namespace OpenNest.Engine.Fill
         }
 
         /// <summary>
+        /// Settles a copied placement against the plate in both axis orders, choosing
+        /// the group closest to the quadrant's work-area corner. A coarse box pass
+        /// runs only when no moving box starts inside an existing part's box.
+        /// </summary>
+        public static void SettlePlacement(
+            List<Part> movingParts,
+            Plate plate,
+            PushDirection horizontal,
+            PushDirection vertical,
+            int maxIterations = 20
+        )
+        {
+            if (movingParts.Count == 0)
+                return;
+
+            var workArea = plate.WorkArea();
+            var skipBoxes = movingParts.Any(moving =>
+                plate.Parts.Any(obstacle => moving.BoundingBox.Intersects(obstacle.BoundingBox))
+            );
+            var bestScore = double.MaxValue;
+            Vector[] best = null;
+
+            foreach (var first in new[] { horizontal, vertical })
+            {
+                var second = first == horizontal ? vertical : horizontal;
+                var trial = movingParts.Select(p => (Part)p.Clone()).ToList();
+                if (!skipBoxes)
+                {
+                    PushBoundingBox(trial, plate, first);
+                    PushBoundingBox(trial, plate, second);
+                }
+
+                for (var i = 0; i < maxIterations; i++)
+                {
+                    var moved = Push(trial, plate, first) + Push(trial, plate, second);
+                    if (moved < 0.01)
+                        break;
+                }
+
+                var bounds = trial.GetBoundingBox();
+                var dx = horizontal == PushDirection.Left
+                    ? bounds.Left - workArea.Left : workArea.Right - bounds.Right;
+                var dy = vertical == PushDirection.Down
+                    ? bounds.Bottom - workArea.Bottom : workArea.Top - bounds.Top;
+                var score = dx * dx + dy * dy;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = trial.Select(p => p.Location).ToArray();
+                }
+            }
+
+            for (var i = 0; i < movingParts.Count; i++)
+                movingParts[i].Location = best[i];
+        }
+
+        /// <summary>
         /// Repeatedly pushes parts left then down until total movement per
         /// iteration falls below the given threshold.
         /// </summary>

@@ -15,8 +15,9 @@ Open/incomplete chains and ambiguous contacts conservatively block. This is not 
 - CPU best-fit batches prepare contact topology once and use all vertices plus curve/line interior and curve/curve tangency events. The old leading-half vertex filter cannot establish the next blocker after a skipped touch.
 - GPU kernels retain nearest-hit reduction and return unsnapped contact witnesses. The shared CPU classifier accepts a blocking witness or replays the full query after a nonblocking witness, preserving tied/later blockers. Both batch APIs honor active buffer lengths and refresh mutated/reused segment arrays. The GPU distance adapter sends only exact cardinal directions to the axis-only slide interface; arbitrary directions and native curves use the shared CPU path.
 
-## Regression coverage
+- Shift-click while cloning parts settles the copied group toward the plate quadrant. If its starting bounds overlap any placed part's bounds, it skips the coarse bounding-box pass and uses geometry directly; otherwise it tries coarse horizontal/vertical and vertical/horizontal orders. Each candidate then alternates geometry pushes until movement is negligible (at most 20 iterations), and the group nearest the quadrant's work-area corner wins. The coarse pass remains useful for avoiding sawtooth/rung traps when the starting boxes do not overlap.
 
+## Regression coverage
 `SlideContactTests` exercises cardinal line, translated line, reused edge-array, arbitrary-vector, native-entity, and both CPU batch paths. Cases include winding reversal, nonzero origins, rotated hooks, holes, separating circles, positive-distance grazing followed by a blocker, full-circle arc seams, concave/straight junctions, thin rings, and circle/line interior contact.
 
 `CompactorTests` covers the reported sequence (push left with spacing, then right/up/down), genuine zero-distance blocking, zero/nonzero-spacing later hooks, and inside-hole pushes through both direct and plate entry points. Physical spacing is measured from raw outlines rather than the inflated contours used by the solver.
