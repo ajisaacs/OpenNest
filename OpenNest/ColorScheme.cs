@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Drawing.Drawing2D;
 
 namespace OpenNest
@@ -16,6 +16,19 @@ namespace OpenNest
         public string Name { get; set; } = "Unnamed";
 
         public Color[] PartColors { get; set; } = Drawing.PartColors;
+
+        public bool UseGoldenAngleColors { get; set; }
+
+        // Empty preserves the legacy outline derived from each part's fill.
+        public Color PartOutlineColor { get; set; } = Color.Empty;
+
+        // Empty preserves the legacy translucent selection fill.
+        public Color SelectedPartColor { get; set; } = Color.Empty;
+
+        public Color EtchColor { get; set; } = Color.Lime;
+
+        public Color GetPartOutlineColor(Color fill) =>
+            PartOutlineColor.IsEmpty ? System.Windows.Forms.ControlPaint.Dark(fill) : PartOutlineColor;
 
         public static readonly ColorScheme Default = new ColorScheme
         {

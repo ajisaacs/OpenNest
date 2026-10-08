@@ -1257,14 +1257,19 @@ namespace OpenNest.Forms
             {
                 form.SaveDrawing(drawing);
 
-                // Metadata edits only refresh color; never rebuild the placed part program.
-                foreach (var layoutPart in PlateView.Parts)
-                    if (ReferenceEquals(layoutPart.BasePart.BaseDrawing, drawing))
-                        layoutPart.Color = drawing.Color;
+                RefreshDrawingColor(drawing);
 
                 UpdateDrawingList();
                 PlateView.Invalidate();
             }
+        }
+
+        internal void RefreshDrawingColor(Drawing drawing)
+        {
+            // Metadata edits only refresh color; never rebuild the placed part program.
+            foreach (var layoutPart in PlateView.Parts)
+                if (ReferenceEquals(layoutPart.BasePart.BaseDrawing, drawing))
+                    layoutPart.Update();
         }
 
         private void drawingListBox1_DeleteRequested(object sender, Drawing drawing)

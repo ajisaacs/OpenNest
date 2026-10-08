@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
@@ -18,8 +18,10 @@ namespace OpenNest
         private static Pen leadInPen;
 
         private Color color;
+        private Color? colorOverride;
         private Brush brush;
         private Pen pen;
+        private ColorScheme colorScheme = ColorScheme.Default;
 
         private List<PointF[]> _offsetPolygonPoints;
         private double _cachedOffsetSpacing;
@@ -45,7 +47,7 @@ namespace OpenNest
             if (part.BaseDrawing.Color.IsEmpty)
                 part.BaseDrawing.Color = Color.FromArgb(130, 204, 130);
 
-            Color = part.BaseDrawing.Color;
+            SetDisplayColor(part.BaseDrawing.Color);
         }
 
         internal bool IsDirty { get; set; }
@@ -56,37 +58,45 @@ namespace OpenNest
 
         public GraphicsPath LeadInPath { get; private set; }
 
+        public GraphicsPath EtchPath { get; private set; }
+
+        internal RectangleF DisplayBounds { get; private set; }
+
         public Color Color
         {
             get { return color; }
             set
             {
-                color = value;
-
-                if (brush != null)
-                    brush.Dispose();
-
-                brush = new SolidBrush(value);
-
-                if (pen != null)
-                    pen.Dispose();
-
-                pen = new Pen(ControlPaint.Dark(value));
+                colorOverride = value;
+                SetDisplayColor(value);
             }
+        }
+
+        private void SetDisplayColor(Color value)
+        {
+            color = value;
+            brush?.Dispose();
+            brush = new SolidBrush(value);
+            pen?.Dispose();
+            pen = new Pen(colorScheme.GetPartOutlineColor(value));
+        }
+
+        private void RefreshColors()
+        {
+            var fill = colorOverride ?? BasePart.BaseDrawing.Color;
+            if (color != fill || pen.Color != colorScheme.GetPartOutlineColor(fill))
+                SetDisplayColor(fill);
         }
 
         public void Draw(Graphics g)
         {
-            if (IsSelected)
-            {
-                g.FillPath(selectedBrush, Path);
-                g.DrawPath(selectedPen, Path);
-            }
-            else
-            {
-                g.FillPath(brush, Path);
-                g.DrawPath(pen, Path);
-            }
+            RefreshColors();
+            using var schemeSelectionBrush = IsSelected && !colorScheme.SelectedPartColor.IsEmpty
+                ? new SolidBrush(colorScheme.SelectedPartColor) : null;
+            g.FillPath(schemeSelectionBrush ?? (IsSelected ? selectedBrush : brush), Path);
+            DrawEtch(g);
+            // Keep real cuts visible even where an etch overlaps them.
+            g.DrawPath(IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
 
             if (LeadInPath != null)
                 g.DrawPath(leadInPen, LeadInPath);
@@ -94,19 +104,7 @@ namespace OpenNest
 
         public void Draw(Graphics g, string id)
         {
-            if (IsSelected)
-            {
-                g.FillPath(selectedBrush, Path);
-                g.DrawPath(selectedPen, Path);
-            }
-            else
-            {
-                g.FillPath(brush, Path);
-                g.DrawPath(pen, Path);
-            }
-
-            if (LeadInPath != null)
-                g.DrawPath(leadInPen, LeadInPath);
+            Draw(g);
 
             using var sf = new StringFormat
             {
@@ -125,10 +123,18 @@ namespace OpenNest
 
         public GraphicsPath OffsetPath { get; private set; }
 
+        internal void DrawEtch(Graphics g)
+        {
+            if (EtchPath == null || EtchPath.PointCount == 0)
+                return;
+            using var etchPen = new Pen(colorScheme.EtchColor, 1.5f);
+            g.DrawPath(etchPen, EtchPath);
+        }
+
         private Vector ComputeLabelPoint()
         {
             var entities = ConvertProgram.ToGeometry(BasePart.BaseDrawing.Program);
-            var nonRapid = entities.Where(e => e.Layer != SpecialLayers.Rapid).ToList();
+            var nonRapid = entities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList();
 
             var shapes = ShapeBuilder.GetShapes(nonRapid);
 
@@ -158,26 +164,31 @@ namespace OpenNest
 
         public void Update(DrawControl plateView)
         {
-            if (BasePart.HasManualLeadIns)
-            {
-                BasePart.Program.GetGraphicsPaths(
-                    BasePart.Location,
-                    out var cutPath,
-                    out var leadPath
-                );
-                cutPath.Transform(plateView.Matrix);
-                leadPath.Transform(plateView.Matrix);
-                Path = cutPath;
-                LeadInPath?.Dispose();
-                LeadInPath = leadPath;
-            }
-            else
-            {
-                Path = GraphicsHelper.GetGraphicsPath(BasePart.Program, BasePart.Location);
-                Path.Transform(plateView.Matrix);
-                LeadInPath?.Dispose();
-                LeadInPath = null;
-            }
+            colorScheme = (plateView as PlateView)?.ColorScheme ?? ColorScheme.Default;
+            RefreshColors();
+            BasePart.Program.GetDisplayPaths(BasePart.Location,
+                out var cutPath, out var leadPath, out var etchPath);
+            cutPath.Transform(plateView.Matrix);
+            leadPath.Transform(plateView.Matrix);
+            etchPath.Transform(plateView.Matrix);
+            Path?.Dispose();
+            LeadInPath?.Dispose();
+            EtchPath?.Dispose();
+            Path = cutPath;
+            EtchPath = etchPath;
+            LeadInPath = BasePart.HasManualLeadIns ? leadPath : null;
+            if (!BasePart.HasManualLeadIns)
+                leadPath.Dispose();
+
+            var bounds = cutPath.GetBounds();
+            if (etchPath.PointCount > 0)
+                bounds = cutPath.PointCount > 0 ? RectangleF.Union(bounds, etchPath.GetBounds()) : etchPath.GetBounds();
+            if (LeadInPath?.PointCount > 0)
+                bounds = cutPath.PointCount > 0 || etchPath.PointCount > 0
+                    ? RectangleF.Union(bounds, LeadInPath.GetBounds()) : LeadInPath.GetBounds();
+            // Include screen-space stroke width, even for a horizontal or vertical mark.
+            bounds.Inflate(1, 1);
+            DisplayBounds = bounds;
 
             // _labelPoint is computed from BaseDrawing.Program's current geometry, which already
             // carries BaseDrawing.Program.Rotation (nonzero for canonical-frame drawings, e.g. in
@@ -371,7 +382,8 @@ namespace OpenNest
 
         public void Update()
         {
-            Color = BasePart.BaseDrawing.Color;
+            colorOverride = null;
+            RefreshColors();
         }
     }
 }

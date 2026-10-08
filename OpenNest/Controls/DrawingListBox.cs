@@ -1,11 +1,10 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Size = System.Drawing.Size;
 
 namespace OpenNest.Controls
 {
-    using Size = System.Drawing.Size;
-
     public class DrawingListBox : ListBox
     {
         private const int WM_ERASEBKGND = 0x0014;
@@ -98,9 +97,9 @@ namespace OpenNest.Controls
             var pt = new PointF(5, e.Bounds.Y + 5);
 
             var brush = new SolidBrush(dwg.Color);
-            var pen = new Pen(ControlPaint.Dark(dwg.Color));
+            var pen = new Pen(ColorScheme.Default.GetPartOutlineColor(dwg.Color));
 
-            var img = dwg.Program.GetImage(imageSize, pen, brush);
+            using var img = dwg.Program.GetImage(imageSize, pen, brush);
 
             pen.Dispose();
             brush.Dispose();

@@ -26,7 +26,11 @@ namespace OpenNest
                 OriginColor = ToHex(scheme.OriginColor),
                 EdgeSpacingColor = ToHex(scheme.EdgeSpacingColor),
                 PreviewPartColor = ToHex(scheme.PreviewPartColor),
+                PartOutlineColor = scheme.PartOutlineColor.IsEmpty ? null : ToHex(scheme.PartOutlineColor),
+                SelectedPartColor = scheme.SelectedPartColor.IsEmpty ? null : ToHex(scheme.SelectedPartColor),
+                EtchColor = ToHex(scheme.EtchColor),
                 PartColors = scheme.PartColors.Select(ToHex).ToArray(),
+                UseGoldenAngleColors = scheme.UseGoldenAngleColors,
             };
             return JsonSerializer.Serialize(dto, JsonOptions);
         }
@@ -48,7 +52,11 @@ namespace OpenNest
                 OriginColor = FromHex(dto.OriginColor),
                 EdgeSpacingColor = FromHex(dto.EdgeSpacingColor),
                 PreviewPartColor = FromHex(dto.PreviewPartColor),
+                PartOutlineColor = string.IsNullOrWhiteSpace(dto.PartOutlineColor) ? Color.Empty : FromHex(dto.PartOutlineColor),
+                SelectedPartColor = string.IsNullOrWhiteSpace(dto.SelectedPartColor) ? Color.Empty : FromHex(dto.SelectedPartColor),
+                EtchColor = string.IsNullOrWhiteSpace(dto.EtchColor) ? Color.Lime : FromHex(dto.EtchColor),
                 PartColors = (dto.PartColors ?? new string[0]).Select(FromHex).ToArray(),
+                UseGoldenAngleColors = dto.UseGoldenAngleColors,
             };
         }
 
@@ -91,7 +99,11 @@ namespace OpenNest
             public string OriginColor { get; set; }
             public string EdgeSpacingColor { get; set; }
             public string PreviewPartColor { get; set; }
+            public string PartOutlineColor { get; set; }
+            public string SelectedPartColor { get; set; }
+            public string EtchColor { get; set; }
             public string[] PartColors { get; set; }
+            public bool UseGoldenAngleColors { get; set; }
         }
     }
 }

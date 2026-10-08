@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -32,12 +32,17 @@ namespace OpenNest
             Color.FromArgb(215, 130, 130), // Light Coral
         };
 
-        public static Color GetNextColor()
+        public static bool UseGoldenAngleColors { get; set; }
+
+        public static Color GetPartColor(int index)
         {
-            var color = PartColors[nextColorIndex % PartColors.Length];
-            nextColorIndex++;
-            return color;
+            ArgumentOutOfRangeException.ThrowIfNegative(index);
+            return UseGoldenAngleColors
+                ? PartColorPalette.GoldenAngle(index)
+                : PartColors[index % PartColors.Length];
         }
+
+        public static Color GetNextColor() => GetPartColor(unchecked(nextColorIndex++) & int.MaxValue);
 
         public Drawing()
             : this(string.Empty, new Program()) { }
