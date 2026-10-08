@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -34,7 +33,7 @@ public sealed class ServerFactory : WebApplicationFactory<global::Program>
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<NestDatabase>();
-            services.AddSingleton(_ => new NestDatabase(DatabasePath));
+            services.AddSingleton(_ => new NestDatabase(DatabasePath, pooling: false));
         });
     }
 
@@ -45,8 +44,6 @@ public sealed class ServerFactory : WebApplicationFactory<global::Program>
             return;
 
         _cleanedUp = true;
-        // Pooled connections would keep the file open on Windows after the host disposed it.
-        SqliteConnection.ClearAllPools();
         if (Directory.Exists(DirectoryPath))
             Directory.Delete(DirectoryPath, recursive: true);
     }

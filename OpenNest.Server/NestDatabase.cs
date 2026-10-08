@@ -16,13 +16,18 @@ public sealed class NestDatabase : IDisposable
     private readonly object _sync = new();
     private readonly SqliteConnection _connection;
 
-    public NestDatabase(string databasePath)
+    public NestDatabase(string databasePath, bool pooling = true)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(databasePath));
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        _connection = new SqliteConnection($"Data Source={databasePath}");
+        // Test databases are short-lived files: disabling pooling releases Windows file handles on dispose.
+        _connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath,
+            Pooling = pooling,
+        }.ToString());
         _connection.Open();
         Execute("""
             PRAGMA journal_mode=WAL;
