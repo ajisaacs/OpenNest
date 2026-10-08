@@ -15,5 +15,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OpenNest\OpenNest.csproj" />
+    <Content Include="Fixtures\absolute-coordinate-parts.nest" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

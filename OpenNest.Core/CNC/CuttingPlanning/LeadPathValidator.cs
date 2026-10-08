@@ -90,7 +90,9 @@ public static class LeadPathValidator
                     if (ReferenceEquals(material, target))
                         continue;
                     if (CheckMaterial(material, null) != null)
-                        return new(true, false, "Lead contacts or enters another placed material.");
+                        return new(true, false, "Lead contacts or enters another placed material. "
+                            + "Try spacing the parts farther apart or reducing the lead-in/lead-out length, then replan. "
+                            + "For locked parts, edit the leads or unlock the part before replanning.");
                 }
 
                 string CheckMaterial(LeadMaterialSnapshot material, Vector? permittedJoint)

@@ -77,7 +77,14 @@ the final replay enforce them:
 With regeneration, the bounded deterministic search plans internal contour order
 and native entry candidates part by part along a whole-part order. Internal
 contours precede their own perimeter; parts remain contiguous. Backtracking can
-revisit an earlier entry when a later part cannot be reached safely.
+revisit an earlier entry when a later part cannot be reached safely. For multi-part
+requests containing regenerated holes, it first tries one ranked hole chain for
+each outside endpoint. This lets a later blocked approach change the previous
+part's departure without first exhausting combinations of its earlier holes.
+This preferred pass uses the same emitted-motion checks, shared expansion budget
+and stall limit as the retained search; on failure the full entry/hole-order
+backtracking pass remains available. Single-part and no-hole requests keep their
+existing search order.
 
 A preserved order is followed as given. Otherwise the order is an open
 travelling-salesman path over part centres from the start point: nearest neighbour,
@@ -100,6 +107,22 @@ and tab trimming happen during emission. Validation uses the actual emitted
 motions, never the nominal entry point alone. Existing lead styles are not
 shortened, disabled or substituted as a search fallback.
 
+Whole-circle candidates rank by distance to their next-cut target; for a hole,
+that is the next contour's actual pierce. They do not reward a diagonal point as
+if it were a bounding-box corner. All eight
+compass options remain available, including the four polar points at 0°, 90°,
+180° and 270°, and every alternative still passes the emitted-lead and rapid checks.
+Without a next-cut target, the arrival-based rule is unchanged. Polygon corner
+preferences are unchanged.
+
+`Round Lead-In Angles` remains an explicit cutting setting: a 90° increment snaps
+circular-hole starts to the four polar directions; 45° also permits diagonals.
+Snapping can increase reuse of identical hole subprograms and reduce output for
+posts that support that reuse, at the cost of a less direct departure. It is not
+a clearance exemption or a guaranteed file-size reduction. The planner does not
+silently enable rounding, change the increment, or bypass checks on the rounded
+motions.
+
 Every candidate rapid is checked against contours already completed, including
 earlier holes in the same part. Future contours are not yet obstacles. Rapid
 checks skip completed contours whose extents are more than 0.001 clear of the
@@ -121,12 +144,56 @@ tangent arc at a shared vertex, such as a fillet, is an ordinary joint: an exact
 contact that the native query rounds away is not uncertain at a line endpoint the
 other curve already touches, while a contact anywhere else on the line still refuses.
 
-Candidates rank by actual modeled rapid distance with stable source/contour/entry
-ordinals. Hash values and drawing names are not tie breakers. The expansion budget
+Source parts rank by modeled travel (material-centre distance at a holed-part
+boundary); within a part, preferred contour order and facing-entry rank precede
+travel. Ties use stable source/contour/entry ordinals. Hash values and drawing names are not tie breakers. The expansion budget
 counts rejected candidates and frontier ranking as well as accepted moves, before
 emission; it is not a wall-clock timeout. Callers can cancel. Exhaustion may occur
 before already-generated siblings are traversed; it returns a refusal, not an
 unranked fallback or a proof of geometric impossibility.
+
+## Automatic outside entries and look-ahead
+
+An unlocked part's outside entry is chosen automatically toward the NEXT cut: the ranker orders the native candidate
+catalogue by the facing side(s) of the next part's placed-material centre, and
+the shared lead validator certifies each emitted lead lazily until up to
+`maxEntries` feasible candidates remain. At caps of four or more, a corrective
+scan reconsiders memoized clear candidates for each missing side before evaluating
+more of the catalogue; a later side cannot lose a usable point merely because
+an earlier side's scan passed it. Replacements preserve other covered sides and
+global rank, never exceed the cap, and stop evaluating the tail once coverage
+settles. Smaller caps retain rank priority rather than promising all-side coverage.
+The next cut is the next unfinished part in a supplied order — recomputed
+after every learned-order replan — or, in the full fallback search, the nearest
+dependency-ready remaining part, stable-ordinal ties; the last part has no
+target and ranks by tier then distance to the tool's arrival. Between source
+parts the tour stays nearest-first; the look-ahead rank only orders the entries
+inside one part's contour stage, so distance sorting cannot undo the facing.
+Uncertain (numerically incomplete) validator answers are not geometric refusals:
+those candidates can fill remaining retained slots for emitted-prefix checking and
+complete replay. The total retained entry count stays within `maxEntries`. A
+part/contour with no fitting lead in its fully evaluated catalogue is reported
+as "No tested lead-in fits on part N, contour M"; budget exhaustion stays a
+budget finding and incomplete checks are never presented as geometric
+impossibility. Lead prechecks are reported separately and their requests also consume
+the shared expansion budget before native work.
+
+For a holed part, the search chooses an outside endpoint before cutting any hole.
+Each endpoint branch builds an open hole-centre route from the original arrival to
+that endpoint, using bounded nearest-neighbour, 2-opt and Or-opt improvement.
+Preferred hole entries are then resolved backward from the outside's actual emitted
+pierce, ignoring scribe marks: each hole faces the following contour's actual pierce.
+Convex corners lead the preference tiers, then straight midpoints/tangent joints,
+then native fallbacks. Reflex/cusp corners remain manual-only.
+
+This preference orders the search; it never certifies a rapid or prunes alternate
+retained entries or hole orders. A different outside endpoint recomputes its hole
+preference. Every standalone emitted prefix is replayed from the original part
+arrival and a copy of the checker from before that part, not from the previous
+prefix (which would double-consume holes and scribes). Holes are cut once, the
+outside last, and scribes once. Locked programs remain exact. A crossed preferred
+route must recover through checked backtracking or return a refusal, never unsafe
+`Ready`.
 
 Selected programs are replayed from the beginning with a fresh checker and fresh
 lead validation, without regenerating them or trusting cached search verdicts.
@@ -228,6 +295,14 @@ plans every plate that has parts. Both open one dialog built on
   whole-part order; either change replans. The settings are confirmed parameters: every
   unlocked part's lead-ins are regenerated, and locked parts keep programs that must
   already pass the checks.
+- A missing or zero-length lead-in is reported directly, rather than as a search-limit
+  failure. Open `Cutting Settings...`, choose a lead-in other than `None` with a nonzero
+  length on the affected `External`, `Internal`, or `Arc / Circle` tab, then replan.
+  Locked programs require manual lead editing or unlocking before regeneration.
+  When a lead hits another part, the finding suggests more spacing or a shorter lead;
+  when no tested entry fits, it suggests reducing lead-in length and, if neighbours
+  obstruct it, spacing the parts farther apart. These are suggestions, not guaranteed
+  fixes: replanning runs the same checks, and Apply stays blocked until every plate is ready.
 - Every plate is captured on the UI thread and checked and planned on a worker. Clean part
   material is checked for overlaps with the pre-post overlap analyzer; overlapping parts or
   an incomplete check (see [pre-post verification](post-verification.md)) block that plate
@@ -252,7 +327,10 @@ plans every plate that has parts. Both open one dialog built on
   the thread it was created on rather than to whichever context is current.
 - `PlateView` follows `Plate.PartsReordered`: it redraws parts in the plate's order (the
   numbers it draws are the cutting order), rebuilds their graphics and marks the overlap
-  check out of date.
+  check out of date. Both the editor and preview build outlines and lead paths in the
+  drawing-local frame, then apply the part placement once. Absolute (G90) programs
+  therefore follow moves and clones just like incremental (G91) programs; displaying a
+  part does not rewrite its program or coordinate mode.
 
 ## Remaining integration boundaries
 

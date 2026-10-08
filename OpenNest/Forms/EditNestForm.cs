@@ -781,19 +781,10 @@ namespace OpenNest.Forms
         {
             var plate = PlateManager.CurrentPlate;
 
-            if (plate != null)
-            {
-                plateInfoLabel.Text = string.Format(
-                    "Plate {0} of {1}  |  {2}",
-                    PlateManager.CurrentIndex + 1,
-                    PlateManager.Count,
-                    plate.Size
-                );
-            }
-            else
-            {
-                plateInfoLabel.Text = "No plates";
-            }
+            // Display-only numbering: the trailing empty new-plate sentinel is excluded from the
+            // total (and labeled as such); navigation and storage indexes are untouched.
+            plateInfoLabel.Text = PlateDisplayNumbering.FormatHeader(
+                Nest.Plates, PlateManager.CurrentIndex, plate.Size.ToString());
 
             btnFirstPlate.Enabled = !PlateManager.IsFirst;
             btnPreviousPlate.Enabled = !PlateManager.IsFirst;

@@ -202,6 +202,31 @@ public class CuttingPlanFormTests
         Assert.All(first.Parts, part => Assert.False(part.HasManualLeadIns));
     });
 
+    [Fact]
+    public void OnePlateDialog_ExcludesTheSentinelFromTheShownTotal() => RunSta(() =>
+    {
+        var (nest, view) = CreateView(Square("a", 1, 1));
+        nest.CreatePlate(); // The editor's trailing empty new-plate sentinel.
+        using var editor = view;
+        using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
+
+        Assert.StartsWith("Plate 1 of 1, numbered in cutting order:", Control<Label>(form, "previewLabel").Text);
+    });
+
+    [Fact]
+    public void SentinelActivePlate_IsLabeledNotNumberedBeyondTheTotal() => RunSta(() =>
+    {
+        var (nest, _) = CreateView(Square("a", 1, 1));
+        var sentinel = nest.CreatePlate(); // trailing empty new-plate sentinel
+        using var view = new PlateView { Plate = sentinel };
+        using var editor = view;
+        using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
+
+        var text = Control<Label>(form, "previewLabel").Text;
+        Assert.StartsWith("New plate (empty)", text);
+        Assert.DoesNotContain("Plate 2", text);
+    });
+
     private static (Nest Nest, PlateView View) CreateView(params Part[] parts)
     {
         var nest = new Nest();

@@ -239,6 +239,32 @@ namespace OpenNest.CNC.CuttingStrategy
         {
             var result = new Program(Mode.Absolute);
             EmitScribeContours(result, scribes);
+            EmitChosenContours(result, shapes, choices);
+            result.Mode = Mode.Incremental;
+            return result;
+        }
+
+        // Diagnostic seam for candidate lead validation (PreparedContours
+        // .EmitCandidateForValidation): emit a single already-validated choice with its
+        // ORIGINAL contour type — the last shape is External even when emitted alone, so a
+        // perimeter never degrades to a hole because it was isolated. Output must not be
+        // installed on a Part or accepted as a complete plan.
+        internal Program EmitCandidateIsolated(Shape[] shapes, List<Entity> scribes,
+            CuttingPlanning.ContourChoice choice)
+        {
+            var result = new Program(Mode.Absolute);
+            EmitScribeContours(result, scribes);
+            EmitChosenContours(result, shapes, new[] { choice });
+            result.Mode = Mode.Incremental;
+            return result;
+        }
+
+        // One contour per choice in order; the perimeter (last shape) is always External.
+        // Contour emission itself reads only the contour's own geometry and settings, never
+        // prior choices — the differential tests in ContourCandidateEmissionTests pin this.
+        private void EmitChosenContours(Program result, Shape[] shapes,
+            IReadOnlyList<CuttingPlanning.ContourChoice> choices)
+        {
             foreach (var choice in choices)
             {
                 var shape = shapes[choice.ContourOrdinal];
@@ -246,8 +272,6 @@ namespace OpenNest.CNC.CuttingStrategy
                     choice.ContourOrdinal == shapes.Length - 1 ? ContourType.External : null,
                     exactCirclePrograms: true);
             }
-            result.Mode = Mode.Incremental;
-            return result;
         }
 
         private void EmitRawContour(Program program, Shape shape)
@@ -636,12 +660,44 @@ namespace OpenNest.CNC.CuttingStrategy
             }
         }
 
-        private enum CornerKind
+        internal enum CornerKind
         {
             Convex,
             Reflex,
             Smooth,
             Cusp,
+        }
+
+        /// <summary>
+        /// A vertex classified for automatic start-point planning: what kind of turn the
+        /// contour makes there, and the travel tangents of the two edges it joins. Read-only
+        /// so callers cannot mutate the contour; winding is derived the same way
+        /// <see cref="EmitContour"/> derives it, so the kind matches actual emission.
+        /// </summary>
+        internal readonly record struct AutomaticCorner(CornerKind Kind, Vector TangentIn, Vector TangentOut);
+
+        /// <summary>
+        /// Classification query shared with entry planning: the turn at <paramref name="point"/>
+        /// on a closed line/arc contour, using the same corner geometry and winding derivation
+        /// as emission. False when <paramref name="point"/> is not a shared vertex of two
+        /// chainable entities (an interior point, an open contour, a degenerate or non-finite
+        /// corner). Lead generation itself is not involved.
+        /// </summary>
+        internal static bool TryClassifyAutomaticStartCorner(
+            Shape shape,
+            Vector point,
+            Entity entity,
+            out AutomaticCorner corner)
+        {
+            if (!TryGetCorner(shape, point, entity, out var raw))
+            {
+                corner = default;
+                return false;
+            }
+
+            corner = new AutomaticCorner(
+                ClassifyCorner(raw, DetermineWinding(shape)), raw.TangentIn, raw.TangentOut);
+            return true;
         }
 
         /// <summary>A contour vertex: the entity cut into it and the one cut away from it.</summary>

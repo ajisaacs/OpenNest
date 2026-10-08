@@ -39,8 +39,13 @@ internal static class CuttingPartOrder
     /// <param name="centres">One representative point per part ordinal.</param>
     /// <param name="start">The modeled tool position before the first part.</param>
     /// <param name="prerequisites">Ordinals that must come before each part; must be acyclic.</param>
+    /// <param name="endpoint">
+    /// Optional fixed final position AFTER the last visited point (an open path with a closed
+    /// terminal edge). The terminal edge joins EVERY improvement delta, not just final
+    /// scoring. Null keeps the previous whole-part open-route semantics exactly.
+    /// </param>
     internal static int[] Plan(IReadOnlyList<Vector> centres, Vector start,
-        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token)
+        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token, Vector? endpoint = null)
     {
         var count = centres.Count;
         var order = NearestNeighbour(centres, start, prerequisites, token);
@@ -48,8 +53,8 @@ internal static class CuttingPartOrder
         for (var pass = 0; pass < MaxPasses; pass++)
         {
             token.ThrowIfCancellationRequested();
-            var improved = TwoOpt(order, centres, start, prerequisites, position, token);
-            improved |= OrOpt(order, centres, start, prerequisites, position, token);
+            var improved = TwoOpt(order, centres, start, prerequisites, position, token, endpoint);
+            improved |= OrOpt(order, centres, start, prerequisites, position, token, endpoint);
             if (!improved)
                 break;
         }
@@ -90,19 +95,23 @@ internal static class CuttingPartOrder
 
     // Reverses order[i..j] when that shortens the open path and keeps every prerequisite earlier.
     private static bool TwoOpt(int[] order, IReadOnlyList<Vector> centres, Vector start,
-        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, int[] position, CancellationToken token)
+        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, int[] position, CancellationToken token,
+        Vector? endpoint = null)
     {
         var improved = false;
         var count = order.Length;
+        // The terminal edge belongs to every delta: reversing the route's tail swaps which
+        // endpoint-side centre faces the fixed final position.
+        double Tail(Vector from) => endpoint is { } e ? from.DistanceTo(e) : 0;
         for (var i = 0; i < count - 1; i++)
         {
             token.ThrowIfCancellationRequested();
             for (var j = i + 1; j < count; j++)
             {
                 var before = Point(i - 1).DistanceTo(centres[order[i]])
-                    + (j + 1 < count ? centres[order[j]].DistanceTo(centres[order[j + 1]]) : 0);
+                    + (j + 1 < count ? centres[order[j]].DistanceTo(centres[order[j + 1]]) : Tail(centres[order[j]]));
                 var after = Point(i - 1).DistanceTo(centres[order[j]])
-                    + (j + 1 < count ? centres[order[i]].DistanceTo(centres[order[j + 1]]) : 0);
+                    + (j + 1 < count ? centres[order[i]].DistanceTo(centres[order[j + 1]]) : Tail(centres[order[i]]));
                 if (after >= before - Epsilon || !CanReverse(order, i, j, prerequisites, position))
                     continue;
                 Array.Reverse(order, i, j - i + 1);
@@ -129,7 +138,8 @@ internal static class CuttingPartOrder
 
     // Moves a run of one to three parts to a later or earlier gap when that shortens the path.
     private static bool OrOpt(int[] order, IReadOnlyList<Vector> centres, Vector start,
-        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, int[] position, CancellationToken token)
+        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, int[] position, CancellationToken token,
+        Vector? endpoint = null)
     {
         var improved = false;
         var count = order.Length;
@@ -157,12 +167,15 @@ internal static class CuttingPartOrder
             }
         return improved;
 
-        // Path length between order[a] and order[b] (a == -1 is the start; b == count is the open end).
+        // Path length between order[a] and order[b] (a == -1 is the start; b == count is the open
+        // end — the fixed endpoint when one was supplied, so the terminal edge is in every delta).
         double Gap(int a, int b)
         {
-            if (b >= count || b < 0)
-                return 0;
             var from = a < 0 ? start : centres[order[a]];
+            if (b >= count)
+                return endpoint is { } e ? from.DistanceTo(e) : 0;
+            if (b < 0)
+                return 0;
             return from.DistanceTo(centres[order[b]]);
         }
     }

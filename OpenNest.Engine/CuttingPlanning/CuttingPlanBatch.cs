@@ -307,14 +307,22 @@ public sealed class CuttingPlanProposal
             yield break;
         }
 
+        var missingLead = !plate.IsRouteReady && result.Status != CuttingPlanStatus.Cancelled
+            && result.Findings.Any(f => f.Kind == PostVerificationKind.MissingLeadIn);
         yield return heading + (plate.IsRouteReady
             ? "blocked: parts overlap or could not be checked for overlap."
-            : StatusText(result.Status));
+            : missingLead ? "blocked: missing or zero-length lead-in." : StatusText(result.Status));
         foreach (var line in Limit(DescribeOverlap(plate.Overlap)))
             yield return line;
         if (plate.IsRouteReady)
             yield break;
-        if (plate.KeptCurrentOrder)
+        if (missingLead)
+        {
+            yield return "  Open Cutting Settings... and select a lead-in type other than None with "
+                + "nonzero length for the affected contour (External, Internal, or Arc / Circle), then replan.";
+            yield return "  If the affected part is locked, edit its lead-ins or unlock it before replanning.";
+        }
+        else if (plate.KeptCurrentOrder)
             yield return "  No new part order was found within the search limit, and planning with the "
                 + "current order was refused:";
         foreach (var line in Limit(result.Findings.Select(DescribeFinding)))
