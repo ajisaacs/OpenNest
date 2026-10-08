@@ -114,7 +114,7 @@ jobs:
   publish:
     if: >-
       github.repository == 'ajisaacs/OpenNest' &&
-      (github.event_name == 'release' ||
+      ((github.event_name == 'release' && github.event.release.prerelease == false) ||
        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
