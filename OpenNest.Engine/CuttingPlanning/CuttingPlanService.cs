@@ -15,9 +15,13 @@ public static class CuttingPlanService
     /// Read stable caller-owned sources once into privately owned programs and geometry.
     /// No private Plates, settings aliases, quantity updates or source subcall rebinding.
     /// </summary>
-    public static CuttingPlanSnapshot Capture(CuttingPlanRequest request, CancellationToken token = default)
+    public static CuttingPlanSnapshot Capture(CuttingPlanRequest request, CancellationToken token = default) =>
+        Capture(request, token, bestEffort: false);
+
+    internal static CuttingPlanSnapshot Capture(CuttingPlanRequest request, CancellationToken token, bool bestEffort)
     {
         var placements = new List<FixedProgramPlacement>();
+        var warnings = new List<CuttingPlanFinding>();
         Part source = null;
         int? ordinal = null;
         try
@@ -107,7 +111,11 @@ public static class CuttingPlanService
                 {
                     material = LeadMaterialSnapshot.Capture(ownedClean, location, token);
                     if (!material.IsComplete)
-                        throw new NotSupportedException(material.Reason);
+                    {
+                        if (!bestEffort)
+                            throw new NotSupportedException(material.Reason);
+                        warnings.Add(new(index, source, null, null, PostVerificationKind.Incomplete, material.Reason));
+                    }
                     if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
                         prepared = PreparedContours.Capture(ownedClean, request.ConfirmedParameters, token);
                 }
@@ -122,13 +130,16 @@ public static class CuttingPlanService
             placements[0].Execution.RapidDistanceFrom(request.StartPoint);
             source = null;
             ordinal = null;
-            var dependencies = CuttingDependencyGraph.Build(nodes, request.Plate?.BoundingBox(includeParts: false), token);
+            var dependencies = CuttingDependencyGraph.Build(nodes, request.Plate?.BoundingBox(includeParts: false), token,
+                bestEffort ? exception => warnings.Add(new(exception.Ordinal, request.Parts[exception.Ordinal],
+                    exception.Other, exception.Other is int other ? request.Parts[other] : null,
+                    PostVerificationKind.Incomplete, exception.Message)) : null);
             return new(placements, request.StartPoint, request.ExpansionBudget, regeneration: request.ConfirmedParameters != null,
                 preservePartOrder: request.PreservePartOrder, maxEntries: request.MaxEntries,
                 expansionObserver: request.ExpansionObserver, plateState: plateState,
                 ownedParameters: request.ConfirmedParameters == null ? null
                     : OwnedCuttingParameters.Copy(request.ConfirmedParameters),
-                dependencies: dependencies);
+                dependencies: dependencies, findings: warnings, bestEffort: bestEffort);
         }
         catch (OperationCanceledException)
         {
@@ -175,14 +186,15 @@ public static class CuttingPlanService
 
     // beforeInstall is the commit's install-boundary test seam.
     internal static CuttingCommitResult Apply(IEnumerable<CuttingPlanResult> results, CancellationToken token,
-        Action<Plate, Part> beforeInstall)
+        Action<Plate, Part> beforeInstall, bool acceptUnverified = false)
     {
         var plans = new List<PlateCuttingPlan>();
         foreach (var result in results ?? [])
         {
             var snapshot = result?.Snapshot;
-            if (result?.Status != CuttingPlanStatus.Ready || !result.IndependentlyReplayed
-                || snapshot?.PlateState == null || result.ProposedOrder.Count != snapshot.Placements.Count)
+            var eligible = result != null && (result.Status == CuttingPlanStatus.Ready && result.IndependentlyReplayed
+                || acceptUnverified && result.Status == CuttingPlanStatus.BestEffort);
+            if (!eligible || snapshot?.PlateState == null || result.ProposedOrder.Count != snapshot.Placements.Count)
                 return new(CuttingCommitStatus.InvalidInput,
                     "Only Ready, independently replayed plate-scoped proposals can be applied.");
             var programs = new List<PlannedPartProgram>();
@@ -211,6 +223,8 @@ public static class CuttingPlanService
             return new(CuttingPlanStatus.InvalidInput);
         if (snapshot.Failure is { } failure)
             return new(failure, findings: snapshot.Findings);
+        if (snapshot.BestEffort)
+            return BestEffortCuttingPlan.Plan(snapshot, token);
         if (snapshot.Placements.Count == 0)
             return snapshot.PlateState == null ? new(CuttingPlanStatus.InvalidInput)
                 : new(CuttingPlanStatus.Ready, independentlyReplayed: true); // Empty plate: unchanged no-op.

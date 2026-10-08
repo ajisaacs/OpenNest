@@ -25,6 +25,7 @@ partial class CuttingPlanForm
         settingsButton = new Button();
         optionsPanel = new FlowLayoutPanel();
         keepOrderCheckBox = new CheckBox();
+        acceptWarningsCheckBox = new CheckBox();
         planButton = new Button();
         split = new SplitContainer();
         previewLayout = new TableLayoutPanel();
@@ -54,13 +55,15 @@ partial class CuttingPlanForm
         layout.Controls.Add(optionsPanel, 0, 1);
         layout.Controls.Add(split, 0, 2);
         layout.Controls.Add(statusLabel, 0, 3);
-        layout.Controls.Add(buttonsPanel, 0, 4);
+        layout.Controls.Add(acceptWarningsCheckBox, 0, 4);
+        layout.Controls.Add(buttonsPanel, 0, 5);
         layout.Dock = DockStyle.Fill;
         layout.Name = "layout";
-        layout.RowCount = 5;
+        layout.RowCount = 6;
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.TabIndex = 0;
@@ -190,6 +193,16 @@ partial class CuttingPlanForm
         statusLabel.Name = "statusLabel";
         statusLabel.TabIndex = 3;
         //
+        // acceptWarningsCheckBox
+        //
+        acceptWarningsCheckBox.AutoSize = true;
+        acceptWarningsCheckBox.Dock = DockStyle.Fill;
+        acceptWarningsCheckBox.Name = "acceptWarningsCheckBox";
+        acceptWarningsCheckBox.Text = "I reviewed the warnings. Apply this unverified plan.";
+        acceptWarningsCheckBox.Visible = false;
+        acceptWarningsCheckBox.TabIndex = 4;
+        acceptWarningsCheckBox.CheckedChanged += AcceptWarningsCheckBox_CheckedChanged;
+        //
         // buttonsPanel
         //
         buttonsPanel.AutoSize = true;
@@ -199,7 +212,7 @@ partial class CuttingPlanForm
         buttonsPanel.FlowDirection = FlowDirection.RightToLeft;
         buttonsPanel.Margin = new Padding(0, 8, 0, 0);
         buttonsPanel.Name = "buttonsPanel";
-        buttonsPanel.TabIndex = 4;
+        buttonsPanel.TabIndex = 5;
         buttonsPanel.WrapContents = false;
         //
         // applyButton
@@ -264,6 +277,7 @@ partial class CuttingPlanForm
     private Button settingsButton;
     private FlowLayoutPanel optionsPanel;
     private CheckBox keepOrderCheckBox;
+    private CheckBox acceptWarningsCheckBox;
     private Button planButton;
     private SplitContainer split;
     private TableLayoutPanel previewLayout;

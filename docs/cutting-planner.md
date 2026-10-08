@@ -219,7 +219,9 @@ against owned clean material. Neither mode certifies final NC, production cuttin
 readiness or physical machine safety.
 
 Findings and source ordinals use the original zero-based source list, not proposed
-sequence positions. A non-ready result contains no proposed order or unsafe fallback.
+sequence positions. Strict service refusals contain no proposed order. The desktop batch may
+produce a separate `BestEffort` proposal as described below; it never labels it `Ready` or
+sets `IndependentlyReplayed`.
 
 - `ConstraintConflict`: fixed programs or explored fixed routing violate the
   modeled constraints. Locked internal crossings cannot be repaired by regeneration.
@@ -293,8 +295,8 @@ plans every plate that has parts. Both open one dialog built on
 - The dialog starts from the plate's cutting settings (or the last-used settings) and plans
   at once. `Cutting Settings...` edits them and `Keep the current part order` fixes the
   whole-part order; either change replans. The settings are confirmed parameters: every
-  unlocked part's lead-ins are regenerated, and locked parts keep programs that must
-  already pass the checks.
+  unlocked part's lead-ins are regenerated. Locked parts keep their exact programs;
+  the strict route checks them, while any best-effort warnings require explicit review below.
 - A missing or zero-length lead-in is reported directly, rather than as a search-limit
   failure. Open `Cutting Settings...`, choose a lead-in other than `None` with a nonzero
   length on the affected `External`, `Internal`, or `Arc / Circle` tab, then replan.
@@ -302,11 +304,12 @@ plans every plate that has parts. Both open one dialog built on
   When a lead hits another part, the finding suggests more spacing or a shorter lead;
   when no tested entry fits, it suggests reducing lead-in length and, if neighbours
   obstruct it, spacing the parts farther apart. These are suggestions, not guaranteed
-  fixes: replanning runs the same checks, and Apply stays blocked until every plate is ready.
+  fixes: replanning runs the same strict checks; an unverified fallback requires
+  separate warning acceptance and is not approval to post or cut.
 - Every plate is captured on the UI thread and checked and planned on a worker. Clean part
-  material is checked for overlaps with the pre-post overlap analyzer; overlapping parts or
-  an incomplete check (see [pre-post verification](post-verification.md)) block that plate
-  whatever its route. A free-order search that ends
+  material is checked for overlaps with the pre-post overlap analyzer; known overlapping parts
+  still block that plate whatever its route. Incomplete checks remain visible warnings, never
+  a clear result (see [pre-post verification](post-verification.md)). A free-order search that ends
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
@@ -314,11 +317,13 @@ plans every plate that has parts. Both open one dialog built on
   with their status and findings. Finding part numbers are the plate's current order, as the
   editor numbers them. The preview shows the active plate detached from the nest (quantity
   zero, so drawing quantities do not change) in the proposed order with the proposed
-  programs. It is shown only for a ready plate that still matches what was planned: a
-  refused plate may hold program graphs that are unsafe to copy, and a changed one would
-  draw replayed programs at poses that were never checked.
-- Apply is enabled only when every plate is ready, and it is all or nothing through
-  `CuttingPlanService.Apply`. After it applies, each plate keeps its own copy of the
+  programs. Ready and best-effort proposals can be previewed only while the plate still
+  matches capture. Best-effort previews are labelled `UNVERIFIED`. Refused program graphs
+  are never copied, and changed plates require replanning.
+- Apply requires usable output for every plate and remains all or nothing. A ready batch
+  can apply immediately; an unverified batch requires the unchecked, per-proposal
+  `I reviewed the warnings. Apply this unverified plan.` checkbox. Replanning clears it.
+  Both use the same owned-program, freshness and rollback boundary. After it applies, each plate keeps its own copy of the
   confirmed settings, which also become the saved defaults. `Stale` keeps the dialog open
   and asks for a replan; nothing changes.
 - Closing or cancelling while planning cancels the worker and keeps the dialog open until
@@ -331,6 +336,31 @@ plans every plate that has parts. Both open one dialog built on
   drawing-local frame, then apply the part placement once. Absolute (G90) programs
   therefore follow moves and clones just like incremental (G91) programs; displaying a
   part does not rewrite its program or coordinate mode.
+
+### Best-effort fallback for imperfect geometry
+
+When strict planning reports unsupported or incomplete geometry, the desktop batch
+automatically attempts a bounded, deterministic best-effort proposal. Touching, intersecting
+or numerically uncertain material boundaries need not prevent lead-in generation when their
+closed executable contours are readable. The fallback reuses the existing contour emitter:
+internal contours first, the largest bounding perimeter last, nearest entry from the preceding
+departure, with the confirmed lead styles. It retains source part order except to satisfy
+proven cutoff and nested-part prerequisites. `Keep the current part order` still refuses an
+order that contradicts a proven prerequisite. Uncertain containment is named as a warning.
+
+No source contours are repaired, removed, simplified, or silently closed. Locked programs
+and cutoffs remain exact. Unknown/null/recursive instruction graphs, suppressed or nonfinite
+motions and contours the emitter cannot represent still refuse. This fallback is for
+incomplete geometry checks, not every constraint conflict or exhausted search. Known
+inter-part material overlap still blocks the entire batch.
+
+The result retains strict refusal findings and available rapid-check findings, and is
+explicitly not a certificate of lead clearance, rapid travel or material containment.
+Inspect the preview and warnings before accepting it. A route with only an incomplete
+overlap check may likewise be accepted with warnings. `CanApply` and parameterless batch
+`Apply()` remain strict; `CanApplyWithWarnings` and `Apply(acceptWarnings: true)` are the
+explicit review path. `CuttingPlanService.Apply` still rejects best-effort results directly.
+Acceptance never skips the separate pre-post checks or grants posting consent.
 
 ## Remaining integration boundaries
 

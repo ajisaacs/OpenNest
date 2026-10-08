@@ -76,7 +76,7 @@ internal sealed class CuttingDependencyGraph
     }
 
     internal static CuttingDependencyGraph Build(IReadOnlyList<DependencyNode> nodes, Box plate,
-        CancellationToken token)
+        CancellationToken token, Action<CuttingDependencyException> uncertain = null)
     {
         var edges = nodes.Select(_ => new SortedSet<int>()).ToArray();
         for (var cut = 0; cut < nodes.Count; cut++)
@@ -98,9 +98,24 @@ internal sealed class CuttingDependencyGraph
                 token.ThrowIfCancellationRequested();
                 // Bounds only select candidates; containment itself is proven on native material.
                 if (inner != host && !nodes[inner].IsCutOff && !nodes[host].IsCutOff
-                    && Within(nodes[inner].CleanBounds, nodes[host].HostBounds)
-                    && InsideCutout(nodes, inner, host, token))
-                    edges[host].Add(inner);
+                    && Within(nodes[inner].CleanBounds, nodes[host].HostBounds))
+                {
+                    try
+                    {
+                        if (InsideCutout(nodes, inner, host, token))
+                            edges[host].Add(inner);
+                    }
+                    catch (CuttingDependencyException exception) when (uncertain != null
+                        && exception.Status == CuttingPlanStatus.UnsupportedGeometry)
+                    {
+                        uncertain(exception);
+                    }
+                    catch (Exception exception) when (uncertain != null
+                        && exception is ArgumentException or NotSupportedException)
+                    {
+                        uncertain(Ambiguous(inner, host, exception.Message));
+                    }
+                }
             }
         var graph = new CuttingDependencyGraph(edges.Select(e => e.ToArray()).ToArray());
         if (graph.FindCycle() is { } cyclic)
