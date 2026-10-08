@@ -57,6 +57,8 @@ public partial class CuttingPlanForm : Form
         this.isOperationBusy = isOperationBusy;
         unit = UnitsHelper.GetShortString(nest.Units);
         InitializeComponent();
+        // Best-effort acceptance must be able to display every warning, even on large jobs.
+        summaryBox.MaxLength = int.MaxValue;
         // Captured once: when Application.DoEvents ends the outermost message loop, WinForms
         // uninstalls its ambient context, so progress and results must not depend on whichever
         // context is current when planning starts.

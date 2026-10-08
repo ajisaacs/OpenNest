@@ -343,10 +343,10 @@ public sealed class CuttingPlanProposal
         {
             yield return heading + $"best-effort, unverified. {Count(plate.PartCount, "part")}, "
                 + $"{plate.RegeneratedCount} regenerated; review lead-ins and cutting order.";
-            foreach (var line in Limit(DescribeOverlap(plate.Overlap)))
-                yield return line;
-            foreach (var line in Limit(result.Findings.Select(DescribeFinding)))
-                yield return line;
+            // Unverified Apply requires the operator to see every finding, not just a
+            // bounded diagnostic summary that hides later parts behind "... and N more".
+            foreach (var line in DescribeOverlap(plate.Overlap).Concat(result.Findings.Select(DescribeFinding)))
+                yield return "  - " + line;
             yield break;
         }
 

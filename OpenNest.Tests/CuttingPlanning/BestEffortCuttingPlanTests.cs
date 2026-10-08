@@ -26,6 +26,25 @@ public class BestEffortCuttingPlanTests
     }
 
     [Fact]
+    public void UnverifiedSummary_ShowsEveryWarningBeforeAcceptance()
+    {
+        var parts = Enumerable.Range(0, 6).Select(index =>
+        {
+            var part = TouchingContours();
+            part.Offset(index * 12, 0);
+            return part;
+        }).ToArray();
+        var proposal = CuttingPlanBatch.Capture([Plate(parts)], ExplicitContourTests.Parameters(), false).Plan();
+        Assert.True(proposal.RequiresWarningAcceptance);
+        var findings = Assert.Single(proposal.Plates).Result.Findings.ToArray();
+        Assert.True(findings.Length > 5);
+        Assert.Contains(findings, finding => finding.SourceOrdinal == 5);
+        var summary = string.Join("\n", proposal.Describe("in"));
+        Assert.Contains("Part 6", summary);
+        Assert.DoesNotContain("... and", summary);
+    }
+
+    [Fact]
     public void AcceptWarnings_InstallsOwnedProgramsAndLeavesStrictApplyClosed()
     {
         var part = TouchingContours();

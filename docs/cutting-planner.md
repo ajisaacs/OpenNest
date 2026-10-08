@@ -314,7 +314,9 @@ plans every plate that has parts. Both open one dialog built on
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
 - The summary lists every plate: ready plates with part counts and rapid travel, others
-  with their status and findings. Finding part numbers are the plate's current order, as the
+  with their status and findings. Unverified proposals show every overlap and route
+  warning in the scrollable summary before the acceptance checkbox is used; they do
+  not truncate later parts' warnings. Finding part numbers are the plate's current order, as the
   editor numbers them. The preview shows the active plate detached from the nest (quantity
   zero, so drawing quantities do not change) in the proposed order with the proposed
   programs. Ready and best-effort proposals can be previewed only while the plate still
