@@ -18,6 +18,7 @@ namespace OpenNest
             ["Classic"] = BuildClassic(),
             ["Pastel"] = BuildPastel(),
             ["Dark"] = BuildDark(),
+            ["Workshop"] = BuildWorkshop(),
         };
 
         private static List<ColorScheme> diskCache;
@@ -64,13 +65,18 @@ namespace OpenNest
             d.EdgeSpacingColor = scheme.EdgeSpacingColor;
             d.PreviewPartColor = scheme.PreviewPartColor;
             d.PartColors = scheme.PartColors;
+            d.UseGoldenAngleColors = scheme.UseGoldenAngleColors;
+            d.PartOutlineColor = scheme.PartOutlineColor;
+            d.SelectedPartColor = scheme.SelectedPartColor;
+            d.EtchColor = scheme.EtchColor;
 
             Drawing.PartColors = scheme.PartColors;
+            Drawing.UseGoldenAngleColors = scheme.UseGoldenAngleColors;
 
-            RecolorOpenNests(scheme.PartColors);
+            RecolorOpenNests();
         }
 
-        private static void RecolorOpenNests(Color[] palette)
+        private static void RecolorOpenNests()
         {
             foreach (Form f in Application.OpenForms)
             {
@@ -82,7 +88,7 @@ namespace OpenNest
                 {
                     if (drawing.IsCutOff)
                         continue;
-                    drawing.Color = palette[i % palette.Length];
+                    drawing.Color = Drawing.GetPartColor(i);
                     i++;
                 }
             }
@@ -109,6 +115,25 @@ namespace OpenNest
                     yield return scheme;
             }
         }
+
+        private static ColorScheme BuildWorkshop() =>
+            new ColorScheme
+            {
+                Name = "Workshop",
+                BackgroundColor = Color.FromArgb(205, 208, 212),
+                LayoutOutlineColor = Color.FromArgb(145, 150, 156),
+                LayoutFillColor = Color.FromArgb(242, 242, 242),
+                BoundingBoxColor = Color.FromArgb(95, 125, 155),
+                RapidColor = Color.FromArgb(65, 115, 165),
+                OriginColor = Color.FromArgb(110, 115, 120),
+                EdgeSpacingColor = Color.FromArgb(185, 190, 196),
+                PreviewPartColor = Color.FromArgb(100, 145, 180),
+                PartOutlineColor = Color.FromArgb(48, 48, 48),
+                EtchColor = Color.Lime,
+                UseGoldenAngleColors = true,
+                // Samples for previews/legacy consumers; assignment uses the full index.
+                PartColors = Enumerable.Range(0, 12).Select(PartColorPalette.GoldenAngle).ToArray(),
+            };
 
         private static ColorScheme BuildClassic() =>
             new ColorScheme

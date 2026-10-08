@@ -39,6 +39,33 @@ namespace OpenNest
             return path;
         }
 
+        public static void GetDisplayPaths(
+            this Program pgm,
+            Vector origin,
+            out GraphicsPath cutPath,
+            out GraphicsPath leadPath,
+            out GraphicsPath etchPath
+        )
+        {
+            cutPath = GetLayerPath(pgm, origin,
+                layer => layer != LayerType.Scribe && layer != LayerType.Leadin && layer != LayerType.Leadout);
+            leadPath = GetLayerPath(pgm, origin,
+                layer => layer == LayerType.Leadin || layer == LayerType.Leadout);
+            etchPath = GetLayerPath(pgm, origin, layer => layer == LayerType.Scribe);
+        }
+
+        private static GraphicsPath GetLayerPath(Program pgm, Vector origin, System.Func<LayerType, bool> includeLayer)
+        {
+            var path = new GraphicsPath();
+            var position = Vector.Zero;
+            AddProgram(path, pgm, pgm.Mode, ref position, includeLayer);
+            // Place the completed local path; absolute moves must not discard placement.
+            using var translation = new Matrix();
+            translation.Translate((float)origin.X, (float)origin.Y);
+            path.Transform(translation);
+            return path;
+        }
+
         public static Image GetImage(this Program pgm, System.Drawing.Size size)
         {
             return pgm.GetImage(size, Pens.Black, null);
@@ -57,26 +84,34 @@ namespace OpenNest
         )
         {
             var img = new Bitmap(size.Width, size.Height);
-            var path = pgm.GetGraphicsPath();
-            var bounds = path.GetBounds();
+            pgm.GetDisplayPaths(Vector.Zero, out var cuts, out var leads, out var etches);
+            using var path = cuts;
+            using var leadPath = leads;
+            using var etchPath = etches;
+            var bounds = path.PointCount > 0 ? path.GetBounds() : etchPath.GetBounds();
+            if (path.PointCount > 0 && etchPath.PointCount > 0)
+                bounds = RectangleF.Union(bounds, etchPath.GetBounds());
 
-            var scalex = (size.Height - 10) / bounds.Height;
-            var scaley = (size.Width - 10) / bounds.Width;
+            var scalex = (size.Height - 10) / System.Math.Max(bounds.Height, 0.001f);
+            var scaley = (size.Width - 10) / System.Math.Max(bounds.Width, 0.001f);
             var scale = scalex < scaley ? scalex : scaley;
 
-            var matrix = new Matrix();
+            using var matrix = new Matrix();
             matrix.Scale(scale, -scale);
 
             path.Transform(matrix);
+            etchPath.Transform(matrix);
 
-            bounds = path.GetBounds();
+            bounds = path.PointCount > 0 ? path.GetBounds() : etchPath.GetBounds();
+            if (path.PointCount > 0 && etchPath.PointCount > 0)
+                bounds = RectangleF.Union(bounds, etchPath.GetBounds());
 
             var offset = new PointF(
                 (size.Width - bounds.Width) * 0.5f - bounds.X,
                 (size.Height - bounds.Height) * 0.5f - bounds.Y
             );
 
-            var graphics = Graphics.FromImage(img);
+            using var graphics = Graphics.FromImage(img);
             graphics.TranslateTransform(offset.X, offset.Y);
 
             if (brush != null)
@@ -85,10 +120,10 @@ namespace OpenNest
             if (pen == null)
                 pen = Pens.Black;
 
+            using var etchPen = new Pen(ColorScheme.Default.EtchColor, 1.5f);
+            graphics.DrawPath(etchPen, etchPath);
+            // A coincident cut must remain visible over an etch.
             graphics.DrawPath(pen, path);
-
-            matrix.Dispose();
-            graphics.Dispose();
 
             return img;
         }
@@ -282,7 +317,8 @@ namespace OpenNest
             curpos = pt;
         }
 
-        private static void AddProgram(GraphicsPath path, Program pgm, Mode mode, ref Vector curpos)
+        private static void AddProgram(GraphicsPath path, Program pgm, Mode mode, ref Vector curpos,
+            System.Func<LayerType, bool> includeLayer = null)
         {
             // Capture the frame origin at entry. Sub-program Offsets are relative
             // to this fixed origin, not to the current tool position.
@@ -309,7 +345,9 @@ namespace OpenNest
                     case CodeType.ArcMove:
                         {
                             var arc = (ArcMove)code;
-                            if (arc.Layer != LayerType.Leadin && arc.Layer != LayerType.Leadout)
+                            if (includeLayer == null
+                                ? arc.Layer != LayerType.Leadin && arc.Layer != LayerType.Leadout
+                                : !arc.Suppressed && includeLayer(arc.Layer))
                             {
                                 if (currentFigure == null)
                                     currentFigure = new GraphicsPath();
@@ -329,7 +367,9 @@ namespace OpenNest
                     case CodeType.LinearMove:
                         {
                             var line = (LinearMove)code;
-                            if (line.Layer != LayerType.Leadin && line.Layer != LayerType.Leadout)
+                            if (includeLayer == null
+                                ? line.Layer != LayerType.Leadin && line.Layer != LayerType.Leadout
+                                : !line.Suppressed && includeLayer(line.Layer))
                             {
                                 if (currentFigure == null)
                                     currentFigure = new GraphicsPath();
@@ -372,7 +412,7 @@ namespace OpenNest
                                     frameOrigin.X + subpgm.Offset.X,
                                     frameOrigin.Y + subpgm.Offset.Y
                                 );
-                                AddProgram(path, subpgm.Program, mode, ref curpos);
+                                AddProgram(path, subpgm.Program, mode, ref curpos, includeLayer);
                             }
 
                             mode = tmpmode;

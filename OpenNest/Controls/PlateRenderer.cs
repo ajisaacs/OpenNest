@@ -118,10 +118,7 @@ namespace OpenNest.Controls
                 if (part.IsDirty)
                     part.Update(view);
 
-                var path = part.Path;
-                var pathBounds = path.GetBounds();
-
-                if (!pathBounds.IntersectsWith(viewBounds))
+                if (!part.DisplayBounds.IntersectsWith(viewBounds))
                     continue;
 
                 part.Draw(g, (i + 1).ToString());
@@ -142,10 +139,11 @@ namespace OpenNest.Controls
                     part.Update(view);
 
                 var path = part.Path;
-                if (!path.GetBounds().IntersectsWith(viewBounds))
+                if (!part.DisplayBounds.IntersectsWith(viewBounds))
                     continue;
 
                 g.FillPath(previewBrush, path);
+                part.DrawEtch(g);
                 g.DrawPath(previewPen, path);
             }
 

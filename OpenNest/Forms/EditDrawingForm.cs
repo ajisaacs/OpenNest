@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace OpenNest.Forms
@@ -45,7 +45,8 @@ namespace OpenNest.Forms
         private void UpdateImage()
         {
             var brush = new SolidBrush(colorDialog1.Color);
-            var pen = new Pen(ControlPaint.Dark(colorDialog1.Color));
+            var pen = new Pen(ColorScheme.Default.GetPartOutlineColor(colorDialog1.Color));
+            DrawingImage?.Dispose();
             DrawingImage = drawing.Program.GetImage(pictureBox1.Size, pen, brush);
 
             pen.Dispose();
