@@ -133,7 +133,10 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter FullyQualifiedName~Rep
 The writer tests read page sizes and content streams with PDFsharp. Text
 assertions use Poppler's `pdftotext -bbox` coordinates to rebuild visual rows;
 `-layout` can return columns in a different order on Windows. They are skipped,
-not passed, when poppler-utils is absent. For manual inspection also use `pdfinfo`,
+not passed, when poppler-utils is absent. The Windows release workflow installs
+an SHA-256-pinned Poppler binary because the runner's built-in `pdftotext` lacks
+`-bbox`; no PDF text test is skipped for that reason in a release candidate.
+For manual inspection also use `pdfinfo`,
 `pdffonts` and `pdftoppm -png` (Linux verification baseline: poppler-utils
 24.02.0). Confirm page sizes, quantity rows, page X of Y, embedded fonts, native
 vector curves, unfilled holes and visible tab gaps with no connecting stroke.

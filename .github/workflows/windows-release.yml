@@ -49,6 +49,20 @@ jobs:
         run: |
           dotnet build OpenNest.sln -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Solution build failed.' }
+      - name: Install pinned Poppler for PDF report tests
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'poppler-26.09.0.zip'
+          Invoke-WebRequest 'https://github.com/oschwartz10612/poppler-windows/releases/download/v26.09.0-0/Release-26.09.0-0.zip' -OutFile $zip
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne '7a6f256a0ddf7536182246a5733331bf4677cbcc34f4663774947ad34556c8d0') { throw 'Poppler archive hash mismatch.' }
+          $destination = Join-Path $env:RUNNER_TEMP 'poppler-release-tests'
+          Expand-Archive $zip -DestinationPath $destination
+          $bin = Join-Path $destination 'poppler-26.09.0/Library/bin'
+          $tool = Join-Path $bin 'pdftotext.exe'
+          if (-not (Test-Path $tool)) { throw 'Pinned pdftotext.exe is missing.' }
+          & $tool -v
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned pdftotext.exe cannot start.' }
+          $bin >> $env:GITHUB_PATH
       - name: Run all test projects on Windows
         # A test silent for 5 minutes is killed and named in the log, with a
         # mini dump in TestResults, instead of holding the runner until the

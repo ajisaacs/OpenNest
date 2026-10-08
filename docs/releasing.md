@@ -15,7 +15,9 @@ pulls from GitHub every hour; it refuses pushes.
    runner. It builds the solution, runs all six test projects in Release and
    the main test project in Debug, then packages and smoke-tests the desktop app.
    A test that is silent for five minutes is killed and named in the log, with a
-   mini dump in the uploaded `windows-test-results` artifact.
+   mini dump in the uploaded `windows-test-results` artifact. The release job
+   installs a SHA-256-pinned Poppler Windows binary for PDF text/column tests;
+   the runner's older `pdftotext` lacks the required `-bbox` option.
    Optional local/proprietary fixture and opt-in measurement tests may skip;
    inspect the uploaded TRX files rather than treating skips as passes.
 4. Download the `OpenNest-X.Y.Z-win-x64` artifact and verify its `.sha256`.
