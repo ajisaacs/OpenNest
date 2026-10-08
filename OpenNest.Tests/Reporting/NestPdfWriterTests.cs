@@ -44,6 +44,8 @@ public sealed class NestPdfWriterTests : IDisposable
             File.Copy(path, Path.Combine(results, "pdf-report-text-diagnostic.pdf"), overwrite: true);
         }
         var summary = ReportPdf.Text(path, 1);
+        if (OperatingSystem.IsWindows() && Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
+            File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("GITHUB_WORKSPACE")!, "TestResults", "pdf-report-text-windows.txt"), summary);
         var plate = ReportPdf.Text(path, 2);
 
         Assert.Contains("Report test job", summary);
