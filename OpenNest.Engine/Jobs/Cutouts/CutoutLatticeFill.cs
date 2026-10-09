@@ -36,6 +36,9 @@ internal static class CutoutLatticeFill
     private const double Margin = FlattenTolerance + 0.001;
 
     private const int Precision = NestTolerances.ClipperPrecision;
+    // Fill materializes an entire grid before quantity trimming. Bound work even for a
+    // tiny insert with demand of only three, rather than allocating millions of clones.
+    private const int MaxLatticePositions = 1000;
 
     /// <summary>Returns up to <paramref name="maxQuantity"/> insert poses inside the cutout,
     /// or none when no copy fits.</summary>
@@ -45,9 +48,17 @@ internal static class CutoutLatticeFill
 
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
         NestJobPart insert, int maxQuantity, double spacing, int shiftSteps, CancellationToken token)
+        => Fill(frame, cutoutIndex, insert, maxQuantity, spacing, shiftSteps,
+            Array.Empty<(JobPartGeometry Geometry, NestJobPlacement Pose)>(), token);
+
+    internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
+        NestJobPart insert, int maxQuantity, double spacing, int shiftSteps,
+        IReadOnlyList<(JobPartGeometry Geometry, NestJobPlacement Pose)> occupied, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(insert);
+        ArgumentNullException.ThrowIfNull(occupied);
+        token.ThrowIfCancellationRequested();
         ArgumentOutOfRangeException.ThrowIfNegative(shiftSteps);
         if (maxQuantity <= 0 || !double.IsFinite(spacing) || spacing < 0)
             return Array.Empty<NestJobPlacement>();
@@ -69,6 +80,10 @@ internal static class CutoutLatticeFill
         var bounds = cutout.BoundingBox;
         var insertBounds = insertGeometry.Bounds;
         var step = System.Math.Max(insertBounds.Length, insertBounds.Width) + spacing;
+        var estimated = (System.Math.Ceiling(bounds.Length / step) + 4)
+            * (System.Math.Ceiling(bounds.Width / step) + 4);
+        if (!(step > 0) || !double.IsFinite(estimated) || estimated > MaxLatticePositions)
+            return Array.Empty<NestJobPlacement>();
 
         var lattice = Lattice(insert, bounds, step, spacing, token);
         if (lattice.Count == 0)
@@ -83,7 +98,8 @@ internal static class CutoutLatticeFill
             {
                 token.ThrowIfCancellationRequested();
                 var (dx, dy) = Shift(step, shiftSteps, i, j);
-                var count = lattice.Count(p => Inside(regions[p.Rotation], p.X + dx, p.Y + dy));
+                var count = lattice.Count(p => Inside(regions[p.Rotation], p.X + dx, p.Y + dy)
+                    && ClearsOccupied(p, dx, dy));
                 if (Better(count, i, j, best))
                     best = (count, i, j);
             }
@@ -91,13 +107,33 @@ internal static class CutoutLatticeFill
             return Array.Empty<NestJobPlacement>();
 
         var (sx, sy) = Shift(step, shiftSteps, best.I, best.J);
-        var kept = lattice.Where(p => Inside(regions[p.Rotation], p.X + sx, p.Y + sy))
+        var kept = lattice.Where(p => Inside(regions[p.Rotation], p.X + sx, p.Y + sy)
+                && ClearsOccupied(p, sx, sy))
             .Select(p => new NestJobPlacement(insert.Id, 0, System.Math.Round(p.X + sx, 8),
                 System.Math.Round(p.Y + sy, 8), p.Rotation))
             .OrderBy(p => p.Y).ThenBy(p => p.X).ThenBy(p => p.Rotation)
             .ToList();
         return Certify(frame.Id, frameGeometry, insertGeometry, kept, spacing, token).Take(maxQuantity)
             .Select((p, index) => p with { InstanceIndex = index }).ToArray();
+
+        bool ClearsOccupied(NestJobPlacement pose, double dx, double dy)
+        {
+            token.ThrowIfCancellationRequested();
+            if (occupied.Count == 0)
+                return true;
+            var moved = pose with
+            {
+                X = System.Math.Round(pose.X + dx, 8),
+                Y = System.Math.Round(pose.Y + dy, 8)
+            };
+            foreach (var other in occupied)
+            {
+                token.ThrowIfCancellationRequested();
+                if (!NestLayoutCheck.Clears(other.Geometry, other.Pose, insertGeometry, moved, spacing))
+                    return false;
+            }
+            return true;
+        }
     }
 
     /// <summary>Fill over the cutout's bounds grown by one step on every side, in frame

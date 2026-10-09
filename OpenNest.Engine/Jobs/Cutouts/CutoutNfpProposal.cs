@@ -20,10 +20,18 @@ internal static class CutoutNfpProposal
     /// <summary>Returns one frame-local pose inside a closed cutout, or null if no pose is certified.
     /// A null result is not a proof that the insert cannot fit elsewhere in this cutout.</summary>
     internal static NestJobPlacement? Find(NestJobPart frame, int cutoutIndex, NestJobPart insert,
-        double spacing, CancellationToken token = default)
+        double spacing, CancellationToken token = default) =>
+        Find(frame, cutoutIndex, insert, spacing,
+            Array.Empty<(JobPartGeometry Geometry, NestJobPlacement Pose)>(), token);
+
+    /// <summary>Find a pose clearing already accepted inserts as well as the enclosing frame.</summary>
+    internal static NestJobPlacement? Find(NestJobPart frame, int cutoutIndex, NestJobPart insert,
+        double spacing, IReadOnlyList<(JobPartGeometry Geometry, NestJobPlacement Pose)> occupied,
+        CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(insert);
+        ArgumentNullException.ThrowIfNull(occupied);
         token.ThrowIfCancellationRequested();
         if (!double.IsFinite(spacing) || spacing < 0 || spacing > MaxSpacing)
             return null;
@@ -55,7 +63,19 @@ internal static class CutoutNfpProposal
                 if (!CutoutLatticeFill.Inside(region, x, y))
                     continue;
                 var pose = new NestJobPlacement(insert.Id, 0, x, y, rotation);
-                if (NestLayoutCheck.Clears(frameGeometry, framePose, insertGeometry, pose, spacing))
+                if (!NestLayoutCheck.Clears(frameGeometry, framePose, insertGeometry, pose, spacing))
+                    continue;
+                var clears = true;
+                foreach (var other in occupied)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (NestLayoutCheck.Clears(other.Geometry, other.Pose, insertGeometry, pose, spacing))
+                        continue;
+                    clears = false;
+                    break;
+                }
+                token.ThrowIfCancellationRequested();
+                if (clears)
                     return pose;
             }
         }
@@ -81,6 +101,12 @@ internal static class CutoutNfpProposal
             yield return (cx, cy);
             foreach (var point in path)
                 yield return (point.x * 0.99 + cx * 0.01, point.y * 0.99 + cy * 0.01);
+            // Bounded interior samples let a residual insert land beside a partial lattice;
+            // a center/vertex-only sample often lands directly on an earlier copy.
+            for (var y = 1; y <= 9; y++)
+                for (var x = 1; x <= 9; x++)
+                    yield return (bounds.left + (bounds.right - bounds.left) * x / 10,
+                        bounds.top + (bounds.bottom - bounds.top) * y / 10);
         }
     }
 }

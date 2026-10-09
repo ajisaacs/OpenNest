@@ -83,6 +83,16 @@ layout check uses. The method suits many small copies in a large cutout; a few l
 meant for no-fit-polygon placement. Fill can return different, equally scored lattices on repeated
 calls for some parts, so results are not yet guaranteed identical between runs.
 
+The internal `CutoutRouter` can propose copies from the shifted lattice, then search bounded
+inner-fit/NFP sample points for remaining copies and other insert requirements. It keeps
+original requirement IDs, reindexes accepted copies and checks clearance against the frame
+and every previously accepted insert. Lattice shifts account for occupied poses before
+quantity trimming; a pre-fill work limit declines giant grids and lets bounded NFP sampling
+try instead. A null NFP proposal is not proof of geometric impossibility. No material-area
+ratio cutoff is enabled: the proposed 0.10/0.20 routing thresholds still need measured
+neutral and sanitized-job evidence. The router has no pipeline caller and does not change
+stock, live demand, cutting order or posting safety; in-hole production use remains held.
+
 ## Renamed engines
 
 The registry maps names used by earlier releases (the first two shipped as plug-ins) so saved
