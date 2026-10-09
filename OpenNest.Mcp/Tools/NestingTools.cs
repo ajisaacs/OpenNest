@@ -334,6 +334,114 @@ namespace OpenNest.Mcp.Tools
             return sb.ToString();
         }
 
+        [McpServerTool(Name = "autonest_job")]
+        [Description("Complete requested drawing quantities across as many matching sheets as needed. The selected empty plate is the stock template; by default new sheets may be added. An incomplete or invalid proposal changes nothing.")]
+        public string AutoNestJob(
+            [Description("Index of an empty plate to use as the stock template")] int plateIndex,
+            [Description("Comma-separated drawing names")] string drawingNames,
+            [Description("Comma-separated total requested quantities for the entire session")] string quantities,
+            [Description(JobEngines)] string engine = null,
+            [Description("Use only already-created empty plates with matching dimensions and spacing; do not add sheets")] bool no_new_plates = false,
+            CancellationToken cancellationToken = default
+        )
+        {
+            var template = _session.GetPlate(plateIndex);
+            if (template == null)
+                return $"Error: plate {plateIndex} not found";
+            if (template.Parts.Count != 0 || template.CutOffs.Count != 0)
+                return "Error: stock template must be empty and have no cutoff definitions. Nothing committed.";
+            if (string.IsNullOrWhiteSpace(drawingNames) || string.IsNullOrWhiteSpace(quantities))
+                return "Error: drawingNames and quantities are required";
+            var parsed = ParseItems(drawingNames, quantities);
+            if (parsed.error != null)
+                return parsed.error;
+            if (parsed.items.Any(item => item.Quantity <= 0))
+                return "Error: whole-job quantities must be positive";
+
+            var existing = _session.AllPlates();
+            if (existing.Any(p => p.Parts.Count > 0 && p.Quantity <= 0))
+                return "Error: an occupied plate has a nonpositive quantity. Nothing committed.";
+            var remaining = new List<NestItem>(parsed.items.Count);
+            var counts = new Dictionary<Drawing, long>(ReferenceEqualityComparer.Instance);
+            foreach (var item in parsed.items)
+            {
+                var nested = existing.Sum(p => (long)p.Parts.Count(part => ReferenceEquals(part.BaseDrawing, item.Drawing)) * p.Quantity);
+                if (nested > item.Quantity)
+                    return $"Error: drawing '{item.Drawing.Name}' already exceeds requested quantity ({nested} > {item.Quantity}). Nothing committed.";
+                counts[item.Drawing] = nested;
+                if (nested < item.Quantity)
+                    remaining.Add(new NestItem { Drawing = item.Drawing, Quantity = (int)(item.Quantity - nested), Priority = item.Priority });
+            }
+            if (remaining.Count == 0)
+                return "Job already complete: all requested quantities are present. Nothing committed.";
+
+            var available = new List<Plate> { template };
+            available.AddRange(existing.Where(p => !ReferenceEquals(p, template)
+                && p.Parts.Count == 0 && p.CutOffs.Count == 0 && SameStock(p, template)));
+            var demand = remaining.Sum(item => (long)item.Quantity);
+            if (demand > int.MaxValue)
+                return "Error: total remaining demand exceeds the supported sheet limit. Nothing committed.";
+            var limit = no_new_plates ? System.Math.Min(available.Count, (int)demand) : (int)demand;
+            var engineName = string.IsNullOrWhiteSpace(engine) ? _session.DefaultEngineName : engine.Trim();
+            NestPipelineResult result;
+            try
+            {
+                result = NestPipeline.Run(new NestPipelineRequest(engineName, remaining,
+                    NestStockBuilder.FromTemplate(template, null, no_new_plates ? available.Count : null),
+                    new NestJobOptions(maxPlates: limit)), token: cancellationToken);
+            }
+            catch (NotSupportedException)
+            {
+                return UnknownEngineMessage(engineName);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!result.CanKeep || !result.IsValid)
+                return "Error: invalid whole-job proposal. Nothing committed. " + string.Join("; ", result.Violations);
+
+            var placed = new Dictionary<Drawing, long>(ReferenceEqualityComparer.Instance);
+            foreach (var sheet in result.Plates)
+                foreach (var part in sheet.Parts)
+                    placed[part.BaseDrawing] = placed.GetValueOrDefault(part.BaseDrawing) + 1;
+            if (remaining.Any(item => placed.GetValueOrDefault(item.Drawing) != item.Quantity))
+            {
+                var summary = string.Join(", ", remaining.Select(item =>
+                    $"{item.Drawing.Name}: {placed.GetValueOrDefault(item.Drawing)}/{item.Quantity} newly placed"));
+                return $"Error: incomplete whole-job proposal ({result.StopReason}); {summary}. Nothing committed. A solver's no-placement result does not prove geometric impossibility.";
+            }
+            if (result.Plates.Count > limit)
+                return "Error: proposal exceeds the allowed sheet count. Nothing committed.";
+
+            cancellationToken.ThrowIfCancellationRequested();
+            for (var i = 0; i < result.Plates.Count; i++)
+            {
+                var proposed = result.Plates[i];
+                var target = i < available.Count ? available[i] : new Plate(proposed.Stock.Size)
+                {
+                    GrainAngle = template.GrainAngle,
+                    CuttingParameters = template.CuttingParameters,
+                };
+                target.Size = proposed.Stock.Size;
+                target.PartSpacing = proposed.Stock.PartSpacing;
+                target.EdgeSpacing = proposed.Stock.EdgeSpacing;
+                target.Quadrant = proposed.Stock.Quadrant;
+                target.Quantity = 1;
+                if (i >= available.Count)
+                    _session.Plates.Add(target);
+                target.Parts.AddRange(proposed.Parts);
+            }
+            var lines = new StringBuilder();
+            lines.AppendLine($"Whole job complete: {result.Plates.Count} sheet(s) placed, {System.Math.Max(0, result.Plates.Count - available.Count)} new sheet(s) created.");
+            foreach (var item in parsed.items)
+                lines.AppendLine($"  {item.Drawing.Name}: requested={item.Quantity}, already={counts[item.Drawing]}, newly placed={placed.GetValueOrDefault(item.Drawing)}, remaining=0");
+            return lines.ToString();
+        }
+
+        private static bool SameStock(Plate a, Plate b) =>
+            a.Size.Width == b.Size.Width && a.Size.Length == b.Size.Length
+            && a.PartSpacing == b.PartSpacing && a.EdgeSpacing.Equals(b.EdgeSpacing)
+            && a.Quadrant == b.Quadrant && a.GrainAngle == b.GrainAngle
+            && ReferenceEquals(a.CuttingParameters, b.CuttingParameters);
+
         private static void AppendMixSummary(StringBuilder sb, IReadOnlyList<NestItem> items, IEnumerable<Part> newlyPlaced)
         {
             var counts = new Dictionary<Drawing, int>(ReferenceEqualityComparer.Instance);
