@@ -19,7 +19,14 @@ internal static class CutoutRouter
     internal const double LargeRatio = 0.35;
 
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
-        IReadOnlyList<NestJobPart> inserts, double spacing, CancellationToken token = default)
+        IReadOnlyList<NestJobPart> inserts, double spacing, CancellationToken token = default) =>
+        Fill(frame, cutoutIndex, inserts, spacing, null, token);
+
+    /// <summary>Optional internal diagnostic receives only poses from the chosen proposal,
+    /// after indexing; true marks a retained lattice seed, false a residual NFP pose.</summary>
+    internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
+        IReadOnlyList<NestJobPart> inserts, double spacing,
+        Action<NestJobPlacement, bool>? observeAccepted, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(inserts);
@@ -61,11 +68,14 @@ internal static class CutoutRouter
                     CutoutLatticeFill.DefaultShiftSteps, occupied, token)
                 : Array.Empty<NestJobPlacement>();
             IReadOnlyList<NestJobPlacement> chosen;
+            var retainedLattice = 0;
             if (compareBoth || (nfpFirst && lattice.Count > 0))
             {
                 nfp ??= Nfp(Array.Empty<NestJobPlacement>());
                 var fromLattice = Complete(lattice);
                 chosen = fromLattice.Count > nfp.Count ? fromLattice : nfp;
+                if (ReferenceEquals(chosen, fromLattice))
+                    retainedLattice = lattice.Count;
             }
             else if (nfpFirst)
                 chosen = nfp!;
@@ -77,14 +87,17 @@ internal static class CutoutRouter
                 chosen = Complete(seed);
                 if (chosen.Count == 0 && lattice.Count == 1)
                     chosen = lattice;
+                retainedLattice = ReferenceEquals(chosen, lattice) ? lattice.Count : seed.Count;
             }
 
+            var localIndex = 0;
             foreach (var pose in chosen)
             {
                 token.ThrowIfCancellationRequested();
                 var indexed = pose with { InstanceIndex = accepted.Count(p => p.PartId == part.Id) };
                 accepted.Add(indexed);
                 occupied.Add((geometry, indexed));
+                observeAccepted?.Invoke(indexed, localIndex++ < retainedLattice);
             }
 
             IReadOnlyList<NestJobPlacement> Complete(IReadOnlyList<NestJobPlacement> seed)

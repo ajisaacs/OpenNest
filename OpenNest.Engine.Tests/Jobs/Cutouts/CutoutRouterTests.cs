@@ -24,10 +24,14 @@ public class CutoutRouterTests
         var frame = JobBuilder.Part("frame", TestShapes.Ring(20, 10), 1);
         var small = JobBuilder.Part("small", TestShapes.Rectangle(1, 1), 3);
         var large = JobBuilder.Rectangle("large", 3, 3, 1, RotationPolicy.Fixed(0));
-        Assert.Equal(3, CutoutLatticeFill.Fill(frame, 0, small, 3, 0.25).Count);
-        var poses = CutoutRouter.Fill(frame, 0, new[] { small, large }, 0.25);
+        var origins = new List<(NestJobPlacement Pose, bool Lattice)>();
+        var poses = CutoutRouter.Fill(frame, 0, new[] { small, large }, 0.25,
+            (pose, lattice) => origins.Add((pose, lattice)));
         Assert.Equal(3, poses.Count(p => p.PartId == small.Id));
         Assert.Single(poses, p => p.PartId == large.Id);
+        Assert.Contains(origins, row => row.Pose.PartId == small.Id && row.Lattice);
+        Assert.Contains(origins, row => row.Pose.PartId == large.Id && !row.Lattice);
+        Assert.Equal(poses, origins.Select(row => row.Pose));
         Assert.Equal(new[] { 0, 1, 2 }, poses.Where(p => p.PartId == small.Id).Select(p => p.InstanceIndex));
         AssertPhysical(frame, new[] { small, large }, poses);
     }
@@ -38,10 +42,10 @@ public class CutoutRouterTests
         var frame = Frame();
         var small = JobBuilder.Rectangle("small", 1, 1, 3, RotationPolicy.Fixed(0));
         var impossible = JobBuilder.Rectangle("impossible", 9.6, 9.6, 1, RotationPolicy.Fixed(0));
-        var alone = CutoutRouter.Fill(frame, 0, new[] { small }, 0.25);
         var together = CutoutRouter.Fill(frame, 0, new[] { small, impossible }, 0.25);
-        Assert.Equal(alone, together);
         Assert.Equal(3, together.Count);
+        Assert.All(together, p => Assert.Equal(small.Id, p.PartId));
+        Assert.Equal(Enumerable.Range(0, 3), together.Select(p => p.InstanceIndex));
         AssertPhysical(frame, new[] { small, impossible }, together);
     }
 
@@ -74,10 +78,13 @@ public class CutoutRouterTests
         // lattice keeps 11; an independently certified NFP pose occupies its leftover.
         var frame = JobBuilder.Part("frame", TestShapes.Ring(18, 8), 1);
         var insert = JobBuilder.Part("insert", TestShapes.Rectangle(2, 1), 12);
-        var lattice = CutoutLatticeFill.Fill(frame, 0, insert, 12, 0.25);
-        Assert.Equal(11, lattice.Count);
-        var poses = CutoutRouter.Fill(frame, 0, new[] { insert }, 0.25);
+        var origins = new List<(NestJobPlacement Pose, bool Lattice)>();
+        var poses = CutoutRouter.Fill(frame, 0, new[] { insert }, 0.25,
+            (pose, lattice) => origins.Add((pose, lattice)));
         Assert.Equal(12, poses.Count);
+        Assert.Equal(11, origins.Count(row => row.Lattice));
+        Assert.Single(origins, row => !row.Lattice);
+        Assert.Equal(poses, origins.Select(row => row.Pose));
         Assert.Equal(Enumerable.Range(0, 12), poses.Select(p => p.InstanceIndex));
         AssertPhysical(frame, new[] { insert }, poses);
     }
