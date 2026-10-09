@@ -58,6 +58,22 @@ namespace OpenNest.Mcp.Tools
             return sb.ToString();
         }
 
+        [McpServerTool(Name = "delete_plate")]
+        [Description("Delete an empty plate without parts or cutoff definitions. Later plate indices shift down by one.")]
+        public string DeletePlate([Description("Index of the empty plate to delete")] int plateIndex)
+        {
+            var oldCount = _session.AllPlates().Count;
+            if (!_session.TryDeleteEmptyPlate(plateIndex, out var reason))
+                return $"Error: {reason}; no plates changed";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Deleted plate {plateIndex}. Plates: {oldCount} -> {oldCount - 1}.");
+            for (var oldIndex = plateIndex + 1; oldIndex < oldCount; oldIndex++)
+                sb.AppendLine($"  {oldIndex} -> {oldIndex - 1}");
+            sb.AppendLine("Use get_plate_info with the new indices before further operations.");
+            return sb.ToString();
+        }
+
         [McpServerTool(Name = "clear_plate")]
         [Description("Remove all parts from a plate. Returns how many parts were removed.")]
         public string ClearPlate([Description("Index of the plate to clear")] int plateIndex)

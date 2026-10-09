@@ -48,6 +48,8 @@ Invalid output is printed and rejected with exit code 2 without saving or postin
 
 MCP `autonest_plate` requires an empty target. The stdio server serializes all tool calls sharing its mutable session, so another request cannot change drawings or occupy a target during a solve. `allow_invalid` defaults to false. It reports violations and makes no changes on rejection, including with an override when the output is unrepresentable or contains multiple sheets. `engine` defaults to Default, and its description lists the built-in engines with what each suits. Fill tools (`fill_plate`, `fill_area`, `fill_remnants`, `pack_plate`) remain separate and default to the Fill strategy. Console and MCP load jobs plug-ins from `Engines/` beside their executable.
 
+MCP `delete_plate(plateIndex)` removes only a sheet with no parts and no cutoff definitions, from either loaded or newly created session plates. Occupied, cutoff-bearing and invalid indices are refused without changing the session. After deletion every later index shifts down by one; inspect `get_plate_info` before further edits. This is session cleanup, not a data purge or a save-time option. `save_nest` lists all session plates in its response, but the existing `.nest` writer omits empty cutoff-free plates from the serialized file; reloading may therefore have fewer plates than the response says. There is no opt-in switch to preserve empty plates in the file.
+
 ### MCP engine development harness
 
 `test_engine` builds and runs `OpenNest.Console` in a configured, trusted checkout.

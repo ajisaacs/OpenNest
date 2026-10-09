@@ -30,6 +30,38 @@ namespace OpenNest.Mcp
             return null;
         }
 
+        /// <summary>Remove only a genuinely unused sheet; loaded sheets precede appended sheets.</summary>
+        public bool TryDeleteEmptyPlate(int index, out string reason)
+        {
+            var plate = GetPlate(index);
+            if (plate == null)
+            {
+                reason = $"plate {index} not found";
+                return false;
+            }
+
+            if (plate.Parts.Count != 0)
+            {
+                reason = $"plate {index} is occupied";
+                return false;
+            }
+
+            if (plate.CutOffs.Count != 0)
+            {
+                reason = $"plate {index} has cutoff definitions";
+                return false;
+            }
+
+            var loadedCount = Nest?.Plates.Count ?? 0;
+            if (index < loadedCount)
+                Nest.Plates.RemoveAt(index);
+            else
+                Plates.RemoveAt(index - loadedCount);
+
+            reason = null;
+            return true;
+        }
+
         public Drawing GetDrawing(string name)
         {
             if (Nest != null)
