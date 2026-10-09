@@ -336,14 +336,15 @@ namespace OpenNest.Mcp.Tools
         }
 
         [McpServerTool(Name = "autonest_job")]
-        [Description("Complete requested drawing quantities across as many matching sheets as needed. The selected empty plate is the stock template; by default new sheets may be added. An incomplete or invalid proposal changes nothing.")]
+        [Description("Complete requested drawing quantities across physical sheets. The selected empty plate supplies common settings; optional sheets offer finite sizes and quantities. An incomplete or invalid proposal changes nothing.")]
         public string AutoNestJob(
             [Description("Index of an empty plate to use as the stock template")] int plateIndex,
             [Description("Comma-separated drawing names")] string drawingNames,
             [Description("Comma-separated total requested quantities for the entire session")] string quantities,
             [Description(JobEngines)] string engine = null,
             [Description("Use only already-created empty plates with matching dimensions and spacing; do not add sheets")] bool no_new_plates = false,
-            CancellationToken cancellationToken = default
+            CancellationToken cancellationToken = default,
+            [Description("Optional finite physical sheet stock: width, length and available quantity per size. Incompatible with no_new_plates.")] SheetStockInput[] sheets = null
         )
         {
             var template = _session.GetPlate(plateIndex);
@@ -351,6 +352,11 @@ namespace OpenNest.Mcp.Tools
                 return $"Error: plate {plateIndex} not found";
             if (template.Parts.Count != 0 || template.CutOffs.Count != 0)
                 return "Error: stock template must be empty and have no cutoff definitions. Nothing committed.";
+            if (sheets != null && no_new_plates)
+                return "Error: sheets cannot be combined with no_new_plates. Nothing committed.";
+            var offeredStock = BuildSheetStock(template, sheets);
+            if (offeredStock.error != null)
+                return offeredStock.error;
             if (string.IsNullOrWhiteSpace(drawingNames) || string.IsNullOrWhiteSpace(quantities))
                 return "Error: drawingNames and quantities are required";
             var parsed = ParseItems(drawingNames, quantities);
@@ -390,7 +396,8 @@ namespace OpenNest.Mcp.Tools
             var demand = remaining.Sum(item => (long)item.Quantity);
             if (demand > int.MaxValue)
                 return "Error: total remaining demand exceeds the supported sheet limit. Nothing committed.";
-            var limit = no_new_plates ? System.Math.Min(available.Count, (int)demand) : (int)demand;
+            var limit = no_new_plates ? System.Math.Min(available.Count, (int)demand)
+                : sheets != null ? (int)System.Math.Min(offeredStock.total, demand) : (int)demand;
             var engineName = string.IsNullOrWhiteSpace(engine) ? _session.DefaultEngineName : engine.Trim();
             if (NestingEngineRegistry.ResolveName(engineName) == null)
                 return $"Error: unknown whole-job engine '{engineName}'. Nothing committed. Available: {string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name))}";
@@ -398,7 +405,7 @@ namespace OpenNest.Mcp.Tools
             try
             {
                 result = NestPipeline.Run(new NestPipelineRequest(engineName, remaining,
-                    NestStockBuilder.FromTemplate(template, null, no_new_plates ? available.Count : null),
+                    sheets == null ? NestStockBuilder.FromTemplate(template, null, no_new_plates ? available.Count : null) : offeredStock.stock,
                     new NestJobOptions(maxPlates: limit)), token: cancellationToken);
             }
             catch (NotSupportedException ex)
@@ -422,33 +429,88 @@ namespace OpenNest.Mcp.Tools
             if (result.Plates.Count > limit)
                 return "Error: proposal exceeds the allowed sheet count. Nothing committed.";
 
-            cancellationToken.ThrowIfCancellationRequested();
-            for (var i = 0; i < result.Plates.Count; i++)
+            // Build the entire target map before attaching a single part. Indexes in a mixed
+            // stock proposal are solver ordinals, not indexes into the session's empty plates.
+            var usedTargets = new HashSet<Plate>(ReferenceEqualityComparer.Instance);
+            var targets = new List<(Plate plate, bool created, string stockId)>();
+            foreach (var proposed in result.Plates)
             {
-                var proposed = result.Plates[i];
-                var target = i < available.Count ? available[i] : new Plate(proposed.Stock.Size)
+                var target = new[] { template }.Concat(existing.Where(p => !ReferenceEquals(p, template)))
+                    .FirstOrDefault(p => !usedTargets.Contains(p)
+                        && p.Parts.Count == 0 && p.CutOffs.Count == 0
+                        && SameStock(p, template, proposed.Stock.Size));
+                var created = target == null;
+                target ??= new Plate(proposed.Stock.Size)
                 {
                     GrainAngle = template.GrainAngle,
                     CuttingParameters = template.CuttingParameters,
                 };
+                usedTargets.Add(target);
+                targets.Add((target, created, proposed.Stock.Id));
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            for (var i = 0; i < result.Plates.Count; i++)
+            {
+                var proposed = result.Plates[i];
+                var (target, created, _) = targets[i];
                 target.Size = proposed.Stock.Size;
                 target.PartSpacing = proposed.Stock.PartSpacing;
                 target.EdgeSpacing = proposed.Stock.EdgeSpacing;
                 target.Quadrant = proposed.Stock.Quadrant;
                 target.Quantity = 1;
-                if (i >= available.Count)
+                if (created)
                     _session.Plates.Add(target);
                 target.Parts.AddRange(proposed.Parts);
             }
             var lines = new StringBuilder();
-            lines.AppendLine($"Whole job complete: {result.Plates.Count} sheet(s) placed, {System.Math.Max(0, result.Plates.Count - available.Count)} new sheet(s) created.");
+            lines.AppendLine($"Whole job complete: {result.Plates.Count} sheet(s) placed, {targets.Count(t => t.created)} new sheet(s) created.");
+            if (sheets != null)
+            {
+                foreach (var stock in offeredStock.stock)
+                {
+                    var used = targets.Count(t => t.stockId == stock.Id);
+                    lines.AppendLine($"  {stock.Id} ({stock.Size.Width}x{stock.Size.Length}): used={used}, remaining={stock.Quantity - used}, reused={targets.Count(t => !t.created && t.stockId == stock.Id)}, created={targets.Count(t => t.created && t.stockId == stock.Id)}");
+                }
+                foreach (var (target, _, stockId) in targets)
+                    lines.AppendLine($"  plate {_session.AllPlates().FindIndex(p => ReferenceEquals(p, target))} -> {stockId}");
+            }
             foreach (var item in parsed.items)
                 lines.AppendLine($"  {item.Drawing.Name}: requested={item.Quantity}, already={counts[item.Drawing]}, newly placed={placed.GetValueOrDefault(item.Drawing)}, remaining=0");
             return lines.ToString();
         }
 
-        private static bool SameStock(Plate a, Plate b) =>
-            a.Size.Width == b.Size.Width && a.Size.Length == b.Size.Length
+        private static (List<NestPlateStock> stock, long total, string error) BuildSheetStock(Plate template, SheetStockInput[] sheets)
+        {
+            if (sheets == null)
+                return (null, 0, null);
+            if (sheets.Length == 0)
+                return (null, 0, "Error: sheets must contain at least one stock size. Nothing committed.");
+            var stock = new List<NestPlateStock>(sheets.Length);
+            long total = 0;
+            for (var i = 0; i < sheets.Length; i++)
+            {
+                var row = sheets[i];
+                if (row == null || !double.IsFinite(row.Width) || !double.IsFinite(row.Length)
+                    || row.Width <= 0 || row.Length <= 0 || row.Quantity <= 0
+                    || row.Length <= template.EdgeSpacing.Left + template.EdgeSpacing.Right
+                    || row.Width <= template.EdgeSpacing.Top + template.EdgeSpacing.Bottom)
+                    return (null, 0, $"Error: sheets[{i}] requires finite positive usable dimensions and a positive physical quantity. Nothing committed.");
+                var duplicate = stock.FindIndex(s => s.Size.Width == row.Width && s.Size.Length == row.Length);
+                if (duplicate >= 0)
+                    return (null, 0, $"Error: sheets[{i}] duplicates sheets[{duplicate}] size. Nothing committed.");
+                total += row.Quantity;
+                if (total > int.MaxValue)
+                    return (null, 0, "Error: total sheet inventory exceeds the supported sheet limit. Nothing committed.");
+                stock.Add(new NestPlateStock($"stock-{i}", new Size(row.Width, row.Length), row.Quantity,
+                    template.PartSpacing, template.EdgeSpacing, template.Quadrant));
+            }
+            return (stock, total, null);
+        }
+
+        private static bool SameStock(Plate a, Plate b) => SameStock(a, b, b.Size);
+
+        private static bool SameStock(Plate a, Plate b, Size size) =>
+            a.Size.Width == size.Width && a.Size.Length == size.Length
             && a.PartSpacing == b.PartSpacing && a.EdgeSpacing.Equals(b.EdgeSpacing)
             && a.Quadrant == b.Quadrant && a.GrainAngle == b.GrainAngle
             && (a.CuttingParameters == null && b.CuttingParameters == null
