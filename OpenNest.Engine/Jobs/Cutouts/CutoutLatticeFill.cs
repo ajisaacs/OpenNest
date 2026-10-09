@@ -30,7 +30,7 @@ internal static class CutoutLatticeFill
     /// <summary>Offsets tried per side on each axis; the search covers (2n + 1)^2 offsets.</summary>
     internal const int DefaultShiftSteps = 8;
 
-    private const double FlattenTolerance = 0.001;
+    internal const double FlattenTolerance = 0.001;
 
     /// <summary>Extra growth beyond the spacing, covering flattening and Clipper rounding.</summary>
     private const double Margin = FlattenTolerance + 0.001;
@@ -134,7 +134,7 @@ internal static class CutoutLatticeFill
     /// cutout: some point b0 of the grown outline is inside (t in hole - b0) and the grown outline
     /// never meets the cutout boundary (t outside boundary + reflected outline).
     /// </summary>
-    private static PathsD InnerFit(JobPartGeometry insert, double rotation, PathD hole, double spacing)
+    internal static PathsD InnerFit(JobPartGeometry insert, double rotation, PathD hole, double spacing)
     {
         var entities = insert.Perimeter.Entities.Select(e => e.Clone()).ToList();
         foreach (var entity in entities)
@@ -203,7 +203,7 @@ internal static class CutoutLatticeFill
     }
 
     /// <summary>Strictly inside an even-odd region; boundary points count as outside.</summary>
-    private static bool Inside(PathsD region, double x, double y)
+    internal static bool Inside(PathsD region, double x, double y)
     {
         var point = new PointD(x, y);
         var inside = false;
@@ -218,7 +218,7 @@ internal static class CutoutLatticeFill
         return inside;
     }
 
-    private static PathD Positive(PathD path)
+    internal static PathD Positive(PathD path)
     {
         if (path.Count >= 3 && !Clipper.IsPositive(path))
             path.Reverse();
