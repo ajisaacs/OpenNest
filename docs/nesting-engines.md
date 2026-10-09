@@ -70,8 +70,9 @@ remain separate sequencer/verification work.
 ## Filling cutouts (not yet in production)
 
 Placing parts inside another part's enclosed cutout is being built as a step that runs before any
-engine, so every engine benefits. Nothing calls it yet: a part inside a cutout must be cut before
-the cutout's contour, and the sequencer does not enforce that order.
+engine, so every engine benefits. Only an internal test-only pipeline preview calls it: a part
+inside a cutout must be cut before the cutout's contour, and the cutting/post safety gates are
+not complete. Ordinary whole-job calls do not enable this path.
 
 `CutoutLatticeFill` (`OpenNest.Engine/Jobs/Cutouts/`) fills one closed cutout with copies of one
 part. It runs Fill over the cutout's bounds plus one part step on every side, then shifts
@@ -96,8 +97,18 @@ NFP first, then Fill if demand remains, taking the higher-count valid proposal.
 An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
 Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
 the search-order hints; these limited cases are not a global density guarantee.
-The router has no pipeline caller and does not change
-stock, live demand, cutting order or posting safety; in-hole production use remains held.
+The internal `NestPipeline.RunCutoutPreview` prepares at most one quantity-one frame with one
+cutout as a fixed-zero proxy. Reserved inserts are removed from the engine's independent demand;
+remaining demand is offered once to the selected engine. Only after a complete, accounted-for
+engine result does it expand the proxy back to original requirement IDs, validate every physical
+pose, stock and quantity, then bind caller drawings. Incomplete, forged or geometrically invalid
+composites return no bindable plates even with invalid-result consent. Candidate evaluation
+progress is forwarded with unverified proxy commitment counts zeroed; transformed proxy commits
+are hidden. Physical commits are reported only after physical validation. Frames needing other
+orientations or repeated frame copies still run through the ordinary unbundled path. This is a
+narrow internal integration trial, not a production setting or a cut-ready nest; multi-frame
+routing, rotation compatibility, save/reload and cutting/post safety are still pending before
+enablement.
 
 ## Renamed engines
 
