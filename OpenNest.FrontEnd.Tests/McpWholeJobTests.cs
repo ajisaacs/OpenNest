@@ -1,4 +1,5 @@
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 using OpenNest.IO;
@@ -34,21 +35,8 @@ public class McpWholeJobTests : IDisposable
     }
 
     private static string Call(NestingTools tools, int plateIndex, string names, string quantities,
-        string engine, bool noNew = false)
-    {
-        var method = typeof(NestingTools).GetMethod("AutoNestJob");
-        Assert.NotNull(method);
-        var args = method.GetParameters().Select(p => p.Name switch
-        {
-            "plateIndex" => (object)plateIndex,
-            "drawingNames" => names,
-            "quantities" => quantities,
-            "engine" => engine,
-            "no_new_plates" => noNew,
-            _ => p.DefaultValue,
-        }).ToArray();
-        return (string)method.Invoke(tools, args)!;
-    }
+        string engine, bool noNew = false, CancellationToken token = default) =>
+        tools.AutoNestJob(plateIndex, names, quantities, engine, noNew, token);
 
     [Fact]
     public void CreatesSheetsForCompleteMixedJobThenSavesAndReloads()
@@ -148,6 +136,138 @@ public class McpWholeJobTests : IDisposable
         Assert.Same(original, session.GetPlate(0));
         Assert.Empty(original.Parts);
         Assert.All(session.Nest.Drawings, d => Assert.Equal(0, d.Quantity.Nested));
+    }
+
+    [Fact]
+    public void RestrictedDrawingRejectsPluginRotationWithoutMutationAfterReload()
+    {
+        var session = Session();
+        var drawing = session.Nest.Drawings.Single(d => d.Name == "A");
+        drawing.Constraints = new NestConstraints
+        {
+            StepAngle = OpenNest.Math.Angle.TwoPI,
+            StartAngle = 0,
+            EndAngle = 0,
+        };
+        session.GetPlate(0).Parts.Add(new Part(session.Nest.Drawings.Single(d => d.Name == "B")));
+        var path = Path.Combine(directory, "rotation.nest");
+        Assert.True(new NestWriter(session.Nest).Write(path));
+        session = new NestSession { Nest = new NestReader(path).Read() };
+        Assert.Equal(OpenNest.Math.Angle.TwoPI, session.Nest.Drawings.Single(d => d.Name == "A").Constraints.StepAngle);
+        session.Plates.Add(new Plate(10, 10) { PartSpacing = 0.25, Quantity = 1 });
+        var engine = "JobForbiddenRotation-" + Guid.NewGuid();
+        NestingEngineRegistry.Register(engine, "rotated proposal", () => new RotatedStub());
+        var plateTool = new NestingTools(session).AutoNestPlate(1, "A", "1", engine);
+        Assert.Contains("Violation", plateTool);
+        Assert.Contains("rotation", plateTool, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(session.GetPlate(1).Parts);
+        var text = Call(new NestingTools(session), 1, "A", "1", engine);
+        Assert.True(text.Contains("rotation", StringComparison.OrdinalIgnoreCase), text);
+        Assert.Contains("Nothing committed", text);
+        Assert.Equal(2, session.AllPlates().Count);
+        Assert.Empty(session.GetPlate(1).Parts);
+        Assert.Single(session.GetPlate(0).Parts);
+        Assert.Equal(0, session.Nest.Drawings.Single(d => d.Name == "A").Quantity.Nested);
+    }
+
+    [Fact]
+    public void EquivalentDeserializedCuttingSettingsReuseExistingSheets()
+    {
+        var session = Session();
+        var first = session.GetPlate(0);
+        first.Size = new Size(3, 3);
+        first.CuttingParameters = new CuttingParameters { MachineName = "Same" };
+        var second = new Plate(3, 3)
+        {
+            Quantity = 1,
+            PartSpacing = 0.25,
+            CuttingParameters = new CuttingParameters { MachineName = "Same" }
+        };
+        session.Plates.Add(second);
+        Assert.NotSame(first.CuttingParameters, second.CuttingParameters);
+        var text = Call(new NestingTools(session), 0, "A", "2", "Rectangles", noNew: true);
+        Assert.Contains("Whole job complete", text);
+        Assert.Equal(2, session.AllPlates().Count);
+        Assert.Single(first.Parts);
+        Assert.Single(second.Parts);
+    }
+
+    [Fact]
+    public void DifferentCuttingSettingsAreNotReusedAsStock()
+    {
+        var session = Session();
+        var first = session.GetPlate(0);
+        first.Size = new Size(3, 3);
+        first.CuttingParameters = new CuttingParameters { MachineName = "First" };
+        var second = new Plate(3, 3)
+        {
+            Quantity = 1,
+            PartSpacing = 0.25,
+            CuttingParameters = new CuttingParameters { MachineName = "Other" }
+        };
+        session.Plates.Add(second);
+        var text = Call(new NestingTools(session), 0, "A", "2", "Rectangles", noNew: true);
+        Assert.Contains("incomplete", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Nothing committed", text);
+        Assert.Empty(first.Parts);
+        Assert.Empty(second.Parts);
+        Assert.Equal(2, session.AllPlates().Count);
+    }
+
+    [Fact]
+    public void SolverNotSupportedErrorNamesActualCause()
+    {
+        var session = Session();
+        var engine = "JobUnsupported-" + Guid.NewGuid();
+        NestingEngineRegistry.Register(engine, "unsupported solver", () => new UnsupportedStub());
+        var text = Call(new NestingTools(session), 0, "A", "1", engine);
+        Assert.Contains("unsupported fixture", text);
+        Assert.DoesNotContain("Use autonest_plate", text);
+        Assert.Contains("Nothing committed", text);
+        Assert.Empty(session.GetPlate(0).Parts);
+    }
+
+    [Fact]
+    public void CancellationAfterPluginIgnoresTokenDoesNotCommit()
+    {
+        var session = Session();
+        using var cts = new CancellationTokenSource();
+        var engine = "JobCancel-" + Guid.NewGuid();
+        NestingEngineRegistry.Register(engine, "cancels after solving", () => new CancelStub(cts));
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            Call(new NestingTools(session), 0, "A,B", "2,2", engine, token: cts.Token));
+        Assert.Single(session.AllPlates());
+        Assert.Empty(session.GetPlate(0).Parts);
+        Assert.All(session.Nest.Drawings, d => Assert.Equal(0, d.Quantity.Nested));
+    }
+
+    private sealed class CancelStub(CancellationTokenSource source) : INestingEngine
+    {
+        public NestJobResult Solve(NestJob job, IProgress<NestJobProgress>? progress = null,
+            CancellationToken token = default)
+        {
+            var result = new TwoSheetStub().Solve(job, progress, token);
+            source.Cancel();
+            return result;
+        }
+    }
+
+    private sealed class RotatedStub : INestingEngine
+    {
+        public NestJobResult Solve(NestJob job, IProgress<NestJobProgress>? progress = null,
+            CancellationToken token = default)
+        {
+            var stock = Assert.Single(job.Plates);
+            return new NestJobResult(NestJobStatus.Complete, NestJobStopReason.Completed,
+                [new NestJobPlateResult(0, stock,
+                    [new NestJobPlacement(job.Parts[0].Id, 0, 4, 4, System.Math.PI / 2)])], [], []);
+        }
+    }
+
+    private sealed class UnsupportedStub : INestingEngine
+    {
+        public NestJobResult Solve(NestJob job, IProgress<NestJobProgress>? progress = null,
+            CancellationToken token = default) => throw new NotSupportedException("unsupported fixture");
     }
 
     private sealed class TwoSheetStub(bool overlap = false) : INestingEngine

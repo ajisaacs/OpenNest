@@ -10,6 +10,7 @@ using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
+using OpenNest.IO;
 
 namespace OpenNest.Mcp.Tools
 {
@@ -370,7 +371,15 @@ namespace OpenNest.Mcp.Tools
                     return $"Error: drawing '{item.Drawing.Name}' already exceeds requested quantity ({nested} > {item.Quantity}). Nothing committed.";
                 counts[item.Drawing] = nested;
                 if (nested < item.Quantity)
-                    remaining.Add(new NestItem { Drawing = item.Drawing, Quantity = (int)(item.Quantity - nested), Priority = item.Priority });
+                    remaining.Add(new NestItem
+                    {
+                        Drawing = item.Drawing,
+                        Quantity = (int)(item.Quantity - nested),
+                        Priority = item.Priority,
+                        StepAngle = item.StepAngle,
+                        RotationStart = item.RotationStart,
+                        RotationEnd = item.RotationEnd,
+                    });
             }
             if (remaining.Count == 0)
                 return "Job already complete: all requested quantities are present. Nothing committed.";
@@ -383,6 +392,8 @@ namespace OpenNest.Mcp.Tools
                 return "Error: total remaining demand exceeds the supported sheet limit. Nothing committed.";
             var limit = no_new_plates ? System.Math.Min(available.Count, (int)demand) : (int)demand;
             var engineName = string.IsNullOrWhiteSpace(engine) ? _session.DefaultEngineName : engine.Trim();
+            if (NestingEngineRegistry.ResolveName(engineName) == null)
+                return $"Error: unknown whole-job engine '{engineName}'. Nothing committed. Available: {string.Join(", ", NestingEngineRegistry.AvailableEngines.Select(e => e.Name))}";
             NestPipelineResult result;
             try
             {
@@ -390,9 +401,9 @@ namespace OpenNest.Mcp.Tools
                     NestStockBuilder.FromTemplate(template, null, no_new_plates ? available.Count : null),
                     new NestJobOptions(maxPlates: limit)), token: cancellationToken);
             }
-            catch (NotSupportedException)
+            catch (NotSupportedException ex)
             {
-                return UnknownEngineMessage(engineName);
+                return $"Error: whole-job request unsupported: {ex.Message}. Nothing committed.";
             }
             cancellationToken.ThrowIfCancellationRequested();
             if (!result.CanKeep || !result.IsValid)
@@ -440,7 +451,10 @@ namespace OpenNest.Mcp.Tools
             a.Size.Width == b.Size.Width && a.Size.Length == b.Size.Length
             && a.PartSpacing == b.PartSpacing && a.EdgeSpacing.Equals(b.EdgeSpacing)
             && a.Quadrant == b.Quadrant && a.GrainAngle == b.GrainAngle
-            && ReferenceEquals(a.CuttingParameters, b.CuttingParameters);
+            && (a.CuttingParameters == null && b.CuttingParameters == null
+                || a.CuttingParameters != null && b.CuttingParameters != null
+                && string.Equals(CuttingParametersSerializer.Serialize(a.CuttingParameters),
+                    CuttingParametersSerializer.Serialize(b.CuttingParameters), StringComparison.Ordinal));
 
         private static void AppendMixSummary(StringBuilder sb, IReadOnlyList<NestItem> items, IEnumerable<Part> newlyPlaced)
         {
@@ -528,7 +542,15 @@ namespace OpenNest.Mcp.Tools
                 if (!seen.Add(drawing))
                     return (null, $"Error: duplicate drawing '{names[i]}' in request");
 
-                items.Add(new NestItem { Drawing = drawing, Quantity = qtys[i] });
+                items.Add(new NestItem
+                {
+                    Drawing = drawing,
+                    Quantity = qtys[i],
+                    Priority = drawing.Priority,
+                    StepAngle = drawing.Constraints?.StepAngle ?? 0,
+                    RotationStart = drawing.Constraints?.StartAngle ?? 0,
+                    RotationEnd = drawing.Constraints?.EndAngle ?? 0,
+                });
             }
 
             return (items, null);
