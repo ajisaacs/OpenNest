@@ -350,21 +350,12 @@ namespace OpenNest.Mcp.Tools
                 sb.AppendLine($"    [{i}] {item.Drawing.Name}: requested={item.Quantity}, placed={placed[i]}, remaining={remaining}");
             }
 
-            var total = placed.Sum(count => (long)count);
-            if (total == 0)
+            if (placed.All(count => count == 0))
                 sb.AppendLine("  Mix: zero progress for all requested drawings.");
-            else if (items.Count > 1 && items.All(item => item.Quantity > 0))
-            {
-                var balanced = true;
-                for (var i = 1; i < items.Count; i++)
-                    if ((long)placed[i] * items[0].Quantity != (long)placed[0] * items[i].Quantity)
-                        balanced = false;
-                sb.AppendLine(balanced
-                    ? "  Mix: ratio satisfied for new placements; remaining demand may still exist."
-                    : "  Warning: ratio not met by new placements; quantities are ceilings, not a balance constraint.");
-            }
-            else if (items.Count > 1)
-                sb.AppendLine("  Mix: ratio not evaluated for unlimited or nonpositive requested quantities.");
+            else if (items.Where((item, i) => item.Quantity > placed[i]).Any())
+                sb.AppendLine("  Warning: remaining demand in this call; place the outstanding quantities on another sheet before treating the job as complete.");
+            else
+                sb.AppendLine("  Mix: requested quantities placed in this call.");
         }
 
         /// <summary>

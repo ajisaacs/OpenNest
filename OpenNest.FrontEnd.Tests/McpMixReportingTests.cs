@@ -37,7 +37,8 @@ public class McpMixReportingTests
         var text = new NestingTools(session).PackPlate(0, "A,B", "10,10");
         Assert.Contains("A: requested=10", text);
         Assert.Contains("B: requested=10, placed=0, remaining=10", text);
-        Assert.Contains("ratio not met", text);
+        Assert.Contains("remaining demand", text);
+        Assert.DoesNotContain("ratio not met", text);
         Assert.Contains($"A: requested=10, placed={plate.Parts.Count - 1}, remaining={11 - plate.Parts.Count}", text);
         Assert.True(plate.Parts.Count > 1);
     }
@@ -52,7 +53,8 @@ public class McpMixReportingTests
         var text = tool.AutoNestPlate(0, "A,B", "2,2", engine);
         Assert.Contains("A: requested=2, placed=1, remaining=1", text);
         Assert.Contains("B: requested=2, placed=0, remaining=2", text);
-        Assert.Contains("ratio not met", text);
+        Assert.Contains("remaining demand", text);
+        Assert.DoesNotContain("ratio not met", text);
 
         // Duplicate tokens must be refused before the engine can mutate a fresh target.
         var fresh = Session();
