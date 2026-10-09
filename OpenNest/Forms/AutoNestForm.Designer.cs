@@ -173,7 +173,7 @@ namespace OpenNest.Forms
             this.plateGrid.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.plateGrid.Location = new System.Drawing.Point(10, 22);
             this.plateGrid.Name = "plateGrid";
-            this.plateGrid.RowHeadersVisible = false;
+            this.plateGrid.RowHeadersVisible = true;
             this.plateGrid.AutoGenerateColumns = false;
             this.plateGrid.Size = new System.Drawing.Size(508, 130);
             this.plateGrid.TabIndex = 1;

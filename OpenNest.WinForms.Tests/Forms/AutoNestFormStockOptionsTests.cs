@@ -13,6 +13,36 @@ public class AutoNestFormStockOptionsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void StockRowsCanBeSelectedAndRemoved(bool loadSavedOptions)
+    {
+        RunSta(() =>
+        {
+            using var form = new AutoNestForm(new Nest());
+            if (loadSavedOptions)
+                form.LoadPlateOptions(new List<PlateOption>
+                {
+                    new() { Width = 48, Length = 96, Cost = 25 },
+                    new() { Width = 60, Length = 120, Cost = 40 },
+                }, 0.5);
+            form.OptimizePlateSize = true;
+            var grid = GetGrid(form);
+
+            Assert.True(grid.RowHeadersVisible);
+            Assert.True(grid.AllowUserToDeleteRows);
+            Assert.Equal(DataGridViewSelectionMode.RowHeaderSelect, grid.SelectionMode);
+            grid.Rows[0].Selected = true;
+            Assert.True(grid.Rows[0].Selected);
+
+            var remaining = form.GetPlateOptions().Count;
+            Assert.IsAssignableFrom<IList>(grid.DataSource).RemoveAt(grid.SelectedRows[0].Index);
+            Assert.Equal(remaining - 1, form.GetPlateOptions().Count);
+            AssertNewRow(grid);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void StockOptionsKeepAnAddRowAfterAddingAPlate(bool loadSavedOptions)
     {
         RunSta(() =>
