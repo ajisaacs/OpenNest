@@ -68,6 +68,45 @@ public class CutoutRouterTests
     }
 
     [Fact]
+    public void NfpAddsOneMoreCopyToPartialShiftedLattice()
+    {
+        // Neutral 8-inch round hole, 2x1 insert, quarter-inch spacing: the shifted
+        // lattice keeps 11; an independently certified NFP pose occupies its leftover.
+        var frame = JobBuilder.Part("frame", TestShapes.Ring(18, 8), 1);
+        var insert = JobBuilder.Part("insert", TestShapes.Rectangle(2, 1), 12);
+        var lattice = CutoutLatticeFill.Fill(frame, 0, insert, 12, 0.25);
+        Assert.Equal(11, lattice.Count);
+        var poses = CutoutRouter.Fill(frame, 0, new[] { insert }, 0.25);
+        Assert.Equal(12, poses.Count);
+        Assert.Equal(Enumerable.Range(0, 12), poses.Select(p => p.InstanceIndex));
+        AssertPhysical(frame, new[] { insert }, poses);
+    }
+
+    [Fact]
+    public void MiddleRatioChoosesTwoLatticeCopiesOverOneNfpCopy()
+    {
+        // 4x4 / (pi*5^2) = 0.204. A hard NFP-only threshold at 0.20 loses one copy.
+        var frame = JobBuilder.Part("frame", TestShapes.Ring(20, 10), 1);
+        var insert = JobBuilder.Part("insert", TestShapes.Rectangle(4, 4), 3);
+        Assert.InRange(16 / (System.Math.PI * 25), CutoutRouter.SmallRatio, CutoutRouter.LargeRatio);
+        var poses = CutoutRouter.Fill(frame, 0, new[] { insert }, 0.25);
+        Assert.Equal(2, poses.Count);
+        AssertPhysical(frame, new[] { insert }, poses);
+    }
+
+    [Fact]
+    public void LargeRatioKeepsAnNfpPoseWhenFillCannotProduceALattice()
+    {
+        var frame = JobBuilder.Part("frame", TestShapes.Ring(18, 8), 1);
+        var insert = JobBuilder.Rectangle("insert", 4.5, 4.5, 3, RotationPolicy.Fixed(0));
+        Assert.True(20.25 / (System.Math.PI * 16) > CutoutRouter.LargeRatio);
+        Assert.Empty(CutoutLatticeFill.Fill(frame, 0, insert, 3, 0.25));
+        var poses = CutoutRouter.Fill(frame, 0, new[] { insert }, 0.25);
+        Assert.Single(poses);
+        AssertPhysical(frame, new[] { insert }, poses);
+    }
+
+    [Fact]
     public void DuplicateRequirementIdsAreRejectedBeforePlacement()
     {
         var frame = Frame();
@@ -149,8 +188,34 @@ public class CutoutRouterTests
                     Assert.InRange(ry, 5.25, 14.75);
                 }
                 else
-                    Assert.True(System.Math.Sqrt(rx * rx + ry * ry) <= 4.75 + 0.00001);
+                {
+                    var radius = System.Math.Abs(frameGeometry.Cutouts[0].BoundingBox.Right);
+                    Assert.True(System.Math.Sqrt(rx * rx + ry * ry) <= radius - 0.25 + 0.00001);
+                }
             }
+        }
+        // Independent rectangle-vs-rectangle distance, not the production Clears predicate.
+        for (var i = 0; i < poses.Count; i++)
+            for (var j = i + 1; j < poses.Count; j++)
+            {
+                var a = Bounds(poses[i]);
+                var b = Bounds(poses[j]);
+                var dx = System.Math.Max(0, System.Math.Max(a.Left - b.Right, b.Left - a.Right));
+                var dy = System.Math.Max(0, System.Math.Max(a.Bottom - b.Top, b.Bottom - a.Top));
+                Assert.True(System.Math.Sqrt(dx * dx + dy * dy) >= 0.25 - 0.00001,
+                    $"independent material gap too small: {poses[i]} vs {poses[j]}");
+            }
+
+        (double Left, double Right, double Bottom, double Top) Bounds(NestJobPlacement pose)
+        {
+            var box = JobPartGeometry.Read(inserts.Single(p => p.Id == pose.PartId).Geometry).Bounds;
+            var corners = new[] { (box.Left, box.Bottom), (box.Right, box.Bottom),
+                (box.Right, box.Top), (box.Left, box.Top) };
+            var x = corners.Select(c => pose.X + c.Item1 * System.Math.Cos(pose.Rotation)
+                - c.Item2 * System.Math.Sin(pose.Rotation)).ToArray();
+            var y = corners.Select(c => pose.Y + c.Item1 * System.Math.Sin(pose.Rotation)
+                + c.Item2 * System.Math.Cos(pose.Rotation)).ToArray();
+            return (x.Min(), x.Max(), y.Min(), y.Max());
         }
     }
 }

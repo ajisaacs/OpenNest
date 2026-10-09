@@ -7,13 +7,17 @@ using System.Threading;
 namespace OpenNest.Engine.Jobs.Cutouts;
 
 /// <summary>Internal frame-local cutout proposal. Never changes demand, stock or a live plate.</summary>
-/// <remarks>Tries shifted partial Fill for a type with at least three requested copies,
-/// prefers it only when it beats a single NFP pose, then fills residual demand
-/// with NFP poses. No tuned ratio cutoff is claimed: the
-/// historical 0.10/0.20 routing thresholds still require measured acceptance.
-/// Fill's equal-score pose nondeterminism is tracked as PM c98c21bd.</remarks>
+/// <remarks>Area ratio selects search order, not placement permission. The small-insert path
+/// prefers a shifted partial lattice; the middle compares it with occupied-aware NFP search;
+/// the large-insert path tries NFP first. All accepted poses are clearance-checked.
+/// Fill's equal-score pose nondeterminism remains PM c98c21bd.</remarks>
 internal static class CutoutRouter
 {
+    // Calibrated as search-order hints, not hard geometry cutoffs. Round-hole neutral tests
+    // show a Fill win at 0.204, so the original proposed >0.20 NFP-only rule loses copies.
+    internal const double SmallRatio = 0.10;
+    internal const double LargeRatio = 0.35;
+
     internal static IReadOnlyList<NestJobPlacement> Fill(NestJobPart frame, int cutoutIndex,
         IReadOnlyList<NestJobPart> inserts, double spacing, CancellationToken token = default)
     {
@@ -28,8 +32,7 @@ internal static class CutoutRouter
         ArgumentOutOfRangeException.ThrowIfNegative(cutoutIndex);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(cutoutIndex, frameGeometry.Cutouts.Count);
         var hole = frameGeometry.Cutouts[cutoutIndex];
-        if (!hole.IsClosed() || !Supported(frameGeometry.Bounds)
-            || !Supported(hole.BoundingBox))
+        if (!hole.IsClosed() || !Supported(frameGeometry.Bounds) || !Supported(hole.BoundingBox))
             return Array.Empty<NestJobPlacement>();
         if (inserts.Any(p => p == null || !SupportedGeometry(p)))
             return Array.Empty<NestJobPlacement>();
@@ -40,41 +43,74 @@ internal static class CutoutRouter
 
         var accepted = new List<NestJobPlacement>();
         var occupied = new List<(JobPartGeometry Geometry, NestJobPlacement Pose)>();
+        var holeArea = System.Math.Abs(hole.Area());
         // Preserve caller requirement order: priorities are a whole-job concern, not inferred here.
         foreach (var part in inserts)
         {
             token.ThrowIfCancellationRequested();
             var geometry = JobPartGeometry.Read(part.Geometry);
-            if (part.Quantity >= 3)
+            var ratio = geometry.MaterialArea / holeArea;
+            // Unsupported or degenerate material cannot establish a useful routing ratio;
+            // NFP retains its own fail-closed checks and the bounded lattice is not tried.
+            var tryLattice = part.Quantity >= 3 && double.IsFinite(ratio) && ratio > 0;
+            var nfpFirst = !tryLattice || ratio >= LargeRatio;
+            var compareBoth = tryLattice && ratio >= SmallRatio && ratio < LargeRatio;
+            var nfp = nfpFirst ? Nfp(Array.Empty<NestJobPlacement>()) : null;
+            var lattice = tryLattice && (!nfpFirst || nfp!.Count < part.Quantity)
+                ? CutoutLatticeFill.Fill(frame, cutoutIndex, part, part.Quantity, spacing,
+                    CutoutLatticeFill.DefaultShiftSteps, occupied, token)
+                : Array.Empty<NestJobPlacement>();
+            IReadOnlyList<NestJobPlacement> chosen;
+            if (compareBoth || (nfpFirst && lattice.Count > 0))
             {
-                // Geometric work is bounded inside Fill. Do not infer a ratio threshold
-                // from material area before measuring cutout jobs; try both proposals.
-                var usable = CutoutLatticeFill.Fill(frame, cutoutIndex, part, part.Quantity,
-                    spacing, CutoutLatticeFill.DefaultShiftSteps, occupied, token);
-                // A one-copy lattice adds no value over the geometry-aware NFP search;
-                // retain the latter's stable candidate order for that tie.
-                if (usable.Count > 1 || (usable.Count == 1
-                    && CutoutNfpProposal.Find(frame, cutoutIndex, part, spacing, occupied, token) == null))
-                    foreach (var pose in usable)
-                    {
-                        token.ThrowIfCancellationRequested();
-                        Accept(pose);
-                    }
+                nfp ??= Nfp(Array.Empty<NestJobPlacement>());
+                var fromLattice = Complete(lattice);
+                chosen = fromLattice.Count > nfp.Count ? fromLattice : nfp;
             }
-            while (accepted.Count(p => p.PartId == part.Id) < part.Quantity)
+            else if (nfpFirst)
+                chosen = nfp!;
+            else
             {
-                token.ThrowIfCancellationRequested();
-                var pose = CutoutNfpProposal.Find(frame, cutoutIndex, part, spacing, occupied, token);
-                if (pose == null)
-                    break;
-                Accept(pose with { InstanceIndex = accepted.Count(p => p.PartId == part.Id) });
+                // A single Fill copy ties one NFP pose; prefer NFP's stable candidate
+                // order, but retain the lattice copy if bounded NFP found nothing.
+                var seed = lattice.Count > 1 ? lattice : Array.Empty<NestJobPlacement>();
+                chosen = Complete(seed);
+                if (chosen.Count == 0 && lattice.Count == 1)
+                    chosen = lattice;
             }
 
-            void Accept(NestJobPlacement pose)
+            foreach (var pose in chosen)
             {
+                token.ThrowIfCancellationRequested();
                 var indexed = pose with { InstanceIndex = accepted.Count(p => p.PartId == part.Id) };
                 accepted.Add(indexed);
                 occupied.Add((geometry, indexed));
+            }
+
+            IReadOnlyList<NestJobPlacement> Complete(IReadOnlyList<NestJobPlacement> seed)
+            {
+                if (seed.Count >= part.Quantity)
+                    return seed;
+                var result = new List<NestJobPlacement>(seed);
+                result.AddRange(Nfp(seed));
+                return result;
+            }
+
+            IReadOnlyList<NestJobPlacement> Nfp(IReadOnlyList<NestJobPlacement> seed)
+            {
+                var result = new List<NestJobPlacement>();
+                var local = new List<(JobPartGeometry Geometry, NestJobPlacement Pose)>(occupied);
+                local.AddRange(seed.Select(p => (geometry, p)));
+                while (seed.Count + result.Count < part.Quantity)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var pose = CutoutNfpProposal.Find(frame, cutoutIndex, part, spacing, local, token);
+                    if (pose == null)
+                        break;
+                    result.Add(pose);
+                    local.Add((geometry, pose));
+                }
+                return result;
             }
         }
         token.ThrowIfCancellationRequested();

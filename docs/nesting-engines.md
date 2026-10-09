@@ -89,8 +89,14 @@ original requirement IDs, reindexes accepted copies and checks clearance against
 and every previously accepted insert. Lattice shifts account for occupied poses before
 quantity trimming; a pre-fill work limit declines giant grids and lets bounded NFP sampling
 try instead. A null NFP proposal is not proof of geometric impossibility. No material-area
-ratio cutoff is enabled: the proposed 0.10/0.20 routing thresholds still need measured
-neutral and sanitized-job evidence. The router has no pipeline caller and does not change
+ratio cutoff rejects a possible placement: the measured 0.10 and 0.35 ratios guide
+search order only. Below 0.10 it starts with Fill for three or more copies; between
+0.10 and 0.35 it compares Fill-plus-NFP with NFP-only counts; above 0.35 it tries
+NFP first, then Fill if demand remains, taking the higher-count valid proposal.
+An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
+Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
+the search-order hints; these limited cases are not a global density guarantee.
+The router has no pipeline caller and does not change
 stock, live demand, cutting order or posting safety; in-hole production use remains held.
 
 ## Renamed engines
