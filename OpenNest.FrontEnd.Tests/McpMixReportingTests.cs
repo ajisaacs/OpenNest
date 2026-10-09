@@ -77,6 +77,18 @@ public class McpMixReportingTests
         Assert.Empty(session.GetPlate(0).Parts);
     }
 
+    [Fact]
+    public void ZeroDemandHasZeroRemainingAndNegativeDemandIsRejected()
+    {
+        var session = Session();
+        var tools = new NestingTools(session);
+        var text = tools.PackPlate(0, "A", "0");
+        Assert.Contains("A: requested=0, placed=0, remaining=0", text);
+        Assert.Contains("zero progress", text);
+        Assert.Contains("negative", tools.PackPlate(0, "A", "-1"), StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(session.GetPlate(0).Parts);
+    }
+
     private sealed class Stub : INestingEngine
     {
         public NestJobResult Solve(NestJob job, IProgress<NestJobProgress>? progress = null,

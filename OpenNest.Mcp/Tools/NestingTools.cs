@@ -346,7 +346,7 @@ namespace OpenNest.Mcp.Tools
             {
                 var item = items[i];
                 placed[i] = counts.GetValueOrDefault(item.Drawing);
-                var remaining = item.Quantity > 0 ? (item.Quantity - placed[i]).ToString() : "unlimited";
+                var remaining = item.Quantity - placed[i];
                 sb.AppendLine($"    [{i}] {item.Drawing.Name}: requested={item.Quantity}, placed={placed[i]}, remaining={remaining}");
             }
 
@@ -405,6 +405,8 @@ namespace OpenNest.Mcp.Tools
             {
                 if (!int.TryParse(qtyStrings[i], out qtys[i]))
                     return (null, $"Error: '{qtyStrings[i]}' is not a valid quantity");
+                if (qtys[i] < 0)
+                    return (null, $"Error: negative quantity '{qtys[i]}' is not supported");
             }
 
             if (names.Length != qtys.Length)
