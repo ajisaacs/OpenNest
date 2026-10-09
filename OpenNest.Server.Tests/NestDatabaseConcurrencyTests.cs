@@ -24,7 +24,7 @@ public sealed class NestDatabaseConcurrencyTests
     public async Task Concurrency_EveryOperationWaitsForTheSameMonitor(string operation)
     {
         using var factory = new ServerFactory();
-        using var database = new NestDatabase(factory.DatabasePath);
+        using var database = new NestDatabase(factory.DatabasePath, pooling: false);
         var id = Guid.NewGuid();
         var record = new NestRecord { Name = "Monitor ownership fixture" };
         database.Insert(id, record, new byte[] { 1, 2, 3 });
@@ -75,7 +75,7 @@ public sealed class NestDatabaseConcurrencyTests
     public void Concurrency_AllSqlStepsIncludingReadbacks_OwnTheMonitor()
     {
         using var factory = new ServerFactory();
-        using var database = new NestDatabase(factory.DatabasePath);
+        using var database = new NestDatabase(factory.DatabasePath, pooling: false);
         var sync = typeof(NestDatabase).GetField("_sync", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(database)!;
         var connection = (SqliteConnection)typeof(NestDatabase)
@@ -125,7 +125,7 @@ public sealed class NestDatabaseConcurrencyTests
     public async Task Concurrency_DatabaseReadersAndWriters_PreserveExactRecords()
     {
         using var factory = new ServerFactory();
-        using var database = new NestDatabase(factory.DatabasePath);
+        using var database = new NestDatabase(factory.DatabasePath, pooling: false);
         using var start = new Barrier(4);
         var workers = Enumerable.Range(0, 4).Select(lane => Task.Factory.StartNew(() =>
         {
