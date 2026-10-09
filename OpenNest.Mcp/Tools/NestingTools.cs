@@ -257,10 +257,7 @@ namespace OpenNest.Mcp.Tools
             sb.AppendLine($"  Total parts: {countAfter}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
 
-            // Breakdown by drawing
-            var groups = plate.Parts.GroupBy(p => p.BaseDrawing.Name);
-            foreach (var group in groups)
-                sb.AppendLine($"  {group.Key}: {group.Count()}");
+            AppendMixSummary(sb, items, parts);
 
             return sb.ToString();
         }
@@ -333,9 +330,41 @@ namespace OpenNest.Mcp.Tools
             sb.AppendLine($"  Parts placed: {totalPlaced}");
             sb.AppendLine($"  Total parts: {plate.Parts.Count}");
             sb.AppendLine($"  Utilization: {plate.Utilization():P1}");
-            foreach (var group in plate.Parts.GroupBy(p => p.BaseDrawing.Name))
-                sb.AppendLine($"  {group.Key}: {group.Count()}");
+            AppendMixSummary(sb, parsed.items, proposed == null ? Enumerable.Empty<Part>() : proposed.Parts);
             return sb.ToString();
+        }
+
+        private static void AppendMixSummary(StringBuilder sb, IReadOnlyList<NestItem> items, IEnumerable<Part> newlyPlaced)
+        {
+            var counts = new Dictionary<Drawing, int>(ReferenceEqualityComparer.Instance);
+            foreach (var part in newlyPlaced)
+                counts[part.BaseDrawing] = counts.TryGetValue(part.BaseDrawing, out var n) ? n + 1 : 1;
+
+            var placed = new int[items.Count];
+            sb.AppendLine("  Requested mix (new placements only):");
+            for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                placed[i] = counts.GetValueOrDefault(item.Drawing);
+                var remaining = item.Quantity > 0 ? (item.Quantity - placed[i]).ToString() : "unlimited";
+                sb.AppendLine($"    [{i}] {item.Drawing.Name}: requested={item.Quantity}, placed={placed[i]}, remaining={remaining}");
+            }
+
+            var total = placed.Sum(count => (long)count);
+            if (total == 0)
+                sb.AppendLine("  Mix: zero progress for all requested drawings.");
+            else if (items.Count > 1 && items.All(item => item.Quantity > 0))
+            {
+                var balanced = true;
+                for (var i = 1; i < items.Count; i++)
+                    if ((long)placed[i] * items[0].Quantity != (long)placed[0] * items[i].Quantity)
+                        balanced = false;
+                sb.AppendLine(balanced
+                    ? "  Mix: ratio satisfied for new placements; remaining demand may still exist."
+                    : "  Warning: ratio not met by new placements; quantities are ceilings, not a balance constraint.");
+            }
+            else if (items.Count > 1)
+                sb.AppendLine("  Mix: ratio not evaluated for unlimited or nonpositive requested quantities.");
         }
 
         /// <summary>
@@ -385,12 +414,18 @@ namespace OpenNest.Mcp.Tools
                 );
 
             var items = new List<NestItem>();
+            var seen = new HashSet<Drawing>(ReferenceEqualityComparer.Instance);
 
             for (var i = 0; i < names.Length; i++)
             {
-                var drawing = _session.GetDrawing(names[i]);
-                if (drawing == null)
+                var matches = _session.AllDrawings().Where(d => d.Name == names[i]).ToArray();
+                if (matches.Length == 0)
                     return (null, $"Error: drawing '{names[i]}' not found");
+                if (matches.Length > 1)
+                    return (null, $"Error: ambiguous drawing name '{names[i]}' matches multiple drawings");
+                var drawing = matches[0];
+                if (!seen.Add(drawing))
+                    return (null, $"Error: duplicate drawing '{names[i]}' in request");
 
                 items.Add(new NestItem { Drawing = drawing, Quantity = qtys[i] });
             }
