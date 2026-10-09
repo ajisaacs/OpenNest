@@ -17,6 +17,9 @@ namespace OpenNest.Mcp
 
         public Plate GetPlate(int index)
         {
+            if (index < 0)
+                return null;
+
             if (Nest != null && index < Nest.Plates.Count)
                 return Nest.Plates[index];
 
