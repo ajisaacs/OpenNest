@@ -119,6 +119,50 @@ public class NativeContactRegressionTests
         Assert.Throws<NotSupportedException>(() => circle.Contacts(line, out _));
     }
 
+    [Fact]
+    public void ReusedNativeCurves_KeepContactAndContainmentVerdictsAcrossCallsAndThreads()
+    {
+        var lineStart = new Vector(-2, 0);
+        var lineEnd = new Vector(2, 0);
+        var arcCenter = new Vector(0, 0.003);
+        var arcStart = new Vector(0.003, 0.003);
+        var circleCenter = new Vector(0, 0);
+        var circleStart = new Vector(0.003, 0);
+        var line = PostVerificationGeometry.Curve.Create(lineStart, lineEnd, null, false);
+        var arc = PostVerificationGeometry.Curve.Create(arcStart, new Vector(-0.003, 0.003), arcCenter, false);
+        var circle = PostVerificationGeometry.Curve.Create(circleStart, circleStart, circleCenter, false);
+        var pairs = new[] { (line, arc), (arc, line), (line, circle), (circle, line), (arc, circle), (circle, arc) };
+        var probes = new[] { Vector.Zero, new Vector(0.003, 0), new Vector(0, 0.006) };
+
+        string Observe(PostVerificationGeometry.Curve a, PostVerificationGeometry.Curve b)
+        {
+            var inside = string.Join(",", probes.Select(p => $"{a.Contains(p)}:{b.Contains(p)}"));
+            try
+            {
+                var contacts = a.Contacts(b, out var overlap);
+                return $"{inside}|{overlap}|" + string.Join(";", contacts.Select(p =>
+                    $"{BitConverter.DoubleToInt64Bits(p.X)}:{BitConverter.DoubleToInt64Bits(p.Y)}"));
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+            {
+                return $"{inside}|{ex.GetType().Name}:{ex.Message}";
+            }
+        }
+
+        var expected = pairs.Select(p => Observe(
+            PostVerificationGeometry.Curve.Create(p.Item1.Start, p.Item1.End,
+                ReferenceEquals(p.Item1, arc) ? arcCenter : ReferenceEquals(p.Item1, circle) ? circleCenter : null, false),
+            PostVerificationGeometry.Curve.Create(p.Item2.Start, p.Item2.End,
+                ReferenceEquals(p.Item2, arc) ? arcCenter : ReferenceEquals(p.Item2, circle) ? circleCenter : null, false))).ToArray();
+        for (var repeat = 0; repeat < 3; repeat++)
+            Assert.Equal(expected, pairs.Select(p => Observe(p.Item1, p.Item2)).ToArray());
+        Parallel.For(0, 8, _ => Assert.Equal(expected, pairs.Select(p => Observe(p.Item1, p.Item2)).ToArray()));
+        // A separate pair has not initialized either native wrapper before the readers race.
+        var coldLine = PostVerificationGeometry.Curve.Create(lineStart, lineEnd, null, false);
+        var coldCircle = PostVerificationGeometry.Curve.Create(circleStart, circleStart, circleCenter, false);
+        Parallel.For(0, 8, _ => Assert.Equal(expected[2], Observe(coldLine, coldCircle)));
+    }
+
     private static Program RoundedRectangle(double width, double height, double radius, double angle, Vector at)
     {
         var cos = System.Math.Cos(angle);

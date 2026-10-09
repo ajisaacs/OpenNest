@@ -106,7 +106,12 @@ internal static class PostVerificationGeometry
             Center = center;
             Radius = radius;
             Sweep = sweep;
+            nativeEntity = new Lazy<Entity>(ToEntity);
         }
+
+        // Never expose this mutable native wrapper; its geometry is read-only after creation.
+        // Lazy preserves the old conversion point for unsupported curves and is safe for concurrent checks.
+        private readonly Lazy<Entity> nativeEntity;
 
         internal Vector Start { get; }
         internal Vector End { get; }
@@ -170,12 +175,12 @@ internal static class PostVerificationGeometry
                 : Start + (End - Start) * (distance / Length);
         }
 
-        internal bool Contains(Vector point) => ToEntity().ClosestPointTo(point).DistanceTo(point) <= Epsilon;
+        internal bool Contains(Vector point) => nativeEntity.Value.ClosestPointTo(point).DistanceTo(point) <= Epsilon;
 
         internal IReadOnlyList<Vector> Contacts(Curve other, out bool overlap)
         {
-            var entity = ToEntity();
-            var candidate = other.ToEntity();
+            var entity = nativeEntity.Value;
+            var candidate = other.nativeEntity.Value;
             // Native arc filters discard NaN supporting-circle intersections. Inspect
             // both unfiltered queries first: roundoff can differ by operand direction.
             // Coincident supports have separate overlap handling below.
