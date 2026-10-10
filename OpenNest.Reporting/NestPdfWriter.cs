@@ -532,7 +532,7 @@ public static class NestPdfWriter
         snapshot.Thickness > 0 ? $"{Number(snapshot.Thickness)} {snapshot.Units}" : "Not specified";
 
     private static string SheetSize(NestReportSnapshot snapshot, ReportPlate plate) =>
-        $"{Number(plate.Bounds.Length)} x {Number(plate.Bounds.Width)} {snapshot.Units}";
+        $"{Number(plate.Bounds.Width)} x {Number(plate.Bounds.Length)} {snapshot.Units}";
 
     private static string Number(double value) => value.ToString("0.####", Invariant);
 

@@ -54,6 +54,8 @@ each plate's part table across pages with the heading row repeated, and notes
 flow as an ordinary paragraph. No row, table or note text is ever dropped or
 truncated to fit a page.
 
+Stock sizes read **width x length** in job units.
+
 Each part ID is centered on its part's pole of inaccessibility (`PolyLabel`,
 the same method `PlateView`'s `LayoutPart` uses), computed on a
 placement-independent quantized copy so identical parts always get the

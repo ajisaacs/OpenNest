@@ -37,7 +37,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.Matches(@"R002\s+Rotated\s+1\s+3\s+0\s+2\s+1, 3", summary);
         Assert.Matches(@"R003\s+Bracket\s+7\s+3\s+4\s+0\s+1, 3", summary);
         Assert.Matches(@"R004\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
-        Assert.Matches(@"3\s+60 x 30 in\s+1\s+2", summary);
+        Assert.Matches(@"3\s+30 x 60 in\s+1\s+2", summary);
         for (var plate = 1; plate <= 4; plate++)
         {
             var page = pages[plate];
@@ -143,7 +143,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.Equal(5, pages.Length);
         Assert.Contains("millimeters (mm)", pages[0]);
         Assert.Contains("3 mm", pages[0]);
-        Assert.Matches(@"48 x 24 mm", pages[2]);
+        Assert.Matches(@"24 x 48 mm", pages[2]);
         using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
         var stream = ReportPdf.ContentStreams(pdf.Pages[1]).Last();
         stream = stream[(stream.IndexOf("W* n", StringComparison.Ordinal) + 4)..];

@@ -47,7 +47,7 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Contains("2026-09-29 12:00 +00:00", summary);
         Assert.Matches(@"Distinct layouts:\s+1", summary);
         Assert.Matches(@"Total physical sheets:\s+2", summary);
-        Assert.Matches(@"1\s+48 x 24 in\s+2\s+4\s+\d+\.\d%", summary);
+        Assert.Matches(@"1\s+24 x 48 in\s+2\s+4\s+\d+\.\d%", summary);
         Assert.Matches(@"R001\s+Bracket\s+5\s+4\s+1\s+0\s+1", summary);
         Assert.Matches(@"R002\s+Rotated\s+1\s+2\s+0\s+1\s+1", summary);
         Assert.Matches(@"R003\s+Bracket\s+7\s+2\s+5\s+0\s+1", summary);
