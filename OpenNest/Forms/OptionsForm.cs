@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.Data;
 using OpenNest.Engine.Strategies;
 using OpenNest.Properties;
 
@@ -72,6 +73,7 @@ namespace OpenNest.Forms
 
         private void LoadSettings()
         {
+            serverUrlBox.Text = NestStorage.Settings.ServerUrl;
             checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
             numericUpDown1.Value = (decimal)Settings.Default.AutoSizePlateFactor;
 
@@ -141,6 +143,29 @@ namespace OpenNest.Forms
         private void SaveSettings_Click(object sender, EventArgs e)
         {
             SaveSettings();
+        }
+
+        private void SetServer_Click(object sender, EventArgs e)
+        {
+            if (!NestStorageSettings.TryNormalizeServerUrl(serverUrlBox.Text, out var url))
+            {
+                MessageBox.Show(this, "Enter a valid http or https server URL.",
+                    "Server URL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                NestStorage.Save(NestStorage.Settings.Mode, url);
+                serverUrlBox.Text = NestStorage.Settings.ServerUrl;
+                MessageBox.Show(this, "Server URL saved. Storage mode has not changed.",
+                    "Server URL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Could not save the server URL: {ex.Message}",
+                    "Server URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }

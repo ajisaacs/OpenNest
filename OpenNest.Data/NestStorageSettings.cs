@@ -32,6 +32,18 @@ public sealed class NestStorageSettings
     public bool IsDatabaseMode =>
         Mode == NestStorageMode.Database && !string.IsNullOrWhiteSpace(ServerUrl);
 
+    /// <summary>Validate and normalize a nest server base URL without changing storage mode.</summary>
+    public static bool TryNormalizeServerUrl(string? url, out string normalized)
+    {
+        normalized = NormalizeUrl(url);
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            return true;
+
+        normalized = "";
+        return false;
+    }
+
     /// <summary>%APPDATA%\OpenNest\storage.json.</summary>
     public static string DefaultPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

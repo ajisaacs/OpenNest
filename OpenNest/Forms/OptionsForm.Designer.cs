@@ -41,9 +41,13 @@
             this.strategyGroupBox = new System.Windows.Forms.GroupBox();
             this.colorSchemeLabel = new System.Windows.Forms.Label();
             this.colorSchemeCombo = new System.Windows.Forms.ComboBox();
+            this.serverGroupBox = new System.Windows.Forms.GroupBox();
+            this.serverUrlBox = new System.Windows.Forms.TextBox();
+            this.setServerButton = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
             this.bottomPanel1.SuspendLayout();
+            this.serverGroupBox.SuspendLayout();
             this.SuspendLayout();
             // 
             // checkBox1
@@ -135,7 +139,7 @@
             this.bottomPanel1.Controls.Add(this.cancelButton);
             this.bottomPanel1.Controls.Add(this.saveButton);
             this.bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.bottomPanel1.Location = new System.Drawing.Point(0, 368);
+            this.bottomPanel1.Location = new System.Drawing.Point(0, 443);
             this.bottomPanel1.Name = "bottomPanel1";
             this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
             this.bottomPanel1.TabIndex = 1;
@@ -158,7 +162,7 @@
             // strategyGroupBox
             //
             this.strategyGroupBox.Controls.Add(this.strategyGrid);
-            this.strategyGroupBox.Location = new System.Drawing.Point(12, 178);
+            this.strategyGroupBox.Location = new System.Drawing.Point(12, 253);
             this.strategyGroupBox.Name = "strategyGroupBox";
             this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
             this.strategyGroupBox.TabIndex = 2;
@@ -184,13 +188,43 @@
             this.colorSchemeCombo.Size = new System.Drawing.Size(130, 24);
             this.colorSchemeCombo.TabIndex = 11;
             //
+            // serverGroupBox
+            //
+            this.serverGroupBox.Controls.Add(this.serverUrlBox);
+            this.serverGroupBox.Controls.Add(this.setServerButton);
+            this.serverGroupBox.Location = new System.Drawing.Point(12, 178);
+            this.serverGroupBox.Name = "serverGroupBox";
+            this.serverGroupBox.Size = new System.Drawing.Size(684, 69);
+            this.serverGroupBox.TabIndex = 1;
+            this.serverGroupBox.TabStop = false;
+            this.serverGroupBox.Text = "Nest server URL (File / Database mode is selected under File > Storage Mode)";
+            //
+            // serverUrlBox
+            //
+            this.serverUrlBox.Location = new System.Drawing.Point(12, 29);
+            this.serverUrlBox.Name = "serverUrlBox";
+            this.serverUrlBox.PlaceholderText = "http://server:8090";
+            this.serverUrlBox.Size = new System.Drawing.Size(485, 22);
+            this.serverUrlBox.TabIndex = 0;
+            //
+            // setServerButton
+            //
+            this.setServerButton.Location = new System.Drawing.Point(504, 26);
+            this.setServerButton.Name = "setServerButton";
+            this.setServerButton.Size = new System.Drawing.Size(168, 28);
+            this.setServerButton.TabIndex = 1;
+            this.setServerButton.Text = "Set / Change Server";
+            this.setServerButton.UseVisualStyleBackColor = true;
+            this.setServerButton.Click += new System.EventHandler(this.SetServer_Click);
+            //
             // OptionsForm
             //
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(708, 418);
+            this.ClientSize = new System.Drawing.Size(708, 493);
             this.Controls.Add(this.strategyGroupBox);
+            this.Controls.Add(this.serverGroupBox);
             this.Controls.Add(this.tableLayoutPanel1);
             this.Controls.Add(this.bottomPanel1);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -206,6 +240,8 @@
             this.tableLayoutPanel1.ResumeLayout(false);
             this.tableLayoutPanel1.PerformLayout();
             this.bottomPanel1.ResumeLayout(false);
+            this.serverGroupBox.ResumeLayout(false);
+            this.serverGroupBox.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -224,5 +260,8 @@
         private System.Windows.Forms.GroupBox strategyGroupBox;
         private System.Windows.Forms.Label colorSchemeLabel;
         private System.Windows.Forms.ComboBox colorSchemeCombo;
+        private System.Windows.Forms.GroupBox serverGroupBox;
+        private System.Windows.Forms.TextBox serverUrlBox;
+        private System.Windows.Forms.Button setServerButton;
     }
 }

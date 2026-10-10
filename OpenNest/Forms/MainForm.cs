@@ -646,6 +646,7 @@ namespace OpenNest.Forms
                 var serverUrl = NestStorage.Settings.ServerUrl;
                 databaseOpenInProgress = true;
                 storageModeMenu.Enabled = false;
+                mnuToolsOptions.Enabled = false;
                 var file = await repository.GetFileAsync(dlg.SelectedId);
                 if (file == null)
                     throw new FileNotFoundException("This nest no longer exists on the server.");
@@ -663,7 +664,10 @@ namespace OpenNest.Forms
             {
                 databaseOpenInProgress = false;
                 if (!IsDisposed)
+                {
                     storageModeMenu.Enabled = !databaseSaveInProgress;
+                    mnuToolsOptions.Enabled = !databaseSaveInProgress;
+                }
             }
         }
 
@@ -707,6 +711,7 @@ namespace OpenNest.Forms
         {
             databaseSaveInProgress = true;
             storageModeMenu.Enabled = false;
+            mnuToolsOptions.Enabled = false;
             EnableCheck();
             try
             {
@@ -729,6 +734,7 @@ namespace OpenNest.Forms
                 if (!IsDisposed)
                 {
                     storageModeMenu.Enabled = !databaseOpenInProgress;
+                    mnuToolsOptions.Enabled = !databaseOpenInProgress;
                     EnableCheck();
                 }
             }
