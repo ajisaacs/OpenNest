@@ -70,8 +70,17 @@ public sealed class SavedNestsForm : Form
     {
         this.repository = repository;
         this.serverUrl = serverUrl ?? "";
-        session = new NestBrowseSession(repository);
+        var settings = Properties.Settings.Default;
+        var sort = Enum.TryParse<NestSortField>(settings.SavedNestsSortColumn, out var savedSort)
+            && Enum.IsDefined(savedSort) ? savedSort : NestSortField.SavedAt;
+        session = new NestBrowseSession(repository, sort: sort, descending: settings.SavedNestsSortDescending);
         details = new NestDetailsSession(LoadDetailsAsync);
+        FormClosed += (_, _) =>
+        {
+            settings.SavedNestsSortColumn = session.Sort.ToString();
+            settings.SavedNestsSortDescending = session.Descending;
+            settings.Save();
+        };
 
         Text = WindowTitle;
         // Placed on the owner's screen in Load; see FitToScreen.

@@ -16,6 +16,22 @@ namespace OpenNest.Properties {
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("SavedAt")]
+        public string SavedNestsSortColumn {
+            get { return ((string)(this["SavedNestsSortColumn"])); }
+            set { this["SavedNestsSortColumn"] = value; }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool SavedNestsSortDescending {
+            get { return ((bool)(this["SavedNestsSortDescending"])); }
+            set { this["SavedNestsSortDescending"] = value; }
+        }
         
         public static Settings Default {
             get {

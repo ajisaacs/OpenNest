@@ -15,7 +15,8 @@ public sealed class NestBrowseSession : IDisposable
     private int _generation;
     private bool _disposed;
 
-    public NestBrowseSession(INestRepository repository, int pageSize = NestQuery.DefaultLimit)
+    public NestBrowseSession(INestRepository repository, int pageSize = NestQuery.DefaultLimit,
+        NestSortField sort = NestSortField.SavedAt, bool descending = true)
     {
         ArgumentNullException.ThrowIfNull(repository);
         if (pageSize < 1 || pageSize > NestQuery.MaxLimit)
@@ -23,6 +24,8 @@ public sealed class NestBrowseSession : IDisposable
 
         _repository = repository;
         PageSize = pageSize;
+        Sort = Enum.IsDefined(sort) ? sort : NestSortField.SavedAt;
+        Descending = descending;
     }
 
     public int PageSize { get; }

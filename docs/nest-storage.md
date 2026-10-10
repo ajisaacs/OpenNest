@@ -10,6 +10,9 @@ The desktop app can save nests two ways:
   column header sorts every match on the server (click again to reverse); the
   arrow buttons move between pages and the title and find bar show the range and
   total. Dates and numbers are not searched as text; sort their column instead.
+  The selected sort column and direction are remembered for the current Windows
+  user when the browser closes, including across app restarts. Until a selection
+  is saved, nests appear newest-saved first.
   Below the list, the **Details** tabs show the highlighted nest's plates
   (duplicates, size, parts, drawings, utilization) and drawings (required, nested,
   remaining, area); they are read from that nest's archive, which is downloaded
