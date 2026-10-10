@@ -36,6 +36,9 @@ public class PostVerificationAnalyzerTests
         var report = Analyze(Cutoff(30, 30), a, Scribe(40, 40), b);
         var overlap = Assert.Single(Find(report, PostVerificationKind.Overlap));
         Assert.Equal((1, 2, 4), (overlap.PlateNumber, overlap.PartNumber, overlap.OtherPartNumber));
+        Assert.NotNull(overlap.Overlap);
+        Assert.Equal(new Vector(1.5, 1.5), overlap.Location);
+        Assert.Equal(1, overlap.Overlap.Area, 6);
         Assert.True(report.HasWarnings);
         Assert.False(report.CanPost(false));
         Assert.True(report.CanPost(true));
@@ -58,7 +61,8 @@ public class PostVerificationAnalyzerTests
     {
         var part = Rectangle(0, 0, 4);
         part.HasManualLeadIns = true;
-        Assert.Single(Find(Analyze(part), PostVerificationKind.MissingLeadIn));
+        var finding = Assert.Single(Find(Analyze(part), PostVerificationKind.MissingLeadIn));
+        Assert.Equal(Vector.Zero, finding.Location);
     }
 
     [Fact]
@@ -105,8 +109,11 @@ public class PostVerificationAnalyzerTests
     public void Rapid_ThroughPreviouslyCutPartWarns()
     {
         var report = Analyze(Rectangle(0, 0, 4), Scribe(-2, 2), Scribe(6, 2));
-        Assert.Contains(Find(report, PostVerificationKind.RapidCrossing), f =>
-            f.PartNumber == 3 && f.OtherPartNumber == 1);
+        var crossing = Assert.Single(Find(report, PostVerificationKind.RapidCrossing).Where(f =>
+            f.PartNumber == 3 && f.OtherPartNumber == 1));
+        Assert.NotNull(crossing.RapidStart);
+        Assert.NotNull(crossing.RapidEnd);
+        Assert.Equal((crossing.RapidStart.Value + crossing.RapidEnd.Value) * 0.5, crossing.Location);
     }
 
     [Fact]
@@ -169,8 +176,11 @@ public class PostVerificationAnalyzerTests
     public void Rapid_CutoffTravelStillCrossesEarlierRealCuts()
     {
         var report = Analyze(Rectangle(0, 0, 4), Scribe(-2, 2), Cutoff(6, 2));
-        Assert.Contains(Find(report, PostVerificationKind.RapidCrossing), f =>
-            f.PartNumber == 3 && f.OtherPartNumber == 1);
+        var crossing = Assert.Single(Find(report, PostVerificationKind.RapidCrossing).Where(f =>
+            f.PartNumber == 3 && f.OtherPartNumber == 1));
+        Assert.NotNull(crossing.RapidStart);
+        Assert.NotNull(crossing.RapidEnd);
+        Assert.Equal((crossing.RapidStart.Value + crossing.RapidEnd.Value) * 0.5, crossing.Location);
     }
 
     [Theory]

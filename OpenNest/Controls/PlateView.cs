@@ -25,6 +25,7 @@ namespace OpenNest.Controls
     {
         private readonly Timer redrawTimer;
         private readonly OverlapOverlayController overlapOverlay;
+        private readonly ValidationOverlay validationOverlay;
 
         private string status;
         private Plate plate;
@@ -102,6 +103,7 @@ namespace OpenNest.Controls
         public PlateView(ColorScheme colorScheme)
         {
             overlapOverlay = new OverlapOverlayController(this);
+            validationOverlay = new ValidationOverlay(this);
             Plate = new Plate(60, 120);
             origin = new PointF();
             parts = new List<LayoutPart>();
@@ -150,6 +152,8 @@ namespace OpenNest.Controls
         }
 
         public ColorScheme ColorScheme { get; set; }
+
+        internal bool InspectionOnly { get; set; }
 
         public bool AllowZoom { get; set; }
 
@@ -218,6 +222,7 @@ namespace OpenNest.Controls
                 selection.Clear();
             }
 
+            validationOverlay.Clear();
             plate = p;
             plate.PartAdded += plate_PartAdded;
             plate.PartRemoved += plate_PartRemoved;
@@ -231,6 +236,25 @@ namespace OpenNest.Controls
         }
 
         internal OverlapOverlayController OverlapOverlay => overlapOverlay;
+        internal ValidationOverlay ValidationOverlay => validationOverlay;
+        internal (float Scale, PointF Origin) CaptureViewport() => (ViewScale, origin);
+        internal void RestoreViewport((float Scale, PointF Origin) viewport)
+        {
+            ViewScale = viewport.Scale;
+            origin = viewport.Origin;
+            UpdateMatrix();
+            Invalidate();
+        }
+        internal void ShowValidationFinding(PostVerificationFinding finding) => validationOverlay.Show(finding);
+        internal void ClearValidationFinding() => validationOverlay.Clear();
+        internal void CenterValidationPoint(Vector location, Point target)
+        {
+            var current = PointWorldToControl(location);
+            origin.X += target.X - current.X;
+            origin.Y += target.Y - current.Y;
+            UpdateMatrix();
+            Invalidate();
+        }
         public OverlapCheckStatus OverlapStatus => overlapOverlay.Status;
         public PlateOverlapReport OverlapReport => overlapOverlay.Report;
         public bool IsOverlapCheckRunning => overlapOverlay.IsRunning;
@@ -317,6 +341,8 @@ namespace OpenNest.Controls
 
         protected override void OnDragEnter(DragEventArgs drgevent)
         {
+            if (InspectionOnly)
+                return;
             if (drgevent.Data.GetData(typeof(Drawing)) != null)
                 drgevent.Effect = DragDropEffects.Copy;
             else if (FilesDropped != null && drgevent.Data.GetDataPresent(DataFormats.FileDrop))
@@ -325,6 +351,8 @@ namespace OpenNest.Controls
 
         protected override void OnDragDrop(DragEventArgs drgevent)
         {
+            if (InspectionOnly)
+                return;
             if (drgevent.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 FilesDropped?.Invoke(this, (string[])drgevent.Data.GetData(DataFormats.FileDrop));
@@ -351,6 +379,9 @@ namespace OpenNest.Controls
             if (e.Button == MouseButtons.Middle)
                 middleMouseDownPoint = e.Location;
 
+            if (InspectionOnly)
+                return;
+
             if (e.Button == MouseButtons.Left && actionManager.CurrentAction is ActionSelect)
             {
                 var hitCutOff = cutOffHandler.TryStartDrag(CurrentPoint, 5.0 / ViewScale);
@@ -373,6 +404,8 @@ namespace OpenNest.Controls
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
+            if (InspectionOnly)
+                return;
             if (e.Button == MouseButtons.Middle && SelectedParts.Count > 0)
             {
                 var dx = e.X - middleMouseDownPoint.X;
@@ -396,11 +429,12 @@ namespace OpenNest.Controls
 
         protected override void OnMouseWheel(MouseEventArgs e)
         {
-            base.OnMouseWheel(e);
+            if (!InspectionOnly)
+                base.OnMouseWheel(e);
 
             var multiplier = System.Math.Abs(e.Delta / 120);
 
-            if (SelectedParts.Count > 0 && ((ModifierKeys & Keys.Shift) == Keys.Shift))
+            if (!InspectionOnly && SelectedParts.Count > 0 && ((ModifierKeys & Keys.Shift) == Keys.Shift))
             {
                 var increment =
                     (ModifierKeys & Keys.Control) == Keys.Control
@@ -456,6 +490,9 @@ namespace OpenNest.Controls
 
             lastPoint = e.Location;
 
+            if (InspectionOnly)
+                return;
+
             if (cutOffHandler.IsDragging && selection.SelectedCutOffs.Count > 0)
             {
                 cutOffHandler.UpdateDrag(CurrentPoint, selection.SelectedCutOffs[0]);
@@ -484,14 +521,21 @@ namespace OpenNest.Controls
 
         protected override void OnMouseDoubleClick(MouseEventArgs e)
         {
-            base.OnMouseDoubleClick(e);
+            if (!InspectionOnly)
+                base.OnMouseDoubleClick(e);
 
-            if (e.Button == MouseButtons.Middle && SelectedParts.Count == 0)
+            if (e.Button == MouseButtons.Middle && (InspectionOnly || SelectedParts.Count == 0))
                 ZoomToFit();
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (InspectionOnly)
+            {
+                if (keyData == Keys.F)
+                    ZoomToFit();
+                return true;
+            }
             // Audited: DrawControl/PlateView, Action key handlers, EditNestForm,
             // MainForm.ProcessCmdKey and menu shortcuts have no plain PgUp/PgDn
             // binding. BestFitViewerForm owns these only in its separate dialog.
@@ -504,6 +548,12 @@ namespace OpenNest.Controls
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            if (InspectionOnly)
+            {
+                if (e.KeyData == Keys.F)
+                    ZoomToFit();
+                return;
+            }
             switch (e.KeyCode)
             {
                 case Keys.Delete:
@@ -529,6 +579,8 @@ namespace OpenNest.Controls
 
         protected override bool ProcessDialogKey(Keys keyData)
         {
+            if (InspectionOnly)
+                return true;
             // Only handle TAB, RETURN, ESC, and ARROW KEYS here.
             // All other keys can be handled in OnKeyDown method.
 
@@ -603,6 +655,7 @@ namespace OpenNest.Controls
             renderer.DrawActiveWorkArea(e.Graphics);
             renderer.DrawDebugRemnants(e.Graphics);
             DrawOverlapOverlay(e.Graphics);
+            validationOverlay.Draw(e.Graphics);
 
             base.OnPaint(e);
 
@@ -633,6 +686,7 @@ namespace OpenNest.Controls
         {
             ClearHover();
             overlapOverlay.ReleaseHandle();
+            validationOverlay.Clear();
             base.OnHandleDestroyed(e);
             actionManager.Cleanup();
         }
@@ -649,6 +703,7 @@ namespace OpenNest.Controls
                     plate.PartsReordered -= plate_PartsReordered;
                 }
                 overlapOverlay?.Dispose();
+                validationOverlay?.Dispose();
                 hoverTimer?.Dispose();
                 hoverTimer = null;
                 redrawTimer?.Dispose();

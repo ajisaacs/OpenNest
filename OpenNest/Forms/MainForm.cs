@@ -27,6 +27,7 @@ namespace OpenNest.Forms
     public partial class MainForm : Form
     {
         private EditNestForm activeForm;
+        private ValidateNestForm validationForm;
         private bool clickUpdateLocation;
         private bool nestingInProgress;
         private CancellationTokenSource nestingCts;
@@ -1551,6 +1552,34 @@ namespace OpenNest.Forms
                 return;
 
             activeForm.AutoSequenceAllPlates();
+        }
+
+        private void ValidateNest_Click(object sender, EventArgs e)
+        {
+            var editForm = activeForm;
+            if (editForm == null)
+                return;
+
+            var views = MdiChildren.OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, editForm.Nest))
+                .Select(form => form.PlateView).ToArray();
+            if (nestingInProgress || Application.OpenForms.OfType<NestProgressForm>().Any()
+                || views.Any(view => view.IsFillInProgress || view.Actions.CurrentAction?.IsBusy() == true))
+            {
+                MessageBox.Show(this, "Finish or cancel the current nesting or plate action before validating.",
+                    "Validate Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            foreach (var view in views)
+                view.SetAction(typeof(ActionSelect));
+            if (validationForm is { IsDisposed: false })
+            {
+                validationForm.Activate();
+                return;
+            }
+            validationForm = new ValidateNestForm(editForm);
+            validationForm.Show(this);
         }
 
         private void PostProcessor_Click(object sender, EventArgs e)

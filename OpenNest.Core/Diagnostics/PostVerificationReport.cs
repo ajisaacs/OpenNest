@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using OpenNest.Geometry;
 
 namespace OpenNest.Diagnostics;
 
@@ -15,7 +16,13 @@ public enum PostVerificationKind
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
 public sealed record PostVerificationFinding(PostVerificationKind Kind, int PlateNumber,
-    int? PartNumber, int? OtherPartNumber, string Message);
+    int? PartNumber, int? OtherPartNumber, string Message)
+{
+    public Vector? Location { get; init; }
+    public Vector? RapidStart { get; init; }
+    public Vector? RapidEnd { get; init; }
+    public PlateOverlapPair Overlap { get; init; }
+}
 
 /// <summary>Owned, immutable findings. Consent is evaluated afresh, never stored.</summary>
 public sealed class PostVerificationReport
@@ -29,10 +36,12 @@ public sealed class PostVerificationReport
     public bool HasWarnings => Findings.Count != 0;
     public bool CanPost(bool risksAcknowledged) => !HasWarnings || risksAcknowledged;
 
-    public string ToDisplayText()
+    public string ToDisplayText() => ToDisplayText("Pre-post verification");
+
+    public string ToDisplayText(string title)
     {
         var text = new StringBuilder();
-        text.AppendLine("Pre-post verification");
+        text.AppendLine(title);
         var incomplete = Findings.Any(finding => finding.Kind == PostVerificationKind.Incomplete);
         Summary(PostVerificationKind.Overlap, "Overlap");
         Summary(PostVerificationKind.MissingLeadIn, "Missing lead-ins");

@@ -113,7 +113,8 @@ public static class PostVerificationAnalyzer
                 PlateOverlapAnalyzer.Capture(materialParts, cancellationToken), cancellationToken);
             foreach (var pair in overlap.Pairs)
                 findings.Add(new(PostVerificationKind.Overlap, plateNumber, indices[pair.PartAId],
-                    indices[pair.PartBId], "Clean drawing material overlaps (holes subtracted)."));
+                    indices[pair.PartBId], "Clean drawing material overlaps (holes subtracted).")
+                { Location = pair.Centroid, Overlap = pair });
             foreach (var issue in overlap.Issues)
                 findings.Add(new(PostVerificationKind.Incomplete, plateNumber, indices[issue.PartAId],
                     issue.PartBId is { } other ? indices[other] : null, "Overlap check: " + issue.Message));

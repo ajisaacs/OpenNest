@@ -68,7 +68,8 @@ public sealed class ReleasedContourState
                     if (PostVerificationGeometry.Crosses(start, move.End, obstacle.Curves, token))
                         findings.Add(new(PostVerificationKind.RapidCrossing, plate, part, obstacle.Part,
                             $"Direct XY rapid crosses or touches completed untabbed contour {obstacle.Contour} " +
-                            $"of part {obstacle.Part}."));
+                            $"of part {obstacle.Part}.")
+                        { Location = (start + move.End) * 0.5, RapidStart = start, RapidEnd = move.End });
                 }
             }
             else if (move.Layer == LayerType.Leadin)
@@ -94,7 +95,8 @@ public sealed class ReleasedContourState
                     contourNumber++;
                     if (!cutoff && !hasLead)
                         findings.Add(new(PostVerificationKind.MissingLeadIn, plate, part, null,
-                            $"Cutting contour {contourNumber} has no nonzero placed lead-in motion."));
+                            $"Cutting contour {contourNumber} has no nonzero placed lead-in motion.")
+                        { Location = move.Curve.Start });
                     hasLead = false;
                     // A rapid can pause/reposition without leaving any material gap.
                     // Retain already-cut fragments, but do not turn them into obstacles

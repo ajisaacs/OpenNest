@@ -1,5 +1,41 @@
 # Verify a nest before posting
 
+## Standalone desktop validation
+
+Choose **Nest > Validate Nest...** to inspect all plates without running the cut
+planner or selecting a post processor. The read-only **Validate Nest** window
+checks overlapping material, missing lead-ins, and rapid crossings in the existing
+placed programs and cutting order. Findings identify plate and part sequence
+numbers in a read-only grid like the cut planner; incomplete or failed checks are
+never reported as clear. Select a row to switch the main plate view to that plate
+and focus the finding. The inspector opens at the right of the screen and can be
+moved or resized. The details below the grid explain the selected warning.
+
+Overlaps use the same magenta material shading as **View > Overlap Check**. A
+DPI-scaled ring expands and fades continuously while the finding is selected;
+both its color and contrasting halo fade as it grows. For overlaps the ring marks the area centroid (possibly between
+separate patches); for missing lead-ins it marks the contour start. Rapid warnings
+pulse the offending orange dashed segment continuously, without a ring or an
+exact contact-point marker. Incomplete findings use the part center when available;
+findings without a usable location do not invent a marker. Closing the inspector
+clears the highlight and restores the original plate, zoom, and overlap display mode.
+
+Validation does not change placements, programs, lead-ins, or cutting order, save
+the nest, or write CNC output. Minimum spacing and plate boundaries are not checked.
+It does not verify a post processor's final output. Posting still runs its own
+fresh verification and consent flow.
+
+Finish or cancel active nesting/fill operations before validating. The window is
+a normal top-level, modeless form. Editing controls and shortcuts stay disabled
+while it is open, but the main plate view remains available for wheel zoom,
+middle-button pan, and **F** or middle-button double-click to fit. Close the
+inspector to resume editing. Cancel, Escape, or closing the window requests
+cancellation and waits for the worker to stop before restoring editing controls.
+Closing the main window during inspection closes/cancels the inspector first;
+close the main window again after inspection has finished.
+
+## Posting workflow
+
 The desktop's **Nest > Post > (post processor)** workflow checks every plate after
 post settings are accepted and before asking where to save CNC output. The review
 shows all three check categories, even when there are no findings:
