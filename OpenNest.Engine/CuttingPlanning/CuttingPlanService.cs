@@ -241,7 +241,7 @@ public static class CuttingPlanService
                 if (placement.Prepared != null)
                     continue; // An eligible old crossing is precisely what regeneration may repair.
                 // Ignore only the unknown incoming rapid. Every fixed internal motion is checked.
-                var findings = new ReleasedContourState().Check(placement.Execution, null,
+                var findings = new ReleasedContourState(reportMissingLeadIns: false).Check(placement.Execution, null,
                     placement.SourceOrdinal + 1, placement.IsCutOff, token);
                 fixedFindings.AddRange(Map(snapshot, findings));
             }
@@ -279,7 +279,7 @@ public static class CuttingPlanService
         if (snapshot.Dependencies.FirstViolation(order) is { } violation)
             return new(CuttingPlanStatus.InvalidInput,
                 findings: [DependencyFinding(snapshot, violation, "The proposed order")], expansions: expansions);
-        var checker = new ReleasedContourState();
+        var checker = new ReleasedContourState(reportMissingLeadIns: false);
         var position = snapshot.StartPoint;
         var distance = 0.0;
         var findings = new List<PostVerificationFinding>();
@@ -313,7 +313,7 @@ public static class CuttingPlanService
         if (snapshot.Dependencies.FirstViolation(order.Select(p => p.SourceOrdinal).ToArray()) is { } violation)
             return new(CuttingPlanStatus.InvalidInput,
                 findings: [DependencyFinding(snapshot, violation, "The proposed order")], expansions: expansions);
-        var checker = new ReleasedContourState();
+        var checker = new ReleasedContourState(reportMissingLeadIns: false);
         var position = snapshot.StartPoint;
         var distance = 0.0;
         var findings = new List<CuttingPlanFinding>();

@@ -126,9 +126,24 @@ public class CuttingPlanServiceTests
         Assert.Equal(beforeCodes, program.Codes?.ToArray());
     }
 
+    [Fact]
+    public void FixedProgramWithoutLead_IsReadyAndReplayed()
+    {
+        var part = Fixture()[0];
+        part.Program.Codes.RemoveAt(1);
+        ((RapidMove)part.Program.Codes[0]).EndPoint = new Vector(4, 2);
+        var unchanged = Unchanged([part]);
+
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest([part]));
+
+        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        Assert.True(result.IndependentlyReplayed);
+        Assert.False(Assert.Single(result.ProposedOrder).IsRegenerated);
+        unchanged();
+    }
+
     [Theory]
     [InlineData("suppressed")]
-    [InlineData("missing-lead")]
     [InlineData("retention-unknown")]
     [InlineData("cutoff")]
     public void Plan_UnsupportedOrIncompleteStateIsRefused(string fault)
@@ -138,10 +153,6 @@ public class CuttingPlanServiceTests
         switch (fault)
         {
             case "suppressed": ((Motion)part.Program.Codes[2]).Suppressed = true; break;
-            case "missing-lead":
-                part.Program.Codes.RemoveAt(1);
-                ((RapidMove)part.Program.Codes[0]).EndPoint = new Vector(4, 2);
-                expected = CuttingPlanStatus.ConstraintConflict; break;
             case "retention-unknown": ((LinearMove)part.Program.Codes[^2]).EndPoint = new Vector(4, 2.25); break;
             case "cutoff": part.BaseDrawing.IsCutOff = true; break;
         }

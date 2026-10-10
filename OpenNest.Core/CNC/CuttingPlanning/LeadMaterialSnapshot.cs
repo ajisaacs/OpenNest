@@ -47,7 +47,7 @@ public sealed class LeadMaterialSnapshot
                 if (chain.Count > 0 && chain[^1].End.DistanceTo(curve.Start) > PostVerificationGeometry.Epsilon)
                     throw new ArgumentException("Material contour is discontinuous.");
                 chain.Add(curve);
-                if (PostVerificationGeometry.Closed(chain))
+                if (NominalContourClosure.IsClosed(chain[0].Start, chain[^1].End))
                     Finish();
             }
             Finish();
@@ -67,6 +67,15 @@ public sealed class LeadMaterialSnapshot
                             var b = rings[s][j];
                             var contacts = a.Contacts(b, out var overlap);
                             var adjacent = r == s && (j == i + 1 || (i == 0 && j == rings[r].Length - 1));
+                            var arcJoint = adjacent && a.IsFiniteArc && b.IsFiniteArc
+                                && (a.End.DistanceTo(b.Start) <= Tolerance.Epsilon
+                                    || a.Start.DistanceTo(b.End) <= Tolerance.Epsilon);
+                            // Native arc queries pad angles by 1e-5 radians, admitting
+                            // intersections on an extension (distance grows with radius).
+                            // At a shared arc joint require both actual finite spans;
+                            // overlap and genuine second intersections still refuse.
+                            if (arcJoint)
+                                contacts = contacts.Where(p => !a.IsOutsideArcSpan(p) && !b.IsOutsideArcSpan(p)).ToArray();
                             // Native contacts at rounded arc/line joints can drift from the
                             // authored endpoint. Use the shared geometry tolerance only to
                             // recognize that joint; overlaps and other contacts still refuse.
@@ -101,8 +110,13 @@ public sealed class LeadMaterialSnapshot
             {
                 if (chain.Count == 0)
                     return;
-                if (!PostVerificationGeometry.Closed(chain))
-                    throw new ArgumentException("Nominal material contour is open; tab gaps cannot be filled implicitly.");
+                if (!NominalContourClosure.IsClosed(chain[0].Start, chain[^1].End))
+                {
+                    var gap = chain[0].Start.DistanceTo(chain[^1].End);
+                    throw new ArgumentException(FormattableString.Invariant(
+                        $"Nominal material contour {rings.Count + 1} is open: endpoint gap {gap:G6} model units exceeds closure tolerance {NominalContourClosure.Tolerance:G6}.")
+                        + " Review the source contour in the drawing editor; gaps cannot be filled implicitly.");
+                }
                 rings.Add(chain.ToArray());
                 chain.Clear();
             }

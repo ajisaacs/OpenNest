@@ -57,8 +57,17 @@ Nominal material validation recognizes contacts at shared endpoints of adjacent
 contour segments using `OpenNest.Math.Tolerance.Epsilon` (0.00001 model units).
 This avoids false self-intersection warnings from rounding at arc/line joints,
 including the contour seam. Overlapping segments and contacts away from those
-joints or between separate contours still fail validation. Contour closure and
-the underlying native intersection queries retain their existing tolerances.
+joints or between separate contours still fail validation. For adjacent finite arcs
+with a shared endpoint, material validation filters native contacts against both
+actual arc spans: the native query's angular padding can otherwise report a
+supporting-circle intersection beyond one arc's endpoint. This does not increase
+the joint-distance tolerance, discard overlapping arcs, or waive a second intersection
+inside both spans. Lead and rapid checks keep their conservative contact queries.
+Source contour closure
+in material capture and emitter preparation accepts endpoint gaps up to 0.000001
+model units (inches for an inch nest), with a floating-point roundoff allowance
+capped at 1e-12. It does not rewrite source endpoints. Native intersections,
+executed-motion checks and pre-post verification retain their existing tolerances.
 
 Capture builds whole-part prerequisites from owned values, and both the search and
 the final replay enforce them:
@@ -232,7 +241,7 @@ Neither obtaining a proposal nor copying its programs installs them on live part
 ## Results and refusal
 
 `Ready` and `IndependentlyReplayed` describe the modeled proposal only. In the
-no-parameter fixed route, replay checks rapid crossings, missing leads and
+no-parameter fixed route, replay checks rapid crossings and
 incomplete retention; it does not add regeneration-mode material/lead checks.
 In regeneration mode, replay also checks actual lead paths and contour accounting
 against owned clean material. Neither mode certifies final NC, production cutting
@@ -317,10 +326,13 @@ plans every plate that has parts. Both open one dialog built on
   whole-part order; either change replans. The settings are confirmed parameters: every
   unlocked part's lead-ins are regenerated. Locked parts keep their exact programs;
   the strict route checks them, while any best-effort warnings require explicit review below.
-- A missing or zero-length lead-in is reported directly, rather than as a search-limit
-  failure. Open `Cutting Settings...`, choose a lead-in other than `None` with a nonzero
-  length on the affected `External`, `Internal`, or `Arc / Circle` tab, then replan.
-  Locked programs require manual lead editing or unlocking before regeneration.
+- Lead-ins are optional for planning. With `None` (or a style that emits no lead
+  motion), the emitter places the pierce directly on the selected contour point.
+  Unlocked contour starts can still move to improve travel; locked programs keep
+  their existing starts. Search and independent replay still check rapid crossings,
+  emitted lead paths when present, and contour accounting. The separate pre-post
+  missing-lead warning remains available for operator review; a ready plan does not
+  waive posting checks.
   When a lead hits another part, the finding suggests more spacing or a shorter lead;
   when no tested entry fits, it suggests reducing lead-in length and, if neighbours
   obstruct it, spacing the parts farther apart. These are suggestions, not guaranteed
@@ -360,7 +372,12 @@ plans every plate that has parts. Both open one dialog built on
   programs. Ready and best-effort proposals can be previewed only while the plate still
   matches capture. Best-effort previews are labelled `UNVERIFIED`. Refused program graphs
   are never copied, and changed plates require replanning.
-- Apply requires usable output for every plate and remains all or nothing. A ready batch
+- Apply requires usable output for every plate and remains all or nothing. The summary
+  counts best-effort proposals as usable when reporting how many plates block Apply;
+  their warnings still require acceptance. Open nominal contour findings identify the
+  contour number, endpoint gap in model units (the nest's linear units), and closure
+  tolerance, so the source can be reviewed in the drawing editor. Reporting never
+  closes gaps or changes the validation tolerance. A fully ready batch
   can apply immediately; an unverified batch requires the unchecked, per-proposal
   `I reviewed the warnings. Apply this unverified plan.` checkbox. Replanning clears it.
   Both use the same owned-program, freshness and rollback boundary. After it applies, each plate keeps its own copy of the

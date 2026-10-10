@@ -126,7 +126,7 @@ public class ContourEntryFeasibilityTests
 
         // Nothing to certify means the validator passes vacuously — the emitted program
         // carries no lead motion at all, so this verdict certifies no lead and the
-        // complete-plan missing-lead check still has to run later. The adapter must not
+        // complete-plan rapid/contour checks still have to run later. The adapter must not
         // silently drop the distinction: consumers can see it is vacuous by counting leads.
         Assert.True(verdict.IsClear);
         var motions = ExecutionMotionReader.Read(prepared.Emit(new[] { choice }), At, null, default).Motions;

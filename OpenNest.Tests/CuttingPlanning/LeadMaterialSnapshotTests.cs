@@ -7,6 +7,61 @@ namespace OpenNest.Tests.CuttingPlanning;
 public class LeadMaterialSnapshotTests
 {
     [Theory]
+    [InlineData(false, 0, 0, 0)]
+    [InlineData(true, 0, 0, 0)]
+    [InlineData(false, 0.7, 40, 20)]
+    [InlineData(true, 0.7, 40, 20)]
+    public void AdjacentArcs_IntersectionOnExtensionIsNotASelfIntersection(bool atSeam, double angle, double x, double y)
+    {
+        var program = ArcJoint(0.00005, false, atSeam);
+        program.Rotate(angle);
+        var location = new Vector(x, y);
+        var execution = ExecutionMotionReader.ReadSupported(program, location, null);
+        var arcs = execution.Motions.Where(m => m.Curve?.IsFiniteArc == true).Select(m => m.Curve!).ToArray();
+        var contacts = arcs[0].Contacts(arcs[1], out var overlap);
+        Assert.False(overlap);
+        Assert.Contains(contacts, p => arcs.Any(a => a.IsOutsideArcSpan(p)));
+
+        var material = LeadMaterialSnapshot.Capture(program, location);
+
+        Assert.True(material.IsComplete, material.Reason);
+    }
+
+    [Fact]
+    public void AdjacentArcs_RealSecondIntersectionRemainsRejected()
+    {
+        var program = ArcJoint(-0.00005, true, false);
+        var arcs = ExecutionMotionReader.ReadSupported(program, Vector.Zero, null).Motions
+            .Where(m => m.Curve?.IsFiniteArc == true).Select(m => m.Curve!).ToArray();
+        var contacts = arcs[0].Contacts(arcs[1], out var overlap);
+        Assert.False(overlap);
+        Assert.Contains(contacts, p => p.DistanceTo(Vector.Zero) > 0.00001
+            && !arcs[0].IsOutsideArcSpan(p) && !arcs[1].IsOutsideArcSpan(p));
+        var material = LeadMaterialSnapshot.Capture(program, Vector.Zero);
+
+        Assert.False(material.IsComplete);
+        Assert.Contains("Material boundaries", material.Reason);
+    }
+
+    private static Program ArcJoint(double centerOffset, bool reverseSecond, bool atSeam)
+    {
+        // Near-tangent circles meet at zero and about 0.000106 away. The native
+        // angular band of the radius-18 arc admits its extension beyond zero.
+        var first = new Vector(-18, 18);
+        var center = new Vector(centerOffset, 1);
+        var end = center + new Vector(center.DistanceTo(Vector.Zero), 0);
+        var program = new Program();
+        program.MoveTo(atSeam ? Vector.Zero : first);
+        if (!atSeam)
+            program.ArcTo(0, 0, 0, 18, RotationType.CCW);
+        program.ArcTo(end.X, end.Y, center.X, center.Y, reverseSecond ? RotationType.CW : RotationType.CCW);
+        program.LineTo(first);
+        if (atSeam)
+            program.ArcTo(0, 0, 0, 18, RotationType.CCW);
+        return program;
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void RoundedCornerContact_RoundingAtAdjacentEndpointIsAccepted(bool atSeam)

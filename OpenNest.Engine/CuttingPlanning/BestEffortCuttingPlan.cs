@@ -28,7 +28,7 @@ internal static class BestEffortCuttingPlan
         var done = new HashSet<int>();
         var position = snapshot.StartPoint;
         var distance = 0.0;
-        var checker = new ReleasedContourState();
+        var checker = new ReleasedContourState(reportMissingLeadIns: false);
         try
         {
             while (order.Count < snapshot.Placements.Count)

@@ -191,7 +191,7 @@ internal static class JointCuttingPlanSearch
         /// </summary>
         internal Attempt Follow(int[] sequence, int? stall, Node resume, bool preferredOnly = false)
         {
-            var root = resume ?? new Node([], snapshot.StartPoint, new ReleasedContourState(), null, null);
+            var root = resume ?? new Node([], snapshot.StartPoint, new ReleasedContourState(reportMissingLeadIns: false), null, null);
             var attempt = new Attempt(sequence);
             var progressExpansions = Expansions;
             var stack = new Stack<Frame>();

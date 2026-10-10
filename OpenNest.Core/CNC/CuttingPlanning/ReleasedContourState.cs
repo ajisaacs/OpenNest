@@ -11,10 +11,20 @@ namespace OpenNest.CNC.CuttingPlanning;
 public sealed class ReleasedContourState
 {
     private readonly List<Obstacle> obstacles = new();
+    private readonly bool reportMissingLeadIns;
+
+    public ReleasedContourState() : this(true) { }
+
+    /// <param name="reportMissingLeadIns">Keep pre-post warnings by default. Planning
+    /// may pierce directly on a contour and checks travel without requiring a lead.</param>
+    public ReleasedContourState(bool reportMissingLeadIns)
+    {
+        this.reportMissingLeadIns = reportMissingLeadIns;
+    }
 
     public ReleasedContourState Copy()
     {
-        var copy = new ReleasedContourState();
+        var copy = new ReleasedContourState(reportMissingLeadIns);
         copy.obstacles.AddRange(obstacles);
         return copy;
     }
@@ -98,7 +108,7 @@ public sealed class ReleasedContourState
                 if (contour.Count == 0)
                 {
                     contourNumber++;
-                    if (!cutoff && !hasLead)
+                    if (reportMissingLeadIns && !cutoff && !hasLead)
                         findings.Add(new(PostVerificationKind.MissingLeadIn, plate, part, null,
                             $"Cutting contour {contourNumber} has no nonzero placed lead-in motion.")
                         { Location = move.Curve.Start });

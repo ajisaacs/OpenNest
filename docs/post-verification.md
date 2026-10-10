@@ -54,6 +54,8 @@ shows all three check categories, even when there are no findings:
 - **Missing lead-ins:** cutting contours without an actual, nonzero lead-in in the
   placed program. Applying a lead-in to only one contour does not clear the other
   contours. Scribe-only work and scrap cutoff lines do not require lead-ins here.
+  The cutting planner supports direct contour piercing without lead-ins; that does
+  not suppress this pre-post review warning or grant posting consent.
 - **Rapid crossings:** direct XY moves crossing closed, already-cut, untabbed
   contours in cutting order. This includes earlier holes within the same part and
   previously cut parts. A future cut is not an obstacle yet. Actual uncut gaps are

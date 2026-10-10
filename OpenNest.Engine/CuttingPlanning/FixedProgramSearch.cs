@@ -16,7 +16,7 @@ internal static class FixedProgramSearch
     internal static Outcome Run(CuttingPlanSnapshot snapshot, CancellationToken token)
     {
         var stack = new Stack<Frame>();
-        stack.Push(Create([], snapshot.StartPoint, new ReleasedContourState()));
+        stack.Push(Create([], snapshot.StartPoint, new ReleasedContourState(reportMissingLeadIns: false)));
         var rejected = new HashSet<PostVerificationFinding>();
         var expansions = 0;
         while (stack.Count != 0)

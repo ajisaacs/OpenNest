@@ -49,7 +49,9 @@ public class CuttingPlanFormTests
     public void BlockedPlate_KeepsApplyDisabledAndShowsTheCurrentParts() => RunSta(() =>
     {
         var locked = Square("locked", 1, 1);
-        locked.LeadInsLocked = true; // A locked program is never regenerated: no lead-in blocks it.
+        var crossing = (OpenNest.CNC.Program)locked.Program.Clone();
+        crossing.MoveTo(5, 5); // A locked crossing cannot be repaired by regeneration.
+        Assert.True(locked.RestoreLeadInProgram(crossing, true));
         var (nest, view) = CreateView(locked);
         using var editor = view;
         using var form = new CuttingPlanForm(view, nest, allPlates: false, Parameters());
@@ -187,7 +189,9 @@ public class CuttingPlanFormTests
         first.Parts.Add(Square("open", 1, 1));
         var second = nest.CreatePlate();
         var locked = Square("locked", 1, 1);
-        locked.LeadInsLocked = true;
+        var crossing = (OpenNest.CNC.Program)locked.Program.Clone();
+        crossing.MoveTo(5, 5);
+        Assert.True(locked.RestoreLeadInProgram(crossing, true));
         second.Parts.Add(locked);
         nest.CreatePlate(); // An empty plate, like the editor's trailing plate.
         using var view = new PlateView { Plate = first };

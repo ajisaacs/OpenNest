@@ -31,8 +31,8 @@ public sealed record ContourFeasibilityVerdict(ContourFeasibilityStatus Status, 
 /// candidate contour through the S06 diagnostic seam, reads it at the placement position,
 /// and certifies the emitted lead-in and lead-out against ALL placed material. It is not a
 /// new collision implementation and not a plan approval: a Clear verdict certifies this
-/// contour's emitted leads only — the missing-lead (NoLeadIn) check still runs later on the
-/// complete plan, and rapids/pierce clearance belong to their existing checkers. A
+/// contour's emitted leads only — NoLeadIn is supported, and the complete plan must
+/// still pass rapid travel and contour-accounting checks. A
 /// candidate rejected here is not proven infeasible by anything else: this adapter only
 /// reports what the validator reported.
 /// One instance is one captured planning attempt: verdicts cache per exact choice and node

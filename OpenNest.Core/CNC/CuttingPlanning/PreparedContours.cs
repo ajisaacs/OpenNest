@@ -74,7 +74,7 @@ public sealed class PreparedContours
             if (current.Entities.Count > 0 && End(current.Entities[^1]).DistanceTo(Start(entity)) > PostVerificationGeometry.Epsilon)
                 throw new ArgumentException("Discontinuous native contour.");
             current.Entities.Add(entity);
-            if (Start(current.Entities[0]).DistanceTo(End(entity)) <= PostVerificationGeometry.Epsilon)
+            if (NominalContourClosure.IsClosed(Start(current.Entities[0]), End(entity)))
                 FinishContour();
         }
         if (current.Entities.Count != 0 || contours.Count == 0)

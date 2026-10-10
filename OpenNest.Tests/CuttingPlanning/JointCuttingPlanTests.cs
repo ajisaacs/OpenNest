@@ -4,11 +4,55 @@ using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Diagnostics;
 using OpenNest.Engine.CuttingPlanning;
 using OpenNest.Geometry;
+using OpenNest.IO;
 
 namespace OpenNest.Tests.CuttingPlanning;
 
 public class JointCuttingPlanTests
 {
+    [Fact]
+    public void JointSearch_NoLeads_RepairsRapidCrossings()
+    {
+        var (part, parameters) = Crossing();
+        parameters.ExternalLeadIn = new NoLeadIn();
+        parameters.InternalLeadIn = new NoLeadIn();
+        parameters.ArcCircleLeadIn = new NoLeadIn();
+        var unchanged = Unchanged(part, parameters);
+        var source = Read(part.Program, part.Location);
+        Assert.Contains(new ReleasedContourState(reportMissingLeadIns: false).Check(source, Vector.Zero, 1),
+            f => f.Kind == PostVerificationKind.RapidCrossing);
+
+        var result = CuttingPlanService.Plan(new CuttingPlanRequest([part], confirmedParameters: parameters));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        var output = Read(Assert.Single(result.ProposedOrder).CopyProgram(), part.Location);
+        Assert.DoesNotContain(output.Motions, m => m.Layer == LayerType.Leadin);
+        Assert.Empty(new ReleasedContourState(reportMissingLeadIns: false).Check(output, Vector.Zero, 1));
+        Assert.Contains(new ReleasedContourState().Check(output, Vector.Zero, 1),
+            f => f.Kind == PostVerificationKind.MissingLeadIn);
+        unchanged();
+    }
+
+    [Fact]
+    public void JointSearch_NoLeads_ChoosesDifferentPiercesForOppositeApproaches()
+    {
+        var part = new Part(new Drawing("direct pierce", ExplicitContourTests.Square(false)));
+        var settings = new CuttingParameters();
+        var pierces = new List<Vector?>();
+        foreach (var start in new[] { new Vector(-5, 5), new Vector(15, 5) })
+        {
+            var result = CuttingPlanService.Plan(new CuttingPlanRequest([part], start, confirmedParameters: settings));
+            Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+            Assert.True(result.IndependentlyReplayed);
+            var output = Read(Assert.Single(result.ProposedOrder).CopyProgram(), part.Location);
+            Assert.DoesNotContain(output.Motions, m => m.Layer == LayerType.Leadin);
+            pierces.Add(output.Motions.First(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display).Start);
+            Assert.Empty(new ReleasedContourState(reportMissingLeadIns: false).Check(output, start, 1));
+        }
+        Assert.NotEqual(pierces[0], pierces[1]);
+    }
+
     [Fact]
     public void JointSearch_RepairsActualCompletedHoleCrossing_WithExactReplayAndNoMutation()
     {
@@ -46,7 +90,6 @@ public class JointCuttingPlanTests
     [Theory]
     [InlineData("locked")]
     [InlineData("ineligible")]
-    [InlineData("no-valid-entry")]
     [InlineData("unsupported")]
     public void JointSearch_RefusesWithoutInstallingFallbackOrMutating(string fault)
     {
@@ -55,12 +98,6 @@ public class JointCuttingPlanTests
         var expected = CuttingPlanStatus.ConstraintConflict;
         if (fault == "locked") part.LeadInsLocked = true;
         if (fault == "ineligible") eligible = [];
-        if (fault == "no-valid-entry")
-        {
-            parameters.ArcCircleLeadIn = new NoLeadIn();
-            parameters.InternalLeadIn = parameters.ArcCircleLeadIn;
-            expected = CuttingPlanStatus.NoSolutionWithinBudget;
-        }
         if (fault == "unsupported")
         {
             part.BaseDrawing.Program.Codes.AddRange(LeadPathValidationTests.Rectangle(30, 30, 40, 40).Codes);
@@ -418,7 +455,7 @@ public class JointCuttingPlanTests
         var manual = part.HasManualLeadIns;
         var bounds = part.BoundingBox;
         var quantity = part.BaseDrawing.Quantity.Nested;
-        var length = ((LineLeadIn)parameters.ExternalLeadIn).Length;
+        var settings = CuttingParametersSerializer.Serialize(parameters);
         return () =>
         {
             Assert.Same(program, part.Program); Assert.Same(clean, part.BaseDrawing.Program);
@@ -427,7 +464,7 @@ public class JointCuttingPlanTests
             Assert.Equal(locked, part.LeadInsLocked); Assert.Equal(manual, part.HasManualLeadIns);
             Assert.Same(bounds, part.BoundingBox); Assert.Same(parameters, part.CuttingParameters);
             Assert.Equal(quantity, part.BaseDrawing.Quantity.Nested);
-            Assert.Equal(length, ((LineLeadIn)parameters.ExternalLeadIn).Length);
+            Assert.Equal(settings, CuttingParametersSerializer.Serialize(parameters));
             foreach (var sub in subs)
             {
                 Assert.Same(sub.Program, sub.c.Program); Assert.Equal(sub.text, sub.c.Program.ToString());

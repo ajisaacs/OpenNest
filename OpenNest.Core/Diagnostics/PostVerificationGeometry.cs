@@ -201,6 +201,15 @@ internal static class PostVerificationGeometry
 
         internal bool Contains(Vector point) => nativeEntity.Value.ClosestPointTo(point).DistanceTo(point) <= Epsilon;
 
+        /// <summary>
+        /// Filters supporting-circle contacts against the actual finite arc span. The
+        /// native angular padding is larger and must not turn an arc extension into a
+        /// self-intersection at an adjacent nominal joint. This is not a radial test.
+        /// </summary>
+        internal bool IsOutsideArcSpan(Vector point) => Center.HasValue && !OnArc(point);
+
+        internal bool IsFiniteArc => Center.HasValue && System.Math.Abs(Sweep) < TwoPi;
+
         internal IReadOnlyList<Vector> Contacts(Curve other, out bool overlap)
         {
             var entity = nativeEntity.Value;

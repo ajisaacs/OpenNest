@@ -8,77 +8,91 @@ namespace OpenNest.Tests.CuttingPlanning;
 
 public class CuttingPlanMessageTests
 {
+    [Fact]
+    public void Describe_MixedBestEffortAndOpenContour_CountsOnlyBlockedPlateAndExplainsGap()
+    {
+        var open = new OpenNest.CNC.Program();
+        open.MoveTo(0, 0);
+        open.LineTo(10, 0);
+        open.LineTo(10, 10);
+        open.LineTo(0, 10);
+        open.LineTo(0, 0.000002);
+        var part = new Part(new Drawing("open perimeter", open));
+        var original = OwnedProgramCopy.Copy(part.BaseDrawing.Program);
+        var plates = new[]
+        {
+            BestEffortCuttingPlanTests.Plate(BestEffortCuttingPlanTests.TouchingContours()),
+            BestEffortCuttingPlanTests.Plate(part),
+        };
+
+        var proposal = CuttingPlanBatch.Capture(plates, ExplicitContourTests.Parameters(), false).Plan();
+        var text = string.Join("\n", proposal.Describe("in"));
+
+        Assert.StartsWith("Apply is unavailable: 1 of 2 plates could not be planned.", text);
+        Assert.Contains("Plate 1: best-effort, unverified.", text);
+        Assert.Contains("Plate 2: blocked:", text);
+        Assert.Contains("contour 1 is open: endpoint gap 2E-06 model units", text);
+        Assert.Contains("closure tolerance 1E-06", text);
+        Assert.Contains("Review the source contour in the drawing editor", text);
+        Assert.False(proposal.CanApplyWithWarnings);
+        Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply(true).Status);
+        Assert.True(ProgramContent.Equal(original, part.BaseDrawing.Program));
+        Assert.All(plates.SelectMany(p => p.Parts), p => Assert.False(p.HasManualLeadIns));
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void Describe_MissingOrZeroLengthLead_ExplainsSettingsWithoutBlamingSearch(bool keepOrder, bool zeroLength)
+    public void Describe_NoneIsSupportedButDegenerateLeadMotionStillRefuses(bool keepOrder, bool zeroLength)
     {
         var part = new Part(new Drawing("sample", ExplicitContourTests.Square(false)), new Vector(1, 1));
-        var plate = new Nest().CreatePlate();
-        plate.Size = new Size(100, 100);
-        plate.Parts.Add(part);
-        var program = part.Program;
-        var original = OwnedProgramCopy.Copy(program);
+        var plate = BestEffortCuttingPlanTests.Plate(part);
+        var original = OwnedProgramCopy.Copy(part.Program);
         var settings = new CuttingParameters();
         if (zeroLength)
             settings.ExternalLeadIn = new LineLeadIn { Length = 0, ApproachAngle = 90 };
 
         var proposal = CuttingPlanBatch.Capture([plate], settings, keepOrder).Plan();
 
-        Assert.False(proposal.CanApply);
-        var result = Assert.Single(proposal.Plates).Result;
-        Assert.Equal(CuttingPlanStatus.NoSolutionWithinBudget, result.Status);
-        Assert.Contains(result.Findings, f => f.Kind == PostVerificationKind.MissingLeadIn);
-        var text = string.Join("\n", proposal.Describe("in"));
-        Assert.Contains("Plate 1: blocked: missing or zero-length lead-in.", text);
-        Assert.Contains("Open Cutting Settings...", text);
-        Assert.Contains("other than None", text);
-        Assert.Contains("nonzero length", text);
-        Assert.Contains("Part 1 (sample):", text);
-        Assert.Contains("Cutting contour 1", text);
-        Assert.DoesNotContain("search limit", text);
-        Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
-        Assert.Same(program, part.Program);
-        Assert.True(ProgramContent.Equal(original, part.Program));
-        Assert.Null(plate.CuttingParameters);
-        Assert.False(part.HasManualLeadIns);
+        if (zeroLength)
+        {
+            Assert.False(proposal.CanApply);
+            Assert.Contains("Lead motion is missing, degenerate or inconsistent", string.Join("\n", proposal.Describe("in")));
+            Assert.True(ProgramContent.Equal(original, part.Program));
+            return;
+        }
 
-        // Choosing valid settings fixes the refusal; reporting never changes settings or bypasses checks.
-        var ready = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), keepOrder).Plan();
-        Assert.True(ready.CanApply, string.Join("\n", ready.Describe("in")));
-        Assert.True(Assert.Single(ready.Plates).Result.IndependentlyReplayed);
-        Assert.DoesNotContain("missing or zero-length", string.Join("\n", ready.Describe("in")));
-        Assert.Same(program, part.Program);
+        Assert.True(proposal.CanApply, string.Join("\n", proposal.Describe("in")));
+        var result = Assert.Single(proposal.Plates).Result;
+        Assert.True(result.IndependentlyReplayed);
+        Assert.DoesNotContain(result.Findings, f => f.Kind == PostVerificationKind.MissingLeadIn);
+        Assert.Contains("Plate 1: ready.", string.Join("\n", proposal.Describe("in")));
+        var output = Assert.Single(result.ProposedOrder).CopyProgram();
+        Assert.DoesNotContain(ExecutionMotionReader.ReadSupported(output, part.Location, null).Motions,
+            m => m.Layer == OpenNest.CNC.LayerType.Leadin && m.Length > 0);
         Assert.True(ProgramContent.Equal(original, part.Program));
+        Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply().Status);
     }
 
     [Fact]
-    public void Describe_LockedProgramWithoutLead_ExplainsThatSettingsCannotRegenerateIt()
+    public void Describe_LockedProgramWithoutLead_IsReadyAndKeepsItsProgram()
     {
         var part = new Part(new Drawing("locked sample", ExplicitContourTests.Square(false)), new Vector(1, 1))
         {
             LeadInsLocked = true,
         };
-        var plate = new Nest().CreatePlate();
-        plate.Size = new Size(100, 100);
-        plate.Parts.Add(part);
+        var plate = BestEffortCuttingPlanTests.Plate(part);
         var program = part.Program;
-
         var proposal = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan();
 
-        Assert.Equal(CuttingPlanStatus.ConstraintConflict, Assert.Single(proposal.Plates).Result.Status);
-        Assert.False(proposal.CanApply);
-        var text = string.Join("\n", proposal.Describe("in"));
-        Assert.Contains("missing or zero-length lead-in", text);
-        Assert.Contains("If the affected part is locked, edit its lead-ins or unlock it before replanning.", text);
-        Assert.Contains("Part 1 (locked sample):", text);
-        Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
+        Assert.True(proposal.CanApply, string.Join("\n", proposal.Describe("in")));
+        Assert.False(Assert.Single(proposal.Plates[0].Result.ProposedOrder).IsRegenerated);
+        Assert.Equal(CuttingCommitStatus.Applied, proposal.Apply().Status);
         Assert.True(part.LeadInsLocked);
         Assert.Same(program, part.Program);
     }
-
     [Fact]
     public void Describe_LeadHitsNeighbour_SuggestsSpacingOrShorterLeadWithoutAllowingApply()
     {

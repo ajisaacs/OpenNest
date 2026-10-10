@@ -349,7 +349,7 @@ public sealed class CuttingPlanProposal
     public IReadOnlyList<string> Describe(string unit)
     {
         var lines = new List<string>();
-        var ready = Plates.Count(p => p.IsReady);
+        var blocked = Plates.Count(p => !p.CanApplyWithWarnings);
         if (IsCancelled)
             lines.Add("Planning was cancelled. Nothing has changed.");
         else if (CanApply)
@@ -360,7 +360,7 @@ public sealed class CuttingPlanProposal
             lines.Add("Best-effort plan available. Review the warnings and accept the unverified plan to apply. "
                 + "This is not approval to cut or post CNC output.");
         else
-            lines.Add($"Apply is unavailable: {Plates.Count - ready} of {Count(Plates.Count, "plate")} could not "
+            lines.Add($"Apply is unavailable: {blocked} of {Count(Plates.Count, "plate")} could not "
                 + "be planned. No plate changes until every plate is ready.");
 
         foreach (var plate in Plates)

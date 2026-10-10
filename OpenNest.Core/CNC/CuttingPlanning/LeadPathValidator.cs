@@ -113,7 +113,8 @@ public static class LeadPathValidator
                     return material.ContainsMaterial(move.Curve.Midpoint, token) ? "interior" : null;
                 }
             }
-            // Missing leads are the ReleasedContourState check's responsibility.
+            // No lead motion is valid for direct contour piercing. The caller still
+            // checks rapid travel and contour accounting for the complete program.
             return new(true, true, null);
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)

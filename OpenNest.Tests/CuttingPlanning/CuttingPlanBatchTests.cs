@@ -45,7 +45,9 @@ public class CuttingPlanBatchTests
         var nest = new Nest();
         var ready = Plate(nest, Clean("open", 1, 1));
         var locked = Clean("locked", 1, 1);
-        locked.LeadInsLocked = true; // Locked programs never regenerate: no lead-in is a conflict.
+        var crossing = OwnedProgramCopy.Copy(locked.Program);
+        crossing.MoveTo(5, 5); // Rapid enters the already completed square.
+        Assert.True(locked.RestoreLeadInProgram(crossing, true));
         var blocked = Plate(nest, locked);
         var readyProgram = ready.Parts[0].Program;
 
@@ -314,7 +316,9 @@ public class CuttingPlanBatchTests
         var nest = new Nest();
         var ready = Plate(nest, Clean("a", 1, 1));
         var locked = Clean("locked", 1, 1);
-        locked.LeadInsLocked = true;
+        var crossing = OwnedProgramCopy.Copy(locked.Program);
+        crossing.MoveTo(5, 5); // Rapid enters the already completed square.
+        Assert.True(locked.RestoreLeadInProgram(crossing, true));
         var blocked = Plate(nest, locked);
         var proposal = CuttingPlanBatch.Capture([ready, blocked], ExplicitContourTests.Parameters(), false).Plan();
         Assert.True(proposal.Plates[0].IsReady);
