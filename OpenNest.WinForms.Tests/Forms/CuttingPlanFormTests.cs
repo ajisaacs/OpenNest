@@ -59,10 +59,12 @@ public class CuttingPlanFormTests
         Assert.False(Control<Button>(form, "applyButton").Enabled);
         var summary = Control<TextBox>(form, "summaryBox").Text;
         Assert.Contains("Plate 1: blocked", summary);
-        Assert.Contains("Part 1 (locked)", summary);
+        var warnings = Control<DataGridView>(form, "warningGrid");
+        Assert.Contains(warnings.Rows.Cast<DataGridViewRow>(), row =>
+            row.Cells[3].Value?.ToString()?.Contains("Part 1 (locked)") == true);
         // A refused plate is never previewed; the editor already shows its part numbers.
         Assert.False(Field<PlateView>(form, "preview").Visible);
-        Assert.StartsWith("No preview", Control<Label>(form, "previewLabel").Text);
+        Assert.Contains("no current, usable preview", Control<Label>(form, "previewLabel").Text);
         Assert.Null(view.Plate.CuttingParameters);
     });
 
@@ -146,6 +148,7 @@ public class CuttingPlanFormTests
         Assert.Equal(CuttingCommitStatus.Stale, form.CommitResult!.Status);
         Assert.Contains("changed after planning", Control<TextBox>(form, "summaryBox").Text);
         Assert.False(Control<Button>(form, "applyButton").Enabled);
+        Assert.Empty(Control<DataGridView>(form, "warningGrid").Rows.Cast<DataGridViewRow>());
         Assert.Equal(programs, view.Plate.Parts.Select(part => part.Program));
         Assert.Null(view.Plate.CuttingParameters);
 
@@ -247,13 +250,23 @@ public class CuttingPlanFormTests
         Assert.False(Control<Button>(form, "applyButton").Enabled);
         Assert.True(Field<PlateView>(form, "preview").Visible);
         Assert.Contains("UNVERIFIED", Control<Label>(form, "previewLabel").Text);
+        var grid = Control<DataGridView>(form, "warningGrid");
+        Assert.NotEmpty(grid.Rows.Cast<DataGridViewRow>());
+        Assert.Contains(grid.Rows.Cast<DataGridViewRow>(), row =>
+            row.Cells[3].Value?.ToString()?.Contains("Material boundaries") == true);
+        var partRow = grid.Rows.Cast<DataGridViewRow>().First(row => row.Cells[1].Value is int);
+        partRow.Selected = true;
+        Assert.Contains("affected part extent", Control<Label>(form, "previewLabel").Text);
+        Assert.True(Field<PlateView>(form, "preview").Visible);
         Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
         Assert.Null(form.CommitResult);
         Assert.False(part.HasManualLeadIns);
         accept.Checked = true;
         Assert.True(Control<Button>(form, "applyButton").Enabled);
         Invoke(form, "PlanButton_Click", null, EventArgs.Empty);
+        Assert.Empty(grid.Rows.Cast<DataGridViewRow>()); // No stale warning targets while replanning.
         WaitForPlan(form);
+        Assert.NotEmpty(grid.Rows.Cast<DataGridViewRow>());
         Assert.False(accept.Checked);
         Assert.False(Control<Button>(form, "applyButton").Enabled);
         accept.Checked = true;

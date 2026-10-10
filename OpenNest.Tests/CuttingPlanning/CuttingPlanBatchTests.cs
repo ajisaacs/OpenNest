@@ -90,6 +90,10 @@ public class CuttingPlanBatchTests
         var text = string.Join("\n", proposal.Describe("in"));
         Assert.Contains("Plate 1: blocked: parts overlap or could not be checked for overlap.", text);
         Assert.Contains("- Part 1 (first) overlaps part 2 (second).", text);
+        var row = Assert.Single(proposal.DiagnosticRows());
+        Assert.Equal((0, 1, 1, 2),
+            (row.PlateIndex, row.PlateNumber, row.PartNumber, row.OtherPartNumber));
+        Assert.Contains("overlaps part 2", row.Message);
         Assert.Equal(CuttingCommitStatus.InvalidInput, proposal.Apply().Status);
         Assert.Equal(programs, plate.Parts.Select(p => p.Program));
         Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));

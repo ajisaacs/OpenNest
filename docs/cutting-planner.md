@@ -334,9 +334,19 @@ plans every plate that has parts. Both open one dialog built on
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
+- The dialog uses an owner-monitor-sized window (approximately 90% of the working area), like
+  the database browser. The right panel keeps the batch outcome and plate headings above a
+  read-only, unsorted warning grid with Plate, source Part, With, and full finding text. Every
+  overlap issue/pair and every planner finding has its own selectable row, including findings
+  hidden by the compact blocked-plate summary. Selecting a row switches to that plate's
+  detached preview and zooms to the affected part extent (or both parts for a pair), mapping
+  source positions to the proposed cutting order. This is not an exact contact marker: most
+  findings do not carry a geometric witness. If a plate cannot produce a current, supported
+  preview, no geometry is cloned or focused; the row still identifies its source part in the
+  editor. Replanning, cancellation and stale Apply clear old warning targets.
 - The summary lists every plate: ready plates with part counts and rapid travel, others
-  with their status and findings. Unverified proposals show every overlap and route
-  warning in the scrollable summary before the acceptance checkbox is used; they do
+  with their status and findings. Unverified proposals retain every overlap and route
+  warning in the selectable grid before the acceptance checkbox is used; they do
   not truncate later parts' warnings. Finding part numbers are the plate's current order, as the
   editor numbers them. The preview shows the active plate detached from the nest (quantity
   zero, so drawing quantities do not change) in the proposed order with the proposed
