@@ -69,8 +69,24 @@ namespace OpenNest.Mcp.Tools
             [Description("Name for the nest (optional)")] string name = null
         )
         {
-            var nest = new Nest();
-            nest.Name = name ?? Path.GetFileNameWithoutExtension(path);
+            var source = _session.Nest;
+            var nest = new Nest
+            {
+                Name = name ?? (string.IsNullOrWhiteSpace(source?.Name) ? Path.GetFileNameWithoutExtension(path) : source.Name),
+                Customer = source?.Customer ?? "",
+                Notes = source?.Notes ?? "",
+                AssistGas = source?.AssistGas ?? "",
+                Status = source?.Status ?? NestStatus.Quote,
+                MadeBy = source?.MadeBy ?? "",
+                Thickness = source?.Thickness ?? 0,
+                Material = source?.Material ?? new Material(),
+                Units = source?.Units ?? default,
+                DateCreated = source?.DateCreated ?? default,
+                DateLastModified = source?.DateLastModified ?? default,
+                PlateDefaults = source?.PlateDefaults ?? new Nest.PlateSettings(),
+                PlateOptions = source?.PlateOptions ?? new(),
+                SalvageRate = source?.SalvageRate ?? 0.5,
+            };
 
             foreach (var drawing in _session.AllDrawings())
                 nest.Drawings.Add(drawing);

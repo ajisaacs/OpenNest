@@ -344,7 +344,7 @@ namespace OpenNest.Mcp.Tools
             [Description(JobEngines)] string engine = null,
             [Description("Use only already-created empty plates with matching dimensions and spacing; do not add sheets")] bool no_new_plates = false,
             CancellationToken cancellationToken = default,
-            [Description("Optional finite physical sheet stock: width, length and available quantity per size. Incompatible with no_new_plates.")] SheetStockInput[] sheets = null
+            [Description("Optional finite physical sheet stock: width, length, available quantity and optional positive per-sheet cost in common units. Specify costs for every row or omit all. Incompatible with no_new_plates.")] SheetStockInput[] sheets = null
         )
         {
             var template = _session.GetPlate(plateIndex);
@@ -429,6 +429,8 @@ namespace OpenNest.Mcp.Tools
             if (result.Plates.Count > limit)
                 return "Error: proposal exceeds the allowed sheet count. Nothing committed.";
 
+            var costSummary = NestCostSummary.FromAccepted(result);
+
             // Build the entire target map before attaching a single part. Indexes in a mixed
             // stock proposal are solver ordinals, not indexes into the session's empty plates.
             var usedTargets = new HashSet<Plate>(ReferenceEqualityComparer.Instance);
@@ -462,7 +464,18 @@ namespace OpenNest.Mcp.Tools
                     _session.Plates.Add(target);
                 target.Parts.AddRange(proposed.Parts);
             }
+            foreach (var item in parsed.items)
+                item.Drawing.Quantity.Required = item.Quantity;
+            if (sheets != null)
+            {
+                _session.Nest ??= new Nest();
+                _session.Nest.PlateOptions = offeredStock.stock.Select(s => new PlateOption
+                { Width = s.Size.Width, Length = s.Size.Length, Cost = s.Cost ?? 0 }).ToList();
+            }
             var lines = new StringBuilder();
+            lines.AppendLine($"Cost basis={costSummary.Basis}, gross total={costSummary.GrossTotal}, estimated salvage credit={costSummary.SalvageCredit}, net score={costSummary.NetScore}");
+            foreach (var usage in costSummary.Stock)
+                lines.AppendLine($"  {usage.StockId}: used={usage.Used}, supplied cost={usage.Cost?.ToString() ?? "unspecified"}, gross subtotal={usage.GrossSubtotal}");
             lines.AppendLine($"Whole job complete: {result.Plates.Count} sheet(s) placed, {targets.Count(t => t.created)} new sheet(s) created.");
             if (sheets != null)
             {
@@ -486,15 +499,20 @@ namespace OpenNest.Mcp.Tools
             if (sheets.Length == 0)
                 return (null, 0, "Error: sheets must contain at least one stock size. Nothing committed.");
             var stock = new List<NestPlateStock>(sheets.Length);
+            var priced = sheets.Any(s => s?.Cost != null);
             long total = 0;
             for (var i = 0; i < sheets.Length; i++)
             {
                 var row = sheets[i];
                 if (row == null || !double.IsFinite(row.Width) || !double.IsFinite(row.Length)
+                    || !double.IsFinite(row.Width * row.Length)
                     || row.Width <= 0 || row.Length <= 0 || row.Quantity <= 0
                     || row.Length <= template.EdgeSpacing.Left + template.EdgeSpacing.Right
                     || row.Width <= template.EdgeSpacing.Top + template.EdgeSpacing.Bottom)
                     return (null, 0, $"Error: sheets[{i}] requires finite positive usable dimensions and a positive physical quantity. Nothing committed.");
+                if (row.Cost is double cost && (!double.IsFinite(cost) || cost <= 0)
+                    || priced && row.Cost == null)
+                    return (null, 0, $"Error: sheets[{i}] requires a finite positive cost; specify costs on every row or omit all. Nothing committed.");
                 var duplicate = stock.FindIndex(s => s.Size.Width == row.Width && s.Size.Length == row.Length);
                 if (duplicate >= 0)
                     return (null, 0, $"Error: sheets[{i}] duplicates sheets[{duplicate}] size. Nothing committed.");
@@ -502,7 +520,7 @@ namespace OpenNest.Mcp.Tools
                 if (total > int.MaxValue)
                     return (null, 0, "Error: total sheet inventory exceeds the supported sheet limit. Nothing committed.");
                 stock.Add(new NestPlateStock($"stock-{i}", new Size(row.Width, row.Length), row.Quantity,
-                    template.PartSpacing, template.EdgeSpacing, template.Quadrant));
+                    template.PartSpacing, template.EdgeSpacing, template.Quadrant, row.Cost));
             }
             return (stock, total, null);
         }

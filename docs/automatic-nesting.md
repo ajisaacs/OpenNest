@@ -115,3 +115,15 @@ overflow fails instead of becoming a score.
 
 Returned nests preserve offered stock prices. These are cost-aware heuristics,
 not global cost optimizers; validation and fulfillment remain required.
+
+
+MCP `autonest_job` accepts optional `cost` on each `sheets` row, alongside `width`,
+`length` and positive finite `quantity`. Supply positive finite costs on every row
+or omit all costs. MCP continues to reject duplicate sizes and disables salvage.
+Its result reports the cost basis, used physical counts, supplied costs, gross
+subtotals, gross total, estimated salvage credit and net score for the proposal.
+
+An accepted MCP solve stores requested drawing quantities and offered stock prices;
+save/reopen preserves them and existing nest metadata, plate defaults and salvage
+settings. Rejected/cancelled proposals change neither requirements nor options.
+Inventory remains request-local; saved options are offers, not a purchase ledger.

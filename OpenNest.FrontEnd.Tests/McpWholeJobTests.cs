@@ -39,6 +39,54 @@ public class McpWholeJobTests : IDisposable
         tools.AutoNestJob(plateIndex, names, quantities, engine, noNew, token);
 
     [Fact]
+    public void AcceptedPricesAndRequirementsSurviveSaveWithoutLosingMetadata()
+    {
+        var session = Session();
+        session.Nest.Customer = "Cost customer";
+        session.Nest.Notes = "Keep these notes";
+        session.Nest.Units = Units.Inches;
+        session.Nest.SalvageRate = 0.25;
+        var output = new NestingTools(session).AutoNestJob(0, "A,B", "1,1", "Rectangles", sheets:
+            [new SheetStockInput { Width = 10, Length = 10, Quantity = 2, Cost = 50 },
+             new SheetStockInput { Width = 12, Length = 12, Quantity = 2, Cost = 7 }]);
+        Assert.Contains("Whole job complete", output);
+        Assert.Contains("gross total=7", output);
+        Assert.Contains("net score=7", output);
+        Assert.Contains("supplied-cost", output);
+        Assert.All(session.AllDrawings(), d => Assert.Equal(1, d.Quantity.Required));
+        var path = Path.Combine(directory, "priced.nest");
+        new InputTools(session).SaveNest(path);
+        var reopened = new NestReader(path).Read();
+        Assert.Equal("Cost customer", reopened.Customer);
+        Assert.Equal("Keep these notes", reopened.Notes);
+        Assert.Equal(Units.Inches, reopened.Units);
+        Assert.Equal(0.25, reopened.SalvageRate);
+        Assert.Equal(new[] { 50d, 7d }, reopened.PlateOptions.Select(o => o.Cost));
+        Assert.All(reopened.Drawings, d => Assert.Equal(1, d.Quantity.Required));
+        Assert.Equal(2, reopened.Plates.Sum(p => p.Parts.Count));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0d)]
+    [InlineData(-1d)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void InvalidCostsDoNotMutateSession(double? cost)
+    {
+        var session = Session();
+        var quantities = session.AllDrawings().Select(d => d.Quantity.Required).ToArray();
+        var output = new NestingTools(session).AutoNestJob(0, "A,B", "1,1", "Rectangles", sheets:
+            [new SheetStockInput { Width = 10, Length = 10, Quantity = 1, Cost = 5 },
+             new SheetStockInput { Width = 12, Length = 12, Quantity = 1, Cost = cost }]);
+        Assert.Contains("Error:", output);
+        Assert.Contains("sheets[1]", output);
+        Assert.Empty(session.GetPlate(0).Parts);
+        Assert.Empty(session.Nest.PlateOptions);
+        Assert.Equal(quantities, session.AllDrawings().Select(d => d.Quantity.Required));
+    }
+
+    [Fact]
     public void FiniteSheetInputsReachEngineWithTemplateSettings()
     {
         var session = Session();
@@ -398,6 +446,7 @@ public class McpWholeJobTests : IDisposable
     public void CancellationAfterPluginIgnoresTokenDoesNotCommit()
     {
         var session = Session();
+        var required = session.AllDrawings().Select(d => d.Quantity.Required).ToArray();
         using var cts = new CancellationTokenSource();
         var engine = "JobCancel-" + Guid.NewGuid();
         NestingEngineRegistry.Register(engine, "cancels after solving", () => new CancelStub(cts));
@@ -406,6 +455,7 @@ public class McpWholeJobTests : IDisposable
         Assert.Single(session.AllPlates());
         Assert.Empty(session.GetPlate(0).Parts);
         Assert.All(session.Nest.Drawings, d => Assert.Equal(0, d.Quantity.Nested));
+        Assert.Equal(required, session.AllDrawings().Select(d => d.Quantity.Required));
     }
 
     private sealed class CancelStub(CancellationTokenSource source) : INestingEngine

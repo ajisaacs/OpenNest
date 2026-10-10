@@ -92,7 +92,10 @@ format version is required. Legacy zero cost means unspecified, not a free sheet
 Positive costs are generic per-sheet values in caller-consistent units. Solving
 requires all available options to be priced or all to be unspecified.
 
-API returned nests retain offered options, excluding rows with zero available
-quantity because `.nest` options do not retain inventory. Options are offers, not
-a per-sheet purchase ledger. API quote archives additionally retain request costs
-and validated proposal cost summaries; old archives load with `Costs == null`.
+Desktop and accepted MCP/API jobs retain offered options (API rows with zero available
+quantity are excluded because `.nest` options do not retain inventory). MCP save also preserves
+loaded job metadata, plate defaults and salvage settings, and accepted whole-job
+requirements are stored on drawings. Options do not persist finite inventory or
+associate a historical purchase price with each physical sheet. API quote archives
+additionally retain request costs and validated proposal cost summaries; old archives
+without summaries load with `Costs == null`.
