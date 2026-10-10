@@ -58,27 +58,24 @@ Stock sizes read **width x length** in job units. Plate tables use **Quantity**
 and **Parts per plate**; the plate quantity multiplies per-plate part counts for
 the totals.
 
-Each part ID is centered on its part's pole of inaccessibility (`PolyLabel`,
-the same method `PlateView`'s `LayoutPart` uses), computed on a
-placement-independent quantized copy so identical parts always get the
-identical label position and the label naturally clears a central hole. When
-an ID cannot sit legibly inside its own material at overview scale (for
-example, a cluster of tiny repeated parts), the plate gains a lettered
-(rows)/numbered (columns) map grid drawn beneath the sheet, and only the
-crowded cells get a zoomed, framed detail page listing that cell's real
-coordinates. Detail-cell outlines use a long dash-dot stroke, distinct from
-the shorter dashed scrap-cutoff stroke and the dotted grid lines. IDs are
-never shrunk below 7 pt or silently dropped.
+Individual IDs use 7 pt text centered on the part's pole of inaccessibility
+(`PolyLabel`, as in `PlateView`), clear of edges, holes, cutoffs and other labels.
+The search uses a placement-independent quantized copy for consistent placement
+on identical parts. Labels are best effort: there are no closeup or grid pages,
+and a part too small to label never prevents export. Every part remains in the
+quantity tables even when its diagram label cannot fit.
+
+Nearby small parts with the same report ID may share a dotted rectangular outline
+and one ID beside it. Separate clusters get separate outlines. A group is omitted
+if its rectangle includes any other part or cutoff, or if there is no clear space
+for its label. Dotted group outlines are distinct from dashed scrap cutoffs.
 
 The writer still rejects, with `NotSupportedException` and before touching
 the destination:
 
 - a page header (nest name plus plate/material line) needing more than 3
   wrapped lines;
-- a table cell needing more than 20 wrapped lines;
-- a part ID that cannot be placed legibly even in the most zoomed supported
-  detail view, or a plate that would need more than 24 detail views to label
-  every part — named with the plate, part index and ID.
+- a table cell needing more than 20 wrapped lines.
 
 Summary thumbnails and the sheet diagram are vector paths, never raster images.
 Each thumbnail is a small PDFsharp page embedded by MigraDoc as a form XObject.

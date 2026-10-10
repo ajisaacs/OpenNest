@@ -164,56 +164,73 @@ public sealed class NestPdfLayoutTests : IDisposable
     }
 
     [SkippableFact]
-    public void Write_TinyRepeatedPartsGetMapGridDetailViewsWithEveryIdLegible()
+    public void Write_TinyRepeatedPartsShareOneDottedGroupOnThePlatePage()
     {
         var nest = NestReportTestData.CreateDenseNest();
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320, 400);
-        Assert.NotNull(plan.Overview.Grid);
-        Assert.NotEmpty(plan.Details);
-        // Every placement is labeled at full size somewhere; none are dropped.
-        var labeled = plan.Overview.Labels.Select(label => label.Part)
-            .Concat(plan.Details.SelectMany(detail => detail.Labels.Select(label => label.Part))).ToHashSet();
-        Assert.Equal(Enumerable.Range(0, snapshot.Plates[0].Parts.Length), labeled.Order());
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var group = Assert.Single(plan.Groups);
+        Assert.Equal("2", group.Label.Id);
+        Assert.Equal(Enumerable.Range(2, 24), group.Parts.Order());
+        Assert.Equal(2, plan.Labels.Count);
+        Assert.DoesNotContain(plan.Labels, label => label.Id == "2");
+        Assert.All(group.Parts, index => Assert.True(group.Boundary.Contains(plan.Fit.Rect(snapshot.Plates[0].Parts[index].Geometry.Bounds))));
+        Assert.False(group.Boundary.IntersectsWith(group.Label.Box));
+        var labels = plan.Labels.Append(group.Label).ToList();
         var font = NestReportDiagram.LabelFont();
-        Assert.Equal(NestReportDiagram.LabelFontSize, font.Size);
-        foreach (var view in plan.Details.Prepend(plan.Overview))
+        foreach (var label in labels)
         {
-            foreach (var label in view.Labels)
-            {
-                Assert.True(label.Box.Width >= ReportText.Size(label.Id, font).Width);
-                Assert.True(label.Box.X >= 0 && label.Box.Right <= view.Size.Width && label.Box.Y >= 0 && label.Box.Bottom <= view.Size.Height);
-                Assert.DoesNotContain(view.Labels, other => other != label && other.Box.IntersectsWith(label.Box));
-                // Labels sit on material, not in the washer hole.
-                var center = view.Fit.Model(new PdfSharp.Drawing.XPoint(label.Box.X + label.Box.Width / 2, label.Box.Y + label.Box.Height / 2));
-                var part = snapshot.Plates[0].Parts[label.Part].Geometry;
-                var hole = part.Contours.SelectMany(contour => contour.Segments).Single(segment => segment.Center != null);
-                var dx = center.X - hole.Center!.X;
-                var dy = center.Y - hole.Center.Y;
-                Assert.True(dx * dx + dy * dy > hole.Radius * hole.Radius, $"{label.Id} label is inside its hole");
-            }
+            Assert.True(label.Box.Width >= ReportText.Size(label.Id, font).Width);
+            Assert.True(new PdfSharp.Drawing.XRect(0, 0, 720, 320).Contains(label.Box));
+            Assert.DoesNotContain(labels, other => other != label && other.Box.IntersectsWith(label.Box));
         }
-
         var path = Write(nest);
         var pages = ReportPdf.Pages(path);
-        var plateText = string.Join("\n", pages.Skip(1));
-        Assert.Contains("cells outlined dash-dot have detail views", plateText);
-        foreach (var detail in plan.Details)
-            Assert.Contains($"Plate 1 detail {detail.Cell}:", plateText);
-        var washerLabels = pages.Skip(1).Sum(page => Regex.Matches(page, @"\b2\b").Count);
-        // 24 diagram labels plus one table row.
-        Assert.True(washerLabels >= 25, $"2 occurrences: {washerLabels}");
+        Assert.Equal(2, pages.Length);
+        Assert.Contains("A dotted outline groups like parts under one ID", pages[1]);
+        Assert.DoesNotContain("detail", pages[1]);
+        using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
+        var diagram = ReportPdf.ContentStreams(pdf.Pages[1]).Last();
+        Assert.Matches(@"\[0\.6 1\.8\]\s*0\s+d", diagram);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Plan_GroupDoesNotEncloseUnrelatedPartsOrCutoffs(bool cutoff)
+    {
+        var nest = NestReportTestData.CreateDenseNest();
+        var drawing = NestReportTestData.Rectangle("Obstacle", 0.1, 0.1);
+        drawing.IsCutOff = cutoff;
+        nest.Plates[0].Parts.Add(new Part(drawing, new Vector(63.2, 31.2)));
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        Assert.Empty(plan.Groups);
+        Assert.Equal(2, plan.Labels.Count);
+    }
+
+    [Fact]
+    public void Plan_SeparatedClustersOfTheSamePartGetSeparateGroups()
+    {
+        var nest = NestReportTestData.CreateDenseNest();
+        var plate = nest.Plates[0];
+        for (var i = 14; i < 26; i++)
+            plate.Parts[i].Offset(25, 0);
+        var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        Assert.Equal(2, plan.Groups.Count);
+        Assert.All(plan.Groups, group => Assert.Equal(12, group.Parts.Count));
+        Assert.False(plan.Groups[0].Boundary.IntersectsWith(plan.Groups[1].Boundary));
     }
 
     [SkippableFact]
     public void Write_LabelOnHoledPartAvoidsTheHole()
     {
         var snapshot = NestReportBuilder.Capture(NestReportTestData.CreateNest(), NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320, 400);
-        Assert.Empty(plan.Details);
-        var label = plan.Overview.Labels.First(label => label.Part == 0);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var label = plan.Labels.First(label => label.Part == 0);
         var hole = snapshot.Plates[0].Parts[0].Geometry.Contours.SelectMany(c => c.Segments).Single(s => s.Center != null);
-        var holeBox = plan.Overview.Fit.Rect(new ReportBounds(hole.Center!.X - hole.Radius, hole.Center.Y - hole.Radius,
+        var holeBox = plan.Fit.Rect(new ReportBounds(hole.Center!.X - hole.Radius, hole.Center.Y - hole.Radius,
             hole.Center.X + hole.Radius, hole.Center.Y + hole.Radius));
         Assert.False(label.Box.IntersectsWith(holeBox));
     }
@@ -235,10 +252,9 @@ public sealed class NestPdfLayoutTests : IDisposable
         nest.Plates.Add(plate);
         var snapshot = NestReportBuilder.Capture(nest, NestReportTestData.GeneratedAt);
 
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320, 400);
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
 
-        Assert.Empty(plan.Details);
-        foreach (var label in plan.Overview.Labels)
+        foreach (var label in plan.Labels)
         {
             var geometry = snapshot.Plates[0].Parts[label.Part].Geometry;
             var origin = new Vector(geometry.Bounds.Left, geometry.Bounds.Bottom);
@@ -248,14 +264,14 @@ public sealed class NestPdfLayoutTests : IDisposable
             foreach (var ring in rings)
                 ring.Offset(-origin.X, -origin.Y);
             var pole = PolyLabel.Find(rings[0], rings.Skip(1).ToList(), NestReportDiagram.PolePrecision(geometry.Bounds));
-            var expected = plan.Overview.Fit.Point(pole.X + origin.X, pole.Y + origin.Y);
+            var expected = plan.Fit.Point(pole.X + origin.X, pole.Y + origin.Y);
             // Pole of the placement-independent copy, to within the search precision.
-            var tolerance = NestReportDiagram.PolePrecision(geometry.Bounds) * plan.Overview.Fit.Scale;
+            var tolerance = NestReportDiagram.PolePrecision(geometry.Bounds) * plan.Fit.Scale;
             Assert.InRange(label.Box.X + label.Box.Width / 2 - expected.X, -tolerance, tolerance);
             Assert.InRange(label.Box.Y + label.Box.Height / 2 - expected.Y, -tolerance, tolerance);
         }
-        var l = plan.Overview.Labels.Single(label => label.Part == 0);
-        var center = plan.Overview.Fit.Model(new PdfSharp.Drawing.XPoint(l.Box.X + l.Box.Width / 2, l.Box.Y + l.Box.Height / 2));
+        var l = plan.Labels.Single(label => label.Part == 0);
+        var center = plan.Fit.Model(new PdfSharp.Drawing.XPoint(l.Box.X + l.Box.Width / 2, l.Box.Y + l.Box.Height / 2));
         // The pole of this L is in its corner square, about 1.17 in from both outer edges.
         Assert.InRange(center.X - 4, 0.9, 1.4);
         Assert.InRange(center.Y - 4, 0.9, 1.4);
@@ -266,25 +282,22 @@ public sealed class NestPdfLayoutTests : IDisposable
     {
         // A square with a central hole has four equally deep poles; every copy must pick the same one.
         var snapshot = NestReportBuilder.Capture(NestReportTestData.CreateDenseNest(), NestReportTestData.GeneratedAt);
-        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320, 400);
-        foreach (var view in plan.Details.Prepend(plan.Overview))
+        var plan = NestReportDiagram.Plan(snapshot.Plates[0], 720, 320);
+        var offsets = plan.Labels.GroupBy(label => label.Id).SelectMany(group =>
         {
-            var offsets = view.Labels.GroupBy(label => label.Id).SelectMany(group =>
+            var relative = group.Select(label =>
             {
-                var relative = group.Select(label =>
-                {
-                    var bounds = view.Fit.Rect(snapshot.Plates[0].Parts[label.Part].Geometry.Bounds);
-                    return (X: label.Box.X - bounds.X, Y: label.Box.Y - bounds.Y);
-                }).ToList();
-                return relative.Select(offset => (offset.X - relative[0].X, offset.Y - relative[0].Y));
-            });
-            Assert.All(offsets, delta =>
-            {
-                Assert.InRange(delta.Item1, -0.01, 0.01);
-                Assert.InRange(delta.Item2, -0.01, 0.01);
-            });
-        }
-        Assert.Equal(24, plan.Details.Sum(detail => detail.Labels.Count(label => label.Id == "2")));
+                var bounds = plan.Fit.Rect(snapshot.Plates[0].Parts[label.Part].Geometry.Bounds);
+                return (X: label.Box.X - bounds.X, Y: label.Box.Y - bounds.Y);
+            }).ToList();
+            return relative.Select(offset => (offset.X - relative[0].X, offset.Y - relative[0].Y));
+        });
+        Assert.All(offsets, delta =>
+        {
+            Assert.InRange(delta.Item1, -0.01, 0.01);
+            Assert.InRange(delta.Item2, -0.01, 0.01);
+        });
+        Assert.Equal(2, plan.Labels.Count(label => label.Id == "1"));
     }
 
     private static OpenNest.Geometry.Shape ToShape(ReportContour contour)

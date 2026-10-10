@@ -6,43 +6,20 @@ namespace OpenNest.Reporting;
 /// <summary>A part ID label in canvas-local page coordinates (Y down).</summary>
 internal sealed record DiagramLabel(int Part, string Id, XRect Box);
 
-/// <summary>Map grid over the overview; rows are lettered from the top, columns numbered from the left.</summary>
-internal sealed record DiagramGrid(ReportBounds Union, double CellLength, double CellWidth, int Columns, int Rows,
-    IReadOnlyList<(int Row, int Column)> DetailCells)
-{
-    public string Name(int row, int column) => ReportText.RowName(row) + (column + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+/// <summary>A dotted group boundary and its shared ID, in canvas coordinates.</summary>
+internal sealed record DiagramGroup(IReadOnlyList<int> Parts, XRect Boundary, DiagramLabel Label);
 
-    public ReportBounds Cell(int row, int column)
-    {
-        var left = Union.Left + column * CellLength;
-        var top = Union.Top - row * CellWidth;
-        return new ReportBounds(left, top - CellWidth, left + CellLength, top);
-    }
-}
-
-/// <summary>One drawn view of a plate: the fitted overview or a zoomed grid-cell detail.</summary>
 internal sealed record DiagramView(XSize Size, Fit Fit, IReadOnlyList<DiagramLabel> Labels,
-    DiagramGrid? Grid, string? Cell, ReportBounds? CellBounds);
+    IReadOnlyList<DiagramGroup> Groups);
 
-internal sealed record PlateDiagramPlan(DiagramView Overview, IReadOnlyList<DiagramView> Details);
-
-/// <summary>
-/// Plans labels before any PDF output. IDs are never shrunk below <see cref="LabelFontSize"/> or
-/// dropped: a label that cannot sit legibly inside its part's material at overview scale is placed
-/// in a zoomed map-grid detail view instead, or the report fails with the part identified.
-/// </summary>
+/// <summary>Plans best-effort labels on a single plate view; small repeated parts may share a label.</summary>
 internal static class NestReportDiagram
 {
     internal const double LabelFontSize = 7;
-    internal const int MaxDetailViews = 24;
     private const double LabelPadding = 1;
     // Minimum white space between a label and any edge, hole, cutoff or other label.
     private const double Clearance = 1.5;
     private const double Inset = 5;
-    private const double GutterLeft = 16;
-    private const double GutterTop = 12;
-    private const double DetailMargin = 0.08;
-    private static readonly double[] Zooms = [1, 2, 4];
 
     internal static XFont LabelFont()
     {
@@ -58,100 +35,100 @@ internal static class NestReportDiagram
     internal static double PolePrecision(ReportBounds bounds) =>
         System.Math.Max(System.Math.Max(bounds.Length, bounds.Width) * 0.005, 1e-9);
 
-    internal static PlateDiagramPlan Plan(ReportPlate plate, double width, double overviewHeight, double detailHeight)
+    internal static DiagramView Plan(ReportPlate plate, double width, double height)
     {
         var shapes = plate.Parts.Select(part => new Shape(part.Geometry)).ToList();
         var obstacles = shapes.Concat(plate.Cutoffs.Select(cutoff => new Shape(cutoff))).ToList();
         var union = Union(plate, obstacles);
         var font = LabelFont();
         var all = Enumerable.Range(0, plate.Parts.Length).ToList();
-        var canvas = new XSize(width, overviewHeight);
-        var overviewView = new XRect(0, 0, width, overviewHeight);
+        var canvas = new XSize(width, height);
+        var view = new XRect(0, 0, width, height);
+        var fit = Fit.Create(union, new XRect(Inset, Inset, width - 2 * Inset, height - 2 * Inset));
+        var labels = PlaceLabels(plate, shapes, obstacles, all, fit, view, font, out var failed);
+        var groups = PlaceGroups(plate, failed, labels, fit, view, font);
+        return new DiagramView(canvas, fit, labels, groups);
+    }
 
-        var fit = Fit.Create(union, new XRect(Inset, Inset, width - 2 * Inset, overviewHeight - 2 * Inset));
-        var labels = PlaceLabels(plate, shapes, obstacles, all, fit, overviewView, font, out var failed);
-        if (failed.Count == 0)
-            return new PlateDiagramPlan(new DiagramView(canvas, fit, labels, null, null, null), []);
-
-        // Reserve map-grid gutters, then re-place what still fits at overview scale.
-        fit = Fit.Create(union, new XRect(GutterLeft, GutterTop, width - GutterLeft - Inset, overviewHeight - GutterTop - Inset));
-        labels = PlaceLabels(plate, shapes, obstacles, all, fit, overviewView, font, out failed);
-        var failedSet = failed.ToHashSet();
-        var required = failed.Max(index => RequiredScale(plate, index, font));
-        var inner = new XRect(Inset, Inset, width - 2 * Inset, detailHeight - 2 * Inset);
-        var legibleGrid = false;
-        foreach (var zoom in Zooms)
+    private static List<DiagramGroup> PlaceGroups(ReportPlate plate, List<int> failed,
+        List<DiagramLabel> labels, Fit fit, XRect view, XFont font)
+    {
+        var boxes = plate.Parts.Select(part => fit.Rect(part.Geometry.Bounds)).ToList();
+        var cutoffs = plate.Cutoffs.Select(cutoff => fit.Rect(cutoff.Bounds)).ToList();
+        var groups = new List<DiagramGroup>();
+        // A small screen-space gap also accommodates tightly packed parts with unset spacing.
+        var gap = System.Math.Max(4, plate.PartSpacing * fit.Scale * 2);
+        var remaining = failed.ToHashSet();
+        foreach (var seed in failed)
         {
-            var scale = required * zoom;
-            // Cells evenly divide the sheet (no overrun); each is at most the size a detail view
-            // shows at the required scale, so the zoom only increases.
-            var columns = System.Math.Max(1, (int)System.Math.Ceiling(union.Length * scale * (1 + 2 * DetailMargin) / inner.Width));
-            var rows = System.Math.Max(1, (int)System.Math.Ceiling(union.Width * scale * (1 + 2 * DetailMargin) / inner.Height));
-            var cellLength = union.Length / columns;
-            var cellWidth = union.Width / rows;
-            var grid = new DiagramGrid(union, cellLength, cellWidth, columns, rows, []);
-            // Every grid line and gutter name must stay readable on the overview.
-            if (!GridIsLegible(grid, fit, font))
+            if (!remaining.Remove(seed))
                 continue;
-            legibleGrid = true;
-            (int Row, int Column) CellOf(int index) => CellIndex(plate, index, union, columns, rows);
-
-            var cells = failed.Select(CellOf).Distinct().OrderBy(cell => cell.Row).ThenBy(cell => cell.Column).ToList();
-            if (cells.Count > MaxDetailViews)
-                throw new NotSupportedException($"Plate {plate.Number}: legible part ID labels would need {cells.Count} detail views; this report supports at most {MaxDetailViews} per plate.");
-            grid = grid with { DetailCells = cells };
-            var details = new List<DiagramView>();
-            var unplaced = new List<int>();
-            foreach (var (row, column) in cells)
+            var id = plate.Parts[seed].ReportId;
+            var members = new List<int> { seed };
+            for (var cursor = 0; cursor < members.Count; cursor++)
             {
-                var cell = grid.Cell(row, column);
-                var marginX = cellLength * DetailMargin;
-                var marginY = cellWidth * DetailMargin;
-                var view = new ReportBounds(cell.Left - marginX, cell.Bottom - marginY, cell.Right + marginX, cell.Top + marginY);
-                var detailFit = Fit.Create(view, inner);
-                // Parts missing from the overview claim label space first.
-                var members = all.Where(index => CellOf(index) == (row, column))
-                    .OrderBy(index => failedSet.Contains(index) ? 0 : 1).ToList();
-                var detailLabels = PlaceLabels(plate, shapes, obstacles, members, detailFit,
-                    new XRect(0, 0, width, detailHeight), font, out var missed);
-                unplaced.AddRange(missed.Where(failedSet.Contains));
-                details.Add(new DiagramView(new XSize(width, detailHeight), detailFit, detailLabels, null,
-                    grid.Name(row, column), cell));
+                var nearby = boxes[members[cursor]];
+                nearby.Inflate(gap, gap);
+                foreach (var candidate in failed)
+                {
+                    if (remaining.Contains(candidate) && plate.Parts[candidate].ReportId == id
+                        && nearby.IntersectsWith(boxes[candidate]))
+                    {
+                        remaining.Remove(candidate);
+                        members.Add(candidate);
+                    }
+                }
             }
-            if (unplaced.Count == 0)
-                return new PlateDiagramPlan(new DiagramView(canvas, fit, labels, grid, null, null), details);
+            if (members.Count < 2)
+                continue;
+
+            var boundary = boxes[seed];
+            foreach (var member in members.Skip(1))
+                boundary.Union(boxes[member]);
+            boundary.Inflate(1, 1);
+            var memberSet = members.ToHashSet();
+            // A rectangular group must not imply that unrelated or ungrouped parts belong to it.
+            if (!view.Contains(boundary)
+                || boxes.Where((_, index) => !memberSet.Contains(index)).Any(box => box.IntersectsWith(boundary))
+                || cutoffs.Any(box => box.IntersectsWith(boundary))
+                || labels.Any(label => label.Box.IntersectsWith(boundary))
+                || groups.Any(group => group.Boundary.IntersectsWith(boundary) || group.Label.Box.IntersectsWith(boundary)))
+                continue;
+
+            var size = ReportText.Size(id, font);
+            var labelWidth = size.Width + 2 * LabelPadding;
+            var labelHeight = size.Height + 2 * LabelPadding;
+            var centerX = boundary.X + (boundary.Width - labelWidth) / 2;
+            var centerY = boundary.Y + (boundary.Height - labelHeight) / 2;
+            // Put the ID beside the dotted boundary, never over a small part or its hole.
+            var candidates = new[]
+            {
+                new XRect(centerX, boundary.Y - labelHeight - Clearance, labelWidth, labelHeight),
+                new XRect(centerX, boundary.Bottom + Clearance, labelWidth, labelHeight),
+                new XRect(boundary.Right + Clearance, centerY, labelWidth, labelHeight),
+                new XRect(boundary.X - labelWidth - Clearance, centerY, labelWidth, labelHeight),
+            };
+            foreach (var box in candidates)
+            {
+                var padded = box;
+                padded.Inflate(Clearance, Clearance);
+                if (!view.Contains(padded) || boxes.Any(other => other.IntersectsWith(padded))
+                    || cutoffs.Any(other => other.IntersectsWith(padded))
+                    || labels.Any(label => label.Box.IntersectsWith(padded))
+                    || groups.Any(group => group.Boundary.IntersectsWith(padded) || group.Label.Box.IntersectsWith(padded)))
+                    continue;
+                groups.Add(new DiagramGroup(members, boundary, new DiagramLabel(seed, id, box)));
+                break;
+            }
         }
-
-        var worst = failed.First();
-        if (!legibleGrid)
-            throw new NotSupportedException($"Plate {plate.Number}, part {worst + 1} ({plate.Parts[worst].ReportId}): the part is too small relative to the sheet for a legible detail-view grid; this is not supported by the report.");
-        throw new NotSupportedException($"Plate {plate.Number}, part {worst + 1} ({plate.Parts[worst].ReportId}): its ID label cannot be placed legibly inside the part's material, even in a zoomed detail view; this is not supported by the report.");
-    }
-
-    /// <summary>Grid cell holding a part's bounds center; rows count down from the top.</summary>
-    private static (int Row, int Column) CellIndex(ReportPlate plate, int index, ReportBounds union, int columns, int rows)
-    {
-        var bounds = plate.Parts[index].Geometry.Bounds;
-        var x = (bounds.Left + bounds.Right) / 2;
-        var y = (bounds.Bottom + bounds.Top) / 2;
-        return (System.Math.Clamp((int)((union.Top - y) / (union.Width / rows)), 0, rows - 1),
-            System.Math.Clamp((int)((x - union.Left) / (union.Length / columns)), 0, columns - 1));
-    }
-
-    /// <summary>Grid spacing on the overview must exceed the gutter names it carries.</summary>
-    internal static bool GridIsLegible(DiagramGrid grid, Fit fit, XFont font)
-    {
-        var column = ReportText.Size(grid.Columns.ToString(System.Globalization.CultureInfo.InvariantCulture), font);
-        var row = ReportText.Size(ReportText.RowName(grid.Rows - 1), font);
-        return grid.CellLength * fit.Scale >= column.Width + 2 && grid.CellWidth * fit.Scale >= row.Height + 1
-            && row.Width + 2 <= GutterLeft && column.Height + 2 <= GutterTop;
+        return groups;
     }
 
     /// <summary>
     /// Centers each ID on its part's pole of inaccessibility (<see cref="PolyLabel"/>, as PlateView
     /// does), so it sits deepest inside the material and clear of holes. A label box that would
-    /// touch an edge, hole, cutoff or another label is not moved elsewhere: the part fails here
-    /// and gets a zoomed detail view instead.
+    /// touch an edge, hole, cutoff or another label is not moved elsewhere: the individual label is skipped here
+    /// and may share a group label or remain unlabeled.
     /// </summary>
     private static List<DiagramLabel> PlaceLabels(ReportPlate plate, List<Shape> shapes, List<Shape> obstacles,
         List<int> targets, Fit fit, XRect view, XFont font, out List<int> failed)
@@ -176,20 +153,6 @@ internal static class NestReportDiagram
                 failed.Add(index);
         }
         return placed;
-    }
-
-    /// <summary>Scale at which the label would fit the part's bounds, with room to avoid holes and strokes.</summary>
-    private static double RequiredScale(ReportPlate plate, int index, XFont font)
-    {
-        var bounds = plate.Parts[index].Geometry.Bounds;
-        if (!(bounds.Length > 0) || !(bounds.Width > 0))
-            throw new NotSupportedException($"Plate {plate.Number}, part {index + 1} ({plate.Parts[index].ReportId}): the part has no area to hold its ID label; this is not supported by the report.");
-        var size = ReportText.Size(plate.Parts[index].ReportId, font);
-        var scale = System.Math.Max((size.Width + 2 * (LabelPadding + Clearance)) / bounds.Length,
-            (size.Height + 2 * (LabelPadding + Clearance)) / bounds.Width) * 1.5;
-        if (!double.IsFinite(scale))
-            throw new NotSupportedException($"Plate {plate.Number}, part {index + 1} ({plate.Parts[index].ReportId}): the part is too small to hold a legible ID label.");
-        return scale;
     }
 
     private static ReportBounds Union(ReportPlate plate, IEnumerable<Shape> shapes)

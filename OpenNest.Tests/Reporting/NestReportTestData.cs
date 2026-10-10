@@ -73,7 +73,7 @@ public static class NestReportTestData
 
     /// <summary>
     /// One 120 x 60 sheet: two large parts and a cluster of tiny holed washers whose IDs cannot
-    /// be labeled legibly at overview scale, so they need detail views.
+    /// be labeled legibly at overview scale, so they share a group label.
     /// </summary>
     public static Nest CreateDenseNest()
     {

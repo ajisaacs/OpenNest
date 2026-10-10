@@ -53,10 +53,10 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Matches(@"3\s+Bracket\s+7\s+2\s+5\s+0\s+1", summary);
         Assert.Matches(@"4\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
         Assert.Contains("Page 1 of 2", summary);
-        Assert.DoesNotMatch(@"\bR\d+\b", summary + plate);
         Assert.Matches(@"Stock size\s+Quantity\s+Parts per plate", summary);
-        Assert.DoesNotContain("Parts/sheet", summary + plate);
+        Assert.DoesNotMatch(@"\bR\d+\b", summary + plate);
         Assert.DoesNotContain("Copies", summary + plate);
+        Assert.DoesNotContain("Parts/sheet", summary + plate);
 
         Assert.Contains("Plate 1", plate);
         Assert.Contains("Report test job", plate);
@@ -132,8 +132,18 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Equal(new[] { path }, Directory.GetFiles(directory));
     }
 
+    [SkippableFact]
+    public void Write_UnlabelableTinyPartKeepsItsTableRowWithoutAddingPages()
+    {
+        var nest = NestReportTestData.CreateMultiPlateNest();
+        nest.Plates[3].Parts.Add(new Part(NestReportTestData.Rectangle("Tiny", 0.01, 0.01), new Vector(44, 20)));
+        var pages = ReportPdf.Pages(WriteReport(nest));
+        Assert.Equal(5, pages.Length);
+        Assert.Matches(@"4\s+Tiny\s+1\s+1", pages[4]);
+        Assert.DoesNotContain("detail", string.Join("\n", pages));
+    }
+
     [Theory]
-    [InlineData("illegible-label", "Plate 4, part 2 (4)")]
     [InlineData("cell-overflow", "Drawing 2")]
     [InlineData("header-overflow", "Page header")]
     public void Write_UnsupportedLayoutFailsBeforeReplacingDestination(string scenario, string identified)
@@ -141,10 +151,6 @@ public sealed class NestPdfWriterTests : IDisposable
         var nest = NestReportTestData.CreateMultiPlateNest();
         switch (scenario)
         {
-            case "illegible-label":
-                // Too small for a legible label even in a detail view, on the LAST plate.
-                nest.Plates[3].Parts.Add(new Part(NestReportTestData.Rectangle("Tiny", 0.01, 0.01), new Vector(44, 20)));
-                break;
             case "cell-overflow":
                 // A row taller than a page would be silently clipped by MigraDoc.
                 nest.Plates[0].Parts[2].BaseDrawing.Name = string.Concat(Enumerable.Repeat("0123456789", 60));

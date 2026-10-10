@@ -25,7 +25,6 @@ public static class NestPdfWriter
     private const double PortraitWidth = 540;
     private const double LandscapeWidth = 720;
     private const double OverviewHeight = 320;
-    private const double DetailHeight = 400;
 
     private static readonly XColor Fill = XColor.FromArgb(222, 222, 222);
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
@@ -54,7 +53,7 @@ public static class NestPdfWriter
 
         // Plan every diagram before layout; nothing below touches the destination until Save.
         var plans = snapshot.Plates.Select(plate =>
-            NestReportDiagram.Plan(plate, LandscapeWidth, OverviewHeight, DetailHeight)).ToList();
+            NestReportDiagram.Plan(plate, LandscapeWidth, OverviewHeight)).ToList();
 
         var document = new Document();
         document.Info.Title = snapshot.Name;
@@ -158,7 +157,7 @@ public static class NestPdfWriter
     }
 
     private static void AddPlate(Document document, NestReportSnapshot snapshot, ReportPlate plate,
-        PlateDiagramPlan plan, List<(Table, Action<XGraphics, XRect>)> areas)
+        DiagramView plan, List<(Table, Action<XGraphics, XRect>)> areas)
     {
         var heading = $"Plate {plate.Number} of {snapshot.Plates.Length}";
         var header = new List<string> { $"Nest report: {snapshot.Name}", heading, SheetSize(snapshot, plate) };
@@ -181,21 +180,14 @@ public static class NestPdfWriter
         AddInfoRow(info, "Parts per plate:", plate.Parts.Length.ToString(Invariant), "Utilization:",
             Percent(plate.Utilization) + " (net part area / full sheet)");
 
-        var overview = AddReservedArea(section, null, plan.Overview.Size.Height);
-        areas.Add((overview, (gfx, _) => DrawView(gfx, plate, plan.Overview)));
+        var overview = AddReservedArea(section, plan.Size.Height);
+        areas.Add((overview, (gfx, _) => DrawView(gfx, plate, plan)));
 
         var legend = section.AddParagraph("Filled outlines are closed parts; open material paths such as tab gaps are shown without fill. Dashed lines are scrap cutoffs.");
         legend.Format.Font.Size = 7.5;
         legend.Format.SpaceBefore = Unit.FromPoint(4);
-        if (plan.Overview.Grid is { } grid)
-        {
-            var names = string.Join(", ", plan.Details.Select(detail => detail.Cell));
-            var fallback = section.AddParagraph();
-            fallback.Format.Font.Size = 7.5;
-            AddLines(fallback, ReportText.Wrap(
-                $"Some part IDs are too small to label at this scale. Grid rows are lettered from the top and columns numbered from the left; cells outlined dash-dot have detail views on the following pages: {names}.",
-                new XFont(ReportFonts.Family, 7.5), LandscapeWidth));
-        }
+        var labelsNote = section.AddParagraph("Part IDs are shown where space permits. A dotted outline groups like parts under one ID.");
+        labelsNote.Format.Font.Size = 7.5;
         var approval = section.AddParagraph("This report is not a geometry or CNC approval.");
         approval.Format.Font.Size = 7.5;
         approval.Format.SpaceAfter = Unit.FromPoint(4);
@@ -211,29 +203,16 @@ public static class NestPdfWriter
             AddRow(parts, $"Plate {plate.Number}, drawing {drawing.Id}", false, drawing.Id, names2[drawing.Id],
                 count.ToString(Invariant), checked(count * plate.Copies).ToString(Invariant));
         }
-
-        foreach (var detail in plan.Details)
-        {
-            var bounds = detail.CellBounds!;
-            var caption = $"Plate {plate.Number} detail {detail.Cell}: X {Number(bounds.Left)} to {Number(bounds.Right)}, Y {Number(bounds.Bottom)} to {Number(bounds.Top)} {snapshot.Units}. Parts centered in the dash-dot cell are labeled.";
-            var table = AddReservedArea(section, caption, detail.Size.Height);
-            areas.Add((table, (gfx, _) => DrawView(gfx, plate, detail)));
-        }
     }
 
     /// <summary>A fixed-height, never-split table row reserves a vector drawing area in MigraDoc's flow.</summary>
-    private static Table AddReservedArea(Section section, string? caption, double height)
+    private static Table AddReservedArea(Section section, double height)
     {
         var table = AddTable(section, LandscapeWidth);
         table.Borders.Visible = false;
         table.LeftPadding = table.RightPadding = Unit.Zero;
         table.TopPadding = table.BottomPadding = Unit.Zero;
         table.Format.SpaceBefore = Unit.FromPoint(4);
-        if (caption != null)
-        {
-            var row = AddRow(table, "Detail caption", true, caption);
-            row.KeepWith = 1;
-        }
         var reserved = table.AddRow();
         reserved.HeightRule = RowHeightRule.Exactly;
         reserved.Height = Unit.FromPoint(height);
@@ -276,14 +255,6 @@ public static class NestPdfWriter
     private static void DrawView(XGraphics gfx, ReportPlate plate, DiagramView view)
     {
         var fit = view.Fit;
-        // Detail views clip exactly at their frame line so cropped neighbours stop there.
-        var frame = new XRect(0.5, 0.5, view.Size.Width - 1, view.Size.Height - 1);
-        var state = gfx.Save();
-        if (view.CellBounds != null)
-            gfx.IntersectClip(frame);
-        // The map grid lies beneath the sheet and parts so it never hides an outline.
-        if (view.Grid is { } grid)
-            DrawGrid(gfx, grid, fit);
         gfx.DrawRectangle(new XPen(XColors.Black, 1), fit.Rect(plate.Bounds));
         var outline = new XPen(XColors.Black, 0.6);
         foreach (var part in plate.Parts)
@@ -293,53 +264,14 @@ public static class NestPdfWriter
         var cutoff = new XPen(XColors.Black, 0.75) { DashPattern = [9, 3] };
         foreach (var geometry in plate.Cutoffs)
             StrokeContours(gfx, geometry, fit, cutoff);
-        // Long dash-dot, so detail cells are never confused with dashed scrap cutoffs.
-        var detail = new XPen(XColors.Black, 1.6) { DashPattern = [9, 3, 1, 3] };
-        if (view.Grid is { } overviewGrid)
-        {
-            foreach (var (row, column) in overviewGrid.DetailCells)
-                gfx.DrawRectangle(detail, fit.Rect(overviewGrid.Cell(row, column)));
-        }
-        if (view.CellBounds is { } cell)
-            gfx.DrawRectangle(detail, fit.Rect(cell));
+        var groupPen = new XPen(XColors.Black, 0.6) { DashPattern = [1, 3] };
+        foreach (var group in view.Groups)
+            gfx.DrawRectangle(groupPen, group.Boundary);
         var font = NestReportDiagram.LabelFont();
-        foreach (var label in view.Labels)
+        foreach (var label in view.Labels.Concat(view.Groups.Select(group => group.Label)))
         {
             gfx.DrawRectangle(XBrushes.White, label.Box);
             gfx.DrawString(label.Id, font, XBrushes.Black, label.Box, XStringFormats.Center);
-        }
-        gfx.Restore(state);
-        // Frame the viewport so cropped neighbouring parts read as intentional.
-        if (view.CellBounds != null)
-            gfx.DrawRectangle(new XPen(XColors.Gray, 0.75), frame);
-    }
-
-    private static void DrawGrid(XGraphics gfx, DiagramGrid grid, Fit fit)
-    {
-        var line = new XPen(XColors.Gray, 0.3) { DashPattern = [3, 6] };
-        var area = fit.Rect(grid.Union);
-        for (var column = 0; column <= grid.Columns; column++)
-        {
-            var x = area.X + column * grid.CellLength * fit.Scale;
-            gfx.DrawLine(line, x, area.Y, x, area.Y + grid.Rows * grid.CellWidth * fit.Scale);
-        }
-        for (var row = 0; row <= grid.Rows; row++)
-        {
-            var y = area.Y + row * grid.CellWidth * fit.Scale;
-            gfx.DrawLine(line, area.X, y, area.X + grid.Columns * grid.CellLength * fit.Scale, y);
-        }
-        var font = NestReportDiagram.LabelFont();
-        for (var column = 0; column < grid.Columns; column++)
-        {
-            var x = area.X + (column + 0.5) * grid.CellLength * fit.Scale;
-            gfx.DrawString((column + 1).ToString(Invariant), font, XBrushes.Black,
-                new XRect(x - 20, area.Y - 11, 40, 10), XStringFormats.BottomCenter);
-        }
-        for (var row = 0; row < grid.Rows; row++)
-        {
-            var y = area.Y + (row + 0.5) * grid.CellWidth * fit.Scale;
-            gfx.DrawString(ReportText.RowName(row), font, XBrushes.Black,
-                new XRect(area.X - 16, y - 5, 14, 10), XStringFormats.CenterRight);
         }
     }
 
