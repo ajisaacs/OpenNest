@@ -27,7 +27,13 @@ public static class NestReportBuilder
             return item;
         }
 
-        for (var index = 0; index < nest.Plates.Count; index++)
+        // The editor can leave unused stock at the end of a job. Exclude those placeholders
+        // from report pages and totals without changing plate numbers or the live nest.
+        var plateCount = nest.Plates.Count;
+        while (plateCount > 0 && nest.Plates[plateCount - 1]?.Parts.Count == 0)
+            plateCount--;
+
+        for (var index = 0; index < plateCount; index++)
         {
             var number = index + 1;
             var plate = nest.Plates[index];

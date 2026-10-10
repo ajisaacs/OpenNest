@@ -31,6 +31,8 @@ the selected plate, or certify that a layout passed geometry/pre-post checks.
 - Recount nested quantities from placements times sheet copies exactly once using
   checked wide integers. Include unplaced demand; report shortage and extra
   separately. Cached `Quantity.Nested` is not authoritative.
+- Omit trailing empty stock plates from report pages, layout counts and physical
+  sheet totals. Keep the live nest and remaining plate numbers unchanged.
 - Distinguish distinct layouts from physical sheets. Per-sheet quantities do not
   include copies; total quantities do. Utilization uses net part area divided by
   full sheet area, excluding cutoffs.

@@ -79,6 +79,7 @@ public sealed class NestPdfWriterTests : IDisposable
     public void Write_EmptyAndDemandOnlyJobsProduceExplicitSummaryOnlyReports()
     {
         var nest = new Nest("Empty test") { Units = Units.Millimeters };
+        nest.Plates.Add(new Plate(24, 48) { Quantity = 1 });
         var empty = ReportPdf.Text(WriteReport(nest, "empty.pdf"), 1);
         Assert.Contains("No plates in this job.", empty);
         Assert.Contains("No parts in this job.", empty);
@@ -89,6 +90,21 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Contains("No plates in this job.", demand);
         Assert.Matches(@"1\s+Alpha\s+2\s+0\s+2\s+0\s+-", demand);
         Assert.Contains("Page 1 of 1", demand);
+    }
+
+    [SkippableFact]
+    public void Write_TrailingEmptyStockDoesNotAddPagesOrCountTowardTotals()
+    {
+        var nest = NestReportTestData.CreateMultiPlateNest();
+        var expected = ReportPdf.Pages(WriteReport(nest, "without-empty-stock.pdf"));
+        nest.Plates.Add(new Plate(24, 48) { Quantity = 5 });
+        nest.Plates.Add(new Plate(30, 60) { Quantity = 2 });
+        var before = NestReportBuilderTests.Fingerprint(nest);
+
+        var actual = ReportPdf.Pages(WriteReport(nest));
+
+        Assert.Equal(expected, actual);
+        Assert.Equal(before, NestReportBuilderTests.Fingerprint(nest));
     }
 
     [Fact]
