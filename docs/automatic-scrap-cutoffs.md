@@ -36,6 +36,8 @@ For a 120-by-81-inch sheet whose parts extend through 80 inches, the nominal ske
 
 ## Part sequencing
 
+For **Plate > Sequence Parts > Manual Sequence**, choose the one-based sequence number and hover a part on the sheet; only the part under the pointer is outlined. Click it to place it at that exact position, then the number advances up to the last part. Clicking empty sheet space changes nothing. Use **Done**, the window close button, right-click on the sheet, or Escape to leave the tool. Manual reordering changes neither geometry nor quantities.
+
 After adding cutoffs, apply **Part Sequencing** to the current plate or all plates. Each cutoff is moved earlier as needed so it is cut before every part its nominal line passes through. Ordinary parts retain their relative order from the chosen sequencing route; a tail separator that crosses no parts keeps its normal route position rather than being forced to the front. Cutoff geometry, clearance, part programs, placements, and quantities are unchanged.
 
 The dependency check uses the nominal horizontal/vertical line and its start/end limits, not the trimmed cutting segments, which intentionally skip the parts. It conservatively checks placed part bounds (including edge contacts), so a cutoff through a concave recess can also move ahead of that part. Definitions are matched by drawing identity, not their displayed names. A cutoff part with no matching definition is conservatively ordered before all ordinary parts.

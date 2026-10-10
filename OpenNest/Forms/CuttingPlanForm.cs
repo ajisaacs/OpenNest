@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -25,6 +25,8 @@ public partial class CuttingPlanForm : Form
     private readonly Func<bool> isOperationBusy;
     private readonly string unit;
     private readonly PlateView preview;
+    private readonly DataGridView warningGrid;
+    private bool populatingWarnings;
     private readonly SynchronizationContext uiContext;
     private readonly string previewText;
     private CuttingParameters parameters;
@@ -57,11 +59,54 @@ public partial class CuttingPlanForm : Form
         this.isOperationBusy = isOperationBusy;
         unit = UnitsHelper.GetShortString(nest.Units);
         InitializeComponent();
-        // Best-effort acceptance must be able to display every warning, even on large jobs.
+        StartPosition = FormStartPosition.Manual;
+        warningGrid = new DataGridView
+        {
+            Name = "warningGrid",
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            MultiSelect = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoGenerateColumns = false,
+            RowHeadersVisible = false,
+            BackgroundColor = SystemColors.Window,
+        };
+        warningGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            HeaderText = "Plate",
+            Width = 58,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        });
+        warningGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            HeaderText = "Part",
+            Width = 58,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        });
+        warningGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            HeaderText = "With",
+            Width = 58,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        });
+        warningGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            HeaderText = "Warning / finding",
+            AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+            SortMode = DataGridViewColumnSortMode.NotSortable
+        });
+        warningGrid.SelectionChanged += WarningGrid_SelectionChanged;
+        var findingsLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
+        findingsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
+        findingsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
+        summaryBox.Dock = DockStyle.Fill;
+        findingsLayout.Controls.Add(summaryBox, 0, 0);
+        findingsLayout.Controls.Add(warningGrid, 0, 1);
+        split.Panel2.Controls.Add(findingsLayout);
+        // Keep the batch outcome visible; every individual diagnostic lives in the grid.
         summaryBox.MaxLength = int.MaxValue;
-        // Captured once: when Application.DoEvents ends the outermost message loop, WinForms
-        // uninstalls its ambient context, so progress and results must not depend on whichever
-        // context is current when planning starts.
         uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
 
         preview = new PlateView
@@ -118,6 +163,12 @@ public partial class CuttingPlanForm : Form
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
+        // Use the database browser's owner-monitor sizing, without maximizing a modal window.
+        var area = Screen.FromControl(Owner ?? this).WorkingArea;
+        var width = System.Math.Min(area.Width, System.Math.Max(MinimumSize.Width, area.Width * 9 / 10));
+        var height = System.Math.Min(area.Height, System.Math.Max(MinimumSize.Height, area.Height * 9 / 10));
+        Bounds = new Rectangle(area.Left + (area.Width - width) / 2,
+            area.Top + (area.Height - height) / 2, width, height);
         // Min sizes and the splitter only fit once the container has its real size.
         split.Panel1MinSize = 200;
         split.Panel2MinSize = 220;
@@ -242,7 +293,26 @@ public partial class CuttingPlanForm : Form
     private void ShowProposal(CuttingPlanProposal result)
     {
         proposal = result;
-        summaryBox.Text = string.Join(Environment.NewLine, result.Describe(unit));
+        summaryBox.Text = string.Join(Environment.NewLine, result.Describe(unit)
+            .Where(line => !line.TrimStart().StartsWith("- ", StringComparison.Ordinal)
+                && !line.TrimStart().StartsWith("... and ", StringComparison.Ordinal)));
+        var warningRows = result.DiagnosticRows();
+        populatingWarnings = true;
+        try
+        {
+            warningGrid.Rows.Clear();
+            foreach (var row in warningRows)
+            {
+                var display = warningGrid.Rows.Add(row.PlateNumber, row.PartNumber, row.OtherPartNumber,
+                    row.Message);
+                warningGrid.Rows[display].Tag = row;
+            }
+            warningGrid.ClearSelection();
+        }
+        finally
+        {
+            populatingWarnings = false;
+        }
         acceptWarningsCheckBox.Checked = false;
         acceptWarningsCheckBox.Visible = result.RequiresWarningAcceptance;
         statusLabel.Text = result.CanApply ? "Review the plan, then apply it."
@@ -250,23 +320,89 @@ public partial class CuttingPlanForm : Form
             : "Nothing can be applied.";
         applyButton.Enabled = result.CanApply;
         var index = Array.IndexOf(plates, activePlate);
-        var plate = index < 0 ? null : result.BuildPreview(index);
+        ShowPlate(index);
+    }
+
+    private void ShowPlate(int index)
+    {
+        preview.Visible = false;
+        if (proposal == null || index < 0 || index >= proposal.Plates.Count)
+            return;
+        var plate = proposal.BuildPreview(index);
         if (plate == null)
         {
-            if (index >= 0)
-                previewLabel.Text = "No preview: this plate's plan is not ready. Part numbers in the summary "
-                    + "match the editor.";
+            previewLabel.Text = $"Plate {plateNumbers[index]}: no current, usable preview. "
+                + "Part numbers refer to the editor; no location can be certified here.";
             return;
         }
-        previewLabel.Text = result.Plates[index].IsReady ? previewText : "UNVERIFIED — " + previewText;
+        previewLabel.Text = proposal.Plates[index].IsReady
+            ? $"Plate {plateNumbers[index]} — preview, numbered in proposed cutting order:"
+            : $"UNVERIFIED — Plate {plateNumbers[index]} — preview, numbered in proposed cutting order:";
         preview.Plate = plate;
         preview.Visible = true;
         preview.ZoomToFit();
     }
 
+    private void WarningGrid_SelectionChanged(object sender, EventArgs e)
+    {
+        if (populatingWarnings || proposal == null || warningGrid.SelectedRows.Count == 0)
+            return;
+        // SelectionChanged precedes CurrentCell's update; SelectedRows is the new selection.
+        if (warningGrid.SelectedRows[0].Tag is not CuttingPlanDiagnosticRow row)
+            return;
+        ShowPlate(row.PlateIndex);
+        if (!preview.Visible || row.PartNumber is not int partNumber)
+        {
+            if (preview.Visible)
+                previewLabel.Text += " No part location was provided for this warning.";
+            return;
+        }
+        var plan = proposal.Plates[row.PlateIndex].Result;
+        var matched = plan.ProposedOrder.Select((part, position) => (part, position))
+            .FirstOrDefault(item => item.part.SourceOrdinal == partNumber - 1);
+        if (matched.part == null)
+        {
+            previewLabel.Text += " This source part has no proposed preview location.";
+            return;
+        }
+        var bounds = preview.Plate.Parts[matched.position].BoundingBox;
+        if (row.OtherPartNumber is int otherNumber)
+        {
+            var other = plan.ProposedOrder.Select((part, position) => (part, position))
+                .FirstOrDefault(item => item.part.SourceOrdinal == otherNumber - 1);
+            if (other.part != null)
+            {
+                var second = preview.Plate.Parts[other.position].BoundingBox;
+                var left = System.Math.Min(bounds.Left, second.Left);
+                var bottom = System.Math.Min(bounds.Bottom, second.Bottom);
+                bounds = new OpenNest.Geometry.Box(left, bottom,
+                    System.Math.Max(bounds.Right, second.Right) - left,
+                    System.Math.Max(bounds.Top, second.Top) - bottom);
+            }
+        }
+        if (double.IsFinite(bounds.X) && double.IsFinite(bounds.Y)
+            && double.IsFinite(bounds.Length) && double.IsFinite(bounds.Width)
+            && bounds.Length > 0 && bounds.Width > 0)
+        {
+            var pad = System.Math.Max(0.5, System.Math.Max(bounds.Length, bounds.Width) * 0.12);
+            preview.ZoomToArea(bounds.X - pad, bounds.Y - pad,
+                bounds.Length + 2 * pad, bounds.Width + 2 * pad);
+        }
+        previewLabel.Text += " Showing affected part extent, not an exact warning point.";
+    }
+
     private void ClearProposal()
     {
         proposal = null;
+        populatingWarnings = true;
+        try
+        {
+            warningGrid.Rows.Clear();
+        }
+        finally
+        {
+            populatingWarnings = false;
+        }
         acceptWarningsCheckBox.Checked = false;
         acceptWarningsCheckBox.Visible = false;
         applyButton.Enabled = false;

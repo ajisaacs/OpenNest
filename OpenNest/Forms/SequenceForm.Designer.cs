@@ -31,6 +31,7 @@
             tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             label1 = new System.Windows.Forms.Label();
             numericUpDown1 = new OpenNest.Controls.NumericUpDown();
+            doneButton = new System.Windows.Forms.Button();
             tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericUpDown1).BeginInit();
             SuspendLayout();
@@ -42,13 +43,15 @@
             tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             tableLayoutPanel1.Controls.Add(label1, 0, 0);
             tableLayoutPanel1.Controls.Add(numericUpDown1, 1, 0);
+            tableLayoutPanel1.Controls.Add(doneButton, 1, 1);
             tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             tableLayoutPanel1.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             tableLayoutPanel1.Name = "tableLayoutPanel1";
-            tableLayoutPanel1.RowCount = 1;
+            tableLayoutPanel1.RowCount = 2;
+            tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 35F));
             tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            tableLayoutPanel1.Size = new System.Drawing.Size(266, 35);
+            tableLayoutPanel1.Size = new System.Drawing.Size(266, 74);
             tableLayoutPanel1.TabIndex = 0;
             // 
             // label1
@@ -74,20 +77,28 @@
             numericUpDown1.TabIndex = 1;
             numericUpDown1.Value = new decimal(new int[] { 1, 0, 0, 0 });
             numericUpDown1.Leave += numericUpDown1_Leave;
+            // doneButton
             // 
+            doneButton.Anchor = System.Windows.Forms.AnchorStyles.Right;
+            doneButton.Location = new System.Drawing.Point(182, 40);
+            doneButton.Name = "doneButton";
+            doneButton.Size = new System.Drawing.Size(80, 28);
+            doneButton.TabIndex = 2;
+            doneButton.Text = "Done";
+            doneButton.UseVisualStyleBackColor = true;
+            doneButton.Click += doneButton_Click;
             // SequenceForm
             // 
             AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            ClientSize = new System.Drawing.Size(266, 35);
-            ControlBox = false;
+            ClientSize = new System.Drawing.Size(266, 74);
             Controls.Add(tableLayoutPanel1);
             FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
             Location = new System.Drawing.Point(100, 100);
             Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
             MaximizeBox = false;
             MinimizeBox = false;
-            MinimumSize = new System.Drawing.Size(268, 74);
+            MinimumSize = new System.Drawing.Size(268, 113);
             Name = "SequenceForm";
             ShowIcon = false;
             ShowInTaskbar = false;
@@ -105,5 +116,6 @@
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.Label label1;
         public Controls.NumericUpDown numericUpDown1;
+        private System.Windows.Forms.Button doneButton;
     }
 }

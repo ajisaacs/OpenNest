@@ -146,11 +146,24 @@ other curve already touches, while a contact anywhere else on the line still ref
 
 Source parts rank by modeled travel (material-centre distance at a holed-part
 boundary); within a part, preferred contour order and facing-entry rank precede
-travel. Ties use stable source/contour/entry ordinals. Hash values and drawing names are not tie breakers. The expansion budget
-counts rejected candidates and frontier ranking as well as accepted moves, before
-emission; it is not a wall-clock timeout. Callers can cancel. Exhaustion may occur
-before already-generated siblings are traversed; it returns a refusal, not an
-unranked fallback or a proof of geometric impossibility.
+travel. Ties use stable source/contour/entry ordinals. Hash values and drawing names
+are not tie breakers.
+
+When the next whole part is fixed by the tour or a part is already active, the
+search generates and checks contour alternatives on demand in contour/entry rank
+order. It does not emit every sibling before trying the first. Backtracking still
+visits the remaining alternatives when needed; none is pruned. The free whole-part
+fallback still evaluates all ready sources before ranking their travel distances.
+
+The expansion budget counts evaluated candidates and frontier ranking, including
+rejections, before emission; it is not a wall-clock timeout. An unvisited sibling
+consumes no additional DFS-prefix emission work or per-sibling expansion charge;
+entry-catalogue prechecks still emit isolated contours and consume budget.
+Consequently a bounded search can
+reach a different frontier and report different rejected approaches than eager
+expansion did. All visited candidates retain their lead/rapid checks, and a selected
+plan still receives fresh independent replay. Callers can cancel. Exhaustion returns
+a refusal, not an unranked fallback or proof of geometric impossibility.
 
 ## Automatic outside entries and look-ahead
 
@@ -306,6 +319,14 @@ plans every plate that has parts. Both open one dialog built on
   obstruct it, spacing the parts farther apart. These are suggestions, not guaranteed
   fixes: replanning runs the same strict checks; an unverified fallback requires
   separate warning acceptance and is not approval to post or cut.
+- The desktop free-order batch first tries up to eight entries per contour for at most
+  1,000 expansions. Only a Ready proposal that passes independent replay is used;
+  otherwise it runs the original 16-entry search with its entire plate budget.
+  Cancellation stops both attempts. This short pass can choose a different valid
+  route, and a hard plate can take up to 1,000 extra expansions before the full
+  attempt. The current-order retry still uses its original 16-entry budget.
+  Returned expansion counts describe the retained attempt, not a discarded
+  short pass plus its full-cap retry.
 - Every plate is captured on the UI thread and checked and planned on a worker. Clean part
   material is checked for overlaps with the pre-post overlap analyzer; known overlapping parts
   still block that plate whatever its route. Incomplete checks remain visible warnings, never
@@ -313,9 +334,19 @@ plans every plate that has parts. Both open one dialog built on
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
+- The dialog uses an owner-monitor-sized window (approximately 90% of the working area), like
+  the database browser. The right panel keeps the batch outcome and plate headings above a
+  read-only, unsorted warning grid with Plate, source Part, With, and full finding text. Every
+  overlap issue/pair and every planner finding has its own selectable row, including findings
+  hidden by the compact blocked-plate summary. Selecting a row switches to that plate's
+  detached preview and zooms to the affected part extent (or both parts for a pair), mapping
+  source positions to the proposed cutting order. This is not an exact contact marker: most
+  findings do not carry a geometric witness. If a plate cannot produce a current, supported
+  preview, no geometry is cloned or focused; the row still identifies its source part in the
+  editor. Replanning, cancellation and stale Apply clear old warning targets.
 - The summary lists every plate: ready plates with part counts and rapid travel, others
-  with their status and findings. Unverified proposals show every overlap and route
-  warning in the scrollable summary before the acceptance checkbox is used; they do
+  with their status and findings. Unverified proposals retain every overlap and route
+  warning in the selectable grid before the acceptance checkbox is used; they do
   not truncate later parts' warnings. Finding part numbers are the plate's current order, as the
   editor numbers them. The preview shows the active plate detached from the nest (quantity
   zero, so drawing quantities do not change) in the proposed order with the proposed

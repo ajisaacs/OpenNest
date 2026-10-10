@@ -76,6 +76,73 @@ public class NestPipelineCommitTests
     }
 
     [Fact]
+    public void DrawingChangedAfterValidationIsRefusedBeforeCommitEvenWithConsent()
+    {
+        var drawing = new Drawing("part", TestDrawingFactory.Rectangle());
+        var nest = new Nest();
+        nest.Drawings.Add(drawing);
+        var empty = nest.CreatePlate();
+        using var manager = new PlateManager(nest);
+        var result = NestPipeline.Run(new PreMutationStub(), "stub",
+            new NestPipelineRequest("stub", new[] { new NestItem { Drawing = drawing, Quantity = 1 } },
+                new[] { new NestPlateStock("sheet", new Size(48, 96), 1, 0.25) }));
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        drawing.Program = TestDrawingFactory.Rectangle(100, 100);
+        Assert.Throws<InvalidOperationException>(() =>
+            NestPipelineCommit.ApplyToEmptyPlates(result, manager, allowInvalid: true));
+        Assert.Same(empty, Assert.Single(nest.Plates));
+        Assert.Empty(empty.Parts);
+        Assert.Equal(0, drawing.Quantity.Nested);
+    }
+
+    private sealed class PreMutationStub : INestingEngine
+    {
+        public NestJobResult Solve(NestJob job, IProgress<NestJobProgress>? progress = null,
+            CancellationToken token = default)
+        {
+            var builder = new NestJobResultBuilder(job);
+            builder.AddSheet(job.Plates[0], new[] { (job.Parts[0].Id, 1.0, 1.0, 0.0) });
+            return builder.Build(NestJobStopReason.Completed);
+        }
+    }
+
+    private sealed class CancelDuringSnapshot(double x, double y, CancellationTokenSource source)
+        : OpenNest.CNC.LinearMove(x, y)
+    {
+        public override OpenNest.CNC.CodeType Type
+        {
+            get
+            {
+                source.Cancel();
+                return base.Type;
+            }
+        }
+    }
+
+    [Fact]
+    public void CancellationDuringFreshnessScanDoesNotMutateNest()
+    {
+        var drawing = new Drawing("part", TestDrawingFactory.Rectangle());
+        var nest = new Nest();
+        nest.Drawings.Add(drawing);
+        var empty = nest.CreatePlate();
+        using var manager = new PlateManager(nest);
+        var result = NestPipeline.Run(new PreMutationStub(), "stub",
+            new NestPipelineRequest("stub", new[] { new NestItem { Drawing = drawing, Quantity = 1 } },
+                new[] { new NestPlateStock("sheet", new Size(48, 96), 1, 0.25) }));
+        Assert.True(result.IsValid);
+        using var cts = new CancellationTokenSource();
+        var proposed = Assert.Single(Assert.Single(result.Plates).Parts);
+        proposed.Program.Codes[1] = new CancelDuringSnapshot(10, 0, cts);
+        Assert.Throws<OperationCanceledException>(() =>
+            NestPipelineCommit.ApplyToEmptyPlates(result, manager, token: cts.Token));
+        Assert.True(cts.IsCancellationRequested);
+        Assert.Same(empty, Assert.Single(nest.Plates));
+        Assert.Empty(empty.Parts);
+        Assert.Equal(0, drawing.Quantity.Nested);
+    }
+
+    [Fact]
     public void CancelledCommitDoesNotCreateAnyPlate()
     {
         var drawing = new Drawing("part", TestDrawingFactory.Rectangle());

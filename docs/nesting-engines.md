@@ -70,8 +70,9 @@ remain separate sequencer/verification work.
 ## Filling cutouts (not yet in production)
 
 Placing parts inside another part's enclosed cutout is being built as a step that runs before any
-engine, so every engine benefits. Nothing calls it yet: a part inside a cutout must be cut before
-the cutout's contour, and the sequencer does not enforce that order.
+engine, so every engine benefits. Only an internal test-only pipeline preview calls it: a part
+inside a cutout must be cut before the cutout's contour, and the cutting/post safety gates are
+not complete. Ordinary whole-job calls do not enable this path.
 
 `CutoutLatticeFill` (`OpenNest.Engine/Jobs/Cutouts/`) fills one closed cutout with copies of one
 part. It runs Fill over the cutout's bounds plus one part step on every side, then shifts
@@ -82,6 +83,40 @@ is then checked against the frame and the other copies with `NestLayoutCheck.Cle
 layout check uses. The method suits many small copies in a large cutout; a few large inserts are
 meant for no-fit-polygon placement. Fill can return different, equally scored lattices on repeated
 calls for some parts, so results are not yet guaranteed identical between runs.
+
+The internal `CutoutRouter` can propose copies from the shifted lattice, then search bounded
+inner-fit/NFP sample points for remaining copies and other insert requirements. It keeps
+original requirement IDs, reindexes accepted copies and checks clearance against the frame
+and every previously accepted insert. Lattice shifts account for occupied poses before
+quantity trimming; a pre-fill work limit declines giant grids and lets bounded NFP sampling
+try instead. A null NFP proposal is not proof of geometric impossibility. No material-area
+ratio cutoff rejects a possible placement: the measured 0.10 and 0.35 ratios guide
+search order only. Below 0.10 it starts with Fill for three or more copies; between
+0.10 and 0.35 it compares Fill-plus-NFP with NFP-only counts; above 0.35 it tries
+NFP first, then Fill if demand remains, taking the higher-count valid proposal.
+An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
+Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
+the search-order hints; these limited cases are not a global density guarantee.
+The internal `NestPipeline.RunCutoutPreview` builds quantity-one proxy instances for eligible
+closed-cutout frames. It considers legal frame rotations without outer-perimeter symmetry
+reduction, shifts insert rotation policies into the local frame, and reserves certified router
+poses by original requirement ID. It can fill multiple holes and repeated/different frame
+requirements; inserts with a different priority or their own cutouts stay independent, so
+bundles remain flat. It uses the largest offered spacing for every bundle because the current
+job contract cannot condition insert demand on the stock selected later. Remaining demand is
+offered to the selected engine once. Only actually placed proxies expand to original frame and
+insert identities. An unplaced proxy's reservations return to the original unplaced demand;
+they cannot be packed retroactively in that same solve. Engine indices and metadata are checked,
+then every physical pose, stock, rotation, quantity and fulfillment is independently validated
+before binding caller drawings. Incomplete, forged or geometrically invalid composites return
+no bindable plates even with invalid-result consent. Candidate evaluation progress is forwarded
+with unverified proxy commitment counts zeroed; transformed proxy commits are hidden. Physical
+commits are reported only after physical validation. Preparation is bounded to 32 bundles
+and 16 base sweep-angle samples per frame (automatic quarter-turns are all retained);
+remaining copies stay ordinary requirements. Fixed legal proxy orientations are a
+conservative search choice, not full engine choice among all legal orientations; unsupported
+bundles remain ordinary independent requirements. This is an internal pipeline path, not a
+production setting or cut-ready nest. Cutting/post safety remains pending before enablement.
 
 ## Renamed engines
 

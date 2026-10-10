@@ -59,6 +59,31 @@ public class NestStorageSettingsTests : IDisposable
         Assert.False(settings.IsDatabaseMode);
     }
 
+    [Fact]
+    public void TryNormalizeServerUrl_AcceptsHttpsWithoutChangingMode()
+    {
+        var settings = new NestStorageSettings { Mode = NestStorageMode.File };
+
+        Assert.True(NestStorageSettings.TryNormalizeServerUrl(" https://shop.example:8090/ ", out var url));
+        settings.ServerUrl = url;
+        settings.Save(FilePath);
+
+        var loaded = NestStorageSettings.Load(FilePath);
+        Assert.Equal("https://shop.example:8090", loaded.ServerUrl);
+        Assert.Equal(NestStorageMode.File, loaded.Mode);
+        Assert.False(loaded.IsDatabaseMode);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("ftp://shop.example")]
+    [InlineData("not-a-url")]
+    public void TryNormalizeServerUrl_RejectsInvalidAddress(string input)
+    {
+        Assert.False(NestStorageSettings.TryNormalizeServerUrl(input, out var url));
+        Assert.Equal("", url);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))

@@ -93,6 +93,13 @@ public sealed class CuttingPlanSnapshot
     public int ExpansionBudget { get; }
     internal CuttingPlanStatus? Failure { get; }
     internal IReadOnlyList<CuttingPlanFinding> Findings { get; }
+
+    // A worker-only search variant over the same owned capture. Never recapture the live plate:
+    // both proposals retain the identical freshness record and confirmed settings.
+    internal CuttingPlanSnapshot WithSearchLimits(int expansionBudget, int maxEntries) =>
+        new(Placements, StartPoint, expansionBudget, Failure, Findings, Regeneration,
+            PreservePartOrder, maxEntries, ExpansionObserver, PlateState, OwnedParameters,
+            Dependencies, BestEffort);
 }
 
 public sealed class FixedProgramPlacement

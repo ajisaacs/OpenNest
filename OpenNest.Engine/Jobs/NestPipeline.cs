@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using OpenNest.Engine.Jobs.Adapters;
+using OpenNest.Engine.Jobs.Cutouts;
 
 namespace OpenNest.Engine.Jobs;
 
@@ -36,7 +37,8 @@ public sealed class NestPipelineResult
         IReadOnlyList<string> violations,
         bool canKeep,
         TimeSpan solveTime,
-        TimeSpan validationTime
+        TimeSpan validationTime,
+        IReadOnlyDictionary<string, Drawing> drawingsByPartId
     )
     {
         EngineName = engineName;
@@ -47,6 +49,7 @@ public sealed class NestPipelineResult
         CanKeep = canKeep;
         SolveTime = solveTime;
         ValidationTime = validationTime;
+        DrawingsByPartId = drawingsByPartId;
     }
 
     public string EngineName { get; }
@@ -62,6 +65,7 @@ public sealed class NestPipelineResult
     public NestJobStopReason StopReason => Raw.StopReason;
     public TimeSpan SolveTime { get; }
     public TimeSpan ValidationTime { get; }
+    internal IReadOnlyDictionary<string, Drawing> DrawingsByPartId { get; }
 }
 
 /// <summary>
@@ -72,6 +76,15 @@ public sealed class NestPipelineResult
 /// </summary>
 public static class NestPipeline
 {
+    private sealed class PreviewProgress(IProgress<NestJobProgress> inner) : IProgress<NestJobProgress>
+    {
+        public void Report(NestJobProgress value)
+        {
+            if (value != null && value.Stage == NestJobStage.EvaluatingCandidate)
+                inner.Report(value with { CommittedPlates = 0, CommittedParts = 0 });
+        }
+    }
+
     /// <summary>Resolves <see cref="NestPipelineRequest.EngineName"/> through
     /// <see cref="NestingEngineRegistry"/>; unknown names throw <see cref="NotSupportedException"/>.
     /// Engine cancellation propagates unchanged.</summary>
@@ -93,6 +106,32 @@ public static class NestPipeline
         NestPipelineRequest request,
         IProgress<NestJobProgress> progress = null,
         CancellationToken token = default
+    ) => RunCore(engine, engineName, request, progress, token, cutoutPreview: false);
+
+    /// <summary>Internal test-only integration trial. Normal Run never prepares cutouts;
+    /// this entry point must not be called by production front ends before cutting/post gates.</summary>
+    internal static NestPipelineResult RunCutoutPreview(
+        INestingEngine engine,
+        string engineName,
+        NestPipelineRequest request,
+        IProgress<NestJobProgress> progress = null,
+        CancellationToken token = default
+    ) => RunCore(engine, engineName, request, progress, token, cutoutPreview: true);
+
+    internal static NestPipelineResult RunCutoutPreview(
+        NestPipelineRequest request,
+        IProgress<NestJobProgress> progress = null,
+        CancellationToken token = default
+    ) => RunCutoutPreview(NestingEngineRegistry.Create(request.EngineName),
+        request.EngineName, request, progress, token);
+
+    private static NestPipelineResult RunCore(
+        INestingEngine engine,
+        string engineName,
+        NestPipelineRequest request,
+        IProgress<NestJobProgress> progress,
+        CancellationToken token,
+        bool cutoutPreview
     )
     {
         ArgumentNullException.ThrowIfNull(engine);
@@ -115,10 +154,15 @@ public static class NestPipeline
 
         var job = new NestJob(parts, request.Stock, request.Options);
         NestJobValidator.Validate(job);
+        var prepass = cutoutPreview ? CutoutPipelinePrepass.Prepare(job, token) : null;
+        var engineJob = prepass?.EngineJob ?? job;
+        if (prepass != null)
+            NestJobValidator.Validate(engineJob);
 
         var clock = Stopwatch.StartNew();
         var raw =
-            engine.Solve(job, progress, token)
+            engine.Solve(engineJob, prepass == null || progress == null
+                ? progress : new PreviewProgress(progress), token)
             ?? throw new InvalidOperationException($"Engine '{engineName}' returned no result.");
         var solveTime = clock.Elapsed;
         token.ThrowIfCancellationRequested();
@@ -129,7 +173,33 @@ public static class NestPipeline
             kv => kv.Value.Name ?? kv.Key,
             StringComparer.Ordinal
         );
-        var violations = NestLayoutCheck.Violations(job, raw, names, out var canKeep);
+        var checkedNames = prepass == null ? names : engineJob.Parts.ToDictionary(p => p.Id,
+            p => names.GetValueOrDefault(p.Id, p.Id), StringComparer.Ordinal);
+        var violations = NestLayoutCheck.Violations(engineJob, raw, checkedNames, out var canKeep).ToList();
+        if (prepass != null)
+        {
+            // A compound may be physically invalid even when its envelope is legal.
+            // Refuse every unverified trial, including with explicit invalid-result consent.
+            var failure = "Cutout engine output failed reconciliation";
+            if (violations.Count == 0 && prepass.TryExpand(job, raw, token, out var expanded, out failure))
+            {
+                raw = expanded;
+                violations.AddRange(NestLayoutCheck.Violations(job, raw, names, out var physicalKeep));
+                if (raw.Status != NestJobStatus.Complete)
+                    violations.Add("Cutout engine did not complete the transformed job; unplaced frames' reserved inserts remain unplaced in the original job");
+                canKeep = physicalKeep && violations.Count == 0;
+            }
+            else
+            {
+                if (violations.Count == 0)
+                    violations.Add(failure);
+                canKeep = false;
+            }
+        }
+        var freshness = NestPipelineDrawingFreshness.Changes(job, drawingsByPartId);
+        violations.AddRange(freshness);
+        if (freshness.Count > 0)
+            canKeep = false;
         var validationTime = clock.Elapsed;
         if (canKeep && violations.Count == 0)
             _ = NestJobCost.Evaluate(job, raw);
@@ -143,6 +213,31 @@ public static class NestPipeline
             .ToList()
             : new List<ProposedPlate>();
 
+        // Binding clones the caller's current Program; a concurrent edit during binding
+        // must not return parts whose bytes differ from the already validated snapshot.
+        if (canKeep)
+        {
+            var changes = NestPipelineDrawingFreshness.Changes(job, drawingsByPartId).ToList();
+            changes.AddRange(NestPipelineDrawingFreshness.BoundChanges(job, raw, plates, drawingsByPartId));
+            if (changes.Count > 0)
+            {
+                violations.AddRange(changes);
+                plates.Clear();
+                canKeep = false;
+            }
+        }
+
+        token.ThrowIfCancellationRequested();
+        if (prepass != null && canKeep)
+        {
+            var count = 0;
+            for (var i = 0; i < raw.Plates.Count; i++)
+            {
+                count += raw.Plates[i].Placements.Count;
+                progress?.Report(new NestJobProgress(NestJobStage.PlateCommitted,
+                    raw.Plates[i].StockId, i, i + 1, count));
+            }
+        }
         token.ThrowIfCancellationRequested();
         return new NestPipelineResult(
             engineName,
@@ -152,7 +247,8 @@ public static class NestPipeline
             violations,
             canKeep,
             solveTime,
-            validationTime
+            validationTime,
+            drawingsByPartId
         );
     }
 }

@@ -34,6 +34,48 @@ public class ReorderSearchTests
         Assert.Equal(parts, plate.Parts); // Planning alone never reorders the live plate.
     }
 
+    [SkippableFact]
+    public void DenseGrid144_PerformanceProbe()
+    {
+        Skip.IfNot(Environment.GetEnvironmentVariable("OPENNEST_RUN_CUTTING_PERF") == "1",
+            "Set OPENNEST_RUN_CUTTING_PERF=1 for the 144-part cutting-planner probe.");
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(100, 100);
+        foreach (var part in Grid(144, false))
+            plate.Parts.Add(part);
+        var source = plate.Parts.ToArray();
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters(), expansionBudget: 57600));
+        timer.Stop();
+        // Expanded owned execution includes called hole programs; Program.ToString() does not,
+        // and rounds coordinates. Hash exact scalar bits in execution order instead.
+        static string Bits(double value) => BitConverter.DoubleToInt64Bits(value).ToString("X16");
+        static string Point(Vector point) => $"{Bits(point.X)},{Bits(point.Y)}";
+        var payload = string.Join("\n", result.ProposedOrder.SelectMany(p =>
+            new[] { $"part:{p.SourceOrdinal}:{Point(p.Location)}:{Bits(p.Rotation)}" }.Concat(
+                p.Execution.Motions.Select(m =>
+                {
+                    var geometry = m.Curve?.ToEntity() switch
+                    {
+                        Arc arc => $"arc:{Point(arc.Center)}:{Bits(arc.Radius)}:{Bits(arc.StartAngle)}:{Bits(arc.EndAngle)}:{arc.Rotation}",
+                        Circle circle => $"circle:{Point(circle.Center)}:{Bits(circle.Radius)}:{circle.Rotation}",
+                        Line => "line",
+                        null => "none",
+                        _ => throw new NotSupportedException("Unexpected execution curve."),
+                    };
+                    return $"{m.Layer}:{m.Rapid}:{(m.Start is { } start ? Point(start) : "null")}:{Point(m.End)}:{geometry}";
+                }))));
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(payload)));
+        Console.WriteLine($"Cutting144 elapsedMs={timer.Elapsed.TotalMilliseconds:F1} expansions={result.Expansions} status={result.Status} executionSha256={hash}");
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        Assert.True(result.IndependentlyReplayed);
+        Assert.Equal(source.OrderBy(Key), result.ProposedOrder.Select(p => p.SourcePart).OrderBy(Key));
+        Assert.Equal(source, plate.Parts);
+    }
+
     [Fact]
     public void FreeOrder_BlockedApproach_LearnsToCutThatPartFirst()
     {
