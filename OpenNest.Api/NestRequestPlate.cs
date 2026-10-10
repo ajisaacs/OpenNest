@@ -5,6 +5,9 @@ namespace OpenNest.Api;
 /// <summary>One explicit physical-stock type for a whole nesting job.</summary>
 public class NestRequestPlate
 {
+    /// <summary>Positive per-sheet cost in common units; omit on every row for area scoring.</summary>
+    public double? Cost { get; init; }
+
     public string Id { get; init; }
     public Size Size { get; init; }
 

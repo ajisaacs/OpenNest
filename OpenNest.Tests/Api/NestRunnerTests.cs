@@ -4,14 +4,59 @@ using System.Linq;
 using System.Threading.Tasks;
 using OpenNest.Api;
 using OpenNest.Converters;
+using OpenNest.Engine.Jobs;
 using OpenNest.Geometry;
 using OpenNest.IO;
-using OpenNest.Engine.Jobs;
 
 namespace OpenNest.Tests.Api;
 
 public class NestRunnerTests
 {
+    [Fact]
+    public async Task ExplicitPricesSelectCheaperStockAndSurviveArchive()
+    {
+        var path = CreateTempSquareDxf(4, 4);
+        var archive = Path.ChangeExtension(path, ".nestquote");
+        try
+        {
+            var response = await NestRunner.RunAsync(new NestRequest
+            {
+                Engine = "Rectangles",
+                Parts = [new NestRequestPart { DxfPath = path, Quantity = 1 }],
+                Plates = [new NestRequestPlate { Id = "small", Size = new Size(10, 10), Quantity = 1, Cost = 50 },
+                    new NestRequestPlate { Id = "large", Size = new Size(12, 12), Quantity = 1, Cost = 7 }],
+            });
+            Assert.Equal(NestValidationStatus.Valid, response.ValidationStatus);
+            Assert.Equal("large", Assert.Single(response.PlateStockMappings).StockId);
+            Assert.Equal("supplied-cost", response.Costs.Basis);
+            Assert.Equal(7, response.Costs.GrossTotal);
+            Assert.Equal(7, response.Costs.NetScore);
+            Assert.Equal(0, response.Costs.SalvageCredit);
+            await response.SaveAsync(archive);
+            var reopened = await NestResponse.LoadAsync(archive);
+            Assert.Equal(7, reopened.Costs.GrossTotal);
+            Assert.Equal(new[] { 50d, 7d }, reopened.Nest.PlateOptions.Select(p => p.Cost));
+            Assert.Equal(7, reopened.Request.Plates[1].Cost);
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(archive);
+        }
+    }
+
+    [Fact]
+    public async Task MixedCostsFailBeforeImport()
+    {
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => NestRunner.RunAsync(new NestRequest
+        {
+            Parts = [new NestRequestPart { DxfPath = "missing.dxf", Quantity = 1 }],
+            Plates = [new NestRequestPlate { Id = "priced", Size = new Size(10, 10), Cost = 2 },
+                new NestRequestPlate { Id = "missing", Size = new Size(12, 12) }],
+        }));
+        Assert.Contains("Missing: missing", error.Message);
+    }
+
     [Fact]
     public async Task RunAsync_LegacySheetSize_UsesUnlimitedLegacyStockAndDerivedPartId()
     {

@@ -98,3 +98,20 @@ Response archive schema 3 persists validation status and violations. Older archi
 ## Verification
 
 `dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj` exercises Console, MCP and API rejection/override, cancellation, physical-sheet settings, response IDs and archive round-trips. Its current target matches MCP's `net8.0-windows` marker but does not use WindowsDesktop and executes on Linux as well as Windows. It is included in the solution and Windows test workflow. Desktop interaction tests remain in Windows-only `OpenNest.WinForms.Tests`.
+
+## Stock costs
+
+API `NestRequestPlate.Cost` is an optional per-physical-sheet cost in caller-consistent
+units. Omit every cost for area scoring, or supply strictly positive finite costs
+for every available row. Explicit zero and mixed priced/unpriced available stock
+are rejected before import. Quantity-zero rows do not select the cost mode.
+
+Validated proposals expose `Costs` (`Basis`, `Stock`, `GrossTotal`, `SalvageCredit`,
+`NetScore`) and persist them in quote archives. `area` identifies fallback scoring;
+`supplied-cost` identifies explicit prices. API salvage is disabled, so two sheets
+costing 25 each report gross and net totals of 50 with zero salvage credit. Totals
+exclude penalties for unplaced demand. Invalid proposals have no cost summary;
+overflow fails instead of becoming a score.
+
+Returned nests preserve offered stock prices. These are cost-aware heuristics,
+not global cost optimizers; validation and fulfillment remain required.

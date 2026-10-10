@@ -91,3 +91,8 @@ The existing `plateOptions` entries retain width, length and `cost`; no new `.ne
 format version is required. Legacy zero cost means unspecified, not a free sheet.
 Positive costs are generic per-sheet values in caller-consistent units. Solving
 requires all available options to be priced or all to be unspecified.
+
+API returned nests retain offered options, excluding rows with zero available
+quantity because `.nest` options do not retain inventory. Options are offers, not
+a per-sheet purchase ledger. API quote archives additionally retain request costs
+and validated proposal cost summaries; old archives load with `Costs == null`.

@@ -44,6 +44,7 @@ public class NestResponse
     public IReadOnlyList<NestPartFulfillment> Fulfillment { get; init; } = [];
     public IReadOnlyList<NestStockUsage> StockUsage { get; init; } = [];
     public IReadOnlyList<NestPlateStockMapping> PlateStockMappings { get; init; } = [];
+    public NestCostSummary Costs { get; init; }
     public Nest Nest { get; init; }
     public NestRequest Request { get; init; }
 
@@ -86,6 +87,7 @@ public class NestResponse
                     Fulfillment = Fulfillment is null
                         ? []
                         : new List<NestPartFulfillment>(Fulfillment),
+                    Costs = Costs,
                     StockUsage = StockUsage is null ? [] : new List<NestStockUsage>(StockUsage),
                     PlateStockMappings = PlateStockMappings is null
                         ? []
@@ -171,6 +173,7 @@ public class NestResponse
             Fulfillment = hasStatusMetadata ? archive.Fulfillment ?? [] : [],
             StockUsage = hasStatusMetadata ? archive.StockUsage ?? [] : [],
             PlateStockMappings = hasStatusMetadata ? archive.PlateStockMappings ?? [] : [],
+            Costs = archive.Costs,
             Nest = nest,
             Request = request,
         };
@@ -178,6 +181,7 @@ public class NestResponse
 
     private sealed class NestResponseArchiveDto
     {
+        public NestCostSummary Costs { get; init; }
         public int SchemaVersion { get; init; }
         public int SheetCount { get; init; }
         public double Utilization { get; init; }

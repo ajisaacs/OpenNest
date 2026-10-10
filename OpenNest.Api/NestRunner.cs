@@ -28,6 +28,7 @@ public static class NestRunner
         if (requestParts.Count == 0)
             throw new ArgumentException("Request must contain at least one part.", nameof(request));
 
+        var stock = CreateStock(request);
         var sw = Stopwatch.StartNew();
         var parts = IdentifyParts(requestParts);
         var importedByPath = new Dictionary<string, Drawing>(StringComparer.Ordinal);
@@ -82,7 +83,6 @@ public static class NestRunner
             });
         }
 
-        var stock = CreateStock(request);
         var engineName = request.Engine ?? ResolvePlacementStrategy(request);
         var jobProgress = progress == null ? null : new JobProgressBridge(progress);
         var result = NestPipeline.Run(new NestPipelineRequest(
@@ -91,6 +91,9 @@ public static class NestRunner
         // API returns a detached proposal, not an acceptance/commit to a caller's nest.
         // Invalid but representable proposals retain every pose and carry explicit validation status.
         var nest = new Nest { Thickness = request.Thickness, Material = new Material(request.Material) };
+        if (request.Plates != null)
+            nest.PlateOptions = stock.Where(s => s.Quantity != 0).Select(s => new PlateOption
+            { Width = s.Size.Width, Length = s.Size.Length, Cost = s.Cost ?? 0 }).ToList();
         foreach (var item in items)
             nest.Drawings.Add(item.Drawing);
         foreach (var proposed in result.Plates)
@@ -144,6 +147,7 @@ public static class NestRunner
                 Violations = result.Violations,
                 Fulfillment = fulfillment,
                 StockUsage = usage,
+                Costs = result.CanKeep && result.IsValid ? NestCostSummary.FromAccepted(result) : null,
                 PlateStockMappings = result.Plates.Select((value, index) =>
                     new NestPlateStockMapping(index, value.Stock.Id)).ToArray(),
                 Nest = nest,
@@ -209,11 +213,13 @@ public static class NestRunner
                     plate.Quantity,
                     plate.PartSpacing,
                     plate.EdgeSpacing,
-                    plate.Quadrant
+                    plate.Quadrant,
+                    plate.Cost
                 )
             );
         }
 
+        NestJobValidator.ValidateStockCosts(stock);
         return stock;
     }
 
