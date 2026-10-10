@@ -85,7 +85,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         // Every page carrying plate-table rows repeats the table heading.
         var tablePages = platePages.Where(page => Regex.IsMatch(page, @"(?m)^R\d{3}\s+Demand \d{2}\s+1\s+2$")).ToList();
         Assert.True(tablePages.Count >= 2, $"plate table pages: {tablePages.Count}");
-        Assert.All(tablePages, page => Assert.Matches(@"ID\s+Drawing\s+Qty/sheet\s+Total \(2 plates\)", page));
+        Assert.All(tablePages, page => Assert.Matches(@"ID\s+Drawing\s+Parts per plate\s+Total \(2 plates\)", page));
         var plateText = string.Join("\n", platePages);
         for (var i = 0; i < 40; i++)
             Assert.Matches($@"R{i + 4:D3}\s+Demand {i:D2}\s+1\s+2", plateText);
@@ -114,7 +114,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         var platePage = Array.FindIndex(pages, page => page.Contains("Plate 1 of 4"));
         Assert.True(summaryPage >= 0 && platePage > summaryPage);
         Assert.Equal(longName.Replace(" ", ""), ColumnText(path, summaryPage + 1, "Drawing", "Required"));
-        Assert.Equal(longName.Replace(" ", ""), ColumnText(path, platePage + 1, "Drawing", "Qty/sheet"));
+        Assert.Equal(longName.Replace(" ", ""), ColumnText(path, platePage + 1, "Drawing", "Parts"));
         // Column headings stay on one line.
         Assert.Matches(@"ID\s+Part\s+Drawing\s+Required\s+Nested\s+Shortage\s+Extra\s+Plates", pages[summaryPage]);
     }
