@@ -97,18 +97,26 @@ NFP first, then Fill if demand remains, taking the higher-count valid proposal.
 An 0.20 NFP-only rule would lose a second 4-inch square in a 10-inch round hole.
 Six geometry-only, anonymized real-job probes and neutral ring fixtures informed
 the search-order hints; these limited cases are not a global density guarantee.
-The internal `NestPipeline.RunCutoutPreview` prepares at most one quantity-one frame with one
-cutout as a fixed-zero proxy. Reserved inserts are removed from the engine's independent demand;
-remaining demand is offered once to the selected engine. Only after a complete, accounted-for
-engine result does it expand the proxy back to original requirement IDs, validate every physical
-pose, stock and quantity, then bind caller drawings. Incomplete, forged or geometrically invalid
-composites return no bindable plates even with invalid-result consent. Candidate evaluation
-progress is forwarded with unverified proxy commitment counts zeroed; transformed proxy commits
-are hidden. Physical commits are reported only after physical validation. Frames needing other
-orientations or repeated frame copies still run through the ordinary unbundled path. This is a
-narrow internal integration trial, not a production setting or a cut-ready nest; multi-frame
-routing, rotation compatibility, save/reload and cutting/post safety are still pending before
-enablement.
+The internal `NestPipeline.RunCutoutPreview` builds quantity-one proxy instances for eligible
+closed-cutout frames. It considers legal frame rotations without outer-perimeter symmetry
+reduction, shifts insert rotation policies into the local frame, and reserves certified router
+poses by original requirement ID. It can fill multiple holes and repeated/different frame
+requirements; inserts with a different priority or their own cutouts stay independent, so
+bundles remain flat. It uses the largest offered spacing for every bundle because the current
+job contract cannot condition insert demand on the stock selected later. Remaining demand is
+offered to the selected engine once. Only actually placed proxies expand to original frame and
+insert identities. An unplaced proxy's reservations return to the original unplaced demand;
+they cannot be packed retroactively in that same solve. Engine indices and metadata are checked,
+then every physical pose, stock, rotation, quantity and fulfillment is independently validated
+before binding caller drawings. Incomplete, forged or geometrically invalid composites return
+no bindable plates even with invalid-result consent. Candidate evaluation progress is forwarded
+with unverified proxy commitment counts zeroed; transformed proxy commits are hidden. Physical
+commits are reported only after physical validation. Preparation is bounded to 32 bundles
+and 16 base sweep-angle samples per frame (automatic quarter-turns are all retained);
+remaining copies stay ordinary requirements. Fixed legal proxy orientations are a
+conservative search choice, not full engine choice among all legal orientations; unsupported
+bundles remain ordinary independent requirements. This is an internal pipeline path, not a
+production setting or cut-ready nest. Cutting/post safety remains pending before enablement.
 
 ## Renamed engines
 

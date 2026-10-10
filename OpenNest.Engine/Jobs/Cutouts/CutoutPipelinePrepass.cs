@@ -3,23 +3,23 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine.Jobs.Adapters;
 
 namespace OpenNest.Engine.Jobs.Cutouts;
 
-/// <summary>Internal-only single-frame composite trial. No normal pipeline caller enables this.</summary>
+/// <summary>Internal-only frame bundles. No normal pipeline caller enables this.</summary>
 internal sealed class CutoutPipelinePrepass
 {
-    private readonly string proxyId;
-    private readonly string frameId;
-    private readonly IReadOnlyList<NestJobPlacement> localInserts;
+    // A job with thousands of repeats still offers the residual as ordinary demand;
+    // do not multiply expensive Clipper/Fill preparation by every physical instance.
+    private const int MaxBundlesPerJob = 32;
+    private sealed record Bundle(string FrameId, IReadOnlyList<NestJobPlacement> LocalInserts);
+    private readonly IReadOnlyDictionary<string, Bundle> bundles;
 
-    private CutoutPipelinePrepass(NestJob engineJob, string proxyId, string frameId,
-        IReadOnlyList<NestJobPlacement> localInserts)
+    private CutoutPipelinePrepass(NestJob engineJob, IReadOnlyDictionary<string, Bundle> bundles)
     {
         EngineJob = engineJob;
-        this.proxyId = proxyId;
-        this.frameId = frameId;
-        this.localInserts = localInserts;
+        this.bundles = bundles;
     }
 
     internal NestJob EngineJob { get; }
@@ -29,51 +29,121 @@ internal sealed class CutoutPipelinePrepass
         token.ThrowIfCancellationRequested();
         if (original.Plates.Count == 0)
             return null;
-        // A single fixed-zero proxy is safe even when a symmetric outer perimeter causes
-        // an engine to deduplicate rotations. General orientation intersections are deferred.
+        // One reservation vector works for every offered stock. Current jobs cannot
+        // represent stock-conditional insert quantities; use the largest spacing.
         var spacing = original.Plates.Max(p => p.PartSpacing);
-        foreach (var frame in original.Parts.Where(p => p.Quantity == 1 && p.Rotation.Allows(0)))
+        var remaining = original.Parts.ToDictionary(p => p.Id, p => p.Quantity);
+        var geometry = original.Parts.ToDictionary(p => p.Id, p => JobPartGeometry.TryRead(p.Geometry));
+        var bundles = new Dictionary<string, Bundle>(StringComparer.Ordinal);
+        var byFrame = new Dictionary<string, List<NestJobPart>>(StringComparer.Ordinal);
+        foreach (var frame in original.Parts)
         {
-            var geometry = JobPartGeometry.TryRead(frame.Geometry);
-            if (geometry == null || geometry.Cutouts.Count == 0)
+            token.ThrowIfCancellationRequested();
+            if (bundles.Count >= MaxBundlesPerJob)
+                break;
+            var profile = geometry[frame.Id];
+            if (profile == null || profile.Cutouts.Count == 0)
                 continue;
-            var candidates = original.Parts.Where(p => p.Id != frame.Id).ToArray();
-            if (candidates.Length == 0)
-                continue;
-            for (var hole = 0; hole < geometry.Cutouts.Count; hole++)
+            var proxies = new List<NestJobPart>();
+            byFrame[frame.Id] = proxies;
+            for (var instance = 0; instance < frame.Quantity; instance++)
             {
                 token.ThrowIfCancellationRequested();
-                var poses = CutoutRouter.Fill(frame, hole, candidates, spacing, token);
-                if (poses.Count == 0)
-                    continue;
-                var reserved = poses.GroupBy(p => p.PartId).ToDictionary(g => g.Key, g => g.Count());
-                var proxyId = "__cutout-proxy-" + frame.Id;
-                if (original.Parts.Any(p => p.Id == proxyId))
-                    throw new InvalidOperationException("Cutout proxy ID collides with a requirement.");
-                var transformed = new List<NestJobPart>();
-                foreach (var part in original.Parts)
+                if (bundles.Count >= MaxBundlesPerJob)
+                    break;
+                IReadOnlyList<NestJobPlacement>? chosen = null;
+                double frameAngle = 0;
+                // Outer-perimeter symmetry cannot deduplicate asymmetric cutouts.
+                foreach (var angle in frame.Rotation.EnumerateAngles(maxSamples: 16))
                 {
-                    if (part.Id == frame.Id)
-                        transformed.Add(new NestJobPart(proxyId, part.Geometry, 1, part.Priority,
-                            RotationPolicy.Fixed(0)));
-                    else
+                    token.ThrowIfCancellationRequested();
+                    if (!FitsOfferedStock(frame, angle, original.Plates))
+                        continue;
+                    var local = new List<NestJobPlacement>();
+                    var available = new Dictionary<string, int>(remaining);
+                    for (var hole = 0; hole < profile.Cutouts.Count; hole++)
                     {
-                        var remaining = part.Quantity - reserved.GetValueOrDefault(part.Id);
-                        if (remaining > 0)
-                            transformed.Add(new NestJobPart(part.Id, part.Geometry, remaining,
-                                part.Priority, part.Rotation));
+                        token.ThrowIfCancellationRequested();
+                        // Flat bundles: frames cannot simultaneously be inserts in another bundle.
+                        var candidates = original.Parts
+                            .Where(p => p.Id != frame.Id && available[p.Id] > 0
+                                && p.Priority == frame.Priority
+                                && geometry[p.Id] is { Cutouts.Count: 0 })
+                            .Select(p => new NestJobPart(p.Id, p.Geometry, available[p.Id],
+                                p.Priority, LocalRotation(p.Rotation, angle)))
+                            .ToArray();
+                        if (candidates.Length == 0)
+                            break;
+                        foreach (var pose in CutoutRouter.Fill(frame, hole, candidates, spacing, token))
+                        {
+                            token.ThrowIfCancellationRequested();
+                            var source = geometry[pose.PartId]!;
+                            var policy = original.Parts.Single(p => p.Id == pose.PartId).Rotation;
+                            if (!policy.Allows(angle + pose.Rotation)
+                                || local.Any(other => !NestLayoutCheck.Clears(
+                                    geometry[other.PartId]!, other, source, pose, spacing)))
+                                continue;
+                            local.Add(pose);
+                            available[pose.PartId]--;
+                        }
                     }
+                    if (local.Count <= (chosen?.Count ?? 0))
+                        continue;
+                    chosen = local.ToArray();
+                    frameAngle = angle;
                 }
-                return new CutoutPipelinePrepass(new NestJob(transformed, original.Plates,
-                    original.Options), proxyId, frame.Id, poses);
+                if (chosen == null || chosen.Count == 0)
+                    break;
+                var proxyId = $"__cutout-proxy-{frame.Id}-{instance}";
+                if (remaining.ContainsKey(proxyId) || bundles.ContainsKey(proxyId))
+                    throw new InvalidOperationException("Cutout proxy ID collides with a requirement.");
+                bundles.Add(proxyId, new Bundle(frame.Id, chosen));
+                proxies.Add(new NestJobPart(proxyId, frame.Geometry, 1, frame.Priority,
+                    RotationPolicy.Fixed(frameAngle)));
+                remaining[frame.Id]--;
+                foreach (var pose in chosen)
+                    remaining[pose.PartId]--;
             }
         }
-        return null;
+        if (bundles.Count == 0)
+            return null;
+        var transformed = new List<NestJobPart>();
+        foreach (var part in original.Parts)
+        {
+            if (byFrame.TryGetValue(part.Id, out var proxies))
+                transformed.AddRange(proxies);
+            if (remaining[part.Id] > 0)
+                transformed.Add(new NestJobPart(part.Id, part.Geometry, remaining[part.Id],
+                    part.Priority, part.Rotation));
+        }
+        return new CutoutPipelinePrepass(new NestJob(transformed, original.Plates,
+            original.Options), bundles);
+    }
+
+    private static RotationPolicy LocalRotation(RotationPolicy original, double frameAngle) =>
+        original.Kind switch
+        {
+            RotationPolicyKind.Automatic => RotationPolicy.Automatic,
+            RotationPolicyKind.Fixed => RotationPolicy.Fixed(original.Start - frameAngle,
+                original.Allow180Equivalent),
+            _ => RotationPolicy.BoundedSweep(original.Start - frameAngle,
+                original.End - frameAngle, original.Step, original.Allow180Equivalent),
+        };
+
+    private static bool FitsOfferedStock(NestJobPart frame, double angle,
+        IReadOnlyList<NestPlateStock> stock)
+    {
+        var part = new Part(DrawingJobMapper.CreateDrawing(frame));
+        part.Rotate(angle);
+        var bounds = NestLayoutCheck.MaterialBounds(part);
+        return stock.Any(s => s.Quantity != 0 && s.Fits(bounds.Length, bounds.Width,
+            NestTolerances.WorkAreaSlack));
     }
 
     /// <summary>Reject untrusted accounting before expansion. A failed trial is never bindable,
     /// including with allowInvalid. Only actually placed proxies consume reserved inserts.</summary>
-    internal bool TryExpand(NestJob original, NestJobResult result, out NestJobResult? expanded,
+    internal bool TryExpand(NestJob original, NestJobResult result, CancellationToken token,
+        out NestJobResult? expanded,
         out string failure)
     {
         expanded = null;
@@ -81,10 +151,12 @@ internal sealed class CutoutPipelinePrepass
         var parts = EngineJob.Parts.ToDictionary(p => p.Id);
         var counts = parts.ToDictionary(p => p.Key, _ => 0);
         var indices = parts.ToDictionary(p => p.Key, _ => new HashSet<int>());
-        var used = EngineJob.Plates.ToDictionary(s => s.Id, _ => 0);
+        var stockById = EngineJob.Plates.ToDictionary(s => s.Id, StringComparer.Ordinal);
+        var used = stockById.ToDictionary(s => s.Key, _ => 0, StringComparer.Ordinal);
         var expectedIndex = 0;
         foreach (var sheet in result.Plates)
         {
+            token.ThrowIfCancellationRequested();
             if (sheet.PlateIndex != expectedIndex++ || sheet.Placements.Count == 0
                 || !used.ContainsKey(sheet.StockId))
                 return false;
@@ -97,22 +169,32 @@ internal sealed class CutoutPipelinePrepass
                     return false;
             }
         }
-        if (indices.Any(row => row.Value.Any(index => index >= counts[row.Key])))
-            return false;
+        foreach (var row in indices)
+        {
+            token.ThrowIfCancellationRequested();
+            if (row.Value.Any(index => index >= counts[row.Key]))
+                return false;
+        }
         if (result.Fulfillment.Count != parts.Count || result.StockUsage.Count != used.Count)
             return false;
+        var seenParts = new HashSet<string>(StringComparer.Ordinal);
         foreach (var row in result.Fulfillment)
+        {
+            token.ThrowIfCancellationRequested();
             if (row.PartId == null || !parts.TryGetValue(row.PartId, out var part)
+                || !seenParts.Add(row.PartId)
                 || row.Requested != part.Quantity || row.Placed != counts[row.PartId]
-                || row.Unplaced != part.Quantity - counts[row.PartId]
-                || result.Fulfillment.Count(r => r.PartId == row.PartId) != 1)
+                || row.Unplaced != part.Quantity - counts[row.PartId])
                 return false;
+        }
+        var seenStock = new HashSet<string>(StringComparer.Ordinal);
         foreach (var row in result.StockUsage)
         {
-            var stock = EngineJob.Plates.FirstOrDefault(s => s.Id == row.StockId);
-            if (stock == null || row.Used != used[row.StockId]
-                || row.Remaining != stock.Quantity - row.Used
-                || result.StockUsage.Count(r => r.StockId == row.StockId) != 1)
+            token.ThrowIfCancellationRequested();
+            if (row.StockId == null || !stockById.TryGetValue(row.StockId, out var stock)
+                || !seenStock.Add(row.StockId)
+                || row.Used != used[row.StockId]
+                || row.Remaining != stock.Quantity - row.Used)
                 return false;
         }
         var complete = parts.Values.All(p => counts[p.Id] == p.Quantity);
@@ -121,27 +203,22 @@ internal sealed class CutoutPipelinePrepass
             || (!complete && result.StopReason == NestJobStopReason.Completed))
             return false;
 
-        // An incomplete solve cannot silently reserve inserts or reach the commit boundary.
-        if (!complete)
-        {
-            failure = "Cutout engine did not complete the transformed job";
-            return false;
-        }
         var builder = new NestJobResultBuilder(original);
         foreach (var sheet in result.Plates)
         {
+            token.ThrowIfCancellationRequested();
             var poses = new List<(string PartId, double X, double Y, double Rotation)>();
             foreach (var pose in sheet.Placements)
             {
-                if (pose.PartId != proxyId)
+                if (!bundles.TryGetValue(pose.PartId, out var bundle))
                 {
                     poses.Add((pose.PartId, pose.X, pose.Y, pose.Rotation));
                     continue;
                 }
-                poses.Add((frameId, pose.X, pose.Y, pose.Rotation));
+                poses.Add((bundle.FrameId, pose.X, pose.Y, pose.Rotation));
                 var sine = System.Math.Sin(pose.Rotation);
                 var cosine = System.Math.Cos(pose.Rotation);
-                foreach (var local in localInserts)
+                foreach (var local in bundle.LocalInserts)
                     poses.Add((local.PartId,
                         pose.X + local.X * cosine - local.Y * sine,
                         pose.Y + local.X * sine + local.Y * cosine,
@@ -158,12 +235,8 @@ internal sealed class CutoutPipelinePrepass
                 return false;
             }
         }
+        token.ThrowIfCancellationRequested();
         expanded = builder.Build(result.StopReason);
-        if (expanded.Status != NestJobStatus.Complete)
-        {
-            expanded = null;
-            return false;
-        }
         return true;
     }
 }

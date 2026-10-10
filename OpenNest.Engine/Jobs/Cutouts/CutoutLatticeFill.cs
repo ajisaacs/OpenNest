@@ -22,8 +22,9 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// </summary>
 /// <remarks>
 /// Suited to many small copies in a large cutout; a few large inserts belong to NFP placement.
-/// Poses are in the frame's own coordinates: frame at the origin, unrotated. Not wired into
-/// any engine or pipeline yet: placing parts in cutouts waits on containment-aware cutting order.
+/// Poses are in the frame's own coordinates: frame at the origin, unrotated. Used by the
+/// internal pipeline cutout preview, but not enabled for normal whole-job calls;
+/// production placement waits on cutting/post safety.
 /// </remarks>
 internal static class CutoutLatticeFill
 {

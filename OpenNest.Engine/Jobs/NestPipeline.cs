@@ -181,10 +181,12 @@ public static class NestPipeline
             // A compound may be physically invalid even when its envelope is legal.
             // Refuse every unverified trial, including with explicit invalid-result consent.
             var failure = "Cutout engine output failed reconciliation";
-            if (violations.Count == 0 && prepass.TryExpand(job, raw, out var expanded, out failure))
+            if (violations.Count == 0 && prepass.TryExpand(job, raw, token, out var expanded, out failure))
             {
                 raw = expanded;
                 violations.AddRange(NestLayoutCheck.Violations(job, raw, names, out var physicalKeep));
+                if (raw.Status != NestJobStatus.Complete)
+                    violations.Add("Cutout engine did not complete the transformed job; unplaced frames' reserved inserts remain unplaced in the original job");
                 canKeep = physicalKeep && violations.Count == 0;
             }
             else
