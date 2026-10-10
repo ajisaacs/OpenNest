@@ -21,7 +21,7 @@ public static class NestReportBuilder
         {
             if (byReference.TryGetValue(drawing, out var existing))
                 return existing;
-            var item = new DrawingCount(drawing, "R" + (ordered.Count + 1).ToString("D3", CultureInfo.InvariantCulture));
+            var item = new DrawingCount(drawing, (ordered.Count + 1).ToString(CultureInfo.InvariantCulture));
             byReference.Add(drawing, item);
             ordered.Add(item);
             return item;

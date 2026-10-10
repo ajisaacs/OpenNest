@@ -22,7 +22,7 @@ public class NestReportBuilderTests
         Assert.Equal(0.125, snapshot.Thickness);
         Assert.Equal("in", snapshot.Units);
         Assert.Equal(NestReportTestData.GeneratedAt, snapshot.GeneratedAt);
-        Assert.Equal(new[] { "R001", "R002", "R003", "R004" }, snapshot.Drawings.Select(d => d.Id));
+        Assert.Equal(new[] { "1", "2", "3", "4" }, snapshot.Drawings.Select(d => d.Id));
         Assert.Equal(new[] { "Bracket", "Rotated", "Bracket", "Unplaced" }, snapshot.Drawings.Select(d => d.Name));
         Assert.Equal(new long[] { 5, 1, 7, 3 }, snapshot.Drawings.Select(d => d.Required));
         Assert.Equal(new long[] { 4, 2, 2, 0 }, snapshot.Drawings.Select(d => d.Nested));
@@ -31,7 +31,7 @@ public class NestReportBuilderTests
         Assert.All(snapshot.Drawings.Take(3), d => Assert.Equal(new[] { 1 }, d.Plates));
         Assert.Empty(snapshot.Drawings[3].Plates);
         var plate = Assert.Single(snapshot.Plates);
-        Assert.Equal(new[] { "R001", "R001", "R002", "R003" }, plate.Parts.Select(p => p.ReportId));
+        Assert.Equal(new[] { "1", "1", "2", "3" }, plate.Parts.Select(p => p.ReportId));
         Assert.Single(plate.Cutoffs);
         Assert.Equal(2, snapshot.TotalSheets);
         Assert.Equal(new ReportBounds(0, 0, 48, 24), plate.Bounds);

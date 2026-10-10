@@ -24,7 +24,7 @@ the selected plate, or certify that a layout passed geometry/pre-post checks.
 
 ## Snapshot contract
 
-- IDs (`R001`, ...) are local to the report. Visit non-cutoff placements in plate
+- IDs (`1`, `2`, ...) are local to the report. Visit non-cutoff placements in plate
   and part order, then append unseen demanded drawings ordered by ordinal name and
   source path. Identity is by reference: distinct same-named drawings stay distinct,
   including placed drawings absent from the name-keyed drawing collection.

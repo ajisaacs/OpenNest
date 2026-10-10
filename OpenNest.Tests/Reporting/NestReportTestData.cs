@@ -49,8 +49,8 @@ public static class NestReportTestData
     }
 
     /// <summary>
-    /// Four layouts: "Bracket" R001 on plates 1, 2 and 4; R002 on plates 1 and 3; the distinct
-    /// same-named "Bracket" R003 on plates 1 and 3; R004 demanded but unplaced.
+    /// Four layouts: "Bracket" 1 on plates 1, 2 and 4; 2 on plates 1 and 3; the distinct
+    /// same-named "Bracket" 3 on plates 1 and 3; 4 demanded but unplaced.
     /// </summary>
     public static Nest CreateMultiPlateNest()
     {

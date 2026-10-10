@@ -32,11 +32,11 @@ public sealed class NestPdfLayoutTests : IDisposable
         var summary = pages[0];
         Assert.Matches(@"Distinct layouts:\s+4", summary);
         Assert.Matches(@"Total physical sheets:\s+7", summary);
-        // Bracket R001: 2/sheet x 2 + 1 x 3 + 1 x 1 = 8. Same-named R003: 1 x 2 + 1 x 1 = 3.
-        Assert.Matches(@"R001\s+Bracket\s+5\s+8\s+0\s+3\s+1-2, 4", summary);
-        Assert.Matches(@"R002\s+Rotated\s+1\s+3\s+0\s+2\s+1, 3", summary);
-        Assert.Matches(@"R003\s+Bracket\s+7\s+3\s+4\s+0\s+1, 3", summary);
-        Assert.Matches(@"R004\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
+        // Bracket 1: 2/sheet x 2 + 1 x 3 + 1 x 1 = 8. Same-named 3: 1 x 2 + 1 x 1 = 3.
+        Assert.Matches(@"1\s+Bracket\s+5\s+8\s+0\s+3\s+1-2, 4", summary);
+        Assert.Matches(@"2\s+Rotated\s+1\s+3\s+0\s+2\s+1, 3", summary);
+        Assert.Matches(@"3\s+Bracket\s+7\s+3\s+4\s+0\s+1, 3", summary);
+        Assert.Matches(@"4\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
         Assert.Matches(@"3\s+30 x 60 in\s+1\s+2", summary);
         for (var plate = 1; plate <= 4; plate++)
         {
@@ -45,10 +45,10 @@ public sealed class NestPdfLayoutTests : IDisposable
             Assert.Contains($"Page {plate + 1} of 5", page);
             Assert.Contains("Nest report: Report test job", page);
         }
-        Assert.Matches(@"R001\s+Bracket\s+1\s+3", pages[2]);
-        Assert.Matches(@"R002\s+Rotated\s+1\s+1", pages[3]);
-        Assert.Matches(@"R003\s+Bracket\s+1\s+1", pages[3]);
-        Assert.DoesNotContain("R001", pages[3]);
+        Assert.Matches(@"1\s+Bracket\s+1\s+3", pages[2]);
+        Assert.Matches(@"2\s+Rotated\s+1\s+1", pages[3]);
+        Assert.Matches(@"3\s+Bracket\s+1\s+1", pages[3]);
+        Assert.DoesNotMatch(@"(?m)^1\s+Bracket", pages[3]);
     }
 
     [SkippableFact]
@@ -72,23 +72,23 @@ public sealed class NestPdfLayoutTests : IDisposable
         var summaryText = string.Join("\n", summaryPages);
         // Every row exactly once; the Parts heading row repeats on every continuation page.
         for (var id = 1; id <= 74; id++)
-            Assert.Single(Regex.Matches(summaryText, $@"(?m)^\s*R{id:D3}\s"));
+            Assert.Single(Regex.Matches(summaryText, $@"(?m)^\s*{id}\s+(?:Bracket|Rotated|Unplaced|Demand)\b"));
         Assert.All(summaryPages.Skip(1), page => Assert.Matches(@"ID\s+Part\s+Drawing\s+Required\s+Nested\s+Shortage", page));
-        // Placements first (R004-R043 on plate 1), then unplaced demand by ordinal name.
-        Assert.Matches(@"R043\s+Demand 39\s+40\s+2\s+38\s+0\s+1", summaryText);
-        Assert.Matches(@"R073\s+Demand 69\s+70\s+0\s+70\s+0\s+-", summaryText);
-        Assert.Matches(@"R074\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summaryText);
+        // Placements first (4-43 on plate 1), then unplaced demand by ordinal name.
+        Assert.Matches(@"43\s+Demand 39\s+40\s+2\s+38\s+0\s+1", summaryText);
+        Assert.Matches(@"73\s+Demand 69\s+70\s+0\s+70\s+0\s+-", summaryText);
+        Assert.Matches(@"74\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summaryText);
 
         var platePages = pages.Where(page => page.Contains("Plate 1 of 4")).ToList();
         Assert.True(platePages.Count >= 2, $"plate 1 pages: {platePages.Count}");
         Assert.All(platePages, page => Assert.Contains("Nest report: Report test job", page));
         // Every page carrying plate-table rows repeats the table heading.
-        var tablePages = platePages.Where(page => Regex.IsMatch(page, @"(?m)^R\d{3}\s+Demand \d{2}\s+1\s+2$")).ToList();
+        var tablePages = platePages.Where(page => Regex.IsMatch(page, @"(?m)^\d+\s+Demand \d{2}\s+1\s+2$")).ToList();
         Assert.True(tablePages.Count >= 2, $"plate table pages: {tablePages.Count}");
         Assert.All(tablePages, page => Assert.Matches(@"ID\s+Drawing\s+Parts per plate\s+Total \(2 plates\)", page));
         var plateText = string.Join("\n", platePages);
         for (var i = 0; i < 40; i++)
-            Assert.Matches($@"R{i + 4:D3}\s+Demand {i:D2}\s+1\s+2", plateText);
+            Assert.Matches($@"{i + 4}\s+Demand {i:D2}\s+1\s+2", plateText);
         Assert.DoesNotContain("Demand 40", plateText);
         for (var page = 1; page <= total; page++)
             Assert.Contains($"Page {page} of {total}", pages[page - 1]);
@@ -110,7 +110,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.Equal(Enumerable.Range(0, 900), notes);
         Assert.Contains(string.Concat(Enumerable.Repeat("X", 120)), Regex.Replace(all, @"\s+", ""));
         // The long drawing name is wrapped inside its column on the summary and plate tables.
-        var summaryPage = Array.FindIndex(pages, page => page.Contains("Required") && page.Contains("R002"));
+        var summaryPage = Array.FindIndex(pages, page => page.Contains("Required") && page.Contains("2"));
         var platePage = Array.FindIndex(pages, page => page.Contains("Plate 1 of 4"));
         Assert.True(summaryPage >= 0 && platePage > summaryPage);
         Assert.Equal(longName.Replace(" ", ""), ColumnText(path, summaryPage + 1, "Drawing", "Required"));
@@ -200,9 +200,9 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.Contains("cells outlined dash-dot have detail views", plateText);
         foreach (var detail in plan.Details)
             Assert.Contains($"Plate 1 detail {detail.Cell}:", plateText);
-        var washerLabels = pages.Skip(1).Sum(page => Regex.Matches(page, @"\bR002\b").Count);
+        var washerLabels = pages.Skip(1).Sum(page => Regex.Matches(page, @"\b2\b").Count);
         // 24 diagram labels plus one table row.
-        Assert.True(washerLabels >= 25, $"R002 occurrences: {washerLabels}");
+        Assert.True(washerLabels >= 25, $"2 occurrences: {washerLabels}");
     }
 
     [SkippableFact]
@@ -284,7 +284,7 @@ public sealed class NestPdfLayoutTests : IDisposable
                 Assert.InRange(delta.Item2, -0.01, 0.01);
             });
         }
-        Assert.Equal(24, plan.Details.Sum(detail => detail.Labels.Count(label => label.Id == "R002")));
+        Assert.Equal(24, plan.Details.Sum(detail => detail.Labels.Count(label => label.Id == "2")));
     }
 
     private static OpenNest.Geometry.Shape ToShape(ReportContour contour)
@@ -401,14 +401,14 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.Contains("second  line", lines);
     }
 
-    /// <summary>Text of the R002 row inside one table column, read from word boxes in reading order.</summary>
+    /// <summary>Text of the 2 row inside one table column, read from word boxes in reading order.</summary>
     private static string ColumnText(string path, int page, string column, string next)
     {
         var words = ReportPdf.Words(path, page);
         var heading = words.First(word => word.Text == column);
         var limit = words.First(word => word.Text == next && System.Math.Abs(word.Top - heading.Top) < 1);
-        var above = words.First(word => word.Text == "R001" && word.Top > heading.Top);
-        var below = words.First(word => word.Text == "R003" && word.Top > above.Top);
+        var above = words.First(word => word.Text == "1" && word.Left < heading.Left && word.Top > heading.Top);
+        var below = words.First(word => word.Text == "3" && word.Left < heading.Left && word.Top > above.Top);
         var cell = words.Where(word => word.Left >= heading.Left - 1 && word.Right <= limit.Left
                 && word.Top > above.Bottom && word.Bottom < below.Top)
             .OrderBy(word => word.Top).ThenBy(word => word.Left);

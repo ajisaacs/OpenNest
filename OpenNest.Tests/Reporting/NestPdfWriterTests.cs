@@ -48,11 +48,12 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Matches(@"Distinct layouts:\s+1", summary);
         Assert.Matches(@"Total physical sheets:\s+2", summary);
         Assert.Matches(@"1\s+24 x 48 in\s+2\s+4\s+\d+\.\d%", summary);
-        Assert.Matches(@"R001\s+Bracket\s+5\s+4\s+1\s+0\s+1", summary);
-        Assert.Matches(@"R002\s+Rotated\s+1\s+2\s+0\s+1\s+1", summary);
-        Assert.Matches(@"R003\s+Bracket\s+7\s+2\s+5\s+0\s+1", summary);
-        Assert.Matches(@"R004\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
+        Assert.Matches(@"1\s+Bracket\s+5\s+4\s+1\s+0\s+1", summary);
+        Assert.Matches(@"2\s+Rotated\s+1\s+2\s+0\s+1\s+1", summary);
+        Assert.Matches(@"3\s+Bracket\s+7\s+2\s+5\s+0\s+1", summary);
+        Assert.Matches(@"4\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
         Assert.Contains("Page 1 of 2", summary);
+        Assert.DoesNotMatch(@"\bR\d+\b", summary + plate);
         Assert.Matches(@"Stock size\s+Quantity\s+Parts per plate", summary);
         Assert.DoesNotContain("Parts/sheet", summary + plate);
         Assert.DoesNotContain("Copies", summary + plate);
@@ -60,10 +61,10 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Contains("Plate 1", plate);
         Assert.Contains("Report test job", plate);
         Assert.Matches(@"Quantity:\s+2", plate);
-        Assert.Matches(@"R001\s+Bracket\s+2\s+4", plate);
-        Assert.Matches(@"R002\s+Rotated\s+1\s+2", plate);
-        Assert.Matches(@"R003\s+Bracket\s+1\s+2", plate);
-        Assert.DoesNotContain("R004", plate);
+        Assert.Matches(@"1\s+Bracket\s+2\s+4", plate);
+        Assert.Matches(@"2\s+Rotated\s+1\s+2", plate);
+        Assert.Matches(@"3\s+Bracket\s+1\s+2", plate);
+        Assert.DoesNotMatch(@"(?m)^4\s+Unplaced", plate);
         Assert.DoesNotContain("Cutoff test", plate + summary);
         Assert.Contains("not a dimensioned cutting drawing", plate);
         Assert.Contains("not a geometry or CNC approval", plate);
@@ -86,7 +87,7 @@ public sealed class NestPdfWriterTests : IDisposable
         nest.Drawings.Add(NestReportTestData.Rectangle("Alpha", 20, 10, 2));
         var demand = ReportPdf.Text(WriteReport(nest, "demand.pdf"), 1);
         Assert.Contains("No plates in this job.", demand);
-        Assert.Matches(@"R001\s+Alpha\s+2\s+0\s+2\s+0\s+-", demand);
+        Assert.Matches(@"1\s+Alpha\s+2\s+0\s+2\s+0\s+-", demand);
         Assert.Contains("Page 1 of 1", demand);
     }
 
@@ -132,8 +133,8 @@ public sealed class NestPdfWriterTests : IDisposable
     }
 
     [Theory]
-    [InlineData("illegible-label", "Plate 4, part 2 (R004)")]
-    [InlineData("cell-overflow", "Drawing R002")]
+    [InlineData("illegible-label", "Plate 4, part 2 (4)")]
+    [InlineData("cell-overflow", "Drawing 2")]
     [InlineData("header-overflow", "Page header")]
     public void Write_UnsupportedLayoutFailsBeforeReplacingDestination(string scenario, string identified)
     {
@@ -177,7 +178,7 @@ public sealed class NestPdfWriterTests : IDisposable
 
         var error = Assert.Throws<InvalidOperationException>(() => NestPdfWriter.Write(snapshot, path));
 
-        Assert.Contains("R002", error.Message);
+        Assert.Contains("2", error.Message);
         Assert.Contains("U+4E2D", error.Message);
         Assert.Equal("keep", File.ReadAllText(path));
         Assert.Equal(new[] { path }, Directory.GetFiles(directory));
