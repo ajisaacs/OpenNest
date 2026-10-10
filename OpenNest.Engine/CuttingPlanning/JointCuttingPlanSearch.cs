@@ -196,29 +196,39 @@ internal static class JointCuttingPlanSearch
             var progressExpansions = Expansions;
             var stack = new Stack<Frame>();
             stack.Push(new(root));
-            while (stack.Count != 0)
+            try
             {
-                token.ThrowIfCancellationRequested();
-                var frame = stack.Peek();
-                var node = frame.Node;
-                if (node.Order.Length == snapshot.Placements.Count)
+                while (stack.Count != 0)
                 {
-                    attempt.Order = node.Order;
-                    return attempt;
+                    token.ThrowIfCancellationRequested();
+                    var frame = stack.Peek();
+                    var node = frame.Node;
+                    if (node.Order.Length == snapshot.Placements.Count)
+                    {
+                        attempt.Order = node.Order;
+                        return attempt;
+                    }
+                    if (attempt.Advance(node))
+                        progressExpansions = Expansions;
+                    else if (stall is int limit && Expansions - progressExpansions > limit)
+                        return attempt;
+                    frame.Children ??= OrderedChildren(node, sequence, attempt, preferredOnly).GetEnumerator();
+                    if (!frame.Children.MoveNext())
+                    {
+                        stack.Pop().Children.Dispose();
+                        continue;
+                    }
+                    stack.Push(new(frame.Children.Current.Node));
                 }
-                if (attempt.Advance(node))
-                    progressExpansions = Expansions;
-                else if (stall is int limit && Expansions - progressExpansions > limit)
-                    return attempt;
-                frame.Children ??= OrderedChildren(node, sequence, attempt, preferredOnly);
-                if (frame.Next == frame.Children.Length)
-                {
-                    stack.Pop();
-                    continue;
-                }
-                stack.Push(new(frame.Children[frame.Next++].Node));
+                return attempt;
             }
-            return attempt;
+            finally
+            {
+                // Ready, stalled, cancelled and budget-exhausted searches can all leave
+                // suspended siblings. Release their captured prefixes on every exit.
+                foreach (var frame in stack)
+                    frame.Children?.Dispose();
+            }
         }
 
         /// <summary>
@@ -259,8 +269,14 @@ internal static class JointCuttingPlanSearch
         /// one part and contour stage the automatic rank leads — OrderBy(Distance) alone
         /// would undo the look-ahead facing. Legacy (unranked) children keep distance order.
         /// </summary>
-        private Edge[] OrderedChildren(Node node, int[] sequence, Attempt attempt, bool preferredOnly)
+        private IEnumerable<Edge> OrderedChildren(Node node, int[] sequence, Attempt attempt, bool preferredOnly)
         {
+            // A prescribed next part (or an active part's next contour) has a single
+            // source. Expand already yields its contour/entry rank order, so emit and
+            // validate a sibling only when DFS reaches it. Free whole-part selection
+            // still needs every source's distances before it can rank them.
+            if (sequence != null || node.Active != null)
+                return Expand(node, sequence, attempt, preferredOnly);
             var edges = Expand(node, sequence, attempt, preferredOnly).ToList();
             if (edges.Count <= 1)
                 return edges.ToArray();
@@ -334,8 +350,10 @@ internal static class JointCuttingPlanSearch
                 // First try one ranked hole chain per endpoint. A later-part failure then
                 // changes the endpoint before replaying all earlier hole combinations.
                 // The retained pass below still searches every entry and hole order.
+                if (preference != null)
+                    contours = contours.OrderBy(c => Array.IndexOf(preference.Route, c)).ThenBy(c => c);
                 if (preferredOnly && preference != null)
-                    contours = contours.OrderBy(c => Array.IndexOf(preference.Route, c)).Take(1);
+                    contours = contours.Take(1);
                 foreach (var contour in contours)
                 {
                     token.ThrowIfCancellationRequested();
@@ -593,7 +611,6 @@ internal static class JointCuttingPlanSearch
     private sealed class Frame(Node node)
     {
         internal Node Node { get; } = node;
-        internal Edge[] Children { get; set; }
-        internal int Next { get; set; }
+        internal IEnumerator<Edge> Children { get; set; }
     }
 }

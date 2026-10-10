@@ -146,11 +146,24 @@ other curve already touches, while a contact anywhere else on the line still ref
 
 Source parts rank by modeled travel (material-centre distance at a holed-part
 boundary); within a part, preferred contour order and facing-entry rank precede
-travel. Ties use stable source/contour/entry ordinals. Hash values and drawing names are not tie breakers. The expansion budget
-counts rejected candidates and frontier ranking as well as accepted moves, before
-emission; it is not a wall-clock timeout. Callers can cancel. Exhaustion may occur
-before already-generated siblings are traversed; it returns a refusal, not an
-unranked fallback or a proof of geometric impossibility.
+travel. Ties use stable source/contour/entry ordinals. Hash values and drawing names
+are not tie breakers.
+
+When the next whole part is fixed by the tour or a part is already active, the
+search generates and checks contour alternatives on demand in contour/entry rank
+order. It does not emit every sibling before trying the first. Backtracking still
+visits the remaining alternatives when needed; none is pruned. The free whole-part
+fallback still evaluates all ready sources before ranking their travel distances.
+
+The expansion budget counts evaluated candidates and frontier ranking, including
+rejections, before emission; it is not a wall-clock timeout. An unvisited sibling
+consumes no additional DFS-prefix emission work or per-sibling expansion charge;
+entry-catalogue prechecks still emit isolated contours and consume budget.
+Consequently a bounded search can
+reach a different frontier and report different rejected approaches than eager
+expansion did. All visited candidates retain their lead/rapid checks, and a selected
+plan still receives fresh independent replay. Callers can cancel. Exhaustion returns
+a refusal, not an unranked fallback or proof of geometric impossibility.
 
 ## Automatic outside entries and look-ahead
 
