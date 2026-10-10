@@ -272,6 +272,30 @@ public class NestPipelineTests
         Assert.Contains(result.Violations, v => v.Contains("changed") && v.Contains("bracket"));
     }
 
+    private sealed class TransientCloneMove(double x, double y) : LinearMove(x, y)
+    {
+        public override ICode Clone()
+        {
+            var before = EndPoint;
+            EndPoint = new Vector(100, 100);
+            try { return base.Clone(); }
+            finally { EndPoint = before; }
+        }
+    }
+
+    [Fact]
+    public void BindingTransientDrawingEditCannotReturnOrCommitUncheckedGeometry()
+    {
+        var item = Item("bracket", 1);
+        item.Drawing.Program.Codes[^1] = new TransientCloneMove(0, 0);
+        var result = NestPipeline.Run(new StubEngine(job =>
+            OnePlate(job, new NestJobPlacement(job.Parts[0].Id, 0, 1, 1, 0))),
+            "Transient", Request("Transient", item));
+        Assert.False(result.CanKeep);
+        Assert.Empty(result.Plates);
+        Assert.Contains(result.Violations, v => v.Contains("Bound part") && v.Contains("bracket"));
+    }
+
     [Fact]
     public void CancellationPropagatesWithoutAResult()
     {

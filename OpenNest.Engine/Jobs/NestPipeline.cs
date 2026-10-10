@@ -213,7 +213,8 @@ public static class NestPipeline
         // must not return parts whose bytes differ from the already validated snapshot.
         if (canKeep)
         {
-            var changes = NestPipelineDrawingFreshness.Changes(job, drawingsByPartId);
+            var changes = NestPipelineDrawingFreshness.Changes(job, drawingsByPartId).ToList();
+            changes.AddRange(NestPipelineDrawingFreshness.BoundChanges(job, raw, plates, drawingsByPartId));
             if (changes.Count > 0)
             {
                 violations.AddRange(changes);

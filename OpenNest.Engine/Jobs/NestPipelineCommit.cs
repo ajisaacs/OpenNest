@@ -20,8 +20,11 @@ public static class NestPipelineCommit
         token.ThrowIfCancellationRequested();
         if (!result.CanKeep || (!result.IsValid && !allowInvalid))
             throw new InvalidOperationException("The nesting result cannot be committed without a keepable layout and explicit consent to its violations.");
-        if (NestPipelineDrawingFreshness.Changes(result.Job, result.DrawingsByPartId).Count > 0)
-            throw new InvalidOperationException("A drawing changed after the nesting proposal was validated; run Auto Nest again.");
+        if (NestPipelineDrawingFreshness.Changes(result.Job, result.DrawingsByPartId).Count > 0
+            || NestPipelineDrawingFreshness.BoundChanges(result.Job, result.Raw,
+                result.Plates, result.DrawingsByPartId).Count > 0)
+            throw new InvalidOperationException("A drawing or proposed part changed after the nesting proposal was validated; run Auto Nest again.");
+        token.ThrowIfCancellationRequested();
 
         var applied = new List<Plate>();
         // Commit is synchronous on the caller's owning thread. Cancellation is checked
