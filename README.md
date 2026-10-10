@@ -115,6 +115,8 @@ Which engine suits which jobs, renamed engine names, and the rules for changing 
 | G-code | No | Yes (post-processors) |
 | `.nest` | Yes | Yes |
 
+Zoom Out, Zoom In, and Zoom to Fit are centered together with the plate navigation buttons in the plate-view header.
+
 ## Keyboard Shortcuts
 
 `Ctrl+F` fill area · `F` zoom to fit · `Shift+wheel` / middle-click rotate · `X`/`Y` push · arrows nudge · `Shift+arrow` push.

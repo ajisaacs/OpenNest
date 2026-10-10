@@ -104,11 +104,11 @@ namespace OpenNest.Forms
 
             plateInfoLabel = new Label
             {
-                AutoSize = true,
+                AutoSize = false,
+                AutoEllipsis = true,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Font = new Font("Segoe UI", 12f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(120, 120, 120),
-                Dock = DockStyle.Left,
                 Padding = new Padding(4, 4, 4, 4),
             };
 
@@ -126,10 +126,30 @@ namespace OpenNest.Forms
             btnLastPlate = CreateNavButton(Resources.move_last);
             btnLastPlate.Click += (s, e) => PlateManager.LoadLast();
 
-            // Panel that holds the nav buttons and centers itself in the header
+            var zoomOutButton = CreateNavButton(Resources.zoom_out);
+            zoomOutButton.Name = "btnZoomOut";
+            zoomOutButton.AccessibleName = "Zoom Out";
+            zoomOutButton.Click += (s, e) => ZoomPlateView(1.0f / 1.5f);
+
+            var zoomInButton = CreateNavButton(Resources.zoom_in);
+            zoomInButton.Name = "btnZoomIn";
+            zoomInButton.AccessibleName = "Zoom In";
+            zoomInButton.Click += (s, e) => ZoomPlateView(1.5f);
+
+            var zoomToFitButton = CreateNavButton(Resources.zoom_all);
+            zoomToFitButton.Name = "btnZoomToFit";
+            zoomToFitButton.AccessibleName = "Zoom To Fit";
+            zoomToFitButton.Click += (s, e) => PlateView.ZoomToFit();
+
+            var toolTip = new ToolTip(components);
+            toolTip.SetToolTip(zoomOutButton, "Zoom Out (Ctrl+Minus)");
+            toolTip.SetToolTip(zoomInButton, "Zoom In (Ctrl+Plus)");
+            toolTip.SetToolTip(zoomToFitButton, "Zoom To Fit (F)");
+
+            // Keep navigation and zoom controls together in the header.
             var navPanel = new Panel
             {
-                Width = btnSize.Width * 4,
+                Width = btnSize.Width * 7 + 8,
                 Height = btnSize.Height,
                 Anchor = AnchorStyles.None,
             };
@@ -139,22 +159,47 @@ namespace OpenNest.Forms
             btnNextPlate.Location = new Point(btnSize.Width * 2, 0);
             btnLastPlate.Location = new Point(btnSize.Width * 3, 0);
 
+            zoomOutButton.Location = new Point(btnSize.Width * 4 + 8, 0);
+            zoomInButton.Location = new Point(btnSize.Width * 5 + 8, 0);
+            zoomToFitButton.Location = new Point(btnSize.Width * 6 + 8, 0);
+
+            var separator = new Panel
+            {
+                Location = new Point(btnSize.Width * 4 + 3, 4),
+                Size = new System.Drawing.Size(1, btnSize.Height - 8),
+                BackColor = SystemColors.ControlDark,
+                TabStop = false,
+            };
+
             navPanel.Controls.AddRange(
-                new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate }
+                new Control[]
+                {
+                    btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate,
+                    separator, zoomOutButton, zoomInButton, zoomToFitButton
+                }
             );
 
-            plateHeaderPanel.Controls.Add(navPanel);
             plateHeaderPanel.Controls.Add(plateInfoLabel);
-
-            // Center the nav panel on resize
-            CenterNavPanel(navPanel);
-            plateHeaderPanel.Resize += (s, e) => CenterNavPanel(navPanel);
+            plateHeaderPanel.Controls.Add(navPanel);
+            plateHeaderPanel.Layout += (s, e) => CenterPlateHeaderControls(navPanel);
+            CenterPlateHeaderControls(navPanel);
         }
 
-        private void CenterNavPanel(Panel navPanel)
+        private void CenterPlateHeaderControls(Panel navPanel)
         {
-            navPanel.Left = (plateHeaderPanel.Width - navPanel.Width) / 2;
-            navPanel.Top = (plateHeaderPanel.Height - navPanel.Height) / 2;
+            navPanel.Left = (plateHeaderPanel.ClientSize.Width - navPanel.Width) / 2;
+            navPanel.Top = (plateHeaderPanel.ClientSize.Height - navPanel.Height) / 2;
+
+            // Reserve the space before the centered buttons for the plate label.
+            var labelLeft = plateHeaderPanel.Padding.Left;
+            plateInfoLabel.SetBounds(labelLeft, 0,
+                System.Math.Max(0, navPanel.Left - labelLeft), plateHeaderPanel.ClientSize.Height);
+        }
+
+        private void ZoomPlateView(float factor)
+        {
+            var point = new Point(PlateView.Width / 2, PlateView.Height / 2);
+            PlateView.ZoomToControlPoint(point, factor);
         }
 
         private void CreateSidePanel()

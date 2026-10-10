@@ -219,7 +219,6 @@ namespace OpenNest.Forms
 
             var hasValue = activeForm != null;
 
-            btnZoomToFit.Enabled = hasValue;
             mnuFileSave.Enabled = hasValue && !databaseSaveInProgress;
             btnSave.Enabled = hasValue && !databaseSaveInProgress;
             btnSaveAs.Enabled = hasValue && !databaseSaveInProgress;
@@ -228,8 +227,6 @@ namespace OpenNest.Forms
             mnuFileExport.Enabled = hasValue;
             mnuFileExportAll.Enabled = hasValue;
             mnuFileExportNestReport.Enabled = hasValue && !databaseSaveInProgress;
-            btnZoomOut.Enabled = hasValue;
-            btnZoomIn.Enabled = hasValue;
             mnuEdit.Visible = hasValue;
             mnuView.Visible = hasValue;
             mnuNest.Visible = hasValue;

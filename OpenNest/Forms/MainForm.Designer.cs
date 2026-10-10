@@ -170,10 +170,6 @@ namespace OpenNest.Forms
             btnSave = new System.Windows.Forms.ToolStripButton();
             btnSaveAs = new System.Windows.Forms.ToolStripButton();
             toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-            btnZoomOut = new System.Windows.Forms.ToolStripButton();
-            btnZoomIn = new System.Windows.Forms.ToolStripButton();
-            btnZoomToFit = new System.Windows.Forms.ToolStripButton();
-            toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
             engineLabel = new System.Windows.Forms.ToolStripLabel();
             engineComboBox = new System.Windows.Forms.ToolStripComboBox();
             btnAutoNest = new System.Windows.Forms.ToolStripButton();
@@ -1141,7 +1137,7 @@ namespace OpenNest.Forms
             // toolStrip1
             // 
             toolStrip1.AutoSize = false;
-            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, btnZoomOut, btnZoomIn, btnZoomToFit, toolStripSeparator4, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants, toolStripSeparator5, btnCutOff });
+            toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { btnNew, btnOpen, btnSave, btnSaveAs, toolStripSeparator1, engineLabel, engineComboBox, btnAutoNest, btnShowRemnants, toolStripSeparator5, btnCutOff });
             toolStrip1.Location = new System.Drawing.Point(0, 24);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new System.Drawing.Size(1281, 40);
@@ -1200,50 +1196,6 @@ namespace OpenNest.Forms
             // 
             toolStripSeparator1.Name = "toolStripSeparator1";
             toolStripSeparator1.Size = new System.Drawing.Size(6, 40);
-            // 
-            // btnZoomOut
-            // 
-            btnZoomOut.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            btnZoomOut.Image = Properties.Resources.zoom_out;
-            btnZoomOut.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            btnZoomOut.ImageTransparentColor = System.Drawing.Color.Magenta;
-            btnZoomOut.Name = "btnZoomOut";
-            btnZoomOut.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            btnZoomOut.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            btnZoomOut.Size = new System.Drawing.Size(38, 37);
-            btnZoomOut.Text = "Zoom Out";
-            btnZoomOut.Click += ZoomOut_Click;
-            // 
-            // btnZoomIn
-            // 
-            btnZoomIn.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            btnZoomIn.Image = Properties.Resources.zoom_in;
-            btnZoomIn.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            btnZoomIn.ImageTransparentColor = System.Drawing.Color.Magenta;
-            btnZoomIn.Name = "btnZoomIn";
-            btnZoomIn.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            btnZoomIn.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            btnZoomIn.Size = new System.Drawing.Size(38, 37);
-            btnZoomIn.Text = "Zoom In";
-            btnZoomIn.Click += ZoomIn_Click;
-            // 
-            // btnZoomToFit
-            // 
-            btnZoomToFit.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            btnZoomToFit.Image = Properties.Resources.zoom_all;
-            btnZoomToFit.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            btnZoomToFit.ImageTransparentColor = System.Drawing.Color.Magenta;
-            btnZoomToFit.Name = "btnZoomToFit";
-            btnZoomToFit.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            btnZoomToFit.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            btnZoomToFit.Size = new System.Drawing.Size(38, 37);
-            btnZoomToFit.Text = "Zoom To Fit";
-            btnZoomToFit.Click += ZoomToFit_Click;
-            // 
-            // toolStripSeparator4
-            // 
-            toolStripSeparator4.Name = "toolStripSeparator4";
-            toolStripSeparator4.Size = new System.Drawing.Size(6, 40);
             // 
             // engineLabel
             // 
@@ -1434,7 +1386,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuPlateViewInCad;
         private System.Windows.Forms.ToolStripButton btnNew;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateAdd;
-        private System.Windows.Forms.ToolStripButton btnZoomToFit;
         private System.Windows.Forms.ToolStripMenuItem mnuNestRemoveEmptyPlates;
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomIn;
         private System.Windows.Forms.ToolStripMenuItem mnuViewZoomOut;
@@ -1444,8 +1395,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem15;
         private System.Windows.Forms.ToolStripMenuItem mnuPlateSetAsDefault;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem16;
-        private System.Windows.Forms.ToolStripButton btnZoomOut;
-        private System.Windows.Forms.ToolStripButton btnZoomIn;
         private System.Windows.Forms.ToolStripStatusLabel statusLabel1;
         private System.Windows.Forms.ToolStripStatusLabel spacerLabel;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem18;
@@ -1469,7 +1418,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel selectionStatusLabel;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
         private System.Windows.Forms.ToolStripLabel engineLabel;
         private System.Windows.Forms.ToolStripComboBox engineComboBox;
         private System.Windows.Forms.ToolStripButton btnAutoNest;
