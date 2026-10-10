@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using OpenNest.Math;
 
 namespace OpenNest.CNC.CuttingPlanning;
 
@@ -66,11 +67,14 @@ public sealed class LeadMaterialSnapshot
                             var b = rings[s][j];
                             var contacts = a.Contacts(b, out var overlap);
                             var adjacent = r == s && (j == i + 1 || (i == 0 && j == rings[r].Length - 1));
+                            // Native contacts at rounded arc/line joints can drift from the
+                            // authored endpoint. Use the shared geometry tolerance only to
+                            // recognize that joint; overlaps and other contacts still refuse.
                             if (overlap || contacts.Any(p => !adjacent
-                                || !(p.DistanceTo(a.End) <= PostVerificationGeometry.Epsilon
-                                    && p.DistanceTo(b.Start) <= PostVerificationGeometry.Epsilon)
-                                && !(p.DistanceTo(a.Start) <= PostVerificationGeometry.Epsilon
-                                    && p.DistanceTo(b.End) <= PostVerificationGeometry.Epsilon)))
+                                || !(p.DistanceTo(a.End) <= Tolerance.Epsilon
+                                    && p.DistanceTo(b.Start) <= Tolerance.Epsilon)
+                                && !(p.DistanceTo(a.Start) <= Tolerance.Epsilon
+                                    && p.DistanceTo(b.End) <= Tolerance.Epsilon)))
                                 throw new ArgumentException($"Material boundaries overlap, touch or self-intersect ({r}:{i}, {s}:{j}, overlap={overlap}).");
                         }
             var outer = -1;

@@ -53,6 +53,13 @@ does not visit a globally shared descendant twice; it never changes the fixed pa
 
 ## Cutting dependencies
 
+Nominal material validation recognizes contacts at shared endpoints of adjacent
+contour segments using `OpenNest.Math.Tolerance.Epsilon` (0.00001 model units).
+This avoids false self-intersection warnings from rounding at arc/line joints,
+including the contour seam. Overlapping segments and contacts away from those
+joints or between separate contours still fail validation. Contour closure and
+the underlying native intersection queries retain their existing tolerances.
+
 Capture builds whole-part prerequisites from owned values, and both the search and
 the final replay enforce them:
 
