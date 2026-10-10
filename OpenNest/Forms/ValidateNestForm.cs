@@ -89,7 +89,7 @@ public sealed class ValidateNestForm : Form
         {
             AutoSize = true,
             Dock = DockStyle.Fill,
-            Text = "Select an issue to locate it in the main plate view. Its highlight pulses while selected.\r\n"
+            Text = "Select an issue to locate it in the main plate view. Its highlight pulses; unrelated parts appear gray.\r\n"
                 + "Minimum spacing, plate boundaries, and final post-processor output are not checked.",
             Margin = new Padding(3, 3, 3, 10),
         };
@@ -205,7 +205,9 @@ public sealed class ValidateNestForm : Form
         var hint = finding.Kind switch
         {
             PostVerificationKind.Overlap => "Shaded material is the overlap. The ring marks its area centroid, which can lie between separate patches.",
-            PostVerificationKind.RapidCrossing => "The pulsing dashed orange line is the offending rapid segment; it does not mark an exact contact point.",
+            PostVerificationKind.RapidCrossing => finding.ContactPoints.Count > 0
+                ? "Crosshairs mark contacts with the completed contour. For travel along an edge, they mark the contact span's endpoints. The pulsing dashed orange line shows the rapid."
+                : "The pulsing dashed orange line shows the rapid inside the completed contour; there is no boundary contact point to mark.",
             PostVerificationKind.MissingLeadIn => "The ring marks the cutting contour start where a lead-in is missing.",
             _ => "The ring marks the affected part's center when available; no exact problem location is known.",
         };

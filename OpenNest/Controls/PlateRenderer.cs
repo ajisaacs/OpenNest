@@ -121,10 +121,12 @@ namespace OpenNest.Controls
                 if (!part.DisplayBounds.IntersectsWith(viewBounds))
                     continue;
 
-                part.Draw(g, (i + 1).ToString());
-                DrawBendLines(g, part.BasePart);
-                DrawEtchMarks(g, part.BasePart);
-                DrawGrainWarning(g, part.BasePart);
+                var finding = view.ValidationOverlay.Finding;
+                var muted = finding != null && finding.PartNumber != i + 1 && finding.OtherPartNumber != i + 1;
+                part.Draw(g, (i + 1).ToString(), muted);
+                DrawBendLines(g, part.BasePart, muted);
+                DrawEtchMarks(g, part.BasePart, muted);
+                DrawGrainWarning(g, part.BasePart, muted);
             }
 
             var previewParts = view.PreviewParts;
@@ -264,7 +266,7 @@ namespace OpenNest.Controls
             }
         }
 
-        private void DrawBendLines(Graphics g, Part part)
+        private void DrawBendLines(Graphics g, Part part, bool muted)
         {
             if (
                 !view.ShowBendLines
@@ -273,7 +275,7 @@ namespace OpenNest.Controls
             )
                 return;
 
-            using var bendPen = new Pen(Color.Yellow, 1.5f)
+            using var bendPen = new Pen(muted ? Color.Gray : Color.Yellow, 1.5f)
             {
                 DashStyle = System.Drawing.Drawing2D.DashStyle.Dash,
             };
@@ -299,7 +301,7 @@ namespace OpenNest.Controls
             }
         }
 
-        private void DrawEtchMarks(Graphics g, Part part)
+        private void DrawEtchMarks(Graphics g, Part part, bool muted)
         {
             if (
                 !view.ShowBendLines
@@ -308,7 +310,7 @@ namespace OpenNest.Controls
             )
                 return;
 
-            using var etchPen = new Pen(Color.Green, 1.5f);
+            using var etchPen = new Pen(muted ? Color.Gray : Color.Green, 1.5f);
             var etchLength = 1.0;
 
             foreach (var bend in part.BaseDrawing.Bends)
@@ -353,7 +355,7 @@ namespace OpenNest.Controls
             }
         }
 
-        private void DrawGrainWarning(Graphics g, Part part)
+        private void DrawGrainWarning(Graphics g, Part part, bool muted)
         {
             var plate = view.Plate;
             if (
@@ -389,7 +391,7 @@ namespace OpenNest.Controls
                     var pt2 = view.PointWorldToGraph(
                         new Vector(location.X + box.Length, location.Y + box.Width)
                     );
-                    using var warnPen = new Pen(Color.FromArgb(180, 255, 140, 0), 2f);
+                    using var warnPen = new Pen(muted ? Color.Gray : Color.FromArgb(180, 255, 140, 0), 2f);
                     g.DrawRectangle(
                         warnPen,
                         pt1.X,

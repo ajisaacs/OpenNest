@@ -89,6 +89,30 @@ internal static class PostVerificationGeometry
         return inside;
     }
 
+    internal static IReadOnlyList<Vector> ContactPoints(Vector start, Vector end,
+        IReadOnlyList<Curve> curves, CancellationToken token)
+    {
+        var length = start.DistanceTo(end);
+        if (length <= Epsilon)
+            return Array.Empty<Vector>();
+        var direction = (end - start) * (1 / length);
+        var distances = new List<double>();
+        foreach (var curve in curves)
+        {
+            token.ThrowIfCancellationRequested();
+            curve.ContactAfterStart(start, direction, length, distances);
+        }
+        distances.Sort();
+        var points = new List<Vector>();
+        foreach (var distance in distances)
+        {
+            var point = start + direction * distance;
+            if (points.Count == 0 || points[^1].DistanceTo(point) > Epsilon)
+                points.Add(point);
+        }
+        return points.AsReadOnly();
+    }
+
     private static double Dot(Vector a, Vector b) => a.X * b.X + a.Y * b.Y;
     private static double Cross(Vector a, Vector b) => a.X * b.Y - a.Y * b.X;
     private static double Normalize(double angle)
@@ -286,7 +310,8 @@ internal static class PostVerificationGeometry
         // The largest distance from the centre that ContactAfterStart can count as contact.
         private double ContactReach => System.Math.Sqrt(Radius * Radius + ContactSlack);
 
-        internal bool ContactAfterStart(Vector origin, Vector direction, double length)
+        internal bool ContactAfterStart(Vector origin, Vector direction, double length,
+            List<double> contacts = null)
         {
             if (Center is { } center)
             {
@@ -299,10 +324,13 @@ internal static class PostVerificationGeometry
                 if (square < -ContactSlack)
                     return false;
                 var offset = System.Math.Sqrt(System.Math.Max(0, square));
-                return Hit(projection - offset) || Hit(projection + offset);
+                return contacts == null
+                    ? Hit(projection - offset) || Hit(projection + offset)
+                    : Hit(projection - offset) | Hit(projection + offset);
 
                 bool Hit(double distance) => distance > Epsilon && distance <= length + Epsilon
-                    && OnArc(origin + direction * System.Math.Clamp(distance, 0, length));
+                    && OnArc(origin + direction * System.Math.Clamp(distance, 0, length))
+                    && Record(distance);
             }
             var edge = End - Start;
             var relativeStart = Start - origin;
@@ -315,13 +343,20 @@ internal static class PostVerificationGeometry
                 var b = Dot(End - origin, direction);
                 var low = System.Math.Max(0, System.Math.Min(a, b));
                 var high = System.Math.Min(length, System.Math.Max(a, b));
-                return high > Epsilon && low <= high + Epsilon;
+                return high > Epsilon && low <= high + Epsilon && Record(low) && Record(high);
             }
             var distanceAlongRapid = Cross(relativeStart, edge) / denominator;
             var fractionAlongEdge = Cross(relativeStart, direction) / denominator;
             return distanceAlongRapid > Epsilon && distanceAlongRapid <= length + Epsilon
                 && fractionAlongEdge >= -Epsilon / System.Math.Max(Length, Epsilon)
-                && fractionAlongEdge <= 1 + Epsilon / System.Math.Max(Length, Epsilon);
+                && fractionAlongEdge <= 1 + Epsilon / System.Math.Max(Length, Epsilon)
+                && Record(distanceAlongRapid);
+
+            bool Record(double distance)
+            {
+                contacts?.Add(System.Math.Clamp(distance, 0, length));
+                return true;
+            }
         }
 
         internal bool CrossesRay(Vector point)

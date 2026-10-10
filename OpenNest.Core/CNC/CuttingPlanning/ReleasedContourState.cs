@@ -69,7 +69,12 @@ public sealed class ReleasedContourState
                         findings.Add(new(PostVerificationKind.RapidCrossing, plate, part, obstacle.Part,
                             $"Direct XY rapid crosses or touches completed untabbed contour {obstacle.Contour} " +
                             $"of part {obstacle.Part}.")
-                        { Location = (start + move.End) * 0.5, RapidStart = start, RapidEnd = move.End });
+                        {
+                            Location = (start + move.End) * 0.5,
+                            RapidStart = start,
+                            RapidEnd = move.End,
+                            ContactPoints = PostVerificationGeometry.ContactPoints(start, move.End, obstacle.Curves, token)
+                        });
                 }
             }
             else if (move.Layer == LayerType.Leadin)

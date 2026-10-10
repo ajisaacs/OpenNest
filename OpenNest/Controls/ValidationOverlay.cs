@@ -88,6 +88,18 @@ internal sealed class ValidationOverlay : IDisposable
                     { DashStyle = DashStyle.Dash };
                     graphics.DrawLine(rapid, view.PointWorldToGraph(start), view.PointWorldToGraph(end));
                 }
+                using var contactHalo = new Pen(Color.White, 5 * dpi);
+                using var contactPen = new Pen(Color.DeepPink, 2 * dpi);
+                foreach (var contact in finding.ContactPoints.Where(IsFinite))
+                {
+                    var point = view.PointWorldToGraph(contact);
+                    foreach (var pen in new[] { contactHalo, contactPen })
+                    {
+                        graphics.DrawEllipse(pen, point.X - 8 * dpi, point.Y - 8 * dpi, 16 * dpi, 16 * dpi);
+                        graphics.DrawLine(pen, point.X - 12 * dpi, point.Y, point.X + 12 * dpi, point.Y);
+                        graphics.DrawLine(pen, point.X, point.Y - 12 * dpi, point.X, point.Y + 12 * dpi);
+                    }
+                }
                 return;
             }
             if (finding.Location is not { } location || !double.IsFinite(location.X) || !double.IsFinite(location.Y))

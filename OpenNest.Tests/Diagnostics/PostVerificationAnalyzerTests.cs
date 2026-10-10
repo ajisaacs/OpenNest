@@ -113,6 +113,7 @@ public class PostVerificationAnalyzerTests
             f.PartNumber == 3 && f.OtherPartNumber == 1));
         Assert.NotNull(crossing.RapidStart);
         Assert.NotNull(crossing.RapidEnd);
+        Assert.Equal(new[] { new Vector(0, 2), new Vector(4, 2) }, crossing.ContactPoints);
         Assert.Equal((crossing.RapidStart.Value + crossing.RapidEnd.Value) * 0.5, crossing.Location);
     }
 

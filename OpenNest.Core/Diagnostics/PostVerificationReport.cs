@@ -21,6 +21,8 @@ public sealed record PostVerificationFinding(PostVerificationKind Kind, int Plat
     public Vector? Location { get; init; }
     public Vector? RapidStart { get; init; }
     public Vector? RapidEnd { get; init; }
+    /// <summary>Rapid boundary contacts in travel order; collinear contact spans use their endpoints.</summary>
+    public IReadOnlyList<Vector> ContactPoints { get; init; } = Array.Empty<Vector>();
     public PlateOverlapPair Overlap { get; init; }
 }
 

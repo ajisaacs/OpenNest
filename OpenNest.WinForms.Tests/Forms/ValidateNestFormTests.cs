@@ -11,6 +11,34 @@ namespace OpenNest.WinForms.Tests.Forms;
 
 public class ValidateNestFormTests
 {
+    [Fact]
+    public void RapidContactCrosshairIsDrawnAtContactAndClearedWithFinding()
+    {
+        RunSta(() =>
+        {
+            using var view = new PlateView();
+            view.ShowValidationFinding(new PostVerificationFinding(PostVerificationKind.RapidCrossing,
+                1, 2, 1, "crossing")
+            {
+                RapidStart = new Vector(-1, 0),
+                RapidEnd = new Vector(1, 0),
+                ContactPoints = Array.AsReadOnly(new[] { Vector.Zero })
+            });
+            using var bitmap = new Bitmap(120, 120);
+            using var graphics = Graphics.FromImage(bitmap);
+            graphics.TranslateTransform(60, 60);
+            graphics.Clear(Color.Black);
+            view.ValidationOverlay.Draw(graphics);
+            // Off the horizontal rapid, on the contact's vertical crosshair.
+            var pixel = bitmap.GetPixel(60, 65);
+            Assert.True(pixel.R > 150 && pixel.B > 50 && pixel.G < 100);
+            view.ClearValidationFinding();
+            graphics.Clear(Color.Black);
+            view.ValidationOverlay.Draw(graphics);
+            Assert.Equal(Color.Black.ToArgb(), bitmap.GetPixel(60, 65).ToArgb());
+        });
+    }
+
 #pragma warning disable xUnit1031 // Completed tasks on a dedicated STA thread.
     [Fact]
     public void GridNavigatesMainViewAndRestoresViewportOnDisposal()

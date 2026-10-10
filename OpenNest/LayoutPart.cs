@@ -92,23 +92,27 @@ namespace OpenNest
                 SetDisplayColor(fill);
         }
 
-        public void Draw(Graphics g)
+        public void Draw(Graphics g) => Draw(g, false);
+
+        private void Draw(Graphics g, bool muted)
         {
             RefreshColors();
             using var schemeSelectionBrush = IsSelected && !colorScheme.SelectedPartColor.IsEmpty
                 ? new SolidBrush(colorScheme.SelectedPartColor) : null;
-            g.FillPath(schemeSelectionBrush ?? (IsSelected ? selectedBrush : brush), Path);
-            DrawEtch(g);
+            g.FillPath(muted ? Brushes.Gainsboro : schemeSelectionBrush ?? (IsSelected ? selectedBrush : brush), Path);
+            DrawEtch(g, muted);
             // Keep real cuts visible even where an etch overlaps them.
-            g.DrawPath(IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
+            g.DrawPath(muted ? Pens.Gray : IsSelected && colorScheme.PartOutlineColor.IsEmpty ? selectedPen : pen, Path);
 
             if (LeadInPath != null)
-                g.DrawPath(leadInPen, LeadInPath);
+                g.DrawPath(muted ? Pens.Gray : leadInPen, LeadInPath);
         }
 
-        public void Draw(Graphics g, string id)
+        public void Draw(Graphics g, string id) => Draw(g, id, false);
+
+        internal void Draw(Graphics g, string id, bool muted)
         {
-            Draw(g);
+            Draw(g, muted);
 
             using var sf = new StringFormat
             {
@@ -118,7 +122,7 @@ namespace OpenNest
             g.DrawString(
                 id,
                 programIdFont,
-                Brushes.Black,
+                muted ? Brushes.DimGray : Brushes.Black,
                 _labelScreenPoint.X,
                 _labelScreenPoint.Y,
                 sf
@@ -127,11 +131,11 @@ namespace OpenNest
 
         public GraphicsPath OffsetPath { get; private set; }
 
-        internal void DrawEtch(Graphics g)
+        internal void DrawEtch(Graphics g, bool muted = false)
         {
             if (EtchPath == null || EtchPath.PointCount == 0)
                 return;
-            using var etchPen = new Pen(colorScheme.EtchColor, 1.5f);
+            using var etchPen = new Pen(muted ? Color.Gray : colorScheme.EtchColor, 1.5f);
             g.DrawPath(etchPen, EtchPath);
         }
 

@@ -10,13 +10,21 @@ numbers in a read-only grid like the cut planner; incomplete or failed checks ar
 never reported as clear. Select a row to switch the main plate view to that plate
 and focus the finding. The inspector opens at the right of the screen and can be
 moved or resized. The details below the grid explain the selected warning.
+While a finding is selected, its named parts retain their normal colors; other
+parts use muted gray fills and visible gray outlines, lead-ins, and marks. Selecting
+another finding updates the emphasis. Clearing the finding or closing validation
+restores normal rendering without changing drawing colors or selection.
 
 Overlaps use the same magenta material shading as **View > Overlap Check**. A
 DPI-scaled ring expands and fades continuously while the finding is selected;
 both its color and contrasting halo fade as it grows. For overlaps the ring marks the area centroid (possibly between
 separate patches); for missing lead-ins it marks the contour start. Rapid warnings
-pulse the offending orange dashed segment continuously, without a ring or an
-exact contact-point marker. Incomplete findings use the part center when available;
+pulse the offending orange dashed segment continuously and mark its contacts with
+the completed contour using fixed-screen-size magenta crosshairs with white halos.
+Contacts use native lines/arcs and the rapid check's existing numerical tolerances;
+shared vertices and tangencies get one marker, and travel along an edge marks the
+contact span endpoints. Start-only departure is excluded. Travel entirely inside
+a contour has no boundary contact markers. Incomplete findings use the part center when available;
 findings without a usable location do not invent a marker. Closing the inspector
 clears the highlight and restores the original plate, zoom, and overlap display mode.
 
