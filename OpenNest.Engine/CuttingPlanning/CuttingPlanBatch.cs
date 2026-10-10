@@ -43,6 +43,10 @@ public sealed class CuttingPlanBatch
     /// </summary>
     public const int ExpansionsPerPart = 400;
 
+    // Extra bounded work on hard/refused plates; the full-cap search still gets its whole budget.
+    internal const int FirstPassBudget = 1000;
+    internal const int FirstPassEntries = 8;
+
     private readonly Entry[] entries;
     private readonly CuttingParameters ownedParameters;
 
@@ -142,7 +146,7 @@ public sealed class CuttingPlanBatch
             if (entry.Reorder != null)
             {
                 progress?.Report(new(index, entries.Length, entry.Number, CuttingPlanPhase.Reordering));
-                reorder = CuttingPlanService.Plan(entry.Reorder, token);
+                reorder = PlanReorder(entry.Reorder, token);
                 if (reorder.Status != CuttingPlanStatus.NoSolutionWithinBudget)
                 {
                     plans[index] = new(entry.Plate, entry.Number, WithFallback(entry, reorder, token), null, overlap);
@@ -154,6 +158,22 @@ public sealed class CuttingPlanBatch
                 WithFallback(entry, CuttingPlanService.Plan(entry.KeepOrder, token), token), reorder, overlap);
         }
         return new(plans, ownedParameters);
+    }
+
+    internal static CuttingPlanResult PlanReorder(CuttingPlanSnapshot snapshot, CancellationToken token,
+        int firstPassBudget = FirstPassBudget)
+    {
+        // A failed first pass is not a proof of impossibility: retain all original
+        // full-cap alternatives and the complete original budget for the retry.
+        if (snapshot.Failure == null && snapshot.Regeneration && snapshot.MaxEntries > FirstPassEntries
+            && snapshot.ExpansionBudget > firstPassBudget)
+        {
+            var first = CuttingPlanService.Plan(snapshot.WithSearchLimits(firstPassBudget, FirstPassEntries), token);
+            if ((first.Status == CuttingPlanStatus.Ready && first.IndependentlyReplayed)
+                || first.Status == CuttingPlanStatus.Cancelled)
+                return first;
+        }
+        return CuttingPlanService.Plan(snapshot, token);
     }
 
     private static CuttingPlanResult WithFallback(Entry entry, CuttingPlanResult strict, CancellationToken token)

@@ -319,6 +319,14 @@ plans every plate that has parts. Both open one dialog built on
   obstruct it, spacing the parts farther apart. These are suggestions, not guaranteed
   fixes: replanning runs the same strict checks; an unverified fallback requires
   separate warning acceptance and is not approval to post or cut.
+- The desktop free-order batch first tries up to eight entries per contour for at most
+  1,000 expansions. Only a Ready proposal that passes independent replay is used;
+  otherwise it runs the original 16-entry search with its entire plate budget.
+  Cancellation stops both attempts. This short pass can choose a different valid
+  route, and a hard plate can take up to 1,000 extra expansions before the full
+  attempt. The current-order retry still uses its original 16-entry budget.
+  Returned expansion counts describe the retained attempt, not a discarded
+  short pass plus its full-cap retry.
 - Every plate is captured on the UI thread and checked and planned on a worker. Clean part
   material is checked for overlaps with the pre-post overlap analyzer; known overlapping parts
   still block that plate whatever its route. Incomplete checks remain visible warnings, never

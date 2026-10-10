@@ -145,6 +145,63 @@ public class CuttingPlanBatchTests
     }
 
     [Fact]
+    public void PlanReorder_ShortPassReady_RetainsReplayedApplicableProposal()
+    {
+        var plate = Plate(new Nest(), Clean("first", 1, 1), Clean("second", 12, 1));
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters()));
+        var full = CuttingPlanService.Plan(snapshot);
+        var result = CuttingPlanBatch.PlanReorder(snapshot, CancellationToken.None);
+
+        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        Assert.True(result.IndependentlyReplayed);
+        Assert.True(result.Expansions < full.Expansions,
+            $"Short pass {result.Expansions}, full {full.Expansions}");
+        Assert.InRange(result.Expansions, 1, CuttingPlanBatch.FirstPassBudget - 1);
+        Assert.Equal(2, result.ProposedOrder.Count);
+        Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
+        Assert.Equal(CuttingCommitStatus.Applied, CuttingPlanService.Apply([result]).Status);
+    }
+
+    [Fact]
+    public void PlanReorder_ShortPassExhausted_UsesFullCapAndOriginalBudget()
+    {
+        var plate = Plate(new Nest(), Grid(4));
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters()));
+        var full = CuttingPlanService.Plan(snapshot);
+        var recovered = CuttingPlanBatch.PlanReorder(snapshot, CancellationToken.None, firstPassBudget: 1);
+
+        Assert.Equal(CuttingPlanStatus.Ready, full.Status);
+        Assert.Equal(CuttingPlanStatus.Ready, recovered.Status);
+        Assert.True(recovered.IndependentlyReplayed);
+        Assert.Equal(full.Expansions, recovered.Expansions);
+        Assert.Equal(full.RapidDistance, recovered.RapidDistance);
+        Assert.Equal(full.ProposedOrder.Select(p => p.SourceOrdinal), recovered.ProposedOrder.Select(p => p.SourceOrdinal));
+        for (var i = 0; i < full.ProposedOrder.Count; i++)
+            Assert.True(ProgramContent.Equal(full.ProposedOrder[i].CopyProgram(), recovered.ProposedOrder[i].CopyProgram()));
+        Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
+    }
+
+    [Fact]
+    public void PlanReorder_CancelledDuringShortPass_DoesNotRetryOrMutate()
+    {
+        var plate = Plate(new Nest(), Clean("first", 1, 1), Clean("second", 12, 1));
+        using var cancellation = new CancellationTokenSource();
+        var observations = 0;
+        var request = new CuttingPlanRequest(plate.Parts, confirmedParameters: ExplicitContourTests.Parameters())
+        { ExpansionObserver = _ => { observations++; cancellation.Cancel(); } };
+        var snapshot = CuttingPlanService.Capture(request);
+
+        var result = CuttingPlanBatch.PlanReorder(snapshot, cancellation.Token);
+
+        Assert.Equal(CuttingPlanStatus.Cancelled, result.Status);
+        Assert.Equal(1, observations);
+        Assert.Empty(result.ProposedOrder);
+        Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
+    }
+
+    [Fact]
     public void Plan_FreeSearchOutOfBudget_KeepsTheCurrentOrderAndSaysSo()
     {
         var nest = new Nest();
