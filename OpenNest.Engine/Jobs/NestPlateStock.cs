@@ -16,7 +16,14 @@ public sealed class NestPlateStock
         Spacing edgeSpacing = default,
         int quadrant = 1
     )
+        : this(id, size, quantity, partSpacing, edgeSpacing, quadrant, null) { }
+
+    public NestPlateStock(string id, Size size, int? quantity, double partSpacing,
+        Spacing edgeSpacing, int quadrant, double? cost)
     {
+        if (cost.HasValue && (!double.IsFinite(cost.Value) || cost.Value <= 0))
+            throw new ArgumentOutOfRangeException(nameof(cost), $"Stock {id}: cost must be finite and positive, or null.");
+        Cost = cost;
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         if (quantity < 0)
             throw new ArgumentOutOfRangeException(nameof(quantity));
@@ -36,6 +43,8 @@ public sealed class NestPlateStock
         );
     }
 
+    /// <summary>Generic per-physical-sheet cost; null selects area scoring.</summary>
+    public double? Cost { get; }
     public string Id { get; }
     public Size Size { get; }
 

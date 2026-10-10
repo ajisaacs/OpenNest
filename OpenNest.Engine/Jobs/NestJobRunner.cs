@@ -38,7 +38,7 @@ public sealed class NestJobRunner : INestingEngine
         var placed = job.Parts.ToDictionary(part => part.Id, _ => 0, StringComparer.Ordinal);
         var parts = job.Parts.ToDictionary(part => part.Id, StringComparer.Ordinal);
         var used = job.Plates.ToDictionary(stock => stock.Id, _ => 0, StringComparer.Ordinal);
-        var comparer = new NestJobCandidateComparer(job.Parts);
+        var comparer = new NestJobCandidateComparer(job);
         var nester =
             job.Parts.Count == 0
                 ? null

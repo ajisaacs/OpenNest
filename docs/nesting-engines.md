@@ -120,3 +120,19 @@ executable. A plug-in implements `INestingEngine` with a public parameterless co
 registers under its CLR type name. A plug-in whose name matches a built-in engine, or a renamed
 engine's old name, is skipped: a leftover `OpenNest.Engine.Opus55.dll` cannot shadow Irregular.
 Leftover Gpt6Astra or Qwen38FlashNext DLLs still load as ordinary plug-ins until deleted.
+
+## Cost basis and heuristic limits
+
+`NestPlateStock.Cost` is nullable, immutable and per physical sheet. Every available
+stock must have a finite positive cost, or all must omit it. Omitted costs preserve
+area scoring. The original constructor and area-valued `NetSheetArea` and obsolete
+`EstimateNetArea` APIs retain their units. `NetSheetCost` applies proportional salvage
+to explicit costs; geometric area still controls fit, utilization and material ordering.
+
+Rectangles uses net cost in sheet trials and remaining-material estimates. Irregular
+uses it in look-ahead, strategy comparison and equivalent-demand tail replacement.
+StockLadder ranks net cost per placed material area and uses total net cost for
+consolidation. Default compares valid equally fulfilled results by generic job score.
+Fixed Fill/Strip/remnant strategies rank priority fulfillment first, then net cost
+for priced stock (gross area for legacy unpriced stock), then existing stable ties.
+None guarantees globally optimal purchasing or explores every combination of patterns.

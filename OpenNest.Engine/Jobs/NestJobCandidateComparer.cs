@@ -4,10 +4,13 @@ using System.Linq;
 
 namespace OpenNest.Engine.Jobs;
 
-/// <summary>Ranks independent plate trials: priority fulfillment, sheet area, placement envelope, then input order.</summary>
+/// <summary>Ranks independent plate trials: priority fulfillment, sheet cost, placement envelope, then input order.</summary>
 public sealed class NestJobCandidateComparer
 {
     private readonly IReadOnlyList<NestJobPart> parts;
+    private readonly NestJob job;
+
+    public NestJobCandidateComparer(NestJob job) : this(job.Parts) => this.job = job;
 
     public NestJobCandidateComparer(IReadOnlyList<NestJobPart> parts)
     {
@@ -36,7 +39,7 @@ public sealed class NestJobCandidateComparer
                 return leftCount.CompareTo(rightCount);
         }
 
-        var area = Area(rightStock).CompareTo(Area(leftStock));
+        var area = Score(right, rightStock).CompareTo(Score(left, leftStock));
         if (area != 0)
             return area;
 
@@ -52,7 +55,10 @@ public sealed class NestJobCandidateComparer
             parts.First(part => part.Id == placement.PartId).Priority == priority
         );
 
-    private static double Area(NestPlateStock stock) => stock.Size.Width * stock.Size.Length;
+    private double Score(PlateCandidate candidate, NestPlateStock stock) =>
+        job != null && stock.Cost.HasValue
+            ? NestJobCost.NetSheetCost(job, new NestJobPlateResult(0, stock, candidate.Placements))
+            : NestJobCost.GrossSheetCost(stock);
 
     private static double Envelope(PlateCandidate candidate)
     {

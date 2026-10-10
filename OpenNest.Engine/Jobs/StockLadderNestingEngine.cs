@@ -9,7 +9,7 @@ namespace OpenNest.Engine.Jobs;
 
 /// <summary>
 /// Caller-stock-only allocation followed by bounded adjacent-sheet repacking. All replacements
-/// must reproduce exactly the removed demand and reduce net sheet area; inventory is transactional.
+/// must reproduce exactly the removed demand and reduce net sheet cost; inventory is transactional.
 /// This is a deterministic heuristic, not an optimality or geometric impossibility proof.
 /// </summary>
 public sealed class StockLadderNestingEngine : INestingEngine
@@ -41,12 +41,12 @@ public sealed class StockLadderNestingEngine : INestingEngine
 
         // Probe actual validated single-part placements, not bounding-box fit assertions.
         foreach (var part in job.Parts)
-        foreach (var stock in job.Plates.Where(s => s.Quantity != 0))
-        {
-            var probe = Trial(stock, new[] { WithQuantity(part, 1) });
-            if (probe.Placements.Count != 0)
-                feasible[part.Id].Add(stock.Id);
-        }
+            foreach (var stock in job.Plates.Where(s => s.Quantity != 0))
+            {
+                var probe = Trial(stock, new[] { WithQuantity(part, 1) });
+                if (probe.Placements.Count != 0)
+                    feasible[part.Id].Add(stock.Id);
+            }
         var ordered = job
             .Parts.OrderBy(p => p.Priority)
             .ThenBy(p => feasible[p.Id].Count)
@@ -97,8 +97,8 @@ public sealed class StockLadderNestingEngine : INestingEngine
                 // Initial construction only: material area, never raw part counts. Repacking below
                 // compares EXACTLY equivalent demand, and never replaces a sheet by a partial fill.
                 var value =
-                    NestJobCost.NetSheetArea(job, sheet) / candidate.Placements.Sum(p => areas[p.PartId]);
-                if (value < score - 1e-9)
+                    NestJobCost.RequireFinite(NestJobCost.NetSheetCost(job, sheet) / candidate.Placements.Sum(p => areas[p.PartId]));
+                if (value < score - (stock.Cost.HasValue ? 0 : 1e-9))
                 {
                     winner = sheet;
                     score = value;
@@ -182,55 +182,55 @@ public sealed class StockLadderNestingEngine : INestingEngine
             var changed = false;
             // Single downgrade and adjacent pair merge only: bounded local search, no combinatorial tree.
             for (var index = 0; index < sheets.Count; index++)
-            for (var count = System.Math.Min(2, sheets.Count - index); count >= 1; count--)
-            {
-                var old = sheets.Skip(index).Take(count).ToList();
-                var demand = old.SelectMany(s => s.Placements)
-                    .GroupBy(p => p.PartId)
-                    .ToDictionary(g => g.Key, g => g.Count());
-                var baseline = old.Sum(s => NestJobCost.NetSheetArea(job, s));
-                NestJobPlateResult replacement = null;
-                foreach (var stock in job.Plates)
+                for (var count = System.Math.Min(2, sheets.Count - index); count >= 1; count--)
                 {
-                    token.ThrowIfCancellationRequested();
-                    var returned = old.Count(s => s.StockId == stock.Id);
-                    if (stock.Quantity is int limit && used[stock.Id] - returned >= limit)
-                        continue;
-                    // Even the maximum possible salvage credit cannot beat the incumbent.
-                    var lowerBound =
-                        stock.Size.Width * stock.Size.Length * (1 - job.Options.SalvageRate);
-                    if (lowerBound >= baseline - 1e-9)
-                        continue;
-                    if (demand.Keys.Any(id => !feasible[id].Contains(stock.Id)))
-                        continue;
-                    var candidate = Trial(
-                        stock,
-                        ordered
-                            .Where(p => demand.ContainsKey(p.Id))
-                            .Select(p => WithQuantity(p, demand[p.Id]))
-                    );
-                    var actual = candidate
-                        .Placements.GroupBy(p => p.PartId)
+                    var old = sheets.Skip(index).Take(count).ToList();
+                    var demand = old.SelectMany(s => s.Placements)
+                        .GroupBy(p => p.PartId)
                         .ToDictionary(g => g.Key, g => g.Count());
-                    if (demand.Any(kv => !actual.TryGetValue(kv.Key, out var n) || n != kv.Value))
+                    var baseline = NestJobCost.RequireFinite(old.Sum(s => NestJobCost.NetSheetCost(job, s)));
+                    NestJobPlateResult replacement = null;
+                    foreach (var stock in job.Plates)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        var returned = old.Count(s => s.StockId == stock.Id);
+                        if (stock.Quantity is int limit && used[stock.Id] - returned >= limit)
+                            continue;
+                        // Even the maximum possible salvage credit cannot beat the incumbent.
+                        var lowerBound =
+                            NestJobCost.GrossSheetCost(stock) * (1 - job.Options.SalvageRate);
+                        if (lowerBound >= baseline - (stock.Cost.HasValue ? 0 : 1e-9))
+                            continue;
+                        if (demand.Keys.Any(id => !feasible[id].Contains(stock.Id)))
+                            continue;
+                        var candidate = Trial(
+                            stock,
+                            ordered
+                                .Where(p => demand.ContainsKey(p.Id))
+                                .Select(p => WithQuantity(p, demand[p.Id]))
+                        );
+                        var actual = candidate
+                            .Placements.GroupBy(p => p.PartId)
+                            .ToDictionary(g => g.Key, g => g.Count());
+                        if (demand.Any(kv => !actual.TryGetValue(kv.Key, out var n) || n != kv.Value))
+                            continue;
+                        var trial = new NestJobPlateResult(index, stock, candidate.Placements);
+                        var cost = NestJobCost.NetSheetCost(job, trial);
+                        if (cost >= baseline - (stock.Cost.HasValue ? 0 : 1e-9))
+                            continue;
+                        baseline = cost;
+                        replacement = trial;
+                    }
+                    if (replacement == null)
                         continue;
-                    var trial = new NestJobPlateResult(index, stock, candidate.Placements);
-                    var cost = NestJobCost.NetSheetArea(job, trial);
-                    if (cost >= baseline - 1e-9)
-                        continue;
-                    baseline = cost;
-                    replacement = trial;
+                    // No accounting changes until the entire equivalent-demand candidate is valid.
+                    foreach (var sheet in old)
+                        used[sheet.StockId]--;
+                    used[replacement.StockId]++;
+                    sheets.RemoveRange(index, count);
+                    sheets.Insert(index, replacement);
+                    changed = true;
                 }
-                if (replacement == null)
-                    continue;
-                // No accounting changes until the entire equivalent-demand candidate is valid.
-                foreach (var sheet in old)
-                    used[sheet.StockId]--;
-                used[replacement.StockId]++;
-                sheets.RemoveRange(index, count);
-                sheets.Insert(index, replacement);
-                changed = true;
-            }
             return changed;
         }
     }

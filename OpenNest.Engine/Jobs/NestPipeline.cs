@@ -131,6 +131,8 @@ public static class NestPipeline
         );
         var violations = NestLayoutCheck.Violations(job, raw, names, out var canKeep);
         var validationTime = clock.Elapsed;
+        if (canKeep && violations.Count == 0)
+            _ = NestJobCost.Evaluate(job, raw);
 
         var plates = canKeep
             ? raw.Plates.Select(sheet => new ProposedPlate(

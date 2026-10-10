@@ -10,11 +10,13 @@ public static class NestJobValidator
     public static void Validate(NestJob job)
     {
         ArgumentNullException.ThrowIfNull(job);
+        ValidateStockCosts(job.Plates);
         foreach (var stock in job.Plates)
         {
             var edges = stock.EdgeSpacing;
             if (
-                !Positive(stock.Size.Width)
+                !Positive(stock.Area)
+                || !Positive(stock.Size.Width)
                 || !Positive(stock.Size.Length)
                 || !Nonnegative(stock.PartSpacing)
                 || !Nonnegative(edges.Left)
@@ -59,6 +61,14 @@ public static class NestJobValidator
                 );
             }
         }
+    }
+
+    public static void ValidateStockCosts(IEnumerable<NestPlateStock> stocks)
+    {
+        var available = stocks.Where(s => s.Quantity != 0).ToArray();
+        if (available.Any(s => s.Cost.HasValue) && available.Any(s => !s.Cost.HasValue))
+            throw new ArgumentException("Specify a positive cost for every available stock row or omit all costs. Missing: "
+                + string.Join(", ", available.Where(s => !s.Cost.HasValue).Select(s => s.Id)));
     }
 
     internal static void ValidateCandidate(

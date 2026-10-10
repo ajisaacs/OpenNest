@@ -1,10 +1,11 @@
+using System;
 using System.Linq;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs;
 
-/// <summary>Benchmark scoring primitives. Lower costs represent less sheet consumption.</summary>
+/// <summary>Generic per-sheet scoring; unspecified costs retain legacy area scores.</summary>
 public static class NestJobCost
 {
     /// <summary>
@@ -66,16 +67,35 @@ public static class NestJobCost
         return area - options.SalvageRate * salvage;
     }
 
-    /// <summary>Largest offered sheet area, charged by the benchmark per unplaced part.</summary>
+    public static bool UsesExplicitCosts(NestJob job) =>
+        job.Plates.Any(s => s.Quantity != 0 && s.Cost.HasValue);
+
+    public static double RequireFinite(double value) => double.IsFinite(value) ? value
+        : throw new OverflowException("Stock cost arithmetic exceeded the finite scoring range.");
+
+    public static double GrossSheetCost(NestPlateStock stock) => RequireFinite(stock.Cost ?? stock.Area);
+
+    public static double NetSheetCost(NestJob job, NestJobPlateResult sheet) =>
+        PriceArea(sheet.Stock, NetSheetArea(job, sheet));
+
+    public static double NetSheetCost(NestJobOptions options, NestPlateStock stock, Box envelope) =>
+        PriceArea(stock, NetSheetArea(options, stock, envelope));
+
+    private static double PriceArea(NestPlateStock stock, double area) =>
+        RequireFinite(stock.Cost is double cost ? cost * (area / stock.Area) : area);
+
+    /// <summary>Largest offered sheet score, charged per unplaced part.</summary>
     public static double UnplacedPartPenalty(NestJob job) =>
-        job.Plates.Count == 0 ? 0 : job.Plates.Max(stock => stock.Size.Width * stock.Size.Length);
+        job.Plates.Count == 0 ? 0 : UsesExplicitCosts(job)
+            ? job.Plates.Where(s => s.Quantity != 0).Max(GrossSheetCost)
+            : job.Plates.Max(s => RequireFinite(s.Area));
 
     /// <summary>
-    /// Sum of net sheet areas plus unplaced quantity times the largest offered sheet area.
+    /// Sum of net sheet costs plus unplaced quantity times the largest offered sheet score.
     /// Matches the benchmark for a valid run; this method does not validate the result.
     /// </summary>
     public static double Evaluate(NestJob job, NestJobResult result) =>
-        result.Plates.Sum(sheet => NetSheetArea(job, sheet))
+        RequireFinite(result.Plates.Sum(sheet => NetSheetCost(job, sheet))
         + System.Math.Max(0, job.Parts.Sum(part => part.Quantity)
-            - result.Plates.Sum(sheet => sheet.Placements.Count)) * UnplacedPartPenalty(job);
+            - result.Plates.Sum(sheet => sheet.Placements.Count)) * UnplacedPartPenalty(job));
 }

@@ -18,8 +18,8 @@ namespace OpenNest.Engine.NestingEngines.Rectangles;
 ///
 /// Sheet by sheet, each available stock is packed under several free-space scoring rules and
 /// two pick modes (best-fitting box anywhere, or largest type first). The candidate sheet with
-/// the lowest estimated whole-job cost wins: its salvage-credited net area (NestJobCost) plus the
-/// remaining demand priced at the best net-area-per-part-area ratio seen among the candidates.
+/// the lowest estimated whole-job cost wins: its salvage-credited net cost (NestJobCost) plus the
+/// remaining demand priced at the best net-cost-per-part-area ratio seen among the candidates.
 /// Deterministic: no clocks or randomness; the only stop besides completion is the host token.
 /// </summary>
 public sealed class RectanglesNestingEngine : INestingEngine
@@ -78,7 +78,7 @@ public sealed class RectanglesNestingEngine : INestingEngine
                     {
                         var plan = SheetPacker.Pack(types, remaining, stock, rule, mode, token);
                         if (plan.Parts.Count > 0)
-                            trials.Add((plan, NetArea(job, plan)));
+                            trials.Add((plan, NetCost(job, plan)));
                     }
             }
 
@@ -101,7 +101,7 @@ public sealed class RectanglesNestingEngine : INestingEngine
 
     /// <summary>
     /// Picks the sheet with the lowest estimated whole-job cost. Remaining demand is priced at the
-    /// best net-area-per-material ratio any candidate achieved, so a sheet that finishes the job
+    /// best net-cost-per-material ratio any candidate achieved, so a sheet that finishes the job
     /// competes fairly with a denser partial one. Ties: more material placed, then enumeration order.
     /// </summary>
     private static SheetPlan Choose(
@@ -111,7 +111,7 @@ public sealed class RectanglesNestingEngine : INestingEngine
         var bestRatio = trials.Min(t => t.Net / System.Math.Max(t.Plan.MaterialArea, 1e-12));
         return trials
             .Select((t, order) => (t.Plan, order,
-                Estimate: t.Net + System.Math.Max(0, demandArea - t.Plan.MaterialArea) * bestRatio))
+                Estimate: NestJobCost.RequireFinite(t.Net + System.Math.Max(0, demandArea - t.Plan.MaterialArea) * bestRatio)))
             .OrderBy(t => PriorityDebt(types, remaining, t.Plan))
             .ThenBy(t => t.Estimate)
             .ThenByDescending(t => t.Plan.MaterialArea)
@@ -135,10 +135,10 @@ public sealed class RectanglesNestingEngine : INestingEngine
         return active.Where(t => t.Priority == top).Sum(t => remaining[t.Index]) - placed;
     }
 
-    private static double NetArea(NestJob job, SheetPlan plan) =>
+    private static double NetCost(NestJob job, SheetPlan plan) =>
         plan.Envelope is { } envelope
-            ? NestJobCost.NetSheetArea(job.Options, plan.Stock, envelope)
-            : plan.Stock.Area;
+            ? NestJobCost.NetSheetCost(job.Options, plan.Stock, envelope)
+            : NestJobCost.GrossSheetCost(plan.Stock);
 
     private static bool FitsStock(NestPlateStock stock, BoxOrientation o)
     {

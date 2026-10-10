@@ -231,7 +231,8 @@ public static class NestLayoutCheck
     private static bool SameSettings(NestPlateStock expected, NestPlateStock actual) =>
         ReferenceEquals(expected, actual)
         || (
-            expected.Size.Equals(actual.Size)
+            expected.Cost == actual.Cost
+            && expected.Size.Equals(actual.Size)
             && expected.PartSpacing.IsEqualTo(actual.PartSpacing)
             && expected.EdgeSpacing.Left.IsEqualTo(actual.EdgeSpacing.Left)
             && expected.EdgeSpacing.Right.IsEqualTo(actual.EdgeSpacing.Right)

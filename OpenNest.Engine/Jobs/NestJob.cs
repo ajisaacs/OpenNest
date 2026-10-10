@@ -16,6 +16,7 @@ public sealed class NestJob
         Parts = Own(parts);
         Plates = Own(plates);
         Options = options ?? new NestJobOptions();
+        NestJobValidator.ValidateStockCosts(Plates);
         if (
             Parts.Select(p => p.Id).Distinct(StringComparer.Ordinal).Count() != Parts.Count
             || Plates.Select(p => p.Id).Distinct(StringComparer.Ordinal).Count() != Plates.Count

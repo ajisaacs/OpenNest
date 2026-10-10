@@ -29,9 +29,11 @@ public static class NestStockBuilder
                 quantityPerOption,
                 template.PartSpacing,
                 template.EdgeSpacing,
-                template.Quadrant
+                template.Quadrant,
+                option.Cost == 0 ? null : option.Cost
             ));
         }
+        NestJobValidator.ValidateStockCosts(stock);
         return stock.AsReadOnly();
     }
 

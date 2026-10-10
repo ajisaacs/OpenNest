@@ -9,9 +9,9 @@ public class NestJobCostTests
     public static IEnumerable<object[]> EdgeCases()
     {
         foreach (var rate in new[] { 0.0, 0.5, 1.0 })
-        foreach (var edge in new[] { "bottom", "top", "left", "right" })
-        foreach (var quadrant in new[] { 1, 2, 3, 4 })
-            yield return new object[] { rate, edge, quadrant };
+            foreach (var edge in new[] { "bottom", "top", "left", "right" })
+                foreach (var quadrant in new[] { 1, 2, 3, 4 })
+                    yield return new object[] { rate, edge, quadrant };
     }
 
     [Theory]
@@ -84,7 +84,14 @@ public class NestJobCostTests
             TestDrawingFactory.Rectangle(4, 3)), 5);
         var cleanJob = new NestJob(new[] { cleanPart }, job.Plates, job.Options);
         foreach (var sheet in result.Plates)
-            Assert.Equal(LegacyNestJobCost.EstimateNetArea(cleanJob, sheet), NestJobCost.NetSheetArea(job, sheet));
+        {
+            var area = LegacyNestJobCost.EstimateNetArea(cleanJob, sheet);
+            Assert.Equal(area, NestJobCost.NetSheetArea(job, sheet));
+            var priced = new NestPlateStock(sheet.Stock.Id, sheet.Stock.Size, sheet.Stock.Quantity,
+                sheet.Stock.PartSpacing, sheet.Stock.EdgeSpacing, sheet.Stock.Quadrant, 37);
+            var pricedSheet = new NestJobPlateResult(sheet.PlateIndex, priced, sheet.Placements);
+            Assert.Equal(37 * (area / sheet.Stock.Area), NestJobCost.NetSheetCost(job, pricedSheet));
+        }
         Assert.Equal(2500, NestJobCost.UnplacedPartPenalty(job));
         Assert.Equal(result.Plates.Sum(sheet => LegacyNestJobCost.EstimateNetArea(cleanJob, sheet)) + 5000,
             NestJobCost.Evaluate(job, result));

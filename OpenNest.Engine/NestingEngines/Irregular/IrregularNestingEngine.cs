@@ -14,7 +14,7 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 /// (part type, orientation) as inner-fit rectangle minus no-fit polygons, and repeatedly places
 /// either the largest part that fills a gap behind the packing front, or the part that advances
 /// the front least per unit of area covered. Across sheets, every available stock size is
-/// trial-packed and the one with the lowest estimated whole-job cost (its own net area plus the
+/// trial-packed and the one with the lowest estimated whole-job cost (its own net cost plus the
 /// remaining demand at the best efficiency seen) is committed. A handful of deterministic
 /// strategy variants (front direction, area exponent) run whole-job, and the cheapest wins.
 ///
@@ -120,7 +120,7 @@ public sealed class IrregularNestingEngine : INestingEngine
             var reason = run.Reason;
             if (unplaced > 0 && reason == NestJobStopReason.Completed)
                 reason = NestJobStopReason.NoPlacementFound; // Demand no stock can hold.
-            return new Plan(run.Sheets, run.Net + unplaced * Penalty, unplaced, reason);
+            return new Plan(run.Sheets, NestJobCost.RequireFinite(run.Net + unplaced * Penalty), unplaced, reason, NestJobCost.UsesExplicitCosts(job));
         }
 
         /// <summary>
@@ -138,7 +138,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                 var prefix = sheets.Take(sheets.Count - k).ToList();
                 var tail = sheets.Skip(sheets.Count - k).ToList();
                 var tailParts = tail.Sum(s => s.Parts.Count);
-                var tailNet = tail.Sum(s => NetArea(job.Options, s));
+                var tailNet = tail.Sum(s => NetCost(job.Options, s));
                 var tailDemand = new int[types.Count];
                 foreach (var part in tail.SelectMany(s => s.Parts))
                     tailDemand[part.Orientation.TypeIndex]++;
@@ -148,7 +148,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                 int? cap = job.Options.MaxPlates is int max ? max - prefix.Count : null;
 
                 Run? bestRun = null;
-                var bestNet = tailNet - 1e-9 * System.Math.Max(1, tailNet);
+                var bestNet = tailNet - (NestJobCost.UsesExplicitCosts(job) ? 0 : 1e-9 * System.Math.Max(1, tailNet));
                 foreach (var (axis, beta) in Variants)
                     foreach (var first in job.Plates)
                     {
@@ -245,7 +245,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                     var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work, BlocksFor(stock));
                     var fill = packer.Fill(remaining, token);
                     if (fill.Parts.Count > 0)
-                        trials.Add((fill, NetArea(job.Options, fill)));
+                        trials.Add((fill, NetCost(job.Options, fill)));
                 }
 
                 if (trials.Count == 0)
@@ -260,14 +260,14 @@ public sealed class IrregularNestingEngine : INestingEngine
                 var remainingArea = types.Sum(t => remaining[t.Index] * t.Area);
                 var bestRatio = trials.Min(t => t.Net / System.Math.Max(t.Fill.PartArea, 1e-12));
                 var chosen = trials
-                    .Select((t, order) => (t.Fill, t.Net, order, Estimate: t.Net + System.Math.Max(0, remainingArea - t.Fill.PartArea) * bestRatio))
+                    .Select((t, order) => (t.Fill, t.Net, order, Estimate: NestJobCost.RequireFinite(t.Net + System.Math.Max(0, remainingArea - t.Fill.PartArea) * bestRatio)))
                     .OrderBy(t => t.Estimate)
                     .ThenByDescending(t => t.Fill.Parts.Count)
                     .ThenBy(t => t.order)
                     .First();
 
                 sheets.Add(chosen.Fill);
-                net += chosen.Net;
+                net = NestJobCost.RequireFinite(net + chosen.Net);
                 used[chosen.Fill.Stock.Id]++;
                 foreach (var part in chosen.Fill.Parts)
                     remaining[part.Orientation.TypeIndex]--;
@@ -289,21 +289,23 @@ public sealed class IrregularNestingEngine : INestingEngine
         return builder.Build(plan.Reason);
     }
 
-    private static double NetArea(NestJobOptions options, SheetFill fill)
+    private static double NetCost(NestJobOptions options, SheetFill fill)
     {
-        if (fill.Parts.Count == 0) return fill.Stock.Area;
+        if (fill.Parts.Count == 0) return NestJobCost.GrossSheetCost(fill.Stock);
         var left = fill.Parts.Min(p => p.Left);
         var bottom = fill.Parts.Min(p => p.Bottom);
-        return NestJobCost.NetSheetArea(options, fill.Stock, new OpenNest.Geometry.Box(left, bottom,
+        return NestJobCost.NetSheetCost(options, fill.Stock, new OpenNest.Geometry.Box(left, bottom,
             fill.Parts.Max(p => p.Right) - left, fill.Parts.Max(p => p.Top) - bottom));
     }
 
-    private sealed record Plan(IReadOnlyList<SheetFill> Sheets, double Cost, int Unplaced, NestJobStopReason Reason)
+    private sealed record Plan(IReadOnlyList<SheetFill> Sheets, double Cost, int Unplaced, NestJobStopReason Reason, bool Priced)
     {
         public bool IsBetterThan(Plan other)
         {
             if (Unplaced != other.Unplaced)
                 return Unplaced < other.Unplaced;
+            if (Priced && Cost != other.Cost)
+                return Cost < other.Cost;
             var scale = System.Math.Max(1, System.Math.Max(Cost, other.Cost));
             if (System.Math.Abs(Cost - other.Cost) > 1e-9 * scale)
                 return Cost < other.Cost;

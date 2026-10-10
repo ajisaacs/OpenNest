@@ -84,3 +84,10 @@ the existing layers; this change does not alter the strategy or either post.
 Future hardening: make numeric G-code serialization/parsing culture-invariant
 as a coordinated compatibility change; do not change just one side. Program
 content deduplication is optional and must not change per-part ownership.
+
+## Stock-option prices
+
+The existing `plateOptions` entries retain width, length and `cost`; no new `.nest`
+format version is required. Legacy zero cost means unspecified, not a free sheet.
+Positive costs are generic per-sheet values in caller-consistent units. Solving
+requires all available options to be priced or all to be unspecified.

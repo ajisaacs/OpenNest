@@ -100,7 +100,7 @@ public sealed class DefaultNestingEngine : INestingEngine
         }
     }
 
-    private sealed record Scored(NestJobResult Result, bool Valid, int Unplaced, double Cost, int Order)
+    private sealed record Scored(NestJobResult Result, bool Valid, int Unplaced, double Cost, int Order, bool Priced)
     {
         public static Scored Of(NestJob job, NestJobResult result, int order)
         {
@@ -109,7 +109,7 @@ public sealed class DefaultNestingEngine : INestingEngine
             var unplaced = System.Math.Max(0, job.Parts.Sum(p => p.Quantity) - placed);
             // Cost needs every placement to name a known part, which only a valid result guarantees.
             var cost = valid ? NestJobCost.Evaluate(job, result) : double.PositiveInfinity;
-            return new Scored(result, valid, unplaced, cost, order);
+            return new Scored(result, valid, unplaced, cost, order, NestJobCost.UsesExplicitCosts(job));
         }
 
         public bool IsBetterThan(Scored other)
@@ -118,6 +118,8 @@ public sealed class DefaultNestingEngine : INestingEngine
                 return Valid;
             if (Unplaced != other.Unplaced)
                 return Unplaced < other.Unplaced;
+            if (Priced && Cost != other.Cost)
+                return Cost < other.Cost;
             var scale = System.Math.Max(1, System.Math.Max(System.Math.Abs(Cost), System.Math.Abs(other.Cost)));
             if (double.IsFinite(Cost) && double.IsFinite(other.Cost) && System.Math.Abs(Cost - other.Cost) > 1e-9 * scale)
                 return Cost < other.Cost;
