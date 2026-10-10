@@ -101,29 +101,38 @@ Response archive schema 3 persists validation status and violations. Older archi
 
 ## Stock costs
 
-API `NestRequestPlate.Cost` is an optional per-physical-sheet cost in caller-consistent
-units. Omit every cost for area scoring, or supply strictly positive finite costs
-for every available row. Explicit zero and mixed priced/unpriced available stock
-are rejected before import. Quantity-zero rows do not select the cost mode.
-
-Validated proposals expose `Costs` (`Basis`, `Stock`, `GrossTotal`, `SalvageCredit`,
-`NetScore`) and persist them in quote archives. `area` identifies fallback scoring;
-`supplied-cost` identifies explicit prices. API salvage is disabled, so two sheets
-costing 25 each report gross and net totals of 50 with zero salvage credit. Totals
-exclude penalties for unplaced demand. Invalid proposals have no cost summary;
-overflow fails instead of becoming a score.
-
-Returned nests preserve offered stock prices. These are cost-aware heuristics,
-not global cost optimizers; validation and fulfillment remain required.
-
+Auto Nest Stock Options accepts a generic **per physical sheet** Cost. Enter positive
+finite costs on every active row in one common unit (purchase price, area, or another
+consistent scalar). All-zero rows retain legacy area scoring: zero means unspecified,
+not free stock. Negative/nonfinite costs and mixed zero/positive rows are rejected
+before solving. The blank add row is ignored.
 
 MCP `autonest_job` accepts optional `cost` on each `sheets` row, alongside `width`,
-`length` and positive finite `quantity`. Supply positive finite costs on every row
-or omit all costs. MCP continues to reject duplicate sizes and disables salvage.
-Its result reports the cost basis, used physical counts, supplied costs, gross
-subtotals, gross total, estimated salvage credit and net score for the proposal.
+`length` and positive finite `quantity`. API `NestRequestPlate.Cost` uses the same
+nullable contract: omit every cost for area scoring, or supply strictly positive
+finite values for every available row. Explicit zero is invalid in these requests.
+Engine stock with quantity zero is unavailable and does not select the cost mode.
+MCP continues to reject duplicate sizes; API/engine stock IDs keep independent inventory.
+
+With prices, gross sheet cost is the supplied value. Salvage is still computed from
+the largest qualifying material-edge offcut; net cost is
+`Cost * (NetSheetArea / SheetArea)`. Set desktop salvage rate to zero for purchase-price
+comparisons. Entering prices preserves the selected salvage settings. MCP and API
+currently disable salvage. Without prices, scores retain their existing area units
+and tie ordering; fixed strategies retain their legacy no-salvage area tie-break.
+
+Desktop reports gross cost, estimated salvage credit and net score. MCP reports
+`basis`, each stock's used physical count, supplied cost and gross subtotal, plus
+gross total, estimated salvage credit and net score. API exposes these under `Costs`
+(`Basis`, `Stock`, `GrossTotal`, `SalvageCredit`, `NetScore`) and persists them in
+quote archives. For example, two sheets costing 25 each report gross total 50;
+with salvage disabled, credit is 0 and net score is 50. `area` identifies fallback
+scoring; `supplied-cost` identifies explicit prices. Totals cover the returned proposal,
+not previously occupied session sheets, and exclude penalties for unplaced demand.
+Invalid API proposals have no cost summary. Overflow fails instead of becoming a score.
 
 An accepted MCP solve stores requested drawing quantities and offered stock prices;
-save/reopen preserves them and existing nest metadata, plate defaults and salvage
-settings. Rejected/cancelled proposals change neither requirements nor options.
-Inventory remains request-local; saved options are offers, not a purchase ledger.
+save/reopen preserves them and existing nest metadata. Rejected/cancelled proposals
+change neither requirements nor options. Inventory remains request-local; saved
+options are offers, not a per-sheet purchase ledger. These are cost-aware heuristics,
+not global cost optimizers; validation and fulfillment remain required.

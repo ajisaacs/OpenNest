@@ -11,6 +11,64 @@ namespace OpenNest.WinForms.Tests.Forms;
 public class AutoNestFormStockOptionsTests
 {
     [Theory]
+    [InlineData("invalid", false)]
+    [InlineData("-1", false)]
+    [InlineData("NaN", false)]
+    [InlineData("27", true)]
+    public void PendingCostEditsAreValidatedBeforePublishing(string text, bool valid)
+    {
+        RunSta(() =>
+        {
+            using var form = new AutoNestForm(new Nest());
+            form.LoadPlateOptions(new List<PlateOption> { new() { Width = 48, Length = 96, Cost = 5 } }, 0.5);
+            var grid = GetGrid(form);
+            ((TabControl)form.Controls.Find("tabControl", true).Single()).SelectedIndex = 1;
+            form.Show();
+            grid.Focus();
+            grid.CurrentCell = grid.Rows[0].Cells[1];
+            Assert.True(grid.BeginEdit(false));
+            grid.EditingControl.Text = text;
+            Assert.Equal(valid, form.TryGetPlateOptions(out var options, out var error));
+            if (valid)
+                Assert.Equal(27, Assert.Single(options).Cost);
+            else
+            {
+                Assert.Empty(options);
+                Assert.Contains("cost", error);
+            }
+            grid.CancelEdit();
+        });
+    }
+
+    [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(5, 8, true)]
+    [InlineData(5, 0, false)]
+    [InlineData(0, 5, false)]
+    [InlineData(-1, -1, false)]
+    [InlineData(double.NaN, 5, false)]
+    [InlineData(double.PositiveInfinity, 5, false)]
+    public void CostRowsRequireConsistentFiniteValues(double first, double second, bool valid)
+    {
+        RunSta(() =>
+        {
+            using var form = new AutoNestForm(new Nest());
+            form.LoadPlateOptions(new List<PlateOption>
+            {
+                new() { Width = 48, Length = 96, Cost = first },
+                new() { Width = 60, Length = 120, Cost = second },
+            }, 0.5);
+            Assert.Equal(valid, form.TryGetPlateOptions(out var options, out var error));
+            if (!valid)
+            {
+                Assert.Empty(options);
+                Assert.Contains("cost", error);
+            }
+            AssertNewRow(GetGrid(form));
+        });
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void StockRowsCanBeSelectedAndRemoved(bool loadSavedOptions)
@@ -62,7 +120,7 @@ public class AutoNestFormStockOptionsTests
             Assert.True(rows.AllowNew);
             var added = rows.AddNew()!;
             SetValue(added, "Size", "84 x 168");
-            SetValue(added, "Cost", 123.5);
+            SetValue(added, "Cost", loadSavedOptions ? 123.5 : 0);
             ((ICancelAddNew)rows).EndNew(rows.Count - 1);
 
             var options = form.GetPlateOptions();
@@ -70,7 +128,7 @@ public class AutoNestFormStockOptionsTests
             var option = options.Last();
             Assert.Equal(84, option.Width);
             Assert.Equal(168, option.Length);
-            Assert.Equal(123.5, option.Cost);
+            Assert.Equal(loadSavedOptions ? 123.5 : 0, option.Cost);
             AssertNewRow(grid);
         });
     }
@@ -128,6 +186,7 @@ public class AutoNestFormStockOptionsTests
         var rows = Assert.IsAssignableFrom<IBindingList>(grid.DataSource);
         var row = rows.AddNew()!;
         SetValue(row, "Size", invalid);
+        SetValue(row, "Cost", 25);
         ((ICancelAddNew)rows).EndNew(rows.Count - 1);
 
         Assert.False(form.TryGetPlateOptions(out var options, out var error));

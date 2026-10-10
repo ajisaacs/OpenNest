@@ -152,6 +152,7 @@ namespace OpenNest.Forms
                 {
                     DataPropertyName = "Cost",
                     HeaderText = "Cost",
+                    ToolTipText = "Per physical sheet, in one common unit. Use zero on every row for area scoring, or positive costs on every row. Salvage credits cost proportionally; set salvage to zero for purchase totals.",
                     Width = 70,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
@@ -235,6 +236,15 @@ namespace OpenNest.Forms
                 }
             }
 
+            if (plateGrid.IsCurrentCellInEditMode && plateGrid.CurrentCell != null
+                && plateGrid.Columns[plateGrid.CurrentCell.ColumnIndex].DataPropertyName == "Cost"
+                && plateGrid.EditingControl != null
+                && !ValidCost(plateGrid.EditingControl.Text))
+            {
+                error = $"Invalid stock cost in row {plateGrid.CurrentCell.RowIndex + 1}. Enter a finite positive cost, or zero on every row.";
+                return false;
+            }
+
             bool committed;
             try
             {
@@ -269,6 +279,14 @@ namespace OpenNest.Forms
                     return false;
                 }
 
+                if (!double.IsFinite(item.Cost) || item.Cost < 0
+                    || validated.Count > 0 && (validated[0].Cost == 0) != (item.Cost == 0))
+                {
+                    error = $"Invalid stock cost in row {index + 1}. Use finite positive costs on every active row, or zero on every row.";
+                    if (index < plateGrid.Rows.Count)
+                        plateGrid.Rows[index].ErrorText = error;
+                    return false;
+                }
                 if (index < plateGrid.Rows.Count)
                     plateGrid.Rows[index].ErrorText = "";
                 validated.Add(new PlateOption { Width = width, Length = length, Cost = item.Cost });
@@ -378,8 +396,17 @@ namespace OpenNest.Forms
                 UpdateSummary();
         }
 
+        private static bool ValidCost(string text) =>
+            double.TryParse(text, out var cost) && double.IsFinite(cost) && cost >= 0;
+
         private void PlateGrid_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
         {
+            if (plateGrid.Columns[e.ColumnIndex].DataPropertyName == "Cost")
+            {
+                e.Cancel = !plateGrid.Rows[e.RowIndex].IsNewRow && !ValidCost(e.FormattedValue?.ToString());
+                plateGrid.Rows[e.RowIndex].ErrorText = e.Cancel ? "Enter a finite positive cost, or zero on every row." : "";
+                return;
+            }
             if (plateGrid.Columns[e.ColumnIndex].DataPropertyName != "Size")
                 return;
 

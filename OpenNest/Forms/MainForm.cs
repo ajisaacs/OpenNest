@@ -1494,6 +1494,7 @@ namespace OpenNest.Forms
                     allowInvalid = true;
                 }
 
+                var costs = result.IsValid && result.CanKeep ? NestCostSummary.FromAccepted(result) : null;
                 var applied = NestPipelineCommit.ApplyToEmptyPlates(result, target.PlateManager,
                     allowInvalid, cts.Token);
                 if (applied.Count > 0)
@@ -1509,6 +1510,9 @@ namespace OpenNest.Forms
                     target.OverlapDisplay = OverlapDisplayMode.Both;
                     await target.CheckOverlapsAsync();
                 }
+                if (costs?.Basis == "supplied-cost")
+                    MessageBox.Show(this, $"Gross sheet cost: {costs.GrossTotal:G}\nEstimated salvage credit: {costs.SalvageCredit:G}\nNet score: {costs.NetScore:G}",
+                        "Auto Nest Cost", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 if (result.Status != NestJobStatus.Complete)
                     MessageBox.Show(this, $"{engineName} could not place every part ({result.StopReason}).",
                         "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
