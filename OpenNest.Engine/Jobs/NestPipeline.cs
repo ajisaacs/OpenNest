@@ -37,7 +37,8 @@ public sealed class NestPipelineResult
         IReadOnlyList<string> violations,
         bool canKeep,
         TimeSpan solveTime,
-        TimeSpan validationTime
+        TimeSpan validationTime,
+        IReadOnlyDictionary<string, Drawing> drawingsByPartId
     )
     {
         EngineName = engineName;
@@ -48,6 +49,7 @@ public sealed class NestPipelineResult
         CanKeep = canKeep;
         SolveTime = solveTime;
         ValidationTime = validationTime;
+        DrawingsByPartId = drawingsByPartId;
     }
 
     public string EngineName { get; }
@@ -63,6 +65,7 @@ public sealed class NestPipelineResult
     public NestJobStopReason StopReason => Raw.StopReason;
     public TimeSpan SolveTime { get; }
     public TimeSpan ValidationTime { get; }
+    internal IReadOnlyDictionary<string, Drawing> DrawingsByPartId { get; }
 }
 
 /// <summary>
@@ -191,6 +194,10 @@ public static class NestPipeline
                 canKeep = false;
             }
         }
+        var freshness = NestPipelineDrawingFreshness.Changes(job, drawingsByPartId);
+        violations.AddRange(freshness);
+        if (freshness.Count > 0)
+            canKeep = false;
         var validationTime = clock.Elapsed;
 
         var plates = canKeep
@@ -201,6 +208,19 @@ public static class NestPipeline
             ))
             .ToList()
             : new List<ProposedPlate>();
+
+        // Binding clones the caller's current Program; a concurrent edit during binding
+        // must not return parts whose bytes differ from the already validated snapshot.
+        if (canKeep)
+        {
+            var changes = NestPipelineDrawingFreshness.Changes(job, drawingsByPartId);
+            if (changes.Count > 0)
+            {
+                violations.AddRange(changes);
+                plates.Clear();
+                canKeep = false;
+            }
+        }
 
         token.ThrowIfCancellationRequested();
         if (prepass != null && canKeep)
@@ -222,7 +242,8 @@ public static class NestPipeline
             violations,
             canKeep,
             solveTime,
-            validationTime
+            validationTime,
+            drawingsByPartId
         );
     }
 }
