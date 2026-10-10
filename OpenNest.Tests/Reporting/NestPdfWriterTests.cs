@@ -53,10 +53,11 @@ public sealed class NestPdfWriterTests : IDisposable
         Assert.Matches(@"R003\s+Bracket\s+7\s+2\s+5\s+0\s+1", summary);
         Assert.Matches(@"R004\s+Unplaced\s+3\s+0\s+3\s+0\s+-", summary);
         Assert.Contains("Page 1 of 2", summary);
+        Assert.DoesNotContain("Copies", summary + plate);
 
         Assert.Contains("Plate 1", plate);
         Assert.Contains("Report test job", plate);
-        Assert.Matches(@"Copies:\s+2", plate);
+        Assert.Matches(@"Quantity:\s+2", plate);
         Assert.Matches(@"R001\s+Bracket\s+2\s+4", plate);
         Assert.Matches(@"R002\s+Rotated\s+1\s+2", plate);
         Assert.Matches(@"R003\s+Bracket\s+1\s+2", plate);

@@ -131,7 +131,7 @@ public static class NestPdfWriter
         else
         {
             var plates = AddTable(section, 60, 200, 80, 100, 100);
-            AddHeader(plates, "Plate", "Stock size", "Copies", "Parts/sheet", "Utilization");
+            AddHeader(plates, "Plate", "Stock size", "Quantity", "Parts/sheet", "Utilization");
             foreach (var plate in snapshot.Plates)
                 AddRow(plates, $"Plate {plate.Number}", false, plate.Number.ToString(Invariant), SheetSize(snapshot, plate),
                     plate.Copies.ToString(Invariant), plate.Parts.Length.ToString(Invariant), Percent(plate.Utilization));
@@ -175,7 +175,7 @@ public static class NestPdfWriter
         var info = AddTable(section, 80, 280, 90, 270);
         info.Borders.Visible = false;
         AddInfoRow(info, "Nest:", snapshot.Name, "Sheet size:", SheetSize(snapshot, plate));
-        AddInfoRow(info, "Material:", Material(snapshot), "Copies:", plate.Copies.ToString(Invariant));
+        AddInfoRow(info, "Material:", Material(snapshot), "Quantity:", plate.Copies.ToString(Invariant));
         AddInfoRow(info, "Thickness:", Thickness(snapshot), "Part spacing:",
             $"{Number(plate.PartSpacing)} {snapshot.Units}");
         AddInfoRow(info, "Parts/sheet:", plate.Parts.Length.ToString(Invariant), "Utilization:",
@@ -204,7 +204,7 @@ public static class NestPdfWriter
         var perSheet = plate.Parts.GroupBy(part => part.ReportId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => (long)group.Count(), StringComparer.Ordinal);
         var parts = AddTable(section, 60, 400, 110, 150);
-        AddHeader(parts, "ID", "Drawing", "Qty/sheet", $"Total ({plate.Copies} copies)");
+        AddHeader(parts, "ID", "Drawing", "Qty/sheet", $"Total ({plate.Copies} plates)");
         foreach (var drawing in snapshot.Drawings.Where(drawing => perSheet.ContainsKey(drawing.Id)))
         {
             var count = perSheet[drawing.Id];
