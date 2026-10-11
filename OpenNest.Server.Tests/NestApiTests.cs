@@ -141,7 +141,7 @@ public sealed class NestApiTests
         var before = await server.SnapshotAsync();
         server.Client.DefaultRequestHeaders.IfMatch.Add(new EntityTagHeaderValue("\"1\""));
         using var metadata = await server.Client.PutAsync($"/api/nests/{created.Id}/metadata", new StringContent("{}"));
-        Assert.Equal(HttpStatusCode.NotImplemented, metadata.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, metadata.StatusCode);
         using var delete = await server.Client.DeleteAsync($"/api/nests/{created.Id}");
         Assert.Equal(HttpStatusCode.NotImplemented, delete.StatusCode);
         Assert.Equal(before, await server.SnapshotAsync());

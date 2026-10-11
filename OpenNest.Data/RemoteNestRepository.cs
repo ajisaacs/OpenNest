@@ -129,8 +129,7 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
     public async Task<NestRecord> UpdateMetadataAsync(
         Guid id, NestRecord record, CancellationToken cancellationToken = default)
     {
-        await Task.CompletedTask;
-        throw new IOException("Metadata updates require guarded revision support and are not available yet. Upgrade the client before editing server metadata.");
+        return await UpdateMetadataAsync(id, record, record.Revision, cancellationToken);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -191,6 +190,20 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         if (saved.Id != id || saved.Revision < expectedRevision)
             throw new IOException("Nest server returned an invalid saved revision. Reload to reconcile before saving again.");
         return saved;
+    }
+
+    public async Task<NestRecord> UpdateMetadataAsync(Guid id, NestRecord record, int expectedRevision,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateId(id);
+        ValidateRevision(expectedRevision);
+        await GetRevisionsAsync(id, limit: 1, cancellationToken: cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Put, Url($"api/nests/{id}/metadata"));
+        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        request.Content = JsonContent.Create(record, options: JsonOptions);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccess(response, $"edit nest {id}; reload after a conflict", cancellationToken);
+        return await ReadRecord(response, cancellationToken);
     }
 
     private static void ValidateId(Guid id)

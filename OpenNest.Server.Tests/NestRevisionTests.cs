@@ -186,7 +186,7 @@ public sealed class NestRevisionTests
     [Theory]
     [InlineData("metadata", null, 428)]
     [InlineData("delete", null, 428)]
-    [InlineData("metadata", "\"1\"", 501)]
+    [InlineData("metadata", "\"1\"", 400)]
     [InlineData("delete", "\"1\"", 501)]
     [InlineData("file", "\"1\"", 400)]
     public async Task BlockedOrMalformedWrite_PreservesAllSnapshots(string route, string? header, int status)

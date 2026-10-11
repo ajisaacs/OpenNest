@@ -158,6 +158,14 @@ public sealed class NestDatabase : IDisposable
         }
     }
 
+    public NestRecord? UpdateMetadata(Guid id, NestRecord record, int expectedRevision)
+    {
+        lock (_sync)
+        {
+            return Update(id, record, GetFile(id) ?? [], expectedRevision);
+        }
+    }
+
     public NestRecord? Update(Guid id, NestRecord record, byte[] file, int expectedRevision)
     {
         lock (_sync)

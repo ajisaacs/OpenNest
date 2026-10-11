@@ -101,8 +101,22 @@ app.MapPut("/api/nests/{id:guid}/file", async (Guid id, HttpContext http, NestDa
     }
 });
 
-app.MapPut("/api/nests/{id:guid}/metadata", (Guid id, HttpRequest request, NestDatabase db) =>
-    BlockDeferredMutation(id, request, db));
+app.MapPut("/api/nests/{id:guid}/metadata", async (Guid id, HttpRequest request, NestDatabase db) =>
+{
+    var error = ReadPrecondition(request, out var expected);
+    if (error is not null) return error;
+    NestRecord? record;
+    try { record = await request.ReadFromJsonAsync<NestRecord>(); }
+    catch (Exception ex) when (ex is JsonException or InvalidOperationException or BadHttpRequestException)
+    { return Results.BadRequest("Invalid metadata JSON."); }
+    if (record is null) return Results.BadRequest("Missing metadata.");
+    try
+    {
+        var updated = db.UpdateMetadata(id, record, expected);
+        return updated is null ? Results.NotFound() : Results.Ok(updated);
+    }
+    catch (RevisionConflictException conflict) { return Results.Json(conflict.Current, statusCode: 409); }
+});
 app.MapDelete("/api/nests/{id:guid}", (Guid id, HttpRequest request, NestDatabase db) =>
     BlockDeferredMutation(id, request, db));
 

@@ -44,6 +44,10 @@ public interface INestRepository
         CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("This repository does not support nest version history.");
 
+    Task<NestRecord> UpdateMetadataAsync(Guid id, NestRecord record, int expectedRevision,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support guarded metadata edits.");
+
     /// <summary>Atomically replaces the current archive only at the expected revision.</summary>
     Task<NestRecord> UpdateFileAsync(Guid id, byte[] nestFile, NestRecord record, int expectedRevision,
         CancellationToken cancellationToken = default) =>
