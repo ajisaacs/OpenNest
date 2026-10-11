@@ -24,6 +24,7 @@ internal static class JointCuttingPlanSearch
     /// along its order before it gives up and learns from the part that blocked it.
     /// </summary>
     internal const int StallExpansionsPerEntry = 8;
+    private const int MaximumRecoveryHoles = 16;
 
     /// <summary>LeadPrechecks counts S07 adapter evaluations — bounded work tracked separately from expansions.</summary>
     internal sealed record Outcome(CuttingPlanStatus Status, IReadOnlyList<FixedProgramPlacement> Order,
@@ -46,6 +47,9 @@ internal static class JointCuttingPlanSearch
                     var preferred = walk.Follow(keptSequence, stall, null, preferredOnly: true);
                     if (preferred.Order != null)
                         return walk.Ready(preferred.Order);
+                    var recovered = walk.Follow(keptSequence, stall, null, contourRecovery: true);
+                    if (recovered.Order != null)
+                        return walk.Ready(recovered.Order);
                 }
                 var kept = walk.Follow(keptSequence, null, null);
                 return kept.Order != null ? walk.Ready(kept.Order) : walk.Exhausted();
@@ -65,6 +69,9 @@ internal static class JointCuttingPlanSearch
                     var preferred = walk.Follow(sequence, stall, resume, preferredOnly: true);
                     if (preferred.Order != null)
                         return walk.Ready(preferred.Order);
+                    var recovered = walk.Follow(sequence, stall, null, contourRecovery: true);
+                    if (recovered.Order != null)
+                        return walk.Ready(recovered.Order);
                 }
                 var attempt = walk.Follow(sequence, stall, resume);
                 if (attempt.Order != null)
@@ -73,6 +80,12 @@ internal static class JointCuttingPlanSearch
                 {
                     // "Cut before" rules are a heuristic: a part blocked straight after another can
                     // still be reachable via a third. Search every order with what budget remains.
+                    if (preferEndpoints)
+                    {
+                        var recovery = walk.Follow(null, stall, null, contourRecovery: true);
+                        if (recovery.Order != null)
+                            return walk.Ready(recovery.Order);
+                    }
                     var full = walk.Follow(null, null, null);
                     return full.Order != null ? walk.Ready(full.Order) : walk.Exhausted();
                 }
@@ -189,7 +202,7 @@ internal static class JointCuttingPlanSearch
         /// With a stall limit the attempt ends once that many expansions pass without getting
         /// further along the order; it never backtracks behind its starting node.
         /// </summary>
-        internal Attempt Follow(int[] sequence, int? stall, Node resume, bool preferredOnly = false)
+        internal Attempt Follow(int[] sequence, int? stall, Node resume, bool preferredOnly = false, bool contourRecovery = false)
         {
             var root = resume ?? new Node([], snapshot.StartPoint, new ReleasedContourState(reportMissingLeadIns: false), null, null);
             var attempt = new Attempt(sequence);
@@ -211,8 +224,18 @@ internal static class JointCuttingPlanSearch
                     if (attempt.Advance(node))
                         progressExpansions = Expansions;
                     else if (stall is int limit && Expansions - progressExpansions > limit)
-                        return attempt;
-                    frame.Children ??= OrderedChildren(node, sequence, attempt, preferredOnly).GetEnumerator();
+                    {
+                        if (sequence != null || !contourRecovery)
+                            return attempt;
+                        // Diversify the first whole part rather than spending the remainder
+                        // on endpoints of a stalled root's already completed prefix.
+                        while (stack.Count > 1)
+                            stack.Pop().Children?.Dispose();
+                        attempt.Restart();
+                        progressExpansions = Expansions;
+                        continue;
+                    }
+                    frame.Children ??= OrderedChildren(node, sequence, attempt, preferredOnly, contourRecovery).GetEnumerator();
                     if (!frame.Children.MoveNext())
                     {
                         stack.Pop().Children.Dispose();
@@ -269,15 +292,16 @@ internal static class JointCuttingPlanSearch
         /// one part and contour stage the automatic rank leads — OrderBy(Distance) alone
         /// would undo the look-ahead facing. Legacy (unranked) children keep distance order.
         /// </summary>
-        private IEnumerable<Edge> OrderedChildren(Node node, int[] sequence, Attempt attempt, bool preferredOnly)
+        private IEnumerable<Edge> OrderedChildren(Node node, int[] sequence, Attempt attempt, bool preferredOnly, bool contourRecovery)
         {
             // A prescribed next part (or an active part's next contour) has a single
             // source. Expand already yields its contour/entry rank order, so emit and
             // validate a sibling only when DFS reaches it. Free whole-part selection
-            // still needs every source's distances before it can rank them.
-            if (sequence != null || node.Active != null)
-                return Expand(node, sequence, attempt, preferredOnly);
-            var edges = Expand(node, sequence, attempt, preferredOnly).ToList();
+            // still needs every source's distances before it can rank them. Recovery
+            // instead visits dependency-ready sources lazily by their material centres.
+            if (sequence != null || node.Active != null || contourRecovery)
+                return Expand(node, sequence, attempt, preferredOnly, contourRecovery);
+            var edges = Expand(node, sequence, attempt, preferredOnly, contourRecovery).ToList();
             if (edges.Count <= 1)
                 return edges.ToArray();
             // Stable source order: the minimum incremental rapid per source, ties ordinal.
@@ -295,7 +319,7 @@ internal static class JointCuttingPlanSearch
                 .ToArray();
         }
 
-        private IEnumerable<Edge> Expand(Node node, int[] sequence, Attempt attempt, bool preferredOnly)
+        private IEnumerable<Edge> Expand(Node node, int[] sequence, Attempt attempt, bool preferredOnly, bool contourRecovery)
         {
             IEnumerable<FixedProgramPlacement> sources;
             if (node.Active is { } active)
@@ -309,6 +333,8 @@ internal static class JointCuttingPlanSearch
                     : snapshot.Dependencies.IsReady(sequence[node.Order.Length], finished)
                         ? [snapshot.Placements[sequence[node.Order.Length]]] : [];
             }
+            if (contourRecovery)
+                sources = sources.OrderBy(p => Centre(p).DistanceTo(node.Position)).ThenBy(p => p.SourceOrdinal);
             foreach (var source in sources)
             {
                 token.ThrowIfCancellationRequested();
@@ -322,6 +348,12 @@ internal static class JointCuttingPlanSearch
                     continue;
                 }
                 var prepared = source.Prepared;
+                if (contourRecovery && prepared.Count > 1 && prepared.PerimeterOrdinal <= MaximumRecoveryHoles && node.Active == null)
+                {
+                    foreach (var edge in RecoverPart(node, sequence, source, attempt))
+                        yield return edge;
+                    continue;
+                }
                 if (prepared.Count > 1 && node.Active == null)
                 {
                     // Selecting an endpoint does not cut it. Each endpoint owns a separate
@@ -419,6 +451,92 @@ internal static class JointCuttingPlanSearch
                 }
             }
         }
+
+        // Recovery only: solve directed contour transitions rather than assuming
+        // that a centre-to-centre hole tour can cross the already released material.
+        // One complete checked chain per outside endpoint; original DFS remains fallback.
+        private IEnumerable<Edge> RecoverPart(Node node, int[] sequence,
+            FixedProgramPlacement source, Attempt attempt)
+        {
+            var prepared = source.Prepared;
+            var target = LookAheadCentre(node, sequence, source) - source.Location;
+            // Placement origins are authored program coordinates, not a downstream cut.
+            // Use the same material-centre look-ahead as the retained entry search.
+            var perimeters = prepared.AutomaticEntryCandidatesWithFallbacks(prepared.PerimeterOrdinal, token: token)
+                .OrderBy(c => c.Choice.Point.DistanceTo(target ?? node.Position - source.Location))
+                .Where(c => Evaluate(source, c).Status == ContourFeasibilityStatus.Clear).Select(c => c.Choice).ToArray();
+            var holes = Enumerable.Range(0, prepared.PerimeterOrdinal)
+                .Select(c => prepared.AutomaticEntryCandidatesWithFallbacks(c, token: token)
+                    .Where(e => Evaluate(source, e).Status == ContourFeasibilityStatus.Clear).Select(e => e.Choice).ToArray()).ToArray();
+            var motions = new Dictionary<ContourChoice, OwnedExecution>();
+            var stop = Expansions + (long)StallExpansionsPerEntry * snapshot.MaxEntries * prepared.Count;
+            OwnedExecution Motion(ContourChoice choice)
+            {
+                if (motions.TryGetValue(choice, out var known)) return known;
+                CountExpansion(source);
+                return motions[choice] = ExecutionMotionReader.Read(
+                    prepared.EmitCandidateForValidation(choice), source.Location, null, token);
+            }
+            for (var endpoint = 0; endpoint < perimeters.Length; endpoint++)
+            {
+                token.ThrowIfCancellationRequested();
+                if (Expansions >= stop) yield break;
+                var outside = perimeters[endpoint];
+                var chain = new List<ContourChoice>();
+                // This dominance heuristic is confined to recovery: emitted
+                // seams can differ for the same released subset. Never prune full DFS.
+                var failed = new HashSet<(int Mask, long X, long Y)>();
+                if (!Solve(0, node.Position, node.Checker)) continue;
+                var program = prepared.Emit(chain);
+                var execution = ExecutionMotionReader.Read(program, source.Location, node.Position, token);
+                var checker = node.Checker.Copy();
+                CountExpansion(source);
+                if (!Check(source, execution, node.Position, checker, attempt)) continue;
+                var proposal = source.Propose(program, execution, chain, token);
+                yield return new(new([.. node.Order, proposal], execution.DeparturePoint, checker, null, node),
+                    execution.RapidDistanceFrom(node.Position), source.SourceOrdinal, -1, endpoint, endpoint);
+
+                bool Solve(int mask, Vector position, ReleasedContourState before)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (Expansions >= stop) return false;
+                    var key = (mask, BitConverter.DoubleToInt64Bits(position.X),
+                        BitConverter.DoubleToInt64Bits(position.Y));
+                    if (failed.Contains(key)) return false;
+                    if (mask == (1 << prepared.PerimeterOrdinal) - 1)
+                    {
+                        CountExpansion(source);
+                        var findings = before.Copy().Check(Motion(outside), position, source.SourceOrdinal + 1, token);
+                        rejected.AddRange(Map(snapshot, findings));
+                        attempt.NoteCrossings(source.SourceOrdinal, findings);
+                        if (findings.Count != 0) { failed.Add(key); return false; }
+                        chain.Add(outside);
+                        return true;
+                    }
+                    var candidates = Enumerable.Range(0, holes.Length).Where(c => (mask & (1 << c)) == 0)
+                        .SelectMany(c => holes[c])
+                        .OrderBy(c => Motion(c).Motions[0].End.DistanceTo(position));
+                    foreach (var choice in candidates)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (Expansions >= stop) return false;
+                        CountExpansion(source);
+                        var execution = Motion(choice);
+                        var after = before.Copy();
+                        var findings = after.Check(execution, position, source.SourceOrdinal + 1, token);
+                        rejected.AddRange(Map(snapshot, findings));
+                        attempt.NoteCrossings(source.SourceOrdinal, findings);
+                        if (findings.Count != 0) continue;
+                        chain.Add(choice);
+                        if (Solve(mask | (1 << choice.ContourOrdinal), execution.DeparturePoint, after)) return true;
+                        chain.RemoveAt(chain.Count - 1);
+                    }
+                    failed.Add(key);
+                    return false;
+                }
+            }
+        }
+
 
         /// <summary>
         /// The S03-S08 pipeline for one outside contour, in prepared LOCAL coordinates
@@ -574,6 +692,13 @@ internal static class JointCuttingPlanSearch
                 Crossed.Clear();
             }
             return true;
+        }
+
+        internal void Restart()
+        {
+            progress = -1;
+            Deepest = null;
+            Crossed.Clear();
         }
 
         internal void NoteCrossings(int ordinal, IEnumerable<PostVerificationFinding> findings)

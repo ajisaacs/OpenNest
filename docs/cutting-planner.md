@@ -99,8 +99,15 @@ each outside endpoint. This lets a later blocked approach change the previous
 part's departure without first exhausting combinations of its earlier holes.
 This preferred pass uses the same emitted-motion checks, shared expansion budget
 and stall limit as the retained search; on failure the full entry/hole-order
-backtracking pass remains available. Single-part and no-hole requests keep their
-existing search order.
+backtracking pass remains available. Before that full pass, a failed preferred tour
+also gets a directed-contour recovery pass for parts with at most 16 holes. It
+tries native outside entries beyond the ranked shortlist, then builds a hole route
+from actual emitted pierces, checking each transition against already released
+contours. This reaches inner edges of interlocking concave parts which can be
+missing from the facing-side shortlist. A failed released-hole-subset/departure
+state is memoized only in recovery; it never prunes the retained full search.
+Recovered whole programs are checked again and independently replayed. Single-part
+and no-hole requests keep their existing search order.
 
 A preserved order is followed as given. Otherwise the order is an open
 travelling-salesman path over part centres from the start point: nearest neighbour,
@@ -114,11 +121,18 @@ getting further, so it learns instead of retrying every entry combination of the
 parts before it. A rule that would contradict an order already required is skipped.
 "Cut before" rules are a heuristic (a part blocked straight after another may be
 reachable via a third), so once nothing new can be learned the remaining budget
-goes to a full search that tries every ready part, nearest first; only when that
-also fails is the result a refusal.
+first tries sequence-free recovery, visiting dependency-ready parts lazily by
+material-centre distance. When a branch stalls, it disposes the deeper search
+frames and resumes alternatives at the root instead of spending the remainder
+on that branch's completed prefix. Any budget left then goes to the retained full
+search. Recovery shares the original total expansion budget; exhausting it still
+returns a refusal, never a best-effort upgrade.
 
 Candidates use native closest points, vertices, midpoints and circle angles in
-stable order, capped by `maxEntries`. Circle rounding, clamping, corner resolution
+stable order. `maxEntries` caps the normal ranked shortlist, not the recovery
+catalogue: recovery may inspect the remaining finite native entries, with every
+precheck and visited transition charged to the same expansion budget. Circle
+rounding, clamping, corner resolution
 and tab trimming happen during emission. Validation uses the actual emitted
 motions, never the nominal entry point alone. Existing lead styles are not
 shortened, disabled or substituted as a search fallback.
@@ -168,8 +182,9 @@ are not tie breakers.
 When the next whole part is fixed by the tour or a part is already active, the
 search generates and checks contour alternatives on demand in contour/entry rank
 order. It does not emit every sibling before trying the first. Backtracking still
-visits the remaining alternatives when needed; none is pruned. The free whole-part
-fallback still evaluates all ready sources before ranking their travel distances.
+visits the remaining alternatives when needed; none is pruned. The retained full whole-part
+fallback still evaluates all ready sources before ranking their travel distances;
+sequence-free recovery instead uses lazy centre-distance order.
 
 The expansion budget counts evaluated candidates and frontier ranking, including
 rejections, before emission; it is not a wall-clock timeout. An unvisited sibling
@@ -205,7 +220,8 @@ parts the tour stays nearest-first; the look-ahead rank only orders the entries
 inside one part's contour stage, so distance sorting cannot undo the facing.
 Uncertain (numerically incomplete) validator answers are not geometric refusals:
 those candidates can fill remaining retained slots for emitted-prefix checking and
-complete replay. The total retained entry count stays within `maxEntries`. A
+complete replay. The normal ranked entry count stays within `maxEntries`; directed recovery can
+inspect additional native entries as described above. A
 part/contour with no fitting lead in its fully evaluated catalogue is reported
 as "No tested lead-in fits on part N, contour M"; budget exhaustion stays a
 budget finding and incomplete checks are never presented as geometric
