@@ -10,7 +10,7 @@ A Windows desktop application for CNC nesting — imports DXF drawings, arranges
 ## Features
 
 - **Import / export** — DXF & DWG parts (ACadSharp), Excel BOMs, bend-line detection, built-in parametric shapes; export DXF or post-processed G-code.
-- **Nesting** — pluggable whole-job engines (Default, Strip, Vertical/Horizontal Remnant, StockLadder, plus DLL plugins), NFP-based interlocking pair evaluation, gravity compaction, rotation sweeps, multi-plate/multi-material jobs.
+- **Nesting** — automatic multi-plate/multi-material jobs, interlocking pair evaluation, and built-in or plug-in engines. [Choose an engine](docs/nesting-engines.md).
 - **Plate operations** — manual sheet cut-offs, [plate- or nest-wide automatic scrap cutoffs with a minimum tail-to-keep setting](docs/automatic-scrap-cutoffs.md), oversized-part splitting (straight, weld-gap tabs, spike-groove), interactive editing, and spacing-aware pushes that can slide along or away from touching parts.
 - **Visual overlap check** — highlight shared material on the active plate, rechecked automatically after edits, including containment and cutouts, with area shading, pair centroids, and hover details through View > Overlap Check. [Usage and limitations](docs/geometry/visual-overlap-check.md).
 - **CNC output** — configurable lead-ins/outs and tabs, contour editing, user-defined G-code variables (`$name` → `#200+` machine variables), plugin post-processors (Cincinnati CL-707/800/900/940/CLX included). [Pre-post verification](docs/post-verification.md) checks overlaps, missing lead-ins, and rapid crossings, with explicit risk acknowledgment required to bypass warnings.
@@ -34,9 +34,7 @@ dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj # console/MCP
 dotnet run --project OpenNest/OpenNest.csproj                   # desktop app (Windows)
 ```
 
-`OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only; CI runs it and `OpenNest.FrontEnd.Tests` on a GitHub-hosted Windows runner for every master push and pull request. Format changed files with `dotnet format OpenNest.sln --include <path>`.
-
-Shared coding-agent guidance lives in [AGENTS.md](AGENTS.md). [CLAUDE.md](CLAUDE.md) imports it for Claude Code compatibility; make shared instruction changes in AGENTS.md, not in duplicate agent-specific copies.
+`OpenNest.WinForms.Tests` (desktop-assembly tests) runs on Windows only; CI runs it and `OpenNest.FrontEnd.Tests` on a GitHub-hosted Windows runner for every master push and pull request.
 
 ### Quick start
 
@@ -56,18 +54,21 @@ dotnet run --project OpenNest.Console -- part1.dxf part2.dxf --size 60x120 --aut
 dotnet run --project OpenNest.Console -- project.zip                          # re-fill a nest file
 ```
 
-Key options: `--size WxL`, `--autonest` (validated single-sheet whole-job nesting), `--allow-invalid` (explicit warning override), `--engine <name>` (jobs engine or fill strategy), `--quantity`, `--spacing`, `--template <nest>`, `--output <path>`, `--check-overlaps`, `--post <name>`, `--no-save`. Run without arguments for the full list.
+| Option | What it does |
+|--------|--------------|
+| `--size WxL` | Set the plate size; required for DXF-only input. |
+| `--autonest` | Run validated whole-job nesting on one sheet. |
+| `--engine <name>` | Choose a whole-job engine with `--autonest`, or a fill strategy without it. |
+| `--quantity <n>` | Limit parts placed (0 means unlimited). |
+| `--spacing <value>` | Override part spacing. |
+| `--template <path>` | Read plate defaults from a nest file. |
+| `--output <path>` | Set the output nest path. |
+| `--check-overlaps` | Check the result for overlaps. |
+| `--post <name>` | Run a post-processor after nesting. |
+| `--no-save` | Skip saving the nest. |
+| `--allow-invalid` | Explicitly keep a representable invalid `--autonest` result; otherwise it is rejected. |
 
-## Benchmarking Engines
-
-`OpenNest.Benchmark` runs every registered `INestingEngine` against `.nest` files (or a JSON manifest of DXFs + quantities) and scores by salvage-credited sheet area, with a penalty per unplaced part.
-
-```bash
-dotnet run --project OpenNest.Benchmark -- ./benchmark-jobs \
-  --sheet-sizes 48x96,60x120,72x120 --engines Irregular,Rectangles --csv results.csv
-```
-
-Layouts are validated (bounds, spacing, quantity, rotation, stock match); invalid runs place nothing and pay the penalty. `--parallel` (default 3) speeds up scoring but inflates `Time(ms)` — use `--parallel 1` when comparing speed. Pass `--sheet-sizes` for an unbiased run; otherwise only each file's original sizes are offered. `--progress` logs each solve's start, the engine's `NestJobProgress` (plate evaluations throttled to one line per 2 s, every plate commit) and its finish. Custom engines drop in as DLLs implementing `INestingEngine` (public parameterless constructor) in an `Engines/` folder next to the benchmark. Built-in engines and how to change them: [nesting engines](docs/nesting-engines.md).
+Run `dotnet run --project OpenNest.Console -- --help` for the complete options and their defaults.
 
 ## Project Structure
 
@@ -87,19 +88,7 @@ Layouts are validated (bounds, spacing, quantity, rotation, stock match); invali
 
 ## Nesting Engines
 
-Engines implement `INestingEngine.Solve(NestJob)`. Desktop Auto Nest, console autonest, MCP autonest and the API use one independent validation pipeline for every engine, including plug-ins. Invalid layouts require an explicit decision; malformed output cannot be kept. See [automatic nesting and validation](docs/automatic-nesting.md) for caller behavior and API validation status.
-
-| Engine | Description |
-|--------|-------------|
-| **Default** | Any job: runs Irregular and Rectangles and keeps the cheapest valid layout |
-| **Rectangles** | Plain and near-rectangular plates: maximal-rectangles box packing |
-| **Irregular** | Irregular profiles: no-fit-polygon frontier packing |
-| **Fill** | Multi-phase: linear fill → pairs → rect best-fit → extents (named Default in earlier releases) |
-| **Strip** | Iterative shrink-fill for mixed-drawing layouts |
-| **Vertical / Horizontal Remnant** | Optimizes a clean remnant drop on one edge |
-| **StockLadder** | Whole-job, stock-constrained baseline with salvage-credit ranking |
-
-Which engine suits which jobs, renamed engine names, and the rules for changing an engine: [nesting engines](docs/nesting-engines.md).
+Default compares the built-in Irregular and Rectangles engines and keeps the best valid whole-job layout. Other engines and plug-ins suit particular jobs; see [which engine to use](docs/nesting-engines.md). Desktop Auto Nest, console autonest, MCP autonest, and the API share an independent validation pipeline, including for plug-ins. [Automatic nesting and validation](docs/automatic-nesting.md) explains how callers handle invalid results.
 
 ## File Format
 

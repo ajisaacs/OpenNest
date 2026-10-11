@@ -138,6 +138,8 @@ falls back to the default engine with the usual status-bar warning.
 
 ## Changing an engine
 
+Use the [engine benchmarking guide](performance/engine-benchmarking.md) for the command, candidate-sheet controls, and comparison procedure.
+
 - A change lands only when it beats the engine's current result on `OpenNest.Benchmark` for the
   jobs that engine targets, with every layout valid. Report cost, validity, unplaced parts and time.
 - Placement must be deterministic: no clocks, unseeded randomness or environment variables. Budget
