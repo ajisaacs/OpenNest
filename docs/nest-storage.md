@@ -23,11 +23,17 @@ The desktop app can save nests two ways:
   first save and updates that same record afterward. Save As creates a new record
   (a copy). A failed save keeps the previous record association; switching server
   URLs creates a record on the new server rather than updating an id from the
-  previous one. Version-aware deletion hides the record and retains every archive
-  and revision for explicit recovery; it never purges data. A separate **File > Export
-  .nest...** command is always available (in both modes) for producing a local
-  file to share or back up. Export does not change the document's file save path
-  or database record association.
+  previous one. **Version history...** on a selected row lists bounded current and
+  earlier snapshots; **Open read-only...** previews one without binding an editable
+  document, and **Download selected version...** saves its exact archived bytes.
+  A separate confirmed **Restore selected version...** creates a new current
+  revision of the same ID and keeps all intervening versions. **Delete...** hides
+  the record from ordinary browsing but retains every archive; **Deleted nests...**
+  opens an explicit recovery view. Neither action purges data. An old desktop
+  without a revision precondition cannot update or delete on an upgraded server.
+  A separate **File > Export .nest...** command is always available (in both
+  modes) for producing a local file to share or back up. Export does not change
+  the document's file save path or database record association.
 
 Dragging one or more `.nest` files onto the main window (or onto an open
 plate) opens them from disk directly, in either mode — this is the only way
