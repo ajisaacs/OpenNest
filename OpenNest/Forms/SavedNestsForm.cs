@@ -16,9 +16,9 @@ namespace OpenNest.Forms;
 /// <summary>
 /// File &gt; Open (Database mode). The upper list browses saved nests on the shared nest
 /// server one bounded page at a time; filtering, sorting and paging run on the server
-/// through <see cref="NestBrowseSession"/>. The lower tabs show the plates and drawings of
-/// the highlighted nest, read from its archive through <see cref="NestDetailsSession"/>,
-/// beside a preview of one of its plates. This form only renders their state.
+/// through <see cref="NestBrowseSession"/>. The lower tabs show plates and drawings
+/// from <see cref="NestDetailsSession"/> and on-demand version history beside a plate
+/// preview. This form renders the selected nest without editing its archive.
 /// </summary>
 public sealed class SavedNestsForm : Form
 {
@@ -45,6 +45,9 @@ public sealed class SavedNestsForm : Form
     private readonly DataGridView platesGrid;
     private readonly DataGridView drawingsGrid;
     private readonly TabControl detailsTabs;
+    private readonly TabPage versionsTab;
+    private NestHistoryForm historyView;
+    private Guid? historyId;
     private readonly SplitContainer detailsSplit;
     private readonly PlateView platePreview;
     private readonly Button previousPlateButton;
@@ -141,7 +144,6 @@ public sealed class SavedNestsForm : Form
         deleteMenuItem = new ToolStripMenuItem("Delete...", null, async (_, _) => await DeleteSelectedAsync());
         var refreshMenuItem = new ToolStripMenuItem("Refresh", null, async (_, _) => await RunAsync(session.RefreshAsync));
         menu.Items.AddRange(new ToolStripItem[] { openMenuItem, deleteMenuItem, new ToolStripSeparator(), refreshMenuItem });
-        menu.Items.Add(new ToolStripMenuItem("Version history...", null, async (_, _) => await ShowHistoryAsync(false)));
         nestGrid.ContextMenuStrip = menu;
 
         // Details of the highlighted nest.
@@ -173,6 +175,9 @@ public sealed class SavedNestsForm : Form
         detailsTabs = new TabControl { Dock = DockStyle.Fill };
         detailsTabs.TabPages.Add(CreateTab("Plates", platesGrid));
         detailsTabs.TabPages.Add(CreateTab("Drawings", drawingsGrid));
+        versionsTab = new TabPage("Versions");
+        detailsTabs.TabPages.Add(versionsTab);
+        detailsTabs.SelectedIndexChanged += (_, _) => UpdateHistoryView();
 
         // Preview of one plate beside the tables; the buttons below it step through the plates.
         platePreview = new PlateView
@@ -274,11 +279,8 @@ public sealed class SavedNestsForm : Form
         findBar.Controls.Add(new Label { Text = "Find:", AutoSize = true, Margin = new Padding(3, 8, 0, 0) });
         findBar.Controls.Add(searchBox);
         findBar.Controls.Add(refreshButton);
-        var historyButton = new Button { Text = "Version history...", AutoSize = true };
-        historyButton.Click += async (_, _) => await ShowHistoryAsync(false);
         var recoveryButton = new Button { Text = "Deleted nests...", AutoSize = true };
-        recoveryButton.Click += async (_, _) => await ShowHistoryAsync(true);
-        findBar.Controls.Add(historyButton);
+        recoveryButton.Click += async (_, _) => await ShowDeletedAsync();
         findBar.Controls.Add(recoveryButton);
         findBar.Controls.Add(previousButton);
         findBar.Controls.Add(nextButton);
@@ -328,7 +330,7 @@ public sealed class SavedNestsForm : Form
                 _ = RunAsync(() => session.SetSearchAsync(searchBox.Text));
                 nestGrid.Focus();
                 return true;
-            case Keys.Enter:
+            case Keys.Enter when nestGrid.Focused:
                 OpenSelected();
                 return true;
             case Keys.Escape:
@@ -579,6 +581,13 @@ public sealed class SavedNestsForm : Form
     {
         detailsTimer.Stop();
         var id = SelectedNestId();
+        if (historyId != id)
+        {
+            historyView?.Dispose();
+            historyView = null;
+            historyId = null;
+        }
+        UpdateHistoryView();
         if (id == null)
         {
             details.Clear();
@@ -756,10 +765,32 @@ public sealed class SavedNestsForm : Form
         DialogResult = DialogResult.OK;
     }
 
-    private async Task ShowHistoryAsync(bool recovery)
+    private void UpdateHistoryView()
     {
-        if (!recovery && SelectedNestId() == null) return;
-        using var dialog = new NestHistoryForm(repository, serverUrl, recovery ? Guid.Empty : SelectedNestId().Value);
+        if (detailsTabs.SelectedTab != versionsTab || SelectedNestId() is not Guid id || historyId == id)
+            return;
+        historyView?.Dispose();
+        historyView = new NestHistoryForm(repository, serverUrl, id, embedded: true);
+        historyId = id;
+        historyView.HistoryChanged += (_, _) =>
+        {
+            // Let the history operation finish before refreshing the browse selection.
+            BeginInvoke(new Action(async () =>
+            {
+                if (IsDisposed) return;
+                details.Dispose();
+                details = new NestDetailsSession(LoadDetailsAsync);
+                ShowDetailsMessage("");
+                await RunAsync(session.RefreshAsync);
+            }));
+        };
+        versionsTab.Controls.Add(historyView);
+        historyView.Show();
+    }
+
+    private async Task ShowDeletedAsync()
+    {
+        using var dialog = new NestHistoryForm(repository, serverUrl);
         dialog.ShowDialog(this);
         if (dialog.Changed && !IsDisposed)
         {

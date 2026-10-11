@@ -35,8 +35,9 @@ public sealed class NestHistoryForm : Form
     private bool populating;
     private bool busy;
     public bool Changed { get; private set; }
+    public event EventHandler HistoryChanged;
 
-    public NestHistoryForm(INestRepository repository, string serverUrl, Guid id = default)
+    public NestHistoryForm(INestRepository repository, string serverUrl, Guid id = default, bool embedded = false)
     {
         this.repository = repository;
         this.serverUrl = serverUrl;
@@ -48,6 +49,14 @@ public sealed class NestHistoryForm : Form
         Size = new Size(1050, 650);
         MinimumSize = new Size(800, 480);
         ShowInTaskbar = false;
+        if (embedded)
+        {
+            TopLevel = false;
+            FormBorderStyle = FormBorderStyle.None;
+            Dock = DockStyle.Fill;
+            MinimumSize = Size.Empty;
+            CancelButton = null;
+        }
         records.Columns.Add("Name", "Deleted nest");
         records.Columns.Add("Version", "Current version");
         records.Columns.Add("Saved", "Saved");
@@ -77,9 +86,10 @@ public sealed class NestHistoryForm : Form
         var find = new Button { Text = "Find", AutoSize = true };
         find.Click += async (_, _) => { deletedOffset = 0; await ReadDeletedAsync(); };
         var close = new Button { Text = "Close", AutoSize = true, DialogResult = DialogResult.Cancel };
-        CancelButton = close;
+        if (!embedded) CancelButton = close;
         var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
-        bar.Controls.AddRange(new Control[] { refresh, previous, next, inspect, download, restore, recover, close });
+        bar.Controls.AddRange(new Control[] { refresh, previous, next, inspect, download, restore, recover });
+        if (!embedded) bar.Controls.Add(close);
         recover.Visible = recovery;
         restore.Visible = !recovery;
         var heading = new Label
@@ -253,6 +263,7 @@ public sealed class NestHistoryForm : Form
             if (recoveryAction) await session.RecoverAsync(serverUrl, lifetime.Token);
             else await session.RestoreAsync(revision, serverUrl, lifetime.Token);
             Changed = true;
+            HistoryChanged?.Invoke(this, EventArgs.Empty);
             busy = false;
             if (!IsDisposed) { if (recoveryAction) await ReadDeletedAsync(); else await ReadAsync(0); }
         }

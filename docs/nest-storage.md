@@ -14,18 +14,20 @@ The desktop app can save nests two ways:
   user when the browser closes, including across app restarts. Until a selection
   is saved, nests appear newest-saved first.
   Below the list, the **Details** tabs show the highlighted nest's plates
-  (duplicates, size, parts, drawings, utilization) and drawings (required, nested,
-  remaining, area); they are read from that nest's archive, which is downloaded
-  shortly after the highlight stops moving. Beside the tabs, a preview draws one
+  (duplicates, size, parts, drawings, utilization), drawings (required, nested,
+  remaining, area), and **Versions** (bounded current and earlier snapshots).
+  Plates and drawings come from the archive downloaded shortly after the
+  highlight stops moving; Versions loads on selection and follows the selected
+  nest without opening another window. Beside the tabs, a preview draws one
   plate of the highlighted nest; the arrow buttons below it step through the
-  plates, and selecting a row on the Plates tab shows that plate. Enter or a
-  double-click opens the highlighted nest and Esc closes. Save creates a record on
+  plates, and selecting a row on the Plates tab shows that plate. Enter on the
+  nest list or a double-click opens the highlighted nest; Esc closes. Save creates a record on
   first save and updates that same record afterward. Save As creates a new record
   (a copy). A failed save keeps the previous record association; switching server
   URLs creates a record on the new server rather than updating an id from the
-  previous one. **Version history...** on a selected row lists bounded current and
-  earlier snapshots; **Open read-only...** previews one without binding an editable
-  document, and **Download selected version...** saves its exact archived bytes.
+  previous one. On the Versions tab, **Open read-only...** previews one snapshot
+  without binding an editable document, and **Download selected version...** saves
+  its exact archived bytes.
   A separate confirmed **Restore selected version...** creates a new current
   revision of the same ID and keeps all intervening versions. **Delete...** hides
   the record from ordinary browsing but retains every archive; **Deleted nests...**
