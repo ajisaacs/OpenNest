@@ -43,10 +43,12 @@ public class NestSaveSessionTests
             session.SaveAsync(repository, "http://new:8090", new Nest("Job"), [1]));
         Assert.Equal(oldId, session.RemoteId);
         Assert.Equal("http://old:8090", session.ServerUrl);
-        Assert.Equal(Guid.Empty, repository.LastRecord!.Id);
+        Assert.NotEqual(Guid.Empty, repository.LastRecord!.Id);
+        Assert.Equal(session.PendingCreateId, repository.LastRecord.Id);
         Assert.Equal(0, repository.Updates);
 
         repository.Fail = false;
+        Assert.Null(await session.ReconcilePendingCreateAsync(repository, "http://new:8090"));
         await session.SaveAsync(repository, "http://new:8090", new Nest("Job"), [1]);
         Assert.NotEqual(oldId, session.RemoteId);
         Assert.Equal("http://new:8090", session.ServerUrl);
@@ -95,7 +97,7 @@ public class NestSaveSessionTests
             Uploads++;
             LastRecord = record;
             if (Fail) throw new IOException("Offline");
-            record.Id = Guid.NewGuid();
+            if (record.Id == Guid.Empty) record.Id = Guid.NewGuid();
             record.Revision = 1;
             return Task.FromResult(record);
         }
@@ -118,7 +120,7 @@ public class NestSaveSessionTests
 
         public Task<IReadOnlyList<NestRecord>> ListAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<NestPage> QueryAsync(NestQuery query, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken ct = default) => Task.FromResult<NestRecord?>(null);
         public Task<byte[]?> GetFileAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<NestRecord> UpdateMetadataAsync(Guid id, NestRecord record, CancellationToken ct = default) => throw new NotImplementedException();
         public Task DeleteAsync(Guid id, CancellationToken ct = default) => throw new NotImplementedException();

@@ -18,10 +18,14 @@ namespace OpenNest
         private readonly NestSaveSession remoteSession = new();
 
         public Guid RemoteId => remoteSession.RemoteId;
-
+        public Guid PendingCreateId => remoteSession.PendingCreateId;
         public void BindRemote(Guid id, string serverUrl) => remoteSession.Bind(id, serverUrl);
 
         public void BindRemote(Guid id, string serverUrl, int revision) => remoteSession.Bind(id, serverUrl, revision);
+
+        public Task<NestRecord> ReconcilePendingCreateAsync(INestRepository repository, string serverUrl,
+            CancellationToken cancellationToken = default) =>
+            remoteSession.ReconcilePendingCreateAsync(repository, serverUrl, cancellationToken);
 
         public int RemoteRevision => remoteSession.Revision;
 

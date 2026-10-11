@@ -6,6 +6,67 @@ namespace OpenNest.Server.Tests;
 public sealed class NestHistoryClientTests
 {
     [Fact]
+    public async Task LostCreateReply_BlocksReplayAndReconcilesSameId()
+    {
+        using var factory = new ServerFactory();
+        using var http = factory.CreateDefaultClient(new LostReplyHandler());
+        using var repository = new RemoteNestRepository(http, http.BaseAddress!.ToString());
+        var session = new NestSaveSession();
+        var nest = NestApiTests.SyntheticNest();
+        var archive = NestApiTests.Archive(nest);
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, http.BaseAddress.ToString(), nest, archive));
+        var pendingId = session.PendingCreateId;
+        Assert.NotEqual(Guid.Empty, pendingId);
+        Assert.True(session.RequiresReload);
+        Assert.Single(await repository.ListAsync());
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, http.BaseAddress.ToString(), nest, archive));
+        Assert.Single(await repository.ListAsync());
+        var reconciled = await session.ReconcilePendingCreateAsync(repository, http.BaseAddress.ToString());
+        Assert.Equal(pendingId, reconciled!.Id);
+        Assert.Equal(pendingId, session.RemoteId);
+        Assert.Equal(Guid.Empty, session.PendingCreateId);
+        Assert.Single(await repository.ListAsync());
+        Assert.Equal(archive, await repository.GetRevisionFileAsync(pendingId, 1));
+    }
+
+    private sealed class LostReplyHandler : DelegatingHandler
+    {
+        private bool lost;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var response = await base.SendAsync(request, ct);
+            if (request.Method == HttpMethod.Post && !lost)
+            {
+                lost = true;
+                response.Dispose();
+                throw new IOException("Response lost after commit.");
+            }
+            return response;
+        }
+    }
+
+    [Fact]
+    public async Task LostCreateReply_ChangedServerMetadataCannotBindWithoutReload()
+    {
+        using var factory = new ServerFactory();
+        using var http = factory.CreateDefaultClient(new LostReplyHandler());
+        using var repository = new RemoteNestRepository(http, http.BaseAddress!.ToString());
+        var session = new NestSaveSession();
+        var nest = NestApiTests.SyntheticNest();
+        var archive = NestApiTests.Archive(nest);
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, http.BaseAddress.ToString(), nest, archive));
+        var id = session.PendingCreateId;
+        var current = (await repository.GetMetadataAsync(id))!;
+        current.Comments = "Changed by another editor";
+        await repository.UpdateMetadataAsync(id, current, current.Revision);
+        await Assert.ThrowsAsync<IOException>(() => session.ReconcilePendingCreateAsync(repository, http.BaseAddress.ToString()));
+        Assert.Equal(Guid.Empty, session.RemoteId);
+        Assert.True(session.RequiresReload);
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, http.BaseAddress.ToString(), nest, archive));
+        Assert.Single(await repository.ListAsync());
+    }
+
+    [Fact]
     public async Task RealClient_CreatesAndUpdatesOneNestWithExactHistoricalArchives()
     {
         using var factory = new ServerFactory();
