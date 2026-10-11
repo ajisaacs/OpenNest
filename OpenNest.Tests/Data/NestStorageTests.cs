@@ -215,15 +215,16 @@ public class RemoteNestRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateMetadataAsync_RefusesUntilGuardedHistoryIsAvailable()
+    public async Task UpdateMetadataAsync_RefusesLegacyServerBeforeMutation()
     {
         var id = Guid.NewGuid();
         var record = SampleRecord(id);
-        var handler = new StubHandler(_ => StubHandler.Json(record));
+        record.Revision = 1;
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
         using var repo = new RemoteNestRepository(new HttpClient(handler), "http://s");
 
         await Assert.ThrowsAsync<IOException>(() => repo.UpdateMetadataAsync(id, record));
-        Assert.Empty(handler.Requests); // Metadata history is delivered in S3.
+        Assert.Equal(HttpMethod.Get, Assert.Single(handler.Requests).Method);
     }
 
     [Fact]
