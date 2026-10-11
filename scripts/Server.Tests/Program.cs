@@ -103,6 +103,20 @@ internal static class Program
         Check(copy.Id != Guid.Empty && copy.Id != created.Id, "Save copy must create a different id.");
         CheckBinding(session, copy.Id, options.Url);
         var copyState = await ReadSaved(repository, nest, archive, copy, ct);
+        // Keep a hidden nest with metadata, restore-source and visibility history in the backup.
+        var hidden = await repository.UploadAsync(archive, new NestRecord { Name = "Synthetic hidden history" }, ct);
+        hidden.Comments = "Metadata-only revision";
+        hidden = await repository.UpdateMetadataAsync(hidden.Id, hidden, hidden.Revision, ct);
+        hidden = await repository.RestoreAsync(hidden.Id, 1, hidden.Revision, ct);
+        Check(hidden.Revision == 3 && hidden.RestoredFromRevision == 1, "Restore must record its source.");
+        hidden = await repository.DeleteAsync(hidden.Id, hidden.Revision, ct);
+        hidden = await repository.RecoverAsync(hidden.Id, hidden.Revision, ct);
+        hidden = await repository.DeleteAsync(hidden.Id, hidden.Revision, ct);
+        Check(hidden.Deleted && hidden.Revision == 6, "Visibility changes must retain all revisions.");
+        var hiddenHistory = await repository.GetDeletedRevisionsAsync(hidden.Id, limit: 2, cancellationToken: ct);
+        Check(hiddenHistory.Total == 6 && hiddenHistory.Items.Count == 2, "Deleted history must be bounded.");
+        Check((await repository.GetDeletedRevisionFileAsync(hidden.Id, 1, ct))!.SequenceEqual(archive),
+            "Deleted history must retain original bytes.");
         var entries = baseline.Concat(new[] { updateState, copyState }).ToList();
         await CheckSnapshot(repository, entries, ct);
         var state = new SmokeState { Version = 1, Records = entries };
@@ -153,6 +167,8 @@ internal static class Program
                 if (test.File is not null)
                     content.Add(new ByteArrayContent(test.File), "file", "synthetic.nest");
                 using var request = new HttpRequestMessage(method, new Uri(new Uri(url + "/"), path)) { Content = content };
+                if (method == HttpMethod.Put)
+                    request.Headers.TryAddWithoutValidation("If-Match", $"\"{before[0].Metadata.Revision}\"");
                 using var response = await http.SendAsync(request, ct);
                 Check(response.StatusCode == HttpStatusCode.BadRequest, $"{method} {test.Name} must return 400.");
                 await CheckSnapshot(repository, before, ct);
@@ -190,14 +206,15 @@ internal static class Program
         Check(downloaded is not null && downloaded.AsSpan().SequenceEqual(accepted),
             "A near-limit archive must download byte-for-byte.");
         await CheckMembership(repository, before.Select(s => s.Metadata.Id).Append(created.Id), ct);
-        await repository.DeleteAsync(created.Id, ct);
+        var deleted = await repository.DeleteAsync(created.Id, created.Revision, ct);
+        Check(deleted.Deleted && deleted.Revision == 2, "Near-limit archive must be retained as deleted history.");
         await CheckSnapshot(repository, before, ct);
         Console.WriteLine($"Accepted, downloaded, and deleted a {accepted.Length}-byte archive; all other records unchanged.");
 
         // Kestrel rejects an oversized declared length before the app reads the form. With
         // Expect: 100-continue the client waits for, and must receive, that 413 response.
         var oversized = new byte[RequestBodyLimit];
-        var oversizedRecord = new NestRecord { Name = "Synthetic oversized upload" };
+        var oversizedRecord = new NestRecord { Name = "Synthetic oversized upload", Revision = before[0].Metadata.Revision };
         var metadata = JsonSerializer.Serialize(oversizedRecord, JsonOptions);
         foreach (var method in new[] { HttpMethod.Post, HttpMethod.Put })
         {
@@ -207,6 +224,8 @@ internal static class Program
             content.Add(new ByteArrayContent(oversized), "file", "synthetic.nest");
             using var request = new HttpRequestMessage(method, new Uri(new Uri(url + "/"), path)) { Content = content };
             request.Headers.ExpectContinue = true;
+            if (method == HttpMethod.Put)
+                request.Headers.TryAddWithoutValidation("If-Match", $"\"{before[0].Metadata.Revision}\"");
             using var response = await http.SendAsync(request, ct);
             Check(response.StatusCode == HttpStatusCode.RequestEntityTooLarge,
                 $"{method} of a request over {RequestBodyLimit} bytes must return 413.");
@@ -244,6 +263,7 @@ internal static class Program
         Check(returned.SavedAt != default, "Server must assign SavedAt.");
         var expected = NestRecordFactory.FromNest(nest, returned.Id, archive.LongLength);
         expected.SavedAt = returned.SavedAt;
+        expected.Revision = returned.Revision;
         CheckMetadata(expected, returned);
         var readback = await repository.GetMetadataAsync(returned.Id, ct);
         Check(readback is not null, "Saved metadata must be readable.");
@@ -360,6 +380,9 @@ internal static class Program
         Check(reader.Warnings.Count == 0, "NestReader must parse without warnings.");
         var parsed = NestRecordFactory.FromNest(nest, metadata.Id, archive.LongLength);
         parsed.SavedAt = metadata.SavedAt;
+        parsed.Revision = metadata.Revision;
+        parsed.Deleted = metadata.Deleted;
+        parsed.RestoredFromRevision = metadata.RestoredFromRevision;
         CheckMetadata(metadata, parsed);
         Check(nest.Drawings.Count == 1 && nest.Plates.Count == 1 && nest.Plates[0].Parts.Count == 1,
             "Parsed archive must contain one drawing, plate, and part.");
@@ -459,7 +482,15 @@ internal static class Program
                             CheckWireRecord(record);
                     }
                     else
-                        CheckWireRecord(json.RootElement);
+                    {
+                        if (json.RootElement.TryGetProperty("items", out var items))
+                        {
+                            foreach (var record in items.EnumerateArray())
+                                CheckWireRecord(record);
+                        }
+                        else
+                            CheckWireRecord(json.RootElement);
+                    }
                     CheckedResponses++;
                 }
                 return response;

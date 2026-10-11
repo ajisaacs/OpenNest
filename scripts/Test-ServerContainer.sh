@@ -23,7 +23,7 @@ while (($#)); do
     esac
 done
 [[ -n "$image" && "$image" != -* ]] || { usage; exit 2; }
-for command in docker dotnet curl timeout mktemp tar; do
+for command in docker dotnet curl timeout mktemp tar python3 cmp; do
     command -v "$command" >/dev/null || { printf 'Missing prerequisite: %s\n' "$command" >&2; exit 2; }
 done
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
@@ -40,7 +40,7 @@ token=${scratch##*/}
 owner_label='com.opennest.server-smoke.owner'
 # Two service generations on one data volume, a stopped-service backup and restore into
 # a second volume, its service, then two storage locations that must fail startup.
-container_roles=(first replacement backup restore restored readonly unwritable)
+container_roles=(first replacement backup restore restored readonly unwritable legacy)
 container_names=()
 cidfiles=()
 container_attempted=()
@@ -306,16 +306,29 @@ run_tool() {
 
 # A fresh named volume must be writable by the non-root image user.
 create_volume 0
+# Migrate a synthetic prior-schema database, never an existing service's data.
+python3 "$root/scripts/Server.Tests/legacy_fixture.py" "$scratch"
+create_container 7 --rm --interactive --network none --entrypoint tar \
+    --mount "type=volume,src=${volumes[0]},dst=/app/data" "$image" -C /app/data -xf -
+docker_local start --attach --interactive "$cid" < "$scratch/legacy.tar" > "$run_results/legacy.log" 2>&1
 service=first
 start_service 0 "${volumes[0]}"
-run_tool seed --state "$scratch/state.json"
+python3 "$root/scripts/Server.Tests/nest_manifest.py" "$url" --page-size 1 > "$scratch/migrated.manifest"
+cmp "$scratch/legacy.manifest" "$scratch/migrated.manifest"
+run_tool seed --state "$scratch/state.json" --test-allow-nonempty
+python3 "$root/scripts/Server.Tests/nest_manifest.py" "$url" --page-size 1 > "$scratch/before-reject.manifest"
 run_tool reject
+python3 "$root/scripts/Server.Tests/nest_manifest.py" "$url" --page-size 1 > "$scratch/after-reject.manifest"
+cmp "$scratch/before-reject.manifest" "$scratch/after-reject.manifest"
 run_tool limits
+python3 "$root/scripts/Server.Tests/nest_manifest.py" "$url" --page-size 1 > "$scratch/all.manifest"
 retire_service 0
 # The replacement gets another Docker-allocated loopback port; only the volume is reused.
 service=replacement
 start_service 1 "${volumes[0]}"
 run_tool verify --state "$scratch/state.json"
+python3 "$root/scripts/Server.Tests/nest_manifest.py" "$url" --page-size 1 > "$scratch/reopened.manifest"
+cmp "$scratch/all.manifest" "$scratch/reopened.manifest"
 retire_service 1
 
 # Back up the whole data directory from the stopped service (SQLite WAL makes a live
@@ -335,4 +348,7 @@ docker_local start --attach --interactive "$cid" < "$scratch/data-backup.tar" > 
 service=restored
 start_service 4 "${volumes[1]}"
 run_tool verify --state "$scratch/state.json"
+python3 "$root/scripts/Server.Tests/nest_manifest.py" "$url" --page-size 1 > "$scratch/restored.manifest"
+cmp "$scratch/all.manifest" "$scratch/restored.manifest"
+printf 'PASS: legacy migration, idempotent restart, active/deleted ALL-revision metadata, parent relationships and byte hashes match after restore.\n'
 printf 'PASS: non-root healthy runtime, real-client round trips, rejections, upload limit, persistent recreation, stopped-service backup/restore, and storage startup failures.\n'

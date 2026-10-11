@@ -23,8 +23,8 @@ The desktop app can save nests two ways:
   first save and updates that same record afterward. Save As creates a new record
   (a copy). A failed save keeps the previous record association; switching server
   URLs creates a record on the new server rather than updating an id from the
-  previous one. Delete on the Open dialog's right-click menu permanently removes
-  the highlighted server record after confirmation. A separate **File > Export
+  previous one. Version-aware deletion hides the record and retains every archive
+  and revision for explicit recovery; it never purges data. A separate **File > Export
   .nest...** command is always available (in both modes) for producing a local
   file to share or back up. Export does not change the document's file save path
   or database record association.
@@ -62,6 +62,9 @@ with enums serialized as strings (`JsonSerializerDefaults.Web` +
 | `madeBy` | string | |
 | `fileSize` | integer | Server-computed; ignored on upload. |
 | `savedAt` | datetime | Server-computed; ignored on upload. |
+| `revision` | integer | Current immutable revision; zero on a legacy server without history. |
+| `deleted` | boolean | Hidden from ordinary reads when true; retained in recovery/backup. |
+| `restoredFromRevision` | nullable integer | Historical source promoted by Restore; not the preceding revision. |
 
 ## Endpoints
 
@@ -75,7 +78,20 @@ with enums serialized as strings (`JsonSerializerDefaults.Web` +
 | POST | `/api/nests` | multipart: `metadata` (JSON `NestRecord`) + `file` (`.nest` bytes) | `NestRecord` with server-assigned `id` when the client sends an empty guid |
 | PUT | `/api/nests/{id}/file` | multipart: `metadata` + `file` | Updated `NestRecord`, or 404 if `id` is unknown |
 | PUT | `/api/nests/{id}/metadata` | JSON `NestRecord` | Updated `NestRecord` (archive untouched), or 404 |
-| DELETE | `/api/nests/{id}` | — | 204, or 404 |
+| DELETE | `/api/nests/{id}` | — | Updated hidden `NestRecord`, or 404 |
+| GET | `/api/nests/{id}/revisions?offset=0&limit=100` | — | Metadata page, newest first; limit 1–200 |
+| GET | `/api/nests/{id}/revisions/{revision}/file` | — | Exact immutable archive bytes |
+| POST | `/api/nests/{id}/revisions/{revision}/restore` | — | New current revision of the same ID, with source metadata/bytes |
+| GET | `/api/nests/deleted/query` | — | Bounded deleted-record page; same query parameters as ordinary browsing |
+| GET | `/api/nests/deleted/{id}` / `/{id}/file` / `/{id}/revisions` / `/{id}/revisions/{revision}/file` | — | Recovery equivalents of current/history reads |
+| POST | `/api/nests/deleted/{id}/recover` | — | New nondeleted revision of the same ID |
+
+All existing-record mutations require `If-Match: "<current revision>"`.
+Missing precondition returns 428 (upgrade/reload), malformed precondition 400,
+stale precondition 409 with current metadata; none mutate data. Ordinary reads
+of hidden records return 404. Changed file/metadata saves and visibility changes
+append snapshots atomically; an identical save at the current revision is a no-op.
+Restore appends a new snapshot, never rewrites its source or intervening history.
 
 There is no authentication; this is a LAN-only service. Do not expose it
 outside the shop network without adding one.
@@ -122,9 +138,11 @@ HTTP upload/body reading happens outside that lock. `/healthz` executes `SELECT 
 on the live connection; it is a connection check, not a backup, integrity scan,
 or guarantee of future disk capacity.
 
-Concurrent edits of the same record remain **last-writer-wins**: there is no
-optimistic version check or document lock. Coordinate editing with other operators
-to avoid overwriting their changes.
+Revision preconditions refuse stale edits; the database monitor is not a document
+edit lock. After a conflict, explicitly reload the newer revision or Save As a
+separate nest. After an ambiguous network failure, fetch current metadata before
+retrying; never blindly replay a write. Legacy desktops may read but must upgrade
+before updating/deleting. A version-aware client refuses writes to a legacy server.
 
 ## Server integration tests
 
@@ -252,21 +270,29 @@ or enable Database mode. Canceling Options afterward does not undo that address.
 ### Backup, restore, and upgrade
 
 SQLite runs in WAL mode, so copying `nests.db` from a running service is not a
-backup. Back up during a quiet period with no saves. Each step below is a Bash
+backup. Back up during a maintenance period with ALL client writes disabled,
+including metadata edits, delete, recover and restore, until capture finishes.
+The HTTP manifest is not a transaction across requests; writes during capture
+can invalidate it. Keep the entire stopped data directory, including any WAL/SHM
+files, original image digest and deployment configuration. Copy
+`scripts/Server.Tests/nest_manifest.py` from this source version to the deployment
+directory as `nest_manifest.py` (Python 3 standard library only). It enumerates
+bounded active AND deleted pages plus ALL revision pages, then streams every
+current/historical archive through SHA-256. Canonical JSON includes complete
+metadata, IDs, current pointers, visibility, timestamps, byte sizes and restore
+source relationships. Missing pages, legacy endpoints, failed downloads,
+inconsistent totals and invalid revision chains fail closed, not as empty history.
+Protect manifests like the database: they contain names and comments.
+Each step below is a Bash
 function that checks every command and stops at the first failure, however it is
 called; define them in the shell where `compose` is set:
 
 ```bash
 url=http://<bind-address>:<port>
 
-# "<id> <archive SHA-256>" for every record, sorted by id. Fails on any failed request.
+# Canonical complete manifest; stdout is emitted only after all reads succeed.
 nest_manifest() (
-  set -o pipefail
-  list=$(curl -fsS "$1/api/nests") || exit 1
-  for id in $(printf '%s' "$list" | grep -o '"id":"[0-9a-f-]*"' | cut -d'"' -f4 | sort); do
-    hash=$(curl -fsS "$1/api/nests/$id/file" | sha256sum) || exit 1
-    printf '%s %s\n' "$id" "${hash%% *}"
-  done
+  python3 ./nest_manifest.py "$1" || exit 1
 )
 
 # Records the expected manifest and metadata, then archives the stopped data directory.
@@ -274,7 +300,9 @@ nest_manifest() (
 backup_nests() (  # usage: backup_nests opennest-data-YYYY-MM-DD
   set -o pipefail
   fail() { echo "STOP: $*" >&2; exit 1; }
-  [[ ! -e "$1.tar" ]] || fail "$1.tar already exists"
+  for suffix in tar manifest metadata.json; do
+    [[ ! -e "$1.$suffix" ]] || fail "$1.$suffix already exists"
+  done
   nest_manifest "$url" > "$1.manifest" || fail "could not record the manifest"
   curl -fsS "$url/api/nests" > "$1.metadata.json" || fail "could not record the metadata"
   $compose stop || fail "could not stop the service"
@@ -284,7 +312,7 @@ backup_nests() (  # usage: backup_nests opennest-data-YYYY-MM-DD
   curl -fs --retry 30 --retry-all-errors --retry-delay 1 "$url/healthz" > /dev/null \
     || fail "the restarted service is not healthy"
   [[ $status == 0 ]] || fail "the archive failed; $1.tar is incomplete"
-  echo "Backed up $(wc -l < "$1.manifest") records to $1.tar"
+  echo "Backed up all records and revisions to $1.tar"
 )
 
 backup_nests opennest-data-YYYY-MM-DD
@@ -293,20 +321,25 @@ backup_nests opennest-data-YYYY-MM-DD
 Restore only into a volume created for that restore, never into an existing one
 (least of all the active volume). `restore_check` refuses an existing volume,
 extracts the backup into a new one, starts a temporary loopback-only container on
-it, and requires the exact metadata list and every archive hash to match. It
+it, and requires complete active/deleted revision metadata and archive hashes to match. It
 removes only the container it started; the new volume is kept either way:
 
 ```bash
 restore_check() (  # usage: restore_check opennest-data-YYYY-MM-DD <image> [new-volume]
   set -o pipefail
   fail() { echo "STOP: $*" >&2; exit 1; }
+  [[ -r "$1.tar" && -r "$1.manifest" && -r "$1.metadata.json" ]] || fail "backup is incomplete"
   restore=${3:-opennest-data-restore-$(date +%Y%m%d-%H%M%S)}
   ! docker volume inspect "$restore" > /dev/null 2>&1 || fail "volume $restore already exists"
-  docker volume create "$restore" > /dev/null || fail "could not create volume $restore"
+  docker volume create --label "com.opennest.restore.owner=$restore" "$restore" > /dev/null \
+    || fail "could not create volume $restore"
+  [[ $(docker volume inspect --format '{{index .Labels "com.opennest.restore.owner"}}' "$restore") == "$restore" ]] \
+    || fail "restore volume ownership differs"
   echo "Restoring into new volume $restore"
   docker run --rm -i --network none --entrypoint tar -v "$restore:/app/data" "$2" \
     -C /app/data -xf - < "$1.tar" || fail "extraction into $restore failed"
-  check=$(docker create -p 127.0.0.1::8090 -v "$restore:/app/data" "$2") \
+  check=$(docker create --cap-drop ALL --security-opt no-new-privileges:true \
+    -p 127.0.0.1::8090 -v "$restore:/app/data" "$2") \
     || fail "could not create the check container"
   trap 'docker rm -f "$check" > /dev/null' EXIT
   docker start "$check" > /dev/null || fail "the check container did not start"
@@ -315,7 +348,7 @@ restore_check() (  # usage: restore_check opennest-data-YYYY-MM-DD <image> [new-
     || fail "the restored service is not healthy"
   curl -fsS "http://127.0.0.1:$port/api/nests" | cmp - "$1.metadata.json" || fail "metadata differs"
   nest_manifest "http://127.0.0.1:$port" | diff - "$1.manifest" || fail "archives differ"
-  echo "Verified $restore. Set OPENNEST_DATA_VOLUME=$restore in server.env, then run: \$compose up -d"
+  echo "Verified $restore. Keep it isolated until the operator explicitly approves switching volumes."
 )
 
 restore_check opennest-data-YYYY-MM-DD <image>
@@ -328,15 +361,37 @@ To upgrade, take a stopped-service backup and keep a copy of the current
 `server.env`. Prefer a digest in `OPENNEST_SERVER_IMAGE` so that file records
 exactly what ran; for a tag, record
 `docker image inspect --format '{{join .RepoDigests " "}}' <image>` first. Change
-only `OPENNEST_SERVER_IMAGE` and run `$compose up -d`. To roll back, restore the
-previous `server.env` and run `$compose up -d`; if the new version wrote data the
-old one cannot read, also restore the backup as above. Never run
+only `OPENNEST_SERVER_IMAGE` after migration/restore rehearsal on a disposable copy,
+then run `$compose up -d` only with separate deployment authorization.
+**Never run an old image against a migrated database**, even if its current-table
+GETs still work: old writers can overwrite snapshots or physically delete rows
+without updating history. Rollback requires a NEW volume restored from the verified
+PRE-migration backup and the exact old image/configuration. Test its old current
+metadata/byte manifest on that isolated copy before switching; the revision-aware
+manifest deliberately refuses old endpoints. Archive the migrated volume unchanged
+for recovery; reverting loses post-backup changes from the old server's view, so
+reconcile them deliberately, never replay them automatically. A pre-version server
+backup needs its own current-record metadata/byte oracle before migration; verify
+those records become byte-identical revision 1 on the disposable upgraded copy.
+Never run
 `docker compose down -v`: it deletes the data volume.
+
+#### Capacity and retention
+
+Every revision currently stores a full archive BLOB, including metadata-only
+and visibility revisions. Budget approximately the sum of ALL revision archive
+sizes plus current-table archives, SQLite indexes/pages, WAL and backups; do not
+estimate capacity from active current records alone. Measure volume/database and
+WAL growth during the disposable rehearsal, reserve space for migration and a
+separate verified restore copy, and monitor free space before rollout. There is
+no automatic retention or purge; no revision deletion is authorized. Deduplication
+requires a separately reviewed migration after measuring actual growth. An old
+backup is not a substitute for retaining the migrated volume during rollback.
 
 ## Isolated container smoke
 
 Prerequisites: a local Linux Docker daemon on the default Unix-socket context,
-Bash, curl, GNU `timeout`, `mktemp`, `tar`, and a .NET SDK able to build `net8.0` projects
+Bash, Python 3, curl, GNU `timeout`, `mktemp`, `tar`, `cmp`, and a .NET SDK able to build `net8.0` projects
 (.NET 8 or newer). Restore needs NuGet access or cached packages. Run from the
 repository root after building the image:
 
@@ -345,6 +400,22 @@ scripts/Test-ServerContainer.sh --image opennest-server:local
 # Optional durable logs outside the default ignored .hermes/progress directory:
 scripts/Test-ServerContainer.sh --image opennest-server:local --results /path/to/results
 ```
+
+Manifest refusal tests run without Docker. The optional image variables also
+exercise the Bash backup/restore blocks extracted verbatim from this page in a
+unique disposable Compose project, including existing-file/volume refusal and
+tampered-history rejection. The old image test restores ONLY a synthetic
+pre-migration backup to another fresh volume and compares every old record's
+metadata/bytes; it never mounts a migrated database into the old image.
+
+```sh
+python3 -m unittest discover -s scripts/Server.Tests -p test_revision_backup.py -v
+OPENNEST_TEST_IMAGE=opennest-server:local \
+OPENNEST_TEST_OLD_IMAGE=<local-pre-version-image> \
+  python3 -m unittest discover -s scripts/Server.Tests -p test_revision_backup.py -v
+```
+
+Local smoke evidence does not imply registry publication or production deployment.
 
 The wrapper accepts an image, not a URL or an existing volume/container. It uses
 only the local default Docker context, creates uniquely labeled disposable
@@ -363,16 +434,21 @@ owns `nests.db`, and can write `/app/data` but not `/app` or the server DLL.
 The test-only `scripts/Server.Tests/Server.Tests.csproj` console exercises the
 existing .NET storage client; it is not included in the server image.
 
+Before seeding, the wrapper restores two synthetic legacy-schema rows into its
+fresh volume, verifies byte-identical revision-1 migration against a precomputed
+complete metadata/hash oracle, then checks repeated startup preserves history.
 The synthetic fixture is generated in code: one plate and one rectangular part,
 with no customer files. `seed` uses the actual `RemoteNestRepository` and
 `NestSaveSession` to create, update the same ID, and save a copy with a new ID.
+It also creates metadata-only, historical-restore, delete/recover/delete revisions,
+leaving a six-revision hidden record with a restore-source relationship.
 It checks read-back metadata, session binding, exact list membership, raw
 camelCase/string-enum JSON, identical downloaded bytes, and `NestReader` geometry
 and counts. `reject` snapshots every record's metadata and archive hash, then
 checks 400 responses for missing/invalid/null metadata and missing/empty files on
 both upload and file-update routes; unknown metadata/file IDs must return 404.
 Every rejected operation must leave the snapshot unchanged.
-`limits` stores, downloads byte-for-byte, and deletes a 29,000,000-byte synthetic
+`limits` stores, downloads byte-for-byte, and soft-deletes a 29,000,000-byte synthetic
 archive (buffered to disk by the non-root runtime), then requires 413 for a
 request over 30,000,000 bytes sent with `Expect: 100-continue`, and a reported
 failure from the real client's oversized upload and file update. The snapshot
@@ -384,6 +460,10 @@ fresh named volume, starts a replacement on another allocated loopback port, and
 archive hashes, and exact list membership. It then follows the documented
 stopped-service backup: `tar` of the whole data directory through the image,
 restored into a second owned volume whose service must pass the same `verify`.
+The Python manifest is captured after all mutations and compared exactly after
+restart and volume restore, with page size 1 to exercise every pagination boundary.
+It covers active and deleted current records and ALL revisions, not just the
+ordinary `/api/nests` enumeration; the large soft-deleted archive remains included.
 The original volume mounted read-only, and a root-owned `tmpfs`, must each make
 the server exit nonzero at startup with a SQLite error and never report healthy.
 
