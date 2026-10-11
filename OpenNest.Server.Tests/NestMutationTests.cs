@@ -63,6 +63,84 @@ public sealed class NestMutationTests
         Assert.Equal(1, reopened.History(saved.Id, 0, 100)!.Total);
     }
 
+    [Fact]
+    public async Task Delete_HidesAllOrdinaryReadsAndRecoveryPreservesVersions()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var saved = await repository.UploadAsync([0, 255], new NestRecord { Name = "Fixture" });
+        var deleted = await repository.DeleteAsync(saved.Id, 1);
+        Assert.True(deleted.Deleted);
+        Assert.Equal(2, deleted.Revision);
+        foreach (var suffix in new[] { "", "/file", "/revisions", "/revisions/1/file" })
+        {
+            using var hidden = await client.GetAsync($"/api/nests/{saved.Id}{suffix}");
+            Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+        }
+        Assert.Empty(await repository.ListAsync());
+        Assert.Empty((await repository.QueryAsync(new NestQuery())).Items);
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Null(reopened.Get(saved.Id));
+        // Recovery is explicit and bounded, never ordinary search.
+        Assert.Equal(saved.Id, Assert.Single((await repository.QueryDeletedAsync(new NestQuery { Limit = 1 })).Items).Id);
+        Assert.True((await repository.GetDeletedMetadataAsync(saved.Id))!.Deleted);
+        Assert.Equal(new byte[] { 0, 255 }, await repository.GetDeletedFileAsync(saved.Id));
+        var history = await repository.GetDeletedRevisionsAsync(saved.Id);
+        Assert.Equal(new[] { true, false }, history.Items.Select(r => r.Deleted));
+        foreach (var item in history.Items)
+            Assert.Equal(new byte[] { 0, 255 }, await repository.GetDeletedRevisionFileAsync(saved.Id, item.Revision));
+        var recovered = await repository.RecoverAsync(saved.Id, 2);
+        Assert.False(recovered.Deleted);
+        Assert.Empty((await repository.QueryDeletedAsync(new NestQuery())).Items);
+        Assert.Equal(3, (await repository.GetMetadataAsync(saved.Id))!.Revision);
+        Assert.Equal(new byte[] { 0, 255 }, await repository.GetFileAsync(saved.Id));
+        Assert.Equal(3, (await repository.GetRevisionsAsync(saved.Id)).Total);
+    }
+
+    [Theory]
+    [InlineData(false, null, 428)]
+    [InlineData(false, "1", 400)]
+    [InlineData(false, "\"2\"", 409)]
+    [InlineData(true, null, 428)]
+    [InlineData(true, "1", 400)]
+    [InlineData(true, "\"1\"", 409)]
+    public async Task Visibility_RejectedWriteLeavesBytesAndHistory(bool recover, string? header, int status)
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var saved = await repository.UploadAsync([1], new NestRecord { Name = "Fixture" });
+        if (recover) await repository.DeleteAsync(saved.Id, 1);
+        using var request = new HttpRequestMessage(recover ? HttpMethod.Post : HttpMethod.Delete,
+            recover ? $"/api/nests/deleted/{saved.Id}/recover" : $"/api/nests/{saved.Id}");
+        if (header is not null) request.Headers.TryAddWithoutValidation("If-Match", header);
+        using var response = await client.SendAsync(request);
+        Assert.Equal(status, (int)response.StatusCode);
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Equal(recover ? 2 : 1, reopened.History(saved.Id, 0, 100, recover)!.Total);
+        Assert.Equal(new byte[] { 1 }, reopened.GetFile(saved.Id, recover));
+        Assert.Equal(recover, reopened.Get(saved.Id, recover)!.Deleted);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Visibility_FailedSnapshotRollsBack(bool recover)
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var saved = await repository.UploadAsync([1], new NestRecord { Name = "Fixture" });
+        if (recover) await repository.DeleteAsync(saved.Id, 1);
+        FailSnapshots(factory.DatabasePath);
+        Assert.Contains("500", (await Assert.ThrowsAsync<IOException>(() => recover
+            ? repository.RecoverAsync(saved.Id, 2) : repository.DeleteAsync(saved.Id, 1))).Message);
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Equal(recover ? 2 : 1, reopened.History(saved.Id, 0, 100, recover)!.Total);
+        Assert.Equal(new byte[] { 1 }, reopened.GetFile(saved.Id, recover));
+    }
+
     private static void FailSnapshots(string path)
     {
         using var connection = new SqliteConnection($"Data Source={path};Pooling=False");

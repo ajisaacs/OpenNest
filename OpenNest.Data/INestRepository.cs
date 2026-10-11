@@ -48,6 +48,29 @@ public interface INestRepository
         CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("This repository does not support guarded metadata edits.");
 
+    Task<NestRecord?> GetDeletedMetadataAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support deleted nests.");
+
+    Task<byte[]?> GetDeletedFileAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support deleted nests.");
+
+    Task<NestPage> QueryDeletedAsync(NestQuery query, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support deleted nests.");
+
+    Task<NestRevisionPage> GetDeletedRevisionsAsync(Guid id, int offset = 0, int limit = 100,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support deleted nest history.");
+
+    Task<byte[]?> GetDeletedRevisionFileAsync(Guid id, int revisionNumber,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support deleted nest history.");
+
+    Task<NestRecord> DeleteAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support guarded deletion.");
+
+    Task<NestRecord> RecoverAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support guarded recovery.");
+
     /// <summary>Atomically replaces the current archive only at the expected revision.</summary>
     Task<NestRecord> UpdateFileAsync(Guid id, byte[] nestFile, NestRecord record, int expectedRevision,
         CancellationToken cancellationToken = default) =>

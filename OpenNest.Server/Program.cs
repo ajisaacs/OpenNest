@@ -63,23 +63,7 @@ app.MapPost("/api/nests", async (HttpContext http, NestDatabase db) =>
     return Results.Ok(db.Insert(id, record, file!));
 });
 app.MapGet("/api/nests/{id:guid}/revisions", (Guid id, HttpRequest request, NestDatabase db) =>
-{
-    var offset = 0;
-    var limit = 100;
-    foreach (var parameter in request.Query)
-    {
-        if (parameter.Value.Count != 1 || !int.TryParse(parameter.Value[0], out var value))
-            return Results.BadRequest("Invalid history pagination.");
-        switch (parameter.Key)
-        {
-            case "offset": offset = value; break;
-            case "limit": limit = value; break;
-            default: return Results.BadRequest("Unknown history parameter.");
-        }
-    }
-    if (offset < 0 || limit is < 1 or > 200) return Results.BadRequest("Invalid history pagination.");
-    return db.History(id, offset, limit) is { } page ? Results.Ok(page) : Results.NotFound();
-});
+    ReadHistory(id, request, db));
 app.MapGet("/api/nests/{id:guid}/revisions/{revision:int}/file", (Guid id, int revision, NestDatabase db) =>
     revision < 1 ? Results.BadRequest("Invalid revision.") :
     db.GetRevisionFile(id, revision) is { } file ? Results.File(file, "application/zip", $"{id}-r{revision}.nest") : Results.NotFound());
@@ -118,7 +102,21 @@ app.MapPut("/api/nests/{id:guid}/metadata", async (Guid id, HttpRequest request,
     catch (RevisionConflictException conflict) { return Results.Json(conflict.Current, statusCode: 409); }
 });
 app.MapDelete("/api/nests/{id:guid}", (Guid id, HttpRequest request, NestDatabase db) =>
-    BlockDeferredMutation(id, request, db));
+    ChangeVisibility(id, true, request, db));
+app.MapPost("/api/nests/deleted/{id:guid}/recover", (Guid id, HttpRequest request, NestDatabase db) =>
+    ChangeVisibility(id, false, request, db));
+app.MapGet("/api/nests/deleted/query", (HttpRequest request, NestDatabase db) =>
+    NestQueryRequest.TryParse(request.Query, out var query, out var error)
+        ? Results.Ok(db.Query(query, deleted: true)) : Results.BadRequest(error));
+app.MapGet("/api/nests/deleted/{id:guid}", (Guid id, NestDatabase db) =>
+    db.Get(id, deleted: true) is { } record ? Results.Ok(record) : Results.NotFound());
+app.MapGet("/api/nests/deleted/{id:guid}/file", (Guid id, NestDatabase db) =>
+    db.GetFile(id, deleted: true) is { } file ? Results.File(file, "application/zip") : Results.NotFound());
+app.MapGet("/api/nests/deleted/{id:guid}/revisions", (Guid id, HttpRequest request, NestDatabase db) =>
+    ReadHistory(id, request, db, deleted: true));
+app.MapGet("/api/nests/deleted/{id:guid}/revisions/{revision:int}/file", (Guid id, int revision, NestDatabase db) =>
+    revision < 1 ? Results.BadRequest("Invalid revision.") :
+    db.GetRevisionFile(id, revision, deleted: true) is { } file ? Results.File(file, "application/zip") : Results.NotFound());
 
 app.Run();
 
@@ -135,14 +133,35 @@ static IResult? ReadPrecondition(HttpRequest request, out int revision)
     return null;
 }
 
-static IResult BlockDeferredMutation(Guid id, HttpRequest request, NestDatabase db)
+static IResult ChangeVisibility(Guid id, bool deleted, HttpRequest request, NestDatabase db)
 {
     var error = ReadPrecondition(request, out var expected);
     if (error is not null) return error;
-    var current = db.Get(id);
-    if (current is null) return Results.NotFound();
-    if (current.Revision != expected) return Results.Json(current, statusCode: 409);
-    return Results.Json("Versioned metadata and visibility changes are not available yet; no changes were made.", statusCode: 501);
+    try
+    {
+        var changed = db.SetDeleted(id, deleted, expected);
+        return changed is null ? Results.NotFound() : Results.Ok(changed);
+    }
+    catch (RevisionConflictException conflict) { return Results.Json(conflict.Current, statusCode: 409); }
+}
+
+static IResult ReadHistory(Guid id, HttpRequest request, NestDatabase db, bool deleted = false)
+{
+    var offset = 0;
+    var limit = 100;
+    foreach (var parameter in request.Query)
+    {
+        if (parameter.Value.Count != 1 || !int.TryParse(parameter.Value[0], out var value))
+            return Results.BadRequest("Invalid history pagination.");
+        switch (parameter.Key)
+        {
+            case "offset": offset = value; break;
+            case "limit": limit = value; break;
+            default: return Results.BadRequest("Unknown history parameter.");
+        }
+    }
+    if (offset < 0 || limit is < 1 or > 200) return Results.BadRequest("Invalid history pagination.");
+    return db.History(id, offset, limit, deleted) is { } page ? Results.Ok(page) : Results.NotFound();
 }
 
 // Shared multipart reader for upload endpoints. Returns a (record, file, error) triple.

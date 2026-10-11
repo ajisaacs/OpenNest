@@ -59,7 +59,13 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         return items ?? new List<NestRecord>();
     }
 
-    public async Task<NestPage> QueryAsync(NestQuery query, CancellationToken cancellationToken = default)
+    public Task<NestPage> QueryAsync(NestQuery query, CancellationToken cancellationToken = default) =>
+        QueryCoreAsync(query, false, cancellationToken);
+
+    public Task<NestPage> QueryDeletedAsync(NestQuery query, CancellationToken cancellationToken = default) =>
+        QueryCoreAsync(query, true, cancellationToken);
+
+    private async Task<NestPage> QueryCoreAsync(NestQuery query, bool deleted, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
         var error = query.GetValidationError();
@@ -67,7 +73,7 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
             throw new ArgumentException(error, nameof(query));
 
         using var response = await _httpClient.GetAsync(
-            Url("api/nests/query?" + BuildQueryString(query)), cancellationToken);
+            Url((deleted ? "api/nests/deleted/query?" : "api/nests/query?") + BuildQueryString(query)), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             throw new IOException(
@@ -93,18 +99,30 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         + "&offset=" + query.Offset.ToString(CultureInfo.InvariantCulture)
         + "&limit=" + query.Limit.ToString(CultureInfo.InvariantCulture);
 
-    public async Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default) =>
+        GetMetadataCoreAsync(id, false, cancellationToken);
+
+    public Task<NestRecord?> GetDeletedMetadataAsync(Guid id, CancellationToken cancellationToken = default) =>
+        GetMetadataCoreAsync(id, true, cancellationToken);
+
+    private async Task<NestRecord?> GetMetadataCoreAsync(Guid id, bool deleted, CancellationToken cancellationToken)
     {
-        using var response = await _httpClient.GetAsync(Url($"api/nests/{id}"), cancellationToken);
+        using var response = await _httpClient.GetAsync(Url($"api/nests/{(deleted ? "deleted/" : "")}{id}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
         await EnsureSuccess(response, $"get nest {id}", cancellationToken);
         return await response.Content.ReadFromJsonAsync<NestRecord>(JsonOptions, cancellationToken);
     }
 
-    public async Task<byte[]?> GetFileAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<byte[]?> GetFileAsync(Guid id, CancellationToken cancellationToken = default) =>
+        GetFileCoreAsync(id, false, cancellationToken);
+
+    public Task<byte[]?> GetDeletedFileAsync(Guid id, CancellationToken cancellationToken = default) =>
+        GetFileCoreAsync(id, true, cancellationToken);
+
+    private async Task<byte[]?> GetFileCoreAsync(Guid id, bool deleted, CancellationToken cancellationToken)
     {
-        using var response = await _httpClient.GetAsync(Url($"api/nests/{id}/file"), cancellationToken);
+        using var response = await _httpClient.GetAsync(Url($"api/nests/{(deleted ? "deleted/" : "")}{id}/file"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
         await EnsureSuccess(response, $"download nest {id}", cancellationToken);
@@ -138,14 +156,20 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         throw new IOException("Deletion requires guarded soft-delete support and is not available yet. Upgrade the client before deleting a server nest.");
     }
 
-    public async Task<NestRevisionPage> GetRevisionsAsync(Guid id, int offset = 0, int limit = 100,
-        CancellationToken cancellationToken = default)
+    public Task<NestRevisionPage> GetRevisionsAsync(Guid id, int offset = 0, int limit = 100,
+        CancellationToken cancellationToken = default) => GetHistoryAsync(id, offset, limit, false, cancellationToken);
+
+    public Task<NestRevisionPage> GetDeletedRevisionsAsync(Guid id, int offset = 0, int limit = 100,
+        CancellationToken cancellationToken = default) => GetHistoryAsync(id, offset, limit, true, cancellationToken);
+
+    private async Task<NestRevisionPage> GetHistoryAsync(Guid id, int offset, int limit, bool deleted,
+        CancellationToken cancellationToken)
     {
         ValidateId(id);
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
         if (limit < 1 || limit > NestRevisionPage.MaxLimit) throw new ArgumentOutOfRangeException(nameof(limit));
         using var response = await _httpClient.GetAsync(
-            Url($"api/nests/{id}/revisions?offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}"), cancellationToken);
+            Url($"api/nests/{(deleted ? "deleted/" : "")}{id}/revisions?offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new IOException("Nest history is unavailable or this nest no longer exists. Upgrade the nest server if it does not support version history, then reload.");
         await EnsureSuccess(response, $"read nest history {id}", cancellationToken);
@@ -159,12 +183,18 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         return page;
     }
 
-    public async Task<byte[]?> GetRevisionFileAsync(Guid id, int revisionNumber,
-        CancellationToken cancellationToken = default)
+    public Task<byte[]?> GetRevisionFileAsync(Guid id, int revisionNumber,
+        CancellationToken cancellationToken = default) => GetHistoricalFileAsync(id, revisionNumber, false, cancellationToken);
+
+    public Task<byte[]?> GetDeletedRevisionFileAsync(Guid id, int revisionNumber,
+        CancellationToken cancellationToken = default) => GetHistoricalFileAsync(id, revisionNumber, true, cancellationToken);
+
+    private async Task<byte[]?> GetHistoricalFileAsync(Guid id, int revisionNumber, bool deleted,
+        CancellationToken cancellationToken)
     {
         ValidateId(id);
         ValidateRevision(revisionNumber);
-        using var response = await _httpClient.GetAsync(Url($"api/nests/{id}/revisions/{revisionNumber.ToString(CultureInfo.InvariantCulture)}/file"), cancellationToken);
+        using var response = await _httpClient.GetAsync(Url($"api/nests/{(deleted ? "deleted/" : "")}{id}/revisions/{revisionNumber.ToString(CultureInfo.InvariantCulture)}/file"), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         await EnsureSuccess(response, $"download nest {id} revision {revisionNumber}", cancellationToken);
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
@@ -203,6 +233,27 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         request.Content = JsonContent.Create(record, options: JsonOptions);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         await EnsureSuccess(response, $"edit nest {id}; reload after a conflict", cancellationToken);
+        return await ReadRecord(response, cancellationToken);
+    }
+
+    public Task<NestRecord> DeleteAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
+        ChangeVisibilityAsync(id, expectedRevision, true, cancellationToken);
+
+    public Task<NestRecord> RecoverAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
+        ChangeVisibilityAsync(id, expectedRevision, false, cancellationToken);
+
+    private async Task<NestRecord> ChangeVisibilityAsync(Guid id, int expectedRevision, bool deleted,
+        CancellationToken cancellationToken)
+    {
+        ValidateId(id);
+        ValidateRevision(expectedRevision);
+        // A legacy server cannot be trusted to preserve history on DELETE.
+        await GetHistoryAsync(id, 0, 1, !deleted, cancellationToken);
+        using var request = new HttpRequestMessage(deleted ? HttpMethod.Delete : HttpMethod.Post,
+            Url(deleted ? $"api/nests/{id}" : $"api/nests/deleted/{id}/recover"));
+        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccess(response, $"change nest visibility {id}; reload after a conflict", cancellationToken);
         return await ReadRecord(response, cancellationToken);
     }
 

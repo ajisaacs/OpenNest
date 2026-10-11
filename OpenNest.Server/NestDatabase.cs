@@ -63,7 +63,7 @@ public sealed class NestDatabase : IDisposable
         {
             using var command = _connection.CreateCommand();
             command.CommandText =
-                $"SELECT {RecordColumns} FROM nests ORDER BY savedAt DESC";
+                $"SELECT {RecordColumns} FROM nests WHERE deleted=0 ORDER BY savedAt DESC";
             var records = new List<NestRecord>();
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -72,12 +72,13 @@ public sealed class NestDatabase : IDisposable
         }
     }
 
-    public NestRecord? Get(Guid id)
+    public NestRecord? Get(Guid id, bool deleted = false)
     {
         lock (_sync)
         {
             using var command = _connection.CreateCommand();
-            command.CommandText = $"SELECT {RecordColumns} FROM nests WHERE id = $id";
+            command.CommandText = $"SELECT {RecordColumns} FROM nests WHERE id = $id AND deleted=$deleted";
+            command.Parameters.AddWithValue("$deleted", deleted ? 1 : 0);
             command.Parameters.AddWithValue("$id", id.ToString());
             using var reader = command.ExecuteReader();
             return reader.Read() ? ReadRecord(reader) : null;
@@ -88,7 +89,7 @@ public sealed class NestDatabase : IDisposable
     /// One bounded page of matching metadata plus the total match count. The count and
     /// the page are read in the same monitor hold, so they describe one state.
     /// </summary>
-    public NestPage Query(NestQuery query)
+    public NestPage Query(NestQuery query, bool deleted = false)
     {
         ArgumentNullException.ThrowIfNull(query);
         var error = query.GetValidationError();
@@ -96,7 +97,7 @@ public sealed class NestDatabase : IDisposable
             throw new ArgumentException(error, nameof(query));
 
         var search = query.NormalizedSearch;
-        var where = search.Length == 0 ? "" : SearchPredicate;
+        var where = "WHERE deleted=" + (deleted ? "1" : "0") + (search.Length == 0 ? "" : " AND (" + SearchPredicate + ")");
         lock (_sync)
         {
             using var count = _connection.CreateCommand();
@@ -123,12 +124,13 @@ public sealed class NestDatabase : IDisposable
         }
     }
 
-    public byte[]? GetFile(Guid id)
+    public byte[]? GetFile(Guid id, bool deleted = false)
     {
         lock (_sync)
         {
             using var command = _connection.CreateCommand();
-            command.CommandText = "SELECT file FROM nests WHERE id = $id";
+            command.CommandText = "SELECT file FROM nests WHERE id = $id AND deleted=$deleted";
+            command.Parameters.AddWithValue("$deleted", deleted ? 1 : 0);
             command.Parameters.AddWithValue("$id", id.ToString());
             var value = command.ExecuteScalar();
             return value is byte[] bytes ? bytes : null;
@@ -197,12 +199,34 @@ public sealed class NestDatabase : IDisposable
         }
     }
 
-    public NestPage? History(Guid id, int offset, int limit)
+    public NestRecord? SetDeleted(Guid id, bool deleted, int expectedRevision)
+    {
+        lock (_sync)
+        {
+            using var transaction = _connection.BeginTransaction();
+            var current = Get(id, !deleted);
+            if (current is null) return null;
+            if (current.Revision != expectedRevision) throw new RevisionConflictException(current);
+            using var command = _connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "UPDATE nests SET deleted=$deleted, revision=$revision, savedAt=$savedAt WHERE id=$id";
+            command.Parameters.AddWithValue("$id", id.ToString());
+            command.Parameters.AddWithValue("$deleted", deleted ? 1 : 0);
+            command.Parameters.AddWithValue("$revision", checked(current.Revision + 1));
+            command.Parameters.AddWithValue("$savedAt", DateTime.Now.ToString("o"));
+            command.ExecuteNonQuery();
+            Snapshot(id, transaction);
+            transaction.Commit();
+            return Get(id, deleted);
+        }
+    }
+
+    public NestPage? History(Guid id, int offset, int limit, bool deleted = false)
     {
         if (offset < 0 || limit is < 1 or > 200) throw new ArgumentOutOfRangeException(nameof(limit));
         lock (_sync)
         {
-            if (Get(id) is null) return null;
+            if (Get(id, deleted) is null) return null;
             using var count = _connection.CreateCommand();
             count.CommandText = "SELECT COUNT(*) FROM nest_revisions WHERE id=$id";
             count.Parameters.AddWithValue("$id", id.ToString());
@@ -219,11 +243,12 @@ public sealed class NestDatabase : IDisposable
         }
     }
 
-    public byte[]? GetRevisionFile(Guid id, int revision)
+    public byte[]? GetRevisionFile(Guid id, int revision, bool deleted = false)
     {
         lock (_sync)
         {
             using var command = _connection.CreateCommand();
+            if (Get(id, deleted) is null) return null;
             command.CommandText = "SELECT file FROM nest_revisions WHERE id=$id AND revision=$revision";
             command.Parameters.AddWithValue("$id", id.ToString());
             command.Parameters.AddWithValue("$revision", revision);
@@ -255,7 +280,7 @@ public sealed class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 1) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 2) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -264,6 +289,15 @@ public sealed class NestDatabase : IDisposable
                     CREATE UNIQUE INDEX ix_nest_revisions_key ON nest_revisions(id, revision);
                     INSERT INTO nest_revisions SELECT * FROM nests;
                     PRAGMA user_version=1;
+                    """;
+                command.ExecuteNonQuery();
+            }
+            if (version < 2)
+            {
+                command.CommandText = """
+                    ALTER TABLE nests ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
+                    ALTER TABLE nest_revisions ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
+                    PRAGMA user_version=2;
                     """;
                 command.ExecuteNonQuery();
             }
@@ -304,13 +338,13 @@ public sealed class NestDatabase : IDisposable
 
     private const string RecordColumns = """
         id, name, customer, dateCreated, dateModified, material, thickness,
-        status, plateCount, partCount, comments, madeBy, fileSize, savedAt, revision
+        status, plateCount, partCount, comments, madeBy, fileSize, savedAt, revision, deleted
         """;
 
     // Case-insensitive (ASCII) substring over the text columns and the status's stored
     // and display names. The search text is always a bound, escaped LIKE parameter.
     private const string SearchPredicate = """
-        WHERE name LIKE $pattern ESCAPE '\'
+        name LIKE $pattern ESCAPE '\'
             OR customer LIKE $pattern ESCAPE '\'
             OR material LIKE $pattern ESCAPE '\'
             OR madeBy LIKE $pattern ESCAPE '\'
@@ -391,6 +425,7 @@ public sealed class NestDatabase : IDisposable
             FileSize = reader.GetInt64(12),
             SavedAt = DateTime.Parse(reader.GetString(13)),
             Revision = reader.GetInt32(14),
+            Deleted = reader.GetInt32(15) != 0,
         };
     }
 }
