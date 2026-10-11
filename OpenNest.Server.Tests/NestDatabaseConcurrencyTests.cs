@@ -17,8 +17,8 @@ public sealed class NestDatabaseConcurrencyTests
     [InlineData("GetFile")]
     [InlineData("Insert")]
     [InlineData("UpdateFile")]
-    [InlineData("UpdateMetadata")]
-    [InlineData("Delete")]
+    [InlineData("History")]
+    [InlineData("GetRevisionFile")]
     [InlineData("Health")]
     [InlineData("Dispose")]
     public async Task Concurrency_EveryOperationWaitsForTheSameMonitor(string operation)
@@ -44,9 +44,9 @@ public sealed class NestDatabaseConcurrencyTests
                     case "Get": database.Get(id); break;
                     case "GetFile": database.GetFile(id); break;
                     case "Insert": database.Insert(Guid.NewGuid(), record, new byte[] { 4 }); break;
-                    case "UpdateFile": database.Update(id, record, new byte[] { 5 }); break;
-                    case "UpdateMetadata": database.Update(id, record, null); break;
-                    case "Delete": database.Delete(id); break;
+                    case "UpdateFile": database.Update(id, record, new byte[] { 5 }, 1); break;
+                    case "History": database.History(id, 0, 100); break;
+                    case "GetRevisionFile": database.GetRevisionFile(id, 1); break;
                     case "Health": Assert.True(database.IsHealthy()); break;
                     case "Dispose": database.Dispose(); break;
                     default: throw new InvalidOperationException($"Unknown test operation: {operation}");
@@ -102,10 +102,10 @@ public sealed class NestDatabaseConcurrencyTests
                 () => database.Query(new NestQuery { Search = "Synthetic", Limit = 1 }),
                 () => database.Get(id),
                 () => database.GetFile(id),
-                () => database.Update(id, record, new byte[] { 2 }),
-                () => database.Update(id, record, null),
+                () => database.Update(id, record, new byte[] { 2 }, 1),
+                () => database.History(id, 0, 100),
                 () => Assert.True(database.IsHealthy()),
-                () => database.Delete(id),
+                () => database.GetRevisionFile(id, 1),
             ];
             foreach (var operation in operations)
             {
@@ -143,17 +143,13 @@ public sealed class NestDatabaseConcurrencyTests
                 Assert.Equal(file, database.GetFile(id));
                 record.Comments = "Archive updated";
                 file = file.Concat(new byte[] { 42 }).ToArray();
-                saved = database.Update(id, record, file)!;
+                saved = database.Update(id, record, file, 1)!;
                 AssertStoredRecord(record, id, file, saved);
                 record.Comments = "Metadata only";
-                saved = database.Update(id, record, null)!;
+                saved = database.Update(id, record, file, saved.Revision)!;
                 AssertStoredRecord(record, id, file, saved);
                 Assert.Equal(file.LongLength, saved.FileSize);
                 Assert.Equal(file, database.GetFile(id));
-                var transient = Guid.NewGuid();
-                database.Insert(transient, record, new byte[] { 9 });
-                Assert.True(database.Delete(transient));
-                Assert.Null(database.Get(transient));
                 records.Add((saved, file));
             }
             return records;
@@ -193,11 +189,12 @@ public sealed class NestDatabaseConcurrencyTests
                 Assert.Contains(await repository.ListAsync(watchdog.Token), r => r.Id == saved.Id);
                 nest.Notes = $"Archive change {lane}-{index}";
                 file = NestApiTests.Archive(nest);
+                client.DefaultRequestHeaders.IfMatch.Add(new System.Net.Http.Headers.EntityTagHeaderValue("\"1\""));
                 var updated = await session.SaveAsync(repository, client.BaseAddress.ToString(), nest, file,
                     cancellationToken: watchdog.Token);
+                client.DefaultRequestHeaders.IfMatch.Clear();
                 AssertStoredRecord(NestRecordFactory.FromNest(nest, saved.Id, file.LongLength), saved.Id, file, updated);
-                updated.Comments = $"Metadata only {lane}-{index}";
-                saved = await repository.UpdateMetadataAsync(updated.Id, updated, watchdog.Token);
+                saved = updated;
                 AssertStoredRecord(updated, updated.Id, file, saved);
                 Assert.Equal(file.LongLength, saved.FileSize);
                 Assert.Equal(file, await repository.GetFileAsync(saved.Id, watchdog.Token));
@@ -243,6 +240,7 @@ public sealed class NestDatabaseConcurrencyTests
         expected.Id = id;
         expected.FileSize = file.LongLength;
         expected.SavedAt = actual.SavedAt;
+        expected.Revision = actual.Revision;
         Assert.NotEqual(default, actual.SavedAt);
         AssertRecord(expected, actual);
     }

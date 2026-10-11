@@ -62,40 +62,74 @@ app.MapPost("/api/nests", async (HttpContext http, NestDatabase db) =>
     var id = record!.Id == Guid.Empty ? Guid.NewGuid() : record.Id;
     return Results.Ok(db.Insert(id, record, file!));
 });
+app.MapGet("/api/nests/{id:guid}/revisions", (Guid id, HttpRequest request, NestDatabase db) =>
+{
+    var offset = 0;
+    var limit = 100;
+    foreach (var parameter in request.Query)
+    {
+        if (parameter.Value.Count != 1 || !int.TryParse(parameter.Value[0], out var value))
+            return Results.BadRequest("Invalid history pagination.");
+        switch (parameter.Key)
+        {
+            case "offset": offset = value; break;
+            case "limit": limit = value; break;
+            default: return Results.BadRequest("Unknown history parameter.");
+        }
+    }
+    if (offset < 0 || limit is < 1 or > 200) return Results.BadRequest("Invalid history pagination.");
+    return db.History(id, offset, limit) is { } page ? Results.Ok(page) : Results.NotFound();
+});
+app.MapGet("/api/nests/{id:guid}/revisions/{revision:int}/file", (Guid id, int revision, NestDatabase db) =>
+    revision < 1 ? Results.BadRequest("Invalid revision.") :
+    db.GetRevisionFile(id, revision) is { } file ? Results.File(file, "application/zip", $"{id}-r{revision}.nest") : Results.NotFound());
+
 app.MapPut("/api/nests/{id:guid}/file", async (Guid id, HttpContext http, NestDatabase db) =>
 {
+    var precondition = ReadPrecondition(http.Request, out var expected);
+    if (precondition is not null) return precondition;
     var (record, file, error) = await ReadMultipart(http);
-    if (error is not null)
-        return error;
-
-    var updated = db.Update(id, record!, file);
-    return updated is null ? Results.NotFound() : Results.Ok(updated);
-});
-
-app.MapPut("/api/nests/{id:guid}/metadata", async (Guid id, HttpContext http, NestDatabase db) =>
-{
-    NestRecord? record;
+    if (error is not null) return error;
     try
     {
-        record = await http.Request.ReadFromJsonAsync<NestRecord>();
+        var updated = db.Update(id, record!, file!, expected);
+        return updated is null ? Results.NotFound() : Results.Ok(updated);
     }
-    catch (JsonException)
+    catch (RevisionConflictException conflict)
     {
-        return Results.BadRequest("Invalid metadata JSON.");
+        return Results.Json(conflict.Current, statusCode: StatusCodes.Status409Conflict);
     }
-
-    if (record is null)
-        return Results.BadRequest("Missing metadata.");
-
-    // Keep the stored archive's size; metadata updates never touch the file.
-    var updated = db.Update(id, record, file: null);
-    return updated is null ? Results.NotFound() : Results.Ok(updated);
 });
 
-app.MapDelete("/api/nests/{id:guid}", (Guid id, NestDatabase db) =>
-    db.Delete(id) ? Results.NoContent() : Results.NotFound());
+app.MapPut("/api/nests/{id:guid}/metadata", (Guid id, HttpRequest request, NestDatabase db) =>
+    BlockDeferredMutation(id, request, db));
+app.MapDelete("/api/nests/{id:guid}", (Guid id, HttpRequest request, NestDatabase db) =>
+    BlockDeferredMutation(id, request, db));
 
 app.Run();
+
+static IResult? ReadPrecondition(HttpRequest request, out int revision)
+{
+    revision = 0;
+    var values = request.Headers.IfMatch;
+    if (values.Count == 0) return Results.Json("Upgrade/reload required: send If-Match with the current revision.", statusCode: 428);
+    var text = values.Count == 1 ? values[0] : null;
+    if (text is null || text.Length < 3 || text[0] != '"' || text[^1] != '"' ||
+        !text[1..^1].All(c => c is >= '0' and <= '9') ||
+        !int.TryParse(text[1..^1], out revision) || revision < 1)
+        return Results.BadRequest("If-Match must contain one quoted positive integer revision.");
+    return null;
+}
+
+static IResult BlockDeferredMutation(Guid id, HttpRequest request, NestDatabase db)
+{
+    var error = ReadPrecondition(request, out var expected);
+    if (error is not null) return error;
+    var current = db.Get(id);
+    if (current is null) return Results.NotFound();
+    if (current.Revision != expected) return Results.Json(current, statusCode: 409);
+    return Results.Json("Versioned metadata and visibility changes are not available yet; no changes were made.", statusCode: 501);
+}
 
 // Shared multipart reader for upload endpoints. Returns a (record, file, error) triple.
 static async Task<(NestRecord? Record, byte[]? File, IResult? Error)> ReadMultipart(HttpContext http)

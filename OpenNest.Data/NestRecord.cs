@@ -11,6 +11,9 @@ public sealed class NestRecord
 {
     public Guid Id { get; set; }
 
+    /// <summary>Server revision; zero means the server does not support history.</summary>
+    public int Revision { get; set; }
+
     public string Name { get; set; } = "";
 
     public string Customer { get; set; } = "";

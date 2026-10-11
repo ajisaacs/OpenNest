@@ -99,6 +99,7 @@ public sealed class NestApiTests
         nest.Status = NestStatus.ToBeCut;
         nest.Plates[0].Parts[0].Location = new Vector(4, 5);
         var archive = Archive(nest);
+        server.Client.DefaultRequestHeaders.IfMatch.Add(new EntityTagHeaderValue("\"1\""));
         var updated = await session.SaveAsync(server.Repository, server.Url, nest, archive);
 
         Assert.Equal(created.Id, updated.Id);
@@ -133,41 +134,17 @@ public sealed class NestApiTests
     }
 
     [Fact]
-    public async Task MetadataUpdate_ChangesFieldsWithoutTouchingArchiveOrFileSize()
+    public async Task MetadataAndDelete_AreBlockedWithoutMutation()
     {
         using var server = new TestServerSession();
-        var nest = SyntheticNest();
-        var archive = Archive(nest);
-        var created = await new NestSaveSession().SaveAsync(server.Repository, server.Url, nest, archive);
-
-        var change = Clone(created);
-        change.Name = "Renamed by metadata update";
-        change.Status = NestStatus.HasBeenCut;
-        change.Comments = "Metadata-only change";
-        change.FileSize = 1; // Server-computed; must be ignored.
-        var updated = await server.Repository.UpdateMetadataAsync(created.Id, change);
-
-        Assert.Equal(created.Id, updated.Id);
-        Assert.Equal("Renamed by metadata update", updated.Name);
-        Assert.Equal(NestStatus.HasBeenCut, updated.Status);
-        Assert.Equal("Metadata-only change", updated.Comments);
-        Assert.Equal(archive.LongLength, updated.FileSize);
-        AssertSameMetadata(updated, (await server.Repository.GetMetadataAsync(created.Id))!);
-        Assert.Equal(archive, await server.Repository.GetFileAsync(created.Id));
-    }
-
-    [Fact]
-    public async Task Delete_RemovesRecordAndArchive()
-    {
-        using var server = new TestServerSession();
-        var nest = SyntheticNest();
-        var created = await new NestSaveSession().SaveAsync(server.Repository, server.Url, nest, Archive(nest));
-
-        await server.Repository.DeleteAsync(created.Id);
-
-        Assert.Empty(await server.Repository.ListAsync());
-        Assert.Null(await server.Repository.GetMetadataAsync(created.Id));
-        Assert.Null(await server.Repository.GetFileAsync(created.Id));
+        var created = await server.SeedAsync();
+        var before = await server.SnapshotAsync();
+        server.Client.DefaultRequestHeaders.IfMatch.Add(new EntityTagHeaderValue("\"1\""));
+        using var metadata = await server.Client.PutAsync($"/api/nests/{created.Id}/metadata", new StringContent("{}"));
+        Assert.Equal(HttpStatusCode.NotImplemented, metadata.StatusCode);
+        using var delete = await server.Client.DeleteAsync($"/api/nests/{created.Id}");
+        Assert.Equal(HttpStatusCode.NotImplemented, delete.StatusCode);
+        Assert.Equal(before, await server.SnapshotAsync());
     }
 
     public static TheoryData<string, string> InvalidUploads()
@@ -199,6 +176,7 @@ public sealed class NestApiTests
         var method = route == "create" ? HttpMethod.Post : HttpMethod.Put;
         var path = route == "create" ? "/api/nests" : $"/api/nests/{existing.Id}/file";
         using var request = new HttpRequestMessage(method, path) { Content = InvalidUploadContent(body) };
+        request.Headers.IfMatch.Add(new EntityTagHeaderValue("\"1\""));
         using var response = await server.Client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -208,7 +186,7 @@ public sealed class NestApiTests
     [Theory]
     [InlineData("{not-json")]
     [InlineData("null")]
-    public async Task MetadataUpdate_WithInvalidJson_Returns400AndLeavesStoreUnchanged(string json)
+    public async Task MetadataUpdate_WithoutPrecondition_Returns428AndLeavesStoreUnchanged(string json)
     {
         using var server = new TestServerSession();
         var existing = await server.SeedAsync();
@@ -217,7 +195,7 @@ public sealed class NestApiTests
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await server.Client.PutAsync($"/api/nests/{existing.Id}/metadata", content);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal((HttpStatusCode)428, response.StatusCode);
         Assert.Equal(before, await server.SnapshotAsync());
     }
 
@@ -250,6 +228,7 @@ public sealed class NestApiTests
         foreach (var create in requests)
         {
             using var request = create();
+            request.Headers.IfMatch.Add(new EntityTagHeaderValue("\"1\""));
             using var response = await server.Client.SendAsync(request);
             Assert.True(response.StatusCode == HttpStatusCode.NotFound,
                 $"{request.Method} {request.RequestUri} returned {(int)response.StatusCode}, expected 404.");
@@ -339,6 +318,7 @@ public sealed class NestApiTests
     {
         var expected = NestRecordFactory.FromNest(nest, saved.Id, archive.LongLength);
         expected.SavedAt = saved.SavedAt;
+        expected.Revision = saved.Revision;
         return expected;
     }
 

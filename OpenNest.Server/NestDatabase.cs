@@ -29,7 +29,9 @@ public sealed class NestDatabase : IDisposable
             Pooling = pooling,
         }.ToString());
         _connection.Open();
-        Execute("""
+        try
+        {
+            Execute("""
             PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS nests (
                 id           TEXT PRIMARY KEY,
@@ -50,6 +52,9 @@ public sealed class NestDatabase : IDisposable
             );
             CREATE INDEX IF NOT EXISTS ix_nests_savedAt ON nests(savedAt DESC);
             """);
+            Migrate();
+        }
+        catch { _connection.Dispose(); throw; }
     }
 
     public IReadOnlyList<NestRecord> List()
@@ -134,7 +139,9 @@ public sealed class NestDatabase : IDisposable
     {
         lock (_sync)
         {
+            using var transaction = _connection.BeginTransaction();
             using var command = _connection.CreateCommand();
+            command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO nests (id, name, customer, dateCreated, dateModified, material,
                     thickness, status, plateCount, partCount, comments, madeBy, fileSize,
@@ -145,42 +152,114 @@ public sealed class NestDatabase : IDisposable
                 """;
             AddRecordParameters(command, id, record, file, updateFile: true);
             command.ExecuteNonQuery();
+            Snapshot(id, transaction);
+            transaction.Commit();
             return Get(id) ?? throw new InvalidOperationException("Insert did not persist.");
         }
     }
 
-    public NestRecord? Update(Guid id, NestRecord record, byte[]? file)
+    public NestRecord? Update(Guid id, NestRecord record, byte[] file, int expectedRevision)
     {
         lock (_sync)
         {
-            if (Get(id) is null)
-                return null;
+            using var transaction = _connection.BeginTransaction();
+            var current = Get(id);
+            if (current is null) return null;
+            if (current.Revision != expectedRevision) throw new RevisionConflictException(current);
+            if (SameMetadata(current, record) && GetFile(id)!.AsSpan().SequenceEqual(file)) return current;
 
             using var command = _connection.CreateCommand();
-            var fileClause = file is null ? "" : ", file = $file, fileSize = $fileSize";
+            command.Transaction = transaction;
+            const string fileClause = ", file = $file, fileSize = $fileSize";
             command.CommandText = $"""
                 UPDATE nests SET
                     name = $name, customer = $customer, dateCreated = $dateCreated,
                     dateModified = $dateModified, material = $material,
                     thickness = $thickness, status = $status, plateCount = $plateCount,
                     partCount = $partCount, comments = $comments, madeBy = $madeBy,
-                    savedAt = $savedAt{fileClause}
+                    savedAt = $savedAt, revision = $revision{fileClause}
                 WHERE id = $id
                 """;
             AddRecordParameters(command, id, record, file, updateFile: file is not null);
+            command.Parameters.AddWithValue("$revision", checked(current.Revision + 1));
             command.ExecuteNonQuery();
+            Snapshot(id, transaction);
+            transaction.Commit();
             return Get(id);
         }
     }
 
-    public bool Delete(Guid id)
+    public NestPage? History(Guid id, int offset, int limit)
+    {
+        if (offset < 0 || limit is < 1 or > 200) throw new ArgumentOutOfRangeException(nameof(limit));
+        lock (_sync)
+        {
+            if (Get(id) is null) return null;
+            using var count = _connection.CreateCommand();
+            count.CommandText = "SELECT COUNT(*) FROM nest_revisions WHERE id=$id";
+            count.Parameters.AddWithValue("$id", id.ToString());
+            var total = checked((int)(long)count.ExecuteScalar()!);
+            using var command = _connection.CreateCommand();
+            command.CommandText = $"SELECT {RecordColumns} FROM nest_revisions WHERE id=$id ORDER BY revision DESC LIMIT $limit OFFSET $offset";
+            command.Parameters.AddWithValue("$id", id.ToString());
+            command.Parameters.AddWithValue("$limit", limit);
+            command.Parameters.AddWithValue("$offset", offset);
+            var records = new List<NestRecord>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read()) records.Add(ReadRecord(reader));
+            return new NestPage { Items = records, Total = total, Offset = offset, Limit = limit };
+        }
+    }
+
+    public byte[]? GetRevisionFile(Guid id, int revision)
     {
         lock (_sync)
         {
             using var command = _connection.CreateCommand();
-            command.CommandText = "DELETE FROM nests WHERE id = $id";
+            command.CommandText = "SELECT file FROM nest_revisions WHERE id=$id AND revision=$revision";
             command.Parameters.AddWithValue("$id", id.ToString());
-            return command.ExecuteNonQuery() > 0;
+            command.Parameters.AddWithValue("$revision", revision);
+            return command.ExecuteScalar() as byte[];
+        }
+    }
+
+    private static bool SameMetadata(NestRecord a, NestRecord b) =>
+        a.Name == b.Name && a.Customer == b.Customer && a.DateCreated == b.DateCreated &&
+        a.DateModified == b.DateModified && a.Material == b.Material && a.Thickness == b.Thickness &&
+        a.Status == b.Status && a.PlateCount == b.PlateCount && a.PartCount == b.PartCount &&
+        a.Comments == b.Comments && a.MadeBy == b.MadeBy;
+
+    private void Snapshot(Guid id, SqliteTransaction transaction)
+    {
+        using var command = _connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"INSERT INTO nest_revisions ({RecordColumns}, file) SELECT {RecordColumns}, file FROM nests WHERE id=$id";
+        command.Parameters.AddWithValue("$id", id.ToString());
+        command.ExecuteNonQuery();
+    }
+
+    private void Migrate()
+    {
+        lock (_sync)
+        {
+            using var transaction = _connection.BeginTransaction();
+            using var command = _connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "PRAGMA user_version";
+            var version = (long)command.ExecuteScalar()!;
+            if (version > 1) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version == 0)
+            {
+                command.CommandText = """
+                    ALTER TABLE nests ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+                    CREATE TABLE nest_revisions AS SELECT * FROM nests WHERE 0;
+                    CREATE UNIQUE INDEX ix_nest_revisions_key ON nest_revisions(id, revision);
+                    INSERT INTO nest_revisions SELECT * FROM nests;
+                    PRAGMA user_version=1;
+                    """;
+                command.ExecuteNonQuery();
+            }
+            transaction.Commit();
         }
     }
 
@@ -217,7 +296,7 @@ public sealed class NestDatabase : IDisposable
 
     private const string RecordColumns = """
         id, name, customer, dateCreated, dateModified, material, thickness,
-        status, plateCount, partCount, comments, madeBy, fileSize, savedAt
+        status, plateCount, partCount, comments, madeBy, fileSize, savedAt, revision
         """;
 
     // Case-insensitive (ASCII) substring over the text columns and the status's stored
@@ -303,6 +382,12 @@ public sealed class NestDatabase : IDisposable
             MadeBy = reader.GetString(11),
             FileSize = reader.GetInt64(12),
             SavedAt = DateTime.Parse(reader.GetString(13)),
+            Revision = reader.GetInt32(14),
         };
     }
+}
+
+public sealed class RevisionConflictException(NestRecord current) : Exception("The nest has changed. Reload or Save As.")
+{
+    public NestRecord Current { get; } = current;
 }
