@@ -21,6 +21,10 @@ namespace OpenNest
 
         public void BindRemote(Guid id, string serverUrl) => remoteSession.Bind(id, serverUrl);
 
+        public void BindRemote(Guid id, string serverUrl, int revision) => remoteSession.Bind(id, serverUrl, revision);
+
+        public int RemoteRevision => remoteSession.Revision;
+
         public string Name => Nest?.Name;
 
         public bool HasSavePath => File.Exists(LastSavePath);

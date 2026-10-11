@@ -169,11 +169,11 @@ namespace OpenNest.Forms
         }
 
         private void LoadNest(Nest nest, FormWindowState windowState = FormWindowState.Maximized,
-            Guid remoteId = default, string serverUrl = null)
+            Guid remoteId = default, string serverUrl = null, int remoteRevision = 0)
         {
             var editForm = new EditNestForm(nest);
             if (remoteId != Guid.Empty)
-                editForm.Document.BindRemote(remoteId, serverUrl);
+                editForm.Document.BindRemote(remoteId, serverUrl, remoteRevision);
             editForm.MdiParent = this;
             editForm.PlateView.FilesDropped += (sender, paths) => OpenDroppedNestFiles(paths);
             editForm.PlateChanged += (sender, e) =>
@@ -637,21 +637,28 @@ namespace OpenNest.Forms
             try
             {
                 var repository = NestStorage.CreateRepository();
-                using var dlg = new SavedNestsForm(repository, NestStorage.Settings.ServerUrl);
+                var serverUrl = NestStorage.Settings.ServerUrl;
+                using var dlg = new SavedNestsForm(repository, serverUrl);
                 if (dlg.ShowDialog(this) != DialogResult.OK)
                     return;
 
-                var serverUrl = NestStorage.Settings.ServerUrl;
                 databaseOpenInProgress = true;
                 storageModeMenu.Enabled = false;
                 mnuToolsOptions.Enabled = false;
-                var file = await repository.GetFileAsync(dlg.SelectedId);
-                if (file == null)
-                    throw new FileNotFoundException("This nest no longer exists on the server.");
-                using var stream = new MemoryStream(file);
+                var snapshot = await NestHistorySession.ReadCurrentAsync(repository, dlg.SelectedId, serverUrl);
+                using var stream = new MemoryStream(snapshot.Archive);
                 var reader = new NestReader(stream);
                 var nest = reader.Read();
-                LoadNest(nest, remoteId: dlg.SelectedId, serverUrl: serverUrl);
+                // Metadata edits create revisions without rewriting the archive. Use their
+                // current editable fields rather than silently reverting them on the next save.
+                nest.Name = snapshot.Metadata.Name;
+                nest.Customer = snapshot.Metadata.Customer;
+                nest.Notes = snapshot.Metadata.Comments;
+                nest.Status = snapshot.Metadata.Status;
+                nest.MadeBy = snapshot.Metadata.MadeBy;
+                nest.DateLastModified = snapshot.Metadata.DateModified;
+                LoadNest(nest, remoteId: snapshot.Metadata.Id, serverUrl: snapshot.ServerUrl,
+                    remoteRevision: snapshot.Metadata.Revision);
                 ShowNestWarnings(reader);
             }
             catch (Exception ex)

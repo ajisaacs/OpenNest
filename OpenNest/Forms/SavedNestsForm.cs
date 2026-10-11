@@ -39,7 +39,7 @@ public sealed class SavedNestsForm : Form
     private readonly INestRepository repository;
     private readonly string serverUrl;
     private readonly NestBrowseSession session;
-    private readonly NestDetailsSession details;
+    private NestDetailsSession details;
     private readonly SplitContainer split;
     private readonly DataGridView nestGrid;
     private readonly DataGridView platesGrid;
@@ -141,6 +141,7 @@ public sealed class SavedNestsForm : Form
         deleteMenuItem = new ToolStripMenuItem("Delete...", null, async (_, _) => await DeleteSelectedAsync());
         var refreshMenuItem = new ToolStripMenuItem("Refresh", null, async (_, _) => await RunAsync(session.RefreshAsync));
         menu.Items.AddRange(new ToolStripItem[] { openMenuItem, deleteMenuItem, new ToolStripSeparator(), refreshMenuItem });
+        menu.Items.Add(new ToolStripMenuItem("Version history...", null, async (_, _) => await ShowHistoryAsync(false)));
         nestGrid.ContextMenuStrip = menu;
 
         // Details of the highlighted nest.
@@ -273,6 +274,12 @@ public sealed class SavedNestsForm : Form
         findBar.Controls.Add(new Label { Text = "Find:", AutoSize = true, Margin = new Padding(3, 8, 0, 0) });
         findBar.Controls.Add(searchBox);
         findBar.Controls.Add(refreshButton);
+        var historyButton = new Button { Text = "Version history...", AutoSize = true };
+        historyButton.Click += async (_, _) => await ShowHistoryAsync(false);
+        var recoveryButton = new Button { Text = "Deleted nests...", AutoSize = true };
+        recoveryButton.Click += async (_, _) => await ShowHistoryAsync(true);
+        findBar.Controls.Add(historyButton);
+        findBar.Controls.Add(recoveryButton);
         findBar.Controls.Add(previousButton);
         findBar.Controls.Add(nextButton);
         findBar.Controls.Add(summaryLabel);
@@ -517,6 +524,7 @@ public sealed class SavedNestsForm : Form
                 record.Id
             );
             // Row numbers count through the whole filtered list, not just this page.
+            nestGrid.Rows[index].Tag = record;
             nestGrid.Rows[index].HeaderCell.Value = (page.Offset + i + 1).ToString("N0", CultureInfo.CurrentCulture);
         }
 
@@ -748,15 +756,30 @@ public sealed class SavedNestsForm : Form
         DialogResult = DialogResult.OK;
     }
 
+    private async Task ShowHistoryAsync(bool recovery)
+    {
+        if (!recovery && SelectedNestId() == null) return;
+        using var dialog = new NestHistoryForm(repository, serverUrl, recovery ? Guid.Empty : SelectedNestId().Value);
+        dialog.ShowDialog(this);
+        if (dialog.Changed && !IsDisposed)
+        {
+            details.Dispose();
+            details = new NestDetailsSession(LoadDetailsAsync);
+            ShowDetailsMessage("");
+            await RunAsync(session.RefreshAsync);
+        }
+    }
+
     private async Task DeleteSelectedAsync()
     {
         if (deleting || SelectedNestId() is not Guid id)
             return;
 
         var name = nestGrid.SelectedRows[0].Cells[0].Value?.ToString() ?? "";
+        var selected = (NestRecord)nestGrid.SelectedRows[0].Tag;
         var confirm = MessageBox.Show(
             this,
-            $"Delete '{name}' from the server? This cannot be undone.",
+            $"Hide '{name}' from the current list? All versions are retained. Use Deleted nests to recover it.",
             "Delete Nest",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning
@@ -768,7 +791,13 @@ public sealed class SavedNestsForm : Form
         UpdateCommands();
         try
         {
-            await repository.DeleteAsync(id);
+            if (selected.Revision < 1)
+                throw new NotSupportedException("Upgrade the nest server and refresh before deleting a nest.");
+            var hidden = await repository.DeleteAsync(id, selected.Revision);
+            var verified = await repository.GetDeletedMetadataAsync(id);
+            if (hidden.Id != id || !hidden.Deleted || verified == null || verified.Id != id
+                || !verified.Deleted || verified.Revision < hidden.Revision)
+                throw new InvalidDataException("Could not verify deletion. Refresh to reconcile; do not retry automatically.");
             if (!IsDisposed)
                 await RunAsync(session.RefreshAsync);
         }
