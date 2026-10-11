@@ -22,6 +22,8 @@ public class NestSaveSessionTests
         await session.SaveAsync(repository, "http://shop:8090", nest, bytes);
         Assert.Equal(firstId, repository.UpdatedId);
         Assert.Equal(1, repository.Updates);
+        Assert.Equal(1, repository.ExpectedRevision);
+        Assert.Equal(2, session.Revision);
 
         await session.SaveAsync(repository, "http://shop:8090", nest, bytes, saveCopy: true);
         Assert.NotEqual(firstId, session.RemoteId);
@@ -50,6 +52,35 @@ public class NestSaveSessionTests
         Assert.Equal("http://new:8090", session.ServerUrl);
     }
 
+    [Fact]
+    public async Task FailedUpdate_RetainsIdServerAndExpectedRevision_NoAutomaticRetry()
+    {
+        var repository = new FakeRepository { Fail = true };
+        var session = new NestSaveSession();
+        var id = Guid.NewGuid();
+        session.Bind(id, "http://shop/", 4);
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, "http://shop", new Nest("Job"), [1]));
+        Assert.Equal(id, session.RemoteId);
+        Assert.Equal("http://shop", session.ServerUrl);
+        Assert.Equal(4, session.Revision);
+        Assert.Equal(4, repository.ExpectedRevision);
+        Assert.Equal(1, repository.Updates);
+        Assert.True(session.RequiresReload);
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, "http://shop", new Nest("Job"), [1]));
+        Assert.Equal(1, repository.Updates);
+        session.Bind(id, "http://shop", 5);
+        Assert.False(session.RequiresReload);
+    }
+
+    [Fact]
+    public void LegacyBind_DoesNotFabricateARevision()
+    {
+        var session = new NestSaveSession();
+        session.Bind(Guid.NewGuid(), "http://shop", 5);
+        session.Bind(Guid.NewGuid(), "http://shop");
+        Assert.Equal(0, session.Revision);
+    }
+
     private sealed class FakeRepository : INestRepository
     {
         public int Uploads { get; private set; }
@@ -57,6 +88,7 @@ public class NestSaveSessionTests
         public Guid UpdatedId { get; private set; }
         public NestRecord? LastRecord { get; private set; }
         public bool Fail { get; set; }
+        public int ExpectedRevision { get; private set; }
 
         public Task<NestRecord> UploadAsync(byte[] file, NestRecord record, CancellationToken ct = default)
         {
@@ -64,7 +96,15 @@ public class NestSaveSessionTests
             LastRecord = record;
             if (Fail) throw new IOException("Offline");
             record.Id = Guid.NewGuid();
+            record.Revision = 1;
             return Task.FromResult(record);
+        }
+
+        public Task<NestRecord> UpdateFileAsync(Guid id, byte[] file, NestRecord record, int expectedRevision, CancellationToken ct = default)
+        {
+            ExpectedRevision = expectedRevision;
+            record.Revision = expectedRevision + 1;
+            return UpdateFileAsync(id, file, record, ct);
         }
 
         public Task<NestRecord> UpdateFileAsync(Guid id, byte[] file, NestRecord record, CancellationToken ct = default)

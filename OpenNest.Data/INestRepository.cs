@@ -34,4 +34,19 @@ public interface INestRepository
         Guid id, NestRecord record, CancellationToken cancellationToken = default);
 
     Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads bounded immutable history; unsupported backends fail closed.</summary>
+    Task<NestRevisionPage> GetRevisionsAsync(Guid id, int offset = 0, int limit = 100,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support nest version history.");
+
+    Task<byte[]?> GetRevisionFileAsync(Guid id, int revisionNumber,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support nest version history.");
+
+    /// <summary>Atomically replaces the current archive only at the expected revision.</summary>
+    Task<NestRecord> UpdateFileAsync(Guid id, byte[] nestFile, NestRecord record, int expectedRevision,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support guarded saves. Upgrade the nest server and reload.");
+
 }

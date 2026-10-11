@@ -123,26 +123,84 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
     public async Task<NestRecord> UpdateFileAsync(
         Guid id, byte[] nestFile, NestRecord record, CancellationToken cancellationToken = default)
     {
-        using var content = BuildMultipart(nestFile, record);
-        using var response = await _httpClient.PutAsync(Url($"api/nests/{id}/file"), content, cancellationToken);
-        await EnsureSuccess(response, $"update nest {id}", cancellationToken);
-        return await ReadRecord(response, cancellationToken);
+        return await UpdateFileAsync(id, nestFile, record, record.Revision, cancellationToken);
     }
 
     public async Task<NestRecord> UpdateMetadataAsync(
         Guid id, NestRecord record, CancellationToken cancellationToken = default)
     {
-        using var content = new StringContent(
-            JsonSerializer.Serialize(record, JsonOptions), Encoding.UTF8, "application/json");
-        using var response = await _httpClient.PutAsync(Url($"api/nests/{id}/metadata"), content, cancellationToken);
-        await EnsureSuccess(response, $"update nest metadata {id}", cancellationToken);
-        return await ReadRecord(response, cancellationToken);
+        await Task.CompletedTask;
+        throw new IOException("Metadata updates require guarded revision support and are not available yet. Upgrade the client before editing server metadata.");
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.DeleteAsync(Url($"api/nests/{id}"), cancellationToken);
-        await EnsureSuccess(response, $"delete nest {id}", cancellationToken);
+        await Task.CompletedTask;
+        throw new IOException("Deletion requires guarded soft-delete support and is not available yet. Upgrade the client before deleting a server nest.");
+    }
+
+    public async Task<NestRevisionPage> GetRevisionsAsync(Guid id, int offset = 0, int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateId(id);
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        if (limit < 1 || limit > NestRevisionPage.MaxLimit) throw new ArgumentOutOfRangeException(nameof(limit));
+        using var response = await _httpClient.GetAsync(
+            Url($"api/nests/{id}/revisions?offset={offset.ToString(CultureInfo.InvariantCulture)}&limit={limit.ToString(CultureInfo.InvariantCulture)}"), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new IOException("Nest history is unavailable or this nest no longer exists. Upgrade the nest server if it does not support version history, then reload.");
+        await EnsureSuccess(response, $"read nest history {id}", cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<NestRevisionPage>(JsonOptions, cancellationToken)
+            ?? throw new IOException("Nest server returned an empty history page.");
+        if (page.Items is null || page.Items.Count > limit || page.Offset != offset || page.Limit != limit
+            || page.Total < 0 || page.Items.Count > System.Math.Max(0L, (long)page.Total - offset)
+            || page.Items.Any(item => item is null || item.Revision < 1 || item.Id != id)
+            || page.Items.Zip(page.Items.Skip(1)).Any(pair => pair.First.Revision <= pair.Second.Revision))
+            throw new IOException("Nest server returned an invalid or unbounded history page.");
+        return page;
+    }
+
+    public async Task<byte[]?> GetRevisionFileAsync(Guid id, int revisionNumber,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateId(id);
+        ValidateRevision(revisionNumber);
+        using var response = await _httpClient.GetAsync(Url($"api/nests/{id}/revisions/{revisionNumber.ToString(CultureInfo.InvariantCulture)}/file"), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        await EnsureSuccess(response, $"download nest {id} revision {revisionNumber}", cancellationToken);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
+    public async Task<NestRecord> UpdateFileAsync(Guid id, byte[] nestFile, NestRecord record, int expectedRevision,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateId(id);
+        if (expectedRevision < 1)
+            throw new IOException("This nest has no known revision. Upgrade the nest server and reload before saving, or Save As a new nest.");
+        // A legacy server can ignore If-Match and overwrite data. Prove history support
+        // before sending any mutation; never infer revision 1 from a legacy read.
+        var history = await GetRevisionsAsync(id, limit: 1, cancellationToken: cancellationToken);
+        if (history.Items.Count == 0)
+            throw new IOException("Nest server returned no revision history. Upgrade the nest server and reload before saving.");
+        using var request = new HttpRequestMessage(HttpMethod.Put, Url($"api/nests/{id}/file"));
+        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        request.Content = BuildMultipart(nestFile, record);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccess(response, $"update nest {id}; reload the current version or Save As after a conflict", cancellationToken);
+        var saved = await ReadRecord(response, cancellationToken);
+        if (saved.Id != id || saved.Revision < expectedRevision)
+            throw new IOException("Nest server returned an invalid saved revision. Reload to reconcile before saving again.");
+        return saved;
+    }
+
+    private static void ValidateId(Guid id)
+    {
+        if (id == Guid.Empty) throw new ArgumentException("A nest id is required.", nameof(id));
+    }
+
+    private static void ValidateRevision(int revisionNumber)
+    {
+        if (revisionNumber < 1) throw new ArgumentOutOfRangeException(nameof(revisionNumber));
     }
 
     public void Dispose()

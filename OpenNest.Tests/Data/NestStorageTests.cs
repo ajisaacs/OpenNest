@@ -179,18 +179,15 @@ public class RemoteNestRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateFileAsync_PutsMultipartToIdFileRoute()
+    public async Task UpdateFileAsync_RefusesLegacyRecordBeforeHttp()
     {
         var id = Guid.NewGuid();
         var record = SampleRecord(id);
         var handler = new StubHandler(_ => StubHandler.Json(record));
         using var repo = new RemoteNestRepository(new HttpClient(handler), "http://server:8090");
 
-        await repo.UpdateFileAsync(id, new byte[] { 9 }, record);
-
-        var request = handler.Requests[0];
-        Assert.Equal(HttpMethod.Put, request.Method);
-        Assert.EndsWith($"/api/nests/{id}/file", request.RequestUri!.ToString());
+        await Assert.ThrowsAsync<IOException>(() => repo.UpdateFileAsync(id, new byte[] { 9 }, record));
+        Assert.Empty(handler.Requests); // A legacy record has no revision precondition.
     }
 
     [Fact]
@@ -218,22 +215,19 @@ public class RemoteNestRepositoryTests
     }
 
     [Fact]
-    public async Task UpdateMetadataAsync_PutsJsonToMetadataRoute()
+    public async Task UpdateMetadataAsync_RefusesUntilGuardedHistoryIsAvailable()
     {
         var id = Guid.NewGuid();
         var record = SampleRecord(id);
         var handler = new StubHandler(_ => StubHandler.Json(record));
         using var repo = new RemoteNestRepository(new HttpClient(handler), "http://s");
 
-        await repo.UpdateMetadataAsync(id, record);
-
-        Assert.Equal(HttpMethod.Put, handler.Requests[0].Method);
-        Assert.EndsWith($"/api/nests/{id}/metadata", handler.Requests[0].RequestUri!.ToString());
-        Assert.Equal("application/json", handler.Requests[0].Content!.Headers.ContentType!.MediaType);
+        await Assert.ThrowsAsync<IOException>(() => repo.UpdateMetadataAsync(id, record));
+        Assert.Empty(handler.Requests); // Metadata history is delivered in S3.
     }
 
     [Fact]
-    public async Task DeleteAsync_ThrowsWithStatusDetailOnError()
+    public async Task DeleteAsync_RefusesUntilGuardedSoftDeleteIsAvailable()
     {
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)
         {
@@ -242,8 +236,8 @@ public class RemoteNestRepositoryTests
         using var repo = new RemoteNestRepository(new HttpClient(handler), "http://s");
 
         var ex = await Assert.ThrowsAsync<IOException>(() => repo.DeleteAsync(Guid.NewGuid()));
-        Assert.Contains("500", ex.Message);
-        Assert.Contains("disk on fire", ex.Message);
+        Assert.Contains("soft-delete", ex.Message);
+        Assert.Empty(handler.Requests);
     }
 
     [Fact]
