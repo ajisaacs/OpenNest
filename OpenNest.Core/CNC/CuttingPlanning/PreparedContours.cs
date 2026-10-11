@@ -254,12 +254,11 @@ public sealed class PreparedContours
                          .Where(p => p.Kind == AutomaticEntryKind.ConvexCorner))
             {
                 token.ThrowIfCancellationRequested();
-                var cornerPoint = End(shape.Entities[corner.EntityOrdinal]);
                 // Back INTO each incident edge from the corner: the edge ending at the
                 // corner retreats against its own travel, the edge starting at the corner
                 // advances along its own travel.
-                AddInset(corner.EntityOrdinal, cornerPoint, inward: false);
-                AddInset((corner.EntityOrdinal + 1) % count, cornerPoint, inward: true);
+                AddInset(corner.EntityOrdinal, inward: false);
+                AddInset((corner.EntityOrdinal + 1) % count, inward: true);
             }
         }
 
@@ -276,7 +275,7 @@ public sealed class PreparedContours
         token.ThrowIfCancellationRequested();
         return fallbacks;
 
-        void AddInset(int entityOrdinal, Vector corner, bool inward)
+        void AddInset(int entityOrdinal, bool inward)
         {
             // `inward` selects along the edge's own travel from its start; without it the
             // point retreats against travel. Both ways move BACK INTO the edge from the
@@ -285,7 +284,9 @@ public sealed class PreparedContours
                 return;
             var direction = (line.EndPoint - line.StartPoint).Normalize();
             var offset = direction * (2 * lead);
-            var point = inward ? corner + offset : corner - offset;
+            // Adjacent native endpoints may differ within contour-continuity tolerance.
+            // Anchor to the selected edge itself, never the preceding edge's vertex.
+            var point = inward ? line.StartPoint + offset : line.EndPoint - offset;
             // Strictly inside the edge by projection parameter (distance alone loses the
             // sign when a short edge is overshoot): never the corner, never the far
             // endpoint (where a reflex vertex might sit). Short edges omit the point.

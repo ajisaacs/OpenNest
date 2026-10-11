@@ -192,6 +192,11 @@ more of the catalogue; a later side cannot lose a usable point merely because
 an earlier side's scan passed it. Replacements preserve other covered sides and
 global rank, never exceed the cap, and stop evaluating the tail once coverage
 settles. Smaller caps retain rank priority rather than promising all-side coverage.
+An inset near a convex corner is measured along the selected native straight edge from
+that edge's own endpoint, not a neighboring entity's endpoint. This keeps the
+candidate on its selected entity when a joined contour has an accepted rounding gap;
+no entry-membership or lead-clearance tolerance is widened.
+
 The next cut is the next unfinished part in a supplied order — recomputed
 after every learned-order replan — or, in the full fallback search, the nearest
 dependency-ready remaining part, stable-ordinal ties; the last part has no

@@ -311,6 +311,36 @@ public class ContourEntryCandidateTests
     }
 
     [Fact]
+    public void NearCornerOnRoundedJointStaysOnItsSelectedLine()
+    {
+        // Native contour joints can differ within the accepted closure tolerance. The
+        // preceding edge's corner is off the following edge by one micron, while the
+        // near-corner entry must lie on the following edge itself.
+        var shape = new Shape();
+        shape.Entities.Add(new Line(0, 0, 10, 0));
+        shape.Entities.Add(new Line(10, 0, 10, 10));
+        shape.Entities.Add(new Line(10, 10.000001, 0, 10.000001));
+        shape.Entities.Add(new Line(0, 10.000001, 0, 0));
+        shape.UpdateBounds();
+        // Capture constructs this exact owned native shape after program conversion;
+        // build it directly to characterize its legal, sub-tolerance joint discrepancy.
+        var constructor = typeof(PreparedContours).GetConstructor(
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
+            null, [typeof(Shape[]), typeof(List<Entity>), typeof(OpenNest.CNC.CuttingStrategy.CuttingParameters)], null);
+        Assert.NotNull(constructor);
+        var prepared = (PreparedContours)constructor.Invoke([
+            new[] { shape }, new List<Entity>(), ExplicitContourTests.Parameters()]);
+        var near = prepared.AutomaticEntryCandidatesWithFallbacks(0)
+            .Where(c => c.Kind == AutomaticEntryKind.NearCorner).ToList();
+        Assert.NotEmpty(near);
+        Assert.All(near, c => Assert.Equal(c.Choice.Point,
+            prepared.Entry(c.Choice.ContourOrdinal, c.Choice.EntityOrdinal, c.Choice.Point).Point));
+        Assert.Contains(near, c => c.Choice.EntityOrdinal == 2 &&
+            System.Math.Abs(c.Choice.Point.Y - 10.000001) < 1e-10);
+        Assert.Throws<ArgumentException>(() => prepared.Entry(0, 2, new Vector(9.4, 10)));
+    }
+
+    [Fact]
     public void ShortEdge_OmitsNearCornerInsteadOfExtrapolating()
     {
         // 10 x 0.4 rectangle: every convex corner's vertical edge (0.4) is shorter than
