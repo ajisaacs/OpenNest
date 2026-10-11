@@ -151,10 +151,10 @@ For an ambiguous first upload (including Save As or a server switch), OpenNest
 keeps the client-generated pending ID and blocks another upload. The next Save
 checks that exact ID on the original server without writing: if it exists with
 the exact attempted archive and metadata, the document binds to its revision;
-if it is absent, a further explicit Save may retry with the same ID. If it
-differs, reopen the server record to review it; do not discard the pending
-identity or blindly create another record. Older servers remain read-only for
-existing nests until upgraded.
+if it is absent, another explicit Save (or Save As for a pending copy) may
+retry with the same ID. If it differs, reopen the server record to review it;
+do not discard the pending identity or blindly create another record. Older
+servers remain read-only for existing nests until upgraded.
 
 ## Server integration tests
 

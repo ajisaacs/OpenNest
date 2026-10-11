@@ -66,6 +66,68 @@ public sealed class NestHistoryClientTests
         Assert.Single(await repository.ListAsync());
     }
 
+    private sealed class FirstPostFailsBeforeSend : DelegatingHandler
+    {
+        private bool failed;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            if (request.Method == HttpMethod.Post && !failed)
+            {
+                failed = true;
+                throw new IOException("Upload was not sent.");
+            }
+            return base.SendAsync(request, ct);
+        }
+    }
+
+    [Fact]
+    public async Task AbsentPendingUpload_RetriesSameIdOnlyAfterExplicitReconciliation()
+    {
+        using var factory = new ServerFactory();
+        using var http = factory.CreateDefaultClient(new FirstPostFailsBeforeSend());
+        using var repository = new RemoteNestRepository(http, http.BaseAddress!.ToString());
+        var session = new NestSaveSession();
+        var nest = NestApiTests.SyntheticNest();
+        var archive = NestApiTests.Archive(nest);
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, http.BaseAddress.ToString(), nest, archive));
+        var pending = session.PendingCreateId;
+        Assert.Empty(await repository.ListAsync());
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, http.BaseAddress.ToString(), nest, archive));
+        Assert.Null(await session.ReconcilePendingCreateAsync(repository, http.BaseAddress.ToString()));
+        Assert.False(session.RequiresReload);
+        var created = await session.SaveAsync(repository, http.BaseAddress.ToString(), nest, archive);
+        Assert.Equal(pending, created.Id);
+        Assert.Equal(1, created.Revision);
+        Assert.Single(await repository.ListAsync());
+    }
+
+    [Fact]
+    public async Task AbsentPendingSaveAs_NeverUpdatesBoundOriginalOnRetry()
+    {
+        using var factory = new ServerFactory();
+        using var seedHttp = factory.CreateClient();
+        using var seed = new RemoteNestRepository(seedHttp, seedHttp.BaseAddress!.ToString());
+        var nest = NestApiTests.SyntheticNest();
+        var originalBytes = NestApiTests.Archive(nest);
+        var original = await seed.UploadAsync(originalBytes, new NestRecord { Name = "Original" });
+        using var http = factory.CreateDefaultClient(new FirstPostFailsBeforeSend());
+        using var repository = new RemoteNestRepository(http, http.BaseAddress!.ToString());
+        var session = new NestSaveSession();
+        session.Bind(original.Id, http.BaseAddress.ToString(), original.Revision);
+        nest.Name = "Copied nest";
+        var copyBytes = NestApiTests.Archive(nest);
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, http.BaseAddress.ToString(), nest, copyBytes, saveCopy: true));
+        var pending = session.PendingCreateId;
+        Assert.Null(await session.ReconcilePendingCreateAsync(repository, http.BaseAddress.ToString()));
+        await Assert.ThrowsAsync<IOException>(() => session.SaveAsync(repository, http.BaseAddress.ToString(), nest, copyBytes));
+        var copy = await session.SaveAsync(repository, http.BaseAddress.ToString(), nest, copyBytes, saveCopy: true);
+        Assert.Equal(pending, copy.Id);
+        Assert.NotEqual(original.Id, copy.Id);
+        Assert.Equal(1, (await repository.GetMetadataAsync(original.Id))!.Revision);
+        Assert.Equal(originalBytes, await repository.GetFileAsync(original.Id));
+        Assert.Equal(copyBytes, await repository.GetFileAsync(copy.Id));
+    }
+
     [Fact]
     public async Task RealClient_CreatesAndUpdatesOneNestWithExactHistoricalArchives()
     {

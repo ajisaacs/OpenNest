@@ -12,9 +12,11 @@ public sealed class NestSaveSession
     public int Revision { get; private set; }
     public bool RequiresReload { get; private set; }
     public Guid PendingCreateId { get; private set; }
+    public bool PendingCreateWasCopy => PendingCreateId != Guid.Empty && pendingCreateWasCopy;
     private string pendingCreateUrl = "";
     private byte[]? pendingCreateArchive;
     private NestRecord? pendingCreateMetadata;
+    private bool pendingCreateWasCopy;
 
     public void Bind(Guid id, string serverUrl, int revision)
     {
@@ -34,6 +36,7 @@ public sealed class NestSaveSession
         PendingCreateId = Guid.Empty;
         pendingCreateArchive = null;
         pendingCreateMetadata = null;
+        pendingCreateWasCopy = false;
         pendingCreateUrl = "";
     }
 
@@ -72,10 +75,11 @@ public sealed class NestSaveSession
         if (normalizedUrl.Length == 0)
             throw new ArgumentException("A database server URL is required.", nameof(serverUrl));
 
-        if (PendingCreateId != Guid.Empty && (RequiresReload || normalizedUrl != pendingCreateUrl || saveCopy))
-            throw new IOException("The previous upload may have succeeded. Reconcile its pending ID on the original server before saving or copying.");
+        if (PendingCreateId != Guid.Empty && (RequiresReload || normalizedUrl != pendingCreateUrl
+            || saveCopy != pendingCreateWasCopy))
+            throw new IOException("Reconcile the pending upload on its original server, then retry with the same Save or Save As action.");
         var id = !saveCopy && ServerUrl == normalizedUrl ? RemoteId : Guid.Empty;
-        var creating = id == Guid.Empty;
+        var creating = PendingCreateId != Guid.Empty || id == Guid.Empty;
         var uploadId = creating ? (PendingCreateId == Guid.Empty ? Guid.NewGuid() : PendingCreateId) : id;
         var record = NestRecordFactory.FromNest(nest, uploadId, archive.LongLength);
         if (!creating && (Revision < 1 || RequiresReload))
@@ -86,6 +90,7 @@ public sealed class NestSaveSession
             pendingCreateUrl = normalizedUrl;
             pendingCreateArchive = archive.ToArray();
             pendingCreateMetadata = record;
+            pendingCreateWasCopy = saveCopy;
         }
         NestRecord saved;
         try

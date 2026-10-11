@@ -722,12 +722,12 @@ namespace OpenNest.Forms
             {
                 var serverUrl = NestStorage.Settings.ServerUrl;
                 var repository = NestStorage.CreateRepository();
-                if (form.Document.PendingCreateId != Guid.Empty)
+                if (form.Document.PendingCreateRequiresReconciliation)
                 {
                     var reconciled = await form.Document.ReconcilePendingCreateAsync(repository, serverUrl);
                     if (!IsDisposed)
                         statusLabel1.Text = reconciled is null
-                            ? "No pending nest was found. Review your work, then Save again to retry the same ID."
+                            ? $"No pending nest was found. Review your work, then {(form.Document.PendingCreateWasCopy ? "Save As" : "Save")} again to retry the same ID."
                             : $"Found saved version {reconciled.Revision}. Review the current nest before saving again.";
                     return; // Never combine reconciliation with a write in the same click.
                 }
