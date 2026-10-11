@@ -76,6 +76,70 @@ namespace OpenNest.Tests.CNC
             Assert.Equal(new Vector(108, 204), segments[1].To);
         }
 
+        [Theory]
+        [InlineData(Mode.Absolute)]
+        [InlineData(Mode.Incremental)]
+        public void Enumerate_ProgramStartingWithCut_RetainsFirstInternalRapid(Mode mode)
+        {
+            // A saved placed program can start with a lead-in cut rather than a G00.
+            // The first G00 then travels from that cutout to the next one.
+            var pgm = new Program(mode);
+            pgm.Codes.Add(new LinearMove(2, 0));
+            pgm.Codes.Add(new RapidMove(4, 1));
+            pgm.Codes.Add(new LinearMove(5, 1));
+            pgm.Codes.Add(new RapidMove(6, 2));
+
+            var segments = RapidEnumerator.Enumerate(
+                pgm,
+                basePos: new Vector(100, 200),
+                startPos: Vector.Zero
+            );
+
+            Assert.Equal(3, segments.Count);
+            Assert.Equal(new RapidEnumerator.Segment(Vector.Zero, new Vector(100, 200)), segments[0]);
+            Assert.Equal(new Vector(102, 200), segments[1].From);
+            Assert.Equal(mode == Mode.Absolute ? new Vector(104, 201) : new Vector(106, 201), segments[1].To);
+            Assert.Equal(mode == Mode.Absolute ? new Vector(105, 201) : new Vector(111, 202), segments[2].From);
+        }
+
+        [Fact]
+        public void Enumerate_EveryPartStartingWithCut_RetainsItsFirstRapid()
+        {
+            var program = new Program(Mode.Incremental);
+            program.Codes.Add(new LinearMove(1, 0));
+            program.Codes.Add(new RapidMove(1, 1));
+            program.Codes.Add(new LinearMove(0, 1));
+            var drawing = new Drawing("cut-first", program);
+            var parts = new[]
+            {
+                new Part(drawing, new Vector(10, 20)),
+                new Part(drawing, new Vector(30, 40)),
+            };
+
+            var segments = RapidEnumerator.Enumerate(parts);
+
+            Assert.Equal(4, segments.Count);
+            Assert.Equal(new RapidEnumerator.Segment(new Vector(11, 20), new Vector(12, 21)), segments[1]);
+            Assert.Equal(new RapidEnumerator.Segment(new Vector(31, 40), new Vector(32, 41)), segments[3]);
+        }
+
+        [Fact]
+        public void Enumerate_SubProgramStartingWithCut_RetainsFirstInternalRapid()
+        {
+            var hole = new Program(Mode.Incremental);
+            hole.Codes.Add(new LinearMove(1, 0));
+            hole.Codes.Add(new RapidMove(2, 1));
+            hole.Codes.Add(new LinearMove(0, 1));
+            var pgm = new Program(Mode.Absolute);
+            pgm.Codes.Add(new SubProgramCall { Id = 1, Program = hole, Offset = new Vector(5, 5) });
+
+            var segments = RapidEnumerator.Enumerate(pgm, new Vector(100, 200), Vector.Zero);
+
+            Assert.Equal(2, segments.Count);
+            Assert.Equal(new RapidEnumerator.Segment(Vector.Zero, new Vector(105, 205)), segments[0]);
+            Assert.Equal(new RapidEnumerator.Segment(new Vector(106, 205), new Vector(108, 206)), segments[1]);
+        }
+
         [Fact]
         public void Enumerate_SubProgramCall_RapidEndsAtAbsoluteHolePierce()
         {

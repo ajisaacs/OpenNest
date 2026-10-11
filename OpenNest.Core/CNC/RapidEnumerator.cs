@@ -31,16 +31,16 @@ namespace OpenNest.CNC
 
         private static Vector AppendProgram(Program pgm, Vector basePos, Vector startPos, List<Segment> results)
         {
-            // Draw the rapid from the previous tool position to the program's first
-            // pierce point. The walk then starts at the program origin (basePos), not
-            // the pierce: the skipped first rapid still advances pos, so starting at
-            // the pierce would apply a nonzero Incremental first delta twice (as in
-            // lead-in programs) and shift every later rapid by it.
+            // Draw the approach to the first rapid destination, or to the program
+            // origin when it starts cutting without a rapid. Only an initial rapid
+            // (or call arrival) is already represented by this approach; a later
+            // first rapid must remain visible. Walk starts at the program origin,
+            // so an incremental initial rapid is not applied twice.
             var firstPierce = FirstPiercePoint(pgm, basePos);
             results.Add(new Segment(startPos, firstPierce));
 
             var pos = basePos;
-            Walk(pgm, basePos, ref pos, skipFirst: true, results);
+            Walk(pgm, basePos, ref pos, skipFirst: StartsWithRapidOrCall(pgm), results);
             // The last rapid ends at a pierce, not necessarily the final tool position.
             return pos;
         }
@@ -53,9 +53,21 @@ namespace OpenNest.CNC
                     return FirstPiercePoint(call.Program, basePos + call.Offset);
 
                 if (pgm[i] is Motion motion)
-                    return motion.EndPoint + basePos;
+                    return motion is RapidMove ? motion.EndPoint + basePos : basePos;
             }
             return basePos;
+        }
+
+        private static bool StartsWithRapidOrCall(Program pgm)
+        {
+            for (var i = 0; i < pgm.Length; i++)
+            {
+                if (pgm[i] is SubProgramCall { Program: not null })
+                    return true;
+                if (pgm[i] is Motion motion)
+                    return motion is RapidMove;
+            }
+            return false;
         }
 
         private static void Walk(
@@ -83,7 +95,7 @@ namespace OpenNest.CNC
                         results.Add(new Segment(pos, firstPierce));
 
                     var subPos = holeBase;
-                    Walk(program, holeBase, ref subPos, skipFirst: true, results);
+                    Walk(program, holeBase, ref subPos, skipFirst: StartsWithRapidOrCall(program), results);
                     pos = subPos;
                 }
                 else if (code is Motion motion)
