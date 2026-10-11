@@ -118,6 +118,19 @@ app.MapGet("/api/nests/deleted/{id:guid}/revisions/{revision:int}/file", (Guid i
     revision < 1 ? Results.BadRequest("Invalid revision.") :
     db.GetRevisionFile(id, revision, deleted: true) is { } file ? Results.File(file, "application/zip") : Results.NotFound());
 
+app.MapPost("/api/nests/{id:guid}/revisions/{revision:int}/restore", (Guid id, int revision, HttpRequest request, NestDatabase db) =>
+{
+    var error = ReadPrecondition(request, out var expected);
+    if (error is not null) return error;
+    if (revision < 1) return Results.BadRequest("Invalid revision.");
+    try
+    {
+        var restored = db.Restore(id, revision, expected);
+        return restored is null ? Results.NotFound() : Results.Ok(restored);
+    }
+    catch (RevisionConflictException conflict) { return Results.Json(conflict.Current, statusCode: 409); }
+});
+
 app.Run();
 
 static IResult? ReadPrecondition(HttpRequest request, out int revision)

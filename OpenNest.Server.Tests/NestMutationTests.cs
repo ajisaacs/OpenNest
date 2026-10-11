@@ -141,6 +141,141 @@ public sealed class NestMutationTests
         Assert.Equal(new byte[] { 1 }, reopened.GetFile(saved.Id, recover));
     }
 
+    [Fact]
+    public async Task Restore_AppendsSelectedSnapshotWithoutChangingInterveningHistory()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var first = await repository.UploadAsync([0, 255], new NestRecord { Name = "Original", Comments = "Before" });
+        var second = await repository.UpdateFileAsync(first.Id, [3, 4], new NestRecord { Name = "Changed" }, 1);
+        var before = await repository.GetRevisionsAsync(first.Id);
+        var restored = await repository.RestoreAsync(first.Id, 1, 2);
+        Assert.Equal(1, restored.RestoredFromRevision);
+        var current = (await repository.GetMetadataAsync(first.Id))!;
+        Assert.Equal(3, current.Revision);
+        Assert.Equal(first.Id, current.Id);
+        Assert.Equal("Original", current.Name);
+        Assert.Equal("Before", current.Comments);
+        Assert.Equal(new byte[] { 0, 255 }, await repository.GetFileAsync(first.Id));
+        Assert.Equal(new byte[] { 3, 4 }, await repository.GetRevisionFileAsync(first.Id, 2));
+        var after = await repository.GetRevisionsAsync(first.Id);
+        Assert.Equal(3, after.Total);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Items), System.Text.Json.JsonSerializer.Serialize(after.Items.Skip(1)));
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Equal(3, reopened.History(first.Id, 0, 100)!.Total);
+        Assert.Equal(new byte[] { 0, 255 }, reopened.GetFile(first.Id));
+    }
+
+    [Theory]
+    [InlineData(null, 1, 428)]
+    [InlineData("1", 1, 400)]
+    [InlineData("\"2\"", 1, 409)]
+    [InlineData("\"1\"", 0, 400)]
+    [InlineData("\"1\"", 99, 404)]
+    public async Task Restore_RejectedWriteLeavesHistory(string? header, int source, int status)
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var saved = await repository.UploadAsync([1], new NestRecord { Name = "Fixture" });
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/nests/{saved.Id}/revisions/{source}/restore");
+        if (header is not null) request.Headers.TryAddWithoutValidation("If-Match", header);
+        using var response = await client.SendAsync(request);
+        Assert.Equal(status, (int)response.StatusCode);
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Equal(1, reopened.History(saved.Id, 0, 100)!.Total);
+        Assert.Equal(new byte[] { 1 }, reopened.GetFile(saved.Id));
+        Assert.Null(reopened.Get(saved.Id)!.RestoredFromRevision);
+    }
+
+    [Fact]
+    public async Task Restore_FailedSnapshotRollsBackAndSameContentStillAppends()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var saved = await repository.UploadAsync([1], new NestRecord { Name = "Fixture" });
+        var restored = await repository.RestoreAsync(saved.Id, 1, 1);
+        Assert.Equal(2, restored.Revision);
+        Assert.Equal(1, restored.RestoredFromRevision);
+        FailSnapshots(factory.DatabasePath);
+        Assert.Contains("500", (await Assert.ThrowsAsync<IOException>(() => repository.RestoreAsync(saved.Id, 1, 2))).Message);
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Equal(2, reopened.History(saved.Id, 0, 100)!.Total);
+        Assert.Equal(new byte[] { 1 }, reopened.GetFile(saved.Id));
+        Assert.Equal(1, reopened.Get(saved.Id)!.RestoredFromRevision);
+    }
+
+    [Theory]
+    [InlineData("metadata")]
+    [InlineData("delete")]
+    [InlineData("restore")]
+    [InlineData("recover")]
+    public async Task Mutations_UnknownOrWrongVisibilityIs404(string operation)
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var saved = await repository.UploadAsync([1], new NestRecord { Name = "Fixture" });
+        if (operation != "recover") await repository.DeleteAsync(saved.Id, 1);
+        foreach (var id in new[] { saved.Id, Guid.NewGuid() })
+        {
+            using var request = new HttpRequestMessage(operation == "metadata" ? HttpMethod.Put :
+                operation == "delete" ? HttpMethod.Delete : HttpMethod.Post,
+                operation switch
+                {
+                    "metadata" => $"/api/nests/{id}/metadata",
+                    "delete" => $"/api/nests/{id}",
+                    "restore" => $"/api/nests/{id}/revisions/1/restore",
+                    _ => $"/api/nests/deleted/{id}/recover"
+                });
+            request.Headers.TryAddWithoutValidation("If-Match", "\"1\"");
+            if (operation == "metadata") request.Content = JsonContent.Create(new NestRecord());
+            using var response = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Equal(operation == "recover" ? 1 : 2, reopened.History(saved.Id, 0, 100, operation != "recover")!.Total);
+    }
+
+    [Theory]
+    [InlineData("metadata")]
+    [InlineData("delete")]
+    [InlineData("restore")]
+    [InlineData("recover")]
+    public async Task ConcurrentMutation_OnlyOneExpectedRevisionWins(string operation)
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var repository = new RemoteNestRepository(client, client.BaseAddress!.ToString());
+        var saved = await repository.UploadAsync([1], new NestRecord { Name = "Fixture" });
+        var expected = 1;
+        if (operation == "recover") { await repository.DeleteAsync(saved.Id, 1); expected = 2; }
+        var attempts = Enumerable.Range(0, 2).Select(async i =>
+        {
+            using var request = new HttpRequestMessage(operation == "metadata" ? HttpMethod.Put :
+                operation == "delete" ? HttpMethod.Delete : HttpMethod.Post,
+                operation switch
+                {
+                    "metadata" => $"/api/nests/{saved.Id}/metadata",
+                    "delete" => $"/api/nests/{saved.Id}",
+                    "restore" => $"/api/nests/{saved.Id}/revisions/1/restore",
+                    _ => $"/api/nests/deleted/{saved.Id}/recover"
+                });
+            request.Headers.TryAddWithoutValidation("If-Match", $"\"{expected}\"");
+            if (operation == "metadata") request.Content = JsonContent.Create(new NestRecord { Name = $"Writer {i}" });
+            using var response = await client.SendAsync(request);
+            return response.StatusCode;
+        });
+        var statuses = await Task.WhenAll(attempts);
+        Assert.Single(statuses.Where(s => s == HttpStatusCode.OK));
+        Assert.Single(statuses.Where(s => s == (operation is "delete" or "recover" ? HttpStatusCode.NotFound : HttpStatusCode.Conflict)));
+        using var reopened = new NestDatabase(factory.DatabasePath, pooling: false);
+        Assert.Equal(expected + 1, reopened.History(saved.Id, 0, 100, operation == "delete")!.Total);
+        Assert.Equal(new byte[] { 1 }, reopened.GetRevisionFile(saved.Id, 1, operation == "delete"));
+    }
+
     private static void FailSnapshots(string path)
     {
         using var connection = new SqliteConnection($"Data Source={path};Pooling=False");

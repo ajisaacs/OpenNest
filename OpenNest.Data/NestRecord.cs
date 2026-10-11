@@ -16,6 +16,9 @@ public sealed class NestRecord
 
     public bool Deleted { get; set; }
 
+    /// <summary>Selected historical revision promoted by an explicit Restore.</summary>
+    public int? RestoredFromRevision { get; set; }
+
     public string Name { get; set; } = "";
 
     public string Customer { get; set; } = "";

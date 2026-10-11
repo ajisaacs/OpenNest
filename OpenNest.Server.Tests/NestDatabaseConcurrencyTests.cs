@@ -19,6 +19,7 @@ public sealed class NestDatabaseConcurrencyTests
     [InlineData("UpdateFile")]
     [InlineData("UpdateMetadata")]
     [InlineData("SetDeleted")]
+    [InlineData("Restore")]
     [InlineData("History")]
     [InlineData("GetRevisionFile")]
     [InlineData("Health")]
@@ -49,6 +50,7 @@ public sealed class NestDatabaseConcurrencyTests
                     case "UpdateFile": database.Update(id, record, new byte[] { 5 }, 1); break;
                     case "UpdateMetadata": database.UpdateMetadata(id, record, 1); break;
                     case "SetDeleted": database.SetDeleted(id, true, 1); break;
+                    case "Restore": database.Restore(id, 1, 1); break;
                     case "History": database.History(id, 0, 100); break;
                     case "GetRevisionFile": database.GetRevisionFile(id, 1); break;
                     case "Health": Assert.True(database.IsHealthy()); break;
@@ -118,6 +120,7 @@ public sealed class NestDatabaseConcurrencyTests
                 () => database.History(id, 0, 100, true),
                 () => database.GetRevisionFile(id, 1, true),
                 () => database.SetDeleted(id, false, 3),
+                () => database.Restore(id, 1, 4),
             ];
             foreach (var operation in operations)
             {

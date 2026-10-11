@@ -68,6 +68,10 @@ public interface INestRepository
     Task<NestRecord> DeleteAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("This repository does not support guarded deletion.");
 
+    Task<NestRecord> RestoreAsync(Guid id, int sourceRevision, int expectedRevision,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("This repository does not support guarded restoration.");
+
     Task<NestRecord> RecoverAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("This repository does not support guarded recovery.");
 

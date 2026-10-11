@@ -139,10 +139,16 @@ public class RemoteNestHistoryTests
     [Fact]
     public async Task LegacyMetadataAndDelete_AreNeverSentToAnOldServer()
     {
-        using var http = new HttpClient(new Handler(_ => throw new InvalidOperationException("Unsafe mutation")));
+        var mutations = 0;
+        using var http = new HttpClient(new Handler(request =>
+        {
+            if (request.Method != HttpMethod.Get) mutations++;
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }));
         using var repository = new RemoteNestRepository(http, "http://legacy/");
-        await Assert.ThrowsAsync<IOException>(() => repository.UpdateMetadataAsync(Guid.NewGuid(), new NestRecord()));
-        await Assert.ThrowsAsync<IOException>(() => repository.DeleteAsync(Guid.NewGuid()));
+        await Assert.ThrowsAsync<IOException>(() => repository.UpdateMetadataAsync(Guid.NewGuid(), new NestRecord { Revision = 1 }));
+        await Assert.ThrowsAsync<IOException>(() => repository.DeleteAsync(Guid.NewGuid(), 1));
+        Assert.Equal(0, mutations);
     }
 
     private static HttpResponseMessage History(Guid id) => Json(new NestRevisionPage

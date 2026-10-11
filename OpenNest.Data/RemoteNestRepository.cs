@@ -236,6 +236,21 @@ public sealed class RemoteNestRepository : INestRepository, IDisposable
         return await ReadRecord(response, cancellationToken);
     }
 
+    public async Task<NestRecord> RestoreAsync(Guid id, int sourceRevision, int expectedRevision,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateId(id);
+        ValidateRevision(sourceRevision);
+        ValidateRevision(expectedRevision);
+        await GetRevisionsAsync(id, limit: 1, cancellationToken: cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post,
+            Url($"api/nests/{id}/revisions/{sourceRevision.ToString(CultureInfo.InvariantCulture)}/restore"));
+        request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{expectedRevision.ToString(CultureInfo.InvariantCulture)}\""));
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccess(response, $"restore nest {id}; reload after a conflict", cancellationToken);
+        return await ReadRecord(response, cancellationToken);
+    }
+
     public Task<NestRecord> DeleteAsync(Guid id, int expectedRevision, CancellationToken cancellationToken = default) =>
         ChangeVisibilityAsync(id, expectedRevision, true, cancellationToken);
 
