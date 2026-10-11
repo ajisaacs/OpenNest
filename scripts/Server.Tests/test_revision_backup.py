@@ -215,7 +215,7 @@ class DocumentationTests(unittest.TestCase):
             for volume in self.volumes:
                 labels = json.loads(self.docker('volume', 'inspect', '--format', '{{json .Labels}}', volume).stdout)
                 self.assertTrue(labels.get('com.opennest.doc-owner') == self.token
-                                or labels.get('com.opennest.restore.owner') == volume and volume.startswith(self.token + '-'))
+                                or bool(labels.get('com.opennest.restore.owner')) and volume.startswith(self.token + '-'))
                 self.assertEqual('', self.docker('container', 'ls', '-aq', '--filter', 'volume=' + volume).stdout.strip(),
                                  'A documentation check container was not removed')
                 self.docker('volume', 'rm', volume)
@@ -236,6 +236,15 @@ class DocumentationTests(unittest.TestCase):
         restored = self.token + '-restored'
         refused = self.procedure(f'if restore_check backup {self.image} {self.volume}; then exit 90; fi')
         self.assertIn('already exists', refused.stderr)
+        refused = self.procedure(
+            f'docker() {{ if [[ "$1 $2" == "volume ls" ]]; then return 47; fi; command docker "$@"; }}; '
+            f'if restore_check backup {self.image} {self.token}-lookup-failed; then exit 90; fi')
+        self.assertIn('could not inspect Docker volumes', refused.stderr)
+        raced = self.procedure(
+            f'docker() {{ if [[ "$1 $2" == "volume ls" ]]; then return 0; fi; command docker "$@"; }}; '
+            f'if restore_check backup {self.image} {self.volume}; then exit 90; fi')
+        self.assertIn('ownership differs', raced.stderr)
+        self.assertEqual(started, self.docker('inspect', '--format', '{{.State.StartedAt}}', self.cid).stdout)
         self.volumes.append(restored)
         self.procedure(f'restore_check backup {self.image} {restored}')
         tampered = self.token + '-tampered'

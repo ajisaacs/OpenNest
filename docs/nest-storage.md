@@ -146,9 +146,15 @@ or guarantee of future disk capacity.
 
 Revision preconditions refuse stale edits; the database monitor is not a document
 edit lock. After a conflict, explicitly reload the newer revision or Save As a
-separate nest. After an ambiguous network failure, fetch current metadata before
-retrying; never blindly replay a write. Legacy desktops may read but must upgrade
-before updating/deleting. A version-aware client refuses writes to a legacy server.
+separate nest. After an ambiguous update failure, reload the current version before another save.
+For an ambiguous first upload (including Save As or a server switch), OpenNest
+keeps the client-generated pending ID and blocks another upload. The next Save
+checks that exact ID on the original server without writing: if it exists with
+the exact attempted archive and metadata, the document binds to its revision;
+if it is absent, a further explicit Save may retry with the same ID. If it
+differs, reopen the server record to review it; do not discard the pending
+identity or blindly create another record. Older servers remain read-only for
+existing nests until upgraded.
 
 ## Server integration tests
 
@@ -336,10 +342,14 @@ restore_check() (  # usage: restore_check opennest-data-YYYY-MM-DD <image> [new-
   fail() { echo "STOP: $*" >&2; exit 1; }
   [[ -r "$1.tar" && -r "$1.manifest" && -r "$1.metadata.json" ]] || fail "backup is incomplete"
   restore=${3:-opennest-data-restore-$(date +%Y%m%d-%H%M%S)}
-  ! docker volume inspect "$restore" > /dev/null 2>&1 || fail "volume $restore already exists"
-  docker volume create --label "com.opennest.restore.owner=$restore" "$restore" > /dev/null \
+  existing=$(docker volume ls --format '{{.Name}}') || fail "could not inspect Docker volumes"
+  while IFS= read -r volume; do
+    [[ "$volume" != "$restore" ]] || fail "volume $restore already exists"
+  done <<< "$existing"
+  owner=$(python3 -c 'import secrets; print(secrets.token_hex(16))') || fail "could not create ownership token"
+  docker volume create --label "com.opennest.restore.owner=$owner" "$restore" > /dev/null \
     || fail "could not create volume $restore"
-  [[ $(docker volume inspect --format '{{index .Labels "com.opennest.restore.owner"}}' "$restore") == "$restore" ]] \
+  [[ $(docker volume inspect --format '{{index .Labels "com.opennest.restore.owner"}}' "$restore") == "$owner" ]] \
     || fail "restore volume ownership differs"
   echo "Restoring into new volume $restore"
   docker run --rm -i --network none --entrypoint tar -v "$restore:/app/data" "$2" \
