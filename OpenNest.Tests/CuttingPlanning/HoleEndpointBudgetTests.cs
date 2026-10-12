@@ -55,6 +55,12 @@ public class HoleEndpointBudgetTests
         Assert.Contains(checker.Check(snapshot.Placements[1].Execution, execution.DeparturePoint, 2),
             f => f.Kind == PostVerificationKind.RapidCrossing);
 
+        var measured = JointCuttingPlanSearch.Run(snapshot, default);
+        // The untouched baseline spent 63 prechecks in both modes because it evaluated
+        // alternates even in the single-chain pass. The fallback remains available.
+        Assert.Equal(CuttingPlanStatus.Ready, measured.Status);
+        Assert.True(measured.LeadPrechecks < 63,
+            $"Expected fewer prechecks than the baseline's 63; got {measured.LeadPrechecks}.");
         var result = CuttingPlanService.Plan(snapshot);
 
         Assert.True(result.Status == CuttingPlanStatus.Ready,

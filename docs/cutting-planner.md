@@ -97,10 +97,13 @@ revisit an earlier entry when a later part cannot be reached safely. For multi-p
 requests containing regenerated holes, it first tries one ranked hole chain for
 each outside endpoint. This lets a later blocked approach change the previous
 part's departure without first exhausting combinations of its earlier holes.
-This preferred pass uses the same emitted-motion checks, shared expansion budget
-and stall limit as the retained search; on failure the full entry/hole-order
-backtracking pass remains available. Before that full pass, a failed preferred tour
-also gets a directed-contour recovery pass for parts with at most 16 holes. It
+This preferred pass uses the hole centres to propose an order and checks only the
+one previously lead-feasible entry selected for each hole; it does not prepare
+alternative entries until a subsequent recovery/full pass needs them. It still
+checks emitted motions under the shared expansion budget and stall limit, and
+on failure the full entry/hole-order backtracking pass remains available. A failed
+preferred tour first gets a directed-contour recovery pass for parts with at most
+16 holes. It
 tries native outside entries beyond the ranked shortlist, then builds a hole route
 from actual emitted pierces, checking each transition against already released
 contours. This reaches inner edges of interlocking concave parts which can be

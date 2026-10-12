@@ -402,12 +402,18 @@ internal static class JointCuttingPlanSearch
                                 .FirstOrDefault(c => !choices.Any(e => e.ContourOrdinal == c), -1);
                             var target = downstream < 0 ? preference.PerimeterPierce
                                 : preference.Pierces[downstream];
-                            entries = SelectEntries(source, contour, target, node.Position - source.Location);
-                            // Preference only reorders retained candidates. Neither a failed
-                            // preferred entry nor an alternate hole order prunes this branch.
-                            if (preference.Entries.TryGetValue(contour, out var preferred))
-                                entries = entries.OrderBy(e => e.Point.DistanceTo(preferred.Point)
-                                    <= PostVerificationGeometry.Epsilon ? 0 : 1).ToArray();
+                            // The coarse pass already checked one owned, lead-feasible entry
+                            // for this hole. Do not prepare every alternate before trying it.
+                            // The subsequent full pass still enumerates and checks them all.
+                            if (preferredOnly && preference.Entries.TryGetValue(contour, out var first))
+                                entries = [first];
+                            else
+                            {
+                                entries = SelectEntries(source, contour, target, node.Position - source.Location);
+                                if (preference.Entries.TryGetValue(contour, out var preferred))
+                                    entries = entries.OrderBy(e => e.Point.DistanceTo(preferred.Point)
+                                        <= PostVerificationGeometry.Epsilon ? 0 : 1).ToArray();
+                            }
                         }
                     }
                     else
