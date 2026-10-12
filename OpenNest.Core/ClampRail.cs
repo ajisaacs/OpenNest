@@ -1,0 +1,146 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using OpenNest.Geometry;
+
+namespace OpenNest
+{
+    /// <summary>
+    /// The machine's fixed clamp rail: identical rectangular clamps whose X centers are
+    /// measured from the plate origin along the origin-side (operator) edge. Plates always
+    /// start at the origin, so the same rail resolves onto every sheet size without
+    /// re-scaling; a clamp whose footprint lies wholly beyond a sheet is skipped and one
+    /// that still reaches onto it is kept, clipped to the sheet.
+    /// </summary>
+    public sealed class ClampRail : IEquatable<ClampRail>
+    {
+        public ClampRail(double width, double depth, IEnumerable<double> centers)
+        {
+            ArgumentNullException.ThrowIfNull(centers);
+            if (!double.IsFinite(width) || width <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(width),
+                    "Clamp width must be finite and positive."
+                );
+            if (!double.IsFinite(depth) || depth <= 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(depth),
+                    "Clamp depth must be finite and positive."
+                );
+
+            var sorted = new SortedSet<double>();
+            foreach (var center in centers)
+            {
+                if (!double.IsFinite(center) || center < 0)
+                    throw new ArgumentOutOfRangeException(
+                        nameof(centers),
+                        "Clamp centers must be finite and measured from the origin (zero or more)."
+                    );
+                sorted.Add(center);
+            }
+
+            Width = width;
+            Depth = depth;
+            Centers = sorted.ToArray();
+        }
+
+        /// <summary>Clamp extent along the edge (X).</summary>
+        public double Width { get; }
+
+        /// <summary>Clamp intrusion into the sheet from the origin-side edge (Y).</summary>
+        public double Depth { get; }
+
+        /// <summary>Distinct clamp centers along X from the origin, ascending.</summary>
+        public IReadOnlyList<double> Centers { get; }
+
+        /// <summary>
+        /// The zones this rail places on a sheet, in plate coordinates (the frame of
+        /// <see cref="Plate.ClampZones"/>: origin at the sheet's lower-left corner). The
+        /// quadrant locates the plate origin, and with it the origin-side edge, on the sheet.
+        /// Ids are <c>clamp-N</c> by rail position, so one physical clamp keeps its id on
+        /// every sheet even when others are skipped.
+        /// </summary>
+        public IReadOnlyList<ClampZone> ResolveFor(Size size, int quadrant)
+        {
+            var length = size.Length;
+            var sheetWidth = size.Width;
+            if (!(length > 0) || !(sheetWidth > 0) || !double.IsFinite(length) || !double.IsFinite(sheetWidth))
+                return Array.Empty<ClampZone>();
+
+            var extendsLeft = quadrant is 2 or 3;
+            var extendsDown = quadrant is 3 or 4;
+            var depth = System.Math.Min(Depth, sheetWidth);
+            var y = extendsDown ? sheetWidth - depth : 0;
+            var half = Width / 2;
+
+            var zones = new List<ClampZone>(Centers.Count);
+            for (var i = 0; i < Centers.Count; i++)
+            {
+                // Distances from the origin along the edge.
+                var near = Centers[i] - half;
+                var far = Centers[i] + half;
+                if (near >= length)
+                    continue; // wholly beyond this sheet
+
+                var clipped = near < 0 || far > length;
+                var start = near < 0 ? 0 : near;
+                var extent = clipped ? System.Math.Min(far, length) - start : Width;
+                if (!(extent > 0))
+                    continue;
+
+                // Plate coordinates are measured from the lower-left corner; a sheet extending
+                // to -X from the origin has its origin edge at x = length.
+                var x = extendsLeft ? length - (start + extent) : start;
+                zones.Add(new ClampZone($"clamp-{i + 1}", new Box(x, y, extent, depth)));
+            }
+
+            return zones;
+        }
+
+        /// <summary>True when the plate's zones are exactly (ids and bits) this rail's for its sheet.</summary>
+        public bool Matches(Plate plate)
+        {
+            ArgumentNullException.ThrowIfNull(plate);
+            return SameZones(plate.ClampZones, ResolveFor(plate.Size, plate.Quadrant));
+        }
+
+        internal static bool SameZones(IList<ClampZone> current, IReadOnlyList<ClampZone> expected)
+        {
+            if (current.Count != expected.Count)
+                return false;
+            for (var i = 0; i < current.Count; i++)
+            {
+                var a = current[i];
+                var b = expected[i];
+                if (
+                    !string.Equals(a.Id, b.Id, StringComparison.Ordinal)
+                    || a.Bounds.X != b.Bounds.X
+                    || a.Bounds.Y != b.Bounds.Y
+                    || a.Bounds.Length != b.Bounds.Length
+                    || a.Bounds.Width != b.Bounds.Width
+                )
+                    return false;
+            }
+            return true;
+        }
+
+        public bool Equals(ClampRail other) =>
+            other is not null
+            && Width.Equals(other.Width)
+            && Depth.Equals(other.Depth)
+            && Centers.SequenceEqual(other.Centers);
+
+        public override bool Equals(object obj) => Equals(obj as ClampRail);
+
+        public override int GetHashCode()
+        {
+            var hash = HashCode.Combine(Width, Depth, Centers.Count);
+            foreach (var center in Centers)
+                hash = HashCode.Combine(hash, center);
+            return hash;
+        }
+
+        public override string ToString() =>
+            $"ClampRail {Width:R} x {Depth:R} at [{string.Join(", ", Centers.Select(c => c.ToString("R")))}]";
+    }
+}

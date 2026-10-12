@@ -85,9 +85,20 @@ namespace OpenNest
         public Spacing EdgeSpacing;
 
         /// <summary>
-        /// The size of the plate.
+        /// The size of the plate. A plate following a <see cref="ClampRail"/> re-resolves
+        /// its clamp zones for the new size.
         /// </summary>
-        public Size Size { get; set; }
+        public Size Size
+        {
+            get { return size; }
+            set
+            {
+                size = value;
+                ResolveClampRail();
+            }
+        }
+
+        private Size size;
 
         public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
 
@@ -121,6 +132,42 @@ namespace OpenNest
         public event EventHandler? ClampZonesChanged;
 
         private void OnClampZonesChanged() => ClampZonesChanged?.Invoke(this, EventArgs.Empty);
+
+        /// <summary>
+        /// The machine clamp rail this plate follows, or null when its
+        /// <see cref="ClampZones"/> are explicit (engine sheets, files without a rail). While
+        /// set, the zones are derived: re-resolved whenever <see cref="Size"/> or
+        /// <see cref="Quadrant"/> changes, because the clamps are fixed to the machine.
+        /// </summary>
+        public ClampRail ClampRail { get; private set; }
+
+        /// <summary>
+        /// Follows <paramref name="rail"/> and replaces the zones with its resolution for
+        /// this sheet; null detaches and removes every zone. Unchanged zones raise no events.
+        /// </summary>
+        public void SetClampRail(ClampRail rail)
+        {
+            ClampRail = rail;
+            ReplaceClampZones(
+                rail == null ? Array.Empty<ClampZone>() : rail.ResolveFor(Size, Quadrant)
+            );
+        }
+
+        private void ResolveClampRail()
+        {
+            // Called from the constructor's Size assignment before the zone list exists.
+            if (ClampRail != null)
+                ReplaceClampZones(ClampRail.ResolveFor(Size, Quadrant));
+        }
+
+        private void ReplaceClampZones(IReadOnlyList<ClampZone> zones)
+        {
+            if (ClampRail.SameZones(ClampZones, zones))
+                return;
+            ClampZones.Clear();
+            foreach (var zone in zones)
+                ClampZones.Add(zone);
+        }
 
         /// <summary>
         /// Regenerates all cut-off drawings and materializes them as parts.
@@ -256,7 +303,11 @@ namespace OpenNest
         public int Quadrant
         {
             get { return quadrant; }
-            set { quadrant = value <= 4 && value > 0 ? value : 1; }
+            set
+            {
+                quadrant = value <= 4 && value > 0 ? value : 1;
+                ResolveClampRail();
+            }
         }
 
         /// <summary>
