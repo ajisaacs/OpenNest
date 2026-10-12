@@ -23,20 +23,30 @@ public static class NestStockBuilder
         {
             var option = options[i];
             ArgumentNullException.ThrowIfNull(option);
+            var size = new Size(option.Width, option.Length);
             stock.Add(new NestPlateStock(
                 $"option-{i}",
-                new Size(option.Width, option.Length),
+                size,
                 quantityPerOption,
                 template.PartSpacing,
                 template.EdgeSpacing,
                 template.Quadrant,
                 option.Cost == 0 ? null : option.Cost,
-                new List<ClampZone>(template.ClampZones)
+                ClampZonesFor(template, size)
             ));
         }
         NestJobValidator.ValidateStockCosts(stock);
         return stock.AsReadOnly();
     }
+
+    /// <summary>
+    /// A template following the machine clamp rail offers each sheet size with the rail
+    /// resolved for that size (clamps are fixed to the machine, not the sheet); explicit
+    /// template zones are offered unchanged.
+    /// </summary>
+    private static IReadOnlyList<ClampZone> ClampZonesFor(Plate template, Size size) =>
+        template.ClampRail?.ResolveFor(size, template.Quadrant)
+        ?? new List<ClampZone>(template.ClampZones);
 
     /// <summary>Single-sheet callers may not silently create additional sheets.</summary>
     public static IReadOnlyList<NestPlateStock> SinglePlate(Plate plate) =>
