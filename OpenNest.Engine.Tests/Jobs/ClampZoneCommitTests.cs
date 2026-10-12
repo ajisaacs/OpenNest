@@ -93,6 +93,66 @@ public class ClampZoneCommitTests
         Assert.Equal(0, changes);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void SolvedZonesARailCannotRecreateStopFollowingThatRail(int quadrant)
+    {
+        // The nest rail puts a clamp at 6"; the template carries a different explicit zone,
+        // so the extra sheet the commit creates must not keep following the nest rail.
+        var drawing = new Drawing("part", TestDrawingFactory.Rectangle());
+        var nest = new Nest();
+        nest.Drawings.Add(drawing);
+        nest.PlateDefaults.Size = new Size(48, 96);
+        nest.PlateDefaults.Quadrant = quadrant;
+        nest.SetClampRail(new ClampRail(1.5, 0.625, new[] { 6.0 }));
+        var template = nest.CreatePlate();
+        template.SetClampRail(null!);
+        var manual = new ClampZone("manual", new Box(10, 0, 2, 0.5));
+        template.ClampZones.Add(manual);
+        using var manager = new PlateManager(nest);
+
+        var applied = NestPipelineCommit.ApplyToEmptyPlates(
+            Result(drawing, quadrant, template.ClampZones.ToArray()), manager);
+
+        Assert.Equal(2, applied.Count);
+        Assert.All(applied, plate =>
+        {
+            Assert.Null(plate.ClampRail);
+            plate.Size = plate.Size; // the Edit Plate dialog assigns Size even when unchanged
+            plate.Quadrant = plate.Quadrant;
+            Assert.Equal("manual", Assert.Single(plate.ClampZones).Id);
+            Assert.Equal("manual", Assert.Single(Assert.Single(
+                NestStockBuilder.FromTemplate(plate, [new PlateOption { Width = 48, Length = 96 }])).ClampZones).Id);
+        });
+    }
+
+    [Fact]
+    public void SolvedZonesTheRailRecreatesKeepFollowingIt()
+    {
+        var drawing = new Drawing("part", TestDrawingFactory.Rectangle());
+        var nest = new Nest();
+        nest.Drawings.Add(drawing);
+        nest.PlateDefaults.Size = new Size(48, 96);
+        var rail = new ClampRail(1.5, 0.625, new[] { 6.0 });
+        nest.SetClampRail(rail);
+        var template = nest.CreatePlate();
+        using var manager = new PlateManager(nest);
+
+        var applied = NestPipelineCommit.ApplyToEmptyPlates(
+            Result(drawing, 1, template.ClampZones.ToArray()), manager);
+
+        Assert.Equal(2, applied.Count);
+        Assert.All(applied, plate =>
+        {
+            Assert.Same(rail, plate.ClampRail);
+            plate.Size = new Size(48, 4);
+            Assert.Empty(plate.ClampZones); // still re-resolves: no clamp reaches a 4" sheet
+        });
+    }
+
     [Fact]
     public void ZonesTheLayoutWasNotSolvedWithAreRemoved()
     {

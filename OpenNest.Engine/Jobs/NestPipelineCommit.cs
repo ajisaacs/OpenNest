@@ -58,7 +58,9 @@ public static class NestPipelineCommit
     /// The live plate keeps exactly the clamp keep-outs its layout was solved and validated
     /// against, including sheets created for this commit. Stock zones live in the placement
     /// frame; plate zones in plate coordinates, so the stock's translation is inverted. Zones
-    /// already equal in the placement frame are left untouched (no change events).
+    /// already equal in the placement frame are left untouched (no change events). Replaced
+    /// zones stay tied to the plate's clamp rail only when that rail recreates them;
+    /// otherwise a later size or quadrant assignment would silently swap in other clamps.
     /// </summary>
     private static void SyncClampZones(Plate plate, NestPlateStock stock)
     {
@@ -67,9 +69,12 @@ public static class NestPipelineCommit
         if (SameInPlacementFrame(plate.ClampZones, stock.ClampZones, left, bottom))
             return;
 
-        plate.ClampZones.Clear();
+        var rail = plate.ClampRail;
+        plate.SetClampRail(null); // explicit zones from here on
         foreach (var zone in stock.ClampZones)
             plate.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds.Translate(-left, -bottom)));
+        if (rail != null && rail.Matches(plate))
+            plate.SetClampRail(rail);
     }
 
     private static bool SameInPlacementFrame(
