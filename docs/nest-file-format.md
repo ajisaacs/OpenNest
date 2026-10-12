@@ -67,9 +67,22 @@ regions in plate coordinates: `id`, `x`, `y`, `length` (X extent) and `width`
 clamps). Zones are exclusion and display data only - never material, quantity,
 utilization, cut sequence or CNC output. Files without the key load with no
 zones, and an individually malformed entry (blank id, non-positive size) is
-dropped while the rest of the nest loads. Because clamp definitions are real
-machine state, a plate that carries only clamps is written even when it has no
-parts and no cut-offs; genuinely empty plates without clamps remain omitted.
+dropped while the rest of the nest loads.
+
+`plateDefaults.clampRail` optionally stores the nest's machine clamp rail:
+`width` (along the edge), `depth` (into the sheet) and `centers` (X positions
+measured from the plate origin along the origin-side edge). New plates follow
+the rail and resolve it for their own size and quadrant; clamps wholly beyond a
+sheet are skipped and one still reaching onto it is clipped. The key is omitted
+when a nest has no rail, so such files are unchanged; a missing, empty or
+malformed rail loads as none. On load a plate follows the rail again only when
+its saved `clamps` are exactly the rail's zones for that sheet; any other saved
+zones are kept as written.
+
+An empty plate (no parts, no cut-offs) is omitted from the file unless that
+would lose clamp zones: a plate whose zones the saved rail recreates is
+omitted like any other empty plate (this keeps the editor's trailing empty
+sheet out of the file), while one carrying other zones is written.
 
 ## Drawing edits
 

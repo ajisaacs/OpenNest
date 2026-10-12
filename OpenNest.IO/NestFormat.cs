@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace OpenNest.IO
 {
@@ -43,6 +44,25 @@ namespace OpenNest.IO
             public double PartSpacing { get; init; }
             public MaterialDto Material { get; init; } = new();
             public SpacingDto EdgeSpacing { get; init; } = new();
+
+            /// <summary>
+            /// The nest's machine clamp rail, which new plates follow. Omitted when the nest
+            /// has none; older files and older readers simply have no rail.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public ClampRailDto ClampRail { get; init; }
+        }
+
+        public record ClampRailDto
+        {
+            /// <summary>Clamp extent along the origin-side edge (X).</summary>
+            public double Width { get; init; }
+
+            /// <summary>Clamp intrusion into the sheet from that edge (Y).</summary>
+            public double Depth { get; init; }
+
+            /// <summary>Clamp centers along X, measured from the plate origin.</summary>
+            public List<double> Centers { get; init; } = new();
         }
 
         public record DrawingDto

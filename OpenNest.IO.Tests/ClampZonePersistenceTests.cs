@@ -7,7 +7,8 @@ namespace OpenNest.IO.Tests;
 /// <summary>
 /// Clamp zones survive the .nest round trip; files without the "clamps" key load
 /// unchanged with zero zones, and a clamp-carrying sheet is never dropped by the
-/// empty-plate filter. Malformed zones are skipped rather than poisoning the file.
+/// empty-plate filter unless the nest's saved rail recreates exactly those zones
+/// (see ClampRailPersistenceTests). Malformed zones are skipped rather than poisoning the file.
 /// </summary>
 public class ClampZonePersistenceTests
 {

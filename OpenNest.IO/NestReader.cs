@@ -327,6 +327,24 @@ namespace OpenNest.IO
             }
         }
 
+        /// <summary>
+        /// The saved machine clamp rail, or null when absent, empty or malformed (a bad rail
+        /// is ignored rather than failing the nest; each plate's saved zones still load).
+        /// </summary>
+        private static ClampRail ReadClampRail(ClampRailDto dto)
+        {
+            if (dto?.Centers == null || dto.Centers.Count == 0)
+                return null;
+            try
+            {
+                return new ClampRail(dto.Width, dto.Depth, dto.Centers);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+
         private Nest BuildNest(NestDto dto, Dictionary<int, Drawing> drawingMap)
         {
             var nest = new Nest();
@@ -363,6 +381,8 @@ namespace OpenNest.IO
                 pd.EdgeSpacing.Right,
                 pd.EdgeSpacing.Top
             );
+            var clampRail = ReadClampRail(pd.ClampRail);
+            nest.PlateDefaults.ClampRail = clampRail;
 
             // Stock options: sheet sizes and salvage rate
             nest.SalvageRate = dto.SalvageRate;
@@ -417,6 +437,11 @@ namespace OpenNest.IO
                         }
                     }
                 }
+
+                // A plate follows the nest rail only when its saved zones are exactly the
+                // rail's for this sheet; anything else is preserved as saved.
+                if (clampRail != null && clampRail.Matches(plate))
+                    plate.SetClampRail(clampRail);
 
                 for (var partIndex = 0; partIndex < p.Parts.Count; partIndex++)
                 {

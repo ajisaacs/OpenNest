@@ -135,6 +135,14 @@ namespace OpenNest.IO
                     Right = pd.EdgeSpacing.Right,
                     Bottom = pd.EdgeSpacing.Bottom,
                 },
+                ClampRail = pd.ClampRail == null
+                    ? null
+                    : new ClampRailDto
+                    {
+                        Width = pd.ClampRail.Width,
+                        Depth = pd.ClampRail.Depth,
+                        Centers = pd.ClampRail.Centers.ToList(),
+                    },
             };
         }
 
@@ -197,6 +205,9 @@ namespace OpenNest.IO
             return list;
         }
 
+        private bool RailRecreates(Plate plate) =>
+            nest.PlateDefaults.ClampRail is { } rail && rail.Matches(plate);
+
         private List<PlateDto> BuildPlateDtos()
         {
             var list = new List<PlateDto>();
@@ -205,10 +216,12 @@ namespace OpenNest.IO
             {
                 var plate = nest.Plates[i];
 
+                // An empty plate is omitted (this also drops the editor's trailing sentinel)
+                // unless that would lose clamp zones the saved rail cannot recreate.
                 if (
                     plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
                     && plate.CutOffs.Count == 0
-                    && plate.ClampZones.Count == 0
+                    && (plate.ClampZones.Count == 0 || RailRecreates(plate))
                 )
                     continue;
 
