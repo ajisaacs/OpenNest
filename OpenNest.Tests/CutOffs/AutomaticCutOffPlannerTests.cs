@@ -679,6 +679,23 @@ public class AutomaticCutOffPlannerTests
     }
 
     [Fact]
+    public void LargeArcRefit_DoesNotReplaceConvertedPerimeterWithUndersizedBox()
+    {
+        var plate = MakeArcPlate(0.0001);
+        var part = Assert.Single(plate.Parts);
+        var perimeter = Plate.BuildPerimeterCache(plate)[part];
+        Assert.NotNull(perimeter);
+        Assert.True(perimeter.BoundingBox.Right > part.BoundingBox.Right + CutOff.GetBoundsRoundoff(part));
+        var arc = Assert.Single(ConvertProgram.ToGeometry(part.Program).OfType<Arc>());
+        arc.Offset(part.Location);
+        var x = (part.BoundingBox.Right + arc.BoundingBox.Right) / 2;
+        var manual = new CutOff(new Vector(x, 0), CutOffAxis.Vertical);
+        manual.Regenerate(plate, new CutOffSettings { PartClearance = 0 }, Plate.BuildPerimeterCache(plate));
+        foreach (var segment in Segments(manual.Drawing.Program))
+            Assert.False(arc.Intersects(new Line(segment.From, segment.To), out _));
+    }
+
+    [Fact]
     public void ExactArcWithinCachedBounds_PlansAndMaterializesSafeCuts()
     {
         var plate = MakeArcPlate(0);

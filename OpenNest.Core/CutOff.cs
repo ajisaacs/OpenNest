@@ -134,8 +134,22 @@ namespace OpenNest
             double clearance
         )
         {
-            var bb = part.BoundingBox;
+            var cached = part.BoundingBox;
             var roundoff = GetBoundsRoundoff(part);
+            // Keep the farther of the cached and converted perimeter extents. The
+            // perimeter's fine intersection/offset can miss a near-tangent sliver;
+            // only a line in that narrow outer band needs the conservative box.
+            var bb = cached;
+            if (perimeter != null)
+            {
+                var converted = perimeter.BoundingBox;
+                var left = System.Math.Min(cached.Left, converted.Left);
+                var right = System.Math.Max(cached.Right, converted.Right);
+                var bottom = System.Math.Min(cached.Bottom, converted.Bottom);
+                var top = System.Math.Max(cached.Top, converted.Top);
+                bb = new Box(left, bottom, right - left, top - bottom);
+            }
+            var (cachedMin, cachedMax) = AxisBounds(cached, clearance);
             var (partMin, partMax) = AxisBounds(bb, clearance);
             var (partStart, partEnd) = CrossAxisBounds(bb, clearance);
             // Match the planner's representational allowance in BOTH pruning and
@@ -150,6 +164,8 @@ namespace OpenNest
 
             if (perimeter != null)
             {
+                if (cutPosition <= cachedMin + roundoff || cutPosition >= cachedMax - roundoff)
+                    return new List<(double Start, double End)> { (partStart, partEnd) };
                 var perimeterExclusions = IntersectPerimeter(
                     perimeter,
                     cutPosition,
@@ -180,7 +196,14 @@ namespace OpenNest
             magnitude = System.Math.Max(magnitude,
                 System.Math.Max(System.Math.Abs(part.Location.X), System.Math.Abs(part.Location.Y)));
             var step = System.Math.BitIncrement(magnitude) - magnitude;
-            return double.IsFinite(step) ? System.Math.Min(8 * step, Math.Tolerance.Epsilon / 4) : 0;
+            // Imported, nearly tangent arcs can amplify endpoint rounding when
+            // ConvertProgram fits their centers to a chord. Keep that allowance
+            // tiny and apply it to both pruning and fallback exclusions above;
+            // larger refits still require an explicit geometry repair.
+            var arcFitRoundoff = System.Math.Min(4096 * step, Math.Tolerance.Epsilon / 100000);
+            return double.IsFinite(step)
+                ? System.Math.Min(System.Math.Max(8 * step, arcFitRoundoff), Math.Tolerance.Epsilon / 4)
+                : 0;
         }
 
         private List<(double Start, double End)> IntersectPerimeter(

@@ -66,6 +66,63 @@ public class CutOffRoundoffTests
         Assert.Empty(AutomaticCutOffPlanner.Create(loadedPlate, options, settings).Definitions);
     }
 
+    [SkippableFact]
+    public void RoundedImportedArcs_PlanAllPlatesWithoutEditingSource()
+    {
+        var path = TestConfig.GetExistingPath("RoundedCutOffNestPath");
+        Skip.If(path == null, "Configure RoundedCutOffNestPath in ignored test-config.json.");
+        var hash = System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path!));
+        var nest = new NestReader(path).Read();
+        var plates = nest.Plates.Where(p => p.Parts.Count > 0).ToArray();
+        Assert.Equal(2, plates.Length);
+        var parts = plates.SelectMany(p => p.Parts).ToArray();
+        var programs = parts.Select(p => p.Program).ToArray();
+        var bounds = parts.Select(p => p.BoundingBox).ToArray();
+        var result = AutomaticCutOffBatch.Create(plates,
+            new AutomaticCutOffOptions { Spacing = 4, MinimumTailLength = 12 }, new CutOffSettings());
+        Assert.Equal(plates.Length, result.Count);
+        Assert.All(result, p => Assert.False(p.HasBlockingDiagnostics));
+        Assert.All(result, p => Assert.NotEmpty(p.Definitions));
+        var defaultSpacing = AutomaticCutOffBatch.Create(plates,
+            new AutomaticCutOffOptions { Spacing = 35, MinimumTailLength = 12 }, new CutOffSettings());
+        Assert.All(defaultSpacing, p => Assert.False(p.HasBlockingDiagnostics));
+        Assert.All(defaultSpacing, p => Assert.NotEmpty(p.Definitions));
+        // Probe a separator in the tiny converted-arc protrusion: both cached and
+        // uncached regeneration must leave the original curve untouched.
+        var witness = plates[0].Parts.SelectMany(part => ConvertProgram.ToGeometry(part.Program)
+                .OfType<Arc>().Where(a => SpecialLayers.IsMaterial(a.Layer))
+                .Select(a => (part, arc: a, top: a.BoundingBox.Translate(part.Location).Top)))
+            .First(w => w.top > w.part.BoundingBox.Top + 8 *
+                (System.Math.BitIncrement(w.part.BoundingBox.Top) - w.part.BoundingBox.Top));
+        witness.arc.Offset(witness.part.Location);
+        var y = (witness.part.BoundingBox.Top + witness.top) / 2;
+        foreach (var useCache in new[] { false, true })
+        {
+            var cut = new CutOff(new Vector(0, y), CutOffAxis.Horizontal);
+            cut.Regenerate(plates[0], new CutOffSettings { PartClearance = 0 },
+                useCache ? Plate.BuildPerimeterCache(plates[0]) : null);
+            foreach (var line in ConvertProgram.ToGeometry(cut.Drawing.Program).OfType<Line>()
+                .Where(e => SpecialLayers.IsMaterial(e.Layer)))
+                Assert.False(witness.arc.Intersects(line, out _), $"useCache={useCache} y={y:R} segment={line}");
+        }
+        Assert.Equal(programs, parts.Select(p => p.Program));
+        Assert.Equal(bounds, parts.Select(p => p.BoundingBox));
+        Assert.All(plates, p => Assert.Empty(p.CutOffs));
+        var applied = AutomaticCutOffBatch.Apply(plates,
+            new AutomaticCutOffOptions { Spacing = 4, MinimumTailLength = 12 }, new CutOffSettings());
+        Assert.Equal(result.Select(p => p.Definitions.Count), applied.Select(p => p.Definitions.Count));
+        Assert.All(plates, p => Assert.NotEmpty(p.CutOffs));
+        Assert.Equal(programs, parts.Select(p => p.Program));
+        using var stream = new MemoryStream();
+        Assert.True(new NestWriter(nest).Write(stream));
+        stream.Position = 0;
+        var reloaded = new NestReader(stream).Read();
+        var repeated = AutomaticCutOffBatch.Create(reloaded.Plates.Where(p => p.Parts.Count > 0).ToArray(),
+            new AutomaticCutOffOptions { Spacing = 4, MinimumTailLength = 12 }, new CutOffSettings());
+        Assert.All(repeated, p => Assert.Empty(p.Definitions));
+        Assert.Equal(hash, System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path!)));
+    }
+
     [Theory]
     [InlineData(CutOffAxis.Vertical, false, 0)]
     [InlineData(CutOffAxis.Vertical, true, 0)]
