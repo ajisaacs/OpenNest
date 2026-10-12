@@ -21,10 +21,8 @@ internal sealed class ClampObstacles
         for (var i = 0; i < rectangles.Length; i++)
         {
             var box = stock.ClampZones[i].Bounds;
-            var left = box.Left - clearance;
-            var bottom = box.Bottom - clearance;
-            var right = box.Right + clearance;
-            var top = box.Top + clearance;
+            var (left, right) = EncloseOnGrid(box.Left - clearance, box.Right + clearance);
+            var (bottom, top) = EncloseOnGrid(box.Bottom - clearance, box.Top + clearance);
             rectangles[i] = new Orientation
             {
                 // Real part types are nonnegative; the private cache cannot alias them.
@@ -42,6 +40,17 @@ internal sealed class ClampObstacles
                 },
             };
         }
+    }
+
+    // NoFitCache quantizes before adding its safety margin. Enclose the keep-out
+    // on that existing lattice so a sub-grid rectangle cannot disappear first.
+    private static (double Lower, double Upper) EncloseOnGrid(double lower, double upper)
+    {
+        var scale = System.Math.Pow(10, NoFitCache.Precision);
+        var first = System.Math.Floor(lower * scale);
+        // Positive dimensions can be smaller than a coordinate ulp (upper == lower).
+        var last = System.Math.Max(System.Math.Ceiling(upper * scale), first + 1);
+        return (first / scale, last / scale);
     }
 
     public int Count => rectangles.Length;

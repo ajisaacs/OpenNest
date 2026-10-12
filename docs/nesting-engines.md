@@ -79,8 +79,16 @@ per stock per solve, separately from the part-spacing cache. Every orientation's
 free region excludes these obstacles, including extra orientations introduced by pairs
 or Fill blocks. Blocks still size their proposals from work-area/placed-part rectangles;
 member free regions determine whether the whole proposal can actually fit around clamps.
-Open notches and material between clamps remain available. Existing arc/grid safety
-margins, covered-hole certification and cancellation apply without relaxed tolerances.
+Open notches and material between clamps remain available. Inflated synthetic rectangles
+are enclosed on the existing clipping grid before NFP preparation, retaining at least one
+grid interval per axis so positive sub-grid clamps cannot disappear. Existing arc/grid
+safety margins, covered-hole certification and cancellation apply without relaxed tolerances.
+
+Known clamp edge cases remain in the earlier shared/Rectangles implementation:
+large part spacing can make Rectangles overlap a clamp; rectangles below the clipping
+grid can make layout validation (including Default's candidate scoring) throw. Irregular's
+static-obstacle preparation does not repair these separate paths. The ordinary clamp
+fixtures pass for both lanes and Default; this is not an all-input clamp-safety guarantee.
 
 This is whole-job engine support, not interactive fill/push, desktop clamp editing or
 cutoff/post-verification support; those consumers are separate work. Other engines and
