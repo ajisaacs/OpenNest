@@ -83,8 +83,9 @@ An empty plate (no parts, no cut-offs) is omitted from the file unless that
 would lose clamp zones: it is omitted like any other empty plate only when a
 new plate from the saved defaults would recreate it (same size and quadrant,
 zones the saved rail recreates), which keeps the editor's trailing empty sheet
-out of the file. An empty plate with other zones, or a rail-following one
-whose size or quadrant differs from the defaults, is written.
+out of the file while it still matches the defaults. An empty plate with other
+zones, or a rail-following one whose size or quadrant differs from the defaults
+(including a trailing sheet created before the defaults changed), is written.
 
 ## Drawing edits
 
