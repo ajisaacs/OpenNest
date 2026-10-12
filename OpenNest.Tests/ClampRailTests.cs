@@ -268,4 +268,106 @@ public class ClampRailTests
         Assert.NotEqual(Machine(), new ClampRail(1.5, 0.5, MachineCenters));
         Assert.NotEqual(Machine(), new ClampRail(1.5, 0.625, MachineCenters.Take(7)));
     }
+
+    // D9: minutes to remove one clamp and put it back, a variable setting on the rail.
+
+    [Fact]
+    public void RemovalMinutesDefaultsToThePlannerValue()
+    {
+        Assert.Equal(5.0, Machine().RemovalMinutes);
+        Assert.Equal(5.0, ClampRail.DefaultRemovalMinutes);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void RemovalMinutesMustBeFiniteAndZeroOrMore(double minutes)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ClampRail(1.5, 0.625, new[] { 6.0 }, minutes));
+    }
+
+    [Fact]
+    public void ZeroRemovalMinutesIsAllowed()
+    {
+        var rail = new ClampRail(1.5, 0.625, new[] { 6.0 }, removalMinutes: 0);
+        Assert.Equal(0, rail.RemovalMinutes);
+    }
+
+    [Fact]
+    public void RailsWithDifferentRemovalMinutesAreNotEqual()
+    {
+        var fiveMinutes = new ClampRail(1.5, 0.625, MachineCenters, 5);
+        var tenMinutes = new ClampRail(1.5, 0.625, MachineCenters, 10);
+        Assert.NotEqual(fiveMinutes, tenMinutes);
+        Assert.NotEqual(fiveMinutes.GetHashCode(), tenMinutes.GetHashCode());
+    }
+
+    // D8/C13: last-resort per-sheet removal of individual rail clamps.
+
+    [Fact]
+    public void RemovedClampsAreSubtractedFromTheRailResolution()
+    {
+        var plate = Sheet(48, 120);
+        plate.SetClampRail(Machine(), new[] { "clamp-3" });
+
+        Assert.Equal(7, plate.ClampZones.Count);
+        Assert.DoesNotContain(plate.ClampZones, z => z.Id == "clamp-3");
+        Assert.Equal(new[] { "clamp-3" }, plate.RemovedClamps);
+    }
+
+    [Fact]
+    public void RemovedClampStaysOffAfterResizeAndReappearsIfTheClampComesBackOntoTheSheet()
+    {
+        var plate = Sheet(48, 120);
+        plate.SetClampRail(Machine(), new[] { "clamp-8" }); // centered at 111"
+
+        plate.Size = new Size(48, 60); // clamp-8 is beyond this sheet regardless
+        Assert.Equal(new[] { "clamp-1", "clamp-2", "clamp-3", "clamp-4" },
+            plate.ClampZones.Select(z => z.Id));
+        Assert.Equal(new[] { "clamp-8" }, plate.RemovedClamps);
+
+        plate.Size = new Size(48, 120); // clamp-8 is back on the sheet, but still removed
+        Assert.Equal(7, plate.ClampZones.Count);
+        Assert.DoesNotContain(plate.ClampZones, z => z.Id == "clamp-8");
+    }
+
+    [Fact]
+    public void ClampRemovalMinutesSumsTheRailsPerClampTime()
+    {
+        var plate = Sheet(48, 120);
+        Assert.Equal(0, plate.ClampRemovalMinutes); // no rail yet
+
+        plate.SetClampRail(new ClampRail(1.5, 0.625, MachineCenters, removalMinutes: 7),
+            new[] { "clamp-3", "clamp-4" });
+        Assert.Equal(14, plate.ClampRemovalMinutes);
+
+        plate.SetClampRail(null!);
+        Assert.Equal(0, plate.ClampRemovalMinutes); // detaching forgets the removed set too
+        Assert.Empty(plate.RemovedClamps);
+    }
+
+    [Fact]
+    public void SetClampRailWithoutRemovedClampsBehavesAsBefore()
+    {
+        var plate = Sheet(48, 120);
+        plate.SetClampRail(Machine());
+
+        Assert.Empty(plate.RemovedClamps);
+        Assert.Equal(8, plate.ClampZones.Count);
+    }
+
+    [Fact]
+    public void MatchesWithRemovedClampsComparesAgainstTheReducedResolution()
+    {
+        var plate = Sheet(48, 120);
+        plate.SetClampRail(Machine(), new[] { "clamp-3" });
+
+        Assert.True(Machine().Matches(plate, new[] { "clamp-3" }));
+        Assert.False(Machine().Matches(plate)); // full resolution: zones don't match
+        Assert.False(Machine().Matches(plate, Array.Empty<string>()));
+        Assert.False(Machine().Matches(plate, new[] { "clamp-4" }));
+    }
 }

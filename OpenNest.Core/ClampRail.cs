@@ -15,7 +15,18 @@ namespace OpenNest
     /// </summary>
     public sealed class ClampRail : IEquatable<ClampRail>
     {
-        public ClampRail(double width, double depth, IEnumerable<double> centers)
+        /// <summary>
+        /// Planner default minutes to remove one clamp and put it back after cutting (D9),
+        /// used when a caller does not supply its own value.
+        /// </summary>
+        public const double DefaultRemovalMinutes = 5.0;
+
+        public ClampRail(
+            double width,
+            double depth,
+            IEnumerable<double> centers,
+            double removalMinutes = DefaultRemovalMinutes
+        )
         {
             ArgumentNullException.ThrowIfNull(centers);
             if (!double.IsFinite(width) || width <= 0)
@@ -27,6 +38,11 @@ namespace OpenNest
                 throw new ArgumentOutOfRangeException(
                     nameof(depth),
                     "Clamp depth must be finite and positive."
+                );
+            if (!double.IsFinite(removalMinutes) || removalMinutes < 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(removalMinutes),
+                    "Clamp removal time must be finite and zero or more."
                 );
 
             var sorted = new SortedSet<double>();
@@ -42,6 +58,7 @@ namespace OpenNest
 
             Width = width;
             Depth = depth;
+            RemovalMinutes = removalMinutes;
             Centers = sorted.ToArray();
         }
 
@@ -50,6 +67,12 @@ namespace OpenNest
 
         /// <summary>Clamp intrusion into the sheet from the origin-side edge (Y).</summary>
         public double Depth { get; }
+
+        /// <summary>
+        /// Minutes to remove one clamp and put it back after cutting (D9). Added to a sheet's
+        /// cut-time estimate once per clamp <see cref="Plate.RemovedClamps"/> lists there.
+        /// </summary>
+        public double RemovalMinutes { get; }
 
         /// <summary>Distinct clamp centers along X from the origin, ascending.</summary>
         public IReadOnlyList<double> Centers { get; }
@@ -101,6 +124,22 @@ namespace OpenNest
             return SameZones(plate.ClampZones, ResolveFor(plate.Size, plate.Quadrant));
         }
 
+        /// <summary>
+        /// True when the plate's zones are exactly this rail's resolution for its sheet minus
+        /// the clamps named in <paramref name="removedClamps"/> (D8 last-resort removal, C13).
+        /// A null or empty set is the same check as <see cref="Matches(Plate)"/>.
+        /// </summary>
+        public bool Matches(Plate plate, IReadOnlyCollection<string> removedClamps)
+        {
+            ArgumentNullException.ThrowIfNull(plate);
+            if (removedClamps == null || removedClamps.Count == 0)
+                return Matches(plate);
+            var expected = ResolveFor(plate.Size, plate.Quadrant)
+                .Where(z => !removedClamps.Contains(z.Id))
+                .ToList();
+            return SameZones(plate.ClampZones, expected);
+        }
+
         internal static bool SameZones(IList<ClampZone> current, IReadOnlyList<ClampZone> expected)
         {
             if (current.Count != expected.Count)
@@ -125,13 +164,14 @@ namespace OpenNest
             other is not null
             && Width.Equals(other.Width)
             && Depth.Equals(other.Depth)
+            && RemovalMinutes.Equals(other.RemovalMinutes)
             && Centers.SequenceEqual(other.Centers);
 
         public override bool Equals(object obj) => Equals(obj as ClampRail);
 
         public override int GetHashCode()
         {
-            var hash = HashCode.Combine(Width, Depth, Centers.Count);
+            var hash = HashCode.Combine(Width, Depth, RemovalMinutes, Centers.Count);
             foreach (var center in Centers)
                 hash = HashCode.Combine(hash, center);
             return hash;

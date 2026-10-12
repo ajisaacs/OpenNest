@@ -329,7 +329,8 @@ namespace OpenNest.IO
 
         /// <summary>
         /// The saved machine clamp rail, or null when absent, empty or malformed (a bad rail
-        /// is ignored rather than failing the nest; each plate's saved zones still load).
+        /// is ignored rather than failing the nest; each plate's saved zones still load). A
+        /// missing removal-minutes value falls back to <see cref="ClampRail.DefaultRemovalMinutes"/>.
         /// </summary>
         private static ClampRail ReadClampRail(ClampRailDto dto)
         {
@@ -337,7 +338,12 @@ namespace OpenNest.IO
                 return null;
             try
             {
-                return new ClampRail(dto.Width, dto.Depth, dto.Centers);
+                return new ClampRail(
+                    dto.Width,
+                    dto.Depth,
+                    dto.Centers,
+                    dto.RemovalMinutes ?? ClampRail.DefaultRemovalMinutes
+                );
             }
             catch (ArgumentException)
             {
@@ -439,9 +445,14 @@ namespace OpenNest.IO
                 }
 
                 // A plate follows the nest rail only when its saved zones are exactly the
-                // rail's for this sheet; anything else is preserved as saved.
-                if (clampRail != null && clampRail.Matches(plate))
-                    plate.SetClampRail(clampRail);
+                // rail's for this sheet minus any saved removed-clamp ids (C13); otherwise
+                // the saved zones are kept as static, explicit data.
+                var removedClamps = p.RemovedClamps?
+                    .Where(id => !string.IsNullOrEmpty(id))
+                    .ToHashSet(StringComparer.Ordinal)
+                    ?? new HashSet<string>();
+                if (clampRail != null && clampRail.Matches(plate, removedClamps))
+                    plate.SetClampRail(clampRail, removedClamps);
 
                 for (var partIndex = 0; partIndex < p.Parts.Count; partIndex++)
                 {

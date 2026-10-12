@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using OpenNest.Geometry;
 
 namespace OpenNest.IO.Tests;
@@ -158,6 +160,123 @@ public class ClampRailPersistenceTests
         var plate = Assert.Single(reopened.Plates);
         Assert.Equal(7, plate.ClampZones.Count); // saved zones still load, explicitly
         Assert.Null(plate.ClampRail);
+    }
+
+    // D9: the rail's removal-minutes setting round-trips; a file without it defaults.
+
+    [Fact]
+    public void RemovalMinutesRoundTrips()
+    {
+        var nest = new Nest("railed");
+        nest.PlateDefaults.Size = new Size(48, 96);
+        nest.SetClampRail(new ClampRail(1.5, 0.625, MachineCenters, removalMinutes: 8));
+
+        var reopened = RoundTrip(nest);
+
+        Assert.Equal(8, reopened.PlateDefaults.ClampRail.RemovalMinutes);
+    }
+
+    [Fact]
+    public void MissingRemovalMinutesDefaultsOnLoad()
+    {
+        // The writer always emits removalMinutes; simulate an older file that predates it by
+        // stripping the key directly rather than relying on exact JSON formatting elsewhere.
+        var json = ReadNestJson(Write(RailNest()));
+        Assert.Contains("\"removalMinutes\"", json, StringComparison.Ordinal);
+
+        var withoutKey = RewriteNestJson(Write(RailNest()),
+            text => RemoveJsonProperty(text, "removalMinutes"));
+
+        var reopened = new NestReader(withoutKey).Read();
+
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, reopened.PlateDefaults.ClampRail.RemovalMinutes);
+    }
+
+    // D8/C13: last-resort per-sheet clamp removal persists and keeps following the rail.
+
+    [Fact]
+    public void RemovedClampsRoundTripAndTheReducedRailStillFollowsResizes()
+    {
+        var nest = new Nest("railed");
+        nest.PlateDefaults.Size = new Size(48, 120);
+        nest.SetClampRail(Machine());
+        var plate = nest.CreatePlate();
+        plate.SetClampRail(Machine(), new[] { "clamp-3" });
+
+        var reopened = RoundTrip(nest);
+        var reopenedPlate = Assert.Single(reopened.Plates);
+
+        Assert.Equal(7, reopenedPlate.ClampZones.Count);
+        Assert.DoesNotContain(reopenedPlate.ClampZones, z => z.Id == "clamp-3");
+        Assert.Equal(new[] { "clamp-3" }, reopenedPlate.RemovedClamps);
+        Assert.Same(reopened.PlateDefaults.ClampRail, reopenedPlate.ClampRail); // still rail-following
+
+        // The plate still follows the rail minus its removed clamp after a resize (C13).
+        reopenedPlate.Size = new Size(48, 60);
+        Assert.Equal(new[] { "clamp-1", "clamp-2", "clamp-4" }, reopenedPlate.ClampZones.Select(z => z.Id));
+    }
+
+    [Fact]
+    public void AnEmptyPlateWithOnlyRemovedClampsIsNotDropped()
+    {
+        // Every clamp removed: ClampZones is empty, but the removal state must still be saved.
+        var nest = new Nest("railed");
+        nest.PlateDefaults.Size = new Size(48, 96);
+        nest.SetClampRail(new ClampRail(1.5, 0.625, new[] { 6.0 }));
+        var plate = nest.CreatePlate();
+        plate.SetClampRail(new ClampRail(1.5, 0.625, new[] { 6.0 }), new[] { "clamp-1" });
+        Assert.Empty(plate.ClampZones);
+
+        var reopened = RoundTrip(nest);
+
+        var kept = Assert.Single(reopened.Plates);
+        Assert.Equal(new[] { "clamp-1" }, kept.RemovedClamps);
+    }
+
+    [Fact]
+    public void LegacyFileWithoutRemovedClampsKeyLoadsWithNoneRemoved()
+    {
+        var withoutKey = RewriteNestJson(Write(RailNest()),
+            text => RemoveJsonProperty(text, "removedClamps"));
+
+        var reopened = new NestReader(withoutKey).Read();
+
+        var plate = Assert.Single(reopened.Plates);
+        Assert.Empty(plate.RemovedClamps);
+        Assert.Equal(7, plate.ClampZones.Count);
+    }
+
+    /// <summary>Removes a named property wherever it appears in the document, simulating a
+    /// key an older writer never emitted. Rebuilds via <see cref="JsonNode"/> so the result
+    /// is always valid JSON regardless of whether the property was first, last or only one
+    /// in its object - unlike string surgery, which breaks on a dangling comma.</summary>
+    private static string RemoveJsonProperty(string json, string name)
+    {
+        var root = JsonNode.Parse(json)!;
+        var removed = RemovePropertyRecursive(root, name);
+        Assert.True(removed, $"Property '{name}' was not found to remove.");
+        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    private static bool RemovePropertyRecursive(JsonNode node, string name)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                var removed = obj.Remove(name);
+                foreach (var child in obj.ToList())
+                    if (child.Value != null && RemovePropertyRecursive(child.Value, name))
+                        removed = true;
+                return removed;
+            case JsonArray arr:
+                var any = false;
+                foreach (var item in arr)
+                    if (item != null && RemovePropertyRecursive(item, name))
+                        any = true;
+                return any;
+            default:
+                return false;
+        }
     }
 
     private static string ReadNestJson(MemoryStream zipBytes)

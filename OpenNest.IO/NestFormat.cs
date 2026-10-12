@@ -85,7 +85,11 @@ namespace OpenNest.IO
                         return null;
                     list.Add(x);
                 }
-                return new ClampRailDto { Width = width, Depth = depth, Centers = list };
+                // Missing or unreadable -> null; the reader then falls back to the default.
+                double? removalMinutes = TryNumber(rail, "removalMinutes", out var minutes)
+                    ? minutes
+                    : null;
+                return new ClampRailDto { Width = width, Depth = depth, Centers = list, RemovalMinutes = removalMinutes };
             }
 
             public override void Write(
@@ -101,6 +105,8 @@ namespace OpenNest.IO
                 foreach (var center in value.Centers ?? new List<double>())
                     writer.WriteNumberValue(center);
                 writer.WriteEndArray();
+                if (value.RemovalMinutes is double removalMinutes)
+                    writer.WriteNumber("removalMinutes", removalMinutes);
                 writer.WriteEndObject();
             }
 
@@ -123,6 +129,12 @@ namespace OpenNest.IO
 
             /// <summary>Clamp centers along X, measured from the plate origin.</summary>
             public List<double> Centers { get; init; } = new();
+
+            /// <summary>
+            /// Minutes to remove one clamp and put it back after cutting (D9). Null in older
+            /// files and readers fall back to <see cref="OpenNest.ClampRail.DefaultRemovalMinutes"/>.
+            /// </summary>
+            public double? RemovalMinutes { get; init; }
         }
 
         public record DrawingDto
@@ -157,6 +169,12 @@ namespace OpenNest.IO
             /// files, which load with no zones.
             /// </summary>
             public List<ClampZoneDto> Clamps { get; init; } = new();
+
+            /// <summary>
+            /// Rail clamp ids removed from this sheet as a last resort (D8). Missing or empty
+            /// means none were removed; <see cref="Clamps"/> already excludes them.
+            /// </summary>
+            public List<string> RemovedClamps { get; init; } = new();
         }
 
         public record ClampZoneDto

@@ -142,6 +142,7 @@ namespace OpenNest.IO
                         Width = pd.ClampRail.Width,
                         Depth = pd.ClampRail.Depth,
                         Centers = pd.ClampRail.Centers.ToList(),
+                        RemovalMinutes = pd.ClampRail.RemovalMinutes,
                     },
             };
         }
@@ -207,17 +208,28 @@ namespace OpenNest.IO
 
         /// <summary>
         /// True when a plate created from the saved defaults would be this sheet's clamp
-        /// configuration: same size and quadrant, and zones the saved rail recreates.
+        /// configuration: same size and quadrant, no last-resort removal, and zones the
+        /// saved rail recreates.
         /// </summary>
         private bool DefaultsRecreateClamps(Plate plate)
         {
             var defaults = nest.PlateDefaults;
             return defaults.ClampRail is { } rail
+                && plate.RemovedClamps.Count == 0
                 && plate.Size.Width == defaults.Size.Width
                 && plate.Size.Length == defaults.Size.Length
                 && plate.Quadrant == defaults.Quadrant
                 && rail.Matches(plate);
         }
+
+        /// <summary>Numeric suffix of a rail clamp id ("clamp-3" -&gt; 3), for a natural sort of
+        /// <see cref="PlateDto.RemovedClamps"/> instead of lexical ("clamp-10" before "clamp-2").
+        /// A non-matching id sorts last by its own ordinal text.</summary>
+        private static int ClampIndex(string id) =>
+            id != null && id.StartsWith("clamp-", StringComparison.Ordinal)
+                && int.TryParse(id.AsSpan(6), out var index)
+                ? index
+                : int.MaxValue;
 
         private List<PlateDto> BuildPlateDtos()
         {
@@ -233,7 +245,10 @@ namespace OpenNest.IO
                 if (
                     plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
                     && plate.CutOffs.Count == 0
-                    && (plate.ClampZones.Count == 0 || DefaultsRecreateClamps(plate))
+                    && (
+                        (plate.ClampZones.Count == 0 && plate.RemovedClamps.Count == 0)
+                        || DefaultsRecreateClamps(plate)
+                    )
                 )
                     continue;
 
@@ -318,6 +333,10 @@ namespace OpenNest.IO
                                 Length = z.Bounds.Length,
                                 Width = z.Bounds.Width,
                             })
+                            .ToList(),
+                        RemovedClamps = plate.RemovedClamps
+                            .OrderBy(ClampIndex)
+                            .ThenBy(id => id, StringComparer.Ordinal)
                             .ToList(),
                     }
                 );

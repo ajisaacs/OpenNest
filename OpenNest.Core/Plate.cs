@@ -141,23 +141,66 @@ namespace OpenNest
         /// </summary>
         public ClampRail ClampRail { get; private set; }
 
+        private static readonly IReadOnlySet<string> NoRemovedClamps = new HashSet<string>();
+
+        /// <summary>
+        /// Rail clamp ids taken off this sheet as a last resort (D8) so a part that could not
+        /// be nested anywhere with every clamp in place still fits. Empty unless
+        /// <see cref="ClampRail"/> is set; <see cref="ClampZones"/> already excludes them, so
+        /// nothing else needs to consult this list to avoid them. Ids stay listed across a
+        /// resize/rotate even when the matching clamp is temporarily beyond the sheet, so it
+        /// re-appears removed if a later resize brings it back onto the sheet (C13).
+        /// </summary>
+        public IReadOnlySet<string> RemovedClamps { get; private set; } = NoRemovedClamps;
+
+        /// <summary>
+        /// Minutes this sheet's cut-time estimate gains from <see cref="RemovedClamps"/> (D9):
+        /// each listed clamp adds <see cref="OpenNest.ClampRail.RemovalMinutes"/> once. Zero
+        /// when there is no rail (removal is meaningless without one to remove clamps from).
+        /// </summary>
+        public double ClampRemovalMinutes =>
+            ClampRail == null ? 0 : RemovedClamps.Count * ClampRail.RemovalMinutes;
+
         /// <summary>
         /// Follows <paramref name="rail"/> and replaces the zones with its resolution for
         /// this sheet; null detaches and removes every zone. Unchanged zones raise no events.
         /// </summary>
-        public void SetClampRail(ClampRail rail)
+        public void SetClampRail(ClampRail rail) => SetClampRail(rail, null);
+
+        /// <summary>
+        /// Follows <paramref name="rail"/> with the clamps named in <paramref name="removedClamps"/>
+        /// taken off this sheet (D8): zones become the rail's resolution for this sheet minus
+        /// those ids. Null <paramref name="rail"/> detaches, clears every zone and forgets the
+        /// removed set (removal only means something while following a rail).
+        /// </summary>
+        public void SetClampRail(ClampRail rail, IEnumerable<string> removedClamps)
         {
             ClampRail = rail;
-            ReplaceClampZones(
-                rail == null ? Array.Empty<ClampZone>() : rail.ResolveFor(Size, Quadrant)
-            );
+            RemovedClamps = rail == null || removedClamps == null
+                ? NoRemovedClamps
+                : new HashSet<string>(removedClamps, StringComparer.Ordinal);
+            ReplaceClampZones(ResolveRailZones());
         }
 
         private void ResolveClampRail()
         {
             // Called from the constructor's Size assignment before the zone list exists.
             if (ClampRail != null)
-                ReplaceClampZones(ClampRail.ResolveFor(Size, Quadrant));
+                ReplaceClampZones(ResolveRailZones());
+        }
+
+        private IReadOnlyList<ClampZone> ResolveRailZones()
+        {
+            if (ClampRail == null)
+                return Array.Empty<ClampZone>();
+            var resolved = ClampRail.ResolveFor(Size, Quadrant);
+            if (RemovedClamps.Count == 0)
+                return resolved;
+            var kept = new List<ClampZone>(resolved.Count);
+            foreach (var zone in resolved)
+                if (!RemovedClamps.Contains(zone.Id))
+                    kept.Add(zone);
+            return kept;
         }
 
         private void ReplaceClampZones(IReadOnlyList<ClampZone> zones)
