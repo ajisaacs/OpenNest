@@ -39,8 +39,47 @@ namespace OpenNest.Forms
         private const float ZoomInFactor = 1.5f;
         private const float ZoomOutFactor = 1.0f / ZoomInFactor;
 
+        private bool disposeAfterCuttingInspection;
+
+        internal bool DeferCuttingDisposal()
+        {
+            var panel = MdiChildren.OfType<EditNestForm>()
+                .Select(form => form.CuttingInspection).FirstOrDefault(value => value != null);
+            if (panel == null)
+                return false;
+            panel.RequestClose();
+            if (panel.IsDisposed)
+                return false;
+            disposeAfterCuttingInspection = true;
+            return true;
+        }
+
+        internal void ResumeDeferredCuttingDisposal()
+        {
+            if (!disposeAfterCuttingInspection)
+                return;
+            disposeAfterCuttingInspection = false;
+            if (IsHandleCreated)
+                BeginInvoke(new System.Action(Dispose));
+            else
+                Dispose();
+        }
+
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            var inspection = MdiChildren.OfType<EditNestForm>()
+                .Select(form => form.CuttingInspection).FirstOrDefault(panel => panel != null);
+            if (inspection != null)
+            {
+                if (keyData == Keys.Escape)
+                {
+                    inspection.RequestClose();
+                    return true;
+                }
+                // Standard inspection navigation reaches the canvas/panel; menu shortcuts cannot mutate.
+                if ((keyData & (Keys.Control | Keys.Alt)) != 0)
+                    return true;
+            }
             if (keyData == Keys.Escape && activeForm?.PlateView != null)
             {
                 activeForm.PlateView.ProcessEscapeKey();
@@ -455,6 +494,9 @@ namespace OpenNest.Forms
 
         protected override void OnMdiChildActivate(EventArgs e)
         {
+            foreach (var editor in MdiChildren.OfType<EditNestForm>()
+                .Where(editor => editor.CuttingInspection != null && !ReferenceEquals(editor, ActiveMdiChild)))
+                editor.CuttingInspection.RequestClose();
             base.OnMdiChildActivate(e);
 
             if (activeForm != null)
@@ -1885,6 +1927,9 @@ namespace OpenNest.Forms
 
         private void ShowCuttingPlan(bool allPlates)
         {
+            if (validationForm is { IsDisposed: false }
+                || MdiChildren.OfType<EditNestForm>().Any(form => form.CuttingInspection != null))
+                return;
             var editForm = activeForm;
             if (editForm?.PlateView?.Plate == null)
                 return;
@@ -1907,7 +1952,10 @@ namespace OpenNest.Forms
             {
                 foreach (var plateView in views)
                     plateView.SetAction(typeof(ActionSelect));
-                editForm.PlanCutting(allPlates, IsBusy, this);
+                if (allPlates)
+                    editForm.PlanCutting(true, IsBusy, this);
+                else
+                    editForm.OpenCuttingInspection();
             }
             catch (Exception ex)
             {

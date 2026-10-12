@@ -13,13 +13,23 @@ internal sealed class ValidationInspectionScope : IDisposable
     private readonly List<(Form Form, bool AllowDrop)> hosts = new();
     private bool disposed;
     private readonly PlateView view;
-    private readonly Form inspector;
+    private readonly Control inspector;
+    private readonly Control header;
+    private readonly Action close;
+    private Form closingHost;
     private readonly bool previousInspection;
 
     public ValidationInspectionScope(EditNestForm editor, Form inspector)
+        : this(editor, inspector, null, inspector.Close)
+    {
+    }
+
+    public ValidationInspectionScope(EditNestForm editor, Control inspector, Control header, Action close)
     {
         view = editor.PlateView;
         this.inspector = inspector;
+        this.header = header;
+        this.close = close;
         previousInspection = view.InspectionOnly;
         view.InspectionOnly = true;
         var root = editor.MdiParent ?? editor;
@@ -38,9 +48,9 @@ internal sealed class ValidationInspectionScope : IDisposable
     {
         foreach (var child in parent.Controls.Cast<Control>())
         {
-            if (ReferenceEquals(child, view))
+            if (ReferenceEquals(child, view) || ReferenceEquals(child, inspector) || ReferenceEquals(child, header))
                 continue;
-            if (child.Contains(view))
+            if (child.Contains(view) || child.Contains(inspector) || header != null && child.Contains(header))
                 DisableExceptCanvas(child);
             else
             {
@@ -54,7 +64,21 @@ internal sealed class ValidationInspectionScope : IDisposable
     {
         // A worker may still read the nest. Finish closing the inspector first.
         e.Cancel = true;
-        inspector.Close();
+        closingHost = (Form)sender;
+        close();
+    }
+
+    internal void ResumeHostClose()
+    {
+        var host = closingHost;
+        closingHost = null;
+        if (disposed && host is { IsDisposed: false })
+        {
+            if (host.IsHandleCreated)
+                host.BeginInvoke(new Action(host.Close));
+            else
+                host.Close();
+        }
     }
 
     public void Dispose()

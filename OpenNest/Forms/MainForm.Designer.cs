@@ -13,6 +13,9 @@ namespace OpenNest.Forms
         /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
+            // Keep the MDI hierarchy alive until a cutting worker has joined.
+            if (disposing && DeferCuttingDisposal())
+                return;
             if (disposing && (components != null))
             {
                 components.Dispose();

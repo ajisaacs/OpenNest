@@ -129,6 +129,22 @@ namespace OpenNest
             );
         }
 
+        internal void ReleaseDisplayResources()
+        {
+            brush?.Dispose();
+            brush = null;
+            pen?.Dispose();
+            pen = null;
+            Path?.Dispose();
+            Path = null;
+            LeadInPath?.Dispose();
+            LeadInPath = null;
+            EtchPath?.Dispose();
+            EtchPath = null;
+            OffsetPath?.Dispose();
+            OffsetPath = null;
+        }
+
         public GraphicsPath OffsetPath { get; private set; }
 
         internal void DrawEtch(Graphics g, bool muted = false)
@@ -295,9 +311,16 @@ namespace OpenNest
         public static LayoutPart Create(Part part, PlateView plateView)
         {
             var layoutPart = new LayoutPart(part);
-            layoutPart.Update(plateView);
-
-            return layoutPart;
+            try
+            {
+                layoutPart.Update(plateView);
+                return layoutPart;
+            }
+            catch
+            {
+                layoutPart.ReleaseDisplayResources();
+                throw;
+            }
         }
 
         public static Color SelectedColor

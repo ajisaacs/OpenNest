@@ -341,8 +341,17 @@ on an `Applied` result, not as a rollback.
 
 ## Desktop workflow
 
-`Plate > Plan Cutting...` plans the active plate and `Nest > Plan Cutting (All Plates)...`
-plans every plate that has parts. Both open one dialog built on
+`Plate > Plan Cutting...` opens a read-only inspection panel beside the main plate canvas.
+It captures the active plate on the editor thread, plans on a worker, and shows the exact
+fresh, supported detached proposal in that canvas, including proposed part numbers and
+rapids. The live `Plate`, part order, programs and quantities remain unchanged; Escape,
+the panel X or Cancel restores the live view and prior viewport. Closing during planning
+waits for the worker before unlocking inspection. Stale or unsupported output has no
+proposal preview. This first panel slice does not offer Apply or settings editing: use
+`Nest > Plan Cutting (All Plates)...` for the existing modal Apply workflow. A displayed
+proposal is not a live-nest validation report or posting consent.
+
+`Nest > Plan Cutting (All Plates)...` plans every occupied plate in a dialog built on
 `OpenNest.Engine.CuttingPlanning.CuttingPlanBatch`:
 
 - The dialog starts from the plate's cutting settings (or the last-used settings) and plans

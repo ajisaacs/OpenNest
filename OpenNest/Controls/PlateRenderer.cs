@@ -21,7 +21,7 @@ namespace OpenNest.Controls
 
         public void DrawPlate(Graphics g)
         {
-            var plate = view.Plate;
+            var plate = view.DisplayPlate;
             var plateRect = new RectangleF
             {
                 Width = view.LengthWorldToGui(plate.Size.Length),
@@ -109,7 +109,7 @@ namespace OpenNest.Controls
         public void DrawParts(Graphics g)
         {
             var viewBounds = view.GetViewBounds();
-            var layoutParts = view.LayoutParts;
+            var layoutParts = view.DisplayLayoutParts;
 
             for (var i = 0; i < layoutParts.Count; ++i)
             {
@@ -149,16 +149,16 @@ namespace OpenNest.Controls
                 g.DrawPath(previewPen, path);
             }
 
-            if (view.DrawOffset && view.Plate.PartSpacing > 0)
+            if (view.DrawOffset && view.DisplayPlate.PartSpacing > 0)
                 DrawOffsetGeometry(g);
 
-            if (view.DrawBounds)
+            if (view.DrawBounds && !view.HasProposalDisplay)
             {
                 var bounds = view.SelectedParts.Select(p => p.BasePart).ToList().GetBoundingBox();
                 DrawBox(g, bounds);
             }
 
-            if (view.DrawRapid)
+            if (view.DrawRapid || view.HasProposalDisplay)
                 DrawRapids(g);
 
             if (view.DrawPiercePoints)
@@ -170,7 +170,7 @@ namespace OpenNest.Controls
 
         public void DrawCutOffs(Graphics g)
         {
-            var plate = view.Plate;
+            var plate = view.DisplayPlate;
             if (plate?.CutOffs == null || plate.CutOffs.Count == 0)
                 return;
 
@@ -357,7 +357,7 @@ namespace OpenNest.Controls
 
         private void DrawGrainWarning(Graphics g, Part part, bool muted)
         {
-            var plate = view.Plate;
+            var plate = view.DisplayPlate;
             if (
                 !view.ShowBendLines
                 || plate == null
@@ -406,7 +406,7 @@ namespace OpenNest.Controls
 
         private void DrawOffsetGeometry(Graphics g)
         {
-            var layoutParts = view.LayoutParts;
+            var layoutParts = view.DisplayLayoutParts;
             using var offsetPen = new Pen(Color.FromArgb(120, 255, 100, 100));
 
             for (var i = 0; i < layoutParts.Count; i++)
@@ -416,7 +416,7 @@ namespace OpenNest.Controls
                 if (layoutPart.IsDirty)
                     layoutPart.Update(view);
 
-                layoutPart.UpdateOffset(view.Plate.PartSpacing, view.OffsetTolerance, view.Matrix);
+                layoutPart.UpdateOffset(view.DisplayPlate.PartSpacing, view.OffsetTolerance, view.Matrix);
 
                 if (layoutPart.OffsetPath != null)
                     g.DrawPath(offsetPen, layoutPart.OffsetPath);
@@ -426,7 +426,7 @@ namespace OpenNest.Controls
         private void DrawRapids(Graphics g)
         {
             var pen = view.ColorScheme.RapidPen;
-            foreach (var segment in RapidEnumerator.Enumerate(view.Plate.Parts))
+            foreach (var segment in RapidEnumerator.Enumerate(view.DisplayPlate.Parts))
                 DrawLine(g, segment.From, segment.To, pen);
         }
 
@@ -435,9 +435,9 @@ namespace OpenNest.Controls
             using var brush = new SolidBrush(Color.Red);
             using var pen = new Pen(Color.DarkRed, 1f);
 
-            for (var i = 0; i < view.Plate.Parts.Count; ++i)
+            for (var i = 0; i < view.DisplayPlate.Parts.Count; ++i)
             {
-                var part = view.Plate.Parts[i];
+                var part = view.DisplayPlate.Parts[i];
                 var pgm = part.Program;
                 var pos = part.Location;
                 DrawProgramPiercePoints(g, pgm, part.Location, ref pos, brush, pen);
@@ -498,9 +498,9 @@ namespace OpenNest.Controls
             var arrowSpacingWorld = view.LengthGuiToWorld(60f);
             var arrowSize = 6f;
 
-            for (var i = 0; i < view.Plate.Parts.Count; ++i)
+            for (var i = 0; i < view.DisplayPlate.Parts.Count; ++i)
             {
-                var part = view.Plate.Parts[i];
+                var part = view.DisplayPlate.Parts[i];
                 var pgm = part.Program;
                 var pos = part.Location;
                 CutDirectionArrows.DrawProgram(

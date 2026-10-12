@@ -154,6 +154,7 @@ namespace OpenNest.Controls
         public ColorScheme ColorScheme { get; set; }
 
         internal bool InspectionOnly { get; set; }
+        internal System.Action InspectionCloseRequested { get; set; }
 
         public bool AllowZoom { get; set; }
 
@@ -181,7 +182,55 @@ namespace OpenNest.Controls
 
         internal List<LayoutPart> LayoutParts => parts;
 
-        internal IReadOnlyList<LayoutPart> PreviewParts => previewManager.PreviewParts;
+        private Plate displayPlate;
+        private List<LayoutPart> displayParts;
+        private Func<bool> displayIsCurrent;
+        internal Plate DisplayPlate => displayPlate ?? plate;
+        internal List<LayoutPart> DisplayLayoutParts => displayParts ?? parts;
+        internal bool HasProposalDisplay => displayPlate != null;
+
+        internal void ShowProposalDisplay(Plate proposal, Func<bool> isCurrent)
+        {
+            if (!InspectionOnly)
+                throw new InvalidOperationException("Proposal display requires an inspection lock.");
+            ClearProposalDisplay();
+            if (proposal == null || isCurrent?.Invoke() != true)
+                return;
+            var layouts = new List<LayoutPart>();
+            try
+            {
+                foreach (var part in proposal.Parts)
+                    layouts.Add(LayoutPart.Create(part, this));
+                displayPlate = proposal;
+                displayIsCurrent = isCurrent;
+                displayParts = layouts;
+            }
+            catch
+            {
+                foreach (var layout in layouts)
+                    layout.ReleaseDisplayResources();
+                throw;
+            }
+            ClearHover();
+            validationOverlay.Clear();
+            Invalidate();
+        }
+
+        internal void ClearProposalDisplay()
+        {
+            var old = displayParts;
+            displayPlate = null;
+            displayParts = null;
+            displayIsCurrent = null;
+            if (old != null)
+                foreach (var layout in old)
+                    layout.ReleaseDisplayResources();
+            validationOverlay?.Clear();
+            if (!IsDisposed && !Disposing)
+                Invalidate();
+        }
+
+        internal IReadOnlyList<LayoutPart> PreviewParts => HasProposalDisplay ? Array.Empty<LayoutPart>() : previewManager.PreviewParts;
         internal Brush PreviewBrush => previewManager.PreviewBrush;
         internal Pen PreviewPen => previewManager.PreviewPen;
 
@@ -212,6 +261,7 @@ namespace OpenNest.Controls
 
         private void SetPlate(Plate p)
         {
+            ClearProposalDisplay();
             if (plate != null)
             {
                 plate.PartAdded -= plate_PartAdded;
@@ -532,7 +582,9 @@ namespace OpenNest.Controls
         {
             if (InspectionOnly)
             {
-                if (keyData == Keys.F)
+                if (keyData == Keys.Escape && InspectionCloseRequested != null)
+                    InspectionCloseRequested();
+                else if (keyData == Keys.F)
                     ZoomToFit();
                 return true;
             }
@@ -580,7 +632,11 @@ namespace OpenNest.Controls
         protected override bool ProcessDialogKey(Keys keyData)
         {
             if (InspectionOnly)
+            {
+                if (keyData == Keys.Escape)
+                    InspectionCloseRequested?.Invoke();
                 return true;
+            }
             // Only handle TAB, RETURN, ESC, and ARROW KEYS here.
             // All other keys can be handled in OnKeyDown method.
 
@@ -636,6 +692,8 @@ namespace OpenNest.Controls
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (displayPlate != null && displayIsCurrent?.Invoke() != true)
+                ClearProposalDisplay();
             if (BackColor != ColorScheme.BackgroundColor)
                 BackColor = ColorScheme.BackgroundColor;
 
@@ -651,15 +709,18 @@ namespace OpenNest.Controls
 
             renderer.DrawPlate(e.Graphics);
             renderer.DrawParts(e.Graphics);
-            renderer.DrawCutOffs(e.Graphics);
-            renderer.DrawActiveWorkArea(e.Graphics);
-            renderer.DrawDebugRemnants(e.Graphics);
-            DrawOverlapOverlay(e.Graphics);
-            validationOverlay.Draw(e.Graphics);
+            if (!HasProposalDisplay)
+            {
+                renderer.DrawCutOffs(e.Graphics);
+                renderer.DrawActiveWorkArea(e.Graphics);
+                renderer.DrawDebugRemnants(e.Graphics);
+                DrawOverlapOverlay(e.Graphics);
+                validationOverlay.Draw(e.Graphics);
+            }
 
             base.OnPaint(e);
 
-            if (!overlapOverlay.DrawHover(e.Graphics) && hoveredPart != null && showTooltip)
+            if (!InspectionOnly && !overlapOverlay.DrawHover(e.Graphics) && hoveredPart != null && showTooltip)
             {
                 e.Graphics.ResetTransform();
                 var text = hoveredPart.BasePart.BaseDrawing.Name;
@@ -695,6 +756,8 @@ namespace OpenNest.Controls
         {
             if (disposing)
             {
+                ClearProposalDisplay();
+                InspectionCloseRequested = null;
                 // A plate can outlive its view; stop it calling back into a disposed one.
                 if (plate != null)
                 {
@@ -959,7 +1022,7 @@ namespace OpenNest.Controls
 
         public virtual void ZoomToFit(bool redraw = true)
         {
-            ZoomToArea(plate.BoundingBox(true), redraw);
+            ZoomToArea(DisplayPlate.BoundingBox(true), redraw);
         }
 
         public virtual void ZoomToSelected(bool redraw = true)
@@ -983,6 +1046,7 @@ namespace OpenNest.Controls
             ClearHover();
             base.UpdateMatrix();
             parts.ForEach(p => p.Update(this));
+            displayParts?.ForEach(p => p.Update(this));
             previewManager.Update();
         }
     }

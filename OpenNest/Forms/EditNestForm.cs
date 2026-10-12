@@ -244,6 +244,7 @@ namespace OpenNest.Forms
             };
             sidePanelHeader.Controls.Add(sidePanelTitle);
             sidePanelHeader.Controls.Add(closeButton);
+            SidePanelHeader = sidePanelHeader;
 
             viewSplitContainer = new SplitContainer
             {
@@ -261,8 +262,65 @@ namespace OpenNest.Forms
 
         public bool IsSidePanelVisible => !viewSplitContainer.Panel2Collapsed;
 
+        internal Control SidePanelHeader { get; private set; }
+        internal CuttingInspectionPanel CuttingInspection { get; private set; }
+        private bool disposeAfterCuttingInspection;
+        private bool closeAfterCuttingInspection;
+        internal bool DeferCuttingDisposal()
+        {
+            if (CuttingInspection == null)
+                return false;
+            CuttingInspection.RequestClose();
+            if (CuttingInspection == null)
+                return false;
+            disposeAfterCuttingInspection = true;
+            return true;
+        }
+        internal System.Action<System.Threading.CancellationToken> CuttingBeforePlan { get; set; }
+
+        internal void OpenCuttingInspection()
+        {
+            if (CuttingInspection != null)
+                return;
+            PlateView.EndAction();
+            var panel = new CuttingInspectionPanel(this, LoadOrDefaultParameters(PlateView.Plate.CuttingParameters))
+            {
+                BeforePlan = CuttingBeforePlan
+            };
+            CuttingInspection = panel;
+            ShowSidePanel(panel, "Plan Cutting — Read-only Proposal");
+            panel.Open();
+        }
+
+        internal void FinishCuttingInspection(CuttingInspectionPanel panel)
+        {
+            if (!ReferenceEquals(CuttingInspection, panel))
+                return;
+            CuttingInspection = null;
+            var main = MdiParent as MainForm;
+            HideSidePanel();
+            if (disposeAfterCuttingInspection)
+            {
+                disposeAfterCuttingInspection = false;
+                Dispose();
+            }
+            else if (closeAfterCuttingInspection)
+            {
+                closeAfterCuttingInspection = false;
+                Close();
+            }
+            else
+                PlateView.Focus();
+            main?.ResumeDeferredCuttingDisposal();
+        }
+
         public void ShowSidePanel(Control content, string title, int width = 390)
         {
+            if (CuttingInspection != null && !ReferenceEquals(content, CuttingInspection))
+            {
+                CuttingInspection.RequestClose();
+                return;
+            }
             sidePanel.Controls.Clear();
             content.Dock = DockStyle.Fill;
             sidePanel.Controls.Add(content);
@@ -273,6 +331,11 @@ namespace OpenNest.Forms
 
         public void HideSidePanel()
         {
+            if (CuttingInspection != null)
+            {
+                CuttingInspection.RequestClose();
+                return;
+            }
             viewSplitContainer.Panel2Collapsed = true;
             sidePanel.Controls.Clear();
             sidePanelTitle.Text = string.Empty;
@@ -280,6 +343,11 @@ namespace OpenNest.Forms
 
         private void CloseSidePanel()
         {
+            if (CuttingInspection != null)
+            {
+                CuttingInspection.RequestClose();
+                return;
+            }
             // Side panels belong to the plate action that opened them; ending the
             // action hides its panel. Hide directly as well so Close always closes.
             PlateView.EndAction();
@@ -856,6 +924,16 @@ namespace OpenNest.Forms
 
         protected override void OnClosing(CancelEventArgs e)
         {
+            if (CuttingInspection != null)
+            {
+                CuttingInspection.RequestClose();
+                if (CuttingInspection != null)
+                {
+                    closeAfterCuttingInspection = true;
+                    e.Cancel = true;
+                    return;
+                }
+            }
             base.OnClosing(e);
 
             PlateManager.Dispose();
@@ -903,7 +981,7 @@ namespace OpenNest.Forms
         /// </summary>
         public bool PlanCutting(bool allPlates, Func<bool> isOperationBusy, IWin32Window owner)
         {
-            if (PlateView?.Plate == null || Nest == null)
+            if (CuttingInspection != null || PlateView?.Plate == null || Nest == null)
                 return false;
 
             // The form plans with its own copy; the plate's live settings stay plate state.
