@@ -175,6 +175,7 @@ public class CuttingInspectionPanelTests
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         Assert.True(editor.PlateView.HasProposalDisplay);
         Field<Button>(panel, "nextButton").PerformClick();
+        Assert.Same(second, editor.PlateView.Plate); // Refusal shows the requested live plate, not the opening plate.
         Assert.False(editor.PlateView.HasProposalDisplay);
         Assert.Contains("no current preview", Field<Label>(panel, "previewLabel").Text);
         var grid = Field<DataGridView>(panel, "warningGrid");
@@ -186,6 +187,40 @@ public class CuttingInspectionPanelTests
         Assert.All(editor.Nest.Plates[0].Parts, p => Assert.False(p.HasManualLeadIns));
         panel.RequestClose();
         Assert.Same(original, editor.PlateView.Plate);
+    });
+
+    [Fact]
+    public void NextAndPreviousShowTheSelectedReadyPlateNotTheOpeningPlate() => RunSta(() =>
+    {
+        using var editor = Editor();
+        var first = editor.Nest.Plates[0];
+        var second = editor.Nest.Plates[^1]; // Fill the managed sentinel.
+        second.Size = new OpenNest.Geometry.Size(100, 100);
+        second.Parts.Add(Square("other plate", 40));
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        OpenAll(editor);
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.Equal(2, panel.Proposal.Plates.Count);
+        Assert.Same(first, editor.PlateView.Plate);
+        Assert.True(editor.PlateView.HasProposalDisplay);
+        Assert.Contains(editor.PlateView.DisplayPlate.Parts, part => part.BaseDrawing.Name == "near");
+
+        Field<Button>(panel, "nextButton").PerformClick();
+        Assert.Same(second, editor.PlateView.Plate);
+        Assert.True(editor.PlateView.HasProposalDisplay);
+        Assert.NotSame(second, editor.PlateView.DisplayPlate);
+        Assert.Single(editor.PlateView.DisplayPlate.Parts);
+        Assert.Equal("other plate", editor.PlateView.DisplayPlate.Parts[0].BaseDrawing.Name);
+        Assert.Contains("Plate 2", Field<Label>(panel, "previewLabel").Text);
+
+        Field<Button>(panel, "previousButton").PerformClick();
+        Assert.Same(first, editor.PlateView.Plate);
+        Assert.True(editor.PlateView.HasProposalDisplay);
+        Assert.Contains(editor.PlateView.DisplayPlate.Parts, part => part.BaseDrawing.Name == "near");
+        panel.RequestClose();
+        Assert.Same(first, editor.PlateView.Plate);
     });
 
     [Fact]

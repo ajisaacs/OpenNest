@@ -399,12 +399,14 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
 - The docked panel keeps the batch outcome and plate headings above a
   read-only, unsorted warning grid with Plate, source Part, With, and full finding text. Every
   overlap issue/pair and every planner finding has its own selectable row, including findings
-  hidden by the compact blocked-plate summary. Selecting a row switches to that plate's
-  detached preview and zooms to the affected part extent (or both parts for a pair), mapping
-  source positions to the proposed cutting order. This is not an exact contact marker: most
-  findings do not carry a geometric witness. If a plate cannot produce a current, supported
-  preview, no geometry is cloned or focused; the row still identifies its source part in the
-  editor. Replanning, cancellation and stale Apply clear old warning targets.
+  hidden by the compact blocked-plate summary. **Previous**/**Next** and warning selection
+  navigate the editor to that plate's live source sheet, then display its detached proposal
+  when available. Warning selection zooms to the affected part extent (or both parts for a
+  pair), mapping source positions to proposed cutting order. This is not an exact contact
+  marker: most findings do not carry a geometric witness. If a plate cannot produce a
+  current, supported proposal preview, its own live sheet remains visible; no unsupported
+  geometry is cloned or focused. Replanning, cancellation and stale Apply clear old warning
+  targets.
 - The summary lists every plate: ready plates with part counts and rapid travel, others
   with their status and findings. Unverified proposals retain every overlap and route
   warning in the selectable grid before the acceptance checkbox is used; they do

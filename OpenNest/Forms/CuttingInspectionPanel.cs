@@ -436,7 +436,7 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private bool IsPreviewCurrent()
     {
-        if (!closed && !invalidated && ReferenceEquals(view.Plate, plate)
+        if (!closed && !invalidated && ReferenceEquals(view.Plate, plates[selectedPlate])
             && inspection.RefreshPreview(selectedPlate) != null)
             return true;
         invalidated = true;
@@ -454,6 +454,23 @@ internal sealed class CuttingInspectionPanel : UserControl
         selectedPlate = index;
         view.ClearProposalDisplay();
         view.ClearValidationFinding();
+        // Keep the authoritative editor plate on the selected live source even when
+        // no safe detached proposal can be rendered for that plate.
+        var sourceIndex = editor.Nest.Plates.IndexOf(plates[index]);
+        if (sourceIndex < 0)
+        {
+            ClearResult();
+            resultLabel.Text = "The selected plate changed after capture. Replan to continue.";
+            return;
+        }
+        if (!ReferenceEquals(view.Plate, plates[index]))
+            editor.PlateManager.LoadAt(sourceIndex);
+        if (!ReferenceEquals(view.Plate, plates[index]))
+        {
+            ClearResult();
+            resultLabel.Text = "The selected plate is no longer current. Replan to continue.";
+            return;
+        }
         if (plates[index].Parts.Count == 0)
         {
             preview = null;
