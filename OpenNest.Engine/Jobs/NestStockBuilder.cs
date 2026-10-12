@@ -30,7 +30,8 @@ public static class NestStockBuilder
                 template.PartSpacing,
                 template.EdgeSpacing,
                 template.Quadrant,
-                option.Cost == 0 ? null : option.Cost
+                option.Cost == 0 ? null : option.Cost,
+                new List<ClampZone>(template.ClampZones)
             ));
         }
         NestJobValidator.ValidateStockCosts(stock);

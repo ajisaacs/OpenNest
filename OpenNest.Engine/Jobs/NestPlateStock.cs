@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs;
@@ -14,19 +15,21 @@ public sealed class NestPlateStock
         int? quantity = null,
         double partSpacing = 0,
         Spacing edgeSpacing = default,
-        int quadrant = 1
+        int quadrant = 1,
+        IReadOnlyList<ClampZone> clampZones = null
     )
-        : this(id, size, quantity, partSpacing, edgeSpacing, quadrant, null) { }
+        : this(id, size, quantity, partSpacing, edgeSpacing, quadrant, null, clampZones) { }
 
     public NestPlateStock(string id, Size size, int? quantity, double partSpacing,
-        Spacing edgeSpacing, int quadrant, double? cost)
+        Spacing edgeSpacing, int quadrant, double? cost,
+        IReadOnlyList<ClampZone> clampZones = null)
     {
         if (cost.HasValue && (!double.IsFinite(cost.Value) || cost.Value <= 0))
             throw new ArgumentOutOfRangeException(nameof(cost), $"Stock {id}: cost must be finite and positive, or null.");
-        Cost = cost;
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         if (quantity < 0)
             throw new ArgumentOutOfRangeException(nameof(quantity));
+        Cost = cost;
         Id = id;
         Size = size;
         Quantity = quantity;
@@ -41,7 +44,26 @@ public sealed class NestPlateStock
             size.Length - edgeSpacing.Left - edgeSpacing.Right,
             size.Width - edgeSpacing.Bottom - edgeSpacing.Top
         );
+        // Zones arrive in plate coordinates and are carried in the placement frame,
+        // translated exactly like WorkArea. Detached copies: stock is immutable input.
+        if (clampZones == null || clampZones.Count == 0)
+        {
+            ClampZones = Array.Empty<ClampZone>();
+        }
+        else
+        {
+            var zones = new ClampZone[clampZones.Count];
+            for (var i = 0; i < zones.Length; i++)
+                zones[i] = new ClampZone(clampZones[i].Id, clampZones[i].Bounds.Translate(left, bottom));
+            ClampZones = zones;
+        }
     }
+
+    /// <summary>
+    /// Keep-out rectangles in the placement frame (quadrant applied), translated exactly
+    /// like <see cref="WorkArea"/>. Empty when the plate defines none; never null.
+    /// </summary>
+    public IReadOnlyList<ClampZone> ClampZones { get; }
 
     /// <summary>Generic per-physical-sheet cost; null selects area scoring.</summary>
     public double? Cost { get; }

@@ -153,9 +153,61 @@ public static class NestLayoutCheck
             ValidateBounds(parts, plate, requirements, result);
             ValidateAreaBudget(parts, plate, result);
             ValidateSpacing(parts, plate.PartSpacing, requirements, result);
+            if (plate.ClampZones.Count > 0)
+                ValidateClamps(parts, plate, requirements, result);
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// C1/C5: no part material may enter a clamp zone inflated by the plate's bottom-edge
+    /// spacing (D6) - the same clearance the part owes the sheet edge, enforced with the
+    /// shared spacing slack so exact engine placements are not reddened by rounding.
+    /// </summary>
+    private static void ValidateClamps(
+        List<Part> parts,
+        Plate plate,
+        IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements,
+        List<string> result
+    )
+    {
+        var inflateBy = InflationFor(plate.EdgeSpacing.Bottom);
+
+        foreach (var zone in plate.ClampZones)
+        {
+            // Box.Offset(d) grows the rectangle on all four sides.
+            var keepOut = zone.Bounds.Offset(inflateBy);
+            var keepOutOutline = RectangleOutline(keepOut);
+
+            foreach (var part in parts)
+            {
+                if (!BoxesTouch(keepOut, MaterialBounds(part)))
+                    continue;
+
+                var material = Outline(part, 0);
+                if (material == null || !Overlaps(material, keepOutOutline))
+                    continue;
+
+                result.Add(
+                    $"'{DisplayName(part, requirements)}' at ({part.Location.X:F2},{part.Location.Y:F2}) overlaps "
+                        + $"clamp zone '{zone.Id}' including its edge clearance"
+                );
+            }
+        }
+    }
+
+    private static PartOutline RectangleOutline(Box box)
+    {
+        var ring = new List<Geometry.Entity>
+        {
+            new Line(box.Left, box.Bottom, box.Right, box.Bottom),
+            new Line(box.Right, box.Bottom, box.Right, box.Top),
+            new Line(box.Right, box.Top, box.Left, box.Top),
+            new Line(box.Left, box.Top, box.Left, box.Bottom),
+        };
+        var profile = new ShapeProfile(ring);
+        return Outline(profile, new Vector(0, 0), 0);
     }
 
     /// <summary>
@@ -239,7 +291,30 @@ public static class NestLayoutCheck
             && expected.EdgeSpacing.Top.IsEqualTo(actual.EdgeSpacing.Top)
             && expected.EdgeSpacing.Bottom.IsEqualTo(actual.EdgeSpacing.Bottom)
             && expected.Quadrant == actual.Quadrant
+            && SameZones(expected.ClampZones, actual.ClampZones)
         );
+
+    // Clamp sets are part of stock settings; a different set is not the offered stock.
+    private static bool SameZones(
+        IReadOnlyList<ClampZone> x,
+        IReadOnlyList<ClampZone> y
+    )
+    {
+        if (x.Count != y.Count)
+            return false;
+        for (var i = 0; i < x.Count; i++)
+        {
+            if (
+                !string.Equals(x[i].Id, y[i].Id, StringComparison.Ordinal)
+                || !x[i].Bounds.X.IsEqualTo(y[i].Bounds.X)
+                || !x[i].Bounds.Y.IsEqualTo(y[i].Bounds.Y)
+                || !x[i].Bounds.Length.IsEqualTo(y[i].Bounds.Length)
+                || !x[i].Bounds.Width.IsEqualTo(y[i].Bounds.Width)
+            )
+                return false;
+        }
+        return true;
+    }
 
     private static string Describe(RotationPolicy policy) =>
         policy.Kind switch
