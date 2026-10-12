@@ -55,7 +55,7 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
-            if (_session.ConsumedStockPlates.Contains(plate))
+            if (_session.IsConsumedStockPlate(plate))
                 return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
 
             var drawing = _session.GetDrawing(drawingName);
@@ -110,7 +110,7 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
-            if (_session.ConsumedStockPlates.Contains(plate))
+            if (_session.IsConsumedStockPlate(plate))
                 return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
 
             var drawing = _session.GetDrawing(drawingName);
@@ -162,7 +162,7 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
-            if (_session.ConsumedStockPlates.Contains(plate))
+            if (_session.IsConsumedStockPlate(plate))
                 return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
 
             var drawing = _session.GetDrawing(drawingName);
@@ -227,7 +227,7 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
-            if (_session.ConsumedStockPlates.Contains(plate))
+            if (_session.IsConsumedStockPlate(plate))
                 return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
 
             if (string.IsNullOrWhiteSpace(drawingNames))
@@ -285,7 +285,7 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
-            if (_session.ConsumedStockPlates.Contains(plate))
+            if (_session.IsConsumedStockPlate(plate))
                 return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
             if (plate.Parts.Count > 0)
                 return "Error: autonest cannot use an occupied plate. Use fill_area or fill_remnants for existing obstacles.";
@@ -360,7 +360,7 @@ namespace OpenNest.Mcp.Tools
             var template = _session.GetPlate(plateIndex);
             if (template == null)
                 return $"Error: plate {plateIndex} not found";
-            if (_session.ConsumedStockPlates.Contains(template))
+            if (_session.IsConsumedStockPlate(template))
                 return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
             if (template.Parts.Count != 0 || template.CutOffs.Count != 0)
                 return "Error: stock template must be empty and have no cutoff definitions. Nothing committed.";
@@ -404,7 +404,7 @@ namespace OpenNest.Mcp.Tools
 
             var available = new List<Plate> { template };
             available.AddRange(existing.Where(p => !ReferenceEquals(p, template)
-                && !_session.ConsumedStockPlates.Contains(p)
+                && !_session.IsConsumedStockPlate(p)
                 && p.Parts.Count == 0 && p.CutOffs.Count == 0 && SameStock(p, template)));
             var demand = remaining.Sum(item => (long)item.Quantity);
             if (demand > int.MaxValue)
@@ -452,7 +452,7 @@ namespace OpenNest.Mcp.Tools
             {
                 var target = new[] { template }.Concat(existing.Where(p => !ReferenceEquals(p, template)))
                     .FirstOrDefault(p => !usedTargets.Contains(p)
-                        && !_session.ConsumedStockPlates.Contains(p)
+                        && !_session.IsConsumedStockPlate(p)
                         && p.Parts.Count == 0 && p.CutOffs.Count == 0
                         && SameStock(p, template, proposed.Stock.Size));
                 var created = target == null;
@@ -469,18 +469,18 @@ namespace OpenNest.Mcp.Tools
             // Reserve physical copies separately from display-layout targets. Do this
             // only after mapping every layout, so a repeat cannot steal a residual's
             // target. A rejected/cancelled proposal reserves nothing and deletes nothing.
-            var consumed = new List<Plate>();
+            var reservations = new List<List<Plate>>();
             foreach (var proposed in result.Plates)
             {
                 var copies = existing.Where(p => !usedTargets.Contains(p)
-                    && !_session.ConsumedStockPlates.Contains(p)
+                    && !_session.IsConsumedStockPlate(p)
                     && p.Parts.Count == 0 && p.CutOffs.Count == 0
                     && SameStock(p, template, proposed.Stock.Size))
                     .Take(proposed.Quantity - 1).ToList();
                 if (no_new_plates && copies.Count != proposed.Quantity - 1)
                     return "Error: insufficient unused physical stock for the repeated layout. Nothing committed.";
                 usedTargets.UnionWith(copies);
-                consumed.AddRange(copies);
+                reservations.Add(copies);
             }
             cancellationToken.ThrowIfCancellationRequested();
             for (var i = 0; i < result.Plates.Count; i++)
@@ -496,7 +496,8 @@ namespace OpenNest.Mcp.Tools
                     _session.Plates.Add(target);
                 target.Parts.AddRange(proposed.Parts);
             }
-            _session.ConsumedStockPlates.UnionWith(consumed);
+            for (var i = 0; i < targets.Count; i++)
+                _session.ReserveStockCopies(targets[i].plate, reservations[i]);
             foreach (var item in parsed.items)
                 item.Drawing.Quantity.Required = item.Quantity;
             if (sheets != null)
