@@ -11,7 +11,7 @@ using OpenNest.Shapes;
 
 namespace OpenNest.Forms
 {
-    public class MachineConfigForm : Form
+    public partial class MachineConfigForm : Form
     {
         private static readonly string[] LeadInTypes =
         {
@@ -30,60 +30,23 @@ namespace OpenNest.Forms
         private static readonly string[] CutOffDirectionOptions = Enum.GetNames<CutDirection>();
 
         private readonly IDataProvider _provider;
-        private readonly TreeView _tree;
-        private readonly Panel _detailPanel;
         private readonly HashSet<Guid> _pendingDeletes = new();
-        private readonly Button _saveButton;
 
         private MachineConfig _currentMachine;
         private TreeNode _currentMachineNode;
         private bool _dirty;
 
-        public MachineConfigForm(IDataProvider provider)
+        private MachineConfigForm()
         {
-            _provider = provider;
-
-            Text = "Machine Configuration";
-            Size = new Size(1210, 640);
-            StartPosition = FormStartPosition.CenterParent;
-            MinimumSize = new Size(1010, 440);
-
-            var splitContainer = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                SplitterDistance = 500,
-                FixedPanel = FixedPanel.Panel1,
-            };
-
-            _tree = new TreeView { Dock = DockStyle.Fill, HideSelection = false };
+            InitializeComponent();
             _tree.AfterSelect += Tree_AfterSelect;
             _tree.MouseDown += Tree_MouseDown;
+        }
 
-            splitContainer.Panel1.Controls.Add(_tree);
-
-            _detailPanel = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
-            splitContainer.Panel2.Controls.Add(_detailPanel);
-
-            var bottomPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Bottom,
-                AutoSize = true,
-                FlowDirection = FlowDirection.RightToLeft,
-                Padding = new Padding(4),
-            };
-
-            _saveButton = new Button { Text = "Save", AutoSize = true };
-            _saveButton.Click += Save_Click;
-            var importButton = new Button { Text = "Import...", AutoSize = true };
-            importButton.Click += Import_Click;
-            var exportButton = new Button { Text = "Export...", AutoSize = true };
-            exportButton.Click += Export_Click;
-
-            bottomPanel.Controls.AddRange(new Control[] { _saveButton, exportButton, importButton });
-
-            Controls.Add(splitContainer);
-            Controls.Add(bottomPanel);
-
+        public MachineConfigForm(IDataProvider provider)
+            : this()
+        {
+            _provider = provider;
             LoadTree();
         }
 
