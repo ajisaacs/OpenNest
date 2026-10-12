@@ -144,10 +144,20 @@ public sealed class ClampSettings
             return settings;
         }
 
-        ClampSettingsDto? dto;
+        // Read as a raw document so a missing field (fallback, Ok) is distinguishable from a
+        // present but unusable one, including an explicit null (fallback, Partial).
+        Dictionary<string, JsonElement> values;
         try
         {
-            dto = JsonSerializer.Deserialize<ClampSettingsDto>(File.ReadAllText(path), JsonOptions);
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                status = ClampSettingsStatus.Invalid;
+                return settings;
+            }
+            values = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in document.RootElement.EnumerateObject())
+                values[property.Name] = property.Value.Clone();
         }
         catch (Exception ex) when (IsUnreadableFile(ex))
         {
@@ -155,15 +165,9 @@ public sealed class ClampSettings
             return settings;
         }
 
-        if (dto is null)
-        {
-            status = ClampSettingsStatus.Invalid;
-            return settings;
-        }
-
         var ignored = false;
 
-        if (dto.Enabled is { } enabled)
+        if (values.TryGetValue("enabled", out var enabled))
         {
             if (enabled.ValueKind is JsonValueKind.True or JsonValueKind.False)
                 settings.Enabled = enabled.GetBoolean();
@@ -171,7 +175,7 @@ public sealed class ClampSettings
                 ignored = true;
         }
 
-        if (dto.Units is { } units)
+        if (values.TryGetValue("units", out var units))
         {
             if (TryParseUnits(units, out var parsed))
                 settings.Units = parsed;
@@ -179,35 +183,34 @@ public sealed class ClampSettings
                 ignored = true;
         }
 
-        if (dto.Width is { } width)
+        // Fallback sizes are the physical default clamp, expressed in the file's units.
+        settings.Width = ConvertDefault(DefaultWidth, settings.Units);
+        settings.Depth = ConvertDefault(DefaultDepth, settings.Units);
+
+        if (values.TryGetValue("width", out var width))
         {
-            if (TryPositive(width, out var value))
+            if (TryLength(width, out var value) && value > 0)
                 settings.Width = value;
             else
                 ignored = true;
         }
 
-        if (dto.Depth is { } depth)
+        if (values.TryGetValue("depth", out var depth))
         {
-            if (TryPositive(depth, out var value))
+            if (TryLength(depth, out var value) && value > 0)
                 settings.Depth = value;
             else
                 ignored = true;
         }
 
-        if (dto.Centers is { } centers)
+        if (values.TryGetValue("centers", out var centers))
         {
             if (centers.ValueKind == JsonValueKind.Array)
             {
                 var valid = new List<double>();
                 foreach (var center in centers.EnumerateArray())
                 {
-                    if (
-                        center.ValueKind == JsonValueKind.Number
-                        && center.TryGetDouble(out var x)
-                        && double.IsFinite(x)
-                        && x >= 0
-                    )
+                    if (TryLength(center, out var x) && x >= 0)
                         valid.Add(x);
                     else
                         ignored = true;
@@ -267,13 +270,17 @@ public sealed class ClampSettings
     private static double ConvertDefault(double inches, Units units) =>
         inches * Scale(Units.Inches, units);
 
-    private static bool TryPositive(JsonElement element, out double value)
+    /// <summary>
+    /// A finite JSON number that stays finite in either unit, so applying it to an inch or a
+    /// millimeter nest can never overflow.
+    /// </summary>
+    private static bool TryLength(JsonElement element, out double value)
     {
         value = 0;
         return element.ValueKind == JsonValueKind.Number
             && element.TryGetDouble(out value)
             && double.IsFinite(value)
-            && value > 0;
+            && double.IsFinite(value * MillimetersPerInch);
     }
 
     /// <summary>
@@ -306,19 +313,4 @@ public sealed class ClampSettings
                 or UnauthorizedAccessException
                 or NotSupportedException
                 or System.Security.SecurityException;
-
-    /// <summary>
-    /// Wire format. Every value is read as raw JSON so a wrongly typed field falls back on
-    /// its own instead of failing the whole file; unknown fields (including a future higher
-    /// <c>version</c>) are ignored.
-    /// </summary>
-    private sealed record ClampSettingsDto
-    {
-        public JsonElement? Version { get; init; }
-        public JsonElement? Enabled { get; init; }
-        public JsonElement? Units { get; init; }
-        public JsonElement? Width { get; init; }
-        public JsonElement? Depth { get; init; }
-        public JsonElement? Centers { get; init; }
-    }
 }

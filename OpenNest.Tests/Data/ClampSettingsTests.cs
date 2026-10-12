@@ -201,6 +201,64 @@ public class ClampSettingsTests : IDisposable
         Assert.Equal(ClampSettingsStatus.Partial, LoadStatus(_path));
     }
 
+    [Theory]
+    [InlineData("enabled")]
+    [InlineData("units")]
+    [InlineData("width")]
+    [InlineData("depth")]
+    [InlineData("centers")]
+    public void ExplicitNullIsAnIgnoredValueAndIsReported(string field)
+    {
+        File.WriteAllText(_path, $$"""{ "enabled": true, "centers": [6], "{{field}}": null }""");
+
+        var loaded = ClampSettings.Load(_path, out var status);
+
+        Assert.Equal(ClampSettingsStatus.Partial, status);
+        Assert.Equal(1.5, loaded.Width);
+        Assert.Equal(0.625, loaded.Depth);
+    }
+
+    [Fact]
+    public void MetricFileWithoutSizesGetsThePhysicalDefaultClamp()
+    {
+        File.WriteAllText(_path, """{ "enabled": true, "units": "millimeters", "centers": [152.4] }""");
+
+        var loaded = ClampSettings.Load(_path, out var status);
+
+        Assert.Equal(ClampSettingsStatus.Ok, status);
+        Assert.Equal(1.5 * 25.4, loaded.Width, 9);
+        Assert.Equal(0.625 * 25.4, loaded.Depth, 9);
+        Assert.Equal(1.5, loaded.RailFor(Units.Inches)!.Width, 9);
+    }
+
+    [Fact]
+    public void MetricFileWithAnInvalidSizeFallsBackToThePhysicalDefault()
+    {
+        File.WriteAllText(_path, """{ "enabled": true, "units": "millimeters", "width": -1, "depth": 15, "centers": [152.4] }""");
+
+        var loaded = ClampSettings.Load(_path, out var status);
+
+        Assert.Equal(ClampSettingsStatus.Partial, status);
+        Assert.Equal(38.1, loaded.Width, 9);
+        Assert.Equal(15, loaded.Depth);
+    }
+
+    [Theory]
+    [InlineData("""{ "enabled": true, "width": 1e308, "centers": [6] }""")]
+    [InlineData("""{ "enabled": true, "depth": 1e308, "centers": [6] }""")]
+    [InlineData("""{ "enabled": true, "centers": [6, 1e308] }""")]
+    public void ValuesThatCannotConvertBetweenUnitsAreIgnored(string json)
+    {
+        File.WriteAllText(_path, json);
+
+        var loaded = ClampSettings.Load(_path, out var status);
+
+        Assert.Equal(ClampSettingsStatus.Partial, status);
+        var nest = new Nest { Units = Units.Millimeters };
+        loaded.ApplyToNewNest(nest); // must not throw while creating a nest
+        Assert.Equal(new[] { 6 * 25.4 }, nest.PlateDefaults.ClampRail!.Centers);
+    }
+
     [Fact]
     public void AnInvalidCenterIsDroppedButTheRestOfTheRailStillLoads()
     {
