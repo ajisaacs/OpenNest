@@ -69,6 +69,22 @@ model units (inches for an inch nest), with a floating-point roundoff allowance
 capped at 1e-12. It does not rewrite source endpoints. Native intersections,
 executed-motion checks and pre-post verification retain their existing tolerances.
 
+Arcs of one circle whose centres were each derived from their own endpoints agree only
+within the 1e-8 support tolerance, not bit for bit. Their spans are compared at the
+1e-6 seam tolerance: arcs that share a span still refuse as overlap, while arcs that
+only meet at a joint, or lie apart on the circle (a notched ring), do not.
+
+A seam overcut baked into a clean contour is trimmed from the planner's owned copy
+before any of this: the last cut runs on past the contour's own start along its first
+cut (same line, or same circle and direction, within `Tolerance.Epsilon`) and a straight
+jog returns to the start. Nests converted from another CAM system carry its overcut
+this way. The retraced tail encloses no area, so material, regenerated programs and
+replay all use the contour closed at its seam; the drawing itself is not edited. Nothing
+else is repaired: a jog from beside the first cut, a last cut that stops short of the
+seam, lead-in/lead-out layers and symbolic moves are left alone and still refuse.
+The overlap analyzer trims the same shape from its own copy (see
+[material-overlap diagnostics](geometry/visual-overlap-check.md)).
+
 Capture builds whole-part prerequisites from owned values, and both the search and
 the final replay enforce them:
 
@@ -115,10 +131,22 @@ and no-hole requests keep their existing search order.
 A preserved order is followed as given. Otherwise the order is an open
 travelling-salesman path over part centres from the start point: nearest neighbour,
 then 2-opt reversals and Or-opt moves of one to three parts, never placing a part
-before a cutoff or nested-part prerequisite. If a part on that order cannot be
+before a cutoff or nested-part prerequisite. A part with other parts nested in its
+cutouts (a host) is cut after all of them, so the tool reaches it from whichever was
+cut last, and from the middle of a crowded cutout every straight approach crosses a
+finished neighbour. The nested parts of each host are therefore toured as one run,
+immediately before the host, ending beside the point of the host's contours nearest
+the tool position at the start of the run; nested hosts apply the same rule inside
+the run. Host groups follow the parts beside them, because a finished host is a large
+obstacle that can only be left across its own outside edge. Learned rules win over
+both: a rule between parts of two groups orders the groups, and rules that cannot
+keep a group whole fall back to the plain tour. Plates without nested parts get the
+plain tour unchanged. If a part on that order cannot be
 reached without crossing parts already cut, the search learns "cut this part
 before those", backs up to just before the earliest of them and re-plans the rest
-from the tool position there; parts cut before that point are kept. An attempt
+from the tool position there; parts cut before that point are kept. The first pass
+along an order that teaches such a rule ends the round; the directed-recovery and
+full passes run only when the lighter pass taught nothing. An attempt
 stops backtracking after a stall of 8 x entries x contours expansions without
 getting further, so it learns instead of retrying every entry combination of the
 parts before it. A rule that would contradict an order already required is skipped.
@@ -215,6 +243,17 @@ that edge's own endpoint, not a neighboring entity's endpoint. This keeps the
 candidate on its selected entity when a joined contour has an accepted rounding gap;
 no entry-membership or lead-clearance tolerance is widened.
 
+With no lead-out the tool leaves a part from its outside entry. An entry inside a slot
+or pocket can only be left back over the part just cut, so within the ranked catalogue
+entries are ordered by how many straight sight lines to the next cut clear the part's
+own perimeter: the look-ahead point and, for an ordinary next part, the four corners
+of its cut extent. This is a stable reordering before the lead checks; no entry is
+dropped, and every emitted rapid is still checked.
+
+When the next cut is the host whose cutout the part sits in, the look-ahead point is
+the nearest point of the host's own contours, not its centre (which lies in the middle
+of the cutout, among the other nested parts).
+
 The next cut is the next unfinished part in a supplied order — recomputed
 after every learned-order replan — or, in the full fallback search, the nearest
 dependency-ready remaining part, stable-ordinal ties; the last part has no
@@ -234,6 +273,9 @@ the shared expansion budget before native work.
 For a holed part, the search chooses an outside endpoint before cutting any hole.
 Each endpoint branch builds an open hole-centre route from the original arrival to
 that endpoint, using bounded nearest-neighbour, 2-opt and Or-opt improvement.
+A cutout that contains the arrival point (the tool comes from a part nested in it) is
+routed from the arrival point itself, not its centre, so it is cut first, before a
+later hop to it would have to cross the other parts nested there.
 Preferred hole entries are then resolved backward from the outside's actual emitted
 pierce, ignoring scribe marks: each hole faces the following contour's actual pierce.
 Convex corners lead the preference tiers, then straight midpoints/tangent joints,

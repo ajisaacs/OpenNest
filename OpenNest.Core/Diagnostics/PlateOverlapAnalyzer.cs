@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingPlanning;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 
@@ -73,8 +74,9 @@ public static class PlateOverlapAnalyzer
         {
             ValidateProgram(program, new HashSet<Program>(ReferenceEqualityComparer.Instance), false);
             // Conversion creates fresh geometry, including expanded shared hole calls;
-            // no cloning/rotation of a live program or subprogram is necessary.
-            return new OverlapSource(program, ConvertProgram.ToGeometry(program)
+            // no cloning/rotation of a live program or subprogram is necessary. A baked-in
+            // seam overcut is trimmed on an owned copy: it encloses no area.
+            return new OverlapSource(program, ConvertProgram.ToGeometry(SeamOvercut.Trimmed(program))
                 .Where(entity => SpecialLayers.IsMaterial(entity.Layer)
                     && entity.Layer != SpecialLayers.Leadin
                     && entity.Layer != SpecialLayers.Leadout).ToList(), null);

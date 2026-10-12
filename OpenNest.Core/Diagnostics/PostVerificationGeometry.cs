@@ -260,18 +260,21 @@ internal static class PostVerificationGeometry
                 points.Clear();
             // Coincident circles produce NaNs in the native discrete-contact query.
             // Their support overlap is handled separately, without inventing crossings.
-            overlap = SameSupport(other) && (InteriorWitness(Midpoint, other)
-                || InteriorWitness(other.Midpoint, this)
-                || InteriorWitness(Start, other) || InteriorWitness(End, other)
-                || InteriorWitness(other.Start, this) || InteriorWitness(other.End, this));
+            // Supports that agree only within Epsilon (arcs of one circle whose centers were
+            // each derived from their own endpoints) put a witness up to that far off the other
+            // support. Test those spans at the admitted seam tolerance instead: shared spans
+            // still refuse, while arcs that only meet at a joint or lie apart are not overlap.
+            var witness = Center is { } c && other.Center is { } oc
+                && (c.X != oc.X || c.Y != oc.Y || Radius != other.Radius) ? RaySeamTolerance : Epsilon;
+            overlap = SameSupport(other) && (InteriorWitness(Midpoint, other, witness)
+                || InteriorWitness(other.Midpoint, this, witness)
+                || InteriorWitness(Start, other, witness) || InteriorWitness(End, other, witness)
+                || InteriorWitness(other.Start, this, witness) || InteriorWitness(other.End, this, witness));
             if (SameSupport(other))
                 points.Clear();
             foreach (var point in points)
                 Validate(point);
             var nativeContactCount = points.Count;
-            if (Center is { } c && other.Center is { } oc && SameSupport(other)
-                && (c.X != oc.X || c.Y != oc.Y || Radius != other.Radius))
-                overlap = true; // Nearly coincident supports are uncertain, never clear.
             foreach (var point in new[] { Start, End, other.Start, other.End })
                 if (Contains(point) && other.Contains(point)
                     && !points.Exists(p => p.DistanceTo(point) <= Epsilon))
@@ -284,9 +287,9 @@ internal static class PostVerificationGeometry
                 throw new NotSupportedException("Native contact query is numerically uncertain.");
             return points;
 
-            static bool InteriorWitness(Vector point, Curve curve) => curve.Contains(point)
+            static bool InteriorWitness(Vector point, Curve curve, double tolerance) => curve.Contains(point, tolerance)
                 && (curve.Start.DistanceTo(curve.End) <= Epsilon
-                    || (point.DistanceTo(curve.Start) > Epsilon && point.DistanceTo(curve.End) > Epsilon));
+                    || (point.DistanceTo(curve.Start) > tolerance && point.DistanceTo(curve.End) > tolerance));
         }
 
         /// <summary>

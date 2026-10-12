@@ -511,6 +511,17 @@ public sealed class PreparedContours
         return centres;
     }
 
+    /// <summary>
+    /// Whether <paramref name="point"/> lies inside the internal contour <paramref name="contourOrdinal"/>.
+    /// A routing hint only (chorded at the overlap check's tolerance), never a clearance verdict.
+    /// </summary>
+    internal bool HoleContains(int contourOrdinal, Vector point)
+    {
+        var shape = GetShape(contourOrdinal);
+        return contourOrdinal != PerimeterOrdinal && shape.BoundingBox.Contains(point)
+            && shape.ToPolygonWithTolerance(PlateOverlapAnalyzer.ChordTolerance).ContainsPoint(point);
+    }
+
     private static Vector Start(Entity entity) => entity is Line line ? line.StartPoint : ((Arc)entity).StartPoint();
     private static Vector End(Entity entity) => entity is Line line ? line.EndPoint : ((Arc)entity).EndPoint();
 

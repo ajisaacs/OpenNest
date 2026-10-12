@@ -140,6 +140,11 @@ triangulation, or `Collision.Check` call is not internally interruptible.
   produces an issue. Native contour intersections are checked before polygonal
   containment, so sampling cannot hide a circular-hole crossing or tangency.
   A gap above `Tolerance.Epsilon` is not silently welded closed.
+  One self-contact is recognized: a seam overcut, where the last cut runs past the
+  contour's own start along its first cut and a straight jog returns to the start
+  (converted nests carry another CAM system's overcut this way). It encloses no area
+  and is trimmed from the analyzer's owned copy, never from the drawing; see
+  [cutting dependencies](../cutting-planner.md#cutting-dependencies).
   Open cut marks are conservatively uncheckable; mark them as Scribe instead.
 - Some valid curved geometry, such as sub-chord-width thin rings whose sampled
   contours cross, is uncheckable at this fixed tolerance and returns incomplete

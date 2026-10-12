@@ -59,24 +59,27 @@ internal static class JointCuttingPlanSearch
             var prerequisites = Enumerable.Range(0, count)
                 .Select(i => new HashSet<int>(snapshot.Dependencies.PrerequisitesOf(i))).ToArray();
 
-            var sequence = CuttingPartOrder.Plan(Enumerable.Range(0, count).ToArray(), centres,
-                snapshot.StartPoint, prerequisites, token);
+            var nesting = NestedOrder(snapshot, centres, prerequisites, token);
+            var sequence = CuttingNestedOrder.Plan(Enumerable.Range(0, count).ToArray(), snapshot.StartPoint, nesting);
             Node resume = null;
             while (true)
             {
-                if (preferEndpoints)
+                // A pass that teaches an order rule ends the round: the heavier passes would
+                // only repeat the same blocked approach along the same order.
+                Attempt attempt = null;
+                foreach (var (preferredOnly, contourRecovery) in preferEndpoints
+                    ? new[] { (true, false), (false, true), (false, false) } : [(false, false)])
                 {
-                    var preferred = walk.Follow(sequence, stall, resume, preferredOnly: true);
-                    if (preferred.Order != null)
-                        return walk.Ready(preferred.Order);
-                    var recovered = walk.Follow(sequence, stall, null, contourRecovery: true);
-                    if (recovered.Order != null)
-                        return walk.Ready(recovered.Order);
+                    var pass = walk.Follow(sequence, stall, resume, preferredOnly, contourRecovery);
+                    if (pass.Order != null)
+                        return walk.Ready(pass.Order);
+                    if (Learn(pass, prerequisites))
+                    {
+                        attempt = pass;
+                        break;
+                    }
                 }
-                var attempt = walk.Follow(sequence, stall, resume);
-                if (attempt.Order != null)
-                    return walk.Ready(attempt.Order);
-                if (!Learn(attempt, prerequisites))
+                if (attempt == null)
                 {
                     // "Cut before" rules are a heuristic: a part blocked straight after another can
                     // still be reachable via a third. Search every order with what budget remains.
@@ -93,8 +96,7 @@ internal static class JointCuttingPlanSearch
                 // parts cut before it, and re-plan the rest from where the tool is at that point.
                 var back = attempt.Crossed.Min(part => Array.IndexOf(sequence, part));
                 resume = attempt.BoundaryAt(back);
-                sequence = [.. sequence.Take(back), .. CuttingPartOrder.Plan(sequence[back..], centres,
-                    resume.Position, prerequisites, token)];
+                sequence = [.. sequence.Take(back), .. CuttingNestedOrder.Plan(sequence[back..], resume.Position, nesting)];
             }
         }
         catch (BudgetExceededException)
@@ -105,6 +107,24 @@ internal static class JointCuttingPlanSearch
         {
             return new(CuttingPlanStatus.Cancelled, [], [], walk.Expansions, walk.LeadPrechecks);
         }
+    }
+
+    // Captured containment (never learned rules) and each host's placed cut contours.
+    private static CuttingNestedOrder.Context NestedOrder(CuttingPlanSnapshot snapshot, Vector[] centres,
+        HashSet<int>[] prerequisites, CancellationToken token)
+    {
+        var inside = snapshot.Placements.Select((placement, host) => placement.IsCutOff ? []
+            : snapshot.Dependencies.PrerequisitesOf(host).Where(p => !snapshot.Placements[p].IsCutOff).ToArray()).ToArray();
+        var contours = new Dictionary<int, Entity[]>();
+        return new(centres, prerequisites, inside, (host, position) =>
+        {
+            if (!contours.TryGetValue(host, out var entities))
+                contours[host] = entities = snapshot.Placements[host].Execution.Motions
+                    .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
+                    .Select(m => m.Curve.ToEntity()).ToArray();
+            return entities.Length == 0 ? centres[host]
+                : entities.Select(e => e.ClosestPointTo(position)).MinBy(point => point.DistanceTo(position));
+        }, token);
     }
 
     // "Cut the blocked part before every part whose cut contour its approach crossed", unless that
@@ -175,6 +195,7 @@ internal static class JointCuttingPlanSearch
         // memoize per owned choice for the attempt, never statically or across attempts.
         private readonly Dictionary<int, ContourEntryFeasibility> feasibility = [];
         private readonly HashSet<int> reportedNoFit = [];
+        private readonly Dictionary<int, Entity[]> hostContours = [];
 
         internal int Expansions { get; private set; }
 
@@ -261,16 +282,19 @@ internal static class JointCuttingPlanSearch
         /// dependency-ready remaining part once the current part counts as finished, stable
         /// ordinal ties. Never the current or a finished part. Global coordinates.
         /// </summary>
-        private Vector? LookAheadCentre(Node node, int[] sequence, FixedProgramPlacement source)
+        private Vector? LookAheadCentre(Node node, int[] sequence, FixedProgramPlacement source) =>
+            NextCut(node, sequence, source) is { } next ? Facing(source, next) : null;
+
+        private FixedProgramPlacement NextCut(Node node, int[] sequence, FixedProgramPlacement source)
         {
             var finished = node.Order.Select(o => o.SourceOrdinal).ToHashSet();
             finished.Add(source.SourceOrdinal);
             if (sequence != null)
                 for (var i = node.Order.Length + 1; i < sequence.Length; i++)
                     if (!finished.Contains(sequence[i]))
-                        return Centre(snapshot.Placements[sequence[i]]);
+                        return snapshot.Placements[sequence[i]];
             var from = Centre(source);
-            Vector? best = null;
+            FixedProgramPlacement best = null;
             var bestDistance = double.PositiveInfinity;
             foreach (var candidate in snapshot.Placements
                          .Where(p => !finished.Contains(p.SourceOrdinal)
@@ -281,10 +305,44 @@ internal static class JointCuttingPlanSearch
                 if (distance < bestDistance - 1e-9)
                 {
                     bestDistance = distance;
-                    best = Centre(candidate);
+                    best = candidate;
                 }
             }
             return best;
+        }
+
+        // Where the tool may have to go next, in global coordinates: the look-ahead point and,
+        // for an ordinary next part, the corners of its cut extent. Its pierce can be anywhere
+        // on it, so an outside entry that sees all of them leaves the most ways open.
+        private Vector[] SightTargets(Node node, int[] sequence, FixedProgramPlacement source)
+        {
+            if (NextCut(node, sequence, source) is not { } next)
+                return [];
+            var facing = Facing(source, next);
+            var cuts = next.Execution.Motions
+                .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
+                .Select(m => m.Curve.ToEntity().BoundingBox).ToList();
+            if (cuts.Count == 0 || facing != Centre(next))
+                return [facing];
+            var box = cuts.GetBoundingBox();
+            return [facing, new(box.Left, box.Bottom), new(box.Right, box.Bottom), new(box.Left, box.Top), new(box.Right, box.Top)];
+        }
+
+        // The next cut as seen from the current part. A host's centre lies in the middle of
+        // its cutout, among the parts nested there; a part inside it leaves toward the
+        // nearest of the host's own contours instead.
+        private Vector Facing(FixedProgramPlacement source, FixedProgramPlacement next)
+        {
+            if (source.IsCutOff || next.IsCutOff
+                || !snapshot.Dependencies.PrerequisitesOf(next.SourceOrdinal).Contains(source.SourceOrdinal))
+                return Centre(next);
+            if (!hostContours.TryGetValue(next.SourceOrdinal, out var contours))
+                hostContours[next.SourceOrdinal] = contours = next.Execution.Motions
+                    .Where(m => !m.Rapid && m.Layer is LayerType.Cut or LayerType.Display && m.Curve != null)
+                    .Select(m => m.Curve.ToEntity()).ToArray();
+            var from = Centre(source);
+            return contours.Length == 0 ? Centre(next)
+                : contours.Select(c => c.ClosestPointTo(from)).MinBy(point => point.DistanceTo(from));
         }
 
         /// <summary>
@@ -559,7 +617,7 @@ internal static class JointCuttingPlanSearch
             // One global->local conversion of target and arrival; geometry is already rotated.
             Vector? local = LookAheadCentre(node, sequence, source) is { } target
                 ? target - source.Location : null;
-            return SelectEntries(source, contour, local, arrival);
+            return SelectEntries(source, contour, local, arrival, SightTargets(node, sequence, source));
         }
 
         private ContourEntryFeasibility Adapter(FixedProgramPlacement source) =>
@@ -578,13 +636,23 @@ internal static class JointCuttingPlanSearch
         }
 
         private IReadOnlyList<ContourChoice> SelectEntries(FixedProgramPlacement source, int contour,
-            Vector? target, Vector arrival)
+            Vector? target, Vector arrival, Vector[] sightTargets = null)
         {
             // Last contour has no downstream target, but still needs its exact native
             // closest-arrival fallback. Keep target null in the ranker: arrival is not
             // a next cut and must not acquire facing-side priority.
             var catalogue = source.Prepared.AutomaticEntryCandidatesWithFallbacks(contour, target ?? arrival, token);
             var ordered = catalogue.RankTowardNextCut(target, arrival);
+            // With no lead-out the tool leaves the part from its outside entry. From inside a
+            // slot or pocket the straight way to the next cut runs back over the part just
+            // cut, so entries with the clearest way out lead. Order only: every entry stays.
+            if (sightTargets is { Length: > 0 } && contour == source.Prepared.PerimeterOrdinal
+                && source.Material is { IsComplete: true } material)
+            {
+                var perimeter = material.Rings[0];
+                ordered = ordered.OrderBy(c => sightTargets.Count(sight => PostVerificationGeometry.Crosses(
+                    c.Choice.Point + source.Location, sight, perimeter, token))).ToList();
+            }
             var selection = ContourEntrySelection.Select(ordered,
                 candidate => Evaluate(source, candidate), snapshot.MaxEntries, token);
             if (selection.Shortfall == ContourSelectionShortfall.Incomplete && selection.UncertainChoices.Count == 0)
@@ -608,6 +676,12 @@ internal static class JointCuttingPlanSearch
             var centres = prepared.HoleCentres(token).Select(c => c ?? Vector.Zero).ToArray();
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
             var localArrival = active.Arrival - source.Location;
+            // The tool arrives inside a cutout from a part nested there. That cutout's centre
+            // says nothing about where its cut can be reached: route it from where the tool is,
+            // before a later hop to it has to cross the other parts nested in it.
+            foreach (var hole in holes)
+                if (prepared.HoleContains(hole, localArrival))
+                    centres[hole] = localArrival;
             var endpoint = perimeter.Point;
             var entries = new Dictionary<int, ContourChoice>();
             var pierces = holes.ToDictionary(h => h, h => centres[h]);

@@ -23,8 +23,9 @@ internal static class CuttingPartOrder
     /// <param name="centres">One representative point per part ordinal.</param>
     /// <param name="start">The modeled tool position before the first of these parts.</param>
     /// <param name="prerequisites">Ordinals that must come before each part; must be acyclic.</param>
+    /// <param name="endpoint">Optional fixed final position after the last of these parts.</param>
     internal static int[] Plan(IReadOnlyList<int> parts, IReadOnlyList<Vector> centres, Vector start,
-        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token)
+        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token, Vector? endpoint = null)
     {
         var local = new Dictionary<int, int>();
         for (var i = 0; i < parts.Count; i++)
@@ -33,7 +34,7 @@ internal static class CuttingPartOrder
         var localPrerequisites = parts
             .Select(p => (IReadOnlyCollection<int>)prerequisites[p].Where(local.ContainsKey).Select(q => local[q]).ToArray())
             .ToArray();
-        return Plan(localCentres, start, localPrerequisites, token).Select(i => parts[i]).ToArray();
+        return Plan(localCentres, start, localPrerequisites, token, endpoint).Select(i => parts[i]).ToArray();
     }
 
     /// <param name="centres">One representative point per part ordinal.</param>
