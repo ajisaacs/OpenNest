@@ -96,18 +96,32 @@ namespace OpenNest.Forms
         private static TreeNode BuildMachineNode(MachineConfig machine)
         {
             var machineNode = new TreeNode(machine.Name) { Tag = machine };
-            foreach (var material in machine.Materials)
-                machineNode.Nodes.Add(BuildMaterialNode(material));
+            foreach (var group in machine.Materials.GroupBy(m => SharedListNames.Key(m.Name)))
+                machineNode.Nodes.Add(BuildMaterialGroupNode(group.First().Name, group));
             return machineNode;
         }
 
-        private static TreeNode BuildMaterialNode(MaterialConfig material)
+        private static TreeNode BuildMaterialGroupNode(
+            string name,
+            IEnumerable<MaterialConfig> grades
+        )
         {
-            var matNode = new TreeNode(material.Name) { Tag = material };
-            foreach (var thickness in material.Thicknesses)
-                matNode.Nodes.Add(BuildThicknessNode(thickness));
-            return matNode;
+            var groupNode = new TreeNode(name) { Tag = name };
+            foreach (var grade in grades)
+                groupNode.Nodes.Add(BuildGradeNode(grade));
+            return groupNode;
         }
+
+        private static TreeNode BuildGradeNode(MaterialConfig material)
+        {
+            var node = new TreeNode(GradeLabel(material)) { Tag = material };
+            foreach (var thickness in material.Thicknesses)
+                node.Nodes.Add(BuildThicknessNode(thickness));
+            return node;
+        }
+
+        private static string GradeLabel(MaterialConfig material) =>
+            string.IsNullOrWhiteSpace(material.Grade) ? "(no grade)" : material.Grade;
 
         private static TreeNode BuildThicknessNode(ThicknessConfig thickness) =>
             new(ThicknessLabel(thickness)) { Tag = thickness };
@@ -128,13 +142,18 @@ namespace OpenNest.Forms
                     _currentMachineNode = e.Node;
                     ShowMachineDetails(machine, e.Node);
                     break;
-                case MaterialConfig material:
+                case string groupName:
                     _currentMachineNode = e.Node.Parent;
+                    _currentMachine = _currentMachineNode?.Tag as MachineConfig;
+                    ShowMaterialGroupDetails(groupName);
+                    break;
+                case MaterialConfig material:
+                    _currentMachineNode = e.Node.Parent?.Parent;
                     _currentMachine = _currentMachineNode?.Tag as MachineConfig;
                     ShowMaterialDetails(material, e.Node);
                     break;
                 case ThicknessConfig thickness:
-                    _currentMachineNode = e.Node.Parent?.Parent;
+                    _currentMachineNode = e.Node.Parent?.Parent?.Parent;
                     _currentMachine = _currentMachineNode?.Tag as MachineConfig;
                     ShowThicknessDetails(thickness, e.Node);
                     break;
@@ -164,10 +183,15 @@ namespace OpenNest.Forms
                     menu.Items.Add(new ToolStripSeparator());
                     menu.Items.Add("Delete Machine", null, RemoveMachine_Click);
                     break;
+                case string:
+                    menu.Items.Add("Add Grade", null, AddGrade_Click);
+                    menu.Items.Add(new ToolStripSeparator());
+                    menu.Items.Add("Delete Material", null, RemoveMaterial_Click);
+                    break;
                 case MaterialConfig:
                     menu.Items.Add("Add Thickness", null, AddThickness_Click);
                     menu.Items.Add(new ToolStripSeparator());
-                    menu.Items.Add("Delete Material", null, RemoveMaterial_Click);
+                    menu.Items.Add("Delete Grade", null, RemoveGrade_Click);
                     break;
                 case ThicknessConfig:
                     menu.Items.Add("Delete Thickness", null, RemoveThickness_Click);
@@ -246,26 +270,34 @@ namespace OpenNest.Forms
             _detailPanel.Controls.Add(group);
         }
 
+        private void ShowMaterialGroupDetails(string groupName)
+        {
+            var label = new Label
+            {
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                Padding = new Padding(10, 16, 10, 10),
+                Text = $"Select a grade of '{groupName}' below, or right-click to add one.",
+            };
+            _detailPanel.Controls.Add(label);
+        }
+
         private void ShowMaterialDetails(MaterialConfig material, TreeNode node)
         {
             var group = CreateGroup("General");
             var layout = CreateDetailLayout();
             var row = 0;
 
-            AddField(
-                layout,
-                ref row,
-                "Name:",
-                CreateTextBox(
-                    material.Name,
-                    v =>
-                    {
-                        material.Name = v;
-                        node.Text = v;
-                        MarkDirty();
-                    }
-                )
+            var nameBox = CreateTextBox(
+                material.Name,
+                v =>
+                {
+                    material.Name = v;
+                    MarkDirty();
+                }
             );
+            nameBox.Leave += (s, e) => RelocateGradeNode(node, material.Name);
+            AddField(layout, ref row, "Name:", nameBox);
             AddField(
                 layout,
                 ref row,
@@ -273,6 +305,7 @@ namespace OpenNest.Forms
                 CreateTextBox(material.Grade, v =>
                 {
                     material.Grade = v;
+                    node.Text = GradeLabel(material);
                     MarkDirty();
                 })
             );
@@ -795,24 +828,59 @@ namespace OpenNest.Forms
             if (_currentMachine is null || _currentMachineNode is null)
                 return;
 
-            var material = new MaterialConfig { Name = "New Material" };
+            var material = new MaterialConfig { Name = "New Material", Grade = "New Grade" };
             _currentMachine.Materials.Add(material);
-            var node = BuildMaterialNode(material);
-            _currentMachineNode.Nodes.Add(node);
+            var groupNode = new TreeNode(material.Name) { Tag = material.Name };
+            var gradeNode = BuildGradeNode(material);
+            groupNode.Nodes.Add(gradeNode);
+            _currentMachineNode.Nodes.Add(groupNode);
             _currentMachineNode.Expand();
-            _tree.SelectedNode = node;
+            groupNode.Expand();
+            _tree.SelectedNode = gradeNode;
+            MarkDirty();
+        }
+
+        private void AddGrade_Click(object sender, EventArgs e)
+        {
+            if (_tree.SelectedNode?.Tag is not string groupName || _currentMachine is null)
+                return;
+
+            var groupNode = _tree.SelectedNode;
+            var material = new MaterialConfig { Name = groupName, Grade = "New Grade" };
+            _currentMachine.Materials.Add(material);
+            var gradeNode = BuildGradeNode(material);
+            groupNode.Nodes.Add(gradeNode);
+            groupNode.Expand();
+            _tree.SelectedNode = gradeNode;
             MarkDirty();
         }
 
         private void RemoveMaterial_Click(object sender, EventArgs e)
         {
-            if (_tree.SelectedNode?.Tag is not MaterialConfig material)
-                return;
-            if (_currentMachine is null)
+            if (_tree.SelectedNode?.Tag is not string groupName || _currentMachine is null)
                 return;
             if (
                 MessageBox.Show(
-                    $"Delete material '{material.Name}'?",
+                    $"Delete material '{groupName}' and all of its grades?",
+                    "Confirm",
+                    MessageBoxButtons.YesNo
+                ) != DialogResult.Yes
+            )
+                return;
+
+            var key = SharedListNames.Key(groupName);
+            _currentMachine.Materials.RemoveAll(m => SharedListNames.Key(m.Name) == key);
+            _tree.Nodes.Remove(_tree.SelectedNode);
+            MarkDirty();
+        }
+
+        private void RemoveGrade_Click(object sender, EventArgs e)
+        {
+            if (_tree.SelectedNode?.Tag is not MaterialConfig material || _currentMachine is null)
+                return;
+            if (
+                MessageBox.Show(
+                    $"Delete grade '{GradeLabel(material)}'?",
                     "Confirm",
                     MessageBoxButtons.YesNo
                 ) != DialogResult.Yes
@@ -820,20 +888,50 @@ namespace OpenNest.Forms
                 return;
 
             _currentMachine.Materials.Remove(material);
-            _tree.Nodes.Remove(_tree.SelectedNode);
+            var gradeNode = _tree.SelectedNode;
+            var groupNode = gradeNode.Parent;
+            groupNode.Nodes.Remove(gradeNode);
+            if (groupNode.Nodes.Count == 0)
+                groupNode.Remove();
             MarkDirty();
+        }
+
+        private void RelocateGradeNode(TreeNode gradeNode, string newName)
+        {
+            var groupNode = gradeNode.Parent;
+            if (groupNode is null || SharedListNames.Key(groupNode.Text) == SharedListNames.Key(newName))
+                return;
+
+            var machineNode = groupNode.Parent;
+            if (machineNode is null)
+                return;
+
+            groupNode.Nodes.Remove(gradeNode);
+
+            var targetKey = SharedListNames.Key(newName);
+            var targetGroup = machineNode
+                .Nodes.Cast<TreeNode>()
+                .FirstOrDefault(n => SharedListNames.Key(n.Text) == targetKey);
+            if (targetGroup is null)
+            {
+                targetGroup = new TreeNode(newName) { Tag = newName };
+                machineNode.Nodes.Add(targetGroup);
+            }
+            targetGroup.Nodes.Add(gradeNode);
+            targetGroup.Expand();
+
+            if (groupNode.Nodes.Count == 0)
+                groupNode.Remove();
+
+            _tree.SelectedNode = gradeNode;
         }
 
         private void AddThickness_Click(object sender, EventArgs e)
         {
-            var materialNode = _tree.SelectedNode;
-            var material = materialNode?.Tag as MaterialConfig;
-            if (material is null && materialNode?.Tag is ThicknessConfig)
-                materialNode = materialNode.Parent;
-            material = materialNode?.Tag as MaterialConfig;
-            if (material is null || _currentMachine is null)
+            if (_tree.SelectedNode?.Tag is not MaterialConfig material || _currentMachine is null)
                 return;
 
+            var materialNode = _tree.SelectedNode;
             var thickness = new ThicknessConfig { Value = 0.250 };
             material.Thicknesses.Add(thickness);
             var node = BuildThicknessNode(thickness);

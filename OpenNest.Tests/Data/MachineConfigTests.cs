@@ -128,4 +128,76 @@ public class MachineConfigTests
         var result = machine.GetMaterial("Titanium");
         Assert.Null(result);
     }
+
+    private static MachineConfig CreateMultiGradeMachine()
+    {
+        return new MachineConfig
+        {
+            Materials = new List<MaterialConfig>
+            {
+                new()
+                {
+                    Name = "Mild Steel",
+                    Grade = "A36",
+                    Thicknesses = new List<ThicknessConfig>
+                    {
+                        new() { Value = 0.250, Kerf = 0.012 },
+                    },
+                },
+                new()
+                {
+                    Name = "Mild Steel",
+                    Grade = "A1011",
+                    Thicknesses = new List<ThicknessConfig>
+                    {
+                        new() { Value = 0.250, Kerf = 0.010 },
+                    },
+                },
+            },
+        };
+    }
+
+    [Fact]
+    public void GetMaterial_WithGrade_ReturnsMatchingGrade()
+    {
+        var machine = CreateMultiGradeMachine();
+
+        var a36 = machine.GetMaterial("Mild Steel", "A36");
+        var a1011 = machine.GetMaterial("Mild Steel", "A1011");
+
+        Assert.NotNull(a36);
+        Assert.NotNull(a1011);
+        Assert.Equal(0.012, a36.Thicknesses[0].Kerf);
+        Assert.Equal(0.010, a1011.Thicknesses[0].Kerf);
+    }
+
+    [Fact]
+    public void GetMaterial_WithUnknownGrade_ReturnsNull()
+    {
+        var machine = CreateMultiGradeMachine();
+        var result = machine.GetMaterial("Mild Steel", "A572");
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void GetGrades_ReturnsAllGradesForName()
+    {
+        var machine = CreateMultiGradeMachine();
+        var grades = machine.GetGrades("mild steel").Select(m => m.Grade).ToList();
+        Assert.Equal(new[] { "A36", "A1011" }, grades);
+    }
+
+    [Fact]
+    public void GetParameters_WithGrade_ReturnsThicknessForThatGrade()
+    {
+        var machine = CreateMultiGradeMachine();
+
+        var a36 = machine.GetParameters("Mild Steel", "A36", 0.250);
+        var a1011 = machine.GetParameters("Mild Steel", "A1011", 0.250);
+
+        Assert.NotNull(a36);
+        Assert.NotNull(a1011);
+        Assert.Equal(0.012, a36.Kerf);
+        Assert.Equal(0.010, a1011.Kerf);
+    }
 }

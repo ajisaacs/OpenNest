@@ -57,7 +57,7 @@ namespace OpenNest.Forms
             // 
             splitContainer.Panel2.Controls.Add(_detailPanel);
             splitContainer.Size = new System.Drawing.Size(1194, 562);
-            splitContainer.SplitterDistance = 500;
+            splitContainer.SplitterDistance = 271;
             splitContainer.TabIndex = 0;
             // 
             // _tree
@@ -66,7 +66,7 @@ namespace OpenNest.Forms
             _tree.HideSelection = false;
             _tree.Location = new System.Drawing.Point(0, 0);
             _tree.Name = "_tree";
-            _tree.Size = new System.Drawing.Size(256, 562);
+            _tree.Size = new System.Drawing.Size(271, 562);
             _tree.TabIndex = 0;
             // 
             // _detailPanel
@@ -75,7 +75,7 @@ namespace OpenNest.Forms
             _detailPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             _detailPanel.Location = new System.Drawing.Point(0, 0);
             _detailPanel.Name = "_detailPanel";
-            _detailPanel.Size = new System.Drawing.Size(934, 562);
+            _detailPanel.Size = new System.Drawing.Size(919, 562);
             _detailPanel.TabIndex = 0;
             // 
             // bottomPanel
