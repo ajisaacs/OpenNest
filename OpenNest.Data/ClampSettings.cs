@@ -95,8 +95,25 @@ public sealed class ClampSettings
         if (!Enabled || Centers.Count == 0)
             return null;
 
+        var converted = ConvertedTo(units);
+        return new ClampRail(converted.Width, converted.Depth, converted.Centers);
+    }
+
+    /// <summary>
+    /// A copy with width, depth and centers expressed in <paramref name="units"/>
+    /// (inches and millimeters convert at 25.4); <see cref="Enabled"/> is kept.
+    /// </summary>
+    public ClampSettings ConvertedTo(Units units)
+    {
         var scale = Scale(Units, units);
-        return new ClampRail(Width * scale, Depth * scale, Centers.Select(c => c * scale));
+        return new ClampSettings
+        {
+            Enabled = Enabled,
+            Units = units,
+            Width = Width * scale,
+            Depth = Depth * scale,
+            Centers = Centers.Select(c => c * scale).ToArray(),
+        };
     }
 
     /// <summary>

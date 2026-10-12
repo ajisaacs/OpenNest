@@ -88,6 +88,7 @@ namespace OpenNest.Forms
             mnuSetRotationIncrement = new System.Windows.Forms.ToolStripMenuItem();
             mnuNest = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestEdit = new System.Windows.Forms.ToolStripMenuItem();
+            mnuNestClamps = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestImportDrawing = new System.Windows.Forms.ToolStripMenuItem();
             mnuNestShapeLibrary = new System.Windows.Forms.ToolStripMenuItem();
             toolStripMenuItem7 = new System.Windows.Forms.ToolStripSeparator();
@@ -573,7 +574,7 @@ namespace OpenNest.Forms
             // 
             // mnuNest
             // 
-            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestImportDrawing, mnuNestShapeLibrary, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestValidate, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAutomaticCutOff, mnuNestPlanCutting, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
+            mnuNest.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { mnuNestEdit, mnuNestClamps, mnuNestImportDrawing, mnuNestShapeLibrary, toolStripMenuItem7, mnuNestFirstPlate, mnuNestLastPlate, toolStripMenuItem6, mnuNestNextPlate, mnuNestPreviousPlate, toolStripMenuItem12, runAutoNestToolStripMenuItem, autoSequenceAllPlatesToolStripMenuItem, mnuNestRemoveEmptyPlates, mnuNestValidate, mnuNestPost, toolStripMenuItem19, calculateCutTimeToolStripMenuItem, toolStripMenuItem22, mnuNestAutomaticCutOff, mnuNestPlanCutting, mnuNestAssignLeadIns, mnuNestRemoveLeadIns });
             mnuNest.Name = "mnuNest";
             mnuNest.Size = new System.Drawing.Size(43, 20);
             mnuNest.Text = "&Nest";
@@ -584,6 +585,13 @@ namespace OpenNest.Forms
             mnuNestEdit.Size = new System.Drawing.Size(205, 22);
             mnuNestEdit.Text = "Edit";
             mnuNestEdit.Click += EditNest_Click;
+            // 
+            // mnuNestClamps
+            // 
+            mnuNestClamps.Name = "mnuNestClamps";
+            mnuNestClamps.Size = new System.Drawing.Size(205, 22);
+            mnuNestClamps.Text = "Clamps...";
+            mnuNestClamps.Click += Clamps_Click;
             // 
             // mnuNestImportDrawing
             // 
@@ -1331,6 +1339,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuToolsOptions;
         private System.Windows.Forms.ToolStripMenuItem mnuNest;
         private System.Windows.Forms.ToolStripMenuItem mnuNestEdit;
+        private System.Windows.Forms.ToolStripMenuItem mnuNestClamps;
         private System.Windows.Forms.ToolStripMenuItem mnuNestImportDrawing;
         private System.Windows.Forms.ToolStripMenuItem mnuNestShapeLibrary;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem7;

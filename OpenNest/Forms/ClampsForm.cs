@@ -1,0 +1,287 @@
+using System;
+using System.Drawing;
+using System.Globalization;
+using System.IO;
+using System.Windows.Forms;
+using OpenNest.Data;
+
+namespace OpenNest.Forms;
+
+/// <summary>
+/// Nest &gt; Clamps...: edits the current nest's machine clamp rail (identical clamps at X
+/// centers measured from the plate origin along the origin-side edge). OK applies the rail
+/// to every plate of this nest; Cancel discards those edits. Save as Machine Defaults writes
+/// clamps.json immediately and is not undone by Cancel. All decisions live in
+/// <see cref="ClampRailEditor"/>; this form only renders and forwards input.
+/// </summary>
+public sealed class ClampsForm : Form
+{
+    private readonly ClampSettings machineDefaults;
+    private readonly string settingsPath;
+    private readonly NumericUpDown widthBox;
+    private readonly NumericUpDown depthBox;
+    private readonly NumericUpDown centerBox;
+    private readonly ListBox centersList;
+    private readonly Button addButton;
+    private readonly Button removeButton;
+    private readonly Button okButton;
+    private readonly CheckBox applyToNewNestsBox;
+    private readonly Label savedLabel;
+
+    public ClampsForm(ClampRail rail, Units units, ClampSettings machineDefaults, string settingsPath = null)
+    {
+        this.machineDefaults = machineDefaults ?? ClampSettings.Fallback;
+        this.settingsPath = settingsPath ?? ClampSettings.DefaultPath;
+        Editor = new ClampRailEditor(rail, units, this.machineDefaults.Enabled);
+        var unit = UnitsHelper.GetShortString(units);
+
+        Text = "Clamps";
+        StartPosition = FormStartPosition.CenterParent;
+        ClientSize = new Size(480, 470);
+        MinimumSize = new Size(440, 460);
+        MinimizeBox = false;
+        MaximizeBox = false;
+        ShowInTaskbar = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Padding = new Padding(10),
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        layout.Controls.Add(
+            new Label
+            {
+                AutoSize = true,
+                MaximumSize = new Size(450, 0),
+                Padding = new Padding(0, 0, 0, 8),
+                Text =
+                    "Fixed clamps along the plate edge through the origin. Parts and nesting keep "
+                    + "clear of each clamp by the plate's bottom edge spacing. Clamps that do not "
+                    + "reach a shorter plate are left off it.",
+            }
+        );
+
+        var size = new TableLayoutPanel { AutoSize = true, ColumnCount = 3, Dock = DockStyle.Top };
+        widthBox = NewLengthBox(Editor.Width, minimum: 0.0001m);
+        depthBox = NewLengthBox(Editor.Depth, minimum: 0.0001m);
+        AddRow(size, "Clamp width (along the edge):", widthBox, unit);
+        AddRow(size, "Clamp depth (into the plate):", depthBox, unit);
+        layout.Controls.Add(size);
+
+        var centersGroup = new GroupBox
+        {
+            Text = $"Clamp centers, measured from the plate origin ({unit})",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8),
+        };
+        centersList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
+        var centerEntry = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            AutoSize = true,
+            WrapContents = false,
+        };
+        centerBox = NewLengthBox(0, minimum: 0m);
+        addButton = new Button { Text = "Add", AutoSize = true };
+        removeButton = new Button { Text = "Remove", AutoSize = true, Enabled = false };
+        centerEntry.Controls.Add(new Label { Text = "Center:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
+        centerEntry.Controls.Add(centerBox);
+        centerEntry.Controls.Add(addButton);
+        centerEntry.Controls.Add(removeButton);
+        centersGroup.Controls.Add(centersList);
+        centersGroup.Controls.Add(centerEntry);
+        layout.Controls.Add(centersGroup);
+
+        var defaultsGroup = new GroupBox
+        {
+            Text = "Machine defaults (clamps.json)",
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(8),
+        };
+        var defaultsLayout = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+        };
+        applyToNewNestsBox = new CheckBox
+        {
+            Text = "Give new nests these clamps",
+            AutoSize = true,
+            Checked = Editor.ApplyToNewNests,
+        };
+        var defaultsButtons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        var loadDefaultsButton = new Button { Text = "Load Machine Defaults", AutoSize = true };
+        var saveDefaultsButton = new Button { Text = "Save as Machine Defaults", AutoSize = true };
+        defaultsButtons.Controls.Add(loadDefaultsButton);
+        defaultsButtons.Controls.Add(saveDefaultsButton);
+        savedLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(430, 0),
+            Text =
+                "Save as Machine Defaults writes the file immediately; Cancel below does not undo "
+                + "it. OK and Cancel only affect this nest.",
+        };
+        defaultsLayout.Controls.Add(applyToNewNestsBox);
+        defaultsLayout.Controls.Add(defaultsButtons);
+        defaultsLayout.Controls.Add(savedLabel);
+        defaultsGroup.Controls.Add(defaultsLayout);
+        layout.Controls.Add(defaultsGroup);
+
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            FlowDirection = FlowDirection.RightToLeft,
+            Padding = new Padding(6),
+        };
+        var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
+        okButton = new Button { Text = "OK", AutoSize = true };
+        buttons.Controls.Add(cancel);
+        buttons.Controls.Add(okButton);
+
+        Controls.Add(layout);
+        Controls.Add(buttons);
+        AcceptButton = okButton;
+        CancelButton = cancel;
+
+        addButton.Click += (_, _) => AddCenter();
+        removeButton.Click += (_, _) => RemoveCenter();
+        centersList.SelectedIndexChanged += (_, _) =>
+            removeButton.Enabled = centersList.SelectedIndex >= 0;
+        // Enter in the center box adds that center instead of closing the dialog.
+        centerBox.Enter += (_, _) => AcceptButton = addButton;
+        centerBox.Leave += (_, _) => AcceptButton = okButton;
+        loadDefaultsButton.Click += (_, _) => LoadMachineDefaults();
+        saveDefaultsButton.Click += (_, _) => SaveMachineDefaults();
+        okButton.Click += (_, _) => Accept();
+
+        RefreshCenters();
+    }
+
+    /// <summary>The edited rail; the caller applies it to the nest after OK.</summary>
+    internal ClampRailEditor Editor { get; }
+
+    private static NumericUpDown NewLengthBox(double value, decimal minimum)
+    {
+        var box = new NumericUpDown
+        {
+            DecimalPlaces = 4,
+            Minimum = minimum,
+            Maximum = 100000,
+            Increment = 0.125m,
+            Width = 110,
+        };
+        box.Value = ToBoxValue(box, value);
+        return box;
+    }
+
+    private static decimal ToBoxValue(NumericUpDown box, double value)
+    {
+        if (!double.IsFinite(value) || value < (double)box.Minimum)
+            return box.Minimum;
+        return value > (double)box.Maximum ? box.Maximum : (decimal)value;
+    }
+
+    private static void AddRow(TableLayoutPanel table, string label, Control box, string unit)
+    {
+        table.Controls.Add(new Label { Text = label, AutoSize = true, Padding = new Padding(0, 6, 6, 0) });
+        table.Controls.Add(box);
+        table.Controls.Add(new Label { Text = unit, AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
+    }
+
+    private void ReadSizes()
+    {
+        Editor.Width = (double)widthBox.Value;
+        Editor.Depth = (double)depthBox.Value;
+        Editor.ApplyToNewNests = applyToNewNestsBox.Checked;
+    }
+
+    private void AddCenter()
+    {
+        if (!Editor.TryAddCenter((double)centerBox.Value, out var error))
+        {
+            MessageBox.Show(this, error, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        RefreshCenters();
+        centerBox.Select(0, centerBox.Text.Length);
+    }
+
+    private void RemoveCenter()
+    {
+        var index = centersList.SelectedIndex;
+        Editor.RemoveCenterAt(index);
+        RefreshCenters();
+        if (centersList.Items.Count > 0)
+            centersList.SelectedIndex = System.Math.Min(index, centersList.Items.Count - 1);
+    }
+
+    private void RefreshCenters()
+    {
+        centersList.BeginUpdate();
+        centersList.Items.Clear();
+        foreach (var center in Editor.Centers)
+            centersList.Items.Add(center.ToString("0.####", CultureInfo.CurrentCulture));
+        centersList.EndUpdate();
+        removeButton.Enabled = centersList.SelectedIndex >= 0;
+    }
+
+    private void LoadMachineDefaults()
+    {
+        Editor.LoadMachineDefaults(machineDefaults);
+        widthBox.Value = ToBoxValue(widthBox, Editor.Width);
+        depthBox.Value = ToBoxValue(depthBox, Editor.Depth);
+        applyToNewNestsBox.Checked = Editor.ApplyToNewNests;
+        RefreshCenters();
+    }
+
+    private void SaveMachineDefaults()
+    {
+        ReadSizes();
+        try
+        {
+            var settings = Editor.ToMachineDefaults();
+            settings.Save(settingsPath);
+            savedLabel.Text = settings.Enabled
+                ? $"Saved {DateTime.Now:t}: new nests get these {settings.Centers.Count} clamps. Cancel does not undo this."
+                : $"Saved {DateTime.Now:t}: new nests get no clamps. Cancel does not undo this.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            MessageBox.Show(
+                this,
+                $"The machine defaults could not be saved:\n{settingsPath}\n\n{ex.Message}",
+                Text,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+        }
+    }
+
+    private void Accept()
+    {
+        ReadSizes();
+        try
+        {
+            Editor.BuildRail();
+        }
+        catch (ArgumentException ex)
+        {
+            MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        DialogResult = DialogResult.OK;
+    }
+}

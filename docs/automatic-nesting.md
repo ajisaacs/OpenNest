@@ -40,6 +40,34 @@ maps to the engine that replaced it (see [nesting engines](nesting-engines.md)).
 If the saved engine is unavailable, Default is selected and the status bar
 reports the fallback; startup does not replace the saved missing-engine preference.
 
+## Machine edge clamps
+
+A nest can carry the machine's fixed clamp rail: identical rectangular clamps
+(width along the edge, depth into the sheet) at X centers measured from the
+plate origin along the origin-side edge. **Nest > Clamps...** edits the current
+nest's rail. **OK** applies it to every plate of the nest (**Cancel** discards
+the edits); removing every center removes the clamps. **Load Machine Defaults**
+only fills the dialog. **Save as Machine Defaults** writes
+`%APPDATA%\OpenNest\clamps.json` immediately, with the clamps, their units and
+whether new nests receive them; Cancel does not undo that write. The dialog
+refuses to open while nesting or a plate action is running.
+
+Clamps are off by default. Until `clamps.json` is saved with clamps enabled and
+at least one center, New and BOM import create nests without clamps exactly as
+before. When enabled, a new nest gets the rail converted to its units. A missing
+file keeps clamps off; an unreadable file, or one with ignored invalid values
+(a bad clamp center is dropped), warns once per session that new nests may not
+match the machine.
+
+Every plate follows the nest's rail at its own size and quadrant: clamps wholly
+beyond a shorter sheet are left off it, one still reaching onto the sheet is
+clipped to it, and resizing or rotating a plate re-resolves its clamps. Auto Nest
+offers each stock size with the rail resolved for that size, and every committed
+sheet keeps exactly the clamps its layout was validated against. Clamps are
+drawn as hatched amber rectangles over the sheet; they cannot be selected,
+moved or sequenced and never count as parts. Interactive fill/push, the overlap
+check and cutoffs do not yet avoid clamps.
+
 ## Integration constraints
 
 Callers must hold drawings and target state stable from snapshot through attachment. Do not append whole-job placements to an occupied target or flatten multiple returned sheets onto one plate: that would commit a layout different from the one checked. Do not trust arbitrary engine fulfillment metadata as a substitute for counting returned placements.

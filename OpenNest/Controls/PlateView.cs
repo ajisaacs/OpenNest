@@ -267,6 +267,7 @@ namespace OpenNest.Controls
                 plate.PartAdded -= plate_PartAdded;
                 plate.PartRemoved -= plate_PartRemoved;
                 plate.PartsReordered -= plate_PartsReordered;
+                plate.ClampZonesChanged -= plate_ClampZonesChanged;
                 parts.Clear();
                 previewManager.Clear();
                 selection.Clear();
@@ -277,6 +278,7 @@ namespace OpenNest.Controls
             plate.PartAdded += plate_PartAdded;
             plate.PartRemoved += plate_PartRemoved;
             plate.PartsReordered += plate_PartsReordered;
+            plate.ClampZonesChanged += plate_ClampZonesChanged;
 
             foreach (var part in plate.Parts)
                 parts.Add(LayoutPart.Create(part, this));
@@ -709,6 +711,7 @@ namespace OpenNest.Controls
 
             renderer.DrawPlate(e.Graphics);
             renderer.DrawParts(e.Graphics);
+            renderer.DrawClampZones(e.Graphics);
             if (!HasProposalDisplay)
             {
                 renderer.DrawCutOffs(e.Graphics);
@@ -965,6 +968,9 @@ namespace OpenNest.Controls
 
             parts.RemoveAll(p => p.BasePart == e.Item);
         }
+
+        // Clamp zones are display-only here: repaint, nothing to select or rebuild.
+        private void plate_ClampZonesChanged(object sender, EventArgs e) => Invalidate();
 
         private void plate_PartsReordered(object sender, EventArgs e)
         {

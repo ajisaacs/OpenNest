@@ -90,8 +90,10 @@ grid can make layout validation (including Default's candidate scoring) throw. I
 static-obstacle preparation does not repair these separate paths. The ordinary clamp
 fixtures pass for both lanes and Default; this is not an all-input clamp-safety guarantee.
 
-This is whole-job engine support, not interactive fill/push, desktop clamp editing or
-cutoff/post-verification support; those consumers are separate work. Other engines and
+This is whole-job engine support, not interactive fill/push or cutoff/post-verification
+support; those consumers are separate work. Desktop clamp editing and the stock-size
+resolution of a nest's clamp rail are described in
+[automatic nesting](automatic-nesting.md#machine-edge-clamps). Other engines and
 plug-ins have not gained clamp-aware placement from this change.
 
 ## Repeating completed layouts

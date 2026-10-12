@@ -18,6 +18,7 @@ namespace OpenNest.Forms
         private readonly BindingList<BomPartRow> _parts;
         private Dictionary<string, BomGroupPlateSettings> _groupSettings;
         private NestDefaults _defaults;
+        private ClampSettings _clamps;
 
         public Form MdiParentForm { get; set; }
 
@@ -30,6 +31,7 @@ namespace OpenNest.Forms
             dgvParts.DataSource = _parts;
             _groupSettings = new Dictionary<string, BomGroupPlateSettings>();
             _defaults = MainForm.LoadSavedNestDefaults(out _);
+            _clamps = MainForm.LoadSavedClampSettings(out _);
             ApplyDefaults();
         }
 
@@ -427,7 +429,17 @@ namespace OpenNest.Forms
                     };
                 }
 
-                var result = BomNestBuilder.Build(group, plate, jobName, _defaults.ApplyTo);
+                var result = BomNestBuilder.Build(
+                    group,
+                    plate,
+                    jobName,
+                    nest =>
+                    {
+                        // As New does: saved defaults, then the machine clamps in those units.
+                        _defaults.ApplyTo(nest);
+                        _clamps.ApplyToNewNest(nest);
+                    }
+                );
                 importErrors.AddRange(result.Errors);
 
                 if (result.Nest == null)
