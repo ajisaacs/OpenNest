@@ -55,6 +55,10 @@ namespace OpenNest
             Parts.ItemAdded += Parts_PartAdded;
             Parts.ItemRemoved += Parts_PartRemoved;
             CutOffs = new ObservableList<CutOff>();
+            ClampZones = new ObservableList<ClampZone>();
+            ClampZones.ItemAdded += (_, _) => OnClampZonesChanged();
+            ClampZones.ItemRemoved += (_, _) => OnClampZonesChanged();
+            ClampZones.ItemChanged += (_, _) => OnClampZonesChanged();
             Quadrant = 1;
         }
 
@@ -101,6 +105,22 @@ namespace OpenNest
         /// The cut-off lines defined on this plate.
         /// </summary>
         public ObservableList<CutOff> CutOffs { get; set; }
+
+        /// <summary>
+        /// Fixed rectangular machine-clamp keep-outs in plate coordinates
+        /// (<see cref="ClampZone"/>). Never parts: excluded from quantity, utilization,
+        /// cut sequence and CNC output; placement rules and display consume them. Mutate
+        /// through this list; <see cref="ClampZonesChanged"/> fires for every change.
+        /// </summary>
+        public ObservableList<ClampZone> ClampZones { get; }
+
+        /// <summary>
+        /// Raised after <see cref="ClampZones"/> content changes so views can refresh
+        /// the zone overlay. Carries no geometry arguments.
+        /// </summary>
+        public event EventHandler? ClampZonesChanged;
+
+        private void OnClampZonesChanged() => ClampZonesChanged?.Invoke(this, EventArgs.Empty);
 
         /// <summary>
         /// Regenerates all cut-off drawings and materializes them as parts.
