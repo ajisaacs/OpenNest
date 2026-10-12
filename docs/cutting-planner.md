@@ -357,7 +357,10 @@ for UNVERIFIED results; a blocked plate disables the whole-batch Apply. A succes
 Apply persists the confirmed settings and refreshes the editor; a failed/stale Apply
 changes nothing and requires replanning. Escape, the panel X or Cancel restores the
 live view and prior viewport; closing during planning waits for the worker before
-unlocking inspection. Planning is not live-nest validation or posting consent.
+unlocking inspection. Planning is not live-nest validation or posting consent. The
+panel's **Validate Nest (live programs)** mode separately checks current installed
+programs across all plates and navigates typed findings on the live canvas; it
+never certifies an unapplied proposal. Posting still initiates its own fresh review.
 
 - The panel starts from the plate's cutting settings (or the last-used settings) and plans
   at once. `Cutting Settings...` edits them and `Keep the current part order` fixes the

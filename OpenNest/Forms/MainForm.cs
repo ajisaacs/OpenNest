@@ -27,7 +27,7 @@ namespace OpenNest.Forms
     public partial class MainForm : Form
     {
         private EditNestForm activeForm;
-        private ValidateNestForm validationForm;
+
         private bool clickUpdateLocation;
         private bool nestingInProgress;
         private CancellationTokenSource nestingCts;
@@ -1629,13 +1629,7 @@ namespace OpenNest.Forms
 
             foreach (var view in views)
                 view.SetAction(typeof(ActionSelect));
-            if (validationForm is { IsDisposed: false })
-            {
-                validationForm.Activate();
-                return;
-            }
-            validationForm = new ValidateNestForm(editForm);
-            validationForm.Show(this);
+            editForm.OpenValidationInspection();
         }
 
         private void PostProcessor_Click(object sender, EventArgs e)
@@ -1649,6 +1643,12 @@ namespace OpenNest.Forms
 
             // Closed progress windows can still have a fill awaiting its final commit.
             // Keep the nest stable throughout verification and all owned modal dialogs.
+            if (MdiChildren.OfType<EditNestForm>().Any(form => form.CuttingInspection != null))
+            {
+                MessageBox.Show(this, "Close cutting inspection before posting. Posting will run fresh checks.",
+                    "Verify Nest Before Posting", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
             var views = MdiChildren.OfType<EditNestForm>()
                 .Where(form => ReferenceEquals(form.Nest, editForm.Nest))
                 .Select(form => form.PlateView).ToArray();
@@ -1927,8 +1927,7 @@ namespace OpenNest.Forms
 
         private void ShowCuttingPlan(bool allPlates)
         {
-            if (validationForm is { IsDisposed: false }
-                || MdiChildren.OfType<EditNestForm>().Any(form => form.CuttingInspection != null))
+            if (MdiChildren.OfType<EditNestForm>().Any(form => form.CuttingInspection != null && !ReferenceEquals(form, activeForm)))
                 return;
             var editForm = activeForm;
             if (editForm?.PlateView?.Plate == null)

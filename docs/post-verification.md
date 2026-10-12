@@ -1,15 +1,16 @@
 # Verify a nest before posting
 
-## Standalone desktop validation
+## Docked desktop validation
 
 Choose **Nest > Validate Nest...** to inspect all plates without running the cut
-planner or selecting a post processor. The read-only **Validate Nest** window
-checks overlapping material, missing lead-ins, and rapid crossings in the existing
-placed programs and cutting order. Findings identify plate and part sequence
-numbers in a read-only grid like the cut planner; incomplete or failed checks are
-never reported as clear. Select a row to switch the main plate view to that plate
-and focus the finding. The inspector opens at the right of the screen and can be
-moved or resized. The details below the grid explain the selected warning.
+planner or selecting a post processor. It opens the editor's read-only side panel
+in **Validate Nest (live programs)** mode, distinct from the panel's unapplied
+**Plan Cutting** proposal. The validation panel checks overlapping material,
+missing lead-ins, and rapid crossings in the existing placed programs and cutting
+order. Findings identify plate and part sequence numbers in a read-only grid;
+incomplete or failed checks are never reported as clear. Select a row to switch
+the main plate view to that plate and focus the finding. The scrollable report
+retains every result and the selected finding's explanation.
 While a finding is selected, its named parts retain their normal colors; other
 parts use muted gray fills and visible gray outlines, lead-ins, and marks. Selecting
 another finding updates the emphasis. Clearing the finding or closing validation
@@ -33,14 +34,15 @@ the nest, or write CNC output. Minimum spacing and plate boundaries are not chec
 It does not verify a post processor's final output. Posting still runs its own
 fresh verification and consent flow.
 
-Finish or cancel active nesting/fill operations before validating. The window is
-a normal top-level, modeless form. Editing controls and shortcuts stay disabled
-while it is open, but the main plate view remains available for wheel zoom,
-middle-button pan, and **F** or middle-button double-click to fit. Close the
-inspector to resume editing. Cancel, Escape, or closing the window requests
+Finish or cancel active nesting/fill operations before validating. The panel is
+exclusive with editing and other side-panel actions while it owns the nest. The
+main plate view remains available for wheel zoom, middle-button pan, and **F**
+or middle-button double-click to fit. Panel X, Cancel or Escape requests
 cancellation and waits for the worker to stop before restoring editing controls.
-Closing the main window during inspection closes/cancels the inspector first;
-close the main window again after inspection has finished.
+Switching to Plan mode also waits for any validation worker; it does not promote
+a live validation report into a plan check. Closing the editor or main window
+joins the worker before continuing the close. Posting while inspection is open
+is refused; close the panel and use the fresh posting review.
 
 ## Posting workflow
 

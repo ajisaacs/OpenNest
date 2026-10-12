@@ -13,6 +13,8 @@ using OpenNest.Engine.CuttingPlanning;
 
 namespace OpenNest.Forms;
 
+internal enum CuttingInspectionMode { Plan, Validate }
+
 /// <summary>Owner-thread planning and atomic Apply beside the read-only main canvas.</summary>
 internal sealed class CuttingInspectionPanel : UserControl
 {
@@ -29,7 +31,16 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly SynchronizationContext context;
     private readonly (float Scale, PointF Origin) viewport;
     private readonly OverlapDisplayMode overlapDisplay;
-    private readonly CuttingProposalInspection inspection = new();
+    private CuttingProposalInspection inspection = new();
+    private readonly ComboBox modeSelector = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
+    private CancellationTokenSource validationCancellation;
+    private bool closeRequested;
+    private CuttingInspectionMode? pendingMode;
+    private bool configuringMode;
+    internal CuttingInspectionMode Mode { get; private set; }
+    internal PostVerificationReport ValidationReport { get; private set; }
+    internal Func<Nest, CancellationToken, Task<PostVerificationReport>> Analyze { get; set; }
+        = (nest, token) => Task.Run(() => PostVerificationAnalyzer.Analyze(nest, token), token);
     private readonly Button planButton = new() { Text = "Replan", AutoSize = true };
     private readonly Button cancelButton = new() { Text = "Cancel / Close", AutoSize = true };
     private readonly TextBox resultLabel = new()
@@ -50,6 +61,13 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly CheckBox acceptWarningsCheckBox = new() { Text = "Accept UNVERIFIED plan warnings (not posting consent)", AutoSize = true, Visible = false };
     private readonly Label settingsLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
     private readonly Label previewLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
+    private readonly Label validationScopeLabel = new()
+    {
+        AutoSize = true,
+        MaximumSize = new Size(440, 0),
+        Visible = false,
+        Text = "LIVE NEST only — not posting consent. Minimum spacing, plate boundaries and final post output are not checked."
+    };
     private readonly DataGridView warningGrid = new()
     {
         Dock = DockStyle.Fill,
@@ -65,7 +83,8 @@ internal sealed class CuttingInspectionPanel : UserControl
     private bool closed;
     private int generation;
 
-    internal CuttingInspectionPanel(EditNestForm editor, CuttingParameters parameters, bool allPlates = false)
+    internal CuttingInspectionPanel(EditNestForm editor, CuttingParameters parameters, bool allPlates = false,
+        CuttingInspectionMode mode = CuttingInspectionMode.Plan)
     {
         this.editor = editor;
         view = editor.PlateView;
@@ -85,7 +104,14 @@ internal sealed class CuttingInspectionPanel : UserControl
         buttons.Controls.AddRange([settingsButton, planButton, applyButton, cancelButton]);
         var navigation = new FlowLayoutPanel { AutoSize = true };
         navigation.Controls.AddRange([previousButton, nextButton]);
-        header.Controls.AddRange([settingsLabel, keepOrderCheckBox, buttons, acceptWarningsCheckBox, navigation, previewLabel]);
+        modeSelector.Items.AddRange(["Plan Cutting", "Validate Nest (live programs)"]);
+        Mode = mode;
+        modeSelector.SelectedIndex = (int)mode;
+        modeSelector.SelectedIndexChanged += (_, _) =>
+        {
+            if (!configuringMode) SwitchMode((CuttingInspectionMode)modeSelector.SelectedIndex);
+        };
+        header.Controls.AddRange([modeSelector, settingsLabel, keepOrderCheckBox, buttons, acceptWarningsCheckBox, navigation, previewLabel, validationScopeLabel]);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
@@ -103,7 +129,7 @@ internal sealed class CuttingInspectionPanel : UserControl
                 AutoSizeMode = name == "Warning / finding" ? DataGridViewAutoSizeColumnMode.Fill : DataGridViewAutoSizeColumnMode.None
             });
         Padding = new Padding(10);
-        planButton.Click += (_, _) => StartPlanning();
+        planButton.Click += (_, _) => StartCurrentMode();
         cancelButton.Click += (_, _) => RequestClose();
         settingsButton.Click += (_, _) => EditSettings();
         keepOrderCheckBox.CheckedChanged += (_, _) => StartPlanning();
@@ -116,7 +142,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         resultLabel.Text = "Read-only proposal inspection. Nothing live changes before Apply.";
     }
 
-    internal bool IsPlanning => inspection.IsRunning;
+    internal bool IsPlanning => inspection.IsRunning || validationCancellation != null;
     internal Task PlanningTask { get; private set; } = Task.CompletedTask;
     internal Action<CancellationToken> BeforePlan { get; set; }
     internal Action BeforePresent { get; set; }
@@ -130,12 +156,167 @@ internal sealed class CuttingInspectionPanel : UserControl
         view.InspectionCloseRequested = RequestClose;
         view.OverlapDisplay = OverlapDisplayMode.Off;
         view.ClearValidationFinding();
-        StartPlanning();
+        ConfigureMode();
+        StartCurrentMode();
+    }
+
+    private void StartCurrentMode()
+    {
+        if (Mode == CuttingInspectionMode.Validate) StartValidation();
+        else StartPlanning();
+    }
+
+    private void ConfigureMode()
+    {
+        configuringMode = true;
+        modeSelector.SelectedIndex = (int)Mode;
+        configuringMode = false;
+        var planning = Mode == CuttingInspectionMode.Plan;
+        settingsButton.Visible = settingsLabel.Visible = keepOrderCheckBox.Visible = applyButton.Visible = planning;
+        previousButton.Visible = nextButton.Visible = planning;
+        validationScopeLabel.Visible = !planning;
+        planButton.Text = planning ? "Replan" : "Recheck all plates";
+        previewLabel.Text = planning ? "No current preview." : "LIVE NEST — read-only validation of all plates.";
+    }
+
+    internal void SwitchMode(CuttingInspectionMode mode)
+    {
+        if (closed || closeRequested || mode == Mode && pendingMode == null) return;
+        pendingMode = mode;
+        ClearResult();
+        SetPlanning(true);
+        resultLabel.Text = "Switching modes… waiting for the worker.";
+        if (validationCancellation != null) validationCancellation.Cancel();
+        if (inspection.IsRunning) inspection.RequestClose();
+        if (!IsPlanning) FinishTransition();
+    }
+
+    private void FinishTransition()
+    {
+        if (closeRequested) { FinishClose(); return; }
+        if (pendingMode is not { } mode) return;
+        pendingMode = null;
+        RestoreLiveView();
+        inspection = new CuttingProposalInspection();
+        Mode = mode;
+        ConfigureMode();
+        StartCurrentMode();
+    }
+
+    private void RestoreLiveView()
+    {
+        view.ClearProposalDisplay();
+        view.ClearValidationFinding();
+        if (view.IsDisposed) return;
+        var index = editor.Nest.Plates.ToList().IndexOf(plate);
+        if (index >= 0 && !ReferenceEquals(view.Plate, plate)) editor.PlateManager.LoadAt(index);
+        view.RestoreViewport(viewport);
+    }
+
+    private void StartValidation()
+    {
+        if (closed || closeRequested || IsPlanning) return;
+        ClearResult();
+        ConfigureMode();
+        SetPlanning(true);
+        resultLabel.Text = "Checking all live plates: overlaps, missing lead-ins and rapid crossings…";
+        var cancellation = validationCancellation = new CancellationTokenSource();
+        var run = ++generation;
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        PlanningTask = completion.Task;
+        // The inspection scope keeps editors and posting from mutating these live inputs.
+        Task<PostVerificationReport> work;
+        try { work = Analyze(editor.Nest, cancellation.Token); }
+        catch (Exception ex) { work = Task.FromException<PostVerificationReport>(ex); }
+        work.ContinueWith(task => context.Post(_ =>
+        {
+            try
+            {
+                validationCancellation = null;
+                cancellation.Dispose();
+                if (closeRequested || pendingMode != null) { FinishTransition(); return; }
+                if (closed || run != generation) return;
+                SetPlanning(false);
+                if (!task.IsCompletedSuccessfully)
+                {
+                    resultLabel.Text = task.IsCanceled ? "Validation cancelled. This nest has not passed the checks."
+                        : $"Validation failed. This nest has not passed the checks. {task.Exception?.GetBaseException().Message}";
+                    return;
+                }
+                ValidationReport = task.Result;
+                resultLabel.Text = ValidationReport.ToDisplayText("Nest validation (live programs)");
+                previewLabel.Text = ValidationReport.Findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
+                    ? "Validation incomplete. Review the findings; this nest has not passed all checks."
+                    : ValidationReport.HasWarnings ? "Warnings found. Review the findings below."
+                    : "Validation complete. No warnings found by these checks.";
+                populatingWarnings = true;
+                try
+                {
+                    foreach (var finding in ValidationReport.Findings)
+                    {
+                        var index = warningGrid.Rows.Add(finding.PlateNumber, finding.PartNumber, finding.OtherPartNumber,
+                            $"{finding.Kind}: {finding.Message}");
+                        warningGrid.Rows[index].Tag = finding;
+                    }
+                    warningGrid.ClearSelection();
+                }
+                finally { populatingWarnings = false; }
+            }
+            catch (Exception ex)
+            {
+                view.ClearValidationFinding();
+                resultLabel.Text = $"Validation failed. This nest has not passed the checks. {ex.Message}";
+            }
+            finally { completion.TrySetResult(); }
+        }, null), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    private void NavigateValidationFinding()
+    {
+        if (closed || closeRequested || pendingMode != null || populatingWarnings || IsPlanning || editor.IsDisposed)
+            return;
+        view.ClearValidationFinding();
+        if (warningGrid.SelectedRows.Count == 0 || warningGrid.SelectedRows[0].Tag is not PostVerificationFinding finding
+            || finding.PlateNumber < 1 || finding.PlateNumber > editor.Nest.Plates.Count) return;
+        if (editor.PlateManager.CurrentIndex != finding.PlateNumber - 1)
+            editor.PlateManager.LoadAt(finding.PlateNumber - 1);
+        var location = finding.Location;
+        if (location == null && finding.PartNumber is { } part && part > 0 && part <= view.Plate.Parts.Count)
+            location = view.Plate.Parts[part - 1]?.BoundingBox?.Center;
+        if (location is { } point && double.IsFinite(point.X) && double.IsFinite(point.Y))
+        {
+            var extent = finding.Overlap?.Bounds;
+            var size = System.Math.Max(10, System.Math.Max(extent?.Length ?? 0, extent?.Width ?? 0) * 2);
+            if (finding.RapidStart is { } start && finding.RapidEnd is { } end)
+                size = System.Math.Max(size, start.DistanceTo(end) * 1.5);
+            view.ZoomToArea(point.X - size / 2, point.Y - size / 2, size, size);
+            // A narrow docked canvas can put a contact at its edge after zoom.
+            // Centre a typed witness, never infer one from the diagnostic text.
+            var focus = finding.Kind == PostVerificationKind.RapidCrossing
+                && finding.ContactPoints.Any(contact => double.IsFinite(contact.X) && double.IsFinite(contact.Y))
+                ? finding.ContactPoints.First(contact => double.IsFinite(contact.X) && double.IsFinite(contact.Y))
+                : point;
+            view.CenterValidationPoint(focus, new Point(view.Width / 2, view.Height / 2));
+        }
+        else view.ZoomToFit();
+        view.ShowValidationFinding(finding with { Location = location });
+        var hint = finding.Kind switch
+        {
+            PostVerificationKind.Overlap => "Shaded material is the overlap. The ring marks its area centroid, which can lie between separate patches.",
+            PostVerificationKind.RapidCrossing => finding.ContactPoints.Count > 0
+                ? "Crosshairs mark contacts with the completed contour. The pulsing dashed orange line shows the rapid."
+                : "The pulsing dashed orange line shows the rapid inside the completed contour; there is no boundary contact point to mark.",
+            PostVerificationKind.MissingLeadIn => "The ring marks the cutting contour start where a lead-in is missing.",
+            _ => "The ring marks the affected part's center when available; no exact problem location is known."
+        };
+        // Keep the complete report visible; selecting a finding does not hide completeness or other warnings.
+        resultLabel.Text = $"Plate {finding.PlateNumber}, part {finding.PartNumber}: {finding.Message}\r\n{hint}\r\n\r\n"
+            + ValidationReport.ToDisplayText("Nest validation (live programs)");
     }
 
     internal void StartPlanning()
     {
-        if (closed || inspection.IsRunning || inspection.CloseRequested)
+        if (Mode != CuttingInspectionMode.Plan || closed || IsPlanning || closeRequested || inspection.CloseRequested)
             return;
         ClearResult();
         SetPlanning(true);
@@ -168,9 +349,9 @@ internal sealed class CuttingInspectionPanel : UserControl
         try
         {
             inspection.CompletePlanning(work);
-            if (inspection.CloseRequested)
+            if (closeRequested || pendingMode != null)
             {
-                FinishClose();
+                FinishTransition();
                 return;
             }
             if (closed || run != generation)
@@ -226,6 +407,7 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void ClearResult()
     {
+        ValidationReport = null;
         invalidated = true;
         preview = null;
         view.ClearProposalDisplay();
@@ -248,7 +430,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         if (running) applyButton.Enabled = false;
     }
 
-    private void UpdateApply() => applyButton.Enabled = !invalidated && !IsPlanning
+    private void UpdateApply() => applyButton.Enabled = Mode == CuttingInspectionMode.Plan && !invalidated && !IsPlanning
         && (Proposal?.CanApply == true || Proposal?.CanApplyWithWarnings == true && acceptWarningsCheckBox.Checked);
 
     private bool IsPreviewCurrent()
@@ -286,6 +468,11 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void NavigateFinding()
     {
+        if (Mode == CuttingInspectionMode.Validate)
+        {
+            NavigateValidationFinding();
+            return;
+        }
         if (populatingWarnings || invalidated || warningGrid.SelectedRows.Count == 0
             || warningGrid.SelectedRows[0].Tag is not CuttingPlanDiagnosticRow row)
             return;
@@ -381,36 +568,67 @@ internal sealed class CuttingInspectionPanel : UserControl
     {
         if (closed)
             return;
+        closeRequested = true;
+        pendingMode = null;
         ClearResult();
         SetPlanning(true);
         cancelButton.Enabled = false;
         resultLabel.Text = "Cancelling… waiting for the worker. Nothing has changed.";
-        if (inspection.RequestClose())
+        validationCancellation?.Cancel();
+        inspection.RequestClose();
+        if (!IsPlanning)
             FinishClose();
     }
+
+    internal Action<Exception> OnRestoreError { get; set; }
 
     private void FinishClose()
     {
         if (closed)
             return;
         closed = true;
-        view.ClearProposalDisplay();
-        if (!view.IsDisposed)
-        {
-            view.InspectionCloseRequested = null;
-            if (ReferenceEquals(view.Plate, plate))
-            {
-                view.OverlapDisplay = overlapDisplay;
-            }
-        }
+        Exception restoreError = null;
         var ownedScope = scope;
-        ownedScope?.Dispose();
         scope = null;
-        editor.FinishCuttingInspection(this);
-        if (!view.IsDisposed && ReferenceEquals(view.Plate, plate))
-            view.RestoreViewport(viewport);
-        ownedScope?.ResumeHostClose();
-        Dispose();
+        try
+        {
+            RestoreLiveView();
+            if (!view.IsDisposed && ReferenceEquals(view.Plate, plate))
+                view.OverlapDisplay = overlapDisplay;
+        }
+        catch (Exception ex)
+        {
+            restoreError = ex;
+        }
+        finally
+        {
+            // Navigation can invoke arbitrary plate-change observers. Even if one throws,
+            // release the scope and panel so a stopped worker never strands editing.
+            if (!view.IsDisposed)
+                view.InspectionCloseRequested = null;
+            try { ownedScope?.Dispose(); }
+            catch (Exception ex) { restoreError ??= ex; }
+            try { editor.FinishCuttingInspection(this); }
+            catch (Exception ex) { restoreError ??= ex; }
+            try
+            {
+                if (!view.IsDisposed && ReferenceEquals(view.Plate, plate))
+                    view.RestoreViewport(viewport);
+            }
+            catch (Exception ex) { restoreError ??= ex; }
+            try { ownedScope?.ResumeHostClose(); }
+            catch (Exception ex) { restoreError ??= ex; }
+            Dispose();
+        }
+        if (restoreError != null)
+        {
+            if (OnRestoreError != null)
+                OnRestoreError(restoreError);
+            else
+                MessageBox.Show(editor.IsDisposed ? null : editor,
+                    "Inspection closed, but the original view could not be fully restored: " + restoreError.Message,
+                    "Cutting Inspection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     protected override void Dispose(bool disposing)

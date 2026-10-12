@@ -278,17 +278,37 @@ namespace OpenNest.Forms
         }
         internal System.Action<System.Threading.CancellationToken> CuttingBeforePlan { get; set; }
 
+        internal void OpenValidationInspection()
+        {
+            if (CuttingInspection != null)
+            {
+                CuttingInspection.SwitchMode(CuttingInspectionMode.Validate);
+                return;
+            }
+            OpenInspection(true, CuttingInspectionMode.Validate);
+        }
+
         internal void OpenCuttingInspection(bool allPlates = false)
+        {
+            if (CuttingInspection != null)
+            {
+                CuttingInspection.SwitchMode(CuttingInspectionMode.Plan);
+                return;
+            }
+            OpenInspection(allPlates, CuttingInspectionMode.Plan);
+        }
+
+        private void OpenInspection(bool allPlates, CuttingInspectionMode mode)
         {
             if (CuttingInspection != null)
                 return;
             PlateView.EndAction();
-            var panel = new CuttingInspectionPanel(this, LoadOrDefaultParameters(PlateView.Plate.CuttingParameters), allPlates)
+            var panel = new CuttingInspectionPanel(this, LoadOrDefaultParameters(PlateView.Plate.CuttingParameters), allPlates, mode)
             {
                 BeforePlan = CuttingBeforePlan
             };
             CuttingInspection = panel;
-            ShowSidePanel(panel, allPlates ? "Plan Cutting — All Plates" : "Plan Cutting — Read-only Proposal", 480);
+            ShowSidePanel(panel, "Cutting Inspection — Plan / Validate", 480);
             panel.Open();
         }
 
