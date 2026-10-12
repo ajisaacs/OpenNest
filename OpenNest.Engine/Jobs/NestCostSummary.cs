@@ -17,7 +17,7 @@ public sealed record NestCostSummary(string Basis, IReadOnlyList<NestStockCost> 
             throw new ArgumentException("Cost reporting requires a validated proposal.", nameof(result));
         var stock = result.Job.Plates.Select(s =>
         {
-            var used = result.Plates.Count(p => p.Stock.Id == s.Id);
+            var used = result.Plates.Where(p => p.Stock.Id == s.Id).Sum(p => p.Quantity);
             return new NestStockCost(s.Id, used, s.Cost,
                 used == 0 ? 0 : NestJobCost.RequireFinite(used * NestJobCost.GrossSheetCost(s)));
         }).ToArray();
@@ -26,12 +26,12 @@ public sealed record NestCostSummary(string Basis, IReadOnlyList<NestStockCost> 
         {
             if (sheet.Parts.Count == 0 || result.Job.Options.SalvageRate == 0
                 || result.Job.Options.MinimumSalvageDimension <= 0)
-                return NestJobCost.GrossSheetCost(sheet.Stock);
+                return NestJobCost.RequireFinite(sheet.Quantity * NestJobCost.GrossSheetCost(sheet.Stock));
             var bounds = sheet.Parts.Select(NestLayoutCheck.MaterialBounds).ToArray();
             var left = bounds.Min(b => b.Left);
             var bottom = bounds.Min(b => b.Bottom);
-            return NestJobCost.NetSheetCost(result.Job.Options, sheet.Stock,
-                new Box(left, bottom, bounds.Max(b => b.Right) - left, bounds.Max(b => b.Top) - bottom));
+            return NestJobCost.RequireFinite(sheet.Quantity * NestJobCost.NetSheetCost(result.Job.Options, sheet.Stock,
+                new Box(left, bottom, bounds.Max(b => b.Right) - left, bounds.Max(b => b.Top) - bottom)));
         }));
         return new NestCostSummary(NestJobCost.UsesExplicitCosts(result.Job)
             ? "supplied-cost" : "area", stock, gross, NestJobCost.RequireFinite(gross - net), net);

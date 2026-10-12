@@ -39,6 +39,11 @@ public sealed class IrregularNestingEngine : INestingEngine
     /// </summary>
     internal long WorkBudget { get; init; } = 1_500_000;
 
+    // Instance-owned diagnostics; no process-global counters or mutable solver state.
+    internal Action? SheetPacked { get; init; }
+    internal Action<RepeatBatch>? BatchSelected { get; init; }
+    internal Action<int>? TailReplaced { get; init; }
+
     public NestJobResult Solve(
         NestJob job,
         IProgress<NestJobProgress>? progress = null,
@@ -48,7 +53,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         ArgumentNullException.ThrowIfNull(job);
         token.ThrowIfCancellationRequested();
         var types = PartCatalog.Build(job);
-        using var solver = new Solver(job, types, progress, token, WorkBudget);
+        using var solver = new Solver(job, types, progress, token, WorkBudget, SheetPacked, BatchSelected, TailReplaced);
 
         // Pair-only orientations may fit stock even when the sampled single poses do not.
         // Demand that neither a single nor a pair can fit is reported unplaced.
@@ -78,7 +83,19 @@ public sealed class IrregularNestingEngine : INestingEngine
 
         // The last sheets hold the leftovers, which is where waste concentrates; re-plan them.
         best = solver.ImproveTail(best!, WorkBudget * 2);
-        return BuildResult(job, types, best, progress);
+        return BuildResult(job, types, best, progress, token);
+    }
+
+    /// <summary>Exercises the production physical-tail lifecycle from a test-owned incumbent.
+    /// This does not alter normal Solve or expose a public packing API.</summary>
+    internal NestJobResult ImproveTailForTesting(NestJob job, IReadOnlyList<SheetFill> physicalPlan)
+    {
+        var types = PartCatalog.Build(job);
+        using var solver = new Solver(job, types, null, default, WorkBudget, SheetPacked, BatchSelected, TailReplaced);
+        var unplaced = job.Parts.Sum(p => p.Quantity) - physicalPlan.Sum(s => s.Parts.Count);
+        var plan = new Plan(physicalPlan, physicalPlan.Sum(s => NetCost(job.Options, s)), unplaced,
+            unplaced == 0 ? NestJobStopReason.Completed : NestJobStopReason.NoPlacementFound, NestJobCost.UsesExplicitCosts(job));
+        return BuildResult(job, types, solver.ImproveTail(plan, WorkBudget * 2), null, default);
     }
 
     /// <summary>Shared state for one solve: job, catalog, NFP caches, effort meter.</summary>
@@ -87,7 +104,10 @@ public sealed class IrregularNestingEngine : INestingEngine
         IReadOnlyList<PartType> types,
         IProgress<NestJobProgress>? progress,
         CancellationToken token,
-        long workBudget
+        long workBudget,
+        Action? sheetPacked,
+        Action<RepeatBatch>? batchSelected,
+        Action<int>? tailReplaced
     ) : IDisposable
     {
         public void Dispose()
@@ -100,6 +120,7 @@ public sealed class IrregularNestingEngine : INestingEngine
         private readonly Dictionary<double, NoFitCache> caches = new();
         private readonly Dictionary<double, IReadOnlyDictionary<int, IReadOnlyList<PairPose>>> pairs = new();
         private readonly Dictionary<double, BlockCatalog> blocks = new();
+        private readonly IReadOnlyDictionary<string, NestJobPart> parts = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
 
         private BlockCatalog BlocksFor(NestPlateStock stock)
         {
@@ -164,6 +185,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                     continue;
                 sheets = prefix.Concat(bestRun.Sheets).ToList();
                 plan = plan with { Sheets = sheets.ToList(), Cost = plan.Cost - (tailNet - bestRun.Net) };
+                tailReplaced?.Invoke(k);
             }
             return plan;
         }
@@ -222,6 +244,7 @@ public sealed class IrregularNestingEngine : INestingEngine
 
             while (true)
             {
+                token.ThrowIfCancellationRequested();
                 if (remaining.All(r => r == 0))
                 {
                     reason = NestJobStopReason.Completed;
@@ -244,6 +267,7 @@ public sealed class IrregularNestingEngine : INestingEngine
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
                     var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work, BlocksFor(stock));
                     var fill = packer.Fill(remaining, token);
+                    sheetPacked?.Invoke();
                     if (fill.Parts.Count > 0)
                         trials.Add((fill, NetCost(job.Options, fill)));
                 }
@@ -266,11 +290,42 @@ public sealed class IrregularNestingEngine : INestingEngine
                     .ThenBy(t => t.order)
                     .First();
 
-                sheets.Add(chosen.Fill);
-                net = NestJobCost.RequireFinite(net + chosen.Net);
-                used[chosen.Fill.Stock.Id]++;
-                foreach (var part in chosen.Fill.Parts)
-                    remaining[part.Orientation.TypeIndex]--;
+                var outstanding = types.ToDictionary(t => t.Part.Id, t => remaining[t.Index], StringComparer.Ordinal);
+                var counts = chosen.Fill.Parts.GroupBy(p => types[p.Orientation.TypeIndex].Part.Id, StringComparer.Ordinal)
+                    .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+                // Count all stock still available, not just the forced-first trial subset.
+                var availableEntries = job.Plates.Count(s => s.Quantity == null || used[s.Id] < s.Quantity);
+                // Fill has no partial/budget exit: it returns after states empty or Choose finds
+                // no supported placement. WorkBudget only controls later variants/block preparation.
+                var copies = CompletedLayoutRepeat.Limit(outstanding, counts, searchCompleted: true, availableEntries,
+                    chosen.Fill.Stock.Quantity - used[chosen.Fill.Stock.Id], sheetCap - sheets.Count);
+                if (copies > 1)
+                {
+                    try
+                    {
+                        NestJobValidator.ValidateCandidate(new PlateCandidate(chosen.Fill.Parts.Select(p =>
+                            new NestJobPlacement(types[p.Orientation.TypeIndex].Part.Id, 0, p.X, p.Y, p.Orientation.Rotation))),
+                            chosen.Fill.Stock, outstanding, parts);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        copies = 1; // Uncertified candidates retain ordinary allocation/final validation.
+                    }
+                }
+                batchSelected?.Invoke(new RepeatBatch(chosen.Fill.Stock.Id, copies, availableEntries, sheets.Count,
+                    sheets.Count == 0 && first != null));
+                for (var copy = 0; copy < copies; copy++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    // Poses are immutable records over the read-only catalog; each physical sheet
+                    // owns a separate list so tail replanning can remove/replace individual copies.
+                    sheets.Add(chosen.Fill with { Parts = chosen.Fill.Parts.ToList() });
+                    net = NestJobCost.RequireFinite(net + chosen.Net);
+                }
+                used[chosen.Fill.Stock.Id] = checked(used[chosen.Fill.Stock.Id] + copies);
+                foreach (var type in types)
+                    if (counts.TryGetValue(type.Part.Id, out var count))
+                        remaining[type.Index] = checked(remaining[type.Index] - checked(count * copies));
             }
 
             return new Run(sheets, net, reason);
@@ -280,12 +335,16 @@ public sealed class IrregularNestingEngine : INestingEngine
     private sealed record Run(IReadOnlyList<SheetFill> Sheets, double Net, NestJobStopReason Reason);
 
     private static NestJobResult BuildResult(NestJob job, IReadOnlyList<PartType> types,
-        Plan plan, IProgress<NestJobProgress>? progress)
+        Plan plan, IProgress<NestJobProgress>? progress, CancellationToken token)
     {
         var builder = new NestJobResultBuilder(job, progress);
         foreach (var sheet in plan.Sheets)
+        {
+            token.ThrowIfCancellationRequested();
             builder.AddSheet(sheet.Stock, sheet.Parts.Select(p =>
                 (types[p.Orientation.TypeIndex].Part.Id, p.X, p.Y, p.Orientation.Rotation)));
+        }
+        token.ThrowIfCancellationRequested();
         return builder.Build(plan.Reason);
     }
 

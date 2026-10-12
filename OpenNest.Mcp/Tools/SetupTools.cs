@@ -85,6 +85,7 @@ namespace OpenNest.Mcp.Tools
 
             var count = plate.Parts.Count;
             plate.Parts.Clear();
+            _session.ReleaseStockCopies(plate);
 
             return $"Cleared plate {plateIndex}: removed {count} parts";
         }

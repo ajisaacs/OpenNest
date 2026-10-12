@@ -20,8 +20,17 @@ public sealed record NestPipelineRequest(
     NestJobOptions Options = null
 );
 
-/// <summary>A proposed sheet: new parts bound by reference to the caller's drawings.</summary>
-public sealed record ProposedPlate(int PlateIndex, NestPlateStock Stock, IReadOnlyList<Part> Parts);
+/// <summary>A proposed layout: new parts bound to caller drawings. PlateIndex is the first
+/// raw physical occurrence; Quantity is the total physical copies, including the first.</summary>
+public sealed record ProposedPlate(int PlateIndex, NestPlateStock Stock, IReadOnlyList<Part> Parts)
+{
+    private int quantity = 1;
+    public int Quantity
+    {
+        get => quantity;
+        init => quantity = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(Quantity));
+    }
+}
 
 /// <summary>
 /// The engine's raw result, its independent validation, and the proposed plates. Nothing
@@ -204,21 +213,24 @@ public static class NestPipeline
         if (canKeep && violations.Count == 0)
             _ = NestJobCost.Evaluate(job, raw);
 
-        var plates = canKeep
-            ? raw.Plates.Select(sheet => new ProposedPlate(
-                sheet.PlateIndex,
-                sheet.Stock,
-                NestResultBinder.Bind(sheet, drawingsByPartId)
-            ))
-            .ToList()
-            : new List<ProposedPlate>();
+        // Invalid-but-representable output retains its physical review correspondence.
+        var consolidate = violations.Count == 0;
+        var plates = new List<ProposedPlate>();
+        if (canKeep)
+            foreach (var group in RepeatedPlateGrouping.Create(raw.Plates, consolidate, token))
+            {
+                token.ThrowIfCancellationRequested();
+                plates.Add(new ProposedPlate(group.Sheet.PlateIndex, group.Sheet.Stock,
+                    NestResultBinder.Bind(group.Sheet, drawingsByPartId))
+                { Quantity = group.Quantity });
+            }
 
         // Binding clones the caller's current Program; a concurrent edit during binding
         // must not return parts whose bytes differ from the already validated snapshot.
         if (canKeep)
         {
             var changes = NestPipelineDrawingFreshness.Changes(job, drawingsByPartId).ToList();
-            changes.AddRange(NestPipelineDrawingFreshness.BoundChanges(job, raw, plates, drawingsByPartId));
+            changes.AddRange(NestPipelineDrawingFreshness.BoundChanges(job, raw, plates, drawingsByPartId, consolidate, token));
             if (changes.Count > 0)
             {
                 violations.AddRange(changes);
@@ -243,7 +255,7 @@ public static class NestPipeline
             engineName,
             job,
             raw,
-            plates,
+            plates.AsReadOnly(),
             violations,
             canKeep,
             solveTime,

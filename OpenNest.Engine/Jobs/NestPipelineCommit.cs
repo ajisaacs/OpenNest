@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace OpenNest.Engine.Jobs;
 
-/// <summary>Applies an explicitly accepted whole-job proposal to empty physical sheets only.
+/// <summary>Applies accepted layouts and total copy quantities to empty/new plates only.
 /// Caller must keep the nest and its drawings stable from request construction through commit.</summary>
 public static class NestPipelineCommit
 {
@@ -22,7 +22,7 @@ public static class NestPipelineCommit
             throw new InvalidOperationException("The nesting result cannot be committed without a keepable layout and explicit consent to its violations.");
         if (NestPipelineDrawingFreshness.Changes(result.Job, result.DrawingsByPartId).Count > 0
             || NestPipelineDrawingFreshness.BoundChanges(result.Job, result.Raw,
-                result.Plates, result.DrawingsByPartId).Count > 0)
+                result.Plates, result.DrawingsByPartId, result.IsValid, token).Count > 0)
             throw new InvalidOperationException("A drawing or proposed part changed after the nesting proposal was validated; run Auto Nest again.");
         token.ThrowIfCancellationRequested();
 
@@ -41,7 +41,7 @@ public static class NestPipelineCommit
                 plate.PartSpacing = proposed.Stock.PartSpacing;
                 plate.EdgeSpacing = proposed.Stock.EdgeSpacing;
                 plate.Quadrant = proposed.Stock.Quadrant;
-                plate.Quantity = 1;
+                plate.Quantity = proposed.Quantity;
                 plate.Parts.AddRange(proposed.Parts);
                 applied.Add(plate);
             }

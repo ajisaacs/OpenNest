@@ -1,12 +1,66 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OpenNest.Mcp
 {
     public class NestSession
     {
-        public Nest Nest { get; set; }
+        private Nest nest;
+
+        public Nest Nest
+        {
+            get => nest;
+            set
+            {
+                nest = value;
+                ReconcileStockReservations();
+            }
+        }
         public List<Plate> Plates { get; } = new();
         public List<Drawing> Drawings { get; } = new();
+
+        // A repeated layout owns its otherwise-empty physical sheet placeholders.
+        // Clearing/removing that owner releases only its copies, never another layout's.
+        // User-authored plates and pre-existing quantities imply no reservations.
+        private readonly Dictionary<Plate, HashSet<Plate>> stockReservations = new(ReferenceEqualityComparer.Instance);
+
+        internal bool IsConsumedStockPlate(Plate plate)
+        {
+            ReconcileStockReservations();
+            return stockReservations.Values.Any(copies => copies.Contains(plate));
+        }
+
+        internal void ReserveStockCopies(Plate owner, IEnumerable<Plate> copies)
+        {
+            var reserved = new HashSet<Plate>(copies, ReferenceEqualityComparer.Instance);
+            if (reserved.Count > 0)
+                stockReservations[owner] = reserved;
+        }
+
+        internal void ReleaseStockCopies(Plate owner) => stockReservations.Remove(owner);
+
+        private void ReconcileStockReservations()
+        {
+            if (stockReservations.Count == 0)
+                return;
+
+            // Both collections are publicly mutable. Reconcile by reference, not index,
+            // so removals/replacements cannot retain stale plates or free unrelated stock.
+            var live = new HashSet<Plate>(Plates, ReferenceEqualityComparer.Instance);
+            if (Nest != null)
+                live.UnionWith(Nest.Plates);
+            foreach (var (owner, copies) in stockReservations.ToArray())
+            {
+                if (!live.Contains(owner) || owner.Parts.Count == 0)
+                {
+                    stockReservations.Remove(owner);
+                    continue;
+                }
+                copies.RemoveWhere(copy => !live.Contains(copy));
+                if (copies.Count == 0)
+                    stockReservations.Remove(owner);
+            }
+        }
 
         /// <summary>
         /// Whole-job engine <c>autonest_plate</c> uses when a call does not pass an explicit
@@ -58,6 +112,7 @@ namespace OpenNest.Mcp
             else
                 Plates.RemoveAt(index - loadedCount);
 
+            ReconcileStockReservations();
             reason = null;
             return true;
         }
@@ -84,6 +139,7 @@ namespace OpenNest.Mcp
 
         public List<Plate> AllPlates()
         {
+            ReconcileStockReservations();
             var all = new List<Plate>();
             if (Nest != null)
                 all.AddRange(Nest.Plates);

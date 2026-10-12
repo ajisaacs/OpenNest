@@ -103,7 +103,7 @@ public static class NestRunner
                 PartSpacing = proposed.Stock.PartSpacing,
                 EdgeSpacing = proposed.Stock.EdgeSpacing,
                 Quadrant = proposed.Stock.Quadrant,
-                Quantity = 1,
+                Quantity = proposed.Quantity,
             };
             plate.Parts.AddRange(proposed.Parts);
             nest.Plates.Add(plate);
@@ -111,8 +111,8 @@ public static class NestRunner
 
         // Pipeline IDs are internal part-i values. Exposed counts/IDs come from the
         // returned, bound placements and the original request, never plug-in summaries.
-        var counts = result.Plates.SelectMany(p => p.Parts)
-            .GroupBy(p => p.BaseDrawing).ToDictionary(g => g.Key, g => g.Count());
+        var counts = result.Plates.SelectMany(p => p.Parts.Select(part => (part.BaseDrawing, p.Quantity)))
+            .GroupBy(p => p.BaseDrawing).ToDictionary(g => g.Key, g => g.Sum(p => p.Quantity));
         var fulfillment = parts.Select((part, i) =>
         {
             var placed = counts.GetValueOrDefault(items[i].Drawing);
@@ -121,7 +121,7 @@ public static class NestRunner
         }).ToArray();
         var usage = stock.Select(s =>
         {
-            var used = result.Plates.Count(p => p.Stock.Id == s.Id);
+            var used = result.Plates.Where(p => p.Stock.Id == s.Id).Sum(p => p.Quantity);
             return new NestStockUsage(s.Id, used, s.Quantity.HasValue ? System.Math.Max(0, s.Quantity.Value - used) : null);
         }).ToArray();
         var complete = fulfillment.All(f => f.Placed == f.Requested);
@@ -136,7 +136,7 @@ public static class NestRunner
         return Task.FromResult(
             new NestResponse
             {
-                SheetCount = nest.Plates.Count,
+                SheetCount = nest.Plates.Sum(p => p.Quantity),
                 Utilization = CalculateUtilization(nest),
                 CutTime = cutTime,
                 Elapsed = sw.Elapsed,
@@ -248,11 +248,11 @@ public static class NestRunner
 
     private static double CalculateUtilization(Nest nest)
     {
-        var sheetArea = nest.Plates.Sum(plate => plate.Area());
+        var sheetArea = nest.Plates.Sum(plate => plate.Area() * plate.Quantity);
         if (sheetArea == 0)
             return 0;
         var placedArea = nest.Plates.Sum(plate =>
-            plate.Parts.Where(part => !part.BaseDrawing.IsCutOff).Sum(part => part.BaseDrawing.Area)
+            plate.Parts.Where(part => !part.BaseDrawing.IsCutOff).Sum(part => part.BaseDrawing.Area) * plate.Quantity
         );
         return placedArea / sheetArea;
     }

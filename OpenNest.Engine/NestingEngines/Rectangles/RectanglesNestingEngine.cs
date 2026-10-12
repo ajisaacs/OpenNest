@@ -32,6 +32,10 @@ public sealed class RectanglesNestingEngine : INestingEngine
 
     private static readonly PickMode[] Modes = { PickMode.Global, PickMode.Ordered };
 
+    // Instance-owned diagnostics; no process-global counters or mutable solver state.
+    internal Action<PickMode>? SheetPacked { get; init; }
+    internal Action<RepeatBatch>? BatchSelected { get; init; }
+
     public NestJobResult Solve(
         NestJob job,
         IProgress<NestJobProgress>? progress = null,
@@ -49,11 +53,13 @@ public sealed class RectanglesNestingEngine : INestingEngine
                 remaining[t.Index] = 0;
 
         var used = job.Plates.ToDictionary(s => s.Id, _ => 0, StringComparer.Ordinal);
+        var parts = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
         var result = new NestJobResultBuilder(job, progress);
         NestJobStopReason reason;
 
         while (true)
         {
+            token.ThrowIfCancellationRequested();
             if (remaining.All(r => r == 0))
             {
                 reason = NestJobStopReason.NoPlacementFound; // Builder reports Completed when demand is met.
@@ -77,6 +83,7 @@ public sealed class RectanglesNestingEngine : INestingEngine
                     foreach (var rule in Rules)
                     {
                         var plan = SheetPacker.Pack(types, remaining, stock, rule, mode, token);
+                        SheetPacked?.Invoke(mode);
                         if (plan.Parts.Count > 0)
                             trials.Add((plan, NetCost(job, plan)));
                     }
@@ -90,10 +97,39 @@ public sealed class RectanglesNestingEngine : INestingEngine
             }
 
             var chosen = Choose(types, remaining, trials);
-            result.AddSheet(chosen.Stock, chosen.Poses());
-            used[chosen.Stock.Id]++;
-            foreach (var p in chosen.Parts)
-                remaining[p.Type.Index]--;
+            var poses = chosen.Poses().ToArray();
+            var demand = types.ToDictionary(t => t.Id, t => remaining[t.Index], StringComparer.Ordinal);
+            var counts = chosen.Parts.GroupBy(p => p.Type.Id, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+            var availableEntries = job.Plates.Count(s => s.Quantity == null || used[s.Id] < s.Quantity);
+            // Both private MaxRects modes return only after their normal demand/no-fit search;
+            // neither returns partial/budget-limited output. This is not a geometric impossibility proof.
+            var copies = CompletedLayoutRepeat.Limit(demand, counts, searchCompleted: true, availableEntries,
+                chosen.Stock.Quantity - used[chosen.Stock.Id], job.Options.MaxPlates - result.SheetsUsed(job));
+            if (copies > 1)
+            {
+                try
+                {
+                    NestJobValidator.ValidateCandidate(new PlateCandidate(poses.Select(p =>
+                        new NestJobPlacement(p.PartId, 0, p.X, p.Y, p.Rotation))), chosen.Stock, demand, parts);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Keep the original one-sheet path if the candidate validator cannot certify
+                    // reuse (including its stricter work-area tolerance). Final job validation still applies.
+                    copies = 1;
+                }
+            }
+            BatchSelected?.Invoke(new RepeatBatch(chosen.Stock.Id, copies, availableEntries, result.SheetsUsed(job), false));
+            for (var copy = 0; copy < copies; copy++)
+            {
+                token.ThrowIfCancellationRequested();
+                result.AddSheet(chosen.Stock, poses); // Builder owns fresh placements/instance indices.
+            }
+            used[chosen.Stock.Id] = checked(used[chosen.Stock.Id] + copies);
+            foreach (var type in types)
+                if (counts.TryGetValue(type.Id, out var count))
+                    remaining[type.Index] = checked(remaining[type.Index] - checked(count * copies));
         }
 
         return result.Build(reason);

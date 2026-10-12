@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;
 
@@ -40,20 +41,29 @@ internal static class NestPipelineDrawingFreshness
     /// <summary>Check the actual cloned programs, not only the drawing before/after
     /// binding. A transient edit during Clone may leave the drawing unchanged.</summary>
     internal static IReadOnlyList<string> BoundChanges(NestJob job, NestJobResult raw,
-        IReadOnlyList<ProposedPlate> plates, IReadOnlyDictionary<string, Drawing> drawings)
+        IReadOnlyList<ProposedPlate> plates, IReadOnlyDictionary<string, Drawing> drawings,
+        bool consolidate = false, CancellationToken token = default)
     {
         var changed = new List<string>();
         var requirements = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
-        if (plates.Count != raw.Plates.Count)
+        var groups = RepeatedPlateGrouping.Create(raw.Plates, consolidate, token);
+        if (plates.Count != groups.Count)
             return new[] { "Bound plate count changed after validation" };
         for (var sheetIndex = 0; sheetIndex < plates.Count; sheetIndex++)
         {
-            var poses = raw.Plates[sheetIndex].Placements;
-            var bound = plates[sheetIndex].Parts;
+            token.ThrowIfCancellationRequested();
+            var group = groups[sheetIndex];
+            var proposed = plates[sheetIndex];
+            if (proposed.Quantity != group.Quantity || proposed.PlateIndex != group.Sheet.PlateIndex
+                || !RepeatedPlateGrouping.SameStock(proposed.Stock, group.Sheet.Stock))
+                return new[] { "Bound plate identity or quantity changed after validation" };
+            var poses = group.Sheet.Placements;
+            var bound = proposed.Parts;
             if (bound.Count != poses.Count)
                 return new[] { "Bound part count changed after validation" };
             for (var index = 0; index < poses.Count; index++)
             {
+                token.ThrowIfCancellationRequested();
                 var pose = poses[index];
                 var actual = bound[index];
                 if (pose.PartId == null || !requirements.TryGetValue(pose.PartId, out var requirement)
