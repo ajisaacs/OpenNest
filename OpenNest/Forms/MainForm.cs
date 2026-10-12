@@ -1952,10 +1952,7 @@ namespace OpenNest.Forms
             {
                 foreach (var plateView in views)
                     plateView.SetAction(typeof(ActionSelect));
-                if (allPlates)
-                    editForm.PlanCutting(true, IsBusy, this);
-                else
-                    editForm.OpenCuttingInspection();
+                editForm.OpenCuttingInspection(allPlates);
             }
             catch (Exception ex)
             {

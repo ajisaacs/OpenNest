@@ -139,6 +139,26 @@ public class CuttingProposalInspectionTests
         Assert.True(inspection.RequestClose());
     }
 
+    [Fact]
+    public async Task BatchPreviewNavigatesToSecondPlateAndRejectsItsStaleState()
+    {
+        var first = Plate();
+        var second = Plate();
+        second.Parts[0].Offset(20, 0);
+        var inspection = new CuttingProposalInspection();
+        var work = inspection.BeginPlanning(CuttingPlanBatch.Capture([first, second], ExplicitContourTests.Parameters(), false));
+        await work;
+        inspection.CompletePlanning(work);
+        var preview = inspection.RefreshPreview(1);
+        Assert.NotNull(preview);
+        Assert.Equal(second.Parts[1].Location, preview.Parts[0].Location);
+        Assert.NotSame(preview, inspection.RefreshPreview(0));
+        second.Quantity++;
+        Assert.Null(inspection.RefreshPreview(1));
+        Assert.NotNull(inspection.RefreshPreview(0));
+        inspection.RequestClose();
+    }
+
     private static CuttingPlanBatch Capture(Plate plate) =>
         CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false);
 

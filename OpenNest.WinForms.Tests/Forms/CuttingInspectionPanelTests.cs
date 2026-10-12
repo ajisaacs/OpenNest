@@ -153,6 +153,174 @@ public class CuttingInspectionPanelTests
         }
     });
 
+    [Fact]
+    public void AllPlatesNavigatesReadyAndBlockedWithoutPartialApply() => RunSta(() =>
+    {
+        using var editor = Editor();
+        var second = editor.Nest.Plates[^1]; // Fill the managed empty sentinel; a new one is appended.
+        second.Size = new OpenNest.Geometry.Size(100, 100);
+        var locked = Square("locked", 1);
+        var crossing = (OpenNest.CNC.Program)locked.Program.Clone();
+        crossing.MoveTo(5, 5);
+        Assert.True(locked.RestoreLeadInProgram(crossing, true));
+        second.Parts.Add(locked);
+        editor.Show();
+        editor.PlateManager.LoadAt(editor.Nest.Plates.Count - 1); // Different empty sentinel.
+        var original = editor.PlateView.Plate;
+        OpenAll(editor);
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.Equal(2, panel.Proposal.Plates.Count);
+        Assert.Equal(ScrollBars.Vertical, Field<TextBox>(panel, "resultLabel").ScrollBars);
+        Assert.False(Field<Button>(panel, "applyButton").Enabled);
+        Assert.True(editor.PlateView.HasProposalDisplay);
+        Field<Button>(panel, "nextButton").PerformClick();
+        Assert.False(editor.PlateView.HasProposalDisplay);
+        Assert.Contains("no current preview", Field<Label>(panel, "previewLabel").Text);
+        var grid = Field<DataGridView>(panel, "warningGrid");
+        Assert.Equal(panel.Proposal.DiagnosticRows().Count, grid.Rows.Count);
+        var row = grid.Rows.Cast<DataGridViewRow>().First(r => r.Tag is OpenNest.Engine.CuttingPlanning.CuttingPlanDiagnosticRow d && d.PlateIndex == 1);
+        grid.ClearSelection();
+        row.Selected = true; // SelectionChanged precedes CurrentCell.
+        Assert.Contains("Plate 2", Field<Label>(panel, "previewLabel").Text);
+        Assert.All(editor.Nest.Plates[0].Parts, p => Assert.False(p.HasManualLeadIns));
+        panel.RequestClose();
+        Assert.Same(original, editor.PlateView.Plate);
+    });
+
+    [Fact]
+    public void WarningAcceptanceResetsOnReplanAndSettingsOrderChange() => RunSta(() =>
+    {
+        using var editor = Editor();
+        var plate = editor.Nest.Plates[0];
+        plate.Parts.Clear();
+        var program = Square("fixture", 1).Program;
+        program.MoveTo(2, 2); program.LineTo(4, 2); program.LineTo(4, 4);
+        program.LineTo(2, 4); program.LineTo(2, 2);
+        program.MoveTo(4, 2); program.LineTo(6, 2); program.LineTo(6, 4);
+        program.LineTo(4, 4); program.LineTo(4, 2);
+        plate.Parts.Add(new Part(new Drawing("touching contours", program), new Vector(1, 1)));
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var accept = Field<CheckBox>(panel, "acceptWarningsCheckBox");
+        Assert.True(accept.Visible);
+        Assert.False(accept.Checked);
+        Assert.Contains("UNVERIFIED", Field<Label>(panel, "previewLabel").Text);
+        accept.Checked = true;
+        Assert.True(Field<Button>(panel, "applyButton").Enabled);
+        panel.StartPlanning();
+        Assert.False(accept.Checked);
+        Assert.Empty(Field<DataGridView>(panel, "warningGrid").Rows.Cast<DataGridViewRow>());
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        accept.Checked = true;
+        Field<CheckBox>(panel, "keepOrderCheckBox").Checked = true;
+        Assert.False(accept.Checked);
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.False(Field<Button>(panel, "applyButton").Enabled);
+        panel.RequestClose();
+    });
+
+    [Fact]
+    public void StaleApplyClearsPreviewAndAcceptanceWithoutChangingPrograms() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var plate = editor.PlateView.Plate;
+        var programs = plate.Parts.Select(p => p.Program).ToArray();
+        plate.Parts[0].Offset(0, 1);
+        Field<Button>(panel, "applyButton").PerformClick();
+        Assert.False(editor.PlateView.HasProposalDisplay);
+        Assert.False(Field<Button>(panel, "applyButton").Enabled);
+        Assert.False(Field<CheckBox>(panel, "acceptWarningsCheckBox").Checked);
+        Assert.Contains("Replan", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Equal(programs, plate.Parts.Select(p => p.Program));
+        Assert.All(plate.Parts, p => Assert.False(p.HasManualLeadIns));
+        panel.RequestClose();
+    });
+
+    [Fact]
+    public void ReadyApplyInstallsExactPreviewAndRefreshesLiveView() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        var plate = editor.PlateView.Plate;
+        var original = plate.Parts.ToArray();
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var proposed = panel.Proposal.Plates[0].Result.ProposedOrder
+            .Select(part => original[part.SourceOrdinal]).ToArray();
+        Assert.True(Field<Button>(panel, "applyButton").Enabled);
+        Field<Button>(panel, "applyButton").PerformClick();
+        Assert.Null(editor.CuttingInspection);
+        Assert.False(editor.PlateView.InspectionOnly);
+        Assert.False(editor.PlateView.HasProposalDisplay);
+        Assert.Equal(proposed, plate.Parts);
+        Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
+        Assert.NotNull(plate.CuttingParameters);
+        Assert.Equal(plate.Parts, editor.PlateView.LayoutParts.Select(layout => layout.BasePart));
+    });
+
+    [Fact]
+    public void PresentationFailureCannotLeaveApplyOrWarningAcceptanceEnabled() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.True(Field<Button>(panel, "applyButton").Enabled);
+        var original = editor.PlateView.Plate.Parts.ToArray();
+        panel.BeforePresent = () => throw new InvalidOperationException("synthetic presentation failure");
+        panel.StartPlanning();
+        PumpUntil(() => !panel.IsPlanning);
+        Assert.False(Field<Button>(panel, "applyButton").Enabled);
+        Assert.False(Field<CheckBox>(panel, "acceptWarningsCheckBox").Checked);
+        Assert.False(editor.PlateView.HasProposalDisplay);
+        Assert.Contains("Nothing can be applied", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Equal(original, editor.PlateView.Plate.Parts);
+        panel.RequestClose();
+    });
+
+    [Fact]
+    public void CommittedPlanStillClosesWhenSavingDefaultsFails() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Exception? error = null;
+        panel.BeforePostApply = () => throw new InvalidOperationException("synthetic defaults failure");
+        panel.OnPostApplyError = ex => error = ex;
+        Field<Button>(panel, "applyButton").PerformClick();
+        Assert.Equal(OpenNest.CNC.CuttingPlanning.CuttingCommitStatus.Applied, panel.CommitResult.Status);
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.Null(editor.CuttingInspection);
+        Assert.False(editor.PlateView.InspectionOnly);
+        Assert.False(editor.PlateView.HasProposalDisplay);
+        Assert.All(editor.PlateView.Plate.Parts, part => Assert.True(part.HasManualLeadIns));
+    });
+
+    private static T Field<T>(object target, string name) => Assert.IsType<T>(target.GetType()
+        .GetField(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(target));
+
+    private static void OpenAll(EditNestForm editor)
+    {
+        var method = typeof(EditNestForm).GetMethod("OpenCuttingInspection", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        method.Invoke(editor, method.GetParameters().Length == 0 ? [] : [true]);
+    }
+
     private static EditNestForm Editor()
     {
         var nest = new Nest();

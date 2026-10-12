@@ -341,20 +341,25 @@ on an `Applied` result, not as a rollback.
 
 ## Desktop workflow
 
-`Plate > Plan Cutting...` opens a read-only inspection panel beside the main plate canvas.
-It captures the active plate on the editor thread, plans on a worker, and shows the exact
-fresh, supported detached proposal in that canvas, including proposed part numbers and
-rapids. The live `Plate`, part order, programs and quantities remain unchanged; Escape,
-the panel X or Cancel restores the live view and prior viewport. Closing during planning
-waits for the worker before unlocking inspection. Stale or unsupported output has no
-proposal preview. This first panel slice does not offer Apply or settings editing: use
-`Nest > Plan Cutting (All Plates)...` for the existing modal Apply workflow. A displayed
-proposal is not a live-nest validation report or posting consent.
+`Plate > Plan Cutting...` opens a cutting inspection panel beside the main plate canvas;
+`Nest > Plan Cutting (All Plates)...` opens the same panel for every occupied plate.
+It captures scope on the editor thread, plans on a worker, and shows only a fresh,
+supported detached proposal in that canvas, including proposed part numbers and
+rapids. The live `Plate`, part order, programs and quantities remain unchanged
+until Apply. The summary and complete structured findings remain available while
+navigating plates; selecting a finding frames its affected part extent, not an
+invented contact point. Unsupported or stale output has no proposal preview.
 
-`Nest > Plan Cutting (All Plates)...` plans every occupied plate in a dialog built on
-`OpenNest.Engine.CuttingPlanning.CuttingPlanBatch`:
+The panel shows the current cutting settings; editing them or switching Keep current
+part order starts a new plan and clears the previous warning acceptance. Apply uses
+the exact captured proposal, with an unchecked per-proposal acceptance required
+for UNVERIFIED results; a blocked plate disables the whole-batch Apply. A successful
+Apply persists the confirmed settings and refreshes the editor; a failed/stale Apply
+changes nothing and requires replanning. Escape, the panel X or Cancel restores the
+live view and prior viewport; closing during planning waits for the worker before
+unlocking inspection. Planning is not live-nest validation or posting consent.
 
-- The dialog starts from the plate's cutting settings (or the last-used settings) and plans
+- The panel starts from the plate's cutting settings (or the last-used settings) and plans
   at once. `Cutting Settings...` edits them and `Keep the current part order` fixes the
   whole-part order; either change replans. The settings are confirmed parameters: every
   unlocked part's lead-ins are regenerated. Locked parts keep their exact programs;
@@ -386,8 +391,7 @@ proposal is not a live-nest validation report or posting consent.
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
-- The dialog uses an owner-monitor-sized window (approximately 90% of the working area), like
-  the database browser. The right panel keeps the batch outcome and plate headings above a
+- The docked panel keeps the batch outcome and plate headings above a
   read-only, unsorted warning grid with Plate, source Part, With, and full finding text. Every
   overlap issue/pair and every planner finding has its own selectable row, including findings
   hidden by the compact blocked-plate summary. Selecting a row switches to that plate's
@@ -400,7 +404,7 @@ proposal is not a live-nest validation report or posting consent.
   with their status and findings. Unverified proposals retain every overlap and route
   warning in the selectable grid before the acceptance checkbox is used; they do
   not truncate later parts' warnings. Finding part numbers are the plate's current order, as the
-  editor numbers them. The preview shows the active plate detached from the nest (quantity
+  editor numbers them. The panel shows the selected plate detached from the nest (quantity
   zero, so drawing quantities do not change) in the proposed order with the proposed
   programs. Ready and best-effort proposals can be previewed only while the plate still
   matches capture. Best-effort previews are labelled `UNVERIFIED`. Refused program graphs
@@ -412,13 +416,13 @@ proposal is not a live-nest validation report or posting consent.
   tolerance, so the source can be reviewed in the drawing editor. Reporting never
   closes gaps or changes the validation tolerance. A fully ready batch
   can apply immediately; an unverified batch requires the unchecked, per-proposal
-  `I reviewed the warnings. Apply this unverified plan.` checkbox. Replanning clears it.
+  `Accept UNVERIFIED plan warnings (not posting consent)` checkbox. Replanning clears it.
   Both use the same owned-program, freshness and rollback boundary. After it applies, each plate keeps its own copy of the
-  confirmed settings, which also become the saved defaults. `Stale` keeps the dialog open
+  confirmed settings, which also become the saved defaults. `Stale` keeps the panel open
   and asks for a replan; nothing changes.
-- Closing or cancelling while planning cancels the worker and keeps the dialog open until
+- Closing or cancelling while planning cancels the worker and keeps the panel locked until
   it stops. Planning and Apply refuse to start while a nesting or plate operation runs.
-  The dialog plans with its own copy of the settings, and posts progress and results to
+  The panel plans with its own copy of the settings, and posts progress and results to
   the thread it was created on rather than to whichever context is current.
 - `PlateView` follows `Plate.PartsReordered`: it redraws parts in the plate's order (the
   numbers it draws are the cutting order), rebuilds their graphics and marks the overlap

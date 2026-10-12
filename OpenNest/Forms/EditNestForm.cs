@@ -278,18 +278,29 @@ namespace OpenNest.Forms
         }
         internal System.Action<System.Threading.CancellationToken> CuttingBeforePlan { get; set; }
 
-        internal void OpenCuttingInspection()
+        internal void OpenCuttingInspection(bool allPlates = false)
         {
             if (CuttingInspection != null)
                 return;
             PlateView.EndAction();
-            var panel = new CuttingInspectionPanel(this, LoadOrDefaultParameters(PlateView.Plate.CuttingParameters))
+            var panel = new CuttingInspectionPanel(this, LoadOrDefaultParameters(PlateView.Plate.CuttingParameters), allPlates)
             {
                 BeforePlan = CuttingBeforePlan
             };
             CuttingInspection = panel;
-            ShowSidePanel(panel, "Plan Cutting — Read-only Proposal");
+            ShowSidePanel(panel, allPlates ? "Plan Cutting — All Plates" : "Plan Cutting — Read-only Proposal", 480);
             panel.Open();
+        }
+
+        internal void CompleteCuttingApply(CuttingParameters parameters, OpenNest.CNC.CuttingPlanning.CuttingCommitResult commit)
+        {
+            if (commit.Status != OpenNest.CNC.CuttingPlanning.CuttingCommitStatus.Applied)
+                return;
+            SaveCuttingParameters(parameters);
+            UpdatePlateList();
+            if (commit.RefreshErrors.Count > 0)
+                MessageBox.Show(this, "The cutting plan was applied, but part of the display did not refresh: "
+                    + commit.RefreshErrors[0].Message, "Plan Cutting", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         internal void FinishCuttingInspection(CuttingInspectionPanel panel)

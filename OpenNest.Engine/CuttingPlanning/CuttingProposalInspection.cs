@@ -61,14 +61,21 @@ public sealed class CuttingProposalInspection
     }
 
     /// <summary>Recheck exact freshness before displaying, including every subsequent paint.</summary>
-    public Plate RefreshPreview()
+    private int previewIndex = -1;
+
+    public Plate RefreshPreview(int plateIndex = 0)
     {
-        if (Proposal == null || CloseRequested)
+        if (plateIndex != previewIndex)
+        {
+            Preview = null;
+            previewIndex = plateIndex;
+        }
+        if (Proposal == null || CloseRequested || plateIndex < 0 || plateIndex >= Proposal.Plates.Count)
             return Preview = null;
         // BuildPreview is the authority; never clone a rejected program for presentation.
-        if (Proposal.Plates[0].Result.Snapshot?.PlateState?.IsCurrent() != true)
+        if (Proposal.Plates[plateIndex].Result.Snapshot?.PlateState?.IsCurrent() != true)
             return Preview = null;
-        return Preview ??= Proposal.BuildPreview(0);
+        return Preview ??= Proposal.BuildPreview(plateIndex);
     }
 
     /// <summary>Zero-based proposed position for a one-based source diagnostic number.</summary>
