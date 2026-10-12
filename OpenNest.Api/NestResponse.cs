@@ -16,7 +16,8 @@ public sealed record NestPartFulfillment(string PartId, int Requested, int Place
 /// <summary>Physical-sheet usage for one stock identity.</summary>
 public sealed record NestStockUsage(string StockId, int Used, int? Remaining);
 
-/// <summary>Maps each materialized physical sheet to its source stock identity.</summary>
+/// <summary>Maps each materialized layout (Nest.Plates index) to its stock identity.
+/// Its Plate.Quantity gives the physical copies; schema 3 and older used one sheet per entry.</summary>
 public sealed record NestPlateStockMapping(int PlateIndex, string StockId);
 
 /// <summary>Independent geometry validation; null on old archives means not recorded.</summary>
@@ -24,10 +25,11 @@ public enum NestValidationStatus { Valid, Invalid, Unrepresentable }
 
 public class NestResponse
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     /// <summary>Zero identifies an archive written before response metadata was versioned.</summary>
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
+    /// <summary>Physical sheets: sum of Plate.Quantity, not materialized layout entries.</summary>
     public int SheetCount { get; init; }
 
     /// <summary>Placed-part area divided by total materialized physical-sheet area, as a 0.0–1.0 ratio.</summary>

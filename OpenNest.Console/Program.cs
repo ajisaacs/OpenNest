@@ -514,9 +514,9 @@ static class NestConsole
         foreach (var violation in result.Violations)
             Console.Error.WriteLine($"Violation: {violation}");
 
-        if (!result.CanKeep || result.Plates.Count > 1 || (!result.IsValid && !allowInvalid))
+        if (!result.CanKeep || result.Raw.Plates.Count > 1 || (!result.IsValid && !allowInvalid))
         {
-            Console.Error.WriteLine(result.Plates.Count > 1
+            Console.Error.WriteLine(result.Raw.Plates.Count > 1
                 ? "Error: multiple result sheets cannot be merged onto one target, even with --allow-invalid. Nothing saved."
                 : !result.CanKeep
                     ? "Error: result cannot be represented faithfully, even with --allow-invalid. Nothing saved."

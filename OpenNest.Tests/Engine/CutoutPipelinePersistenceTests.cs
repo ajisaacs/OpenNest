@@ -40,7 +40,7 @@ public class CutoutPipelinePersistenceTests
         using (var manager = new PlateManager(nest))
         {
             var committed = NestPipelineCommit.ApplyToEmptyPlates(result, manager);
-            Assert.Equal(2, committed.Count);
+            Assert.Equal(2, committed.Sum(p => p.Quantity));
             Assert.All(committed, plate => Assert.Equal(new[] { frame, insert },
                 plate.Parts.Select(p => p.BaseDrawing)));
         }
@@ -49,11 +49,12 @@ public class CutoutPipelinePersistenceTests
         using var stream = new MemoryStream();
         Assert.True(new NestWriter(nest).Write(stream));
         var loaded = new NestReader(new MemoryStream(stream.ToArray())).Read();
-        Assert.Equal(2, loaded.Plates.Count);
+        Assert.Equal(2, loaded.Plates.Sum(p => p.Quantity));
         for (var i = 0; i < loaded.Plates.Count; i++)
         {
             var expected = nest.Plates[i];
             var actual = loaded.Plates[i];
+            Assert.Equal(expected.Quantity, actual.Quantity);
             Assert.Equal(expected.Size, actual.Size);
             Assert.Equal(expected.PartSpacing, actual.PartSpacing);
             Assert.Equal(expected.Quadrant, actual.Quadrant);

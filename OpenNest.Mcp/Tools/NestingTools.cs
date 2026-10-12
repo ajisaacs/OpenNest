@@ -55,6 +55,8 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
+            if (_session.ConsumedStockPlates.Contains(plate))
+                return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
 
             var drawing = _session.GetDrawing(drawingName);
             if (drawing == null)
@@ -108,6 +110,8 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
+            if (_session.ConsumedStockPlates.Contains(plate))
+                return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
 
             var drawing = _session.GetDrawing(drawingName);
             if (drawing == null)
@@ -158,6 +162,8 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
+            if (_session.ConsumedStockPlates.Contains(plate))
+                return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
 
             var drawing = _session.GetDrawing(drawingName);
             if (drawing == null)
@@ -221,6 +227,8 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
+            if (_session.ConsumedStockPlates.Contains(plate))
+                return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
 
             if (string.IsNullOrWhiteSpace(drawingNames))
                 return "Error: drawingNames is required";
@@ -277,6 +285,8 @@ namespace OpenNest.Mcp.Tools
             var plate = _session.GetPlate(plateIndex);
             if (plate == null)
                 return $"Error: plate {plateIndex} not found";
+            if (_session.ConsumedStockPlates.Contains(plate))
+                return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
             if (plate.Parts.Count > 0)
                 return "Error: autonest cannot use an occupied plate. Use fill_area or fill_remnants for existing obstacles.";
             if (string.IsNullOrWhiteSpace(drawingNames))
@@ -305,9 +315,9 @@ namespace OpenNest.Mcp.Tools
             var sb = new StringBuilder();
             foreach (var violation in result.Violations)
                 sb.AppendLine($"Violation: {violation}");
-            if (!result.CanKeep || result.Plates.Count > 1 || (!result.IsValid && !allow_invalid))
+            if (!result.CanKeep || result.Raw.Plates.Count > 1 || (!result.IsValid && !allow_invalid))
             {
-                sb.AppendLine(result.Plates.Count > 1
+                sb.AppendLine(result.Raw.Plates.Count > 1
                     ? "Error: multiple result sheets cannot be merged onto one target, even with allow_invalid. Nothing committed."
                     : !result.CanKeep
                         ? "Error: result cannot be represented faithfully, even with allow_invalid. Nothing committed."
@@ -350,6 +360,8 @@ namespace OpenNest.Mcp.Tools
             var template = _session.GetPlate(plateIndex);
             if (template == null)
                 return $"Error: plate {plateIndex} not found";
+            if (_session.ConsumedStockPlates.Contains(template))
+                return "Error: this empty entry was consumed by a repeated layout; select or create an unused stock plate. Nothing committed.";
             if (template.Parts.Count != 0 || template.CutOffs.Count != 0)
                 return "Error: stock template must be empty and have no cutoff definitions. Nothing committed.";
             if (sheets != null && no_new_plates)
@@ -392,6 +404,7 @@ namespace OpenNest.Mcp.Tools
 
             var available = new List<Plate> { template };
             available.AddRange(existing.Where(p => !ReferenceEquals(p, template)
+                && !_session.ConsumedStockPlates.Contains(p)
                 && p.Parts.Count == 0 && p.CutOffs.Count == 0 && SameStock(p, template)));
             var demand = remaining.Sum(item => (long)item.Quantity);
             if (demand > int.MaxValue)
@@ -419,14 +432,14 @@ namespace OpenNest.Mcp.Tools
             var placed = new Dictionary<Drawing, long>(ReferenceEqualityComparer.Instance);
             foreach (var sheet in result.Plates)
                 foreach (var part in sheet.Parts)
-                    placed[part.BaseDrawing] = placed.GetValueOrDefault(part.BaseDrawing) + 1;
+                    placed[part.BaseDrawing] = placed.GetValueOrDefault(part.BaseDrawing) + sheet.Quantity;
             if (remaining.Any(item => placed.GetValueOrDefault(item.Drawing) != item.Quantity))
             {
                 var summary = string.Join(", ", remaining.Select(item =>
                     $"{item.Drawing.Name}: {placed.GetValueOrDefault(item.Drawing)}/{item.Quantity} newly placed"));
                 return $"Error: incomplete whole-job proposal ({result.StopReason}); {summary}. Nothing committed. A solver's no-placement result does not prove geometric impossibility.";
             }
-            if (result.Plates.Count > limit)
+            if (result.Raw.Plates.Count > limit)
                 return "Error: proposal exceeds the allowed sheet count. Nothing committed.";
 
             var costSummary = NestCostSummary.FromAccepted(result);
@@ -439,9 +452,12 @@ namespace OpenNest.Mcp.Tools
             {
                 var target = new[] { template }.Concat(existing.Where(p => !ReferenceEquals(p, template)))
                     .FirstOrDefault(p => !usedTargets.Contains(p)
+                        && !_session.ConsumedStockPlates.Contains(p)
                         && p.Parts.Count == 0 && p.CutOffs.Count == 0
                         && SameStock(p, template, proposed.Stock.Size));
                 var created = target == null;
+                if (created && no_new_plates)
+                    return "Error: no compatible empty target for the proposed layout. Nothing committed.";
                 target ??= new Plate(proposed.Stock.Size)
                 {
                     GrainAngle = template.GrainAngle,
@@ -449,6 +465,22 @@ namespace OpenNest.Mcp.Tools
                 };
                 usedTargets.Add(target);
                 targets.Add((target, created, proposed.Stock.Id));
+            }
+            // Reserve physical copies separately from display-layout targets. Do this
+            // only after mapping every layout, so a repeat cannot steal a residual's
+            // target. A rejected/cancelled proposal reserves nothing and deletes nothing.
+            var consumed = new List<Plate>();
+            foreach (var proposed in result.Plates)
+            {
+                var copies = existing.Where(p => !usedTargets.Contains(p)
+                    && !_session.ConsumedStockPlates.Contains(p)
+                    && p.Parts.Count == 0 && p.CutOffs.Count == 0
+                    && SameStock(p, template, proposed.Stock.Size))
+                    .Take(proposed.Quantity - 1).ToList();
+                if (no_new_plates && copies.Count != proposed.Quantity - 1)
+                    return "Error: insufficient unused physical stock for the repeated layout. Nothing committed.";
+                usedTargets.UnionWith(copies);
+                consumed.AddRange(copies);
             }
             cancellationToken.ThrowIfCancellationRequested();
             for (var i = 0; i < result.Plates.Count; i++)
@@ -459,11 +491,12 @@ namespace OpenNest.Mcp.Tools
                 target.PartSpacing = proposed.Stock.PartSpacing;
                 target.EdgeSpacing = proposed.Stock.EdgeSpacing;
                 target.Quadrant = proposed.Stock.Quadrant;
-                target.Quantity = 1;
+                target.Quantity = proposed.Quantity;
                 if (created)
                     _session.Plates.Add(target);
                 target.Parts.AddRange(proposed.Parts);
             }
+            _session.ConsumedStockPlates.UnionWith(consumed);
             foreach (var item in parsed.items)
                 item.Drawing.Quantity.Required = item.Quantity;
             if (sheets != null)
@@ -476,13 +509,13 @@ namespace OpenNest.Mcp.Tools
             lines.AppendLine($"Cost basis={costSummary.Basis}, gross total={costSummary.GrossTotal}, estimated salvage credit={costSummary.SalvageCredit}, net score={costSummary.NetScore}");
             foreach (var usage in costSummary.Stock)
                 lines.AppendLine($"  {usage.StockId}: used={usage.Used}, supplied cost={usage.Cost?.ToString() ?? "unspecified"}, gross subtotal={usage.GrossSubtotal}");
-            lines.AppendLine($"Whole job complete: {result.Plates.Count} sheet(s) placed, {targets.Count(t => t.created)} new sheet(s) created.");
+            lines.AppendLine($"Whole job complete: {result.Raw.Plates.Count} sheet(s) placed in {result.Plates.Count} layout(s), {targets.Count(t => t.created)} new layout(s) created.");
             if (sheets != null)
             {
                 foreach (var stock in offeredStock.stock)
                 {
-                    var used = targets.Count(t => t.stockId == stock.Id);
-                    lines.AppendLine($"  {stock.Id} ({stock.Size.Width}x{stock.Size.Length}): used={used}, remaining={stock.Quantity - used}, reused={targets.Count(t => !t.created && t.stockId == stock.Id)}, created={targets.Count(t => t.created && t.stockId == stock.Id)}");
+                    var used = targets.Where(t => t.stockId == stock.Id).Sum(t => t.plate.Quantity);
+                    lines.AppendLine($"  {stock.Id} ({stock.Size.Width}x{stock.Size.Length}): used={used}, remaining={stock.Quantity - used}, reused={targets.Count(t => !t.created && t.stockId == stock.Id)}, created={targets.Count(t => t.created && t.stockId == stock.Id)} (layout counts)");
                 }
                 foreach (var (target, _, stockId) in targets)
                     lines.AppendLine($"  plate {_session.AllPlates().FindIndex(p => ReferenceEquals(p, target))} -> {stockId}");

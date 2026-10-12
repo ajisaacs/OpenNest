@@ -8,6 +8,12 @@ namespace OpenNest.Mcp
         public List<Plate> Plates { get; } = new();
         public List<Drawing> Drawings { get; } = new();
 
+        // A quantity-bearing layout can consume existing physical sheets without
+        // filling every display entry. Keep those placeholders, but never offer
+        // them as fresh stock again in this session. New/user-authored plates and
+        // pre-existing repeat quantities are not inferred to be consumed here.
+        internal HashSet<Plate> ConsumedStockPlates { get; } = new(ReferenceEqualityComparer.Instance);
+
         /// <summary>
         /// Whole-job engine <c>autonest_plate</c> uses when a call does not pass an explicit
         /// <c>engine</c> argument; fill tools default to the Fill strategy instead. Instance state

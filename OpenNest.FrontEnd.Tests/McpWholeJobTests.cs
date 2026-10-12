@@ -262,21 +262,19 @@ public class McpWholeJobTests : IDisposable
         NestingEngineRegistry.Register(engine, "two safe sheets", () => new TwoSheetStub());
         var text = Call(new NestingTools(session), 0, "A,B", "2,2", engine);
         Assert.Contains("complete", text, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(2, session.AllPlates().Count);
+        Assert.Single(session.AllPlates());
         Assert.Same(original, session.GetPlate(0));
-        Assert.Single(session.Plates);
-        Assert.All(session.AllPlates(), plate =>
-        {
-            Assert.Equal(2, plate.Parts.Count);
-            Assert.Equal(0.25, plate.PartSpacing);
-            Assert.Equal(1, plate.Quantity);
-        });
+        Assert.Empty(session.Plates);
+        Assert.Equal(2, original.Parts.Count);
+        Assert.Equal(0.25, original.PartSpacing);
+        Assert.Equal(2, original.Quantity);
+        Assert.Contains("2 sheet(s) placed in 1 layout(s)", text);
         Assert.Equal(2, session.Nest.Drawings.Single(d => d.Name == "A").Quantity.Nested);
         Assert.Equal(2, session.Nest.Drawings.Single(d => d.Name == "B").Quantity.Nested);
         var path = Path.Combine(directory, "complete.nest");
         Assert.Contains("Saved nest", new InputTools(session).SaveNest(path));
         var loaded = new NestReader(path).Read();
-        Assert.Equal(2, loaded.Plates.Count);
+        Assert.Equal(2, Assert.Single(loaded.Plates).Quantity);
         Assert.Equal(2, loaded.Drawings.Single(d => d.Name == "A").Quantity.Nested);
         Assert.Equal(2, loaded.Drawings.Single(d => d.Name == "B").Quantity.Nested);
     }
@@ -310,7 +308,7 @@ public class McpWholeJobTests : IDisposable
         session.Plates.Add(second);
         var text = Call(new NestingTools(session), 1, "A,B", "3,1", "Rectangles", noNew: true);
         Assert.Contains("Whole job complete", text);
-        Assert.Contains("0 new sheet(s)", text);
+        Assert.Contains("0 new layout(s)", text);
         Assert.Same(first, session.GetPlate(1));
         Assert.Same(second, session.GetPlate(2));
         Assert.Equal(3, session.Nest.Drawings.Single(d => d.Name == "A").Quantity.Nested);
@@ -331,8 +329,9 @@ public class McpWholeJobTests : IDisposable
         session.GetPlate(0).Size = new Size(3, 3);
         var text = Call(new NestingTools(session), 0, "A,B", "2,2", "Rectangles");
         Assert.Contains("Whole job complete", text);
-        Assert.Equal(4, session.AllPlates().Count);
-        Assert.All(session.AllPlates(), p => Assert.Single(p.Parts));
+        Assert.Equal(4, session.AllPlates().Sum(p => p.Quantity));
+        Assert.Equal(2, session.AllPlates().Count);
+        Assert.All(session.AllPlates(), p => { Assert.Single(p.Parts); Assert.Equal(2, p.Quantity); });
         Assert.Equal(2, session.Nest.Drawings.Single(d => d.Name == "A").Quantity.Nested);
         Assert.Equal(2, session.Nest.Drawings.Single(d => d.Name == "B").Quantity.Nested);
     }
@@ -404,7 +403,9 @@ public class McpWholeJobTests : IDisposable
         Assert.Contains("Whole job complete", text);
         Assert.Equal(2, session.AllPlates().Count);
         Assert.Single(first.Parts);
-        Assert.Single(second.Parts);
+        Assert.Equal(2, first.Quantity);
+        Assert.Empty(second.Parts); // redundant empty layout remains untouched, not expanded
+        Assert.Equal(1, second.Quantity);
     }
 
     [Fact]
@@ -485,6 +486,135 @@ public class McpWholeJobTests : IDisposable
     {
         public NestJobResult Solve(NestJob job, IProgress<NestJobProgress>? progress = null,
             CancellationToken token = default) => throw new NotSupportedException("unsupported fixture");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RealRepeatedJobPreservesQuantitiesAndExistingOnlyPhysicalCap(bool noNew)
+    {
+        var session = Session();
+        var template = session.GetPlate(0);
+        template.Size = new Size(4.5, 4.5);
+        var drawing = session.Nest.Drawings.Single(d => d.Name == "A");
+        drawing.Constraints = new NestConstraints { StepAngle = OpenNest.Math.Angle.TwoPI, StartAngle = 0, EndAngle = 0 };
+        if (noNew)
+        {
+            session.Plates.Add(new Plate(4.5, 4.5) { PartSpacing = 0.25 });
+            session.Plates.Add(new Plate(4.5, 4.5) { PartSpacing = 0.25 });
+        }
+        var output = new NestingTools(session).AutoNestJob(0, "A", "9", "Rectangles", no_new_plates: noNew,
+            sheets: noNew ? null : [new SheetStockInput { Width = 4.5, Length = 4.5, Quantity = 4, Cost = 7 }]);
+        Assert.Contains("3 sheet(s) placed in 2 layout(s)", output);
+        Assert.Equal(new[] { 2, 1 }, session.AllPlates().Where(p => p.Parts.Count > 0).Select(p => p.Quantity));
+        Assert.Equal(9, drawing.Quantity.Nested);
+        Assert.Equal(9, drawing.Quantity.Required);
+        if (noNew)
+        {
+            Assert.Contains("0 new layout(s)", output);
+            Assert.Equal(3, session.AllPlates().Count);
+            Assert.Empty(session.GetPlate(2).Parts);
+        }
+        else
+        {
+            Assert.Contains("gross total=21", output);
+            Assert.Contains("stock-0 (4.5x4.5): used=3, remaining=1, reused=1, created=1 (layout counts)", output);
+            Assert.Contains("plate 0 -> stock-0", output);
+            Assert.Contains("plate 1 -> stock-0", output);
+        }
+        var path = Path.Combine(directory, "repeated.nest");
+        Assert.Contains("Saved nest", new InputTools(session).SaveNest(path));
+        var loaded = new NestReader(path).Read();
+        Assert.Equal(new[] { 2, 1 }, loaded.Plates.Select(p => p.Quantity));
+        Assert.Equal(9, loaded.Drawings.Single(d => d.Name == "A").Quantity.Nested);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RepeatedLayoutCannotHideInsufficientPhysicalStock(bool noNew)
+    {
+        var session = Session();
+        session.GetPlate(0).Size = new Size(3, 3);
+        if (noNew) session.Plates.Add(new Plate(3, 3) { PartSpacing = 0.25 });
+        var output = new NestingTools(session).AutoNestJob(0, "A", "3", "Rectangles", no_new_plates: noNew,
+            sheets: noNew ? null : [new SheetStockInput { Width = 3, Length = 3, Quantity = 2 }]);
+        Assert.Contains("incomplete", output, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Nothing committed", output);
+        Assert.All(session.AllPlates(), p => Assert.Empty(p.Parts));
+        Assert.Equal(0, session.Nest.Drawings.Single(d => d.Name == "A").Quantity.Nested);
+    }
+
+    [Fact]
+    public void MixedStockGroupedMappingReportsWeightedUsageAndCostWithoutFlattening()
+    {
+        var session = Session();
+        var template = session.GetPlate(0);
+        template.Size = new Size(3, 3);
+        var engine = "GroupedStock-" + Guid.NewGuid();
+        NestingEngineRegistry.Register(engine, "expanded exact layouts", () => new InspectStub(job =>
+        {
+            var builder = new NestJobResultBuilder(job);
+            builder.AddSheet(job.Plates[1], [(job.Parts[1].Id, 1d, 1d, 0d)]);
+            builder.AddSheet(job.Plates[0], [(job.Parts[0].Id, 0.5, 0.5, 0d)]);
+            builder.AddSheet(job.Plates[1], [(job.Parts[1].Id, 1d, 1d, 0d)]);
+            builder.AddSheet(job.Plates[0], [(job.Parts[0].Id, 0.5, 0.5, 0d)]);
+            return builder.Build(NestJobStopReason.Completed);
+        }));
+        var text = new NestingTools(session).AutoNestJob(0, "A,B", "2,2", engine,
+            sheets: [new SheetStockInput { Width = 3, Length = 3, Quantity = 3, Cost = 5 },
+                     new SheetStockInput { Width = 6, Length = 6, Quantity = 2, Cost = 7 }]);
+        Assert.Contains("4 sheet(s) placed in 2 layout(s)", text);
+        Assert.Contains("gross total=24", text);
+        Assert.Contains("stock-0 (3x3): used=2, remaining=1, reused=1, created=0 (layout counts)", text);
+        Assert.Contains("stock-1 (6x6): used=2, remaining=0, reused=0, created=1 (layout counts)", text);
+        Assert.Contains("plate 0 -> stock-0", text);
+        Assert.Contains("plate 1 -> stock-1", text);
+        Assert.Same(template, session.GetPlate(0));
+        Assert.Equal(2, session.AllPlates().Count);
+        Assert.All(session.AllPlates(), p => { Assert.Equal(2, p.Quantity); Assert.Single(p.Parts); });
+        Assert.All(session.AllDrawings(), d => Assert.Equal(2, d.Quantity.Nested));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExistingOnlyGroupedCopiesCannotOfferConsumedEmptyPlaceholdersAsStockAgain(bool noNew)
+    {
+        var session = Session();
+        session.GetPlate(0).Size = new Size(3, 3);
+        var consumed = new Plate(3, 3) { PartSpacing = 0.25 };
+        var spare = new Plate(3, 3) { PartSpacing = 0.25 };
+        session.Plates.Add(consumed);
+        session.Plates.Add(spare);
+        var tools = new NestingTools(session);
+        var first = tools.AutoNestJob(0, "A", "2", "Rectangles", no_new_plates: noNew,
+            sheets: noNew ? null : [new SheetStockInput { Width = 3, Length = 3, Quantity = 2 }]);
+        Assert.Contains("2 sheet(s) placed in 1 layout(s)", first);
+        Assert.Equal(2, session.GetPlate(0).Quantity);
+        Assert.Empty(consumed.Parts);
+        Assert.Empty(spare.Parts);
+        // Two physical sheets were consumed, so only one of the two empty entries is free.
+        var output = Call(new NestingTools(session), 2, "A,B", "2,2", "Rectangles", noNew: true);
+        Assert.Contains("Nothing committed", output);
+        Assert.Equal(2, session.Nest.Drawings.Single(d => d.Name == "A").Quantity.Nested);
+        Assert.Equal(0, session.Nest.Drawings.Single(d => d.Name == "B").Quantity.Nested);
+        Assert.Equal(3, session.AllPlates().Count);
+        Assert.Empty(consumed.Parts);
+        Assert.Empty(spare.Parts);
+        // Explicitly selecting the consumed placeholder must not resurrect it either.
+        Assert.Contains("Nothing committed", Call(new NestingTools(session), 1, "B", "1", "Rectangles", noNew: true));
+        Assert.Contains("consumed", tools.FillPlate(1, "B", 1));
+        Assert.Contains("consumed", tools.FillArea(1, "B", 0, 0, 3, 3, 1));
+        Assert.Contains("consumed", tools.FillRemnants(1, "B", 1));
+        Assert.Contains("consumed", tools.PackPlate(1, "B", "1"));
+        Assert.Contains("consumed", tools.AutoNestPlate(1, "B", "1", allow_invalid: true));
+        Assert.Empty(consumed.Parts);
+        // Rejection must not consume the genuinely unused last physical sheet.
+        Assert.Contains("1 sheet(s) placed in 1 layout(s)", Call(new NestingTools(session), 2, "A,B", "2,1", "Rectangles", noNew: true));
+        Assert.Single(spare.Parts);
+        Assert.Equal(1, spare.Quantity);
+        Assert.Equal(1, session.Nest.Drawings.Single(d => d.Name == "B").Quantity.Nested);
     }
 
     private sealed class TwoSheetStub(bool overlap = false) : INestingEngine
