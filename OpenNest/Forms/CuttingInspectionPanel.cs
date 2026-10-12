@@ -431,6 +431,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     }
 
     private void UpdateApply() => applyButton.Enabled = Mode == CuttingInspectionMode.Plan && !invalidated && !IsPlanning
+        && plates.Any(item => item.Parts.Count > 0)
         && (Proposal?.CanApply == true || Proposal?.CanApplyWithWarnings == true && acceptWarningsCheckBox.Checked);
 
     private bool IsPreviewCurrent()
@@ -453,6 +454,13 @@ internal sealed class CuttingInspectionPanel : UserControl
         selectedPlate = index;
         view.ClearProposalDisplay();
         view.ClearValidationFinding();
+        if (plates[index].Parts.Count == 0)
+        {
+            preview = null;
+            previewLabel.Text = "New plate (empty)";
+            SetPlanning(false);
+            return;
+        }
         preview = inspection.RefreshPreview(index); // Only the guarded authority may clone programs.
         SetPlanning(false);
         if (preview == null)

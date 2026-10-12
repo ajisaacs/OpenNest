@@ -220,7 +220,20 @@ public class CuttingInspectionPanelTests
         Assert.False(accept.Checked);
         PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
-        panel.RequestClose();
+        var grid = Field<DataGridView>(panel, "warningGrid");
+        Assert.NotEmpty(grid.Rows.Cast<DataGridViewRow>());
+        var partRow = grid.Rows.Cast<DataGridViewRow>().First(r => r.Cells[1].Value is int);
+        grid.ClearSelection();
+        partRow.Selected = true;
+        Assert.Contains("affected part extent", Field<Label>(panel, "previewLabel").Text);
+        Field<Button>(panel, "applyButton").PerformClick();
+        Assert.Null(panel.CommitResult);
+        Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
+        accept.Checked = true;
+        Field<Button>(panel, "applyButton").PerformClick();
+        Assert.Equal(OpenNest.CNC.CuttingPlanning.CuttingCommitStatus.Applied, panel.CommitResult!.Status);
+        Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
+        Assert.Null(editor.CuttingInspection);
     });
 
     [Fact]
@@ -242,6 +255,10 @@ public class CuttingInspectionPanelTests
         Assert.Contains("Replan", Field<TextBox>(panel, "resultLabel").Text);
         Assert.Equal(programs, plate.Parts.Select(p => p.Program));
         Assert.All(plate.Parts, p => Assert.False(p.HasManualLeadIns));
+        panel.StartPlanning();
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.True(Field<Button>(panel, "applyButton").Enabled);
+        Assert.True(editor.PlateView.HasProposalDisplay);
         panel.RequestClose();
     });
 
@@ -259,7 +276,18 @@ public class CuttingInspectionPanelTests
         var proposed = panel.Proposal.Plates[0].Result.ProposedOrder
             .Select(part => original[part.SourceOrdinal]).ToArray();
         Assert.True(Field<Button>(panel, "applyButton").Enabled);
+        var parameters = Field<CuttingParameters>(panel, "parameters");
+        var reordered = 0;
+        editor.PlateView.PartsReordered += (_, _) => reordered++;
         Field<Button>(panel, "applyButton").PerformClick();
+        Assert.Equal(1, reordered);
+        Assert.NotSame(parameters, plate.CuttingParameters);
+        foreach (var layout in editor.PlateView.LayoutParts)
+        {
+            if (layout.IsDirty)
+                layout.Update(editor.PlateView);
+            Assert.True(layout.LeadInPath?.PointCount > 0);
+        }
         Assert.Null(editor.CuttingInspection);
         Assert.False(editor.PlateView.InspectionOnly);
         Assert.False(editor.PlateView.HasProposalDisplay);
@@ -304,13 +332,79 @@ public class CuttingInspectionPanelTests
         panel.BeforePostApply = () => throw new InvalidOperationException("synthetic defaults failure");
         panel.OnPostApplyError = ex => error = ex;
         Field<Button>(panel, "applyButton").PerformClick();
-        Assert.Equal(OpenNest.CNC.CuttingPlanning.CuttingCommitStatus.Applied, panel.CommitResult.Status);
+        Assert.Equal(OpenNest.CNC.CuttingPlanning.CuttingCommitStatus.Applied, panel.CommitResult!.Status);
         Assert.IsType<InvalidOperationException>(error);
         Assert.Null(editor.CuttingInspection);
         Assert.False(editor.PlateView.InspectionOnly);
         Assert.False(editor.PlateView.HasProposalDisplay);
         Assert.All(editor.PlateView.Plate.Parts, part => Assert.True(part.HasManualLeadIns));
     });
+
+    [Fact]
+    public void ConstructorKeepsItsOwnCopyOfSettings() => RunSta(() =>
+    {
+        using var editor = Editor();
+        var parameters = Parameters();
+        using var panel = new CuttingInspectionPanel(editor, parameters);
+        ((LineLeadIn)parameters.ExternalLeadIn).Length = 5;
+        var captured = Field<CuttingParameters>(panel, "parameters");
+        Assert.NotSame(parameters, captured);
+        Assert.Equal(0.3, ((LineLeadIn)captured.ExternalLeadIn).Length);
+    });
+
+    [Fact]
+    public void EmptySentinelIsNotNumberedAsAnOccupiedPlate() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(editor.Nest.Plates.Count - 1);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.Equal("New plate (empty)", Field<Label>(panel, "previewLabel").Text);
+        Assert.False(editor.PlateView.HasProposalDisplay);
+        panel.RequestClose();
+    });
+
+    [Fact]
+    public void BusyMenuRefusesPlanningAndFreeMenuOpensDockedPanel() => RunSta(() =>
+    {
+        using var host = new MenuHost();
+        using var editor = Editor();
+        host.Show();
+        editor.MdiParent = host;
+        editor.Show();
+        editor.Activate();
+        editor.PlateManager.LoadAt(0);
+        var busy = typeof(MainForm).GetField("nestingInProgress", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var show = typeof(MainForm).GetMethod("ShowCuttingPlan", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        busy.SetValue(host, true);
+        Assert.True(host.IsCuttingPlanBusy([editor.PlateView]));
+        string? notice = null;
+        host.CuttingPlanNotice = (message, caption) =>
+        {
+            Assert.Equal("Plan Cutting", caption);
+            notice = message;
+        };
+        show.Invoke(host, [false]); // Exercise the real guarded menu path, not only its predicate.
+        Assert.Contains("Finish or cancel", notice);
+        Assert.Null(editor.CuttingInspection);
+        Assert.False(editor.PlateView.InspectionOnly);
+        busy.SetValue(host, false);
+        Assert.False(host.IsCuttingPlanBusy([editor.PlateView]));
+        // A completed DoEvents loop removes the ambient context; the panel still owns its dispatcher.
+        Application.DoEvents();
+        show.Invoke(host, [false]);
+        var panel = Assert.IsType<CuttingInspectionPanel>(editor.CuttingInspection);
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.True(Field<Button>(panel, "applyButton").Enabled);
+        panel.RequestClose();
+    });
+
+    private sealed class MenuHost : MainForm
+    {
+        protected override void OnLoad(EventArgs e) { }
+    }
 
     private static T Field<T>(object target, string name) => Assert.IsType<T>(target.GetType()
         .GetField(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(target));

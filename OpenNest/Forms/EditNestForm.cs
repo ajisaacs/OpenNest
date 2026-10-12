@@ -1009,31 +1009,6 @@ namespace OpenNest.Forms
             CalculateCurrentPlateCutTime();
         }
 
-        /// <summary>
-        /// Opens the cutting planner for the active plate or every plate. The planner applies its
-        /// plan itself, all or nothing; on success the confirmed settings become the saved defaults.
-        /// </summary>
-        public bool PlanCutting(bool allPlates, Func<bool> isOperationBusy, IWin32Window owner)
-        {
-            if (CuttingInspection != null || PlateView?.Plate == null || Nest == null)
-                return false;
-
-            // The form plans with its own copy; the plate's live settings stay plate state.
-            var parameters = LoadOrDefaultParameters(PlateView.Plate.CuttingParameters);
-            using var form = new CuttingPlanForm(PlateView, Nest, allPlates, parameters, isOperationBusy);
-            if (form.ShowDialog(owner) != DialogResult.OK)
-                return false;
-
-            SaveCuttingParameters(form.ConfirmedParameters);
-            UpdatePlateList();
-            if (form.CommitResult?.RefreshErrors.Count > 0)
-                MessageBox.Show(owner,
-                    "The cutting plan was applied, but part of the display did not refresh: "
-                        + form.CommitResult.RefreshErrors[0].Message,
-                    "Plan Cutting", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return true;
-        }
-
         public void AssignLeadIns_Click(object sender, EventArgs e)
         {
             if (PlateView?.Plate == null)

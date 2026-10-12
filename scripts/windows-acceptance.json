@@ -353,7 +353,7 @@
     },
     {
       "id": "cutting-planner",
-      "title": "Current/all-plate cutting dialog",
+      "title": "Docked cutting planning and live validation",
       "required_tests": [
         {
           "project": "OpenNest.WinForms.Tests",
@@ -372,42 +372,58 @@
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.AllPlates_SkipsEmptyPlatesAndRefusesTheBatchWhenOnePlateIsBlocked",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingInspectionPanelTests.AllPlatesNavigatesReadyAndBlockedWithoutPartialApply",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.ApplyAfterALiveEdit_ChangesNothingAndReplanRecovers",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingInspectionPanelTests.StaleApplyClearsPreviewAndAcceptanceWithoutChangingPrograms",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.BlockedPlate_KeepsApplyDisabledAndShowsTheCurrentParts",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingInspectionPanelTests.WarningAcceptanceResetsOnReplanAndSettingsOrderChange",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.BusyEditor_DoesNotStartPlanningUntilItIsFree",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingInspectionPanelTests.CloseDuringWorkerRetainsPanelAndInspectionLockUntilCompletion",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.ClosingWhilePlanning_CancelsAndWaitsForTheWorker",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingInspectionPanelTests.ConstructorKeepsItsOwnCopyOfSettings",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.Constructor_PlansWithItsOwnCopyOfTheSettings",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingInspectionPanelTests.BusyMenuRefusesPlanningAndFreeMenuOpensDockedPanel",
           "minimum_cases": 1
         },
         {
           "project": "OpenNest.WinForms.Tests",
-          "method": "OpenNest.WinForms.Tests.Forms.CuttingPlanFormTests.PlanThenApply_InstallsThePlanAndRedrawsTheEditorInPlateOrder",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingInspectionPanelTests.ReadyApplyInstallsExactPreviewAndRefreshesLiveView",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingValidationPanelTests.ValidateMenuUsesSharedPanelAndRealAllPlateFindingsRestoreOriginalView",
+          "minimum_cases": 1
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingValidationPanelTests.ExternalCloseJoinsValidationBeforeReleasingMdiGuard",
+          "minimum_cases": 3
+        },
+        {
+          "project": "OpenNest.WinForms.Tests",
+          "method": "OpenNest.WinForms.Tests.Forms.CuttingValidationPanelTests.ModeSwitchJoinsBothWorkersAndDiscardsOldResultsWithoutUnlocking",
           "minimum_cases": 1
         }
       ],
       "remaining_acceptance": [
-        "Selected-part side-panel migration and legacy automatic-path retirement are separate unfinished work.",
+        "Native operator check of docked panel readability, multi-plate navigation, Escape/X/Cancel, and final post review; automated form tests are not visual acceptance.",
+        "Selected-part Auto Assign migration and legacy automatic-algorithm retirement are separate work.",
         "Actual job and NC/controller safety are not certified."
       ]
     },

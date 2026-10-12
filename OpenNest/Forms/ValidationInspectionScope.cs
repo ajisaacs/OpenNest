@@ -19,11 +19,6 @@ internal sealed class ValidationInspectionScope : IDisposable
     private Form closingHost;
     private readonly bool previousInspection;
 
-    public ValidationInspectionScope(EditNestForm editor, Form inspector)
-        : this(editor, inspector, null, inspector.Close)
-    {
-    }
-
     public ValidationInspectionScope(EditNestForm editor, Control inspector, Control header, Action close)
     {
         view = editor.PlateView;

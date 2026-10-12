@@ -36,7 +36,7 @@ removing or renaming required coverage requires an intentional manifest change.
 The whole suites still run, not just this manifest's subset.
 
 The areas are BOM import, Nest Info material preservation, saved-nest browsing,
-nesting/commit policy, PDF export, the cutting dialog, automatic cutoffs,
+nesting/commit policy, PDF export, docked cutting planning and validation, automatic cutoffs,
 overlap/posting consent, UI lifetime, import/export failures, and MCP processes.
 The manifest is public test coverage only. Private tracker IDs, plans, customer
 data, and acceptance notes stay out of the repository and CI artifacts.

@@ -361,6 +361,8 @@ unlocking inspection. Planning is not live-nest validation or posting consent. T
 panel's **Validate Nest (live programs)** mode separately checks current installed
 programs across all plates and navigates typed findings on the live canvas; it
 never certifies an unapplied proposal. Posting still initiates its own fresh review.
+The former standalone planning dialog is retired; only the docked Plan/Validate
+panel is wired in the editor. Non-editor callers still use the shared analyzer.
 
 - The panel starts from the plate's cutting settings (or the last-used settings) and plans
   at once. `Cutting Settings...` edits them and `Keep the current part order` fixes the

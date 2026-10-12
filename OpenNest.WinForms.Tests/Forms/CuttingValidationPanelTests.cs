@@ -225,6 +225,55 @@ public class CuttingValidationPanelTests
         }
     });
 
+    [Fact]
+    public void OverlapNavigationKeepsAllPlateProgramsAndPosesStable() => RunSta(() =>
+    {
+        using var editor = RapidEditor();
+        var plate = editor.Nest.Plates[1];
+        plate.Parts.Add(new Part(plate.Parts[0].BaseDrawing) { Location = new Vector(2, 2) });
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        var parts = editor.Nest.Plates.SelectMany(p => p.Parts).ToArray();
+        var programs = parts.Select(p => p.Program).ToArray();
+        var codes = programs.Select(p => p.Codes.ToArray()).ToArray();
+        var locations = parts.Select(p => p.Location).ToArray();
+        var rotations = parts.Select(p => p.Rotation).ToArray();
+        editor.OpenValidationInspection();
+        var panel = editor.CuttingInspection!;
+        Pump(() => panel.ValidationReport != null && !panel.IsPlanning);
+        var grid = Field<DataGridView>(panel, "warningGrid");
+        Assert.True(grid.ReadOnly);
+        Assert.Equal(DataGridViewSelectionMode.FullRowSelect, grid.SelectionMode);
+        Assert.All(grid.Columns.Cast<DataGridViewColumn>(), c => Assert.Equal(DataGridViewColumnSortMode.NotSortable, c.SortMode));
+        Assert.True(Field<TextBox>(panel, "resultLabel").ReadOnly);
+        var row = grid.Rows.Cast<DataGridViewRow>().Single(r => r.Tag is PostVerificationFinding { Kind: PostVerificationKind.Overlap });
+        row.Selected = true;
+        var view = editor.PlateView;
+        Assert.Same(plate, view.Plate);
+        Assert.NotNull(view.ValidationOverlay.Finding.Overlap);
+        Assert.Contains("centroid", Field<TextBox>(panel, "resultLabel").Text);
+        var scale = view.ViewScale;
+        InvokeView(view, "OnMouseWheel", new MouseEventArgs(MouseButtons.None, 0, 100, 100, 120));
+        Assert.True(view.ViewScale > scale);
+        var viewport = view.CaptureViewport();
+        InvokeView(view, "OnMouseMove", new MouseEventArgs(MouseButtons.Middle, 0, 120, 110, 0));
+        Assert.NotEqual(viewport.Origin, view.CaptureViewport().Origin);
+        view.SelectAll();
+        InvokeView(view, "OnKeyDown", new KeyEventArgs(Keys.Delete));
+        InvokeView(view, "ProcessDialogKey", Keys.Right);
+        panel.RequestClose();
+        Assert.Equal(parts, editor.Nest.Plates.SelectMany(p => p.Parts));
+        Assert.Equal(programs, parts.Select(p => p.Program));
+        for (var i = 0; i < programs.Length; i++) Assert.Equal(codes[i], programs[i].Codes.ToArray());
+        Assert.Equal(locations, parts.Select(p => p.Location));
+        Assert.Equal(rotations, parts.Select(p => p.Rotation));
+        Assert.Null(view.ValidationOverlay.Finding);
+        Assert.False(view.ValidationOverlay.IsAnimating);
+    });
+
+    private static void InvokeView(Control target, string name, params object[] args) => target.GetType()
+        .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(target, args);
+
     private static EditNestForm RapidEditor()
     {
         var nest = new Nest();

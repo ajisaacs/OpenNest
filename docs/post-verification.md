@@ -42,7 +42,9 @@ cancellation and waits for the worker to stop before restoring editing controls.
 Switching to Plan mode also waits for any validation worker; it does not promote
 a live validation report into a plan check. Closing the editor or main window
 joins the worker before continuing the close. Posting while inspection is open
-is refused; close the panel and use the fresh posting review.
+is refused; close the panel and use the fresh posting review. The former floating
+validator window is retired; non-editor checks remain available through the
+shared `PostVerificationAnalyzer` without an editor UI dependency.
 
 ## Posting workflow
 
