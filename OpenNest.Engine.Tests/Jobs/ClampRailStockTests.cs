@@ -1,3 +1,4 @@
+using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;
@@ -52,6 +53,41 @@ public class ClampRailStockTests
             Assert.Equal(-6.0, first.Center.X, 9);
         }
         NestJobValidator.Validate(new NestJob([], stock));
+    }
+
+    [Theory]
+    [InlineData("Rectangles")]
+    [InlineData("Irregular")]
+    [InlineData("Default")]
+    public void LanesAvoidTheWholeFootprintOfAClampHangingPastTheSheetEnd(string engine)
+    {
+        // 12" sheet, clamp centered 12.25" from the origin: 1" of its 1.5" lies past the end.
+        var template = new Plate(10, 12) { EdgeSpacing = new Spacing(0.25, 0.25, 0.25, 0.25), PartSpacing = 0.25 };
+        template.SetClampRail(new ClampRail(1.5, 0.625, new[] { 12.25 }));
+        var zone = Assert.Single(template.ClampZones);
+        Assert.Equal(11.5, zone.Bounds.X);
+        Assert.Equal(1.5, zone.Bounds.Length);
+        var drawing = new Drawing("square", TestDrawingFactory.Rectangle(1, 1));
+
+        var result = NestPipeline.Run(new NestPipelineRequest(engine,
+            [new NestItem { Drawing = drawing, Quantity = 80 }], NestStockBuilder.SinglePlate(template)));
+
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        var parts = result.Plates.SelectMany(p => p.Parts).ToList();
+        Assert.NotEmpty(parts);
+        // Independent oracle: the whole clamp grown by the bottom edge spacing.
+        var keepOut = zone.Bounds.Offset(0.25);
+        Assert.All(parts, part =>
+        {
+            var box = part.BoundingBox;
+            var overlapX = System.Math.Min(box.Right, keepOut.Right) - System.Math.Max(box.Left, keepOut.Left);
+            var overlapY = System.Math.Min(box.Top, keepOut.Top) - System.Math.Max(box.Bottom, keepOut.Bottom);
+            Assert.False(overlapX > 1e-6 && overlapY > 1e-6, $"{box} enters {keepOut}");
+        });
+        // Rectangles still uses the front edge beside the clamp. (Irregular may lift its whole
+        // block above the clamp band at the same count; that is a layout choice, not a leak.)
+        if (engine == "Rectangles")
+            Assert.Contains(parts, p => p.BoundingBox.Bottom < keepOut.Top && p.BoundingBox.Right <= keepOut.Left + 1e-6);
     }
 
     [Fact]

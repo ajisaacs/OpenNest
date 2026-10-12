@@ -73,9 +73,11 @@ public static class NestJobValidator
     }
 
     /// <summary>
-    /// Every stock zone must be uniquely identified and lie within its own sheet
-    /// (edge-inclusive; geometry and finiteness already enforced by <see cref="ClampZone"/>).
-    /// Zones are compared in the placement frame, where the stock carries them.
+    /// Every stock zone must be uniquely identified and reach onto its own sheet (a positive
+    /// overlap). A clamp is an avoidance area, so its whole footprint may hang past the sheet
+    /// edges; a zone wholly off the sheet is malformed. Geometry and finiteness are already
+    /// enforced by <see cref="ClampZone"/>. Zones are compared in the placement frame, where
+    /// the stock carries them.
     /// </summary>
     private static void ValidateClampZones(NestPlateStock stock, NestJob job)
     {
@@ -85,7 +87,6 @@ public static class NestJobValidator
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var left = stock.Quadrant is 1 or 4 ? 0 : -stock.Size.Length;
         var bottom = stock.Quadrant is 1 or 2 ? 0 : -stock.Size.Width;
-        const double slack = NestTolerances.WorkAreaSlack;
 
         foreach (var zone in stock.ClampZones)
         {
@@ -97,10 +98,10 @@ public static class NestJobValidator
 
             var b = zone.Bounds;
             if (
-                b.Left < left - slack
-                || b.Right > left + stock.Size.Length + slack
-                || b.Bottom < bottom - slack
-                || b.Top > bottom + stock.Size.Width + slack
+                !(b.Right > left)
+                || !(b.Left < left + stock.Size.Length)
+                || !(b.Top > bottom)
+                || !(b.Bottom < bottom + stock.Size.Width)
             )
                 throw new ArgumentException(
                     $"Clamp zone '{zone.Id}' on stock {stock.Id} lies outside the sheet.",

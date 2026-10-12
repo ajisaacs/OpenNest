@@ -73,7 +73,8 @@ dropped while the rest of the nest loads.
 `width` (along the edge), `depth` (into the sheet) and `centers` (X positions
 measured from the plate origin along the origin-side edge). New plates follow
 the rail and resolve it for their own size and quadrant; clamps wholly beyond a
-sheet are skipped and one still reaching onto it is clipped. The key is omitted
+sheet are skipped and one still reaching onto it keeps its whole footprint, so
+a zone may extend past the sheet edge. The key is omitted
 when a nest has no rail, so such files are unchanged; a missing, empty or
 malformed rail loads as none. On load a plate follows the rail again only when
 its saved `clamps` are exactly the rail's zones for that sheet; any other saved

@@ -74,31 +74,36 @@ public class ClampRailTests
     }
 
     [Fact]
-    public void ClampStraddlingTheSheetEndIsClippedNotDropped()
+    public void ClampReachingOntoTheSheetIsKeptWhole()
     {
+        // A clamp is an avoidance area: if any of it reaches the sheet, all of it applies.
         var rail = new ClampRail(1.5, 0.625, new[] { 59.5, 60.5, 60.75, 61 });
 
         var zones = rail.ResolveFor(new Size(48, 60), quadrant: 1);
 
-        // 59.5 covers [58.75, 60]; 60.5 still reaches onto the sheet [59.75, 60];
-        // 60.75 only touches the end and 61 lies wholly beyond it.
+        // 59.5 covers [58.75, 60.25] and 60.5 still reaches the last 0.25" [59.75, 61.25];
+        // 60.75 only touches the sheet end and 61 lies wholly beyond it.
         Assert.Equal(new[] { "clamp-1", "clamp-2" }, zones.Select(z => z.Id));
-        Assert.Equal(58.75, zones[0].Bounds.X);
-        Assert.Equal(1.25, zones[0].Bounds.Length);
-        Assert.Equal(59.75, zones[1].Bounds.X);
-        Assert.Equal(0.25, zones[1].Bounds.Length);
+        Assert.Equal(new[] { 58.75, 59.75 }, zones.Select(z => z.Bounds.X));
+        Assert.All(zones, z => Assert.Equal(1.5, z.Bounds.Length));
     }
 
     [Fact]
-    public void ClampAtTheOriginAndDeepClampsAreClippedToTheSheet()
+    public void ClampsNearTheOriginOrDeeperThanTheSheetStayWhole()
     {
         var rail = new ClampRail(1.5, 0.625, new[] { 0.25 });
         var origin = Assert.Single(rail.ResolveFor(new Size(48, 96), quadrant: 1));
-        Assert.Equal(0, origin.Bounds.X);
-        Assert.Equal(1.0, origin.Bounds.Length);
+        Assert.Equal(-0.5, origin.Bounds.X);
+        Assert.Equal(1.5, origin.Bounds.Length);
 
-        var deep = Assert.Single(new ClampRail(1.5, 10, new[] { 6.0 }).ResolveFor(new Size(4, 96), 1));
-        Assert.Equal(4, deep.Bounds.Width);
+        var deep = new ClampRail(1.5, 10, new[] { 6.0 });
+        var front = Assert.Single(deep.ResolveFor(new Size(4, 96), 1));
+        Assert.Equal(0, front.Bounds.Y);
+        Assert.Equal(10, front.Bounds.Width);
+        // Sheets extending to -Y have the origin edge on top; the clamp hangs below the sheet.
+        var top = Assert.Single(deep.ResolveFor(new Size(4, 96), 3));
+        Assert.Equal(4.0, top.Bounds.Top);
+        Assert.Equal(10, top.Bounds.Width);
     }
 
     [Theory]

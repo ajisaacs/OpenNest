@@ -111,14 +111,26 @@ public class ClampZoneEngineTests
     }
 
     [Fact]
-    public void ValidatorRejectsZonesOutsideTheSheet()
+    public void ValidatorAcceptsWholeClampsHangingPastTheSheet()
     {
-        var beyond = new NestJob([], [Stock(zones: Zone(x: 95.5))]);
-        Assert.Throws<ArgumentException>(() => NestJobValidator.Validate(beyond));
+        // A clamp is an avoidance area: a footprint reaching onto the sheet is kept whole.
+        NestJobValidator.Validate(new NestJob([], [Stock(zones: Zone(x: 95.5))]));
+        NestJobValidator.Validate(new NestJob([], [new NestPlateStock("s", new Size(48, 96),
+            clampZones: [new ClampZone("under", new Box(5, -0.5, 1.5, 0.625))])]));
+        NestJobValidator.Validate(new NestJob([], [Stock(quadrant: 3, zones: Zone(x: -0.5))]));
+    }
 
-        var belowEdge = new NestJob([], [new NestPlateStock("s", new Size(48, 96),
-            clampZones: [new ClampZone("under", new Box(5, -0.5, 1.5, 0.625))])]);
-        Assert.Throws<ArgumentException>(() => NestJobValidator.Validate(belowEdge));
+    [Theory]
+    [InlineData(96, 0)] // touches the far end only
+    [InlineData(100, 0)]
+    [InlineData(-1.5, 0)] // touches the origin end only
+    [InlineData(5, -0.625)] // below the front edge, touching it
+    [InlineData(5, 48)] // beyond the back edge
+    public void ValidatorRejectsZonesWhollyOffTheSheet(double x, double y)
+    {
+        var job = new NestJob([], [new NestPlateStock("s", new Size(48, 96),
+            clampZones: [new ClampZone("off", new Box(x, y, 1.5, 0.625))])]);
+        Assert.Throws<ArgumentException>(() => NestJobValidator.Validate(job));
     }
 
     [Fact]

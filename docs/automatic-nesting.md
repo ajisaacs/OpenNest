@@ -60,8 +60,9 @@ file keeps clamps off; an unreadable file, or one with ignored invalid values
 match the machine.
 
 Every plate follows the nest's rail at its own size and quadrant: clamps wholly
-beyond a shorter sheet are left off it, one still reaching onto the sheet is
-clipped to it, and resizing or rotating a plate re-resolves its clamps. Auto Nest
+beyond a shorter sheet are left off it, one still reaching onto the sheet keeps
+its whole footprint as the avoidance area (it may hang past the sheet edge), and
+resizing or rotating a plate re-resolves its clamps. Auto Nest
 offers each stock size with the rail resolved for that size, and every committed
 sheet keeps exactly the clamps its layout was validated against. Clamps are
 drawn as hatched amber rectangles over the sheet; they cannot be selected,

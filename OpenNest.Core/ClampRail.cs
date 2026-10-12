@@ -9,8 +9,9 @@ namespace OpenNest
     /// The machine's fixed clamp rail: identical rectangular clamps whose X centers are
     /// measured from the plate origin along the origin-side (operator) edge. Plates always
     /// start at the origin, so the same rail resolves onto every sheet size without
-    /// re-scaling; a clamp whose footprint lies wholly beyond a sheet is skipped and one
-    /// that still reaches onto it is kept, clipped to the sheet.
+    /// re-scaling. A clamp whose footprint lies wholly beyond a sheet is skipped; one that
+    /// still reaches onto it is kept whole: the zone is an avoidance area, so its full
+    /// footprint applies even where it hangs past the sheet.
     /// </summary>
     public sealed class ClampRail : IEquatable<ClampRail>
     {
@@ -57,8 +58,10 @@ namespace OpenNest
         /// The zones this rail places on a sheet, in plate coordinates (the frame of
         /// <see cref="Plate.ClampZones"/>: origin at the sheet's lower-left corner). The
         /// quadrant locates the plate origin, and with it the origin-side edge, on the sheet.
-        /// Ids are <c>clamp-N</c> by rail position, so one physical clamp keeps its id on
-        /// every sheet even when others are skipped.
+        /// Zones are whole clamp footprints, never clipped, so one reaching past a sheet end
+        /// (or deeper than a narrow sheet) extends beyond the sheet. Ids are <c>clamp-N</c> by
+        /// rail position, so one physical clamp keeps its id on every sheet even when others
+        /// are skipped.
         /// </summary>
         public IReadOnlyList<ClampZone> ResolveFor(Size size, int quadrant)
         {
@@ -69,8 +72,8 @@ namespace OpenNest
 
             var extendsLeft = quadrant is 2 or 3;
             var extendsDown = quadrant is 3 or 4;
-            var depth = System.Math.Min(Depth, sheetWidth);
-            var y = extendsDown ? sheetWidth - depth : 0;
+            // The origin-side edge is y = 0 of the sheet, or its top when it extends to -Y.
+            var y = extendsDown ? sheetWidth - Depth : 0;
             var half = Width / 2;
 
             var zones = new List<ClampZone>(Centers.Count);
@@ -82,16 +85,10 @@ namespace OpenNest
                 if (near >= length)
                     continue; // wholly beyond this sheet
 
-                var clipped = near < 0 || far > length;
-                var start = near < 0 ? 0 : near;
-                var extent = clipped ? System.Math.Min(far, length) - start : Width;
-                if (!(extent > 0))
-                    continue;
-
                 // Plate coordinates are measured from the lower-left corner; a sheet extending
                 // to -X from the origin has its origin edge at x = length.
-                var x = extendsLeft ? length - (start + extent) : start;
-                zones.Add(new ClampZone($"clamp-{i + 1}", new Box(x, y, extent, depth)));
+                var x = extendsLeft ? length - far : near;
+                zones.Add(new ClampZone($"clamp-{i + 1}", new Box(x, y, Width, Depth)));
             }
 
             return zones;
