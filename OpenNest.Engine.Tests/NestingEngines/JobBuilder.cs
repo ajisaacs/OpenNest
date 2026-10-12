@@ -16,8 +16,9 @@ public static class JobBuilder
     /// <param name="width">Y extent.</param>
     /// <param name="length">X extent.</param>
     public static NestPlateStock Stock(string id, double width, double length, double spacing = 0,
-        Spacing edge = default, int quadrant = 1, int? quantity = null) =>
-        new(id, new Size(width, length), quantity, spacing, edge, quadrant);
+        Spacing edge = default, int quadrant = 1, int? quantity = null,
+        ClampZone[]? clampZones = null) =>
+        new(id, new Size(width, length), quantity, spacing, edge, quadrant, null, clampZones);
 
     public static NestJobPart Rectangle(string id, double w, double h, int count,
         RotationPolicy? rotation = null, double x = 0, double y = 0) =>

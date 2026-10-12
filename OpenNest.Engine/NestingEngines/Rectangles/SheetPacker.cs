@@ -56,6 +56,7 @@ internal static class SheetPacker
         var work = stock.WorkArea;
         var s = stock.PartSpacing;
         var sheet = new MaxRectsSheet(work.Right - work.Left + s, work.Top - work.Bottom + s);
+        BlockClamps(sheet, stock, work, s);
         var packTypes = types
             .Select(t => new PackType(
                 t.Priority,
@@ -82,6 +83,47 @@ internal static class SheetPacker
             .Select(p => p with { Left = work.Left + p.Left, Bottom = work.Bottom + p.Bottom })
             .ToList();
         return new SheetPlan(stock, world, area, envelope, rule, mode);
+    }
+
+    /// <summary>
+    /// Blocks every clamp keep-out into the sheet's free list before packing. In the
+    /// inflated-box model an item at position p covers material [p, p + size] plus a trailing
+    /// part-spacing tail; blocking bin-local [zone - clearance + s, zone + clearance] per axis
+    /// therefore means exactly: item material keeps at least the bottom-edge clearance from
+    /// every clamp side, without paying any extra part-spacing tax there. A span that
+    /// degenerates because the spacing exceeds the inflated zone collapses to the zone
+    /// centerline - conservative (it forbids crossing the clamp), never permissive.
+    /// Empty zone lists change nothing: the free list evolves bit-identically (C2).
+    /// </summary>
+    private static void BlockClamps(MaxRectsSheet sheet, NestPlateStock stock, Box work, double s)
+    {
+        if (stock.ClampZones.Count == 0)
+            return;
+
+        var clearance = System.Math.Max(0, stock.EdgeSpacing.Bottom);
+        foreach (var zone in stock.ClampZones)
+        {
+            var b = zone.Bounds; // placement frame -> bin-local packing coordinates
+            double x0(double v) => v - work.Left;
+            double y0(double v) => v - work.Bottom;
+            var left = x0(b.Left) - clearance + s;
+            var right = x0(b.Right) + clearance;
+            if (right <= left)
+            {
+                var centerX = x0((b.Left + b.Right) * 0.5);
+                left = centerX;
+                right = centerX;
+            }
+            var bottom = y0(b.Bottom) - clearance + s;
+            var top = y0(b.Top) + clearance;
+            if (top <= bottom)
+            {
+                var centerY = y0((b.Bottom + b.Top) * 0.5);
+                bottom = centerY;
+                top = centerY;
+            }
+            sheet.Block(new Rect(left, bottom, right - left, top - bottom));
+        }
     }
 
     private static Box Union(Box a, Box b)
