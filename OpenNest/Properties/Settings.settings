@@ -62,5 +62,8 @@
     <Setting Name="ActiveColorScheme" Type="System.String" Scope="User">
       <Value Profile="(Default)">Classic</Value>
     </Setting>
+    <Setting Name="UpdateFeedUrl" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
   </Settings>
 </SettingsFile>

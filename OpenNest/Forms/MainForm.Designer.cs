@@ -20,6 +20,8 @@ namespace OpenNest.Forms
             {
                 components.Dispose();
             }
+            if (disposing)
+                updater?.Dispose();
             base.Dispose(disposing);
         }
 

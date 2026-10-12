@@ -62,3 +62,4 @@ Read the relevant contract before changing its behavior:
 - [Pre-post verification](docs/post-verification.md)
 - [Cincinnati CL](docs/cincinnati-post-output.md) and [CI Fiber](docs/cincinnati-ci-fiber-post-output.md)
 - [Fill verification](docs/performance/fill-verification.md): opt-in benchmarks, frozen oracles, Debug-only counters and predictor initialization. Zero Release counters do not prove work removal.
+- [Desktop auto-update](docs/auto-update.md): Velopack feed, `UpdateFeedUrl` setting and `Deploy-OpenNest.ps1`.

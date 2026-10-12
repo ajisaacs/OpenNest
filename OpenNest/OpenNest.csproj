@@ -6,6 +6,7 @@
     <AssemblyName>OpenNest</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>DpiUnaware</ApplicationHighDpiMode>
+    <Version>0.4.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Controls\LayoutViewGL.cs" />
@@ -31,6 +32,7 @@
     <ProjectReference Include="..\Posts\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\Posts\OpenNest.Posts.CincinnatiCIFiber\OpenNest.Posts.CincinnatiCIFiber.csproj" ReferenceOutputAssembly="false" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Properties\Resources.Designer.cs">

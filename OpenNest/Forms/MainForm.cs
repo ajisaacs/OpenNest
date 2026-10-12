@@ -140,6 +140,57 @@ namespace OpenNest.Forms
 
             engineComboBox.SelectedItem = EngineSelection.EngineName;
             engineComboBox.SelectedIndexChanged += EngineComboBox_SelectedIndexChanged;
+
+            InitializeUpdater();
+        }
+
+        private global::OpenNest.UpdaterService updater;
+        private ToolStripStatusLabel updateStatusLabel;
+
+        /// <summary>
+        /// Starts background update checks against the per-machine feed URL
+        /// (Options dialog; blank disables checks). Never restarts on its
+        /// own -- shows a clickable status item once an update is ready and
+        /// restarts only when the user clicks it.
+        /// </summary>
+        private void InitializeUpdater()
+        {
+            updateStatusLabel = new ToolStripStatusLabel
+            {
+                Visible = false,
+                ForeColor = Color.DarkGreen,
+                Font = new Font(statusLabel1.Font, FontStyle.Bold),
+            };
+            updateStatusLabel.Click += (_, _) =>
+            {
+                if (!updater.HasPendingUpdate)
+                    return;
+
+                var result = MessageBox.Show(
+                    this,
+                    "An OpenNest update has been downloaded. Restart now to apply it? Any unsaved nest will be lost.",
+                    "Update ready",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+                if (result == DialogResult.Yes)
+                    updater.ApplyAndRestart();
+            };
+            statusStrip1.Items.Insert(statusStrip1.Items.IndexOf(gpuStatusLabel), updateStatusLabel);
+
+            updater = new global::OpenNest.UpdaterService();
+            updater.UpdateReady += version =>
+            {
+                if (IsHandleCreated)
+                    BeginInvoke(new System.Action(() => ShowUpdateReady(version)));
+            };
+            updater.Start();
+        }
+
+        private void ShowUpdateReady(string version)
+        {
+            updateStatusLabel.Text = $"Update {version} ready - click to restart";
+            updateStatusLabel.Visible = true;
         }
 
         private Nest CreateDefaultNest()

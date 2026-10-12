@@ -44,10 +44,14 @@
             this.serverGroupBox = new System.Windows.Forms.GroupBox();
             this.serverUrlBox = new System.Windows.Forms.TextBox();
             this.setServerButton = new System.Windows.Forms.Button();
+            this.updateGroupBox = new System.Windows.Forms.GroupBox();
+            this.updateFeedUrlBox = new System.Windows.Forms.TextBox();
+            this.setUpdateFeedButton = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
             this.bottomPanel1.SuspendLayout();
             this.serverGroupBox.SuspendLayout();
+            this.updateGroupBox.SuspendLayout();
             this.SuspendLayout();
             // 
             // checkBox1
@@ -139,7 +143,7 @@
             this.bottomPanel1.Controls.Add(this.cancelButton);
             this.bottomPanel1.Controls.Add(this.saveButton);
             this.bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.bottomPanel1.Location = new System.Drawing.Point(0, 443);
+            this.bottomPanel1.Location = new System.Drawing.Point(0, 509);
             this.bottomPanel1.Name = "bottomPanel1";
             this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
             this.bottomPanel1.TabIndex = 1;
@@ -162,7 +166,7 @@
             // strategyGroupBox
             //
             this.strategyGroupBox.Controls.Add(this.strategyGrid);
-            this.strategyGroupBox.Location = new System.Drawing.Point(12, 253);
+            this.strategyGroupBox.Location = new System.Drawing.Point(12, 319);
             this.strategyGroupBox.Name = "strategyGroupBox";
             this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
             this.strategyGroupBox.TabIndex = 2;
@@ -217,13 +221,43 @@
             this.setServerButton.UseVisualStyleBackColor = true;
             this.setServerButton.Click += new System.EventHandler(this.SetServer_Click);
             //
+            // updateGroupBox
+            //
+            this.updateGroupBox.Controls.Add(this.updateFeedUrlBox);
+            this.updateGroupBox.Controls.Add(this.setUpdateFeedButton);
+            this.updateGroupBox.Location = new System.Drawing.Point(12, 253);
+            this.updateGroupBox.Name = "updateGroupBox";
+            this.updateGroupBox.Size = new System.Drawing.Size(684, 60);
+            this.updateGroupBox.TabIndex = 3;
+            this.updateGroupBox.TabStop = false;
+            this.updateGroupBox.Text = "Auto-update feed URL (blank disables update checks; set per machine)";
+            //
+            // updateFeedUrlBox
+            //
+            this.updateFeedUrlBox.Location = new System.Drawing.Point(12, 24);
+            this.updateFeedUrlBox.Name = "updateFeedUrlBox";
+            this.updateFeedUrlBox.PlaceholderText = "http://host:port";
+            this.updateFeedUrlBox.Size = new System.Drawing.Size(485, 22);
+            this.updateFeedUrlBox.TabIndex = 0;
+            //
+            // setUpdateFeedButton
+            //
+            this.setUpdateFeedButton.Location = new System.Drawing.Point(504, 21);
+            this.setUpdateFeedButton.Name = "setUpdateFeedButton";
+            this.setUpdateFeedButton.Size = new System.Drawing.Size(168, 28);
+            this.setUpdateFeedButton.TabIndex = 1;
+            this.setUpdateFeedButton.Text = "Save Feed URL";
+            this.setUpdateFeedButton.UseVisualStyleBackColor = true;
+            this.setUpdateFeedButton.Click += new System.EventHandler(this.SetUpdateFeed_Click);
+            //
             // OptionsForm
             //
             this.AcceptButton = this.saveButton;
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(708, 493);
+            this.ClientSize = new System.Drawing.Size(708, 559);
             this.Controls.Add(this.strategyGroupBox);
+            this.Controls.Add(this.updateGroupBox);
             this.Controls.Add(this.serverGroupBox);
             this.Controls.Add(this.tableLayoutPanel1);
             this.Controls.Add(this.bottomPanel1);
@@ -242,6 +276,8 @@
             this.bottomPanel1.ResumeLayout(false);
             this.serverGroupBox.ResumeLayout(false);
             this.serverGroupBox.PerformLayout();
+            this.updateGroupBox.ResumeLayout(false);
+            this.updateGroupBox.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -263,5 +299,8 @@
         private System.Windows.Forms.GroupBox serverGroupBox;
         private System.Windows.Forms.TextBox serverUrlBox;
         private System.Windows.Forms.Button setServerButton;
+        private System.Windows.Forms.GroupBox updateGroupBox;
+        private System.Windows.Forms.TextBox updateFeedUrlBox;
+        private System.Windows.Forms.Button setUpdateFeedButton;
     }
 }

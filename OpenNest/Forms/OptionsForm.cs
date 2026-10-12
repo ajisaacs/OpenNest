@@ -74,6 +74,7 @@ namespace OpenNest.Forms
         private void LoadSettings()
         {
             serverUrlBox.Text = NestStorage.Settings.ServerUrl;
+            updateFeedUrlBox.Text = Settings.Default.UpdateFeedUrl;
             checkBox1.Checked = Settings.Default.CreateNewNestOnOpen;
             numericUpDown1.Value = (decimal)Settings.Default.AutoSizePlateFactor;
 
@@ -166,6 +167,33 @@ namespace OpenNest.Forms
                 MessageBox.Show(this, $"Could not save the server URL: {ex.Message}",
                     "Server URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void SetUpdateFeed_Click(object sender, EventArgs e)
+        {
+            var text = updateFeedUrlBox.Text?.Trim() ?? "";
+            if (text.Length == 0)
+            {
+                Settings.Default.UpdateFeedUrl = "";
+                Settings.Default.Save();
+                updateFeedUrlBox.Text = "";
+                MessageBox.Show(this, "Update feed URL cleared. Update checks are disabled.",
+                    "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!NestStorageSettings.TryNormalizeServerUrl(text, out var url))
+            {
+                MessageBox.Show(this, "Enter a valid http or https feed URL, or clear the field to disable updates.",
+                    "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            Settings.Default.UpdateFeedUrl = url;
+            Settings.Default.Save();
+            updateFeedUrlBox.Text = url;
+            MessageBox.Show(this, "Update feed URL saved. Restart OpenNest for the new feed to take effect.",
+                "Update Feed URL", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 }
