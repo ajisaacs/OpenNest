@@ -167,20 +167,31 @@ internal static class PostVerificationGeometry
                 center.Y + Radius * System.Math.Sin(StartAngle + Sweep / 2))
             : (Start + End) * 0.5;
 
-        internal bool SameSupport(Curve other)
+        internal bool SameSupport(Curve other) => SameSupport(other, Epsilon);
+
+        /// <summary>
+        /// Support agreement with an explicit positional allowance. Used only where an upstream
+        /// stage has already admitted a larger nominal discrepancy — currently the inclusive
+        /// <see cref="NominalContourClosure.Tolerance"/> joint that a replayed ring bridges. It is
+        /// never a collision tolerance: safety queries keep the exact epsilon.
+        /// </summary>
+        internal bool SameSupport(Curve other, double positionTolerance)
         {
             if (Center is { } center)
-                return other.Center is { } c && center.DistanceTo(c) <= Epsilon
-                    && System.Math.Abs(Radius - other.Radius) <= Epsilon;
-            if (other.Center.HasValue || Length <= Epsilon || other.Length <= Epsilon)
+                return other.Center is { } c && center.DistanceTo(c) <= positionTolerance
+                    && System.Math.Abs(Radius - other.Radius) <= positionTolerance;
+            if (other.Center.HasValue || Length <= positionTolerance || other.Length <= positionTolerance)
                 return false;
             var direction = (End - Start) * (1 / Length);
-            return System.Math.Abs(Cross(other.Start - Start, direction)) <= Epsilon
-                && System.Math.Abs(Cross(other.End - Start, direction)) <= Epsilon;
+            return System.Math.Abs(Cross(other.Start - Start, direction)) <= positionTolerance
+                && System.Math.Abs(Cross(other.End - Start, direction)) <= positionTolerance;
         }
 
         // Directed native arc-length coordinates for contour replay, not collision queries.
-        internal bool SameDirection(Curve other) => SameSupport(other)
+        internal bool SameDirection(Curve other) => SameDirection(other, Epsilon);
+
+        /// <summary>Directed coverage check with an admitted positional allowance; direction sign stays exact.</summary>
+        internal bool SameDirection(Curve other, double positionTolerance) => SameSupport(other, positionTolerance)
             && (Center.HasValue ? System.Math.Sign(Sweep) == System.Math.Sign(other.Sweep)
                 : Dot(End - Start, other.End - other.Start) > 0);
 
@@ -199,7 +210,11 @@ internal static class PostVerificationGeometry
                 : Start + (End - Start) * (distance / Length);
         }
 
-        internal bool Contains(Vector point) => nativeEntity.Value.ClosestPointTo(point).DistanceTo(point) <= Epsilon;
+        internal bool Contains(Vector point) => Contains(point, Epsilon);
+
+        /// <summary>On-support test with an admitted positional allowance (see <see cref="SameSupport(Curve, double)"/>).</summary>
+        internal bool Contains(Vector point, double positionTolerance)
+            => nativeEntity.Value.ClosestPointTo(point).DistanceTo(point) <= positionTolerance;
 
         /// <summary>
         /// Filters supporting-circle contacts against the actual finite arc span. The

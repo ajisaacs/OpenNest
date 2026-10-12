@@ -55,11 +55,13 @@ internal static class ContourProgramVerifier
             var ringIndex = -1;
             var entityIndex = -1;
             for (var r = 0; r < material.Rings.Count && ringIndex < 0; r++)
+            {
+                var admitted = AdmittedClosureSlack(material.Rings[r]);
                 for (var e = 0; e < material.Rings[r].Length; e++)
                 {
                     Query(token, ref budget);
                     var curve = material.Rings[r][e];
-                    if (curve.SameDirection(first) && curve.Contains(first.Start)
+                    if (curve.SameDirection(first, admitted) && curve.Contains(first.Start, admitted)
                         && curve.DistanceAlong(first.Start) < curve.Length - Epsilon)
                     {
                         ringIndex = r;
@@ -67,27 +69,38 @@ internal static class ContourProgramVerifier
                         break;
                     }
                 }
+            }
             if (ringIndex < 0 || !visited.Add(ringIndex)) return false;
             var ring = material.Rings[ringIndex];
+            // Capture admits a nominal ring that closes within NominalContourClosure.Tolerance, and
+            // preparation agrees at that inclusive boundary. A rotated tool path bridges that one
+            // admitted joint, so this ring's positional and length agreement carries exactly that
+            // admitted slack. Direction, coverage order and retrace accounting stay at the epsilon.
+            var tolerance = AdmittedClosureSlack(ring);
             var nominalLength = ring.Sum(c => c.Length);
             var cutLength = run.Curves.Sum(c => c.Length);
             var missing = nominalLength - cutLength;
             if (missing < -Epsilon) return false; // Never a second circuit/retrace.
-            if (missing > Epsilon)
+            if (missing > tolerance)
             {
                 // Fixed legacy payloads have no certified selected tab/entry metadata.
                 // A merely open contour or a caller's current tab switch proves nothing.
                 if (selected == null || ringIndex != 0 || selected.TabSize <= 0
-                    || System.Math.Abs(first.Start.DistanceTo(run.Curves[^1].End) - selected.TabSize) > Epsilon)
+                    || System.Math.Abs(first.Start.DistanceTo(run.Curves[^1].End) - selected.TabSize) > tolerance)
                     return false;
                 // SameEmission has already bound this exact terminal gap to the owned
                 // settings' independently emitted, rounded/clamped selected geometry.
             }
             if (!Follows(run.Curves, ring, entityIndex, ring[entityIndex].DistanceAlong(first.Start),
-                true, token, ref budget)) return false;
+                true, tolerance, token, ref budget)) return false;
         }
         return visited.Count == material.Rings.Count;
     }
+
+    // Zero for an exactly closed ring: a ring may lawfully close within the nominal closure
+    // tolerance, and only that admitted endpoint gap relaxes replay's positional agreement.
+    private static double AdmittedClosureSlack(IReadOnlyList<Curve> ring) => ring.Count == 0 ? Epsilon
+        : Epsilon + System.Math.Max(0.0, ring[^1].End.DistanceTo(ring[0].Start));
 
     private static bool SameEmission(OwnedExecution actual, OwnedExecution expected,
         CancellationToken token, ref int budget)
@@ -107,15 +120,17 @@ internal static class ContourProgramVerifier
                 if (a.End.DistanceTo(b.End) > Epsilon) return false;
             }
             else if (System.Math.Abs(a.Curves.Sum(c => c.Length) - b.Curves.Sum(c => c.Length)) > Epsilon
-                || !Follows(a.Curves, b.Curves, 0, 0, false, token, ref budget)) return false;
+                || !Follows(a.Curves, b.Curves, 0, 0, false, Epsilon, token, ref budget)) return false;
         }
         return true;
     }
 
     // Consume directed native arc-length from both streams. Subdivision, merged
     // collinear moves and a cyclic ring's reindexing do not change coverage.
+    // `tolerance` is the admitted positional slack for this pair of streams (the exact epsilon
+    // unless the nominal ring closes only within the nominal closure tolerance).
     private static bool Follows(IReadOnlyList<Curve> actual, IReadOnlyList<Curve> expected,
-        int index, double offset, bool cyclic, CancellationToken token, ref int budget)
+        int index, double offset, bool cyclic, double tolerance, CancellationToken token, ref int budget)
     {
         foreach (var curve in actual)
         {
@@ -137,13 +152,13 @@ internal static class ContourProgramVerifier
                     continue;
                 }
                 var length = System.Math.Min(remaining, curve.Length - consumed);
-                if (!nominal.SameDirection(curve)
-                    || nominal.PointAtLength(offset).DistanceTo(curve.PointAtLength(consumed)) > Epsilon
-                    || nominal.PointAtLength(offset + length).DistanceTo(curve.PointAtLength(consumed + length)) > Epsilon)
+                if (!nominal.SameDirection(curve, tolerance)
+                    || nominal.PointAtLength(offset).DistanceTo(curve.PointAtLength(consumed)) > tolerance
+                    || nominal.PointAtLength(offset + length).DistanceTo(curve.PointAtLength(consumed + length)) > tolerance)
                     return false;
                 consumed += length;
                 offset += length;
-                if (offset >= nominal.Length - Epsilon)
+                if (offset >= nominal.Length - tolerance)
                 {
                     index++;
                     offset = 0;
@@ -151,7 +166,7 @@ internal static class ContourProgramVerifier
             }
         }
         return cyclic || index == expected.Count || index == expected.Count - 1
-            && expected[index].Length - offset <= Epsilon;
+            && expected[index].Length - offset <= tolerance;
     }
 
     private static List<Run> Runs(OwnedExecution execution)
