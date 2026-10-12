@@ -9,6 +9,10 @@ namespace OpenNest.Diagnostics;
 internal static class PostVerificationGeometry
 {
     internal const double Epsilon = 1e-8;
+    // Matches NominalContourClosure.Tolerance: the largest gap capture admits as a closed ring.
+    // Ray parity snaps vertex Y comparisons within this band so an admitted seam cannot flip an
+    // exterior point to interior (see Curve.CrossesRay).
+    internal const double RaySeamTolerance = 1e-6;
     private const double TwoPi = 2 * System.Math.PI;
 
     /// <summary>An axis-aligned extent used only to skip queries that cannot meet.</summary>
@@ -385,8 +389,18 @@ internal static class PostVerificationGeometry
 
         internal bool CrossesRay(Vector point)
         {
+            // Ray parity needs both edges meeting at a shared vertex to agree which side of the ray
+            // that vertex is on. Rings are only nominally closed: capture admits closure seams and
+            // PEP-converted or rotated geometry carries sub-micro-inch vertex jogs, so an exact
+            // comparison can split one vertex across the ray and report far-away exterior points as
+            // interior — which made LeadPathValidator refuse leads that could touch nothing.
+            // Snapping within the admitted seam tolerance keeps the decision consistent on both
+            // edges; real features (notches, tabs, arc spans) are far larger than the tolerance and
+            // still count. Containment of a point that itself lies within the tolerance of a
+            // boundary edge stays ambiguous by design, exactly as it was before.
+            var rayY = point.Y + RaySeamTolerance;
             if (Center is not { } center)
-                return (Start.Y > point.Y) != (End.Y > point.Y)
+                return (Start.Y > rayY) != (End.Y > rayY)
                     && Start.X + (point.Y - Start.Y) * (End.X - Start.X) / (End.Y - Start.Y) > point.X;
 
             // Split arcs at vertical extrema, giving monotone-Y pieces. Apply the same
@@ -407,7 +421,7 @@ internal static class PostVerificationGeometry
                 var b = StartAngle + System.Math.Sign(Sweep) * breaks[i];
                 var ya = i == 1 ? Start.Y : center.Y + Radius * System.Math.Sin(a);
                 var yb = i == breaks.Count - 1 ? End.Y : center.Y + Radius * System.Math.Sin(b);
-                if ((ya > point.Y) == (yb > point.Y))
+                if ((ya > rayY) == (yb > rayY))
                     continue;
                 var dy = point.Y - center.Y;
                 var dx = System.Math.Sqrt(System.Math.Max(0, Radius * Radius - dy * dy));
