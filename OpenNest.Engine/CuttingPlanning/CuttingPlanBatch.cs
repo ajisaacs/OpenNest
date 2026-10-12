@@ -336,6 +336,9 @@ public sealed class CuttingPlanProposal
             PartSpacing = source.PartSpacing,
             EdgeSpacing = source.EdgeSpacing,
         };
+        // Machine clamps stay visible while inspecting the proposal; zones are immutable.
+        foreach (var zone in source.ClampZones)
+            preview.ClampZones.Add(zone);
         foreach (var proposal in planned.Result.ProposedOrder)
         {
             var part = (Part)proposal.SourcePart.Clone();
