@@ -205,8 +205,19 @@ namespace OpenNest.IO
             return list;
         }
 
-        private bool RailRecreates(Plate plate) =>
-            nest.PlateDefaults.ClampRail is { } rail && rail.Matches(plate);
+        /// <summary>
+        /// True when a plate created from the saved defaults would be this sheet's clamp
+        /// configuration: same size and quadrant, and zones the saved rail recreates.
+        /// </summary>
+        private bool DefaultsRecreateClamps(Plate plate)
+        {
+            var defaults = nest.PlateDefaults;
+            return defaults.ClampRail is { } rail
+                && plate.Size.Width == defaults.Size.Width
+                && plate.Size.Length == defaults.Size.Length
+                && plate.Quadrant == defaults.Quadrant
+                && rail.Matches(plate);
+        }
 
         private List<PlateDto> BuildPlateDtos()
         {
@@ -216,12 +227,12 @@ namespace OpenNest.IO
             {
                 var plate = nest.Plates[i];
 
-                // An empty plate is omitted (this also drops the editor's trailing sentinel)
-                // unless that would lose clamp zones the saved rail cannot recreate.
+                // An empty plate is omitted unless that would lose a clamp configuration the
+                // saved defaults cannot recreate; the editor's trailing empty sheet is dropped.
                 if (
                     plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
                     && plate.CutOffs.Count == 0
-                    && (plate.ClampZones.Count == 0 || RailRecreates(plate))
+                    && (plate.ClampZones.Count == 0 || DefaultsRecreateClamps(plate))
                 )
                     continue;
 

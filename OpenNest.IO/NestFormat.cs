@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -50,7 +51,66 @@ namespace OpenNest.IO
             /// has none; older files and older readers simply have no rail.
             /// </summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientClampRailConverter))]
             public ClampRailDto ClampRail { get; init; }
+        }
+
+        /// <summary>
+        /// Reads a malformed or wrongly typed clamp rail as no rail instead of failing the
+        /// whole nest; the reader still validates the values (sign, size) it receives.
+        /// </summary>
+        public sealed class LenientClampRailConverter : JsonConverter<ClampRailDto>
+        {
+            public override ClampRailDto Read(
+                ref Utf8JsonReader reader,
+                Type typeToConvert,
+                JsonSerializerOptions options
+            )
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                var rail = document.RootElement;
+                if (
+                    rail.ValueKind != JsonValueKind.Object
+                    || !TryNumber(rail, "width", out var width)
+                    || !TryNumber(rail, "depth", out var depth)
+                    || !rail.TryGetProperty("centers", out var centers)
+                    || centers.ValueKind != JsonValueKind.Array
+                )
+                    return null;
+
+                var list = new List<double>();
+                foreach (var center in centers.EnumerateArray())
+                {
+                    if (center.ValueKind != JsonValueKind.Number || !center.TryGetDouble(out var x))
+                        return null;
+                    list.Add(x);
+                }
+                return new ClampRailDto { Width = width, Depth = depth, Centers = list };
+            }
+
+            public override void Write(
+                Utf8JsonWriter writer,
+                ClampRailDto value,
+                JsonSerializerOptions options
+            )
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("width", value.Width);
+                writer.WriteNumber("depth", value.Depth);
+                writer.WriteStartArray("centers");
+                foreach (var center in value.Centers ?? new List<double>())
+                    writer.WriteNumberValue(center);
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+            }
+
+            private static bool TryNumber(JsonElement rail, string name, out double value)
+            {
+                value = 0;
+                return rail.TryGetProperty(name, out var element)
+                    && element.ValueKind == JsonValueKind.Number
+                    && element.TryGetDouble(out value);
+            }
         }
 
         public record ClampRailDto

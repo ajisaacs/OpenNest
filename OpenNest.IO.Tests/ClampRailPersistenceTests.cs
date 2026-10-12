@@ -72,6 +72,25 @@ public class ClampRailPersistenceTests
     }
 
     [Fact]
+    public void EmptyRailSheetThatDiffersFromThePlateDefaultsIsKept()
+    {
+        // The rail recreates its zones, but nothing recreates this sheet's size and quadrant.
+        var nest = RailNest(withEmptyTail: false);
+        var odd = nest.CreatePlate();
+        odd.Size = new Size(48, 60);
+        odd.Quadrant = 3;
+
+        var reopened = RoundTrip(nest);
+
+        Assert.Equal(2, reopened.Plates.Count);
+        var kept = reopened.Plates[1];
+        Assert.Equal(new Size(48, 60), kept.Size);
+        Assert.Equal(3, kept.Quadrant);
+        Assert.Equal(4, kept.ClampZones.Count);
+        Assert.Same(reopened.PlateDefaults.ClampRail, kept.ClampRail);
+    }
+
+    [Fact]
     public void SavedZonesThatDifferFromTheRailArePreservedExactly()
     {
         var nest = RailNest(withEmptyTail: false);
@@ -116,6 +135,12 @@ public class ClampRailPersistenceTests
     [Theory]
     [InlineData("\"width\": 1.5", "\"width\": -1.5")]
     [InlineData("\"centers\": [", "\"centers\": [-6, ")]
+    [InlineData("\"width\": 1.5", "\"width\": \"bad\"")]
+    [InlineData("\"width\": 1.5", "\"width\": null")]
+    [InlineData("\"centers\": [", "\"centers\": [\"bad\", ")]
+    [InlineData("\"centers\": [", "\"centers\": [null, ")]
+    [InlineData("\"centers\": [", "\"centers\": 6, \"unused\": [")]
+    [InlineData("\"clampRail\": {", "\"clampRail\": [6], \"unused\": {")]
     public void MalformedRailIsIgnoredWhileTheNestLoads(string find, string replace)
     {
         var tampered = RewriteNestJson(Write(RailNest()), json =>
