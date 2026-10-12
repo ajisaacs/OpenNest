@@ -169,15 +169,14 @@ internal sealed class CuttingInspectionPanel : UserControl
         {
             view.InspectionCloseRequested = null;
             if (ReferenceEquals(view.Plate, plate))
-            {
-                view.RestoreViewport(viewport);
                 view.OverlapDisplay = overlapDisplay;
-            }
         }
         var ownedScope = scope;
         ownedScope?.Dispose();
         scope = null;
         editor.FinishCuttingInspection(this);
+        if (!view.IsDisposed && ReferenceEquals(view.Plate, plate))
+            view.RestoreViewport(viewport);
         ownedScope?.ResumeHostClose();
         Dispose();
     }

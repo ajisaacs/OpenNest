@@ -325,7 +325,10 @@ namespace OpenNest.Forms
             content.Dock = DockStyle.Fill;
             sidePanel.Controls.Add(content);
             sidePanelTitle.Text = title;
-            viewSplitContainer.SplitterDistance = viewSplitContainer.Width - width;
+            var widest = System.Math.Max(viewSplitContainer.Panel1MinSize,
+                viewSplitContainer.Width - viewSplitContainer.Panel2MinSize - viewSplitContainer.SplitterWidth);
+            viewSplitContainer.SplitterDistance = System.Math.Clamp(viewSplitContainer.Width - width,
+                viewSplitContainer.Panel1MinSize, widest);
             viewSplitContainer.Panel2Collapsed = false;
         }
 
