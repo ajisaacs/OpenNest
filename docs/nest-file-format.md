@@ -59,6 +59,18 @@ cross-platform DTO mapping; the desktop settings serializer delegates to it so
 existing saved settings keep their JSON contract. Settings are independent of
 the saved part programs: restoring settings never regenerates those programs.
 
+## Clamp zones
+
+Each plate may carry an optional `clamps` array of fixed rectangular keep-out
+regions in plate coordinates: `id`, `x`, `y`, `length` (X extent) and `width`
+(Y extent, the depth intrusion from the `y = 0` operator-side edge for machine
+clamps). Zones are exclusion and display data only - never material, quantity,
+utilization, cut sequence or CNC output. Files without the key load with no
+zones, and an individually malformed entry (blank id, non-positive size) is
+dropped while the rest of the nest loads. Because clamp definitions are real
+machine state, a plate that carries only clamps is written even when it has no
+parts and no cut-offs; genuinely empty plates without clamps remain omitted.
+
 ## Drawing edits
 
 `DrawingProgramSnapshot` captures serialized main and hole-program text before

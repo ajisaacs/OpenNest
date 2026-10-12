@@ -71,6 +71,25 @@ namespace OpenNest.IO
             public CuttingParametersDto CuttingParameters { get; init; }
             public List<PartDto> Parts { get; init; } = new();
             public List<CutOffDto> CutOffs { get; init; } = new();
+
+            /// <summary>
+            /// Machine clamp keep-out rectangles in plate coordinates. Missing in older
+            /// files, which load with no zones.
+            /// </summary>
+            public List<ClampZoneDto> Clamps { get; init; } = new();
+        }
+
+        public record ClampZoneDto
+        {
+            public string Id { get; init; } = "";
+            public double X { get; init; }
+            public double Y { get; init; }
+
+            /// <summary>Extent along X.</summary>
+            public double Length { get; init; }
+
+            /// <summary>Extent along Y (depth from the y = 0 operator-side edge).</summary>
+            public double Width { get; init; }
         }
 
         public record PartDto

@@ -399,6 +399,25 @@ namespace OpenNest.IO
                 plate.GrainAngle = p.GrainAngle;
                 plate.CuttingParameters = CuttingParametersSerializer.FromDto(p.CuttingParameters);
 
+                // Clamp zones: older files have no key at all; an individually invalid
+                // entry is dropped rather than poisoning the whole nest.
+                if (p.Clamps != null)
+                {
+                    foreach (var c in p.Clamps)
+                    {
+                        try
+                        {
+                            plate.ClampZones.Add(
+                                new ClampZone(c.Id, new OpenNest.Geometry.Box(c.X, c.Y, c.Length, c.Width))
+                            );
+                        }
+                        catch (ArgumentException)
+                        {
+                            // Invalid zone definition; ignore this one entry.
+                        }
+                    }
+                }
+
                 for (var partIndex = 0; partIndex < p.Parts.Count; partIndex++)
                 {
                     var partDto = p.Parts[partIndex];

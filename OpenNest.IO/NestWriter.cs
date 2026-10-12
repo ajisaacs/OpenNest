@@ -208,6 +208,7 @@ namespace OpenNest.IO
                 if (
                     plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
                     && plate.CutOffs.Count == 0
+                    && plate.ClampZones.Count == 0
                 )
                     continue;
 
@@ -283,6 +284,16 @@ namespace OpenNest.IO
                         CutOffs = cutoffs,
                         GrainAngle = plate.GrainAngle,
                         CuttingParameters = CuttingParametersSerializer.ToDto(plate.CuttingParameters),
+                        Clamps = plate.ClampZones
+                            .Select(z => new ClampZoneDto
+                            {
+                                Id = z.Id,
+                                X = z.Bounds.X,
+                                Y = z.Bounds.Y,
+                                Length = z.Bounds.Length,
+                                Width = z.Bounds.Width,
+                            })
+                            .ToList(),
                     }
                 );
             }
