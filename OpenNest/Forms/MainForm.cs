@@ -198,16 +198,16 @@ namespace OpenNest.Forms
             var nest = new Nest();
             LoadNestDefaults().ApplyTo(nest);
             // After the defaults so the rail is converted to the new nest's units.
-            LoadClampSettings().ApplyToNewNest(nest);
+            LoadClampSettings(this).ApplyToNewNest(nest);
             return nest;
         }
 
         /// <summary>
-        /// Loads the machine clamp settings (see <see cref="LoadSavedClampSettings"/>); an
+        /// Loads the machine clamp settings for creating new nests (New, BOM import); an
         /// unreadable or partly invalid file warns once per session, because the new nest's
         /// clamps may not match the machine.
         /// </summary>
-        private ClampSettings LoadClampSettings()
+        internal static ClampSettings LoadClampSettings(IWin32Window owner)
         {
             var settings = LoadSavedClampSettings(out var status);
 
@@ -222,6 +222,7 @@ namespace OpenNest.Forms
                         ? "could not be read, so new nests have no clamps"
                         : "has invalid values that were ignored, so new nests may be missing clamps";
                 MessageBox.Show(
+                    owner,
                     $"The clamp settings file {problem}:\n{ClampSettings.DefaultPath}\n\nCheck the clamps in Nest > Clamps and use Save as Machine Defaults to rewrite the file.",
                     "Clamps",
                     MessageBoxButtons.OK,
@@ -231,7 +232,7 @@ namespace OpenNest.Forms
             return settings;
         }
 
-        private bool clampSettingsWarned;
+        private static bool clampSettingsWarned;
 
         /// <summary>The single desktop entry point for the persisted machine clamp settings.</summary>
         internal static ClampSettings LoadSavedClampSettings(out ClampSettingsStatus status) =>

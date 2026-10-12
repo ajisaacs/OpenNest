@@ -63,9 +63,10 @@ public sealed class ClampsForm : Form
                 MaximumSize = new Size(450, 0),
                 Padding = new Padding(0, 0, 0, 8),
                 Text =
-                    "Fixed clamps along the plate edge through the origin. Parts and nesting keep "
-                    + "clear of each clamp by the plate's bottom edge spacing. Clamps that do not "
-                    + "reach a shorter plate are left off it.",
+                    "Fixed clamps along the plate edge through the origin. Auto Nest keeps parts "
+                    + "clear of each clamp by the plate's bottom edge spacing; clamps that do not "
+                    + "reach a shorter plate are left off it. Interactive fill and push, the "
+                    + "overlap check and cutoffs do not avoid clamps yet.",
             }
         );
 
