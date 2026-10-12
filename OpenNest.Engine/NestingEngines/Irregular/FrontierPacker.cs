@@ -35,8 +35,8 @@ internal sealed record SheetFill(NestPlateStock Stock, IReadOnlyList<Placed> Par
 ///
 /// For every (part type, orientation) still in play the packer keeps the exact set of legal
 /// reference points: the inner-fit rectangle of the work area minus the no-fit polygons of
-/// everything already placed. Each placement subtracts one translated NFP from each region,
-/// so regions only shrink, and a region that empties is retired for the rest of the sheet.
+/// static clamps and everything already placed. Each placement subtracts one translated NFP
+/// from each region, so regions only shrink; an empty region is retired for the sheet.
 ///
 /// Choice rule, applied over all types and orientations at once (not in a fixed order):
 ///   1. Gap fill - if any part fits without pushing the packing front forward, place the
@@ -62,6 +62,7 @@ internal sealed class FrontierPacker
     private readonly Box work;
     private readonly WorkCounter counter;
     private readonly BlockCatalog? blocks;
+    private readonly ClampObstacles? clamps;
 
     public FrontierPacker(
         IReadOnlyList<PartType> types,
@@ -71,10 +72,12 @@ internal sealed class FrontierPacker
         PackAxis axis,
         double beta,
         WorkCounter counter,
-        BlockCatalog? blocks = null
+        BlockCatalog? blocks = null,
+        ClampObstacles? clamps = null
     )
     {
         this.blocks = blocks;
+        this.clamps = stock.ClampZones.Count == 0 ? null : clamps ?? new ClampObstacles(stock);
         this.counter = counter;
         this.types = types;
         this.nfps = nfps;
@@ -97,6 +100,16 @@ internal sealed class FrontierPacker
             if (!stock.Fits(o.Width, o.Height))
                 return false;
             var region = new Region(o, work, single);
+            if (clamps != null)
+                for (var i = 0; i < clamps.Count; i++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var nfp = clamps.Get(i, o);
+                    token.ThrowIfCancellationRequested();
+                    region.Subtract(nfp, 0, 0);
+                    counter.Add(1);
+                    token.ThrowIfCancellationRequested();
+                }
             states.Add(region);
             byOrientation[o] = region;
             return true;

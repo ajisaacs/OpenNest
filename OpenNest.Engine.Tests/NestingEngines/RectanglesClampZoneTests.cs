@@ -11,10 +11,8 @@ namespace OpenNest.Engine.Tests.NestingEngines;
 /// <summary>
 /// The Rectangles lane treats clamp zones as hard obstacles: placements never enter
 /// the keep-out, demand uses the material between clamps, and layouts with zero
-/// clamps stay bit-identical to the pre-clamp baseline (C2). Per the plan's Slice 1
-/// gate these tests name the Rectangles engine directly: the Irregular lane gets
-/// clamp parity in Slice 2, so until then the Default router is not asserted to
-/// satisfy C1 on clamp fixtures.
+/// clamps stay bit-identical to the pre-clamp baseline (C2). Irregular and Default
+/// parity is covered separately by IrregularClampZoneTests.
 /// </summary>
 public class RectanglesClampZoneTests
 {

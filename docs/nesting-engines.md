@@ -67,6 +67,25 @@ or invalid Fill proposal leaves singles and pairs available. Large enclosed-pock
 pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
 remain separate sequencer/verification work.
 
+## Rectangular clamp zones
+
+Whole-job Rectangles and Irregular exclude each stock's rectangular clamp zones,
+expanded on all sides by its bottom edge spacing. Part spacing is not added to clamp
+clearance. Default runs and validates both lanes as usual. Empty clamp collections
+leave the existing packing path unchanged; clamps never become requested or placed parts.
+
+Irregular prepares static rectangle obstacles and their cached no-fit polygons once
+per stock per solve, separately from the part-spacing cache. Every orientation's initial
+free region excludes these obstacles, including extra orientations introduced by pairs
+or Fill blocks. Blocks still size their proposals from work-area/placed-part rectangles;
+member free regions determine whether the whole proposal can actually fit around clamps.
+Open notches and material between clamps remain available. Existing arc/grid safety
+margins, covered-hole certification and cancellation apply without relaxed tolerances.
+
+This is whole-job engine support, not interactive fill/push, desktop clamp editing or
+cutoff/post-verification support; those consumers are separate work. Other engines and
+plug-ins have not gained clamp-aware placement from this change.
+
 ## Repeating completed layouts
 
 Rectangles and Irregular can skip repeated sheet searches after selecting one nonempty layout

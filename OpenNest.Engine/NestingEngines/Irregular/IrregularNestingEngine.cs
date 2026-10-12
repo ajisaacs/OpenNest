@@ -118,6 +118,7 @@ public sealed class IrregularNestingEngine : INestingEngine
 
         private const int MaxTail = 3;
         private readonly Dictionary<double, NoFitCache> caches = new();
+        private readonly Dictionary<NestPlateStock, ClampObstacles> clamps = new();
         private readonly Dictionary<double, IReadOnlyDictionary<int, IReadOnlyList<PairPose>>> pairs = new();
         private readonly Dictionary<double, BlockCatalog> blocks = new();
         private readonly IReadOnlyDictionary<string, NestJobPart> parts = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
@@ -198,6 +199,15 @@ public sealed class IrregularNestingEngine : INestingEngine
             return cache;
         }
 
+        private ClampObstacles? ClampsFor(NestPlateStock stock)
+        {
+            if (stock.ClampZones.Count == 0)
+                return null;
+            if (!clamps.TryGetValue(stock, out var found))
+                clamps[stock] = found = new ClampObstacles(stock);
+            return found;
+        }
+
         public bool PairFits(PartType type)
         {
             if (type.Part.Quantity < 2 || type.Orientations.Count == 0)
@@ -265,7 +275,8 @@ public sealed class IrregularNestingEngine : INestingEngine
                     if (stock.Quantity is int available && used[stock.Id] >= available)
                         continue;
                     progress?.Report(new NestJobProgress(NestJobStage.EvaluatingCandidate, stock.Id, sheets.Count, 0, 0));
-                    var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work, BlocksFor(stock));
+                    var packer = new FrontierPacker(types, CacheFor(stock), PairsFor(stock), stock, axis, beta, Work,
+                        BlocksFor(stock), ClampsFor(stock));
                     var fill = packer.Fill(remaining, token);
                     sheetPacked?.Invoke();
                     if (fill.Parts.Count > 0)
