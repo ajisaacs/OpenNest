@@ -67,6 +67,36 @@ or invalid Fill proposal leaves singles and pairs available. Large enclosed-pock
 pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
 remain separate sequencer/verification work.
 
+## Repeating completed layouts
+
+Rectangles and Irregular can skip repeated sheet searches after selecting one nonempty layout
+whose normal sheet search has completed. The repeat count includes the first physical copy and
+is limited by the scarcest requirement on that layout, remaining finite stock and the remaining
+physical `MaxPlates` allowance. Parts absent from the layout keep their demand. A salvage-worthy
+offcut does not prevent repetition: completion means the engine found no further supported
+requested placement, not that no geometric packing exists.
+
+Fast-forwarding applies only while exactly one stock entry remains available. Different stock
+IDs count as alternatives even at identical dimensions. Irregular's forced-first-stock tail trial
+still counts **all** remaining stock entries, not just that trial's restricted shortlist; it commits
+the forced first sheet once when alternatives remain and resumes ordinary stock selection.
+Candidates that cannot pass the existing candidate validator retain ordinary one-sheet allocation.
+Cancellation never certifies a layout and is checked during physical-copy expansion.
+
+Both engines continue automatically with residual demand in the same solve, including when a
+layout's repeat count is one. There is no per-layout stop, confirmation or opt-in mode. Rectangles
+retains both Global/Ordered packing modes and its priority guard. Irregular retains demand-dependent
+singles, pairs and blocks, variant ordering and its existing work-budget semantics; saved work can
+allow additional variants to run, so this is not a promise of historical pose equality.
+
+Raw `NestJobResult` output remains one entry per physical sheet, with fresh placements and unique
+instance indices, physical stock usage and physical progress counts. Irregular also retains each
+physical copy in its working plan: its last-one-to-three-sheet improvement can return the removed
+tail's finite stock, repack that demand, and replace just those copies while keeping the prefix.
+Default inherits these fast paths by running the two engines; other engines and external plug-ins
+keep their existing search behavior. Quantity-bearing presentation is a separate validated-pipeline
+representation; repeating does not bypass whole-job validation or change cutting programs.
+
 ## Filling cutouts (not yet in production)
 
 Placing parts inside another part's enclosed cutout is being built as a step that runs before any
