@@ -58,7 +58,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly Button previousButton = new() { Text = "Previous", AutoSize = true };
     private readonly Button nextButton = new() { Text = "Next", AutoSize = true };
     private readonly CheckBox keepOrderCheckBox = new() { Text = "Keep current part order", AutoSize = true };
-    private readonly CheckBox acceptWarningsCheckBox = new() { Text = "Accept UNVERIFIED plan warnings (not posting consent)", AutoSize = true, Visible = false };
+    private readonly CheckBox acceptWarningsCheckBox = new() { Text = "Accept UNVERIFIED plan warnings (post consent happens separately)", AutoSize = true, Visible = false };
     private readonly Label settingsLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
     private readonly Label previewLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
     private readonly Label validationScopeLabel = new()
@@ -66,7 +66,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         AutoSize = true,
         MaximumSize = new Size(440, 0),
         Visible = false,
-        Text = "LIVE NEST only — not posting consent. Minimum spacing, plate boundaries and final post output are not checked."
+        Text = "LIVE NEST only — reviews overlaps, lead-ins and rapid crossings. Confirm minimum spacing, plate boundaries and final post output separately, before posting."
     };
     private readonly DataGridView warningGrid = new()
     {
@@ -239,14 +239,14 @@ internal sealed class CuttingInspectionPanel : UserControl
                 SetPlanning(false);
                 if (!task.IsCompletedSuccessfully)
                 {
-                    resultLabel.Text = task.IsCanceled ? "Validation cancelled. This nest has not passed the checks."
-                        : $"Validation failed. This nest has not passed the checks. {task.Exception?.GetBaseException().Message}";
+                    resultLabel.Text = task.IsCanceled ? "Validation cancelled. Run it again to review this nest."
+                        : $"Validation failed. Run it again to review this nest. {task.Exception?.GetBaseException().Message}";
                     return;
                 }
                 ValidationReport = task.Result;
                 resultLabel.Text = ValidationReport.ToDisplayText("Nest validation (live programs)");
                 previewLabel.Text = ValidationReport.Findings.Any(f => f.Kind == PostVerificationKind.Incomplete)
-                    ? "Validation incomplete. Review the findings; this nest has not passed all checks."
+                    ? "Validation incomplete. Review the findings below."
                     : ValidationReport.HasWarnings ? "Warnings found. Review the findings below."
                     : "Validation complete. No warnings found by these checks.";
                 populatingWarnings = true;
@@ -265,7 +265,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             catch (Exception ex)
             {
                 view.ClearValidationFinding();
-                resultLabel.Text = $"Validation failed. This nest has not passed the checks. {ex.Message}";
+                resultLabel.Text = $"Validation failed. Run it again to review this nest. {ex.Message}";
             }
             finally { completion.TrySetResult(); }
         }, null), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);

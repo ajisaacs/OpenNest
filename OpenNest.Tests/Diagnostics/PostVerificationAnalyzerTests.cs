@@ -19,7 +19,7 @@ public class PostVerificationAnalyzerTests
         Assert.Contains("Overlap", text);
         Assert.Contains("Missing lead-ins", text);
         Assert.Contains("Rapid crossings", text);
-        Assert.Contains("not a physical safety certification", text);
+        Assert.Contains("Inspect the posted machine program", text);
         Assert.Contains("retract", text);
         Assert.Contains("routing", text);
     }

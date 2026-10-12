@@ -202,7 +202,7 @@ public static class AutomaticCutOffPlanner
             if (!usable)
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.EmptyCut,
-                    "The line has no usable cut segments after part clearance and minimum-length filtering; it is not a partition.",
+                    "The line has no usable cut segments after part clearance and minimum-length filtering.",
                     X: x));
 
             if (isSeparator)
@@ -218,7 +218,7 @@ public static class AutomaticCutOffPlanner
             else if (usable && !IsFullSpanProgram(program, bounds))
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.SegmentedCut,
-                    "Part clearance or segment filtering interrupts this line; nominal spacing does not guarantee disconnected scrap.",
+                    "Part clearance or segment filtering interrupts this line; review scrap separation before relying on it.",
                     X: x));
 
             if (usable && existing == null)
@@ -227,7 +227,7 @@ public static class AutomaticCutOffPlanner
 
         void WarnNoSeparator(double x) => diagnostics.Add(new AutomaticCutOffDiagnostic(
             AutomaticCutOffDiagnosticCode.NoSafeTailSeparator,
-            "No safe full-width tail separator survives the current settings. No separated tail is claimed; review manually.",
+            "No safe full-width tail separator survives the current settings. Review the tail manually.",
             X: x));
     }
 

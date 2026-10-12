@@ -135,8 +135,8 @@ partial class AutomaticCutOffForm
         warningLabel.Margin = new Padding(3, 3, 3, 10);
         warningLabel.Name = "warningLabel";
         warningLabel.TabIndex = 2;
-        warningLabel.Text = "Nominal spacing is not cut-line length. Clearances and omitted segments can leave bridges. "
-            + "This does not certify disconnected scrap or hopper fit. Tail dimensions describe a proposed program, not a physical separation.";
+        warningLabel.Text = "Nominal spacing differs from cut-line length. Clearances and omitted segments can leave bridges. "
+            + "Confirm disconnected scrap and hopper fit before relying on it. Tail dimensions describe a proposed program; verify the physical separation.";
         //
         // occupiedLabel
         //

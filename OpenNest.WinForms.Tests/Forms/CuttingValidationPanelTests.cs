@@ -58,7 +58,7 @@ public class CuttingValidationPanelTests
             .Select(dy => bitmap.GetPixel(cx + dx, cy + dy))), pixel =>
             pixel.R > 150 && pixel.B > 50 && pixel.G < 100);
         Assert.Contains("Crosshairs", Field<TextBox>(panel, "resultLabel").Text);
-        Assert.Contains("Minimum spacing, plate boundaries and final post output are not checked", Field<Label>(panel, "validationScopeLabel").Text);
+        Assert.Contains("Confirm minimum spacing, plate boundaries and final post output separately", Field<Label>(panel, "validationScopeLabel").Text);
         Assert.True(Field<Label>(panel, "validationScopeLabel").Visible);
         Assert.Contains("Nest validation (live programs)", Field<TextBox>(panel, "resultLabel").Text);
         panel.RequestClose();
@@ -84,7 +84,7 @@ public class CuttingValidationPanelTests
         Pump(() => panel.ValidationReport != null && !panel.IsPlanning);
         Assert.Contains(incomplete ? "Validation incomplete" : "No warnings found", Field<Label>(panel, "previewLabel").Text);
         Assert.True(Field<Label>(panel, "validationScopeLabel").Visible);
-        Assert.Contains("not posting consent", Field<Label>(panel, "validationScopeLabel").Text);
+        Assert.Contains("LIVE NEST only", Field<Label>(panel, "validationScopeLabel").Text);
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         panel.RequestClose();
     });

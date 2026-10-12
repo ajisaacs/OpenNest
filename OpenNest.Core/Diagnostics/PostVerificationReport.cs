@@ -57,16 +57,16 @@ public sealed class PostVerificationReport
                 text.Append($", other part {other}");
             text.AppendLine($": {finding.Kind}: {finding.Message}");
         }
-        text.AppendLine("This is not a physical safety certification. The check uses direct XY rapids " +
-            "in plate/program order; the post may change order, routing or retracts. Inspect the posted " +
-            "machine program and machine setup. Actual contour gaps are not proof of adequate retention.");
+        text.AppendLine("These checks cover direct XY rapids in plate/program order; the post may " +
+            "change order, routing or retracts. Inspect the posted machine program and machine setup " +
+            "before cutting, and confirm actual contour gaps give adequate retention.");
         return text.ToString();
 
         void Summary(PostVerificationKind kind, string label)
         {
             var count = Findings.Count(finding => finding.Kind == kind);
             text.AppendLine($"{label}: {count} warning(s)" +
-                (incomplete ? "; verification incomplete — do not treat as clear." : "."));
+                (incomplete ? "; verification incomplete — review before posting." : "."));
         }
     }
 }

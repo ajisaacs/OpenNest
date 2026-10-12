@@ -358,7 +358,7 @@ public sealed class CuttingPlanProposal
                 + $"{Count(Plates.Sum(p => p.RegeneratedCount), "part program")} regenerated.");
         else if (RequiresWarningAcceptance)
             lines.Add("Best-effort plan available. Review the warnings and accept the unverified plan to apply. "
-                + "This is not approval to cut or post CNC output.");
+                + "Posting CNC output still requires its own review and approval.");
         else
             lines.Add($"Apply is unavailable: {blocked} of {Count(Plates.Count, "plate")} could not "
                 + "be planned. No plate changes until every plate is ready.");

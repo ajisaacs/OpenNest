@@ -423,7 +423,7 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   tolerance, so the source can be reviewed in the drawing editor. Reporting never
   closes gaps or changes the validation tolerance. A fully ready batch
   can apply immediately; an unverified batch requires the unchecked, per-proposal
-  `Accept UNVERIFIED plan warnings (not posting consent)` checkbox. Replanning clears it.
+  `Accept UNVERIFIED plan warnings (post consent happens separately)` checkbox. Replanning clears it.
   Both use the same owned-program, freshness and rollback boundary. After it applies, each plate keeps its own copy of the
   confirmed settings, which also become the saved defaults. `Stale` keeps the panel open
   and asks for a replan; nothing changes.

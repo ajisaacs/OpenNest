@@ -22,8 +22,8 @@ internal static class BestEffortCuttingPlan
             return new(CuttingPlanStatus.InvalidInput);
         var findings = snapshot.Findings.ToList();
         findings.Add(new(null, null, null, null, PostVerificationKind.Incomplete,
-            "Best-effort plan: lead clearance, rapid travel and material containment are not certified. "
-            + "Review the complete plan before cutting. Source contours have not been repaired."));
+            "Best-effort plan: review lead clearance, rapid travel, material containment and source "
+            + "contours as part of a complete review before cutting."));
         var order = new List<FixedProgramPlacement>();
         var done = new HashSet<int>();
         var position = snapshot.StartPoint;

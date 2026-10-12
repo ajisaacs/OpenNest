@@ -97,8 +97,7 @@ concurrent calls cannot lay out text differently from a sequential export.
 
 Advanced timing, cutting distances, pierce counts, weights, costs, gas use, and
 machine/NC identity are intentionally omitted until their semantics are verified.
-The PDF can be opened or printed through a normal PDF viewer; its fitted diagram
-is not a dimensioned cutting drawing.
+The PDF can be opened or printed through a normal PDF viewer.
 
 ## Backend, fonts and redistribution
 

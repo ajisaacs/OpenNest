@@ -953,7 +953,7 @@ namespace OpenNest.Geometry
                 OldSampleCount = old.TotalSamples,
                 DiagnosticIoU = iou,
                 FailureMessage = (reasons & (AlignmentReasons.FailedConvergence | AlignmentReasons.InsufficientSupport)) != 0
-                    ? "Automatic alignment is not trustworthy for this pair; use the manual overlay."
+                    ? "Use the manual overlay to align this pair."
                     : null,
             };
         }

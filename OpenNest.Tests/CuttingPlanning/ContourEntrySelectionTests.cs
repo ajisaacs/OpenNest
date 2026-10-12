@@ -162,7 +162,7 @@ public class ContourEntrySelectionTests
 
         Assert.Equal(ContourSelectionShortfall.Incomplete, result.Shortfall);
         Assert.DoesNotContain("No tested lead-in fits", result.Reason ?? string.Empty);
-        Assert.Contains("not a geometric verdict", result.Reason);
+        Assert.Contains("undetermined rather than a geometric verdict", result.Reason);
     }
 
     [Fact]

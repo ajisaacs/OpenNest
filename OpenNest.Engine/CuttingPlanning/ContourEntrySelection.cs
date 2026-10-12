@@ -165,7 +165,7 @@ internal static class ContourEntrySelection
         if (sawIncomplete)
         {
             shortfall = ContourSelectionShortfall.Incomplete;
-            reason = "At least one lead check could not complete; this is not a geometric verdict and nothing is proven impossible."
+            reason = "At least one lead check could not complete; treat the result as undetermined rather than a geometric verdict."
                 + (incompleteReason == null ? "" : $" First reason: {incompleteReason}");
         }
         else if (selected.Count >= maxEntries)

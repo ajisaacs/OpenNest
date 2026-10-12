@@ -188,7 +188,7 @@ public static class NestPdfWriter
         legend.Format.SpaceBefore = Unit.FromPoint(4);
         var labelsNote = section.AddParagraph("Part IDs are shown where space permits. A dotted outline groups like parts under one ID.");
         labelsNote.Format.Font.Size = 7.5;
-        var approval = section.AddParagraph("This report is not a geometry or CNC approval.");
+        var approval = section.AddParagraph("Verify geometry and CNC output separately before cutting.");
         approval.Format.Font.Size = 7.5;
         approval.Format.SpaceAfter = Unit.FromPoint(4);
 
@@ -375,7 +375,6 @@ public static class NestPdfWriter
         footer.AddPageField();
         footer.AddText(" of ");
         footer.AddNumPagesField();
-        footer.AddText("  |  Diagram fitted to page; not a dimensioned cutting drawing.");
         footer.Format.Font.Size = 7.5;
         return section;
     }
