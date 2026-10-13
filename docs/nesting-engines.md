@@ -90,15 +90,16 @@ are enclosed on the existing clipping grid before NFP preparation, retaining at 
 grid interval per axis so positive sub-grid clamps cannot disappear. Existing arc/grid
 safety margins, covered-hole certification and cancellation apply without relaxed tolerances.
 
-Known clamp edge cases remain in the earlier shared/Rectangles implementation:
-large part spacing can make Rectangles overlap a clamp; rectangles below the clipping
-grid can make layout validation (including Default's candidate scoring) throw. Irregular's
-static-obstacle preparation does not repair these separate paths. The ordinary clamp
-fixtures pass for both lanes and Default; this is not an all-input clamp-safety guarantee.
+Rectangles blocks each clamp's keep-out out of its free list. When part spacing is so
+large that the spacing-adjusted block would invert, it blocks a zero-width line at the
+clamp edge facing the sheet interior instead: parts on that side keep the exact clearance
+and the unavoidable extra exclusion falls toward the nearer sheet edge. Keep-outs narrower
+than 0.001" on either axis are judged by a tolerance-free rectangle test
+(`KeepOutOverlap`) in layout validation, interactive fill and the overlap check, so they
+can neither crash validation nor be called clear.
 
-This is whole-job engine support, not interactive fill/push or cutoff/post-verification
-support; those consumers are separate work. Desktop clamp editing and the stock-size
-resolution of a nest's clamp rail are described in
+Desktop clamp editing, the stock-size resolution of a nest's clamp rail, last-resort clamp
+removal and the other clamp-aware tools are described in
 [automatic nesting](automatic-nesting.md#machine-edge-clamps). Other engines and
 plug-ins have not gained clamp-aware placement from this change.
 

@@ -66,8 +66,30 @@ resizing or rotating a plate re-resolves its clamps. Auto Nest
 offers each stock size with the rail resolved for that size, and every committed
 sheet keeps exactly the clamps its layout was validated against. Clamps are
 drawn as hatched amber rectangles over the sheet; they cannot be selected,
-moved or sequenced and never count as parts. Interactive fill/push, the overlap
-check and cutoffs do not yet avoid clamps.
+moved or sequenced and never count as parts. Interactive fill, pack and push
+keep parts clear of clamps, Check Overlaps reports parts on a clamp and manual
+cut-offs crossing one, automatic cutoffs never place a cut through a clamp, and
+pre-post verification warns (with per-attempt consent) about parts, cut-offs
+and direct rapids crossing an active clamp - including the first rapid when a
+clamp covers the program start point.
+
+### Last-resort clamp removal
+
+When a part cannot be placed on an empty sheet of any offered size with every
+clamp in place - neither the selected engine nor the Irregular or Rectangles
+lane finds a clamped placement - Auto Nest takes the fewest neighbouring clamps
+off one sheet that let it fit (the run nearest the origin on ties) and nests it
+on extra sheets with those clamps removed; other unplaced parts may share the
+freed sheets. It never removes a clamp to save material, never re-plans a sheet
+the normal nest already used, draws only on stock that is left, and only
+removes clamps resolved from the machine rail. The completion summary lists
+"Sheet N: remove clamp K (+M min)", the sheet shows each removed clamp dashed
+with "remove", and each removed clamp on the sheet adds the rail's removal
+minutes (default 5, set in **Nest > Clamps...**) to that sheet's cut time.
+
+Limits: the search stops after 1000 single-part trial solves and then keeps the
+normal result, removing nothing; and a part whose material clears a clamp by
+less than the engines' 0.0001" grid may still be reported as needing a removal.
 
 ## Integration constraints
 
