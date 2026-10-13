@@ -10,7 +10,13 @@ namespace OpenNest.Diagnostics;
 /// <summary>Request-local, validated single-outer material. Never exposed to report consumers.</summary>
 internal sealed record OverlapMaterial(Polygon Outer, List<Polygon> Holes)
 {
-    internal static OverlapMaterial Read(List<Entity> entities, CancellationToken cancellationToken)
+    internal static OverlapMaterial Read(List<Entity> entities, CancellationToken cancellationToken) =>
+        Read(entities, cancellationToken, PlateOverlapAnalyzer.ChordTolerance);
+
+    /// <summary>As <see cref="Read(List{Entity}, CancellationToken)"/> with a caller-chosen
+    /// chord tolerance (a finer one for keep-outs smaller than the default).</summary>
+    internal static OverlapMaterial Read(List<Entity> entities, CancellationToken cancellationToken,
+        double chordTolerance)
     {
         // ShapeBuilder can reverse entities while chaining. Own a fresh copy for each analysis.
         var shapes = ShapeBuilder.GetShapes(entities.Select(entity => entity.Clone()));
@@ -21,7 +27,7 @@ internal sealed record OverlapMaterial(Polygon Outer, List<Polygon> Holes)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ValidateChain(shape);
-            var polygon = shape.ToPolygonWithTolerance(PlateOverlapAnalyzer.ChordTolerance);
+            var polygon = shape.ToPolygonWithTolerance(chordTolerance);
             // The analytic chain was validated above. Normalize its sampled seam (e.g.
             // sin(2*pi) is not exactly zero), rather than adding a spurious microscopic edge.
             if (polygon.IsClosed())

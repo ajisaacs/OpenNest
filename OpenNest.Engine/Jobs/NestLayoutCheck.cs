@@ -186,8 +186,7 @@ public static class NestLayoutCheck
                 if (!BoxesTouch(keepOut, MaterialBounds(part)))
                     continue;
 
-                var material = Outline(part, 0);
-                if (material == null || !OverlapsKeepOut(material, keepOutOutline, keepOut))
+                if (!OverlapsKeepOut(part, keepOutOutline, keepOut))
                     continue;
 
                 result.Add(
@@ -218,13 +217,21 @@ public static class NestLayoutCheck
     /// <summary>
     /// Material against a keep-out rectangle. A rectangle below the outline tolerance, or one
     /// the triangulated test cannot prepare, is judged by the tolerance-free rectangle test
-    /// instead: the tolerant path would call real overlap clear.
+    /// on the part's native contours (not the grid-rounded validation outline): the
+    /// tolerant path would call real overlap clear. A part without material is skipped.
     /// </summary>
-    private static bool OverlapsKeepOut(PartOutline material, PartOutline keepOutOutline, Box keepOut)
+    private static bool OverlapsKeepOut(Part part, PartOutline keepOutOutline, Box keepOut)
     {
         if (KeepOutOverlap.NeedsToleranceFreeTest(keepOut) || keepOutOutline.Triangles == null)
-            return KeepOutOverlap.MaterialEnters(material.Perimeter, material.Holes, keepOut);
-        return Overlaps(material, keepOutOutline);
+        {
+            var entities = ConvertProgram.ToGeometry(part.Program)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                .ToList();
+            var profile = entities.Count == 0 ? null : new ShapeProfile(entities);
+            return profile?.Perimeter != null && KeepOutOverlap.ProfileEnters(profile, part.Location, keepOut);
+        }
+        var material = Outline(part, 0);
+        return material != null && Overlaps(material, keepOutOutline);
     }
 
     /// <summary>

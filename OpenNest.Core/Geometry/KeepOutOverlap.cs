@@ -20,6 +20,35 @@ public static class KeepOutOverlap
         keepOut.Length < ToleranceFreeBelow || keepOut.Width < ToleranceFreeBelow;
 
     /// <summary>
+    /// Chord tolerance for flattening real part material against <paramref name="keepOut"/>:
+    /// a quarter of its smaller side (at most <see cref="ToleranceFreeBelow"/>), so the
+    /// sliver between an arc and its chord can never hold the whole rectangle - any real
+    /// overlap then shows up as a polygon edge through it or its centre inside.
+    /// </summary>
+    public static double FlatteningTolerance(Box keepOut) =>
+        System.Math.Min(ToleranceFreeBelow, System.Math.Min(keepOut.Length, keepOut.Width) / 4);
+
+    /// <summary>
+    /// <see cref="MaterialEnters"/> for a part's native contours (lines kept exactly, arcs
+    /// flattened at <see cref="FlatteningTolerance"/>), translated by <paramref name="offset"/>.
+    /// Never fed through a grid-rounding offset or a coarse flattening.
+    /// </summary>
+    public static bool ProfileEnters(ShapeProfile profile, Vector offset, Box keepOut)
+    {
+        var tolerance = FlatteningTolerance(keepOut);
+        var perimeter = profile.Perimeter.ToPolygonWithTolerance(tolerance);
+        perimeter.Offset(offset);
+        var holes = new List<Polygon>(profile.Cutouts.Count);
+        foreach (var cutout in profile.Cutouts)
+        {
+            var hole = cutout.ToPolygonWithTolerance(tolerance);
+            hole.Offset(offset);
+            holes.Add(hole);
+        }
+        return MaterialEnters(perimeter, holes, keepOut);
+    }
+
+    /// <summary>
     /// True when the material (perimeter minus holes) shares positive area with the open
     /// rectangle: some boundary edge runs through its interior, or its interior lies wholly
     /// inside the material (tested at its centre).

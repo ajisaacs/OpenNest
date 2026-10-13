@@ -100,8 +100,7 @@ internal static class InteractiveClamps
         // A keep-out below the polygon tolerance collapses in the tolerant test and would
         // read as clear (PM b0062c73); judge it tolerance-free instead.
         if (KeepOutOverlap.NeedsToleranceFreeTest(keepOut))
-            return KeepOutOverlap.MaterialEnters(partProfile.Perimeter.ToPolygonWithTolerance(0.001),
-                HolePolygons(partProfile), keepOut);
+            return KeepOutOverlap.ProfileEnters(partProfile, new Vector(0, 0), keepOut);
         var zoneProfile = new ShapeProfile(RectangleEntities(keepOut));
         if (zoneProfile.Perimeter == null)
             return true;

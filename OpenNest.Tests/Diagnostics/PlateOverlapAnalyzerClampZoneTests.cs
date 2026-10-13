@@ -214,6 +214,40 @@ public class PlateOverlapAnalyzerClampZoneTests
         Assert.Equal(overlaps, report.ClampFindings.Any(f => f.PartBName.Contains("tiny")));
     }
 
+    // PM 407f5eb7: real material, not the 0.001 arc flattening, decides a tiny clamp.
+    [Theory]
+    [InlineData("rect", 8.00002, 0.5, true)]
+    [InlineData("rect", 8.00005, 0.5, false)]
+    [InlineData("disk", 1.9998, 0, true)]
+    [InlineData("disk", 2.0002, 0, false)]
+    public void TinyClampIsJudgedAgainstRealMaterial(string material, double a, double b, bool overlaps)
+    {
+        Program program;
+        Box zone;
+        if (material == "rect")
+        {
+            program = Rect(8.00004, 2);
+            zone = new Box(a, b, 1e-5, 1e-5);
+        }
+        else
+        {
+            program = new Program();
+            program.MoveTo(12, 10);
+            program.ArcTo(8, 10, 10, 10, RotationType.CCW);
+            program.ArcTo(12, 10, 10, 10, RotationType.CCW);
+            var cx = 10 + a * System.Math.Cos(0.02);
+            var cy = 10 + a * System.Math.Sin(0.02);
+            zone = new Box(cx - 0.000005, cy - 0.000005, 1e-5, 1e-5);
+        }
+        var parts = new List<Part> { new(new Drawing(material, program), new Vector(0, 0)) };
+
+        var report = PlateOverlapAnalyzer.Analyze(
+            PlateOverlapAnalyzer.Capture(parts, new[] { new ClampZone("tiny", zone) }));
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues.Select(issue => issue.Message)));
+        Assert.Equal(overlaps, report.ClampFindings.Count > 0);
+    }
+
     private static string Describe(PlateOverlapReport report) =>
         string.Join(";", report.Pairs.Select(p => $"{p.PartAId}/{p.PartBId}:{p.Area:R}"))
         + "|"

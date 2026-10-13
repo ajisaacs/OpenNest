@@ -186,4 +186,74 @@ public class TinyClampZoneTests
 
         Assert.False(EntersTinyZone(mover), $"pushed to ({mover.Location.X:R},{mover.Location.Y:R})");
     }
+    // PM 407f5eb7: the tolerance-free test must read the part's real material, not the
+    // 1e-4-grid validation outline or a 0.001 arc flattening.
+    private static Program RectProgram(double w, double h)
+    {
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.LineTo(w, 0);
+        program.LineTo(w, h);
+        program.LineTo(0, h);
+        program.LineTo(0, 0);
+        return program;
+    }
+
+    private static Program DiskProgram()
+    {
+        // Radius 2 centred at (10, 10), two absolute CCW half circles.
+        var program = new Program();
+        program.MoveTo(12, 10);
+        program.ArcTo(8, 10, 10, 10, RotationType.CCW);
+        program.ArcTo(12, 10, 10, 10, RotationType.CCW);
+        return program;
+    }
+
+    private static Box DiskBox(double radius)
+    {
+        var cx = 10 + radius * System.Math.Cos(0.02);
+        var cy = 10 + radius * System.Math.Sin(0.02);
+        return new Box(cx - 0.000005, cy - 0.000005, Tiny, Tiny);
+    }
+
+    public static TheoryData<string, Box, bool> RealMaterialRows => new()
+    {
+        { "rect-8.00004", new Box(8.00002, 0.5, Tiny, Tiny), true },   // wholly inside the part
+        { "rect-8.00004", new Box(8.00005, 0.5, Tiny, Tiny), false },  // just beyond its edge
+        { "rect-2.00004", new Box(2.000032, 1, 5e-6, Tiny), true },
+        { "disk", DiskBox(1.9998), true },  // inside the true arc, outside its 0.001 chords
+        { "disk", DiskBox(2.0002), false }, // just outside the true arc
+    };
+
+    private static Program MaterialProgram(string name) => name switch
+    {
+        "rect-8.00004" => RectProgram(8.00004, 2),
+        "rect-2.00004" => RectProgram(2.00004, 2),
+        _ => DiskProgram(),
+    };
+
+    [Theory]
+    [MemberData(nameof(RealMaterialRows))]
+    public void LayoutCheckReadsRealMaterialAroundATinyClamp(string material, Box zone, bool overlaps)
+    {
+        var program = MaterialProgram(material);
+        var stock = new NestPlateStock("sheet", new Size(20, 20), null, 0, default, 1,
+            new[] { new ClampZone("tiny", zone) });
+        var job = new NestJob(new[] { new NestJobPart("p", PartGeometrySnapshot.FromProgram(program), 1, 0,
+            RotationPolicy.Fixed(0)) }, new[] { stock });
+        NestJobValidator.Validate(job);
+        var result = new NestJobResult(NestJobStatus.Complete, NestJobStopReason.Completed,
+            new[] { new NestJobPlateResult(0, stock, new[] { new NestJobPlacement("p", 0, 0, 0, 0) }) },
+            Array.Empty<PartFulfillment>(), Array.Empty<StockUsage>());
+
+        Assert.Equal(overlaps, ClampViolations(job, result).Count > 0);
+    }
+
+    [Theory]
+    [MemberData(nameof(RealMaterialRows))]
+    public void InteractiveKeepOutTestReadsRealMaterial(string material, Box zone, bool overlaps)
+    {
+        var part = new Part(new Drawing(material, MaterialProgram(material)));
+        Assert.Equal(overlaps, InteractiveClamps.MaterialInKeepOut(part, zone));
+    }
 }
