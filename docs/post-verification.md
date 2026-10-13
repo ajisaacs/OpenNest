@@ -57,6 +57,8 @@ shows all three check categories, even when there are no findings:
   a sufficiently large cutout is not itself an overlap. The same review also warns if a nominal
   manual cut-off line crosses an active clamp, even when its regenerated cut is currently trimmed;
   a line contact has no material-overlap area. Removed clamps on that sheet are not checked.
+  The placed cut-off program is checked too, so a definition edited without regenerating its
+  cut still warns where the posted cut would cross a clamp (one warning per cut-off and clamp).
   Clamp zones are compared in the plate's quadrant frame. A missing or malformed clamp zone
   makes the clamp checks incomplete (a warning), never a clear result.
   This uses clean drawing geometry, not added lead-in/out paths.

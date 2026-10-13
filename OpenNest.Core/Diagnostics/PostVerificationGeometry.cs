@@ -147,6 +147,7 @@ internal static class PostVerificationGeometry
         private double Radius { get; }
         private double Sweep { get; }
         internal double Length => Center.HasValue ? Radius * System.Math.Abs(Sweep) : Start.DistanceTo(End);
+        internal bool IsLine => !Center.HasValue;
 
         // Native entities are freshly allocated; the immutable curve never exposes state.
         internal Entity ToEntity() => Center is { } center

@@ -200,6 +200,42 @@ public class ClampZonePlacementFrameTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void StalePlacedCutoffAcrossRailClampStillRequiresConsent(int quadrant)
+    {
+        // The placed vertical cut runs across the whole sheet width, through the clamp.
+        var plate = RailPlate(quadrant, 35);
+        var cut = new CutOff(new Vector(XSign(quadrant) * 35, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cut);
+        plate.RegenerateCutOffs(new CutOffSettings { CutDirection = CutDirection.TowardOrigin });
+
+        // In quadrants 3 and 4 the incoming rapid also reaches the clamp; only the cut is asserted.
+        var current = PostVerificationAnalyzer.Analyze(NestOf(plate));
+        var nominal = Assert.Single(current.Findings, f => f.Kind == PostVerificationKind.Overlap);
+        Assert.Equal("clamp-1", nominal.ClampId);
+        Assert.Equal(1, nominal.PartNumber);
+
+        // The definition moves clear of the clamp, but the placed program is not regenerated.
+        cut.Position = new Vector(XSign(quadrant) * 50, 0);
+        Assert.Empty(ClampCutDiagnostics.Find(plate));
+
+        var stale = PostVerificationAnalyzer.Analyze(NestOf(plate));
+        var placed = Assert.Single(stale.Findings, f => f.Kind == PostVerificationKind.Overlap);
+        Assert.Equal("clamp-1", placed.ClampId);
+        Assert.Equal(1, placed.PartNumber);
+        Assert.Contains("placed", placed.Message);
+        var footprint = WorldFootprint(quadrant, 35, 1.5, 0.625);
+        var location = Assert.NotNull(placed.Location);
+        Assert.InRange(location.X, footprint.Left, footprint.Right);
+        Assert.InRange(location.Y, footprint.Bottom, footprint.Top);
+        Assert.False(stale.CanPost(false));
+        Assert.True(stale.CanPost(true));
+    }
+
+    [Theory]
     [InlineData("NaN")]
     [InlineData("negative")]
     [InlineData("overflow")]

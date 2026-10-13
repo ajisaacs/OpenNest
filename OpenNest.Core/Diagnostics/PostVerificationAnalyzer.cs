@@ -69,6 +69,9 @@ public static class PostVerificationAnalyzer
                 findings.Add(new(PostVerificationKind.Incomplete, plateNumber, null, null,
                     "Clamp check: " + exception.Message));
             }
+            // One clamp warning per cut-off part and clamp: the placed-program check below
+            // reports only what the nominal definition check has not already reported.
+            var cutOffClampContacts = new HashSet<(int PartNumber, string ClampId)>();
             if (clamps != null)
             {
                 try
@@ -83,6 +86,8 @@ public static class PostVerificationAnalyzer
                                 partIndex = partSlot;
                                 break;
                             }
+                        if (partIndex >= 0)
+                            cutOffClampContacts.Add((partIndex + 1, contact.ClampId));
                         findings.Add(new(PostVerificationKind.Overlap, plateNumber,
                             partIndex < 0 ? null : partIndex + 1, null,
                             $"Manual cut-off {contact.CutOffIndex + 1} crosses active clamp '{contact.ClampId}'. "
@@ -156,6 +161,25 @@ public static class PostVerificationAnalyzer
                                         ClampId = zone.Id
                                     });
                         }
+                    // The placed program is what posts: a definition edited without
+                    // regenerating it can still cut through a clamp its nominal line misses.
+                    if (cutoff && clamps is { Count: > 0 })
+                        foreach (var move in moves)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (move.Rapid || move.Start is not { } from)
+                                continue;
+                            foreach (var zone in clamps)
+                                if (!cutOffClampContacts.Contains((partNumber, zone.Id))
+                                    && CutTouches(move, from, zone.Bounds, out var contact))
+                                {
+                                    cutOffClampContacts.Add((partNumber, zone.Id));
+                                    findings.Add(new(PostVerificationKind.Overlap, plateNumber, partNumber, null,
+                                        $"The placed cut-off program crosses active clamp '{zone.Id}'. "
+                                        + "Regenerate or move the cut-off before posting; this warning is not a repair.")
+                                    { Location = contact, ClampId = zone.Id });
+                                }
+                        }
                     position = moves[^1].End;
                 }
                 catch (Exception exception) when (IsInvalid(exception))
@@ -188,6 +212,19 @@ public static class PostVerificationAnalyzer
         }
         cancellationToken.ThrowIfCancellationRequested();
         return new PostVerificationReport(findings);
+    }
+
+    // Lines are tested exactly; an arc conservatively by its whole supporting extent.
+    private static bool CutTouches(ExecutionMotion move, Vector from, Box zone, out Vector contact)
+    {
+        if (move.Curve == null || move.Curve.IsLine)
+            return ClampCutDiagnostics.Intersects(from, move.End, zone, out contact);
+        var extent = move.Curve.Extent;
+        contact = new Vector(
+            System.Math.Clamp(move.Curve.Midpoint.X, zone.Left, zone.Right),
+            System.Math.Clamp(move.Curve.Midpoint.Y, zone.Bottom, zone.Top));
+        return !(extent.MinX > zone.Right || extent.MaxX < zone.Left
+            || extent.MinY > zone.Top || extent.MaxY < zone.Bottom);
     }
 
     private static bool IsInvalid(Exception exception) => exception is
