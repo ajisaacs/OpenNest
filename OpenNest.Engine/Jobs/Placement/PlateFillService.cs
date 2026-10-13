@@ -203,9 +203,11 @@ public static class PlateFillService
         Box area, List<NestItem> demand = null, List<Part> previouslyPlaced = null,
         int groupSize = 1)
     {
-        if (proposed == null || groupSize < 1 || proposed.Count % groupSize != 0)
+        if (proposed == null || groupSize < 1)
             return;
-        for (var start = 0; start < proposed.Count; start += groupSize)
+        // FillLinear may append an incomplete trailing tile. Keep complete copies
+        // ahead of it, but never expose the incomplete tail as a group.
+        for (var start = 0; start + groupSize <= proposed.Count; start += groupSize)
         {
             // A group is one proposal: never return just its frame or just its
             // insert when a member collides with a clamp or occupied material.

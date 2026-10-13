@@ -128,6 +128,26 @@ public class ClampZoneInteractiveFillTests
     }
 
     [Fact]
+    public void FillGroupRetainsCompleteCopiesAheadOfAPartialTrailingCopy()
+    {
+        var drawing = RectDrawing(2, 2);
+        var group = new List<Part>
+        {
+            new(drawing, new Vector(0, 0)), new(drawing, new Vector(3, 0)),
+        };
+        var plate = new Plate(new Size(20, 20)) { PartSpacing = 0 };
+        var area = new Box(0, 0, 8, 2);
+        var original = PlateFillService.FillGroup("Fill", plate, group, area,
+            null, CancellationToken.None);
+        Assert.True(original.Count > group.Count && original.Count % group.Count != 0,
+            $"expected a full copy and partial tail, got {original.Count}");
+        plate.ClampZones.Add(new ClampZone("remote", new Box(18, 0, 1, 0.5)));
+        var clamped = PlateFillService.FillGroup("Fill", plate, group, area,
+            null, CancellationToken.None);
+        Assert.Equal(group.Count, clamped.Count);
+    }
+
+    [Fact]
     public void FillGroupRejectsTheWholeCopyWhenOnlyOneMemberTouchesAClamp()
     {
         var plate = new Plate(new Size(20, 20)) { PartSpacing = 0 };
