@@ -36,6 +36,22 @@ internal static class ClampRemovalRecovery
         ArgumentNullException.ThrowIfNull(raw);
         ArgumentNullException.ThrowIfNull(engine);
 
+        // Recovery is optional: any failure inside it (a throwing probe or residual solve)
+        // keeps the caller's ordinary result instead of discarding it. Cancellation still
+        // propagates.
+        try
+        {
+            return Recover(job, raw, engine, token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            token.ThrowIfCancellationRequested();
+            return null;
+        }
+    }
+
+    private static Outcome Recover(NestJob job, NestJobResult raw, INestingEngine engine, CancellationToken token)
+    {
         if (raw.Status == NestJobStatus.Complete)
             return null;
 
