@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace OpenNest.Engine.Jobs;
@@ -59,8 +60,9 @@ public static class NestPipelineCommit
     /// against, including sheets created for this commit. Stock zones live in the placement
     /// frame; plate zones in plate coordinates, so the stock's translation is inverted. Zones
     /// already equal in the placement frame are left untouched (no change events). Replaced
-    /// zones stay tied to the plate's clamp rail only when that rail recreates them;
-    /// otherwise a later size or quadrant assignment would silently swap in other clamps.
+    /// zones stay tied to the plate's clamp rail only when that rail recreates them (directly,
+    /// or minus whichever clamps Auto Nest removed as a last resort, D8/C13); otherwise a
+    /// later size or quadrant assignment would silently swap in other clamps.
     /// </summary>
     private static void SyncClampZones(Plate plate, NestPlateStock stock)
     {
@@ -73,8 +75,19 @@ public static class NestPipelineCommit
         plate.SetClampRail(null); // explicit zones from here on
         foreach (var zone in stock.ClampZones)
             plate.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds.Translate(-left, -bottom)));
-        if (rail != null && rail.Matches(plate))
-            plate.SetClampRail(rail);
+        if (rail == null)
+            return;
+
+        // D8: the sheet's zones may be the rail's resolution for it minus clamps Auto Nest
+        // removed as a last resort; derive which (if any) so the committed plate keeps
+        // following the rail - and the removal - through later resizes (C13).
+        var kept = new HashSet<string>(plate.ClampZones.Select(z => z.Id), StringComparer.Ordinal);
+        var removedClamps = rail.ResolveFor(plate.Size, plate.Quadrant)
+            .Select(z => z.Id)
+            .Where(id => !kept.Contains(id))
+            .ToList();
+        if (rail.Matches(plate, removedClamps))
+            plate.SetClampRail(rail, removedClamps);
     }
 
     private static bool SameInPlacementFrame(
