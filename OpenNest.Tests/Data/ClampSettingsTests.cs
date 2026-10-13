@@ -322,6 +322,71 @@ public class ClampSettingsTests : IDisposable
         AssertFallback(none);
     }
 
+    // D9: minutes to remove one clamp, stored alongside the rail's physical size.
+
+    [Fact]
+    public void RemovalMinutesDefaultsToThePlannerValue()
+    {
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, new ClampSettings().RemovalMinutes);
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, ClampSettings.Fallback.RemovalMinutes);
+    }
+
+    [Fact]
+    public void RemovalMinutesRoundTripsAndIsNeverScaledByUnits()
+    {
+        var settings = Machine();
+        settings.RemovalMinutes = 8;
+        settings.Save(_path);
+
+        var loaded = ClampSettings.Load(_path, out var status);
+        Assert.Equal(ClampSettingsStatus.Ok, status);
+        Assert.Equal(8, loaded.RemovalMinutes);
+        using var json = JsonDocument.Parse(File.ReadAllText(_path));
+        Assert.Equal(8, json.RootElement.GetProperty("removalMinutes").GetDouble());
+
+        // Width/depth/centers scale between units; removal time (not a length) never does.
+        var metric = loaded.ConvertedTo(Units.Millimeters);
+        Assert.Equal(8, metric.RemovalMinutes);
+        Assert.Equal(8, loaded.RailFor(Units.Millimeters)!.RemovalMinutes);
+    }
+
+    [Fact]
+    public void MissingRemovalMinutesDefaultsOnLoad()
+    {
+        File.WriteAllText(_path, """{ "enabled": true, "centers": [6] }""");
+
+        var loaded = ClampSettings.Load(_path, out var status);
+
+        Assert.Equal(ClampSettingsStatus.Ok, status);
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, loaded.RemovalMinutes);
+    }
+
+    [Theory]
+    [InlineData("""{ "enabled": true, "centers": [6], "removalMinutes": -1 }""")]
+    [InlineData("""{ "enabled": true, "centers": [6], "removalMinutes": "five" }""")]
+    [InlineData("""{ "enabled": true, "centers": [6], "removalMinutes": null }""")]
+    public void InvalidRemovalMinutesFallsBackAndIsReported(string json)
+    {
+        File.WriteAllText(_path, json);
+
+        var loaded = ClampSettings.Load(_path, out var status);
+
+        Assert.Equal(ClampSettingsStatus.Partial, status);
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, loaded.RemovalMinutes);
+    }
+
+    [Fact]
+    public void ZeroRemovalMinutesIsValid()
+    {
+        var settings = Machine();
+        settings.RemovalMinutes = 0;
+        settings.Save(_path);
+
+        var loaded = ClampSettings.Load(_path, out var status);
+        Assert.Equal(ClampSettingsStatus.Ok, status);
+        Assert.Equal(0, loaded.RemovalMinutes);
+    }
+
     private static ClampSettingsStatus LoadStatus(string path)
     {
         ClampSettings.Load(path, out var status);

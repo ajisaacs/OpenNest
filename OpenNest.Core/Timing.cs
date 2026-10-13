@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using OpenNest.Api;
 using OpenNest.CNC;
@@ -42,6 +42,10 @@ namespace OpenNest
                 info.TravelDistance += pos.DistanceTo(endpt);
                 pos = endpt;
             }
+
+            // D9: once per physical sheet, before the quantity multiply below scales it with
+            // everything else cut on that sheet.
+            info.ClampRemovalMinutes = plate.ClampRemovalMinutes;
 
             info *= plate.Quantity;
 
@@ -90,6 +94,9 @@ namespace OpenNest
             }
 
             time += TimeSpan.FromTicks(info.PierceCount * cutParams.PierceTime.Ticks);
+
+            // D9: a flat per-removed-clamp time, already in minutes regardless of cutParams.Units.
+            time += TimeSpan.FromMinutes(info.ClampRemovalMinutes);
 
             return time;
         }

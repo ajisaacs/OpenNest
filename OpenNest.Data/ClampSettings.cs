@@ -57,6 +57,12 @@ public sealed class ClampSettings
 
     public double Depth { get; set; } = DefaultDepth;
 
+    /// <summary>
+    /// Minutes to remove one clamp and put it back after cutting (D9), stored and edited in
+    /// the machine clamp settings alongside the rail's physical size.
+    /// </summary>
+    public double RemovalMinutes { get; set; } = ClampRail.DefaultRemovalMinutes;
+
     /// <summary>Clamp centers along X, measured from the plate origin.</summary>
     public IReadOnlyList<double> Centers { get; set; } = Array.Empty<double>();
 
@@ -82,13 +88,14 @@ public sealed class ClampSettings
             Units = units,
             Width = rail?.Width ?? ConvertDefault(DefaultWidth, units),
             Depth = rail?.Depth ?? ConvertDefault(DefaultDepth, units),
+            RemovalMinutes = rail?.RemovalMinutes ?? ClampRail.DefaultRemovalMinutes,
             Centers = rail?.Centers.ToArray() ?? Array.Empty<double>(),
         };
 
     /// <summary>
     /// The rail a new nest in <paramref name="units"/> receives, or null when clamps are
     /// disabled or no center is configured. Values are converted between inches and
-    /// millimeters as needed.
+    /// millimeters as needed; <see cref="RemovalMinutes"/> is a time, so it is never scaled.
     /// </summary>
     public ClampRail? RailFor(Units units)
     {
@@ -96,12 +103,13 @@ public sealed class ClampSettings
             return null;
 
         var converted = ConvertedTo(units);
-        return new ClampRail(converted.Width, converted.Depth, converted.Centers);
+        return new ClampRail(converted.Width, converted.Depth, converted.Centers, converted.RemovalMinutes);
     }
 
     /// <summary>
     /// A copy with width, depth and centers expressed in <paramref name="units"/>
-    /// (inches and millimeters convert at 25.4); <see cref="Enabled"/> is kept.
+    /// (inches and millimeters convert at 25.4); <see cref="Enabled"/> and
+    /// <see cref="RemovalMinutes"/> (a time, not a length) are kept unscaled.
     /// </summary>
     public ClampSettings ConvertedTo(Units units)
     {
@@ -112,6 +120,7 @@ public sealed class ClampSettings
             Units = units,
             Width = Width * scale,
             Depth = Depth * scale,
+            RemovalMinutes = RemovalMinutes,
             Centers = Centers.Select(c => c * scale).ToArray(),
         };
     }
@@ -203,6 +212,14 @@ public sealed class ClampSettings
                 ignored = true;
         }
 
+        if (values.TryGetValue("removalMinutes", out var removalMinutes))
+        {
+            if (TryLength(removalMinutes, out var value) && value >= 0)
+                settings.RemovalMinutes = value;
+            else
+                ignored = true;
+        }
+
         if (values.TryGetValue("centers", out var centers))
         {
             if (centers.ValueKind == JsonValueKind.Array)
@@ -240,6 +257,7 @@ public sealed class ClampSettings
             units = Units.ToString().ToLowerInvariant(),
             width = Width,
             depth = Depth,
+            removalMinutes = RemovalMinutes,
             centers = Centers,
         };
         var json = JsonSerializer.Serialize(dto, JsonOptions);

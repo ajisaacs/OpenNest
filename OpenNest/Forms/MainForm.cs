@@ -1702,6 +1702,18 @@ namespace OpenNest.Forms
                     target.OverlapDisplay = OverlapDisplayMode.Both;
                     await target.CheckOverlapsAsync();
                 }
+                // D8/D9: name every clamp Auto Nest pulled as a last resort and its added time.
+                var removalNotices = applied
+                    .Where(plate => plate.RemovedClamps.Count > 0)
+                    .Select(plate => $"Sheet {target.Nest.Plates.IndexOf(plate) + 1}: remove "
+                        + $"{string.Join(", ", plate.RemovedClamps.OrderBy(id => id, StringComparer.Ordinal))} "
+                        + $"(+{plate.ClampRemovalMinutes:0.#} min)")
+                    .ToList();
+                if (removalNotices.Count > 0)
+                    MessageBox.Show(this,
+                        "Auto Nest removed clamps as a last resort so a part that would not "
+                            + "otherwise fit could be nested:\n\n" + string.Join("\n", removalNotices),
+                        "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 if (costs?.Basis == "supplied-cost")
                     MessageBox.Show(this, $"Gross sheet cost: {costs.GrossTotal:G}\nEstimated salvage credit: {costs.SalvageCredit:G}\nNet score: {costs.NetScore:G}",
                         "Auto Nest Cost", MessageBoxButtons.OK, MessageBoxIcon.Information);

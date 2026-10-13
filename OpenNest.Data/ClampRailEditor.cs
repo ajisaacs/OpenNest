@@ -18,6 +18,7 @@ public sealed class ClampRailEditor
         var initial = ClampSettings.FromRail(rail, units, applyToNewNests);
         Width = initial.Width;
         Depth = initial.Depth;
+        RemovalMinutes = initial.RemovalMinutes;
         _centers.AddRange(initial.Centers);
     }
 
@@ -29,6 +30,10 @@ public sealed class ClampRailEditor
 
     /// <summary>Clamp intrusion into the sheet (Y).</summary>
     public double Depth { get; set; }
+
+    /// <summary>Minutes to remove one clamp and put it back after cutting (D9); not a
+    /// length, so it is never converted between units.</summary>
+    public double RemovalMinutes { get; set; }
 
     /// <summary>Whether saved machine defaults give new nests these clamps.</summary>
     public bool ApplyToNewNests { get; set; }
@@ -76,6 +81,7 @@ public sealed class ClampRailEditor
         var converted = settings.ConvertedTo(Units);
         Width = converted.Width;
         Depth = converted.Depth;
+        RemovalMinutes = converted.RemovalMinutes;
         ApplyToNewNests = settings.Enabled;
         _centers.Clear();
         _centers.AddRange(converted.Centers.Distinct().OrderBy(c => c));
@@ -83,10 +89,11 @@ public sealed class ClampRailEditor
 
     /// <summary>
     /// The edited rail, or null when no clamp is listed. Throws
-    /// <see cref="ArgumentOutOfRangeException"/> for a non-positive width or depth.
+    /// <see cref="ArgumentOutOfRangeException"/> for a non-positive width or depth, or a
+    /// negative/non-finite removal time.
     /// </summary>
     public ClampRail? BuildRail() =>
-        _centers.Count == 0 ? null : new ClampRail(Width, Depth, _centers);
+        _centers.Count == 0 ? null : new ClampRail(Width, Depth, _centers, RemovalMinutes);
 
     /// <summary>The dialog's OK: makes the edited rail the nest's, re-resolving every plate.</summary>
     public void ApplyTo(Nest nest)
@@ -107,12 +114,18 @@ public sealed class ClampRailEditor
                 nameof(Width),
                 "Clamp width and depth must be positive."
             );
+        if (!double.IsFinite(RemovalMinutes) || RemovalMinutes < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(RemovalMinutes),
+                "Clamp removal time must be finite and zero or more."
+            );
         return new ClampSettings
         {
             Enabled = ApplyToNewNests && _centers.Count > 0,
             Units = Units,
             Width = Width,
             Depth = Depth,
+            RemovalMinutes = RemovalMinutes,
             Centers = _centers.ToArray(),
         };
     }

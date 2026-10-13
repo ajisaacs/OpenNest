@@ -168,4 +168,47 @@ public class ClampRailEditorTests
         Assert.Equal(1.5, inches.Width); // the source is not modified
         Assert.Equal(1.5, inches.ConvertedTo(Units.Inches).Width);
     }
+
+    // D9: the editor carries removal minutes through the same three boundaries as size.
+
+    [Fact]
+    public void RemovalMinutesStartsFromTheRailOrMachineDefault()
+    {
+        var rail = new ClampRail(1.5, 0.625, MachineCenters, removalMinutes: 7);
+        Assert.Equal(7, new ClampRailEditor(rail, Units.Inches, false).RemovalMinutes);
+        Assert.Equal(ClampRail.DefaultRemovalMinutes,
+            new ClampRailEditor(null, Units.Inches, false).RemovalMinutes);
+    }
+
+    [Fact]
+    public void RemovalMinutesIsNeverConvertedBetweenUnitsOnLoadOrBuild()
+    {
+        var editor = new ClampRailEditor(null, Units.Millimeters, applyToNewNests: true);
+        editor.RemovalMinutes = 8;
+        editor.TryAddCenter(150, out _);
+
+        Assert.Equal(8, editor.ToMachineDefaults().RemovalMinutes);
+        Assert.Equal(8, editor.BuildRail()!.RemovalMinutes);
+
+        var defaults = new ClampSettings
+        {
+            Enabled = true,
+            Units = Units.Inches,
+            RemovalMinutes = 9,
+            Centers = new[] { 6.0 },
+        };
+        editor.LoadMachineDefaults(defaults);
+        Assert.Equal(9, editor.RemovalMinutes); // a time, so unaffected by the unit change
+    }
+
+    [Fact]
+    public void InvalidRemovalMinutesIsRefusedBeforeSaving()
+    {
+        var editor = new ClampRailEditor(null, Units.Inches, applyToNewNests: true);
+        editor.TryAddCenter(6, out _);
+        editor.RemovalMinutes = -1;
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => editor.ToMachineDefaults());
+        Assert.Throws<ArgumentOutOfRangeException>(() => editor.BuildRail());
+    }
 }

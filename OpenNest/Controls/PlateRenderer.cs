@@ -205,6 +205,43 @@ namespace OpenNest.Controls
             }
         }
 
+        // D8: a clamp Auto Nest pulled as a last resort. Distinct from an active clamp - a
+        // dashed grey outline and a small "remove" marker, still display + exclusion only
+        // (no hit test, selection or sequencing).
+        private static readonly Color RemovedClampOutlineColor = Color.FromArgb(200, 110, 110, 110);
+
+        public void DrawRemovedClamps(Graphics g)
+        {
+            var plate = view.DisplayPlate;
+            if (plate?.ClampRail == null || plate.RemovedClamps.Count == 0)
+                return;
+
+            var left = plate.Quadrant is 2 or 3 ? -plate.Size.Length : 0;
+            var bottom = plate.Quadrant is 3 or 4 ? -plate.Size.Width : 0;
+
+            using var pen = new Pen(RemovedClampOutlineColor, 1.5f) { DashStyle = DashStyle.Dash };
+            using var font = new Font(FontFamily.GenericSansSerif, 7f);
+            using var textBrush = new SolidBrush(RemovedClampOutlineColor);
+
+            foreach (var zone in plate.ClampRail.ResolveFor(plate.Size, plate.Quadrant))
+            {
+                if (!plate.RemovedClamps.Contains(zone.Id))
+                    continue;
+
+                var box = zone.Bounds.Translate(left, bottom);
+                var rect = new RectangleF
+                {
+                    Location = view.PointWorldToGraph(box.Location),
+                    Width = view.LengthWorldToGui(box.Length),
+                    Height = view.LengthWorldToGui(box.Width),
+                };
+                rect.Y -= rect.Height;
+
+                g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+                g.DrawString("remove", font, textBrush, rect.X, rect.Y - font.GetHeight(g));
+            }
+        }
+
         public void DrawCutOffs(Graphics g)
         {
             var plate = view.DisplayPlate;

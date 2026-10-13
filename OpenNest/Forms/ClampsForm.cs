@@ -20,6 +20,7 @@ public sealed class ClampsForm : Form
     private readonly string settingsPath;
     private readonly NumericUpDown widthBox;
     private readonly NumericUpDown depthBox;
+    private readonly NumericUpDown removalMinutesBox;
     private readonly NumericUpDown centerBox;
     private readonly ListBox centersList;
     private readonly Button addButton;
@@ -73,8 +74,10 @@ public sealed class ClampsForm : Form
         var size = new TableLayoutPanel { AutoSize = true, ColumnCount = 3, Dock = DockStyle.Top };
         widthBox = NewLengthBox(Editor.Width, minimum: 0.0001m);
         depthBox = NewLengthBox(Editor.Depth, minimum: 0.0001m);
+        removalMinutesBox = NewLengthBox(Editor.RemovalMinutes, minimum: 0m);
         AddRow(size, "Clamp width (along the edge):", widthBox, unit);
         AddRow(size, "Clamp depth (into the plate):", depthBox, unit);
+        AddRow(size, "Minutes to remove and replace one clamp:", removalMinutesBox, "min");
         layout.Controls.Add(size);
 
         var centersGroup = new GroupBox
@@ -206,6 +209,7 @@ public sealed class ClampsForm : Form
     {
         Editor.Width = (double)widthBox.Value;
         Editor.Depth = (double)depthBox.Value;
+        Editor.RemovalMinutes = (double)removalMinutesBox.Value;
         Editor.ApplyToNewNests = applyToNewNestsBox.Checked;
     }
 
@@ -244,6 +248,7 @@ public sealed class ClampsForm : Form
         Editor.LoadMachineDefaults(machineDefaults);
         widthBox.Value = ToBoxValue(widthBox, Editor.Width);
         depthBox.Value = ToBoxValue(depthBox, Editor.Depth);
+        removalMinutesBox.Value = ToBoxValue(removalMinutesBox, Editor.RemovalMinutes);
         applyToNewNestsBox.Checked = Editor.ApplyToNewNests;
         RefreshCenters();
     }

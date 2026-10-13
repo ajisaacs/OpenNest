@@ -712,6 +712,7 @@ namespace OpenNest.Controls
             renderer.DrawPlate(e.Graphics);
             renderer.DrawParts(e.Graphics);
             renderer.DrawClampZones(e.Graphics);
+            renderer.DrawRemovedClamps(e.Graphics);
             if (!HasProposalDisplay)
             {
                 renderer.DrawCutOffs(e.Graphics);
