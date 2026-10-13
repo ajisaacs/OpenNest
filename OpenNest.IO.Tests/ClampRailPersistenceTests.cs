@@ -286,6 +286,29 @@ public class ClampRailPersistenceTests
         Assert.Equal(keepsRemoval, plate.ClampRail != null);
     }
 
+    // PM 6ded8ac4 (b): an invalid removal time falls back to the default instead of
+    // dropping the rail and every sheet's removal state with it.
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("\"x\"")]
+    public void InvalidRemovalMinutesFallBackToTheDefault(string minutes)
+    {
+        var tampered = RewriteNestJson(RemovedClamp3Nest(), text =>
+        {
+            var root = JsonNode.Parse(text)!;
+            root["plateDefaults"]!["clampRail"]!["removalMinutes"] = JsonNode.Parse(minutes);
+            return root.ToJsonString();
+        });
+
+        var reopened = new NestReader(tampered).Read();
+
+        Assert.NotNull(reopened.PlateDefaults.ClampRail);
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, reopened.PlateDefaults.ClampRail.RemovalMinutes);
+        var plate = Assert.Single(reopened.Plates);
+        Assert.Equal(new[] { "clamp-3" }, plate.RemovedClamps);
+        Assert.NotNull(plate.ClampRail);
+    }
+
     /// <summary>Removes a named property wherever it appears in the document, simulating a
     /// key an older writer never emitted. Rebuilds via <see cref="JsonNode"/> so the result
     /// is always valid JSON regardless of whether the property was first, last or only one

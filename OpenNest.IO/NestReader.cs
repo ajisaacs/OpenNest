@@ -330,7 +330,7 @@ namespace OpenNest.IO
         /// <summary>
         /// The saved machine clamp rail, or null when absent, empty or malformed (a bad rail
         /// is ignored rather than failing the nest; each plate's saved zones still load). A
-        /// missing removal-minutes value falls back to <see cref="ClampRail.DefaultRemovalMinutes"/>.
+        /// missing or invalid removal-minutes value falls back to <see cref="ClampRail.DefaultRemovalMinutes"/>.
         /// </summary>
         private static ClampRail ReadClampRail(ClampRailDto dto)
         {
@@ -338,12 +338,13 @@ namespace OpenNest.IO
                 return null;
             try
             {
-                return new ClampRail(
-                    dto.Width,
-                    dto.Depth,
-                    dto.Centers,
-                    dto.RemovalMinutes ?? ClampRail.DefaultRemovalMinutes
-                );
+                // An invalid removal time (negative or not finite) falls back to the default
+                // rather than dropping the rail, which would also discard every sheet's
+                // removed-clamp state.
+                var minutes = dto.RemovalMinutes is double m && double.IsFinite(m) && m >= 0
+                    ? m
+                    : ClampRail.DefaultRemovalMinutes;
+                return new ClampRail(dto.Width, dto.Depth, dto.Centers, minutes);
             }
             catch (ArgumentException)
             {
