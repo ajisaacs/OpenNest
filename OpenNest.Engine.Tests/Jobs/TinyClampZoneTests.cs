@@ -1,5 +1,7 @@
 using OpenNest.CNC;
+using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Engine.NestingEngines.Default;
 using OpenNest.Engine.NestingEngines.Rectangles;
 using OpenNest.Geometry;
@@ -130,5 +132,58 @@ public class TinyClampZoneTests
             Array.Empty<PartFulfillment>(), Array.Empty<StockUsage>());
 
         Assert.Equal(overlaps, ClampViolations(job, result).Count > 0);
+    }
+
+    [Theory]
+    [InlineData(7.5, 0.0, true)]
+    [InlineData(6.0, 0.0, false)]
+    [InlineData(8.00001, 0.0, false)]
+    [InlineData(3.0, 0.0, false)]
+    public void InteractiveKeepOutTestJudgesATinyClamp(double x, double y, bool overlaps)
+    {
+        var drawing = new Drawing("square", SquareProgram());
+        var part = new Part(drawing, new Vector(x, y));
+        Assert.Equal(overlaps, InteractiveClamps.MaterialInKeepOut(part, new Box(8, 0, Tiny, Tiny)));
+    }
+    private static Plate TinyZonePlate()
+    {
+        var plate = new Plate(new Size(10, 12)); // zero edge and part spacing
+        plate.ClampZones.Add(TinyZone);
+        return plate;
+    }
+
+    // Positive-area overlap with the zone, admitting 1e-9 of floating closure (a ten
+    // thousandth of the zone): a push that stops flush on the zone is clear.
+    private static bool EntersTinyZone(Part part) =>
+        System.Math.Min(part.BoundingBox.Right, 8 + Tiny) - System.Math.Max(part.BoundingBox.Left, 8) > 1e-9
+        && System.Math.Min(part.BoundingBox.Top, Tiny) - System.Math.Max(part.BoundingBox.Bottom, 0) > 1e-9;
+
+    [Theory]
+    [InlineData("Fill")]
+    [InlineData("Strip")]
+    [InlineData("Vertical Remnant")]
+    [InlineData("Horizontal Remnant")]
+    public void InteractiveFillNeverCoversATinyClamp(string strategy)
+    {
+        var plate = TinyZonePlate();
+        var item = new NestItem { Drawing = new Drawing("square", SquareProgram()), Quantity = 30 };
+
+        var parts = PlateFillService.FillItem(strategy, plate, item, plate.WorkArea(), null,
+            System.Threading.CancellationToken.None);
+
+        Assert.NotEmpty(parts);
+        Assert.DoesNotContain(parts, EntersTinyZone);
+    }
+
+    [Fact]
+    public void PushDownStopsBeforeCoveringATinyClamp()
+    {
+        var plate = TinyZonePlate();
+        var mover = new Part(new Drawing("square", SquareProgram()), new Vector(7.5, 5));
+        plate.Parts.Add(mover);
+
+        Compactor.Push(new List<Part> { mover }, plate, PushDirection.Down);
+
+        Assert.False(EntersTinyZone(mover), $"pushed to ({mover.Location.X:R},{mover.Location.Y:R})");
     }
 }
