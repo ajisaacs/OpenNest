@@ -307,4 +307,30 @@ public class ClampRemovalRepairTests
         Assert.Equal(new[] { "clamp-2" }, applied.ClampZones.Select(z => z.Id));
         Assert.Equal(ClampRail.DefaultRemovalMinutes, applied.ClampRemovalMinutes);
     }
+    // PM bf4438ac: when one offered stock runs out, a blocked part may still use another
+    // offered stock that has sheets left (each with its own minimal removal).
+    [Theory]
+    [InlineData(2, false)] // two blocked copies: one on A, one on B
+    [InlineData(1, true)]  // the ordinary part took A; the blocked part goes to B
+    public void RecoveryMovesOnToAnotherStockWithSheetsLeft(int wide, bool small)
+    {
+        NestPlateStock Sheet(string id, double length)
+        {
+            var size = new Size(3, length);
+            return new NestPlateStock(id, size, 1, 0, default, 1, null, Rail.ResolveFor(size, 1)) { ClampRail = Rail };
+        }
+        var items = new List<NestItem> { Item("wide", 14, 3, wide) };
+        if (small)
+            items.Add(Item("small", 2, 1, 1));
+        var request = new NestPipelineRequest("Rectangles", items, new[] { Sheet("A", 23), Sheet("B", 24) },
+            new NestJobOptions(maxPlates: 2));
+
+        var result = NestPipeline.Run(request);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(2, result.Raw.Plates.Count);
+        Assert.All(result.Raw.Plates.Where(p => p.StockId.Contains("removed")), p => Assert.Single(p.Stock.ClampZones));
+        Assert.Equal(2, result.Raw.StockUsage.Sum(u => u.Used));
+    }
 }

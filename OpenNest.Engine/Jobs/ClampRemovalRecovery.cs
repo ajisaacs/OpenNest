@@ -87,89 +87,109 @@ internal static class ClampRemovalRecovery
         if (blocked.Count == 0)
             return null;
 
-        // C11: per blocked part, the fewest clamps (smallest contiguous run, nearest the
-        // origin on ties) whose removal frees an empty sheet of some offered stock. Parts
-        // needing the same removal on the same stock share one variant.
-        var groups = new List<RemovalGroup>();
-        foreach (var part in blocked)
-        {
-            token.ThrowIfCancellationRequested();
-            var best = BestRemoval(part, availableStock, job.Options, lanes, budget, token);
-            if (best == null)
-                continue; // Unfit even with every clamp removed: stays unplaced, as today.
-            var group = groups.FirstOrDefault(g => g.Removal.Stock.Id == best.Stock.Id);
-            if (group == null)
-                groups.Add(group = new RemovalGroup(best));
-            group.BlockedIds.Add(part.Id);
-        }
-        if (groups.Count == 0)
-            return null;
-
-        // Phase 2, one removal variant at a time, fewest removed clamps first: each variant
-        // takes its own blocked parts plus any other unmet demand that is not blocked (freed
-        // space may take other parts, C12). A sheet is kept only when it holds a part that
-        // needed exactly this removal (C10/C11 per sheet), and every kept sheet comes out of
-        // its base stock's remaining physical pool (C12: a finite pool is never exceeded).
+        // Phase 2 state. Each kept sheet comes out of its base stock's remaining physical
+        // pool and the plate cap (C12: a finite pool is never exceeded).
         var unmet = remaining.ToDictionary(x => x.Part.Id, x => x.Unplaced, StringComparer.Ordinal);
-        var blockedIds = new HashSet<string>(groups.SelectMany(g => g.BlockedIds), StringComparer.Ordinal);
+        var blockedIds = new HashSet<string>(blocked.Select(p => p.Id), StringComparer.Ordinal);
         var pool = availableStock.ToDictionary(
             s => s.Id,
             s => s.Quantity is int q ? q - raw.StockUsage.Where(u => u.StockId == s.Id).Sum(u => u.Used) : (int?)null,
             StringComparer.Ordinal);
         int? platesLeft = job.Options.MaxPlates is int cap ? cap - raw.Plates.Count : null;
-
+        var tried = blocked.ToDictionary(p => p.Id, _ => new HashSet<string>(StringComparer.Ordinal), StringComparer.Ordinal);
         var recovered = new List<(NestPlateStock Variant, string BaseId, List<NestJobPlateResult> Sheets)>();
-        foreach (var group in groups.OrderBy(g => g.Removal.RemovedIds.Count))
+
+        // Rounds: each blocked part with demand left takes its best removal among the offered
+        // stocks it has not tried that still have sheets, so a part whose preferred stock runs
+        // out moves on to another stock (with that stock's own minimal removal).
+        for (var round = 0; round < availableStock.Count && platesLeft is not <= 0; round++)
         {
-            token.ThrowIfCancellationRequested();
-            var baseId = group.Removal.BaseStockId;
-            var available = pool[baseId];
-            if (available <= 0 || platesLeft <= 0)
-                continue;
-            int? sheetCap = (available, platesLeft) switch
-            {
-                (int a, int p) => System.Math.Min(a, p),
-                (int a, null) => a,
-                (null, int p) => p,
-                _ => null,
-            };
-
-            var parts = remaining
-                .Where(x => unmet[x.Part.Id] > 0
-                    && (group.BlockedIds.Contains(x.Part.Id) || !blockedIds.Contains(x.Part.Id)))
-                .Select(x => new NestJobPart(x.Part.Id, x.Part.Geometry, unmet[x.Part.Id], x.Part.Priority, x.Part.Rotation))
-                .ToList();
-            if (!parts.Any(p => group.BlockedIds.Contains(p.Id)))
-                continue;
-
-            var variant = Clone(group.Removal.Stock, group.Removal.Stock.Id, sheetCap, null);
-            var options = new NestJobOptions(job.Options.PlacementStrategy, platesLeft,
-                job.Options.SalvageRate, job.Options.MinimumSalvageDimension);
-            var groupJob = new NestJob(parts, new[] { variant }, options);
-
-            List<NestJobPlateResult> kept = null;
-            foreach (var lane in lanes)
+            // C11: per blocked part, the fewest clamps (smallest contiguous run, nearest the
+            // origin on ties) whose removal frees an empty sheet of one of those stocks.
+            // Parts needing the same removal on the same stock share one variant.
+            var groups = new List<RemovalGroup>();
+            foreach (var part in blocked)
             {
                 token.ThrowIfCancellationRequested();
-                var solved = lane.Solve(groupJob, null, token);
-                token.ThrowIfCancellationRequested();
-                kept = solved?.Plates
-                    .Where(sheet => sheet.Placements.Any(p => group.BlockedIds.Contains(p.PartId)))
-                    .Take(sheetCap ?? int.MaxValue)
+                if (unmet[part.Id] <= 0)
+                    continue;
+                var usable = availableStock
+                    .Where(s => pool[s.Id] is not <= 0 && !tried[part.Id].Contains(s.Id))
                     .ToList();
-                if (kept is { Count: > 0 })
-                    break;
+                if (usable.Count == 0)
+                    continue;
+                var best = BestRemoval(part, usable, job.Options, lanes, budget, token);
+                if (best == null)
+                {
+                    // Unfit on all of them even with every clamp removed: stays unplaced.
+                    tried[part.Id].UnionWith(usable.Select(s => s.Id));
+                    continue;
+                }
+                tried[part.Id].Add(best.BaseStockId);
+                var group = groups.FirstOrDefault(g => g.Removal.Stock.Id == best.Stock.Id);
+                if (group == null)
+                    groups.Add(group = new RemovalGroup(best));
+                group.BlockedIds.Add(part.Id);
             }
-            if (kept is not { Count: > 0 })
-                continue;
+            if (groups.Count == 0)
+                break;
 
-            foreach (var placement in kept.SelectMany(sheet => sheet.Placements))
-                unmet[placement.PartId]--;
-            if (pool[baseId] is int left)
-                pool[baseId] = left - kept.Count;
-            if (platesLeft is int plates)
-                platesLeft = plates - kept.Count;
-            recovered.Add((group.Removal.Stock, baseId, kept));
+            // One removal variant at a time, fewest removed clamps first: each variant takes
+            // its own blocked parts plus any other unmet demand that is not blocked (freed
+            // space may take other parts, C12). A sheet is kept only when it holds a part
+            // that needed exactly this removal (C10/C11 per sheet).
+            foreach (var group in groups.OrderBy(g => g.Removal.RemovedIds.Count))
+            {
+                token.ThrowIfCancellationRequested();
+                var baseId = group.Removal.BaseStockId;
+                var available = pool[baseId];
+                if (available <= 0 || platesLeft <= 0)
+                    continue;
+                int? sheetCap = (available, platesLeft) switch
+                {
+                    (int a, int p) => System.Math.Min(a, p),
+                    (int a, null) => a,
+                    (null, int p) => p,
+                    _ => null,
+                };
+
+                var parts = remaining
+                    .Where(x => unmet[x.Part.Id] > 0
+                        && (group.BlockedIds.Contains(x.Part.Id) || !blockedIds.Contains(x.Part.Id)))
+                    .Select(x => new NestJobPart(x.Part.Id, x.Part.Geometry, unmet[x.Part.Id], x.Part.Priority, x.Part.Rotation))
+                    .ToList();
+                if (!parts.Any(p => group.BlockedIds.Contains(p.Id)))
+                    continue;
+
+                var variant = Clone(group.Removal.Stock, group.Removal.Stock.Id, sheetCap, null);
+                var options = new NestJobOptions(job.Options.PlacementStrategy, platesLeft,
+                    job.Options.SalvageRate, job.Options.MinimumSalvageDimension);
+                var groupJob = new NestJob(parts, new[] { variant }, options);
+
+                List<NestJobPlateResult> kept = null;
+                foreach (var lane in lanes)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var solved = lane.Solve(groupJob, null, token);
+                    token.ThrowIfCancellationRequested();
+                    kept = solved?.Plates
+                        .Where(sheet => sheet.Placements.Any(p => group.BlockedIds.Contains(p.PartId)))
+                        .Take(sheetCap ?? int.MaxValue)
+                        .ToList();
+                    if (kept is { Count: > 0 })
+                        break;
+                }
+                if (kept is not { Count: > 0 })
+                    continue;
+
+                foreach (var placement in kept.SelectMany(sheet => sheet.Placements))
+                    unmet[placement.PartId]--;
+                if (pool[baseId] is int left)
+                    pool[baseId] = left - kept.Count;
+                if (platesLeft is int plates)
+                    platesLeft = plates - kept.Count;
+                recovered.Add((group.Removal.Stock, baseId, kept));
+            }
         }
         if (recovered.Count == 0)
             return null;
@@ -363,6 +383,11 @@ internal static class ClampRemovalRecovery
         IReadOnlyList<(NestPlateStock Variant, string BaseId, List<NestJobPlateResult> Sheets)> recovered
     )
     {
+        // A variant used in more than one round is one stock entry with all its sheets.
+        recovered = recovered
+            .GroupBy(r => r.Variant.Id, StringComparer.Ordinal)
+            .Select(g => (g.First().Variant, g.First().BaseId, g.SelectMany(r => r.Sheets).ToList()))
+            .ToList();
         var placedSoFar = raw.Fulfillment.ToDictionary(f => f.PartId, f => f.Placed, StringComparer.Ordinal);
         var nextPlateIndex = raw.Plates.Count;
         var reindexed = new List<NestJobPlateResult>();
