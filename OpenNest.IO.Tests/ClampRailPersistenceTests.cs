@@ -246,6 +246,46 @@ public class ClampRailPersistenceTests
         Assert.Equal(7, plate.ClampZones.Count);
     }
 
+    // Slice 6 task 6.4 (Slice 3b quality review): optional removal fields read leniently
+    // and are only written when there is something to say.
+
+    private static MemoryStream RemovedClamp3Nest()
+    {
+        var nest = new Nest("railed");
+        nest.PlateDefaults.Size = new Size(48, 120);
+        nest.SetClampRail(Machine());
+        var plate = nest.CreatePlate();
+        plate.SetClampRail(Machine(), new[] { "clamp-3" });
+        return Write(nest);
+    }
+
+    private static MemoryStream WithPlateProperty(MemoryStream file, string name, string json) =>
+        RewriteNestJson(file, text =>
+        {
+            var root = JsonNode.Parse(text)!;
+            root["plates"]![0]![name] = JsonNode.Parse(json);
+            return root.ToJsonString();
+        });
+
+    // PM 9f3d676b: a wrongly shaped removedClamps value must not fail the whole nest.
+    [Theory]
+    [InlineData("\"clamp-3\"", false)]
+    [InlineData("[-1]", false)]
+    [InlineData("{\"id\": \"clamp-3\"}", false)]
+    [InlineData("[-1, \"clamp-3\"]", true)]
+    public void MalformedRemovedClampsLoadWithoutFailingTheNest(string value, bool keepsRemoval)
+    {
+        var tampered = WithPlateProperty(RemovedClamp3Nest(), "removedClamps", value);
+
+        var plate = Assert.Single(new NestReader(tampered).Read().Plates);
+
+        // The saved zones always load, so the removed clamp's area is never re-blocked or lost.
+        Assert.Equal(7, plate.ClampZones.Count);
+        Assert.DoesNotContain(plate.ClampZones, z => z.Id == "clamp-3");
+        Assert.Equal(keepsRemoval, plate.RemovedClamps.Contains("clamp-3"));
+        Assert.Equal(keepsRemoval, plate.ClampRail != null);
+    }
+
     /// <summary>Removes a named property wherever it appears in the document, simulating a
     /// key an older writer never emitted. Rebuilds via <see cref="JsonNode"/> so the result
     /// is always valid JSON regardless of whether the property was first, last or only one

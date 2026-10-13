@@ -119,6 +119,41 @@ namespace OpenNest.IO
             }
         }
 
+        /// <summary>
+        /// Reads an optional list of strings without failing the nest: a non-array value
+        /// reads as an empty list and non-string entries are skipped.
+        /// </summary>
+        public sealed class LenientStringListConverter : JsonConverter<List<string>>
+        {
+            public override List<string> Read(
+                ref Utf8JsonReader reader,
+                Type typeToConvert,
+                JsonSerializerOptions options
+            )
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                var list = new List<string>();
+                if (document.RootElement.ValueKind != JsonValueKind.Array)
+                    return list;
+                foreach (var element in document.RootElement.EnumerateArray())
+                    if (element.ValueKind == JsonValueKind.String)
+                        list.Add(element.GetString());
+                return list;
+            }
+
+            public override void Write(
+                Utf8JsonWriter writer,
+                List<string> value,
+                JsonSerializerOptions options
+            )
+            {
+                writer.WriteStartArray();
+                foreach (var item in value)
+                    writer.WriteStringValue(item);
+                writer.WriteEndArray();
+            }
+        }
+
         public record ClampRailDto
         {
             /// <summary>Clamp extent along the origin-side edge (X).</summary>
@@ -172,8 +207,11 @@ namespace OpenNest.IO
 
             /// <summary>
             /// Rail clamp ids removed from this sheet as a last resort (D8). Missing or empty
-            /// means none were removed; <see cref="Clamps"/> already excludes them.
+            /// means none were removed; <see cref="Clamps"/> already excludes them. Read
+            /// leniently: a wrongly shaped value reads as none removed, non-string entries
+            /// are skipped, and the saved zones load either way.
             /// </summary>
+            [JsonConverter(typeof(LenientStringListConverter))]
             public List<string> RemovedClamps { get; init; } = new();
         }
 
