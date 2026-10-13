@@ -119,6 +119,50 @@ namespace OpenNest
             SubscribeToTailPlates();
         }
 
+        /// <summary>
+        /// Applies a nest-defaults edit, moving only an untouched trailing empty sheet
+        /// that matched the old defaults to the new defaults.
+        /// </summary>
+        public void ChangePlateDefaults(Action changeDefaults)
+        {
+            ArgumentNullException.ThrowIfNull(changeDefaults);
+            var defaults = nest.PlateDefaults;
+            var trailing = Count > 0 ? nest.Plates[^1] : null;
+            // Exact configuration equality, not geometric tolerance: even a small edit
+            // makes this configured stock rather than the untouched workspace sentinel.
+            var followsDefaults = trailing != null
+                && trailing.Parts.Count == 0
+                && trailing.CutOffs.Count == 0
+                && trailing.Size.Width == defaults.Size.Width
+                && trailing.Size.Length == defaults.Size.Length
+                && trailing.Quadrant == defaults.Quadrant
+                && trailing.EdgeSpacing.Left == defaults.EdgeSpacing.Left
+                && trailing.EdgeSpacing.Bottom == defaults.EdgeSpacing.Bottom
+                && trailing.EdgeSpacing.Right == defaults.EdgeSpacing.Right
+                && trailing.EdgeSpacing.Top == defaults.EdgeSpacing.Top
+                && trailing.PartSpacing == defaults.PartSpacing
+                && trailing.RemovedClamps.Count == 0
+                && Equals(trailing.ClampRail, defaults.ClampRail)
+                && (defaults.ClampRail == null
+                    ? trailing.ClampZones.Count == 0
+                    : defaults.ClampRail.Matches(trailing));
+
+            changeDefaults();
+
+            if (!followsDefaults)
+                return;
+
+            defaults = nest.PlateDefaults;
+            trailing.Size = defaults.Size;
+            trailing.Quadrant = defaults.Quadrant;
+            trailing.EdgeSpacing = defaults.EdgeSpacing;
+            trailing.PartSpacing = defaults.PartSpacing;
+            trailing.SetClampRail(defaults.ClampRail);
+            PlateListChanged?.Invoke(this, EventArgs.Empty);
+            if (ReferenceEquals(CurrentPlate, trailing))
+                FireCurrentPlateChanged();
+        }
+
         public void BeginBatch()
         {
             batching = true;

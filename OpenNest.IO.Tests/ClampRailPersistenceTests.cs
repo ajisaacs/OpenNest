@@ -93,6 +93,109 @@ public class ClampRailPersistenceTests
     }
 
     [Fact]
+    public void ChangedDefaultsMoveUntouchedSentinelAndSaveNoEmptySheets()
+    {
+        var nest = new Nest("railed");
+        nest.PlateDefaults.Size = new Size(48, 96);
+        nest.PlateDefaults.Quadrant = 1;
+        nest.SetClampRail(Machine());
+        using var manager = new PlateManager(nest);
+        manager.EnsureSentinel();
+        var sentinel = Assert.Single(nest.Plates);
+
+        manager.ChangePlateDefaults(() =>
+        {
+            nest.PlateDefaults.Size = new Size(48, 60);
+            nest.PlateDefaults.Quadrant = 3;
+            nest.PlateDefaults.EdgeSpacing = new Spacing(1, 2, 3, 4);
+            nest.PlateDefaults.PartSpacing = 0.5;
+        });
+        manager.EnsureSentinel();
+
+        Assert.Same(sentinel, Assert.Single(nest.Plates));
+        using var stream = Write(nest);
+        using var json = JsonDocument.Parse(ReadNestJson(stream));
+        Assert.Equal(0, json.RootElement.GetProperty("plates").GetArrayLength());
+        stream.Position = 0;
+        var reopened = new NestReader(stream).Read();
+        Assert.Empty(reopened.Plates);
+        using var reopenedManager = new PlateManager(reopened);
+        reopenedManager.EnsureSentinel();
+        var newSentinel = Assert.Single(reopened.Plates);
+        Assert.Equal(new Size(48, 60), newSentinel.Size);
+        Assert.Equal(3, newSentinel.Quadrant);
+        Assert.Equal(new Spacing(1, 2, 3, 4), newSentinel.EdgeSpacing);
+        Assert.Equal(0.5, newSentinel.PartSpacing);
+        Assert.Same(reopened.PlateDefaults.ClampRail, newSentinel.ClampRail);
+        Assert.True(newSentinel.ClampRail.Matches(newSentinel));
+        Assert.Equal(4, newSentinel.ClampZones.Count);
+        Assert.Equal(53.25, newSentinel.ClampZones[0].Bounds.X);
+        Assert.Equal(47.375, newSentinel.ClampZones[0].Bounds.Y);
+        using var secondSave = Write(reopened);
+        using var secondJson = JsonDocument.Parse(ReadNestJson(secondSave));
+        Assert.Equal(0, secondJson.RootElement.GetProperty("plates").GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData("edited")]
+    [InlineData("middle")]
+    [InlineData("removed")]
+    [InlineData("cutOff")]
+    [InlineData("explicit")]
+    public void ChangedDefaultsPreserveAndWriteConfiguredEmptySheets(string configuration)
+    {
+        var nest = RailNest(withEmptyTail: false);
+        var plate = nest.CreatePlate();
+        switch (configuration)
+        {
+            case "edited":
+                plate.Size = new Size(48, 84);
+                plate.Quadrant = 2;
+                break;
+            case "middle":
+                var separator = nest.CreatePlate();
+                separator.CutOffs.Add(new CutOff(new Vector(40, 0), CutOffAxis.Vertical));
+                nest.CreatePlate();
+                break;
+            case "removed":
+                plate.SetClampRail(nest.PlateDefaults.ClampRail, new[] { "clamp-1" });
+                break;
+            case "cutOff":
+                plate.CutOffs.Add(new CutOff(new Vector(40, 0), CutOffAxis.Vertical));
+                break;
+            case "explicit":
+                plate.SetClampRail(null!);
+                plate.ClampZones.Add(new ClampZone("manual", new Box(10, 0, 2, 1)));
+                break;
+        }
+        var oldSize = plate.Size;
+        var oldQuadrant = plate.Quadrant;
+        var oldZones = plate.ClampZones.Select(z => (z.Id, z.Bounds.X, z.Bounds.Y, z.Bounds.Length, z.Bounds.Width)).ToArray();
+        using var manager = new PlateManager(nest);
+
+        manager.ChangePlateDefaults(() =>
+        {
+            nest.PlateDefaults.Size = new Size(48, 60);
+            nest.PlateDefaults.Quadrant = 3;
+        });
+
+        Assert.Equal(oldSize, plate.Size);
+        Assert.Equal(oldQuadrant, plate.Quadrant);
+        var reopened = RoundTrip(nest);
+        Assert.Equal(configuration == "middle" ? 3 : 2, reopened.Plates.Count);
+        var kept = reopened.Plates[1];
+        Assert.Equal(oldSize, kept.Size);
+        Assert.Equal(oldQuadrant, kept.Quadrant);
+        Assert.Equal(oldZones, kept.ClampZones.Select(z => (z.Id, z.Bounds.X, z.Bounds.Y, z.Bounds.Length, z.Bounds.Width)));
+        if (configuration == "removed")
+            Assert.Equal(new[] { "clamp-1" }, kept.RemovedClamps);
+        if (configuration == "cutOff")
+            Assert.Single(kept.CutOffs);
+        if (configuration == "explicit")
+            Assert.Null(kept.ClampRail);
+    }
+
+    [Fact]
     public void SavedZonesThatDifferFromTheRailArePreservedExactly()
     {
         var nest = RailNest(withEmptyTail: false);

@@ -739,7 +739,7 @@ namespace OpenNest.Forms
 
             if (form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                form.SaveNestInfo(Nest);
+                PlateManager.ChangePlateDefaults(() => form.SaveNestInfo(Nest));
                 drawingListBox1.Units = Nest.Units;
                 drawingListBox1.Invalidate();
             }
@@ -808,7 +808,7 @@ namespace OpenNest.Forms
 
         public void SetCurrentPlateAsNestDefault()
         {
-            Nest.PlateDefaults.SetFromExisting(PlateView.Plate);
+            PlateManager.ChangePlateDefaults(() => Nest.PlateDefaults.SetFromExisting(PlateView.Plate));
         }
 
         public void EditPlate()
@@ -827,7 +827,7 @@ namespace OpenNest.Forms
             drawingListBox1.Refresh();
 
             if (PlateView.Plate.Parts.Count == 0)
-                Nest.PlateDefaults.SetFromExisting(PlateView.Plate);
+                PlateManager.ChangePlateDefaults(() => Nest.PlateDefaults.SetFromExisting(PlateView.Plate));
         }
 
         /// <summary>

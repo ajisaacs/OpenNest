@@ -240,8 +240,9 @@ namespace OpenNest.IO
                 var plate = nest.Plates[i];
 
                 // An empty plate is omitted unless that would lose a clamp configuration the
-                // saved defaults cannot recreate; a trailing empty sheet that still matches
-                // the defaults is dropped.
+                // saved defaults cannot recreate. PlateManager moves an untouched trailing
+                // sentinel to new defaults during an edit, so it remains omitted; configured
+                // nondefault clamp sheets are still written.
                 if (
                     plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
                     && plate.CutOffs.Count == 0
