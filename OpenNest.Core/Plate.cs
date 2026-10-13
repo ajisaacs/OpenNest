@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using OpenNest.Collections;
 using OpenNest.Geometry;
@@ -141,7 +142,7 @@ namespace OpenNest
         /// </summary>
         public ClampRail ClampRail { get; private set; }
 
-        private static readonly IReadOnlySet<string> NoRemovedClamps = new HashSet<string>();
+        private static readonly IReadOnlySet<string> NoRemovedClamps = ImmutableHashSet<string>.Empty;
 
         /// <summary>
         /// Rail clamp ids taken off this sheet as a last resort (D8) so a part that could not
@@ -183,7 +184,7 @@ namespace OpenNest
             ClampRail = rail;
             RemovedClamps = rail == null || removedClamps == null
                 ? NoRemovedClamps
-                : new HashSet<string>(removedClamps, StringComparer.Ordinal);
+                : removedClamps.ToImmutableHashSet(StringComparer.Ordinal);
             ReplaceClampZones(ResolveRailZones());
         }
 

@@ -382,4 +382,17 @@ public class ClampRailTests
         Assert.Equal(ClampRail.DefaultRemovalMinutes, plate.ClampRemovalMinutes);
         Assert.Contains("clamp-8", plate.RemovedClamps); // still listed (C13)
     }
+
+    // PM 6ded8ac4 (e): the removed set is read-only, even through a downcast, and an
+    // untouched plate does not share a mutable empty set with every other plate.
+    [Fact]
+    public void RemovedClampsCannotBeMutatedThroughTheCollection()
+    {
+        var removed = Sheet(48, 120);
+        removed.SetClampRail(Machine(), new[] { "clamp-3" });
+        var untouched = Sheet(48, 120);
+
+        Assert.True(((ICollection<string>)removed.RemovedClamps).IsReadOnly);
+        Assert.True(((ICollection<string>)untouched.RemovedClamps).IsReadOnly);
+    }
 }
