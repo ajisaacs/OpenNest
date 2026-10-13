@@ -419,6 +419,8 @@ namespace OpenNest.Engine.Fill
                 return;
 
             var obstacles = Jobs.InteractiveClamps.ObstacleParts(plate);
+            obstacles.AddRange(plate.Parts.Where(part => !parts.Contains(part)
+                && !part.BaseDrawing.IsCutOff));
 
             for (var i = 0; i < maxIterations; i++)
             {

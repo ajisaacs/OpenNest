@@ -65,8 +65,10 @@ internal static class InteractiveClamps
     public static List<Part> ObstacleParts(Plate plate) =>
         ObstaclePartsFor(ZoneRectangles(plate), System.Math.Max(0, plate.EdgeSpacing.Bottom - plate.PartSpacing));
 
-    /// <summary>Expander walls: the raw keep-out rectangles themselves (no part spacing).</summary>
-    public static List<Part> WallParts(Plate plate) => ObstaclePartsFor(ZoneRectangles(plate), 0);
+    /// <summary>Expander walls use the bottom-edge clearance as a fixed floor,
+    /// independent of the separation target or its final achieved spacing.</summary>
+    public static List<Part> WallParts(Plate plate) =>
+        ObstaclePartsFor(ZoneRectangles(plate), System.Math.Max(0, plate.EdgeSpacing.Bottom));
 
     private static List<Part> ObstaclePartsFor(IReadOnlyList<Box> rectangles, double inflate)
     {
@@ -98,6 +100,32 @@ internal static class InteractiveClamps
             zoneProfile.Perimeter.ToPolygonWithTolerance(0.001),
             HolePolygons(partProfile),
             HolePolygons(zoneProfile));
+    }
+
+    public static bool MaterialsTooClose(Part first, Part second, double spacing)
+    {
+        var a = new ShapeProfile(PartGeometry.GetPartEntities(first));
+        var b = new ShapeProfile(PartGeometry.GetPartEntities(second));
+        if (a.Perimeter == null || b.Perimeter == null)
+            return true;
+        var outerA = a.Perimeter.ToPolygonWithTolerance(0.001);
+        var outerB = b.Perimeter.ToPolygonWithTolerance(0.001);
+        var holesA = HolePolygons(a);
+        var holesB = HolePolygons(b);
+        if (Collision.HasOverlap(outerA, outerB, holesA, holesB))
+            return true;
+        if (spacing <= NestTolerances.SpacingSlack)
+            return false;
+        var ringsA = new List<Polygon> { outerA };
+        var ringsB = new List<Polygon> { outerB };
+        if (holesA != null) ringsA.AddRange(holesA);
+        if (holesB != null) ringsB.AddRange(holesB);
+        foreach (var ringA in ringsA)
+            foreach (var ringB in ringsB)
+                if (Clearance.BoundaryDistance(ringA, ringB).Distance
+                    < spacing - NestTolerances.SpacingSlack)
+                    return true;
+        return false;
     }
 
     private static List<Polygon> HolePolygons(ShapeProfile profile)

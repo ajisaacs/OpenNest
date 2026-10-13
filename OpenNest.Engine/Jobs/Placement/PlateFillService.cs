@@ -63,7 +63,7 @@ public static class PlateFillService
         if (!InteractiveClamps.HasZones(plate))
             return filler.Fill(groupParts, workArea, progress, token);
         var result = ClearAreas(plate, workArea, token, (area, _) =>
-            filler.Fill(groupParts, area, null, token), 0);
+            filler.Fill(groupParts, area, null, token), 0, groupSize: groupParts.Count);
         ReportSafe(progress, result, workArea);
         return result;
     }
@@ -131,6 +131,11 @@ public static class PlateFillService
         foreach (var item in items.OrderBy(item => item.Priority))
         {
             token.ThrowIfCancellationRequested();
+            // Fill/Remnant whole-plate orchestration skips exhausted demand; the
+            // single-item Fill API uses zero to mean unlimited. Strip has its own
+            // historical zero-quantity behavior, preserved here.
+            if (item.Quantity <= 0 && ResolveStrategy(strategy) != "Strip")
+                continue;
             var proposed = FillClearAreas(plate, plate.WorkArea(), item, token,
                 (area, demand) => filler.Fill(demand, area, null, token), result);
             result.AddRange(proposed);
@@ -170,7 +175,7 @@ public static class PlateFillService
 
     private static List<Part> ClearAreas(Plate plate, Box box, CancellationToken token,
         Func<Box, NestItem, List<Part>> fill, int quantity, NestItem item = null,
-        List<Part> previouslyPlaced = null)
+        List<Part> previouslyPlaced = null, int groupSize = 1)
     {
         var result = new List<Part>();
         foreach (var area in ClearRegionBoxes(plate, box))
@@ -181,7 +186,7 @@ public static class PlateFillService
             var demand = item == null ? null : CopyDemand(item,
                 quantity > 0 ? quantity - result.Count : quantity);
             AddClear(result, fill(area, demand), plate, area,
-                item == null ? null : new List<NestItem> { item }, previouslyPlaced);
+                item == null ? null : new List<NestItem> { item }, previouslyPlaced, groupSize);
         }
         return result;
     }
@@ -195,33 +200,65 @@ public static class PlateFillService
     }
 
     private static void AddClear(List<Part> accepted, List<Part> proposed, Plate plate,
-        Box area, List<NestItem> demand = null, List<Part> previouslyPlaced = null)
+        Box area, List<NestItem> demand = null, List<Part> previouslyPlaced = null,
+        int groupSize = 1)
     {
-        if (proposed == null)
+        if (proposed == null || groupSize < 1 || proposed.Count % groupSize != 0)
             return;
-        foreach (var part in proposed)
+        for (var start = 0; start < proposed.Count; start += groupSize)
         {
-            var bounds = part.BoundingBox;
-            if (bounds.Left < area.Left - 1e-6 || bounds.Right > area.Right + 1e-6
-                || bounds.Bottom < area.Bottom - 1e-6 || bounds.Top > area.Top + 1e-6)
-                continue;
-            if (demand != null && !demand.Any(item =>
-                ReferenceEquals(item.Drawing, part.BaseDrawing) &&
-                (item.Quantity <= 0 || accepted.Count(p =>
-                    ReferenceEquals(p.BaseDrawing, item.Drawing)) < item.Quantity)))
-                continue;
-            if (InteractiveClamps.ValidationKeepOuts(plate).Any(zone =>
-                Overlaps(bounds, zone) && InteractiveClamps.MaterialInKeepOut(part, zone)))
-                continue;
-            if (plate.Parts.Any(existing => !existing.BaseDrawing.IsCutOff &&
-                Overlaps(bounds, existing.BoundingBox.Offset(plate.PartSpacing)))
-                || accepted.Any(existing => Overlaps(bounds,
-                    existing.BoundingBox.Offset(plate.PartSpacing)))
-                || (previouslyPlaced?.Any(existing => Overlaps(bounds,
-                    existing.BoundingBox.Offset(plate.PartSpacing))) ?? false))
-                continue;
-            accepted.Add(part);
+            // A group is one proposal: never return just its frame or just its
+            // insert when a member collides with a clamp or occupied material.
+            var batch = new List<Part>();
+            for (var index = start; index < start + groupSize; index++)
+            {
+                if (!TryAddClear(batch, proposed[index], accepted, plate, area,
+                    demand, previouslyPlaced))
+                    break;
+            }
+            if (batch.Count == groupSize)
+                accepted.AddRange(batch);
         }
+    }
+
+    private static bool TryAddClear(List<Part> batch, Part part, List<Part> accepted,
+        Plate plate, Box area, List<NestItem> demand, List<Part> previouslyPlaced)
+    {
+        var bounds = part.BoundingBox;
+        var full = plate.WorkArea();
+        // The packer permits a tiny overhang only at a real sheet edge,
+        // never across a remnant boundary cut by a clamp or another part.
+        double Slack(double edge, double sheet) => System.Math.Abs(edge - sheet) < 1e-9
+            ? NestTolerances.WorkAreaSlack : 1e-6;
+        if (bounds.Left < area.Left - Slack(area.Left, full.Left)
+            || bounds.Right > area.Right + Slack(area.Right, full.Right)
+            || bounds.Bottom < area.Bottom - Slack(area.Bottom, full.Bottom)
+            || bounds.Top > area.Top + Slack(area.Top, full.Top))
+            return false;
+        if (demand != null && !demand.Any(item =>
+            ReferenceEquals(item.Drawing, part.BaseDrawing) &&
+            (item.Quantity <= 0 || accepted.Count(p =>
+                ReferenceEquals(p.BaseDrawing, item.Drawing)) + batch.Count(p =>
+                ReferenceEquals(p.BaseDrawing, item.Drawing)) < item.Quantity)))
+            return false;
+        if (InteractiveClamps.ValidationKeepOuts(plate).Any(zone =>
+            Overlaps(bounds, zone) && InteractiveClamps.MaterialInKeepOut(part, zone)))
+            return false;
+        if (plate.Parts.Any(existing => !existing.BaseDrawing.IsCutOff &&
+            Overlaps(bounds, existing.BoundingBox.Offset(plate.PartSpacing))
+            && InteractiveClamps.MaterialsTooClose(part, existing, plate.PartSpacing))
+            || accepted.Any(existing => Overlaps(bounds,
+                existing.BoundingBox.Offset(plate.PartSpacing))
+                && InteractiveClamps.MaterialsTooClose(part, existing, plate.PartSpacing))
+            || batch.Any(existing => Overlaps(bounds,
+                existing.BoundingBox.Offset(plate.PartSpacing))
+                && InteractiveClamps.MaterialsTooClose(part, existing, plate.PartSpacing))
+            || (previouslyPlaced?.Any(existing => Overlaps(bounds,
+                existing.BoundingBox.Offset(plate.PartSpacing))
+                && InteractiveClamps.MaterialsTooClose(part, existing, plate.PartSpacing)) ?? false))
+            return false;
+        batch.Add(part);
+        return true;
     }
 
     private static bool Overlaps(Box a, Box b) => a.Left < b.Right && a.Right > b.Left

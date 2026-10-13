@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.CNC;
+using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
 using Xunit;
@@ -106,6 +107,85 @@ public class ClampZoneInteractiveFillTests
     }
 
     [Fact]
+    public void DesktopGroupFillThenSettleRemainsClearOfPlateOccupant()
+    {
+        var plate = new Plate(new Size(20, 20))
+        {
+            EdgeSpacing = new Spacing(0.25, 0.25),
+            PartSpacing = 0.1,
+        };
+        plate.ClampZones.Add(new ClampZone("remote", new Box(15, 0, 1.5, 0.625)));
+        var occupant = new Part(RectDrawing(4, 19.5), new Vector(0.25, 0.25));
+        plate.Parts.Add(occupant);
+        var group = new List<Part> { new(RectDrawing(3, 3)) };
+        var result = PlateFillService.FillGroup("Fill", plate, group,
+            plate.WorkArea(), null, CancellationToken.None);
+        Assert.True(result.Count > 1);
+        Assert.DoesNotContain(result, part => Overlaps(part.BoundingBox, occupant.BoundingBox));
+        Compactor.Settle(result, plate, plate.WorkArea());
+        Assert.DoesNotContain(result, part => Overlaps(part.BoundingBox, occupant.BoundingBox));
+        AssertClearOfClamps(result, new Box(15, 0, 1.5, 0.625));
+    }
+
+    [Fact]
+    public void FillGroupRejectsTheWholeCopyWhenOnlyOneMemberTouchesAClamp()
+    {
+        var plate = new Plate(new Size(20, 20)) { PartSpacing = 0 };
+        plate.ClampZones.Add(new ClampZone("front", new Box(5, 0, 1, 0.5)));
+        var drawing = RectDrawing(2, 2);
+        var group = new List<Part>
+        {
+            new(drawing, new Vector(2, 0)), new(drawing, new Vector(5, 0)),
+        };
+        var parts = PlateFillService.FillGroup("Fill", plate, group, new Box(2, 0, 5, 2),
+            null, CancellationToken.None);
+        Assert.Equal(0, parts.Count % group.Count);
+        Assert.Empty(parts);
+    }
+
+    [Fact]
+    public void FillGroupKeepsAnInsertInItsFrameHoleWhenAClampIsElsewhere()
+    {
+        var program = RectProgram(4, 4);
+        program.MoveTo(1, 1);
+        program.LineTo(1, 3);
+        program.LineTo(3, 3);
+        program.LineTo(3, 1);
+        program.LineTo(1, 1);
+        var frame = new Drawing("frame", program);
+        var insert = RectDrawing(1, 1);
+        var plate = new Plate(new Size(20, 20)) { PartSpacing = 0.25 };
+        plate.ClampZones.Add(new ClampZone("remote", new Box(18, 0, 1, 0.5)));
+        var group = new List<Part>
+        {
+            new(frame, new Vector(1, 3)), new(insert, new Vector(2.5, 4.5)),
+        };
+        var parts = PlateFillService.FillGroup("Fill", plate, group, new Box(1, 3, 4, 4),
+            null, CancellationToken.None);
+        Assert.Contains(parts, part => ReferenceEquals(part.BaseDrawing, frame));
+        Assert.Contains(parts, part => ReferenceEquals(part.BaseDrawing, insert));
+        Assert.Equal(0, parts.Count % 2);
+    }
+
+    [Fact]
+    public void PackAreaKeepsAllowedOverhangOnlyAtThePlateBoundary()
+    {
+        var plate = new Plate(new Size(12, 12))
+        {
+            EdgeSpacing = new Spacing(1, 1),
+            PartSpacing = 0,
+        };
+        plate.ClampZones.Add(new ClampZone("front", new Box(5, 0, 1, 0.5)));
+        var drawing = RectDrawing(10 + OpenNest.Engine.NestingEngines.Rectangles.SheetPacker.OverhangAllowance * 0.8, 4);
+        var items = new List<NestItem> { new() { Drawing = drawing, Quantity = 2 } };
+        var parts = PlateFillService.PackArea("Fill", plate, plate.WorkArea(), items,
+            null, CancellationToken.None);
+        Assert.Equal(2, parts.Count);
+        Assert.All(parts, part => Assert.True(part.BoundingBox.Right > plate.WorkArea().Right));
+        AssertClearOfClamps(parts, new Box(5, 0, 1, 0.5));
+    }
+
+    [Fact]
     public void PackAreaNeverPacksInsideClampKeepOut()
     {
         var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("front-2", ZoneB));
@@ -135,6 +215,18 @@ public class ClampZoneInteractiveFillTests
     private sealed class InlineProgress(System.Action<NestProgress> report) : System.IProgress<NestProgress>
     {
         public void Report(NestProgress value) => report(value);
+    }
+
+    [Theory]
+    [MemberData(nameof(Strategies))]
+    public void WholePlateNestWithNoRequestedPartsDoesNotFillBecauseOfClamps(string strategy)
+    {
+        var plate = MakePlate(new ClampZone("front-1", ZoneA));
+        var item = new NestItem { Drawing = RectDrawing(3, 3), Quantity = 0 };
+        var parts = PlateFillService.Nest(strategy, plate, new List<NestItem> { item },
+            null, CancellationToken.None);
+        if (strategy != "Strip")
+            Assert.Empty(parts);
     }
 
     [Theory]

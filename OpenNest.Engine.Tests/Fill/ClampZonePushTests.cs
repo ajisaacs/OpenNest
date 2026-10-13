@@ -94,6 +94,24 @@ public class ClampZonePushTests
     }
 
     [Fact]
+    public void SettleDoesNotMoveGroupThroughAnOccupiedPart()
+    {
+        var plate = new Plate(new Size(20, 20))
+        {
+            EdgeSpacing = new Spacing(0.25, 0.25),
+            PartSpacing = 0.1,
+        };
+        plate.ClampZones.Add(new ClampZone("remote", new Box(15, 0, 1.5, 0.625)));
+        var occupant = AddSquare(plate, 0.25, 0.25, 4);
+        var first = AddSquare(plate, 6, 7);
+        var second = AddSquare(plate, 11, 7);
+        Compactor.Settle(new List<Part> { first, second }, plate, plate.WorkArea());
+        Assert.False(Overlaps(first.BoundingBox, occupant.BoundingBox));
+        Assert.False(Overlaps(second.BoundingBox, occupant.BoundingBox));
+        AssertClear(plate, first, second);
+    }
+
+    [Fact]
     public void SettleKeepsGroupOutsideClampsInsideItsFillArea()
     {
         var plate = MakePlate(new ClampZone("front-1", ZoneA));
@@ -111,6 +129,23 @@ public class ClampZonePushTests
         var clear = AddSquare(plate, 3, 8);
         Compactor.Push(new List<Part> { straddler, clear }, plate, PushDirection.Down);
         AssertClear(plate, clear);
+    }
+
+    [Fact]
+    public void ExpanderPreservesBottomEdgeClearanceWhenItsAchievedSpacingIsSmaller()
+    {
+        var plate = new Plate(new Size(12, 12))
+        {
+            EdgeSpacing = new Spacing(2, 2),
+            PartSpacing = 0.1,
+        };
+        plate.ClampZones.Add(new ClampZone("front", new Box(4, 0, 2, 1)));
+        var upper = AddSquare(plate, 4, 5, 2);
+        var lower = AddSquare(plate, 4, 3.1, 2);
+        var result = Expander.Expand(new List<Part> { upper, lower }, plate);
+        Assert.False(result.Cancelled);
+        Assert.True(lower.BoundingBox.Bottom >= 3 - 1e-6,
+            $"Achieved={result.AchievedSpacing}, lower at {lower.Location.Y}");
     }
 
     [Fact]
