@@ -275,6 +275,15 @@ public static class PlateOverlapAnalyzer
                     continue;
                 try
                 {
+                    // A clamp below the polygon tolerance collapses in Collision.Check and would
+                    // read as clear (PM aa995123): judge it tolerance-free and report the whole
+                    // (negligibly small) clamp rectangle as the overlap fragment.
+                    if (KeepOutOverlap.NeedsToleranceFreeTest(zone))
+                    {
+                        if (KeepOutOverlap.MaterialEnters(part.Material.Outer, part.Material.Holes, zone))
+                            findings.Add(TinyClampFinding(part, clamp));
+                        continue;
+                    }
                     var origin = part.Material.Outer.Vertices[0];
                     var local = part.Material.Transform(0, origin * -1);
                     var rect = RectanglePolygon(zone, origin * -1);
@@ -309,6 +318,19 @@ public static class PlateOverlapAnalyzer
         }
 
         return findings;
+    }
+
+    private static PlateOverlapPair TinyClampFinding(PreparedPart part, CapturedClamp clamp)
+    {
+        var zone = clamp.Bounds;
+        var corners = new[]
+        {
+            new Vector(zone.Left, zone.Bottom), new Vector(zone.Right, zone.Bottom),
+            new Vector(zone.Right, zone.Top), new Vector(zone.Left, zone.Top),
+        };
+        var centre = new Vector((zone.Left + zone.Right) / 2, (zone.Bottom + zone.Top) / 2);
+        return new PlateOverlapPair(part.Input.Id, ClampFindingSlot.IdFor(clamp.Ordinal), part.Input.Name,
+            $"Clamp '{clamp.Id}'", new List<PlateOverlapRegion> { new(corners, zone.Length * zone.Width) }, centre);
     }
 
     private static Polygon RectanglePolygon(Box box, Vector offset)

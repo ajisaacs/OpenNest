@@ -196,6 +196,24 @@ public class PlateOverlapAnalyzerClampZoneTests
         Assert.NotEqual(OverlapCheckStatus.Current, state.Status);
     }
 
+    // C16 (PM 6859db53): a 1e-5 square zone, far below the outline tolerance. A part covering
+    // it is still reported (never silently clear); flush or clear parts are not.
+    [Theory]
+    [InlineData(7.5, true)]
+    [InlineData(6.0, false)]
+    [InlineData(8.00001, false)]
+    [InlineData(3.0, false)]
+    public void TinyClampZoneIsJudgedWithoutOutlineCollapse(double x, bool overlaps)
+    {
+        var tiny = new ClampZone("tiny", new Box(8, 0, 1e-5, 1e-5));
+        var parts = new List<Part> { new(Square("p", 2), new Vector(x, 0)) };
+
+        var report = PlateOverlapAnalyzer.Analyze(PlateOverlapAnalyzer.Capture(parts, new[] { tiny }));
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues.Select(issue => issue.Message)));
+        Assert.Equal(overlaps, report.ClampFindings.Any(f => f.PartBName.Contains("tiny")));
+    }
+
     private static string Describe(PlateOverlapReport report) =>
         string.Join(";", report.Pairs.Select(p => $"{p.PartAId}/{p.PartBId}:{p.Area:R}"))
         + "|"
