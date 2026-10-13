@@ -20,9 +20,60 @@ public class AutomaticCutOffFormTests
             using var form = new AutomaticCutOffForm(view, units);
             Assert.Equal(spacing, Control<TextBox>(form, "spacingBox").Text);
             Assert.Contains(suffix, Control<Label>(form, "spacingLabel").Text);
+            Assert.Contains(suffix, Control<Label>(form, "minimumStripLabel").Text);
+            Assert.Equal(double.Parse(spacing) / 2, double.Parse(Control<TextBox>(form, "minimumStripBox").Text));
             Assert.Contains(suffix, Control<Label>(form, "minimumTailLabel").Text);
             Assert.Equal(minimumTail, double.Parse(Control<TextBox>(form, "minimumTailBox").Text));
             Assert.Contains($"36 {suffix} width", Control<Label>(form, "sheetLabel").Text);
+        });
+    }
+
+    [Fact]
+    public void MinimumStripFollowsSpacingUntilEditedAndPreviewUsesIt()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            var edge = new CNC.Program();
+            edge.Codes.Add(new RapidMove(0, 0));
+            edge.Codes.Add(new LinearMove(10, 0));
+            edge.Codes.Add(new LinearMove(10, 6));
+            edge.Codes.Add(new LinearMove(0, 6));
+            edge.Codes.Add(new LinearMove(0, 0));
+            view.Plate.Parts.Add(new Part(new Drawing("edge", edge), new Vector(24.75, 29)));
+            using var form = new AutomaticCutOffForm(view, Units.Inches);
+            var spacing = Control<TextBox>(form, "spacingBox");
+            var minimum = Control<TextBox>(form, "minimumStripBox");
+            spacing.Text = "30";
+            Assert.Equal(15, double.Parse(minimum.Text));
+            minimum.Text = "20";
+            spacing.Text = "40";
+            Assert.Equal("20", minimum.Text);
+            Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
+            var expected = AutomaticCutOffPlanner.Create(view.Plate,
+                new AutomaticCutOffOptions { Spacing = 40, MinimumStripLength = 20, MinimumTailLength = 12 },
+                view.CutOffSettings);
+            Assert.NotEqual(40, expected.Definitions.First(c => c.Axis == CutOffAxis.Vertical).Position.X);
+            Assert.Equal(expected.Definitions.Select(c => c.Position.X),
+                PreviewParts(view).Select(p => ((RapidMove)p.BasePart.Program.Codes[0]).EndPoint.X));
+            Assert.Contains("Strip cuts:", Control<Label>(form, "stripCutsLabel").Text);
+            Assert.Contains("less than the fixed grid", Control<Label>(form, "stripCutsLabel").Text);
+        });
+    }
+
+    [Fact]
+    public void InvalidMinimumStripRefusesApplyWithoutChangingCutoffs()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            using var form = new AutomaticCutOffForm(view, Units.Inches);
+            Control<TextBox>(form, "minimumStripBox").Text = "40";
+            Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+            Assert.NotEqual(DialogResult.OK, form.DialogResult);
+            Assert.Empty(view.Plate.CutOffs);
+            Assert.False(Control<Button>(form, "applyButton").Enabled);
+            Assert.Contains("Minimum strip", Control<TextBox>(form, "diagnosticsBox").Text);
         });
     }
 
@@ -107,7 +158,7 @@ public class AutomaticCutOffFormTests
             view.Plate.Parts[0].Offset(5, 0);
             view.CutOffSettings.PartClearance = 2;
             var expected = AutomaticCutOffPlanner.Create(view.Plate,
-                new AutomaticCutOffOptions { Spacing = 35 }, view.CutOffSettings);
+                new AutomaticCutOffOptions { Spacing = 35, MinimumStripLength = 17.5 }, view.CutOffSettings);
             var removals = 0;
             view.Plate.PartRemoved += (_, e) =>
             {
@@ -134,6 +185,7 @@ public class AutomaticCutOffFormTests
         {
             using var view = CreateView();
             using var form = new AutomaticCutOffForm(view, Units.Inches);
+            Control<TextBox>(form, "minimumStripBox").Text = "35";
             Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
             var limited = new CutOff(new Vector(35, 0), CutOffAxis.Vertical) { EndLimit = 2 };
             view.Plate.CutOffs.Add(limited);
@@ -255,6 +307,7 @@ public class AutomaticCutOffFormTests
             nest.Plates.Add(view.Plate);
             nest.Plates.Add(otherView.Plate);
             using var form = new AutomaticCutOffForm(view, nest);
+            Control<TextBox>(form, "minimumStripBox").Text = "35";
             Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
             otherView.Plate.CutOffs.Add(new CutOff(new Vector(35, 0), CutOffAxis.Vertical) { EndLimit = 2 });
 

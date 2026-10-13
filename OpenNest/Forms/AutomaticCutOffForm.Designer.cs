@@ -25,6 +25,8 @@ partial class AutomaticCutOffForm
         spacingPanel = new TableLayoutPanel();
         spacingLabel = new Label();
         spacingBox = new TextBox();
+        minimumStripLabel = new Label();
+        minimumStripBox = new TextBox();
         minimumTailLabel = new Label();
         minimumTailBox = new TextBox();
         statusLabel = new Label();
@@ -37,6 +39,7 @@ partial class AutomaticCutOffForm
         usedLabel = new Label();
         separatorLabel = new Label();
         tailLabel = new Label();
+        stripCutsLabel = new Label();
         warningLabel = new Label();
         toolTip = new ToolTip(components);
         plateGrid = new ListView();
@@ -103,12 +106,15 @@ partial class AutomaticCutOffForm
         spacingPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         spacingPanel.Controls.Add(spacingLabel, 0, 0);
         spacingPanel.Controls.Add(spacingBox, 1, 0);
-        spacingPanel.Controls.Add(minimumTailLabel, 0, 1);
-        spacingPanel.Controls.Add(minimumTailBox, 1, 1);
+        spacingPanel.Controls.Add(minimumStripLabel, 0, 1);
+        spacingPanel.Controls.Add(minimumStripBox, 1, 1);
+        spacingPanel.Controls.Add(minimumTailLabel, 0, 2);
+        spacingPanel.Controls.Add(minimumTailBox, 1, 2);
         spacingPanel.Dock = DockStyle.Fill;
         spacingPanel.Margin = new Padding(0, 0, 0, 6);
         spacingPanel.Name = "spacingPanel";
-        spacingPanel.RowCount = 2;
+        spacingPanel.RowCount = 3;
+        spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         spacingPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         spacingPanel.TabIndex = 1;
@@ -126,21 +132,36 @@ partial class AutomaticCutOffForm
         spacingBox.Dock = DockStyle.Fill;
         spacingBox.Name = "spacingBox";
         spacingBox.TabIndex = 1;
-        spacingBox.TextChanged += SettingsBox_TextChanged;
+        spacingBox.TextChanged += SpacingBox_TextChanged;
+        //
+        // minimumStripLabel
+        //
+        minimumStripLabel.Anchor = AnchorStyles.Left;
+        minimumStripLabel.AutoSize = true;
+        minimumStripLabel.Name = "minimumStripLabel";
+        minimumStripLabel.TabIndex = 2;
+        minimumStripLabel.Text = "Minimum strip:";
+        //
+        // minimumStripBox
+        //
+        minimumStripBox.Dock = DockStyle.Fill;
+        minimumStripBox.Name = "minimumStripBox";
+        minimumStripBox.TabIndex = 3;
+        minimumStripBox.TextChanged += MinimumStripBox_TextChanged;
         //
         // minimumTailLabel
         //
         minimumTailLabel.Anchor = AnchorStyles.Left;
         minimumTailLabel.AutoSize = true;
         minimumTailLabel.Name = "minimumTailLabel";
-        minimumTailLabel.TabIndex = 2;
+        minimumTailLabel.TabIndex = 4;
         minimumTailLabel.Text = "Minimum tail to keep:";
         //
         // minimumTailBox
         //
         minimumTailBox.Dock = DockStyle.Fill;
         minimumTailBox.Name = "minimumTailBox";
-        minimumTailBox.TabIndex = 3;
+        minimumTailBox.TabIndex = 5;
         minimumTailBox.TextChanged += SettingsBox_TextChanged;
         //
         // statusLabel
@@ -169,10 +190,13 @@ partial class AutomaticCutOffForm
         metricsPanel.Controls.Add(usedLabel, 1, 1);
         metricsPanel.Controls.Add(separatorLabel, 2, 1);
         metricsPanel.Controls.Add(tailLabel, 3, 1);
+        metricsPanel.Controls.Add(stripCutsLabel, 0, 2);
+        metricsPanel.SetColumnSpan(stripCutsLabel, 4);
         metricsPanel.Dock = DockStyle.Fill;
         metricsPanel.Margin = new Padding(0, 0, 0, 6);
         metricsPanel.Name = "metricsPanel";
-        metricsPanel.RowCount = 2;
+        metricsPanel.RowCount = 3;
+        metricsPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         metricsPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         metricsPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         metricsPanel.TabIndex = 3;
@@ -231,6 +255,12 @@ partial class AutomaticCutOffForm
         tailLabel.Margin = new Padding(3, 0, 3, 0);
         tailLabel.Name = "tailLabel";
         tailLabel.Text = "—";
+        stripCutsLabel.AutoSize = true;
+        stripCutsLabel.Dock = DockStyle.Fill;
+        stripCutsLabel.Font = valueFont;
+        stripCutsLabel.Margin = new Padding(3, 7, 3, 0);
+        stripCutsLabel.Name = "stripCutsLabel";
+        stripCutsLabel.Text = "—";
         //
         // warningLabel
         //
@@ -375,6 +405,8 @@ partial class AutomaticCutOffForm
     private TableLayoutPanel spacingPanel;
     private Label spacingLabel;
     private TextBox spacingBox;
+    private Label minimumStripLabel;
+    private TextBox minimumStripBox;
     private Label minimumTailLabel;
     private TextBox minimumTailBox;
     private Label statusLabel;
@@ -387,6 +419,7 @@ partial class AutomaticCutOffForm
     private Label usedLabel;
     private Label separatorLabel;
     private Label tailLabel;
+    private Label stripCutsLabel;
     private Label warningLabel;
     private ToolTip toolTip;
     private ListView plateGrid;

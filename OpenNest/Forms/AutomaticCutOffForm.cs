@@ -20,6 +20,8 @@ public partial class AutomaticCutOffForm : Form
     private readonly Nest nest;
     private readonly Func<bool> isOperationBusy;
     private readonly string unit;
+    private bool minimumStripEdited;
+    private bool settingMinimumStrip;
 
     public AutomaticCutOffForm(PlateView plateView, Units units, Func<bool> isOperationBusy = null)
         : this(plateView, units, null, isOperationBusy) { }
@@ -37,6 +39,7 @@ public partial class AutomaticCutOffForm : Form
         InitializeComponent();
         spacingLabel.Text = $"Nominal spacing along sheet length ({unit}):";
         spacingBox.Text = units == Units.Millimeters ? "889" : "35";
+        minimumStripLabel.Text = $"Minimum strip ({unit}):";
         minimumTailLabel.Text = $"Minimum tail to keep ({unit}):";
         minimumTailBox.Text = (units == Units.Millimeters ? 304.8 : 12).ToString(CultureInfo.CurrentCulture);
         sheetLabel.Text = $"Sheet: {Measure(plate.Size.Length)} length × {Measure(plate.Size.Width)} width";
@@ -90,10 +93,17 @@ public partial class AutomaticCutOffForm : Form
 
         if (!double.TryParse(spacingBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var spacing))
             throw new ArgumentException($"Enter a numeric spacing in {unit}.");
+        if (!double.TryParse(minimumStripBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var minimumStrip))
+            throw new ArgumentException($"Enter a numeric minimum strip in {unit}.");
         if (!double.TryParse(minimumTailBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var minimumTail))
             throw new ArgumentException($"Enter a numeric minimum tail length in {unit}.");
 
-        var options = new AutomaticCutOffOptions { Spacing = spacing, MinimumTailLength = minimumTail };
+        var options = new AutomaticCutOffOptions
+        {
+            Spacing = spacing,
+            MinimumStripLength = minimumStrip,
+            MinimumTailLength = minimumTail,
+        };
         var settings = plateView.CutOffSettings;
         var plans = apply
             ? AutomaticCutOffBatch.Apply(plates, options, settings)
@@ -121,6 +131,11 @@ public partial class AutomaticCutOffForm : Form
         usedLabel.Text = Measure(plan.UsedSpan);
         separatorLabel.Text = plan.HasSeparatedTail ? SignedPosition(plan.TailSeparatorX.Value) : "none";
         tailLabel.Text = plan.HasSeparatedTail ? Measure(plan.TailLength) : "none";
+        var saving = plan.FixedGridCutLength - plan.StripCutLength;
+        stripCutsLabel.Text = $"Strip cuts: {Measure(plan.StripCutLength)} ("
+            + (saving > 0 ? $"{Measure(saving)} less than the fixed grid" :
+                saving < 0 ? $"{Measure(-saving)} more than the fixed grid" : "same as the fixed grid")
+            + ")";
 
         var blocked = plans.Any(p => p.HasBlockingDiagnostics);
         var definitionCount = plans.Sum(p => p.Definitions.Count);
@@ -196,6 +211,7 @@ public partial class AutomaticCutOffForm : Form
         usedLabel.Text = "—";
         separatorLabel.Text = "—";
         tailLabel.Text = "—";
+        stripCutsLabel.Text = "—";
         plateGrid.Items.Clear();
     }
 
@@ -206,6 +222,32 @@ public partial class AutomaticCutOffForm : Form
         applyButton.Enabled = false;
         SetStatus($"Error — {error.Message}", BlockedColor);
         diagnosticsBox.Text = error.Message;
+    }
+
+    private void SpacingBox_TextChanged(object sender, EventArgs e)
+    {
+        if (!minimumStripEdited &&
+            double.TryParse(spacingBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var spacing) &&
+            double.IsFinite(spacing))
+        {
+            settingMinimumStrip = true;
+            try
+            {
+                minimumStripBox.Text = (spacing / 2).ToString(CultureInfo.CurrentCulture);
+            }
+            finally
+            {
+                settingMinimumStrip = false;
+            }
+        }
+        SettingsBox_TextChanged(sender, e);
+    }
+
+    private void MinimumStripBox_TextChanged(object sender, EventArgs e)
+    {
+        if (!settingMinimumStrip)
+            minimumStripEdited = true;
+        SettingsBox_TextChanged(sender, e);
     }
 
     private void SettingsBox_TextChanged(object sender, EventArgs e)
