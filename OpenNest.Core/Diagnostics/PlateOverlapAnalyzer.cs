@@ -270,8 +270,11 @@ public static class PlateOverlapAnalyzer
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var zone = clamp.Bounds;
-                if (partBounds.Right <= zone.Left || zone.Right <= partBounds.Left
-                    || partBounds.Top <= zone.Bottom || zone.Top <= partBounds.Bottom)
+                // The prepared material is inscribed at ChordTolerance, so real material can
+                // reach that far past its bounds; a tiny clamp there must still be checked.
+                var reach = KeepOutOverlap.NeedsToleranceFreeTest(zone) ? ChordTolerance : 0;
+                if (partBounds.Right + reach <= zone.Left || zone.Right <= partBounds.Left - reach
+                    || partBounds.Top + reach <= zone.Bottom || zone.Top <= partBounds.Bottom - reach)
                     continue;
                 try
                 {

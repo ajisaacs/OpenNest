@@ -282,6 +282,32 @@ public class PlateOverlapAnalyzerClampZoneTests
         Assert.NotEmpty(report.ClampFindings);
     }
 
+    // Delta review 3: a tiny clamp in the sliver beyond a convex arc's 0.001 chords must not
+    // be dismissed by the coarse material bounds before the fine check runs.
+    [Fact]
+    public void TinyClampBeyondCoarseChordsIsReported()
+    {
+        const double r = 0.01, half = 0.04;
+        var dx = r * System.Math.Sin(half);
+        var cy = 20 - r * System.Math.Cos(half);
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.LineTo(20, 0);
+        program.LineTo(20, 20);
+        program.LineTo(10 + dx, 20);
+        program.ArcTo(10 - dx, 20, 10, cy, RotationType.CCW);
+        program.LineTo(0, 20);
+        program.LineTo(0, 0);
+        // Witness (10, 20.000002) is inside the arc (radius 0.009994 < 0.01) and the zone.
+        var zone = new ClampZone("tiny", new Box(9.999995, 20.000001199840007, 1e-5, 1e-5));
+
+        var report = PlateOverlapAnalyzer.Analyze(PlateOverlapAnalyzer.Capture(
+            new List<Part> { new(new Drawing("cap", program), new Vector(0, 0)) }, new[] { zone }));
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues.Select(issue => issue.Message)));
+        Assert.NotEmpty(report.ClampFindings);
+    }
+
     private static string Describe(PlateOverlapReport report) =>
         string.Join(";", report.Pairs.Select(p => $"{p.PartAId}/{p.PartBId}:{p.Area:R}"))
         + "|"
