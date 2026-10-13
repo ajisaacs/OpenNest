@@ -247,7 +247,9 @@ public static class AutomaticCutOffPlanner
             RegisterCandidate(distance);
             // Use the certification path's exact Near predicate, including its ULP
             // allowance, so a selected line cannot rediscover a limited-cut conflict.
-            return !plate.CutOffs.Any(c => c.Axis == CutOffAxis.Vertical && Near(c.Position.X, sign * distance));
+            var x = sign * distance;
+            return !plate.CutOffs.Any(c => c.Axis == CutOffAxis.Vertical && Near(c.Position.X, x)) &&
+                !clamps.Any(zone => CrossesClamp(zone, x));
         }
 
         void RegisterCandidate(double distance)
@@ -291,10 +293,8 @@ public static class AutomaticCutOffPlanner
             // existing line is regenerated and certified at its own X. Keep the whole
             // footprint when it hangs off the sheet. A same-line manual limit conflict above
             // still blocks the whole plan, clamp or not.
-            var clearance = plate.EdgeSpacing.Bottom;
             var blocked = clamps.FirstOrDefault(zone =>
-                matches.Select(c => c.Position.X).Prepend(x).Any(position =>
-                    position >= zone.Bounds.Left - clearance && position <= zone.Bounds.Right + clearance));
+                matches.Select(c => c.Position.X).Prepend(x).Any(position => CrossesClamp(zone, position)));
             if (blocked != null)
             {
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
@@ -349,6 +349,11 @@ public static class AutomaticCutOffPlanner
                     stripCutLength += Measure(System.Math.Abs(x)).Length;
             }
         }
+
+        // Share the exact placement-frame predicate with candidate exclusion and final
+        // certification. Infeasible gaps still use nominal lines through AddCandidate.
+        bool CrossesClamp(ClampZone zone, double x) =>
+            x >= zone.Bounds.Left - plate.EdgeSpacing.Bottom && x <= zone.Bounds.Right + plate.EdgeSpacing.Bottom;
 
         void WarnNoSeparator(double x) => diagnostics.Add(new AutomaticCutOffDiagnostic(
             AutomaticCutOffDiagnosticCode.NoSafeTailSeparator,
