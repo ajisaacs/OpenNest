@@ -39,6 +39,17 @@ namespace OpenNest
             Drawing.Program = program;
         }
 
+        /// <summary>Measures the same trimmed, filtered segments as regeneration without building a program.</summary>
+        internal (double Length, int SegmentCount) MeasureSegments(
+            Plate plate,
+            CutOffSettings settings,
+            Dictionary<Part, Entity> cache = null
+        )
+        {
+            var segments = ComputeSegments(plate, settings, cache);
+            return (segments.Sum(s => s.End - s.Start), segments.Count);
+        }
+
         private string GetName()
         {
             var axisChar = Axis == CutOffAxis.Vertical ? "V" : "H";
