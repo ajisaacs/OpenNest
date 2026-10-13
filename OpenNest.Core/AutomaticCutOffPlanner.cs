@@ -173,30 +173,35 @@ public static class AutomaticCutOffPlanner
 
         void AddCandidate(double x, bool isSeparator)
         {
-            // A full-width cut crosses every active front-edge clamp at this X. Test
-            // even equivalent existing definitions: a stale manual line cannot certify
-            // a retained tail. Keep the whole footprint when it hangs off the sheet.
-            var clearance = plate.EdgeSpacing.Bottom;
-            var blocked = plate.ClampZones.FirstOrDefault(zone =>
-                x >= zone.Bounds.Left - clearance && x <= zone.Bounds.Right + clearance);
-            if (blocked != null)
-            {
-                diagnostics.Add(new AutomaticCutOffDiagnostic(
-                    AutomaticCutOffDiagnosticCode.ClampBlockedCut,
-                    $"The proposed cut crosses clamp '{blocked.Id}' (including bottom-edge clearance); it was skipped.",
-                    X: x));
-                if (isSeparator)
-                    WarnNoSeparator(x);
-                return;
-            }
             var matches = plate.CutOffs.Where(c => c.Axis == CutOffAxis.Vertical &&
                 Near(c.Position.X, x)).ToList();
+
             if (matches.Any(c => !FullSpanLimits(c, bounds, settings)))
             {
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.LimitedCutOffConflict,
                     "A same-line manual cut has different limits. Manual review is required; no cuts may be applied.",
                     true, x));
+                if (isSeparator)
+                    WarnNoSeparator(x);
+                return;
+            }
+
+            // A full-width cut crosses every active front-edge clamp at its X. Test the
+            // proposed X and every equivalent existing definition, because a tolerance-close
+            // existing line is regenerated and certified at its own X. Keep the whole
+            // footprint when it hangs off the sheet. A same-line manual limit conflict above
+            // still blocks the whole plan, clamp or not.
+            var clearance = plate.EdgeSpacing.Bottom;
+            var blocked = plate.ClampZones.FirstOrDefault(zone =>
+                matches.Select(c => c.Position.X).Prepend(x).Any(position =>
+                    position >= zone.Bounds.Left - clearance && position <= zone.Bounds.Right + clearance));
+            if (blocked != null)
+            {
+                diagnostics.Add(new AutomaticCutOffDiagnostic(
+                    AutomaticCutOffDiagnosticCode.ClampBlockedCut,
+                    $"The proposed cut crosses clamp '{blocked.Id}' (including bottom-edge clearance); it was skipped.",
+                    X: x));
                 if (isSeparator)
                     WarnNoSeparator(x);
                 return;

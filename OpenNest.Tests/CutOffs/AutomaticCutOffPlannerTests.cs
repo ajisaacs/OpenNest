@@ -244,6 +244,62 @@ public class AutomaticCutOffPlannerTests
         Assert.Same(existing, Assert.Single(plate.CutOffs));
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void NearEquivalentExistingSeparatorInsideClampCannotCertifyTail(int quadrant)
+    {
+        // The nominal separator (80.50001) lies just beyond the clamp edge (80.5000075),
+        // but the equivalent existing line that would be certified (80.500005) is inside it.
+        var plate = MakePlate(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        var y = quadrant is 3 or 4 ? -0.625 : 0;
+        plate.ClampZones.Add(new ClampZone("edge", sign > 0
+            ? new Box(79.500005, y, 1.0000025, 0.625)
+            : new Box(-80.5000075, y, 1.0000025, 0.625)));
+        var existing = new CutOff(new Vector(sign * 80.500005, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(existing);
+        existing.Regenerate(plate, new CutOffSettings());
+        var original = existing.Drawing.Program;
+
+        var plan = Plan(plate);
+
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Null(plan.TailSeparatorX);
+        Assert.Equal(0, plan.TailLength);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.ClampBlockedCut);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeTailSeparator);
+        Assert.DoesNotContain(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.ExistingCutOff);
+        Assert.Equal(new[] { sign * 35.0, sign * 70.0 }, Positions(plan));
+        Assert.Same(original, existing.Drawing.Program);
+        Assert.Same(existing, Assert.Single(plate.CutOffs));
+    }
+
+    [Theory]
+    [InlineData(35)]
+    [InlineData(80.50001)]
+    public void SameLineLimitedManualCutOnClamp_StillBlocksWholePlan(double x)
+    {
+        var plate = MakePlate();
+        plate.ClampZones.Add(new ClampZone("under-manual", new Box(x - 0.75, 0, 1.5, 0.625)));
+        var manual = new CutOff(new Vector(x, 0), CutOffAxis.Vertical) { StartLimit = 10, EndLimit = 60 };
+        plate.CutOffs.Add(manual);
+        var program = manual.Drawing.Program;
+
+        var plan = Plan(plate);
+
+        Assert.True(plan.HasBlockingDiagnostics);
+        Assert.Empty(plan.Definitions);
+        Assert.Empty(plan.PreviewParts);
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Contains(plan.Diagnostics, d => d.IsBlocking &&
+            d.Code == AutomaticCutOffDiagnosticCode.LimitedCutOffConflict);
+        Assert.Same(program, manual.Drawing.Program);
+        Assert.Same(manual, Assert.Single(plate.CutOffs));
+    }
+
     [Fact]
     public void Planning_DoesNotMutateAnyLiveObjectsOrSequence()
     {
@@ -603,7 +659,7 @@ public class AutomaticCutOffPlannerTests
     }
 
     [Fact]
-    public void ToleranceCloseExistingSeparator_ThatStillTouchesClearance_DoesNotClaimTail()
+    public void NearEquivalentExistingSeparator_ThatStillTouchesClearance_DoesNotClaimTail()
     {
         var plate = MakePlate();
         plate.PartSpacing = 0;
