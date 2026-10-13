@@ -98,8 +98,8 @@ vertices cannot mutate the snapshot, report, or live geometry.
 ## Capture once, analyze off-thread
 
 ```csharp
-// UI thread, while parts/drawings are stable:
-var snapshot = PlateOverlapAnalyzer.Capture(parts, plate.ClampZones.ToArray(), cancellationToken);
+// UI thread, while the plate and drawings are stable:
+var snapshot = PlateOverlapAnalyzer.CapturePlate(plate, cancellationToken: cancellationToken);
 
 // Worker thread, no access to live Part/Drawing/Program objects:
 var report = await Task.Run(
@@ -158,6 +158,14 @@ triangulation, or `Collision.Check` call is not internally interruptible.
   preserve overlaps found among other valid parts. Unexpected failures propagate.
   A report with any issue has `IsComplete == false`, even if `Pairs` is empty.
 - No part, drawing, quantity, pose, cutting state, or selection is modified.
+
+For a full plate, `PlateOverlapAnalyzer.CapturePlate(plate)` also captures active
+clamps and nominal manual cut-off definitions. `CutOffClampFindings` is a separate
+list of zero-area line/rectangle contacts, not `Pairs` or material overlap. The
+view marks these with an X and a cut-off number/clamp ID, including contacts whose
+current regenerated program has been trimmed. Removed clamps produce no contact.
+Editing definitions, sheet size/quadrant or zones stales the result; posting runs
+its own fresh check with per-attempt consent.
 
 ## Interpretation and limits
 

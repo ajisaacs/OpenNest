@@ -302,7 +302,11 @@ internal sealed class CuttingInspectionPanel : UserControl
         view.ShowValidationFinding(finding with { Location = location });
         var hint = finding.Kind switch
         {
+            PostVerificationKind.Overlap when finding.ClampId != null =>
+                "The ring marks a nominal cut-off contacting a clamp; no material-overlap area is implied.",
             PostVerificationKind.Overlap => "Shaded material is the overlap. The ring marks its area centroid, which can lie between separate patches.",
+            PostVerificationKind.RapidCrossing when finding.ClampId != null =>
+                "The crosshair marks the rapid's contact with the clamp. Head height is not modeled.",
             PostVerificationKind.RapidCrossing => finding.ContactPoints.Count > 0
                 ? "Crosshairs mark contacts with the completed contour. The pulsing dashed orange line shows the rapid."
                 : "The pulsing dashed orange line shows the rapid inside the completed contour; there is no boundary contact point to mark.",

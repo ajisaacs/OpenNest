@@ -21,17 +21,22 @@ public sealed class OverlapReportState
     public PlateOverlapReport Report { get; private set; }
     /// <summary>Known overlap pairs safe to draw, even while the full layout needs a recheck.</summary>
     public IReadOnlyList<PlateOverlapPair> DisplayPairs { get; private set; } = Array.Empty<PlateOverlapPair>();
+    public IReadOnlyList<CutOffClampFinding> DisplayCutOffClampFindings { get; private set; } =
+        Array.Empty<CutOffClampFinding>();
     public bool IsRunning => Status == OverlapCheckStatus.Checking;
 
     public string Message => Status switch
     {
         OverlapCheckStatus.Checking => "Checking overlaps…",
-        OverlapCheckStatus.Current => Report.ClampFindings.Count == 0
+        OverlapCheckStatus.Current => Report.ClampFindings.Count == 0 && Report.CutOffClampFindings.Count == 0
             ? (Report.Pairs.Count == 0 ? "No material overlaps detected"
                 : $"Overlaps: {Report.Pairs.Count} pairs")
-            : $"Overlaps: {Report.Pairs.Count} pairs, {Report.ClampFindings.Count} clamps",
+            : $"Overlaps: {Report.Pairs.Count} pairs, {Report.ClampFindings.Count} clamps, "
+                + $"{Report.CutOffClampFindings.Count} cut-off/clamp contacts",
         OverlapCheckStatus.Incomplete => $"Overlap check incomplete: {Report.Pairs.Count} overlapping pairs; "
             + (Report.ClampFindings.Count == 0 ? "" : $"{Report.ClampFindings.Count} clamp findings; ")
+            + (Report.CutOffClampFindings.Count == 0 ? ""
+                : $"{Report.CutOffClampFindings.Count} cut-off/clamp contacts; ")
             + $"{uncheckedPartCount} parts could not be checked",
         OverlapCheckStatus.Failed => "Overlap check failed — run Check Overlaps again",
         OverlapCheckStatus.Canceled => "Overlap check canceled",
@@ -60,6 +65,7 @@ public sealed class OverlapReportState
         Report = report;
         DisplayPairs = report.ClampFindings.Count == 0 ? report.Pairs
             : report.Pairs.Concat(report.ClampFindings).ToList().AsReadOnly();
+        DisplayCutOffClampFindings = report.CutOffClampFindings;
         displayStamp = stamp;
         observedDisplayStamp = stamp;
         uncheckedPartCount = CountUncheckedParts(report.Issues);
@@ -111,11 +117,13 @@ public sealed class OverlapReportState
             return;
         var unchanged = displayStamp.UnchangedSlots(plate);
         var sameZones = displayStamp.SameZones(plate);
+        if (!sameZones || !displayStamp.SameCutOffs(plate))
+            DisplayCutOffClampFindings = Array.Empty<CutOffClampFinding>();
         var retained = DisplayPairs.Where(pair => unchanged[pair.PartAId]
             && (pair.PartBId < 0 ? sameZones : unchanged[pair.PartBId])).ToList();
         if (retained.Count != DisplayPairs.Count)
             DisplayPairs = retained.AsReadOnly();
-        if (DisplayPairs.Count == 0)
+        if (DisplayPairs.Count == 0 && DisplayCutOffClampFindings.Count == 0)
             ClearDisplayPairs();
         else
             observedDisplayStamp = OverlapGeometryStamp.Capture(plate);
@@ -124,6 +132,7 @@ public sealed class OverlapReportState
     private void ClearDisplayPairs()
     {
         DisplayPairs = Array.Empty<PlateOverlapPair>();
+        DisplayCutOffClampFindings = Array.Empty<CutOffClampFinding>();
         displayStamp = null;
         observedDisplayStamp = null;
     }

@@ -56,6 +56,30 @@ public static class PostVerificationAnalyzer
             }
             var materialParts = new List<Part>();
             var indices = new List<int>();
+            try
+            {
+                foreach (var contact in ClampCutDiagnostics.Find(plate))
+                {
+                    var cut = plate.CutOffs[contact.CutOffIndex];
+                    var partIndex = -1;
+                    for (var partSlot = 0; partSlot < plate.Parts.Count; partSlot++)
+                        if (ReferenceEquals(plate.Parts[partSlot]?.BaseDrawing, cut.Drawing))
+                        {
+                            partIndex = partSlot;
+                            break;
+                        }
+                    findings.Add(new(PostVerificationKind.Overlap, plateNumber,
+                        partIndex < 0 ? null : partIndex + 1, null,
+                        $"Manual cut-off {contact.CutOffIndex + 1} crosses active clamp '{contact.ClampId}'. "
+                        + "Review the clamp and cut before posting; this warning is not a repair.")
+                    { Location = contact.Location, ClampId = contact.ClampId });
+                }
+            }
+            catch (Exception exception) when (IsInvalid(exception))
+            {
+                findings.Add(new(PostVerificationKind.Incomplete, plateNumber, null, null,
+                    "Clamp/cut-off check: " + exception.Message));
+            }
             var obstacles = new ReleasedContourState();
             Vector? position = startPoint;
             for (var index = 0; index < plate.Parts.Count; index++)
@@ -95,6 +119,27 @@ public static class PostVerificationAnalyzer
                         && move.Curve.Length > PostVerificationGeometry.Epsilon))
                         Incomplete("Placed program has no cutting contour motions for this drawing.");
                     obstacles.AnalyzeMoves(moves, cutoff, findings, plateNumber, partNumber, cancellationToken);
+                    if (plate.ClampZones.Count != 0)
+                        foreach (var move in moves)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (!move.Rapid || move.Start is not { } from
+                                || from.X == move.End.X && from.Y == move.End.Y)
+                                continue;
+                            foreach (var zone in plate.ClampZones)
+                                if (ClampCutDiagnostics.Intersects(from, move.End, zone.Bounds, out var contact))
+                                    findings.Add(new(PostVerificationKind.RapidCrossing, plateNumber,
+                                        partNumber, null,
+                                        $"Direct XY rapid crosses active clamp '{zone.Id}'. "
+                                        + "Head height is not modeled; review the posted route and clamp setup.")
+                                    {
+                                        Location = (from + move.End) * 0.5,
+                                        RapidStart = from,
+                                        RapidEnd = move.End,
+                                        ContactPoints = new[] { contact },
+                                        ClampId = zone.Id
+                                    });
+                        }
                     position = moves[^1].End;
                 }
                 catch (Exception exception) when (IsInvalid(exception))
@@ -110,10 +155,15 @@ public static class PostVerificationAnalyzer
             }
             cancellationToken.ThrowIfCancellationRequested();
             var overlap = PlateOverlapAnalyzer.Analyze(
-                PlateOverlapAnalyzer.Capture(materialParts, cancellationToken), cancellationToken);
+                PlateOverlapAnalyzer.Capture(materialParts, plate.ClampZones.ToArray(), cancellationToken),
+                cancellationToken);
             foreach (var pair in overlap.Pairs)
                 findings.Add(new(PostVerificationKind.Overlap, plateNumber, indices[pair.PartAId],
                     indices[pair.PartBId], "Clean drawing material overlaps (holes subtracted).")
+                { Location = pair.Centroid, Overlap = pair });
+            foreach (var pair in overlap.ClampFindings)
+                findings.Add(new(PostVerificationKind.Overlap, plateNumber, indices[pair.PartAId],
+                    null, $"Clean drawing material overlaps {pair.PartBName} (holes subtracted).")
                 { Location = pair.Centroid, Overlap = pair });
             foreach (var issue in overlap.Issues)
                 findings.Add(new(PostVerificationKind.Incomplete, plateNumber, indices[issue.PartAId],

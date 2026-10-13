@@ -18,6 +18,23 @@ public static class PlateOverlapAnalyzer
     public const double ChordTolerance = 0.001;
 
     /// <summary>
+    /// Capture a whole plate including active clamps and nominal cut-off definitions.
+    /// Use this entry for the desktop overlap check so manual cut-off contacts
+    /// cannot be mistaken for a clear plate merely because cut-offs are not material.
+    /// </summary>
+    public static PlateOverlapSnapshot CapturePlate(Plate plate, OverlapMaterialCache cache = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(plate);
+        var material = Capture(plate.Parts.ToArray(), plate.ClampZones.ToArray(),
+            cache ?? new OverlapMaterialCache(), cancellationToken);
+        var cutoffs = ClampCutDiagnostics.Find(plate);
+        cancellationToken.ThrowIfCancellationRequested();
+        return new PlateOverlapSnapshot(material.Parts.ToList(), material.Issues.ToList(),
+            material.Clamps.ToList(), cutoffs.ToList());
+    }
+
+    /// <summary>
     /// Captures poses and converts each distinct clean source program to owned entities once.
     /// Inputs must not change during capture. Later analysis never reads live domain objects.
     /// </summary>
@@ -226,7 +243,8 @@ public static class PlateOverlapAnalyzer
         return new PlateOverlapReport(pairs.OrderBy(pair => pair.PartAId)
             .ThenBy(pair => pair.PartBId).ToList(), issues.OrderBy(issue => issue.PartAId)
             .ThenBy(issue => issue.PartBId).ToList(), snapshot, clampFindings
-            .OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToList());
+            .OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToList(),
+            snapshot.CutOffClampFindings.ToList());
     }
 
     /// <summary>

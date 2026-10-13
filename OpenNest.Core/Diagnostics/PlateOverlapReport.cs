@@ -8,12 +8,14 @@ namespace OpenNest.Diagnostics;
 public sealed class PlateOverlapReport
 {
     internal PlateOverlapReport(List<PlateOverlapPair> pairs, List<PlateOverlapIssue> issues,
-        PlateOverlapSnapshot snapshot, List<PlateOverlapPair> clampFindings = null)
+        PlateOverlapSnapshot snapshot, List<PlateOverlapPair> clampFindings = null,
+        List<CutOffClampFinding> cutOffClampFindings = null)
     {
         Pairs = pairs.AsReadOnly();
         Issues = issues.AsReadOnly();
         Snapshot = snapshot;
         ClampFindings = (clampFindings ?? new List<PlateOverlapPair>()).AsReadOnly();
+        CutOffClampFindings = (cutOffClampFindings ?? new List<CutOffClampFinding>()).AsReadOnly();
     }
 
     /// <summary>The owned input this report was computed from; the baseline for incremental rechecks.</summary>
@@ -28,6 +30,8 @@ public sealed class PlateOverlapReport
     /// are reported like other overlap findings; they do not change <see cref="IsComplete"/>.
     /// </summary>
     public IReadOnlyList<PlateOverlapPair> ClampFindings { get; }
+    /// <summary>Nominal cut-off/clamp contacts. Lines have no material area or part pair.</summary>
+    public IReadOnlyList<CutOffClampFinding> CutOffClampFindings { get; }
 
     public bool IsComplete => Issues.Count == 0;
     public double ChordTolerance => PlateOverlapAnalyzer.ChordTolerance;
@@ -112,11 +116,12 @@ public sealed record PlateOverlapIssue(int PartAId, int? PartBId, string Message
 public sealed class PlateOverlapSnapshot
 {
     internal PlateOverlapSnapshot(List<CapturedOverlapPart> parts, List<PlateOverlapIssue> issues,
-        List<CapturedClamp> clamps = null)
+        List<CapturedClamp> clamps = null, List<CutOffClampFinding> cutOffClampFindings = null)
     {
         Parts = parts.AsReadOnly();
         Issues = issues.AsReadOnly();
         Clamps = (clamps ?? new List<CapturedClamp>()).AsReadOnly();
+        CutOffClampFindings = (cutOffClampFindings ?? new List<CutOffClampFinding>()).AsReadOnly();
     }
 
     internal IReadOnlyList<CapturedOverlapPart> Parts { get; }
@@ -124,6 +129,7 @@ public sealed class PlateOverlapSnapshot
 
     /// <summary>Owned clamp keep-out rectangles in plate coordinates, capture order.</summary>
     internal IReadOnlyList<CapturedClamp> Clamps { get; }
+    internal IReadOnlyList<CutOffClampFinding> CutOffClampFindings { get; }
 }
 
 internal sealed record CapturedOverlapPart(int Id, string Name, OverlapSource Source,

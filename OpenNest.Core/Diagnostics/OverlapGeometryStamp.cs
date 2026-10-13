@@ -12,10 +12,13 @@ public sealed class OverlapGeometryStamp
     private readonly Plate plate;
     private readonly Entry[] entries;
     private readonly (string Id, long X, long Y, long Length, long Width)[] zones;
+    private readonly (CutOff Definition, CutOffAxis Axis, long X, long Y, long? Start, long? End)[] cutoffs;
+    private readonly (long Width, long Length, int Quadrant) sheet;
 
     private OverlapGeometryStamp(Plate plate)
     {
         this.plate = plate;
+        sheet = (Bits(plate.Size.Width), Bits(plate.Size.Length), plate.Quadrant);
         entries = new Entry[plate.Parts.Count];
         for (var i = 0; i < entries.Length; i++)
             entries[i] = new Entry(plate.Parts[i]);
@@ -26,7 +29,15 @@ public sealed class OverlapGeometryStamp
             var box = zone.Bounds;
             zones[i] = (zone.Id, Bits(box.X), Bits(box.Y), Bits(box.Length), Bits(box.Width));
         }
+        cutoffs = new (CutOff, CutOffAxis, long, long, long?, long?)[plate.CutOffs.Count];
+        for (var i = 0; i < cutoffs.Length; i++)
+            cutoffs[i] = CutOffState(plate.CutOffs[i]);
     }
+
+    private static (CutOff, CutOffAxis, long, long, long?, long?) CutOffState(CutOff cut) =>
+        (cut, cut.Axis, Bits(cut.Position.X), Bits(cut.Position.Y),
+            cut.StartLimit.HasValue ? Bits(cut.StartLimit.Value) : null,
+            cut.EndLimit.HasValue ? Bits(cut.EndLimit.Value) : null);
 
     private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 
@@ -46,9 +57,20 @@ public sealed class OverlapGeometryStamp
         return true;
     }
 
+    internal bool SameCutOffs(Plate current)
+    {
+        if (!ReferenceEquals(plate, current) || current.CutOffs.Count != cutoffs.Length
+            || sheet != (Bits(current.Size.Width), Bits(current.Size.Length), current.Quadrant))
+            return false;
+        for (var i = 0; i < cutoffs.Length; i++)
+            if (cutoffs[i] != CutOffState(current.CutOffs[i]))
+                return false;
+        return true;
+    }
+
     public bool Matches(Plate current)
     {
-        if (current.Parts.Count != entries.Length || !SameZones(current))
+        if (current.Parts.Count != entries.Length || !SameZones(current) || !SameCutOffs(current))
             return false;
         for (var i = 0; i < entries.Length; i++)
             if (!entries[i].Matches(current.Parts[i]))

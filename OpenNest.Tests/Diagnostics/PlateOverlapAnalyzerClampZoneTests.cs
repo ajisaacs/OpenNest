@@ -32,6 +32,28 @@ public class PlateOverlapAnalyzerClampZoneTests
     private static readonly ClampZone Front2 = new("front-2", new Box(20, 0, 1.5, 0.625));
 
     [Fact]
+    public void ManualCutoffCrossingClampAppearsInOverlapCheckWithoutBeingMaterial()
+    {
+        var plate = new Plate(new Size(24, 48));
+        plate.ClampZones.Add(Front1);
+        plate.CutOffs.Add(new CutOff(new Vector(10.5, 0), CutOffAxis.Vertical));
+        var report = PlateOverlapAnalyzer.Analyze(PlateOverlapAnalyzer.CapturePlate(plate));
+        Assert.Empty(report.Pairs);
+        Assert.Empty(report.ClampFindings);
+        Assert.True(report.IsComplete);
+        var finding = Assert.Single(report.CutOffClampFindings);
+        Assert.Equal("front-1", finding.ClampId);
+        Assert.Equal(0, finding.CutOffIndex);
+        Assert.InRange(finding.Location.X, 10, 11.5);
+        var state = new OverlapReportState();
+        Assert.True(state.TryPublish(state.Begin(plate), plate, report));
+        Assert.Contains("cut-off", state.Message);
+        plate.CutOffs.Clear();
+        Assert.False(state.EnsureFresh(plate));
+        Assert.Equal(OverlapCheckStatus.Stale, state.Status);
+    }
+
+    [Fact]
     public void PartOverlappingClampProducesHoleAwareFinding()
     {
         // 4x4 square at (9.25, 0): the shared fragment with front-1 is exactly its footprint.

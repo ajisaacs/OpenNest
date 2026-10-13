@@ -99,6 +99,53 @@ public class PostVerificationAnalyzerTests
     }
 
     [Fact]
+    public void ManualCutoffAndRapidCrossingClampRequireFreshPostingConsent()
+    {
+        var nest = NestWith(Rectangle(50, 20, 4));
+        var plate = Assert.Single(nest.Plates);
+        plate.ClampZones.Add(new ClampZone("front-3", new Box(10, 0, 1.5, 0.625)));
+        var cutoff = new CutOff(new Vector(10.5, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        var report = PostVerificationAnalyzer.Analyze(nest);
+        Assert.Contains(report.Findings, f => f.Kind == PostVerificationKind.Overlap
+            && f.Message.Contains("front-3") && f.Message.Contains("cut-off") && f.PlateNumber == 1);
+        Assert.Contains(report.Findings, f => f.Kind == PostVerificationKind.RapidCrossing
+            && f.Message.Contains("front-3") && f.RapidStart.HasValue && f.RapidEnd.HasValue);
+        Assert.False(report.CanPost(false));
+        Assert.True(report.CanPost(true));
+        Assert.False(PostVerificationAnalyzer.Analyze(nest).CanPost(false));
+        plate.ClampZones.Clear();
+        var withoutClamps = PostVerificationAnalyzer.Analyze(nest);
+        Assert.DoesNotContain(withoutClamps.Findings, f => f.Message.Contains("front-3"));
+    }
+
+    [Fact]
+    public void InvalidManualCutoffGeometryIsIncompleteNotClear()
+    {
+        var nest = NestWith(Rectangle(40, 20, 4));
+        var plate = nest.Plates[0];
+        plate.ClampZones.Add(new ClampZone("front", new Box(10, 0, 1.5, 0.625)));
+        plate.CutOffs.Add(new CutOff(new Vector(double.NaN, 0), CutOffAxis.Vertical));
+        var report = PostVerificationAnalyzer.Analyze(nest);
+        Assert.Contains(report.Findings, f => f.Kind == PostVerificationKind.Incomplete
+            && f.Message.Contains("Clamp/cut-off check"));
+        Assert.False(report.CanPost(false));
+    }
+
+    [Fact]
+    public void PartMaterialOnClampAppearsInPrePostOverlapFindings()
+    {
+        var nest = NestWith(Rectangle(10, 0, 4));
+        nest.Plates[0].ClampZones.Add(new ClampZone("front-1", new Box(10, 0, 1.5, 0.625)));
+        var finding = Assert.Single(PostVerificationAnalyzer.Analyze(nest).Findings.Where(f =>
+            f.Kind == PostVerificationKind.Overlap && f.Message.Contains("front-1")));
+        Assert.Equal(1, finding.PartNumber);
+        Assert.Null(finding.OtherPartNumber);
+        Assert.NotNull(finding.Overlap);
+    }
+
+    [Fact]
     public void ScribeAndCutoff_AreExemptFromOverlapAndLeadInChecks()
     {
         var report = Analyze(Scribe(0, 0), Cutoff(0, 0));
