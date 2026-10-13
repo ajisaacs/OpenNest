@@ -36,6 +36,7 @@ internal sealed class OverlapOverlayController : IDisposable
     private IReadOnlyList<PlateOverlapPair> pathPairs;
     private float pathScale;
     private Units capturedUnits;
+    private Plate observedPlate;
     private IReadOnlyList<PlateOverlapPair> hoveredPairs = Array.Empty<PlateOverlapPair>();
     private string hoverText;
     private OverlapHoverPages hoverPages;
@@ -110,6 +111,9 @@ internal sealed class OverlapOverlayController : IDisposable
         autoCheck.Reset();
         baseline = null;
         ReleasePath();
+        observedPlate = plate;
+        if (observedPlate != null)
+            observedPlate.ClampZonesChanged += ZonesChanged;
         observedParts = plate?.Parts;
         if (observedParts != null)
         {
@@ -144,7 +148,8 @@ internal sealed class OverlapOverlayController : IDisposable
         try
         {
             // Do not include PreviewManager parts. Capture owns clean geometry and stable names.
-            var snapshot = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(), materialCache, token);
+            var snapshot = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(),
+                plate.ClampZones.ToArray(), materialCache, token);
             var previous = baseline;
             var analyze = Analyze ?? ((input, cancel) => PlateOverlapAnalyzer.Analyze(input, previous, cancel));
             var report = await Task.Run(() => analyze(snapshot, token), token);
@@ -331,6 +336,7 @@ internal sealed class OverlapOverlayController : IDisposable
         || System.Windows.Forms.Application.OpenForms.Cast<System.Windows.Forms.Form>()
             .Any(form => form.Modal || form is NestProgressForm);
 
+    private void ZonesChanged(object sender, EventArgs e) => Invalidate();
     private void PartAdded(object sender, ItemAddedEventArgs<Part> e) => Invalidate();
     private void PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => Invalidate();
     private void PartChanged(object sender, ItemChangedEventArgs<Part> e) => Invalidate();
@@ -338,6 +344,11 @@ internal sealed class OverlapOverlayController : IDisposable
 
     private void Unsubscribe()
     {
+        if (observedPlate != null)
+        {
+            observedPlate.ClampZonesChanged -= ZonesChanged;
+            observedPlate = null;
+        }
         if (observedParts == null)
             return;
         observedParts.ItemAdded -= PartAdded;
@@ -418,7 +429,7 @@ internal sealed class OverlapOverlayController : IDisposable
 
         // Graph coordinates are already screen-scaled; remove pan from the pointer once.
         var graphPoint = view.PointControlToGraph(point);
-        var hits = OverlapPairPresentation.HitTest(state.Report.Pairs, world =>
+        var hits = OverlapPairPresentation.HitTest(state.DisplayPairs, world =>
         {
             var graph = view.PointWorldToGraph(world);
             return new Vector(graph.X, graph.Y);

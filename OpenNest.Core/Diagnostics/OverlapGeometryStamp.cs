@@ -11,6 +11,7 @@ public sealed class OverlapGeometryStamp
 {
     private readonly Plate plate;
     private readonly Entry[] entries;
+    private readonly (string Id, long X, long Y, long Length, long Width)[] zones;
 
     private OverlapGeometryStamp(Plate plate)
     {
@@ -18,13 +19,36 @@ public sealed class OverlapGeometryStamp
         entries = new Entry[plate.Parts.Count];
         for (var i = 0; i < entries.Length; i++)
             entries[i] = new Entry(plate.Parts[i]);
+        zones = new (string, long, long, long, long)[plate.ClampZones.Count];
+        for (var i = 0; i < zones.Length; i++)
+        {
+            var zone = plate.ClampZones[i];
+            var box = zone.Bounds;
+            zones[i] = (zone.Id, Bits(box.X), Bits(box.Y), Bits(box.Length), Bits(box.Width));
+        }
     }
+
+    private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 
     public static OverlapGeometryStamp Capture(Plate plate) => new(plate);
 
+    internal bool SameZones(Plate current)
+    {
+        if (!ReferenceEquals(plate, current) || current.ClampZones.Count != zones.Length)
+            return false;
+        for (var i = 0; i < zones.Length; i++)
+        {
+            var zone = current.ClampZones[i];
+            var box = zone.Bounds;
+            if (zones[i] != (zone.Id, Bits(box.X), Bits(box.Y), Bits(box.Length), Bits(box.Width)))
+                return false;
+        }
+        return true;
+    }
+
     public bool Matches(Plate current)
     {
-        if (!ReferenceEquals(plate, current) || current.Parts.Count != entries.Length)
+        if (current.Parts.Count != entries.Length || !SameZones(current))
             return false;
         for (var i = 0; i < entries.Length; i++)
             if (!entries[i].Matches(current.Parts[i]))

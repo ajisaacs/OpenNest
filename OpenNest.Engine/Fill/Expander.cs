@@ -479,6 +479,11 @@ namespace OpenNest.Engine.Fill
             {
                 var movers = new List<Part>(selected);
                 var walls = plate.Parts.Where(p => !movers.Contains(p)).ToList();
+                // Slice 4 (C1): the plate's clamp keep-outs are static walls - growth that
+                // would consume a zone stops against it like an edge, and violations
+                // against zones are reported instead of crashed through. Zone rectangles
+                // carry no program of their own part spacing: walls are the raw keep-outs.
+                walls.AddRange(Jobs.InteractiveClamps.WallParts(plate));
 
                 var parts = new List<Part>(movers.Count + walls.Count);
                 parts.AddRange(movers);

@@ -8,7 +8,10 @@ selection, cutting paths, or export behavior. Cutoffs and temporary preview part
 are excluded. **Cancel Check** discards the running request. **Display > Off /
 Areas / Centroids / Both** changes visibility without rerunning analysis. Areas
 is the default; rechecking preserves a visible mode, while checking from Off
-shows Areas. Display preferences belong to the current document and are not saved.
+shows Areas. Clamp overlaps are shown as part/clamp findings with the clamp ID
+in hover details; clamps are not selectable parts and are not added to quantity
+or machining. A clamp edit invalidates the diagnostic and schedules a fresh
+check. Display preferences belong to the current document and are not saved.
 
 Centroids and Both show fixed-screen-size, DPI-scaled pair crosshairs with a
 contrasting halo. Labels such as `1/3` identify the two plate sequence positions
@@ -96,7 +99,7 @@ vertices cannot mutate the snapshot, report, or live geometry.
 
 ```csharp
 // UI thread, while parts/drawings are stable:
-var snapshot = PlateOverlapAnalyzer.Capture(parts, cancellationToken);
+var snapshot = PlateOverlapAnalyzer.Capture(parts, plate.ClampZones.ToArray(), cancellationToken);
 
 // Worker thread, no access to live Part/Drawing/Program objects:
 var report = await Task.Run(

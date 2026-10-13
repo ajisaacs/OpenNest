@@ -27,6 +27,9 @@ internal static class PlateFillOrchestrator
             return new List<Part>();
 
         var workArea = plate.WorkArea();
+        // Slice 4 (C1): inflated clamp keep-outs act like occupied space for every stage
+        // below - fill remnants, pack areas, pair placement - so a zone is never covered.
+        var clampKeepOuts = InteractiveClamps.ClearanceRectangles(plate);
         var allParts = new List<Part>();
 
         var plateArea = workArea.Width * workArea.Length;
@@ -41,7 +44,7 @@ internal static class PlateFillOrchestrator
 
         if (fillItems.Count > 0)
         {
-            var remnantFiller = new RemnantFiller(workArea, plate.PartSpacing);
+            var remnantFiller = new RemnantFiller(workArea, plate.PartSpacing, clampKeepOuts);
 
             var fillParts = remnantFiller.FillItems(
                 fillItems,
@@ -58,6 +61,7 @@ internal static class PlateFillOrchestrator
                 var placedObstacles = fillParts
                     .Select(part => part.BoundingBox.Offset(plate.PartSpacing))
                     .ToList();
+                placedObstacles.AddRange(clampKeepOuts);
                 var finder = new RemnantFinder(workArea, placedObstacles);
                 var remnants = finder.FindRemnants();
                 if (remnants.Count > 0)
@@ -90,11 +94,11 @@ internal static class PlateFillOrchestrator
 
         if (pairItems.Count > 0 && !token.IsCancellationRequested)
         {
-            var placed = PlaceBestFitPairs(plate, comparer, pairItems, allParts, plate.WorkArea());
+            var placed = PlaceBestFitPairs(plate, comparer, pairItems, allParts, plate.WorkArea(), clampKeepOuts);
             allParts.AddRange(placed);
         }
 
-        Compactor.Settle(allParts, plate.WorkArea(), plate.PartSpacing);
+        Compactor.Settle(allParts, plate);
 
         return allParts;
     }
@@ -113,13 +117,16 @@ internal static class PlateFillOrchestrator
         IFillComparer comparer,
         List<NestItem> pairItems,
         List<Part> existingParts,
-        Box fullWorkArea
+        Box fullWorkArea,
+        IReadOnlyList<Box> clampKeepOuts = null
     )
     {
         var result = new List<Part>();
         var obstacles = existingParts
             .Select(part => part.BoundingBox.Offset(plate.PartSpacing))
             .ToList();
+        if (clampKeepOuts != null)
+            obstacles.AddRange(clampKeepOuts);
         var finder = new RemnantFinder(fullWorkArea, obstacles);
 
         foreach (var item in pairItems)

@@ -26,9 +26,12 @@ public sealed class OverlapReportState
     public string Message => Status switch
     {
         OverlapCheckStatus.Checking => "Checking overlaps…",
-        OverlapCheckStatus.Current => Report.Pairs.Count == 0
-            ? "No material overlaps detected" : $"Overlaps: {Report.Pairs.Count} pairs",
+        OverlapCheckStatus.Current => Report.ClampFindings.Count == 0
+            ? (Report.Pairs.Count == 0 ? "No material overlaps detected"
+                : $"Overlaps: {Report.Pairs.Count} pairs")
+            : $"Overlaps: {Report.Pairs.Count} pairs, {Report.ClampFindings.Count} clamps",
         OverlapCheckStatus.Incomplete => $"Overlap check incomplete: {Report.Pairs.Count} overlapping pairs; "
+            + (Report.ClampFindings.Count == 0 ? "" : $"{Report.ClampFindings.Count} clamp findings; ")
             + $"{uncheckedPartCount} parts could not be checked",
         OverlapCheckStatus.Failed => "Overlap check failed — run Check Overlaps again",
         OverlapCheckStatus.Canceled => "Overlap check canceled",
@@ -55,7 +58,8 @@ public sealed class OverlapReportState
         if (!CanComplete(generation, plate))
             return false;
         Report = report;
-        DisplayPairs = report.Pairs;
+        DisplayPairs = report.ClampFindings.Count == 0 ? report.Pairs
+            : report.Pairs.Concat(report.ClampFindings).ToList().AsReadOnly();
         displayStamp = stamp;
         observedDisplayStamp = stamp;
         uncheckedPartCount = CountUncheckedParts(report.Issues);
@@ -106,7 +110,9 @@ public sealed class OverlapReportState
         if (displayStamp == null || observedDisplayStamp?.Matches(plate) == true)
             return;
         var unchanged = displayStamp.UnchangedSlots(plate);
-        var retained = DisplayPairs.Where(pair => unchanged[pair.PartAId] && unchanged[pair.PartBId]).ToList();
+        var sameZones = displayStamp.SameZones(plate);
+        var retained = DisplayPairs.Where(pair => unchanged[pair.PartAId]
+            && (pair.PartBId < 0 ? sameZones : unchanged[pair.PartBId])).ToList();
         if (retained.Count != DisplayPairs.Count)
             DisplayPairs = retained.AsReadOnly();
         if (DisplayPairs.Count == 0)

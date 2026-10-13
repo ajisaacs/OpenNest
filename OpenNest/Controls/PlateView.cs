@@ -870,7 +870,10 @@ namespace OpenNest.Controls
                             progress,
                             cts.Token
                         );
-                        Compactor.Settle(result, workArea, spacing);
+                        if (Plate.ClampZones.Count == 0)
+                            Compactor.Settle(result, workArea, spacing);
+                        else
+                            Compactor.Settle(result, Plate, workArea);
                         return result;
                     });
                     operationActive = false;

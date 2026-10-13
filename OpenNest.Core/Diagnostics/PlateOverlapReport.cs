@@ -8,11 +8,12 @@ namespace OpenNest.Diagnostics;
 public sealed class PlateOverlapReport
 {
     internal PlateOverlapReport(List<PlateOverlapPair> pairs, List<PlateOverlapIssue> issues,
-        PlateOverlapSnapshot snapshot)
+        PlateOverlapSnapshot snapshot, List<PlateOverlapPair> clampFindings = null)
     {
         Pairs = pairs.AsReadOnly();
         Issues = issues.AsReadOnly();
         Snapshot = snapshot;
+        ClampFindings = (clampFindings ?? new List<PlateOverlapPair>()).AsReadOnly();
     }
 
     /// <summary>The owned input this report was computed from; the baseline for incremental rechecks.</summary>
@@ -20,6 +21,14 @@ public sealed class PlateOverlapReport
 
     public IReadOnlyList<PlateOverlapPair> Pairs { get; }
     public IReadOnlyList<PlateOverlapIssue> Issues { get; }
+
+    /// <summary>
+    /// Part-vs-clamp-zone findings (C1): the same owned-fragment shape as part pairs, with a
+    /// negative <see cref="PlateOverlapPair.PartBId"/> slot encoding the zone ordinal. Findings
+    /// are reported like other overlap findings; they do not change <see cref="IsComplete"/>.
+    /// </summary>
+    public IReadOnlyList<PlateOverlapPair> ClampFindings { get; }
+
     public bool IsComplete => Issues.Count == 0;
     public double ChordTolerance => PlateOverlapAnalyzer.ChordTolerance;
 }
@@ -102,15 +111,30 @@ public sealed record PlateOverlapIssue(int PartAId, int? PartBId, string Message
 /// </summary>
 public sealed class PlateOverlapSnapshot
 {
-    internal PlateOverlapSnapshot(List<CapturedOverlapPart> parts, List<PlateOverlapIssue> issues)
+    internal PlateOverlapSnapshot(List<CapturedOverlapPart> parts, List<PlateOverlapIssue> issues,
+        List<CapturedClamp> clamps = null)
     {
         Parts = parts.AsReadOnly();
         Issues = issues.AsReadOnly();
+        Clamps = (clamps ?? new List<CapturedClamp>()).AsReadOnly();
     }
 
     internal IReadOnlyList<CapturedOverlapPart> Parts { get; }
     internal IReadOnlyList<PlateOverlapIssue> Issues { get; }
+
+    /// <summary>Owned clamp keep-out rectangles in plate coordinates, capture order.</summary>
+    internal IReadOnlyList<CapturedClamp> Clamps { get; }
 }
 
 internal sealed record CapturedOverlapPart(int Id, string Name, OverlapSource Source,
     double Rotation, Vector Location);
+
+/// <summary>A clamp keep-out rectangle owned by the snapshot; Ordinal is its capture index.</summary>
+internal sealed record CapturedClamp(int Ordinal, string Id, Box Bounds);
+
+/// <summary>Deterministic negative PartBId for a part-vs-clamp finding's clamp slot.</summary>
+internal static class ClampFindingSlot
+{
+    public static int IdFor(int ordinal) => -2 - ordinal;
+    public static int OrdinalOf(int pairPartBId) => -2 - pairPartBId;
+}
