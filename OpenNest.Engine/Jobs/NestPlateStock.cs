@@ -60,14 +60,16 @@ public sealed class NestPlateStock
                 zones[i] = new ClampZone(clampZones[i].Id, clampZones[i].Bounds.Translate(left, bottom));
                 sheetZones[i] = new ClampZone(clampZones[i].Id, clampZones[i].Bounds);
             }
-            ClampZones = zones;
+            ClampZones = new DetachedZones(zones);
             SheetClampZones = sheetZones;
         }
     }
 
     /// <summary>
     /// Keep-out rectangles in the placement frame (quadrant applied), translated exactly
-    /// like <see cref="WorkArea"/>. Empty when the plate defines none; never null.
+    /// like <see cref="WorkArea"/>. Empty when the plate defines none; never null. Every
+    /// read returns detached copies: zone bounds are mutable, and the stock must stay
+    /// consistent with the zones its materialized plates use.
     /// </summary>
     public IReadOnlyList<ClampZone> ClampZones { get; }
 
@@ -102,4 +104,26 @@ public sealed class NestPlateStock
     /// <summary>True when a width (X) by height (Y) envelope fits the work area within epsilon.</summary>
     public bool Fits(double width, double height, double epsilon = 1e-9) =>
         width <= workArea.Length + epsilon && height <= workArea.Width + epsilon;
+
+    private sealed class DetachedZones : IReadOnlyList<ClampZone>
+    {
+        private readonly ClampZone[] zones;
+
+        public DetachedZones(ClampZone[] zones) => this.zones = zones;
+
+        public int Count => zones.Length;
+
+        public ClampZone this[int index] => Copy(zones[index]);
+
+        public IEnumerator<ClampZone> GetEnumerator()
+        {
+            foreach (var zone in zones)
+                yield return Copy(zone);
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+
+        // The ClampZone constructor copies the rectangle, keeping its exact bits.
+        private static ClampZone Copy(ClampZone zone) => new(zone.Id, zone.Bounds);
+    }
 }

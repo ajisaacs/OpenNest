@@ -79,6 +79,26 @@ public class ClampZoneSheetFrameTests
         Assert.False(report.CanPost(false));
     }
 
+    [Fact]
+    public void StockClampZonesCannotBeEditedThroughTheReturnedZones()
+    {
+        // Stock is immutable input: editing a returned zone must not move the stock's clamp
+        // away from the zones its materialized plates (validation, fill, posting) use.
+        var live = new Plate(24, 48);
+        live.ClampZones.Add(new ClampZone("z", new Box(10, 0, 1.5, 0.625)));
+        var stock = DrawingJobMapper.FromPlate("s", live, 1);
+
+        stock.ClampZones[0].Bounds.X += 10;
+        foreach (var zone in stock.ClampZones)
+            zone.Bounds.Y = 5;
+
+        var current = Assert.Single(stock.ClampZones);
+        Assert.Equal(10, current.Bounds.X);
+        Assert.Equal(0, current.Bounds.Y);
+        var plate = DrawingJobMapper.CreatePlate(stock);
+        Assert.Equal(stock.ClampZones.Select(Bits), ClampZoneFrame.ToPlacement(plate).Select(Bits));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
