@@ -80,6 +80,14 @@ malformed rail loads as none. On load a plate follows the rail again only when
 its saved `clamps` are exactly the rail's zones for that sheet; any other saved
 zones are kept as written.
 
+The rail's optional `removalMinutes` is the time to take one clamp off and put
+it back; a missing or invalid value loads as five minutes. A plate on which
+Auto Nest removed clamps as a last resort lists their rail ids in an optional
+`removedClamps` array (omitted when none were removed); its `clamps` already
+exclude them, and it follows the rail minus those ids. A malformed
+`removedClamps` value reads as none removed (non-string entries are skipped);
+the saved `clamps` load either way.
+
 An empty plate (no parts, no cut-offs) is omitted from the file unless that
 would lose clamp zones: it is omitted like any other empty plate only when a
 new plate from the saved defaults would recreate it (same size and quadrant,

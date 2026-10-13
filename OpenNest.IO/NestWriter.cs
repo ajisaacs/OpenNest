@@ -334,10 +334,14 @@ namespace OpenNest.IO
                                 Width = z.Bounds.Width,
                             })
                             .ToList(),
-                        RemovedClamps = plate.RemovedClamps
-                            .OrderBy(ClampIndex)
-                            .ThenBy(id => id, StringComparer.Ordinal)
-                            .ToList(),
+                        // Omitted unless a clamp was removed (files without the feature
+                        // stay unchanged).
+                        RemovedClamps = plate.RemovedClamps.Count == 0
+                            ? null
+                            : plate.RemovedClamps
+                                .OrderBy(ClampIndex)
+                                .ThenBy(id => id, StringComparer.Ordinal)
+                                .ToList(),
                     }
                 );
             }

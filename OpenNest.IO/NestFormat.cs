@@ -206,11 +206,12 @@ namespace OpenNest.IO
             public List<ClampZoneDto> Clamps { get; init; } = new();
 
             /// <summary>
-            /// Rail clamp ids removed from this sheet as a last resort (D8). Missing or empty
-            /// means none were removed; <see cref="Clamps"/> already excludes them. Read
+            /// Rail clamp ids removed from this sheet as a last resort (D8). Omitted when none
+            /// were removed; missing or empty means none; <see cref="Clamps"/> already excludes them. Read
             /// leniently: a wrongly shaped value reads as none removed, non-string entries
             /// are skipped, and the saved zones load either way.
             /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             [JsonConverter(typeof(LenientStringListConverter))]
             public List<string> RemovedClamps { get; init; } = new();
         }

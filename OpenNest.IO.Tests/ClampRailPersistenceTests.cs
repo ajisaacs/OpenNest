@@ -236,8 +236,10 @@ public class ClampRailPersistenceTests
     [Fact]
     public void LegacyFileWithoutRemovedClampsKeyLoadsWithNoneRemoved()
     {
-        var withoutKey = RewriteNestJson(Write(RailNest()),
-            text => RemoveJsonProperty(text, "removedClamps"));
+        // Sheets without a removal are written without the key, exactly like a file from
+        // before the feature.
+        var withoutKey = Write(RailNest());
+        Assert.DoesNotContain("\"removedClamps\"", ReadNestJson(withoutKey), StringComparison.Ordinal);
 
         var reopened = new NestReader(withoutKey).Read();
 
@@ -307,6 +309,16 @@ public class ClampRailPersistenceTests
         var plate = Assert.Single(reopened.Plates);
         Assert.Equal(new[] { "clamp-3" }, plate.RemovedClamps);
         Assert.NotNull(plate.ClampRail);
+    }
+
+    // PM 6ded8ac4 (c): sheets without a removal write no removedClamps key at all.
+    [Fact]
+    public void SheetsWithoutRemovedClampsWriteNoRemovedClampsKey()
+    {
+        var json = ReadNestJson(Write(RailNest()));
+
+        Assert.DoesNotContain("\"removedClamps\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"removedClamps\"", ReadNestJson(RemovedClamp3Nest()), StringComparison.Ordinal);
     }
 
     /// <summary>Removes a named property wherever it appears in the document, simulating a
