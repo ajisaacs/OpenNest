@@ -21,6 +21,12 @@ public sealed class AutomaticCutOffOptions
     /// The desktop default is 12 inches (304.8 mm).
     /// </summary>
     public double MinimumTailLength { get; set; }
+
+    /// <summary>
+    /// Minimum strip length in model units. Null or equal to Spacing preserves the fixed grid.
+    /// Otherwise must be finite, greater than MinimumSpacing and no greater than Spacing.
+    /// </summary>
+    public double? MinimumStripLength { get; set; }
 }
 
 public enum AutomaticCutOffDiagnosticCode
@@ -32,6 +38,7 @@ public enum AutomaticCutOffDiagnosticCode
     ClampBlockedCut,
     NoSafeTailSeparator,
     TailBelowMinimum,
+    ShiftedCut,
 }
 
 public sealed record AutomaticCutOffDiagnostic(
@@ -70,6 +77,12 @@ public sealed class AutomaticCutOffPlan
     /// <summary>True only for a verified full-width separator, never just a nominal boundary.</summary>
     public bool HasSeparatedTail => TailSeparatorX.HasValue;
 
+    /// <summary>Total cut length of proposed new strip lines (excludes the tail separator).</summary>
+    public double StripCutLength { get; internal set; }
+
+    /// <summary>Length of nominal strip lines in the same gaps. Zero on the legacy path.</summary>
+    public double FixedGridCutLength { get; internal set; }
+
     public bool HasBlockingDiagnostics => Diagnostics.Any(d => d.IsBlocking);
 }
 
@@ -79,6 +92,7 @@ public static class AutomaticCutOffPlanner
     public const double GeometryTolerance = Tolerance.Epsilon;
     public const double MinimumSpacing = 2 * GeometryTolerance;
     public const int MaximumCandidateCount = 10000;
+    public const int MaximumShiftCandidateCount = 20000;
 
     /// <summary>
     /// Plans without changing the plate, its parts, or existing cut-off definitions/programs.
@@ -133,14 +147,25 @@ public static class AutomaticCutOffPlanner
         var diagnostics = new List<AutomaticCutOffDiagnostic>();
         var separated = false;
         var separatorX = (double?)null;
+        var shifted = options.MinimumStripLength.HasValue && options.MinimumStripLength.Value < options.Spacing
+            && !plate.CutOffs.Any(c => c.Axis == CutOffAxis.Vertical);
+        var stripCutLength = 0.0;
+        var fixedGridCutLength = 0.0;
+        var measurements = new Dictionary<double, (double Length, int SegmentCount)>();
+        var candidates = new HashSet<double>();
 
-        // Multiplication by an integer avoids drift from repeated floating-point addition.
-        for (var index = 1; index <= (int)candidateCount; index++)
+        if (shifted)
+            AddShiftedGap(0, usedSpan);
+        else
         {
-            var distance = index * options.Spacing;
-            if (distance >= usedSpan - GeometryTolerance)
-                break;
-            AddCandidate(sign * distance, false);
+            // Keep the legacy loop and certification unchanged when shifting is disabled.
+            for (var index = 1; index <= (int)candidateCount; index++)
+            {
+                var distance = index * options.Spacing;
+                if (distance >= usedSpan - GeometryTolerance)
+                    break;
+                AddCandidate(sign * distance, false);
+            }
         }
         if (hasTailCandidate)
         {
@@ -158,6 +183,7 @@ public static class AutomaticCutOffPlanner
         {
             // A partial proposal must not accidentally be accepted around a manual conflict.
             definitions.Clear();
+            stripCutLength = 0;
             separated = false;
             separatorX = null;
         }
@@ -171,7 +197,63 @@ public static class AutomaticCutOffPlanner
             UsedSpan = separated ? System.Math.Abs(separatorX.Value) : length,
             TailLength = separated ? length - System.Math.Abs(separatorX.Value) : 0,
             TailSeparatorX = separatorX,
+            StripCutLength = stripCutLength,
+            FixedGridCutLength = fixedGridCutLength,
         };
+
+        void AddShiftedGap(double start, double end)
+        {
+            var nominal = new List<double>();
+            for (var index = 1; index <= (int)candidateCount; index++)
+            {
+                var distance = start + index * options.Spacing;
+                if (distance >= end - GeometryTolerance)
+                    break;
+                nominal.Add(distance);
+                fixedGridCutLength += Measure(distance).Length;
+            }
+            if (nominal.Count == 0)
+                return;
+            var step = System.Math.Max(options.Spacing / 700, usedSpan / MaximumShiftCandidateCount);
+            var positions = AutomaticCutOffStripSearch.FindPositions(start, end, nominal.Count,
+                options.Spacing, options.MinimumStripLength.Value, step, Allowed, Measure) ?? nominal.ToArray();
+            for (var index = 0; index < positions.Length; index++)
+            {
+                var distance = positions[index];
+                AddCandidate(sign * distance, false);
+                if (!Near(distance, nominal[index]))
+                    diagnostics.Add(new AutomaticCutOffDiagnostic(AutomaticCutOffDiagnosticCode.ShiftedCut,
+                        $"Moved from {nominal[index]:G8} to {distance:G8} model units; this line cuts "
+                        + $"{Measure(nominal[index]).Length - Measure(distance).Length:G8} model units less.",
+                        X: sign * distance));
+            }
+        }
+
+        bool Allowed(double distance)
+        {
+            RegisterCandidate(distance);
+            return true;
+        }
+
+        void RegisterCandidate(double distance)
+        {
+            if (candidates.Add(distance))
+                Require(candidates.Count <= MaximumShiftCandidateCount,
+                    $"Shift search would generate more than {MaximumShiftCandidateCount} distinct positions. "
+                    + "Increase spacing or the minimum strip length, or use the fixed grid.", nameof(options));
+        }
+
+        (double Length, int SegmentCount) Measure(double distance)
+        {
+            RegisterCandidate(distance);
+            if (!measurements.TryGetValue(distance, out var measured))
+            {
+                measured = new CutOff(new Vector(sign * distance, 0), CutOffAxis.Vertical)
+                    .MeasureSegments(plate, settings, cache);
+                measurements.Add(distance, measured);
+            }
+            return measured;
+        }
 
         void AddCandidate(double x, bool isSeparator)
         {
@@ -246,7 +328,11 @@ public static class AutomaticCutOffPlanner
                     X: x));
 
             if (usable && existing == null)
+            {
                 definitions.Add(candidate);
+                if (shifted && !isSeparator)
+                    stripCutLength += Measure(System.Math.Abs(x)).Length;
+            }
         }
 
         void WarnNoSeparator(double x) => diagnostics.Add(new AutomaticCutOffDiagnostic(
@@ -259,6 +345,10 @@ public static class AutomaticCutOffPlanner
     {
         Require(double.IsFinite(options.Spacing) && options.Spacing > MinimumSpacing,
             $"Spacing must be finite and greater than {MinimumSpacing} model units.", nameof(options));
+        Require(!options.MinimumStripLength.HasValue ||
+            (double.IsFinite(options.MinimumStripLength.Value) && options.MinimumStripLength.Value > MinimumSpacing &&
+                options.MinimumStripLength.Value <= options.Spacing),
+            $"Minimum strip length must be finite, greater than {MinimumSpacing} and no greater than spacing.", nameof(options));
         Require(Nonnegative(options.MinimumTailLength),
             "Minimum tail length must be finite and nonnegative.", nameof(options));
         Require(double.IsFinite(plate.Size.Length) && plate.Size.Length > 0 &&
