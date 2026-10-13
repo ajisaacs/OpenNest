@@ -180,4 +180,43 @@ public class ClampRemovalRepairTests
         Assert.All(result.Job.Plates, s => Assert.DoesNotContain("removed", s.Id));
         Assert.All(result.Raw.Plates, sheet => Assert.Single(sheet.Stock.ClampZones));
     }
+    private static int RemovedCount(NestJobPlateResult sheet) => 2 - sheet.Stock.ClampZones.Count;
+
+    // PM f91e054a (C11): minimality holds per sheet. part-0 (22 wide) needs both clamps off,
+    // part-1 (14 wide) only clamp-1; the sheet holding only part-1 must keep clamp-2.
+    [Fact]
+    public void EachSheetRemovesOnlyTheClampsItsOwnPartsNeed()
+    {
+        var result = NestPipeline.Run(Request(Stock(), Item("widest", 22, 3, 1), Item("wide", 14, 3, 1)));
+
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(2, result.Raw.Plates.Count);
+        foreach (var sheet in result.Raw.Plates)
+        {
+            var needsBoth = sheet.Placements.Any(p => p.PartId == "part-0");
+            Assert.Equal(needsBoth ? 2 : 1, RemovedCount(sheet));
+            if (!needsBoth)
+                Assert.Contains(sheet.Stock.ClampZones, z => z.Id == "clamp-2");
+        }
+    }
+
+    // PM 245a555f (C12): reduced-clamp sheets come out of the same finite pool.
+    [Theory]
+    [InlineData(3, false)] // three blocked parts, one physical sheet
+    [InlineData(1, true)]  // the ordinary part already used the only sheet
+    public void RemovalNeverInventsSheetsBeyondTheFiniteStock(int wide, bool small)
+    {
+        var items = new List<NestItem> { Item("wide", 14, 3, wide) };
+        if (small)
+            items.Add(Item("small", 2, 1, 1));
+
+        var result = NestPipeline.Run(Request(Stock(quantity: 1), items.ToArray()));
+
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        Assert.Single(result.Raw.Plates);
+        Assert.Equal(1, result.Raw.StockUsage.Sum(u => u.Used));
+        Assert.Equal(1, result.Job.Plates.Sum(s => s.Quantity ?? int.MaxValue));
+        Assert.All(result.Raw.StockUsage, u => Assert.True(u.Remaining is null or >= 0));
+    }
 }
