@@ -164,8 +164,10 @@ clamps and nominal manual cut-off definitions. `CutOffClampFindings` is a separa
 list of zero-area line/rectangle contacts, not `Pairs` or material overlap. The
 view marks these with an X and a cut-off number/clamp ID, including contacts whose
 current regenerated program has been trimmed. Removed clamps produce no contact.
-Editing definitions, sheet size/quadrant or zones stales the result; posting runs
-its own fresh check with per-attempt consent.
+Zones are mapped from the sheet's lower-left frame into the parts' quadrant frame; a
+malformed zone fails the check rather than being skipped. Editing definitions, sheet
+size/quadrant or zones stales the result (including part/clamp findings, because a size or
+quadrant change moves the zones); posting runs its own fresh check with per-attempt consent.
 
 ## Interpretation and limits
 

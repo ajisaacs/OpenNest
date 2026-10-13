@@ -21,12 +21,14 @@ public static class PlateOverlapAnalyzer
     /// Capture a whole plate including active clamps and nominal cut-off definitions.
     /// Use this entry for the desktop overlap check so manual cut-off contacts
     /// cannot be mistaken for a clear plate merely because cut-offs are not material.
+    /// Clamp zones are mapped from the sheet's lower-left frame into the parts' signed
+    /// placement frame; a malformed zone throws <see cref="ArgumentException"/>.
     /// </summary>
     public static PlateOverlapSnapshot CapturePlate(Plate plate, OverlapMaterialCache cache = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plate);
-        var material = Capture(plate.Parts.ToArray(), plate.ClampZones.ToArray(),
+        var material = Capture(plate.Parts.ToArray(), ClampZoneFrame.ToPlacement(plate).ToArray(),
             cache ?? new OverlapMaterialCache(), cancellationToken);
         var cutoffs = ClampCutDiagnostics.Find(plate);
         cancellationToken.ThrowIfCancellationRequested();

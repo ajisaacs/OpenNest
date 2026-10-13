@@ -18,7 +18,7 @@ public sealed class OverlapGeometryStamp
     private OverlapGeometryStamp(Plate plate)
     {
         this.plate = plate;
-        sheet = (Bits(plate.Size.Width), Bits(plate.Size.Length), plate.Quadrant);
+        sheet = SheetState(plate);
         entries = new Entry[plate.Parts.Count];
         for (var i = 0; i < entries.Length; i++)
             entries[i] = new Entry(plate.Parts[i]);
@@ -41,11 +41,17 @@ public sealed class OverlapGeometryStamp
 
     private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 
+    private static (long, long, int) SheetState(Plate plate) =>
+        (Bits(plate.Size.Width), Bits(plate.Size.Length), plate.Quadrant);
+
     public static OverlapGeometryStamp Capture(Plate plate) => new(plate);
 
     internal bool SameZones(Plate current)
     {
-        if (!ReferenceEquals(plate, current) || current.ClampZones.Count != zones.Length)
+        // Stored zones are sheet-relative: a size or quadrant change moves them in the
+        // parts' frame without changing their bits.
+        if (!ReferenceEquals(plate, current) || current.ClampZones.Count != zones.Length
+            || sheet != SheetState(current))
             return false;
         for (var i = 0; i < zones.Length; i++)
         {
@@ -60,7 +66,7 @@ public sealed class OverlapGeometryStamp
     internal bool SameCutOffs(Plate current)
     {
         if (!ReferenceEquals(plate, current) || current.CutOffs.Count != cutoffs.Length
-            || sheet != (Bits(current.Size.Width), Bits(current.Size.Length), current.Quadrant))
+            || sheet != SheetState(current))
             return false;
         for (var i = 0; i < cutoffs.Length; i++)
             if (cutoffs[i] != CutOffState(current.CutOffs[i]))

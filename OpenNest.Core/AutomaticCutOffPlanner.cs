@@ -94,6 +94,8 @@ public static class AutomaticCutOffPlanner
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(settings);
         ValidateInputs(plate, options, settings);
+        // Stored zones use the sheet's lower-left frame; cut positions are signed.
+        var clamps = ClampZoneFrame.ToPlacement(plate);
         var bounds = plate.BoundingBox(false);
         Require(ValidBox(bounds) && double.IsFinite(bounds.Top + settings.Overtravel),
             "Physical sheet bounds and overtravel must be finite.", nameof(plate));
@@ -193,7 +195,7 @@ public static class AutomaticCutOffPlanner
             // footprint when it hangs off the sheet. A same-line manual limit conflict above
             // still blocks the whole plan, clamp or not.
             var clearance = plate.EdgeSpacing.Bottom;
-            var blocked = plate.ClampZones.FirstOrDefault(zone =>
+            var blocked = clamps.FirstOrDefault(zone =>
                 matches.Select(c => c.Position.X).Prepend(x).Any(position =>
                     position >= zone.Bounds.Left - clearance && position <= zone.Bounds.Right + clearance));
             if (blocked != null)
@@ -265,9 +267,7 @@ public static class AutomaticCutOffPlanner
         Require(plate.Quadrant is >= 1 and <= 4, "Quadrant must be 1 through 4.", nameof(plate));
         Require(Nonnegative(plate.PartSpacing), "Part spacing must be finite and nonnegative.", nameof(plate));
         Require(plate.ClampZones != null && (plate.ClampZones.Count == 0 ||
-            Nonnegative(plate.EdgeSpacing.Bottom) && plate.ClampZones.All(zone =>
-                zone?.Bounds != null && ValidBox(zone.Bounds) &&
-                zone.Bounds.Length > 0 && zone.Bounds.Width > 0)),
+            Nonnegative(plate.EdgeSpacing.Bottom)),
             "Clamp zones and bottom-edge clearance must be finite and valid.", nameof(plate));
         Require(Nonnegative(settings.PartClearance) && Nonnegative(settings.MinSegmentLength) &&
             Nonnegative(settings.Overtravel), "Cut-off settings must be finite and nonnegative.", nameof(settings));

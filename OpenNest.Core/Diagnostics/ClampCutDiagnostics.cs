@@ -11,6 +11,7 @@ public sealed record CutOffClampFinding(int CutOffIndex, string ClampId, Vector 
 /// Read-only axis-aligned clamp contact checks. Nominal cut-off definitions are checked
 /// even if their current regenerated program is stale or trimmed by nearby parts.
 /// A removed clamp is absent from Plate.ClampZones and therefore cannot be reported.
+/// Zones are compared in the plate's signed placement frame (<see cref="ClampZoneFrame"/>).
 /// </summary>
 public static class ClampCutDiagnostics
 {
@@ -20,6 +21,7 @@ public static class ClampCutDiagnostics
         var findings = new List<CutOffClampFinding>();
         if (plate.ClampZones.Count == 0 || plate.CutOffs.Count == 0)
             return findings.AsReadOnly();
+        var zones = ClampZoneFrame.ToPlacement(plate);
         var sheet = plate.BoundingBox(false);
         for (var index = 0; index < plate.CutOffs.Count; index++)
         {
@@ -32,7 +34,7 @@ public static class ClampCutDiagnostics
             var end = cut.Axis == CutOffAxis.Vertical
                 ? new Vector(cut.Position.X, cut.EndLimit ?? sheet.Top)
                 : new Vector(cut.EndLimit ?? sheet.Right, cut.Position.Y);
-            foreach (var zone in plate.ClampZones)
+            foreach (var zone in zones)
                 if (Intersects(start, end, zone.Bounds, out var location))
                     findings.Add(new CutOffClampFinding(index, zone.Id, location));
         }

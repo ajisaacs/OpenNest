@@ -57,6 +57,8 @@ shows all three check categories, even when there are no findings:
   a sufficiently large cutout is not itself an overlap. The same review also warns if a nominal
   manual cut-off line crosses an active clamp, even when its regenerated cut is currently trimmed;
   a line contact has no material-overlap area. Removed clamps on that sheet are not checked.
+  Clamp zones are compared in the plate's quadrant frame. A missing or malformed clamp zone
+  makes the clamp checks incomplete (a warning), never a clear result.
   This uses clean drawing geometry, not added lead-in/out paths.
 - **Missing lead-ins:** cutting contours without an actual, nonzero lead-in in the
   placed program. Applying a lead-in to only one contour does not clear the other
