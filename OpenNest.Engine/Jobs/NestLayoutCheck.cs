@@ -187,7 +187,7 @@ public static class NestLayoutCheck
                     continue;
 
                 var material = Outline(part, 0);
-                if (material == null || !Overlaps(material, keepOutOutline))
+                if (material == null || !OverlapsKeepOut(material, keepOutOutline, keepOut))
                     continue;
 
                 result.Add(
@@ -198,17 +198,33 @@ public static class NestLayoutCheck
         }
     }
 
+    /// <summary>
+    /// The keep-out as an exact four-vertex ring. Routing a synthetic rectangle through the
+    /// tolerance-based validation offset collapses a zone smaller than that tolerance to
+    /// nothing (PM 6859db53), so the rectangle is never offset or flattened here.
+    /// </summary>
     private static PartOutline RectangleOutline(Box box)
     {
-        var ring = new List<Geometry.Entity>
-        {
-            new Line(box.Left, box.Bottom, box.Right, box.Bottom),
-            new Line(box.Right, box.Bottom, box.Right, box.Top),
-            new Line(box.Right, box.Top, box.Left, box.Top),
-            new Line(box.Left, box.Top, box.Left, box.Bottom),
-        };
-        var profile = new ShapeProfile(ring);
-        return Outline(profile, new Vector(0, 0), 0);
+        var perimeter = new Polygon();
+        perimeter.Vertices.Add(new Vector(box.Left, box.Bottom));
+        perimeter.Vertices.Add(new Vector(box.Right, box.Bottom));
+        perimeter.Vertices.Add(new Vector(box.Right, box.Top));
+        perimeter.Vertices.Add(new Vector(box.Left, box.Top));
+        perimeter.Vertices.Add(new Vector(box.Left, box.Bottom));
+        perimeter.UpdateBounds();
+        return new PartOutline { Perimeter = perimeter, Holes = new List<Polygon>() };
+    }
+
+    /// <summary>
+    /// Material against a keep-out rectangle. A rectangle below the outline tolerance, or one
+    /// the triangulated test cannot prepare, is judged by the tolerance-free rectangle test
+    /// instead: the tolerant path would call real overlap clear.
+    /// </summary>
+    private static bool OverlapsKeepOut(PartOutline material, PartOutline keepOutOutline, Box keepOut)
+    {
+        if (KeepOutOverlap.NeedsToleranceFreeTest(keepOut) || keepOutOutline.Triangles == null)
+            return KeepOutOverlap.MaterialEnters(material.Perimeter, material.Holes, keepOut);
+        return Overlaps(material, keepOutOutline);
     }
 
     /// <summary>
