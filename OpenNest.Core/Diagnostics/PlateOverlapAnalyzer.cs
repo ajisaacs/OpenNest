@@ -280,11 +280,14 @@ public static class PlateOverlapAnalyzer
                     // (negligibly small) clamp rectangle as the overlap fragment.
                     if (KeepOutOverlap.NeedsToleranceFreeTest(zone))
                     {
-                        // Re-read the native contours flattened finely enough for this clamp:
-                        // the shared 0.001 chords can hide material between an arc and its chord.
-                        var fine = OverlapMaterial
-                            .Read(part.Input.Source.Entities, cancellationToken, KeepOutOverlap.FlatteningTolerance(zone))
-                            .Transform(part.Input.Rotation, part.Input.Location);
+                        // Re-read the native contours conservatively and finely enough for
+                        // this clamp: the shared 0.001 chords can hide material between an
+                        // arc and its chord.
+                        var profile = new ShapeProfile(part.Input.Source.Entities.Select(e => e.Clone()).ToList());
+                        if (profile.Perimeter == null)
+                            throw new ArgumentException("Drawing has no closed material contour.");
+                        var (outer, holes) = KeepOutOverlap.ConservativePolygons(profile, zone);
+                        var fine = new OverlapMaterial(outer, holes).Transform(part.Input.Rotation, part.Input.Location);
                         if (KeepOutOverlap.MaterialEnters(fine.Outer, fine.Holes, zone))
                             findings.Add(TinyClampFinding(part, clamp));
                         continue;

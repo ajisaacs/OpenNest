@@ -223,6 +223,8 @@ public class TinyClampZoneTests
         { "rect-2.00004", new Box(2.000032, 1, 5e-6, Tiny), true },
         { "disk", DiskBox(1.9998), true },  // inside the true arc, outside its 0.001 chords
         { "disk", DiskBox(2.0002), false }, // just outside the true arc
+        // The arc cuts a corner off the zone, 6.2e-7 deep: less than a fine chord's sag.
+        { "disk", new Box(11.935615871667656, 10.503377293956166, Tiny, Tiny), true },
     };
 
     private static Program MaterialProgram(string name) => name switch

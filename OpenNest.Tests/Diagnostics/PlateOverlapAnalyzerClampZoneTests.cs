@@ -220,6 +220,7 @@ public class PlateOverlapAnalyzerClampZoneTests
     [InlineData("rect", 8.00005, 0.5, false)]
     [InlineData("disk", 1.9998, 0, true)]
     [InlineData("disk", 2.0002, 0, false)]
+    [InlineData("disk-box", 11.935615871667656, 10.503377293956166, true)] // arc cuts a corner
     public void TinyClampIsJudgedAgainstRealMaterial(string material, double a, double b, bool overlaps)
     {
         Program program;
@@ -235,9 +236,16 @@ public class PlateOverlapAnalyzerClampZoneTests
             program.MoveTo(12, 10);
             program.ArcTo(8, 10, 10, 10, RotationType.CCW);
             program.ArcTo(12, 10, 10, 10, RotationType.CCW);
-            var cx = 10 + a * System.Math.Cos(0.02);
-            var cy = 10 + a * System.Math.Sin(0.02);
-            zone = new Box(cx - 0.000005, cy - 0.000005, 1e-5, 1e-5);
+            if (material == "disk-box")
+            {
+                zone = new Box(a, b, 1e-5, 1e-5);
+            }
+            else
+            {
+                var cx = 10 + a * System.Math.Cos(0.02);
+                var cy = 10 + a * System.Math.Sin(0.02);
+                zone = new Box(cx - 0.000005, cy - 0.000005, 1e-5, 1e-5);
+            }
         }
         var parts = new List<Part> { new(new Drawing(material, program), new Vector(0, 0)) };
 

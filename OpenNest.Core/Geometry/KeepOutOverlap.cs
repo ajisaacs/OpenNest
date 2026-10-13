@@ -21,30 +21,38 @@ public static class KeepOutOverlap
 
     /// <summary>
     /// Chord tolerance for flattening real part material against <paramref name="keepOut"/>:
-    /// a quarter of its smaller side (at most <see cref="ToleranceFreeBelow"/>), so the
-    /// sliver between an arc and its chord can never hold the whole rectangle - any real
-    /// overlap then shows up as a polygon edge through it or its centre inside.
+    /// a quarter of its smaller side, at most <see cref="ToleranceFreeBelow"/>.
     /// </summary>
     public static double FlatteningTolerance(Box keepOut) =>
         System.Math.Min(ToleranceFreeBelow, System.Math.Min(keepOut.Length, keepOut.Width) / 4);
 
     /// <summary>
-    /// <see cref="MaterialEnters"/> for a part's native contours (lines kept exactly, arcs
-    /// flattened at <see cref="FlatteningTolerance"/>), translated by <paramref name="offset"/>.
-    /// Never fed through a grid-rounding offset or a coarse flattening.
+    /// A part's native contours flattened for a tiny keep-out, never through a grid-rounding
+    /// offset: lines exact, arcs at <see cref="FlatteningTolerance"/>, perimeter arcs
+    /// circumscribed and cutout arcs inscribed, so the polygons hold all real material and
+    /// any real overlap is found. The price is a possible report within that tolerance of
+    /// an arc, never a false clear.
+    /// </summary>
+    public static (Polygon Perimeter, List<Polygon> Holes) ConservativePolygons(ShapeProfile profile, Box keepOut)
+    {
+        var tolerance = FlatteningTolerance(keepOut);
+        var perimeter = profile.Perimeter.ToPolygonWithTolerance(tolerance, circumscribe: true);
+        var holes = new List<Polygon>(profile.Cutouts.Count);
+        foreach (var cutout in profile.Cutouts)
+            holes.Add(cutout.ToPolygonWithTolerance(tolerance));
+        return (perimeter, holes);
+    }
+
+    /// <summary>
+    /// <see cref="MaterialEnters"/> on <see cref="ConservativePolygons"/>, translated by
+    /// <paramref name="offset"/>.
     /// </summary>
     public static bool ProfileEnters(ShapeProfile profile, Vector offset, Box keepOut)
     {
-        var tolerance = FlatteningTolerance(keepOut);
-        var perimeter = profile.Perimeter.ToPolygonWithTolerance(tolerance);
+        var (perimeter, holes) = ConservativePolygons(profile, keepOut);
         perimeter.Offset(offset);
-        var holes = new List<Polygon>(profile.Cutouts.Count);
-        foreach (var cutout in profile.Cutouts)
-        {
-            var hole = cutout.ToPolygonWithTolerance(tolerance);
+        foreach (var hole in holes)
             hole.Offset(offset);
-            holes.Add(hole);
-        }
         return MaterialEnters(perimeter, holes, keepOut);
     }
 
