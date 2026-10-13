@@ -370,4 +370,16 @@ public class ClampRailTests
         Assert.False(Machine().Matches(plate, Array.Empty<string>()));
         Assert.False(Machine().Matches(plate, new[] { "clamp-4" }));
     }
+    // PM 6ded8ac4 (a): only removed clamps that are actually on this sheet cost time.
+    [Fact]
+    public void RemovalTimeCountsOnlyRemovedClampsOnTheSheet()
+    {
+        var plate = Sheet(48, 120);
+        plate.SetClampRail(Machine(), new[] { "clamp-3", "clamp-8", "clamp-99" });
+        Assert.Equal(2 * ClampRail.DefaultRemovalMinutes, plate.ClampRemovalMinutes); // 3 and 8
+
+        plate.Size = new Size(48, 60); // clamp-8 is now beyond the sheet
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, plate.ClampRemovalMinutes);
+        Assert.Contains("clamp-8", plate.RemovedClamps); // still listed (C13)
+    }
 }

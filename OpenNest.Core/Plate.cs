@@ -155,11 +155,16 @@ namespace OpenNest
 
         /// <summary>
         /// Minutes this sheet's cut-time estimate gains from <see cref="RemovedClamps"/> (D9):
-        /// each listed clamp adds <see cref="OpenNest.ClampRail.RemovalMinutes"/> once. Zero
-        /// when there is no rail (removal is meaningless without one to remove clamps from).
+        /// each listed clamp the rail places on this sheet adds
+        /// <see cref="OpenNest.ClampRail.RemovalMinutes"/> once; a listed clamp that is beyond
+        /// the sheet (or unknown to the rail) is not pulled and costs nothing. Zero when there
+        /// is no rail (removal is meaningless without one to remove clamps from).
         /// </summary>
         public double ClampRemovalMinutes =>
-            ClampRail == null ? 0 : RemovedClamps.Count * ClampRail.RemovalMinutes;
+            ClampRail == null || RemovedClamps.Count == 0
+                ? 0
+                : ClampRail.ResolveFor(Size, Quadrant).Count(zone => RemovedClamps.Contains(zone.Id))
+                    * ClampRail.RemovalMinutes;
 
         /// <summary>
         /// Follows <paramref name="rail"/> and replaces the zones with its resolution for
