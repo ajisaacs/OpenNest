@@ -104,8 +104,8 @@ internal static class ClampRemovalRecovery
         // out moves on to another stock (with that stock's own minimal removal).
         for (var round = 0; round < availableStock.Count && platesLeft is not <= 0; round++)
         {
-            // C11: per blocked part, the fewest clamps (smallest contiguous run, nearest the
-            // origin on ties) whose removal frees an empty sheet of one of those stocks.
+            // C11: per blocked part, the fewest clamps (any set, nearest the origin on ties)
+            // whose removal frees an empty sheet of one of those stocks.
             // Parts needing the same removal on the same stock share one variant.
             var groups = new List<RemovalGroup>();
             foreach (var part in blocked)
@@ -224,10 +224,11 @@ internal static class ClampRemovalRecovery
 
     /// <summary>
     /// The (stock, removal) with the fewest removed clamps across every offered rail-backed
-    /// stock; ties prefer the stock listed earliest, then the run nearest the origin. One
+    /// stock; ties prefer the stock listed earliest, then the clamps nearest the origin. One
     /// all-clamps-removed probe per stock first dismisses stock the part cannot use at all
-    /// and picks the lanes worth asking; the run search then goes size by size across the
-    /// remaining stock and stops at the first size that fits anywhere.
+    /// and picks the lanes worth asking; one probe per clamp then finds the clamps every
+    /// removal must include; the set search goes size by size across the remaining stock and
+    /// stops at the first size that fits anywhere.
     /// </summary>
     private static Removal BestRemoval(
         NestJobPart part,
@@ -255,23 +256,66 @@ internal static class ClampRemovalRecovery
                 candidates.Add((stock, zones, fitting));
         }
 
-        var maxRun = candidates.Count == 0 ? 0 : candidates.Max(c => c.Zones.Count);
-        for (var run = 1; run <= maxRun; run++)
+        // Removing more clamps never stops a part fitting, so a clamp the part cannot live
+        // with even when it is the only one left must be in every feasible removal.
+        var searches = new List<(NestPlateStock Stock, List<ClampZone> Zones, List<INestingEngine> Lanes, List<int> Mandatory)>();
+        foreach (var (stock, zones, fitting) in candidates)
         {
-            foreach (var (stock, zones, fitting) in candidates)
+            var mandatory = new List<int>();
+            for (var i = 0; i < zones.Count; i++)
             {
-                for (var start = 0; start + run <= zones.Count; start++)
+                token.ThrowIfCancellationRequested();
+                var onlyThis = Clone(stock, stock.Id, null, zones.Where((_, j) => j != i).Select(z => z.Id).ToList());
+                if (zones.Count == 1 || !fitting.Any(lane => FitsAlone(part, onlyThis, options, lane, budget, token)))
+                    mandatory.Add(i);
+            }
+            searches.Add((stock, zones, fitting, mandatory));
+        }
+
+        // Then the fewest clamps overall (any set, not only neighbours: a notch can leave a
+        // middle clamp in place), size by size across stocks in offered order; within a stock
+        // the optional additions nearest the origin first.
+        var maxSize = searches.Count == 0 ? 0 : searches.Max(c => c.Zones.Count);
+        for (var size = 1; size <= maxSize; size++)
+        {
+            foreach (var (stock, zones, fitting, mandatory) in searches)
+            {
+                if (mandatory.Count > size || size > zones.Count)
+                    continue;
+                var optional = Enumerable.Range(0, zones.Count).Where(i => !mandatory.Contains(i)).ToList();
+                foreach (var added in Combinations(optional, size - mandatory.Count))
                 {
                     token.ThrowIfCancellationRequested();
-                    var removedIds = zones.Skip(start).Take(run).Select(z => z.Id).ToList();
+                    var removedIds = mandatory.Concat(added).OrderBy(i => i).Select(i => zones[i].Id).ToList();
                     var candidate = Clone(stock, Suffixed(stock.Id, removedIds), null, removedIds);
                     // Removing every clamp was already probed.
-                    if (run == zones.Count || fitting.Any(lane => FitsAlone(part, candidate, options, lane, budget, token)))
+                    if (size == zones.Count || fitting.Any(lane => FitsAlone(part, candidate, options, lane, budget, token)))
                         return new Removal(candidate, stock.Id, removedIds);
                 }
             }
         }
         return null;
+    }
+
+    /// <summary>Every <paramref name="count"/>-element subset of <paramref name="items"/>, lazily,
+    /// in lexicographic order of positions.</summary>
+    private static IEnumerable<List<int>> Combinations(IReadOnlyList<int> items, int count)
+    {
+        if (count < 0 || count > items.Count)
+            yield break;
+        var positions = Enumerable.Range(0, count).ToArray();
+        while (true)
+        {
+            yield return positions.Select(p => items[p]).ToList();
+            var k = count - 1;
+            while (k >= 0 && positions[k] == items.Count - count + k)
+                k--;
+            if (k < 0)
+                yield break;
+            positions[k]++;
+            for (var j = k + 1; j < count; j++)
+                positions[j] = positions[j - 1] + 1;
+        }
     }
 
     /// <summary>Only clamps resolved from a machine rail can be removed (see

@@ -359,4 +359,33 @@ public class ClampRemovalRepairTests
         Assert.Equal(8, outcome.Result.Plates.Count);
         Assert.All(outcome.Result.Plates, sheet => Assert.Empty(sheet.Stock.ClampZones));
     }
+    // PM 3df03af2 (C11/D8 "the fewest clamps"): the minimal set need not be neighbours. The
+    // notch over the middle clamp lets it stay while the two outer clamps come off.
+    [Fact]
+    public void FewestClampsNeedNotBeNeighbours()
+    {
+        var program = new OpenNest.CNC.Program();
+        program.MoveTo(0, 0);
+        program.LineTo(8, 0);
+        program.LineTo(8, 1);
+        program.LineTo(15, 1);
+        program.LineTo(15, 0);
+        program.LineTo(23, 0);
+        program.LineTo(23, 3);
+        program.LineTo(0, 3);
+        program.LineTo(0, 0);
+        var rail = new ClampRail(1.5, 0.625, new[] { 3.0, 11.5, 20.0 });
+        var size = new Size(3, 23);
+        var stock = new NestPlateStock("sheet", size, null, 0, default, 1, null, rail.ResolveFor(size, 1))
+        { ClampRail = rail };
+
+        var result = NestPipeline.Run(new NestPipelineRequest("Default",
+            new[] { new NestItem { Drawing = new Drawing("middle-notch", program), Quantity = 1 } },
+            new[] { stock }));
+
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        var sheet = Assert.Single(result.Raw.Plates);
+        Assert.Equal(new[] { "clamp-2" }, sheet.Stock.ClampZones.Select(z => z.Id));
+    }
 }

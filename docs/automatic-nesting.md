@@ -77,8 +77,9 @@ clamp covers the program start point.
 
 When a part cannot be placed on an empty sheet of any offered size with every
 clamp in place - neither the selected engine nor the Irregular or Rectangles
-lane finds a clamped placement - Auto Nest takes the fewest neighbouring clamps
-off one sheet that let it fit (the run nearest the origin on ties) and nests it
+lane finds a clamped placement - Auto Nest takes the fewest clamps off one sheet
+that let it fit (not necessarily neighbours: a notch may let a clamp between
+them stay; the clamps nearest the origin on ties) and nests it
 on extra sheets with those clamps removed; other unplaced parts may share the
 freed sheets. It never removes a clamp to save material, never re-plans a sheet
 the normal nest already used, draws only on stock that is left, and only
