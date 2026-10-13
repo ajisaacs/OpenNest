@@ -256,6 +256,32 @@ public class PlateOverlapAnalyzerClampZoneTests
         Assert.Equal(overlaps, report.ClampFindings.Count > 0);
     }
 
+    // Delta review 2: material beside a concave (notch) arc is not lost for a tiny clamp.
+    [Fact]
+    public void TinyClampBesideAConcaveArcIsReported()
+    {
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.LineTo(20, 0);
+        program.LineTo(20, 20);
+        program.LineTo(12, 20);
+        program.ArcTo(8, 20, 10, 20, RotationType.CW);
+        program.LineTo(0, 20);
+        program.LineTo(0, 0);
+        var arc = new ShapeProfile(OpenNest.Converters.ConvertProgram.ToGeometry(program))
+            .Perimeter.Entities.OfType<Arc>().Single();
+        var native = arc.ToPoints(arc.SegmentsForTolerance(1e-5 / 4)).First(v => v.X > 11.9 && v.Y < 19.5);
+        var centre = new Vector(10, 20);
+        var outward = centre + (native - centre) / 2 * (2 + 6e-7);
+        var zone = new ClampZone("tiny", new Box(outward.X - 1e-5, outward.Y, 1e-5, 1e-5));
+
+        var report = PlateOverlapAnalyzer.Analyze(PlateOverlapAnalyzer.Capture(
+            new List<Part> { new(new Drawing("notch", program), new Vector(0, 0)) }, new[] { zone }));
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues.Select(issue => issue.Message)));
+        Assert.NotEmpty(report.ClampFindings);
+    }
+
     private static string Describe(PlateOverlapReport report) =>
         string.Join(";", report.Pairs.Select(p => $"{p.PartAId}/{p.PartBId}:{p.Area:R}"))
         + "|"

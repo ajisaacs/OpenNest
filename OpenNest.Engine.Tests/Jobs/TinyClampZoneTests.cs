@@ -258,4 +258,40 @@ public class TinyClampZoneTests
         var part = new Part(new Drawing(material, MaterialProgram(material)));
         Assert.Equal(overlaps, InteractiveClamps.MaterialInKeepOut(part, zone));
     }
+    // Delta review 2: a concave (notch) arc must not lose material either. The zone's corner
+    // sits 6e-7 into the material beside a semicircular notch, at a flattening vertex.
+    internal static (Program Program, Box Zone) NotchCornerFixture()
+    {
+        var program = new Program();
+        program.MoveTo(0, 0);
+        program.LineTo(20, 0);
+        program.LineTo(20, 20);
+        program.LineTo(12, 20);
+        program.ArcTo(8, 20, 10, 20, RotationType.CW);
+        program.LineTo(0, 20);
+        program.LineTo(0, 0);
+        var arc = new ShapeProfile(OpenNest.Converters.ConvertProgram.ToGeometry(program))
+            .Perimeter.Entities.OfType<Arc>().Single();
+        var native = arc.ToPoints(arc.SegmentsForTolerance(Tiny / 4)).First(v => v.X > 11.9 && v.Y < 19.5);
+        var centre = new Vector(10, 20);
+        var outward = centre + (native - centre) / 2 * (2 + 6e-7);
+        return (program, new Box(outward.X - Tiny, outward.Y, Tiny, Tiny));
+    }
+
+    [Fact]
+    public void ConcaveArcMaterialIsNotLostBesideATinyClamp()
+    {
+        var (program, zone) = NotchCornerFixture();
+        var stock = new NestPlateStock("sheet", new Size(25, 25), null, 0, default, 1,
+            new[] { new ClampZone("tiny", zone) });
+        var job = new NestJob(new[] { new NestJobPart("p", PartGeometrySnapshot.FromProgram(program), 1, 0,
+            RotationPolicy.Fixed(0)) }, new[] { stock });
+        NestJobValidator.Validate(job);
+        var result = new NestJobResult(NestJobStatus.Complete, NestJobStopReason.Completed,
+            new[] { new NestJobPlateResult(0, stock, new[] { new NestJobPlacement("p", 0, 0, 0, 0) }) },
+            Array.Empty<PartFulfillment>(), Array.Empty<StockUsage>());
+
+        Assert.NotEmpty(ClampViolations(job, result));
+        Assert.True(InteractiveClamps.MaterialInKeepOut(new Part(new Drawing("notch", program)), zone));
+    }
 }

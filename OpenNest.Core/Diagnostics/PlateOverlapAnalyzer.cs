@@ -286,9 +286,10 @@ public static class PlateOverlapAnalyzer
                         var profile = new ShapeProfile(part.Input.Source.Entities.Select(e => e.Clone()).ToList());
                         if (profile.Perimeter == null)
                             throw new ArgumentException("Drawing has no closed material contour.");
-                        var (outer, holes) = KeepOutOverlap.ConservativePolygons(profile, zone);
-                        var fine = new OverlapMaterial(outer, holes).Transform(part.Input.Rotation, part.Input.Location);
-                        if (KeepOutOverlap.MaterialEnters(fine.Outer, fine.Holes, zone))
+                        if (KeepOutOverlap.ConservativePolygons(profile, zone)
+                            .Select(polygons => new OverlapMaterial(polygons.Perimeter, polygons.Holes)
+                                .Transform(part.Input.Rotation, part.Input.Location))
+                            .Any(fine => KeepOutOverlap.MaterialEnters(fine.Outer, fine.Holes, zone)))
                             findings.Add(TinyClampFinding(part, clamp));
                         continue;
                     }
