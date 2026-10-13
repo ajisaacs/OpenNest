@@ -10,7 +10,7 @@ namespace OpenNest.Engine.Jobs;
 /// <summary>
 /// Interactive-path clamp keep-outs (Slice 4): the inflated rectangles and static obstacle
 /// parts that make the single-plate fill, push and pack surfaces respect
-/// <see cref="Plate.ClampZones"/> like existing parts. Zones are never material: the fake
+/// <see cref="Plate.ClampZones"/> (mapped into the placement frame) like existing parts. Zones are never material: the fake
 /// obstacle parts exist only inside a single call - they are never added to
 /// <see cref="Plate.Parts"/>, plates, jobs or files.
 /// </summary>
@@ -18,14 +18,18 @@ internal static class InteractiveClamps
 {
     public static bool HasZones(Plate plate) => plate.ClampZones.Count > 0;
 
-    /// <summary>Raw zone rectangles, detached copies, capture order.</summary>
+    /// <summary>
+    /// Raw zone rectangles in the parts' placement frame (plate zones are stored in sheet
+    /// coordinates, see <see cref="ClampZoneFrame"/>), detached copies, capture order.
+    /// </summary>
     public static IReadOnlyList<Box> ZoneRectangles(Plate plate)
     {
         if (plate.ClampZones.Count == 0)
             return Array.Empty<Box>();
-        var boxes = new Box[plate.ClampZones.Count];
+        var zones = ClampZoneFrame.ToPlacement(plate);
+        var boxes = new Box[zones.Count];
         for (var i = 0; i < boxes.Length; i++)
-            boxes[i] = Copy(plate.ClampZones[i].Bounds);
+            boxes[i] = Copy(zones[i].Bounds);
         return boxes;
     }
 
@@ -49,9 +53,10 @@ internal static class InteractiveClamps
     {
         if (plate.ClampZones.Count == 0)
             return Array.Empty<Box>();
-        var boxes = new Box[plate.ClampZones.Count];
+        var zones = ClampZoneFrame.ToPlacement(plate);
+        var boxes = new Box[zones.Count];
         for (var i = 0; i < boxes.Length; i++)
-            boxes[i] = plate.ClampZones[i].Bounds.Offset(clearance);
+            boxes[i] = zones[i].Bounds.Offset(clearance);
         return boxes;
     }
 

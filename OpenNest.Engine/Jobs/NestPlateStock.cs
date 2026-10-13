@@ -49,13 +49,19 @@ public sealed class NestPlateStock
         if (clampZones == null || clampZones.Count == 0)
         {
             ClampZones = Array.Empty<ClampZone>();
+            SheetClampZones = Array.Empty<ClampZone>();
         }
         else
         {
             var zones = new ClampZone[clampZones.Count];
+            var sheetZones = new ClampZone[clampZones.Count];
             for (var i = 0; i < zones.Length; i++)
+            {
                 zones[i] = new ClampZone(clampZones[i].Id, clampZones[i].Bounds.Translate(left, bottom));
+                sheetZones[i] = new ClampZone(clampZones[i].Id, clampZones[i].Bounds);
+            }
             ClampZones = zones;
+            SheetClampZones = sheetZones;
         }
     }
 
@@ -64,6 +70,14 @@ public sealed class NestPlateStock
     /// like <see cref="WorkArea"/>. Empty when the plate defines none; never null.
     /// </summary>
     public IReadOnlyList<ClampZone> ClampZones { get; }
+
+    /// <summary>
+    /// The same zones exactly as given, in plate coordinates (the frame of
+    /// <see cref="Plate.ClampZones"/>), for plates built from this stock. Keeping the input
+    /// avoids a lossy translate-and-back; <see cref="ClampZoneFrame.ToPlacement"/> of such a
+    /// plate reproduces <see cref="ClampZones"/> bit for bit.
+    /// </summary>
+    internal IReadOnlyList<ClampZone> SheetClampZones { get; }
 
     /// <summary>Generic per-physical-sheet cost; null selects area scoring.</summary>
     public double? Cost { get; }

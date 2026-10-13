@@ -74,6 +74,12 @@ expanded on all sides by its bottom edge spacing. Part spacing is not added to c
 clearance. Default runs and validates both lanes as usual. Empty clamp collections
 leave the existing packing path unchanged; clamps never become requested or placed parts.
 
+Every `Plate`, including plates the engine builds from stock, stores clamp zones relative
+to the sheet's lower-left corner; `NestPlateStock.ClampZones` carries them in the signed
+placement frame of part coordinates. Code that compares a plate's zones with parts, cuts
+or motions maps them through `ClampZoneFrame.ToPlacement`, which reproduces the stock's
+zones exactly; reading `Plate.ClampZones` bounds directly is wrong in quadrants 2-4.
+
 Irregular prepares static rectangle obstacles and their cached no-fit polygons once
 per stock per solve, separately from the part-spacing cache. Every orientation's initial
 free region excludes these obstacles, including extra orientations introduced by pairs

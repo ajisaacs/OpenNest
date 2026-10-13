@@ -116,9 +116,10 @@ public static class DrawingJobMapper
             EdgeSpacing = stock.EdgeSpacing,
             Quadrant = stock.Quadrant,
         };
-        // Zones are immutable and already carry the placement-frame transform.
-        foreach (var zone in stock.ClampZones)
-            plate.ClampZones.Add(zone);
+        // Every Plate stores zones in plate (sheet lower-left) coordinates; consumers map
+        // them into the placement frame through ClampZoneFrame, exactly as the stock did.
+        foreach (var zone in stock.SheetClampZones)
+            plate.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds));
         return plate;
     }
 }

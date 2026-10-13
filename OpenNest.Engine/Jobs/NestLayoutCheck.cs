@@ -174,7 +174,8 @@ public static class NestLayoutCheck
     {
         var inflateBy = InflationFor(plate.EdgeSpacing.Bottom);
 
-        foreach (var zone in plate.ClampZones)
+        // Plate zones are stored in sheet coordinates; parts are in the placement frame.
+        foreach (var zone in ClampZoneFrame.ToPlacement(plate))
         {
             // Box.Offset(d) grows the rectangle on all four sides.
             var keepOut = zone.Bounds.Offset(inflateBy);

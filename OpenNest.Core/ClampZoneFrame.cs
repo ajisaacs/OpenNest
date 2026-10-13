@@ -5,12 +5,12 @@ using OpenNest.Geometry;
 namespace OpenNest;
 
 /// <summary>
-/// Maps a live plate's <see cref="Plate.ClampZones"/>, stored in the sheet's lower-left frame
+/// Maps a plate's <see cref="Plate.ClampZones"/>, stored in the sheet's lower-left frame
 /// (<see cref="ClampRail.ResolveFor"/>), into the signed placement frame of its parts,
 /// cut-offs and motions. The translation matches the sheet itself and the engine stock:
 /// -Length on X in quadrants 2 and 3, -Width on Y in quadrants 3 and 4. Whole footprints are
-/// kept, never clipped. Engine-internal plates built from a <c>NestPlateStock</c> already
-/// carry placement-frame zones and must not be mapped again.
+/// kept, never clipped. Every plate uses the sheet frame, including plates the engine builds
+/// from a <c>NestPlateStock</c>, so this is the only translation any consumer applies.
 /// </summary>
 public static class ClampZoneFrame
 {

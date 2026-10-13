@@ -78,12 +78,16 @@ public class ClampZoneEngineTests
         Assert.Equal(ZoneX - 96, zone.Bounds.X);
         Assert.Equal(0, zone.Bounds.Y);
 
-        // Materializing the stock back keeps the placement frame: no second transform.
+        // A plate materialized from the stock stores plate coordinates like every Plate;
+        // mapping it into the placement frame reproduces the stock zone exactly.
         var materialized = DrawingJobMapper.CreatePlate(stock);
         var copy = Assert.Single(materialized.ClampZones);
-        Assert.Equal(zone.Bounds.X, copy.Bounds.X);
+        Assert.Equal(ZoneX, copy.Bounds.X);
         Assert.Equal(0, copy.Bounds.Y); // quadrant 2 keeps Y at zero
         Assert.Equal("clamp-0", copy.Id);
+        var placed = Assert.Single(ClampZoneFrame.ToPlacement(materialized));
+        Assert.Equal(zone.Bounds.X, placed.Bounds.X);
+        Assert.Equal(zone.Bounds.Y, placed.Bounds.Y);
     }
 
     [Fact]
