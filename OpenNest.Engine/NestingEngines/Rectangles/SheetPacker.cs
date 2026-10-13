@@ -90,9 +90,14 @@ internal static class SheetPacker
     /// inflated-box model an item at position p covers material [p, p + size] plus a trailing
     /// part-spacing tail; blocking bin-local [zone - clearance + s, zone + clearance] per axis
     /// therefore means exactly: item material keeps at least the bottom-edge clearance from
-    /// every clamp side, without paying any extra part-spacing tax there. A span that
-    /// degenerates because the spacing exceeds the inflated zone collapses to the zone
-    /// centerline - conservative (it forbids crossing the clamp), never permissive.
+    /// every clamp side, without paying any extra part-spacing tax there. When s exceeds the
+    /// inflated span the interval inverts (decision D11): block a zero-extent line at the
+    /// clamp edge facing the sheet interior — at (zone max + clearance) when the zone center
+    /// lies in the lower half of the bin on that axis, else at (zone min - clearance + s).
+    /// Parts on the interior side then keep the exact clearance; the unavoidable extra
+    /// exclusion (s - extent - 2*clearance) lands on the side toward the nearer sheet edge.
+    /// The old collapse to the zone centerline was NOT conservative: an item could start
+    /// exactly on the centerline with material inside the clamp.
     /// Empty zone lists change nothing: the free list evolves bit-identically (C2).
     /// </summary>
     private static void BlockClamps(MaxRectsSheet sheet, NestPlateStock stock, Box work, double s)
@@ -110,17 +115,24 @@ internal static class SheetPacker
             var right = x0(b.Right) + clearance;
             if (right <= left)
             {
-                var centerX = x0((b.Left + b.Right) * 0.5);
-                left = centerX;
-                right = centerX;
+                var center = x0((b.Left + b.Right) * 0.5);
+                // D11: the interior-facing clamp edge (toward the farther sheet edge).
+                var line = center < sheet.Width * 0.5
+                    ? x0(b.Right) + clearance
+                    : x0(b.Left) - clearance + s;
+                left = line;
+                right = line;
             }
             var bottom = y0(b.Bottom) - clearance + s;
             var top = y0(b.Top) + clearance;
             if (top <= bottom)
             {
-                var centerY = y0((b.Bottom + b.Top) * 0.5);
-                bottom = centerY;
-                top = centerY;
+                var center = y0((b.Bottom + b.Top) * 0.5);
+                var line = center < sheet.Height * 0.5
+                    ? y0(b.Top) + clearance
+                    : y0(b.Bottom) - clearance + s;
+                bottom = line;
+                top = line;
             }
             sheet.Block(new Rect(left, bottom, right - left, top - bottom));
         }
