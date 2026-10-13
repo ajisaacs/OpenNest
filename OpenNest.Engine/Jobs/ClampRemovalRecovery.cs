@@ -69,9 +69,11 @@ internal static class ClampRemovalRecovery
 
         token.ThrowIfCancellationRequested();
 
-        // C10: only a part that fits nowhere with every clamp in place is "blocked".
+        // C10: only a part that fits nowhere with every clamp in place is "blocked". One
+        // lane's failure is not proof: a part any built-in lane can place clamped is not.
+        var lanes = FeasibilityLanes(engine);
         var blocked = remaining
-            .Where(x => !FitsAnywhere(x.Part, availableStock, job.Options, engine, token))
+            .Where(x => !lanes.Any(lane => FitsAnywhere(x.Part, availableStock, job.Options, lane, token)))
             .Select(x => x.Part)
             .ToList();
         if (blocked.Count == 0)
@@ -129,6 +131,23 @@ internal static class ClampRemovalRecovery
 
         var merged = Merge(job, raw, recoveryVariants.Values, raw2);
         return merged;
+    }
+
+    /// <summary>
+    /// Engines whose placement of a lone part proves it fits (C10): the caller's own engine,
+    /// plus the built-in Irregular (NFP, true material) and Rectangles lanes. Default already
+    /// runs both, so it is enough on its own.
+    /// </summary>
+    private static IReadOnlyList<INestingEngine> FeasibilityLanes(INestingEngine engine)
+    {
+        if (engine is NestingEngines.Default.DefaultNestingEngine)
+            return new[] { engine };
+        var lanes = new List<INestingEngine> { engine };
+        if (engine is not NestingEngines.Irregular.IrregularNestingEngine)
+            lanes.Add(new NestingEngines.Irregular.IrregularNestingEngine());
+        if (engine is not NestingEngines.Rectangles.RectanglesNestingEngine)
+            lanes.Add(new NestingEngines.Rectangles.RectanglesNestingEngine());
+        return lanes;
     }
 
     /// <summary>Same stock, quantity reduced by what phase 1 already used (unlimited stays

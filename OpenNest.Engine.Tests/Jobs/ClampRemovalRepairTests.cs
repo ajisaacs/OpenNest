@@ -1,4 +1,5 @@
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.NestingEngines.Rectangles;
 using OpenNest.Engine.Tests.NestingEngines;
 using OpenNest.Geometry;
@@ -143,5 +144,40 @@ public class ClampRemovalRepairTests
         var sheet = Assert.Single(result.Raw.Plates);
         Assert.DoesNotContain(sheet.Stock.ClampZones, z => z.Id == "clamp-1");
         Assert.Contains(sheet.Stock.ClampZones, z => z.Id == "clamp-2");
+    }
+    // PM c5984c6e (C10): one lane's failure to place is not proof the part cannot fit. The
+    // fixed-rotation L below fits at the origin with its notch over the clamp (an explicit
+    // witness passes the layout check), but Rectangles packs its 10 x 10 bounding box and
+    // cannot place it; no clamp may be removed for it.
+    [Fact]
+    public void PartThatFitsClampedInSomeLaneNeverRemovesAClamp()
+    {
+        var program = new OpenNest.CNC.Program();
+        program.MoveTo(0, 0);
+        program.LineTo(2, 0);
+        program.LineTo(2, 8);
+        program.LineTo(10, 8);
+        program.LineTo(10, 10);
+        program.LineTo(0, 10);
+        program.LineTo(0, 0);
+        var rail = new ClampRail(1.5, 0.625, new[] { 5.75 }); // clamp-1 spans X [5, 6.5]
+        var size = new Size(10, 10);
+        var stock = new NestPlateStock("sheet", size, null, 0, default, 1, null, rail.ResolveFor(size, 1))
+        { ClampRail = rail };
+        var drawing = new Drawing("notched", program);
+
+        var witnessJob = new NestJob(new[] { DrawingJobMapper.FromItem("p", new NestItem { Drawing = drawing, Quantity = 1 }) },
+            new[] { stock });
+        var witness = new NestJobResult(NestJobStatus.Complete, NestJobStopReason.Completed,
+            new[] { new NestJobPlateResult(0, stock, new[] { new NestJobPlacement("p", 0, 0, 0, 0) }) },
+            Array.Empty<PartFulfillment>(), Array.Empty<StockUsage>());
+        Assert.Empty(NestLayoutCheck.Violations(witnessJob, witness)); // fits with the clamp in place
+
+        var result = NestPipeline.Run(new NestPipelineRequest("Rectangles",
+            new[] { new NestItem { Drawing = drawing, Quantity = 1 } },
+            new[] { stock }));
+
+        Assert.All(result.Job.Plates, s => Assert.DoesNotContain("removed", s.Id));
+        Assert.All(result.Raw.Plates, sheet => Assert.Single(sheet.Stock.ClampZones));
     }
 }
