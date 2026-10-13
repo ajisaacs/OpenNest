@@ -29,6 +29,7 @@ public enum AutomaticCutOffDiagnosticCode
     LimitedCutOffConflict,
     EmptyCut,
     SegmentedCut,
+    ClampBlockedCut,
     NoSafeTailSeparator,
     TailBelowMinimum,
 }
@@ -172,6 +173,22 @@ public static class AutomaticCutOffPlanner
 
         void AddCandidate(double x, bool isSeparator)
         {
+            // A full-width cut crosses every active front-edge clamp at this X. Test
+            // even equivalent existing definitions: a stale manual line cannot certify
+            // a retained tail. Keep the whole footprint when it hangs off the sheet.
+            var clearance = plate.EdgeSpacing.Bottom;
+            var blocked = plate.ClampZones.FirstOrDefault(zone =>
+                x >= zone.Bounds.Left - clearance && x <= zone.Bounds.Right + clearance);
+            if (blocked != null)
+            {
+                diagnostics.Add(new AutomaticCutOffDiagnostic(
+                    AutomaticCutOffDiagnosticCode.ClampBlockedCut,
+                    $"The proposed cut crosses clamp '{blocked.Id}' (including bottom-edge clearance); it was skipped.",
+                    X: x));
+                if (isSeparator)
+                    WarnNoSeparator(x);
+                return;
+            }
             var matches = plate.CutOffs.Where(c => c.Axis == CutOffAxis.Vertical &&
                 Near(c.Position.X, x)).ToList();
             if (matches.Any(c => !FullSpanLimits(c, bounds, settings)))
@@ -242,6 +259,11 @@ public static class AutomaticCutOffPlanner
             "Sheet length and width must be positive and finite.", nameof(plate));
         Require(plate.Quadrant is >= 1 and <= 4, "Quadrant must be 1 through 4.", nameof(plate));
         Require(Nonnegative(plate.PartSpacing), "Part spacing must be finite and nonnegative.", nameof(plate));
+        Require(plate.ClampZones != null && (plate.ClampZones.Count == 0 ||
+            Nonnegative(plate.EdgeSpacing.Bottom) && plate.ClampZones.All(zone =>
+                zone?.Bounds != null && ValidBox(zone.Bounds) &&
+                zone.Bounds.Length > 0 && zone.Bounds.Width > 0)),
+            "Clamp zones and bottom-edge clearance must be finite and valid.", nameof(plate));
         Require(Nonnegative(settings.PartClearance) && Nonnegative(settings.MinSegmentLength) &&
             Nonnegative(settings.Overtravel), "Cut-off settings must be finite and nonnegative.", nameof(settings));
         Require(Enum.IsDefined(settings.CutDirection), "Unknown cut direction.", nameof(settings));

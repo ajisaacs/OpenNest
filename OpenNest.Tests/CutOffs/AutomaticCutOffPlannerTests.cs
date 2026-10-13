@@ -189,6 +189,61 @@ public class AutomaticCutOffPlannerTests
         Assert.Equal(80.5 + Tolerance.Epsilon, plan.UsedSpan);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void ClampWall_SkipsNominalLineAndRefusesTailSeparator(int quadrant)
+    {
+        var plate = MakePlate(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.ClampZones.Add(new ClampZone("nominal", new Box(sign > 0 ? 35.1 : -35.3,
+            quadrant is 3 or 4 ? -0.625 : 0, 0.2, 0.625)));
+        plate.ClampZones.Add(new ClampZone("tail", new Box(sign > 0 ? 80.6 : -80.8,
+            quadrant is 3 or 4 ? -0.625 : 0, 0.2, 0.625)));
+        var before = plate.Parts.ToArray();
+        var plan = Plan(plate);
+        Assert.Equal(new[] { sign * 70.0 }, Positions(plan));
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Equal(0, plan.TailLength);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeTailSeparator);
+        Assert.Equal(before, plate.Parts.ToArray());
+        Assert.Empty(plate.CutOffs);
+    }
+
+    [Fact]
+    public void ClampOnlyBlocksItsInflatedSpan_AndRemovedClampStopsBlocking()
+    {
+        var plate = MakePlate();
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.ClampZones.Add(new ClampZone("front", new Box(35.25, 0, 1.5, 0.625)));
+        var blocked = Plan(plate);
+        Assert.Equal(new[] { 70, 80.5 + Tolerance.Epsilon }, Positions(blocked));
+        Assert.True(blocked.HasSeparatedTail);
+        plate.ClampZones.Clear();
+        Assert.Equal(new[] { 35, 70, 80.5 + Tolerance.Epsilon }, Positions(Plan(plate)));
+    }
+
+    [Fact]
+    public void ExistingLineAcrossClampCannotCertifyTail_AndPartialFootprintBlocks()
+    {
+        var plate = MakePlate();
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.ClampZones.Add(new ClampZone("hanging", new Box(80.6, 0, 0.2, 0.625)));
+        var existing = new CutOff(new Vector(80.5 + Tolerance.Epsilon, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(existing);
+        existing.Regenerate(plate, new CutOffSettings());
+        var original = existing.Drawing.Program;
+        var plan = Plan(plate);
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Null(plan.TailSeparatorX);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeTailSeparator);
+        Assert.Same(original, existing.Drawing.Program);
+        Assert.Same(existing, Assert.Single(plate.CutOffs));
+    }
+
     [Fact]
     public void Planning_DoesNotMutateAnyLiveObjectsOrSequence()
     {
