@@ -143,6 +143,178 @@ public class AutomaticCutOffShiftTests
         }
     }
 
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(3, false)]
+    [InlineData(4, false)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    [InlineData(3, true)]
+    [InlineData(4, true)]
+    public void FullSpanManualLine_AtTwentyIsBoundary_NotAnExtraObstacle(int quadrant, bool explicitLimits)
+    {
+        var plate = UserCase(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        var settings = new CutOffSettings { Overtravel = 0.2 };
+        var manual = new CutOff(new Vector(sign * 20, 0), CutOffAxis.Vertical);
+        if (explicitLimits)
+        {
+            var bounds = plate.BoundingBox(false);
+            manual.StartLimit = bounds.Bottom;
+            manual.EndLimit = bounds.Top + settings.Overtravel;
+        }
+        plate.CutOffs.Add(manual);
+        var plan = AutomaticCutOffPlanner.Create(plate, Options(), settings);
+        Assert.False(plan.HasBlockingDiagnostics);
+        Assert.Equal(2, plan.Definitions.Count);
+        // The feasible window 45.3..55 misses every rectangle, so all costs tie.
+        // One unbroken full-width segment at the gap-relative nominal X wins.
+        Assert.Equal(sign * 55, plan.Definitions[0].Position.X);
+        Assert.Single(plan.PreviewParts[0].Program.Codes.OfType<LinearMove>());
+        Assert.Equal(60.2, CutLength(plan.PreviewParts[0].Program), 8);
+        Assert.Equal(plan.StripCutLength, plan.FixedGridCutLength);
+        Assert.InRange(System.Math.Abs(plan.Definitions[0].Position.X) - 20, 17.5, 35);
+        Assert.InRange(plan.UsedSpan - System.Math.Abs(plan.Definitions[0].Position.X), 0, 35);
+        Assert.Same(manual, Assert.Single(plate.CutOffs));
+    }
+
+    [Theory]
+    [InlineData(1, -1)]
+    [InlineData(2, -1)]
+    [InlineData(3, -1)]
+    [InlineData(4, -1)]
+    [InlineData(1, 0)]
+    [InlineData(2, 0)]
+    [InlineData(3, 0)]
+    [InlineData(4, 0)]
+    [InlineData(1, 1)]
+    [InlineData(2, 1)]
+    [InlineData(3, 1)]
+    [InlineData(4, 1)]
+    public void LimitedManualLine_AtBestPosition_IsAvoidedWithoutBlocking(int quadrant, int toleranceOffset)
+    {
+        var plate = UserCase(quadrant);
+        var best = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+        var x = best.Definitions[0].Position.X;
+        var manualX = x + toleranceOffset * AutomaticCutOffPlanner.GeometryTolerance;
+        plate.CutOffs.Add(new CutOff(new Vector(manualX, 0), CutOffAxis.Vertical)
+        {
+            EndLimit = plate.BoundingBox(false).Bottom + 2,
+        });
+        var plan = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+        Assert.False(plan.HasBlockingDiagnostics);
+        Assert.Equal(3, plan.Definitions.Count);
+        Assert.DoesNotContain(plan.Definitions, c => c.Position.X == x ||
+            System.Math.Abs(c.Position.X - manualX) <= AutomaticCutOffPlanner.GeometryTolerance);
+        Assert.True(plan.StripCutLength < plan.FixedGridCutLength);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void LimitedManualLine_AtSeparator_StillBlocksAndEmptiesProposedTotals(int quadrant)
+    {
+        var plate = UserCase(quadrant);
+        var first = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+        plate.CutOffs.Add(new CutOff(new Vector(first.TailSeparatorX!.Value, 0), CutOffAxis.Vertical)
+        {
+            EndLimit = plate.BoundingBox(false).Bottom + 2,
+        });
+        var plan = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+        Assert.True(plan.HasBlockingDiagnostics);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.LimitedCutOffConflict && d.IsBlocking);
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Empty(plan.Definitions);
+        Assert.Empty(plan.PreviewParts);
+        Assert.Equal(0, plan.StripCutLength);
+        Assert.True(plan.FixedGridCutLength > 0);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void ApplyAndRerun_FullSpanDefinitionsMakeEveryGapANoOp(int quadrant)
+    {
+        var plate = UserCase(quadrant);
+        var settings = new CutOffSettings();
+        var plan = AutomaticCutOffPlanner.Create(plate, Options(), settings);
+        plate.CutOffs.AddRange(plan.Definitions);
+        plate.RegenerateCutOffs(settings);
+        var parts = plate.Parts.ToArray();
+        var rerun = AutomaticCutOffPlanner.Create(plate, Options(), settings);
+        Assert.Empty(rerun.Definitions);
+        Assert.False(rerun.HasBlockingDiagnostics);
+        Assert.Equal(plan.TailSeparatorX, rerun.TailSeparatorX);
+        Assert.Equal(parts, plate.Parts.ToArray());
+        Assert.Equal(0, rerun.StripCutLength);
+        Assert.Equal(0, rerun.FixedGridCutLength);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void FullSpanLineInTail_IsIgnoredAsAStripBoundary(int quadrant)
+    {
+        var plate = UserCase(quadrant);
+        var before = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+        plate.CutOffs.Add(new CutOff(new Vector(quadrant is 2 or 3 ? -110 : 110, 0), CutOffAxis.Vertical));
+        var after = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+        Assert.Equal(before.Definitions.Select(c => c.Position.X), after.Definitions.Select(c => c.Position.X));
+        Assert.Equal(before.StripCutLength, after.StripCutLength);
+        Assert.Equal(before.FixedGridCutLength, after.FixedGridCutLength);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void UnsortedDuplicateBoundaries_SpacingSizedGapsNeedNoNewLines(int quadrant)
+    {
+        var plate = UserCase(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        foreach (var distance in new[] { 55.0, 110, 20, 55, 0 })
+            plate.CutOffs.Add(new CutOff(new Vector(sign * distance, 0), CutOffAxis.Vertical));
+        var plan = AutomaticCutOffPlanner.Create(plate, Options(), new CutOffSettings());
+        Assert.False(plan.HasBlockingDiagnostics);
+        Assert.Equal(plan.TailSeparatorX, Assert.Single(plan.Definitions).Position.X);
+        Assert.Equal(0, plan.StripCutLength);
+        Assert.Equal(0, plan.FixedGridCutLength);
+        Assert.Equal(5, plate.CutOffs.Count);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void LimitedManualLine_WhenNoAllowedCandidate_FallbackStillBlocks(int quadrant)
+    {
+        var plate = UserCase(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        plate.CutOffs.Add(new CutOff(new Vector(sign * 35, 0), CutOffAxis.Vertical)
+        {
+            EndLimit = plate.BoundingBox(false).Bottom + 2,
+        });
+        var options = Options();
+        // Only nominal 35 is on the lattice in this first-line window.
+        options.MinimumStripLength = 35 - AutomaticCutOffPlanner.GeometryTolerance / 2;
+        var plan = AutomaticCutOffPlanner.Create(plate, options, new CutOffSettings());
+        Assert.True(plan.HasBlockingDiagnostics);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.LimitedCutOffConflict && d.IsBlocking);
+        Assert.Empty(plan.Definitions);
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Equal(0, plan.StripCutLength);
+        Assert.True(plan.FixedGridCutLength > 0);
+    }
+
     internal static void AssertLimits(AutomaticCutOffPlan plan, double spacing, double minimum)
     {
         var positions = plan.Definitions.Where(c => c.Position.X != plan.TailSeparatorX)

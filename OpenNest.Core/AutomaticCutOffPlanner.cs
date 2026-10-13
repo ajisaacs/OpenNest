@@ -147,15 +147,28 @@ public static class AutomaticCutOffPlanner
         var diagnostics = new List<AutomaticCutOffDiagnostic>();
         var separated = false;
         var separatorX = (double?)null;
-        var shifted = options.MinimumStripLength.HasValue && options.MinimumStripLength.Value < options.Spacing
-            && !plate.CutOffs.Any(c => c.Axis == CutOffAxis.Vertical);
+        var shifted = options.MinimumStripLength.HasValue && options.MinimumStripLength.Value < options.Spacing;
         var stripCutLength = 0.0;
         var fixedGridCutLength = 0.0;
         var measurements = new Dictionary<double, (double Length, int SegmentCount)>();
         var candidates = new HashSet<double>();
 
         if (shifted)
-            AddShiftedGap(0, usedSpan);
+        {
+            // Full-span definitions fix the strip boundaries, even when their emitted
+            // programs are segmented. Partial cuts remain obstacles, not boundaries.
+            var boundaries = plate.CutOffs
+                .Where(c => c.Axis == CutOffAxis.Vertical && FullSpanLimits(c, bounds, settings))
+                .Select(c => sign * c.Position.X)
+                .Where(distance => distance > GeometryTolerance && distance < usedSpan - GeometryTolerance)
+                .Distinct().OrderBy(distance => distance);
+            var start = 0.0;
+            foreach (var end in boundaries.Append(usedSpan))
+            {
+                AddShiftedGap(start, end);
+                start = end;
+            }
+        }
         else
         {
             // Keep the legacy loop and certification unchanged when shifting is disabled.
@@ -232,7 +245,9 @@ public static class AutomaticCutOffPlanner
         bool Allowed(double distance)
         {
             RegisterCandidate(distance);
-            return true;
+            // Use the certification path's exact Near predicate, including its ULP
+            // allowance, so a selected line cannot rediscover a limited-cut conflict.
+            return !plate.CutOffs.Any(c => c.Axis == CutOffAxis.Vertical && Near(c.Position.X, sign * distance));
         }
 
         void RegisterCandidate(double distance)
