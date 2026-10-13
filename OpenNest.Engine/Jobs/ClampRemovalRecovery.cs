@@ -298,7 +298,9 @@ internal static class ClampRemovalRecovery
     ) => Probe(part, stocks, options, engine, budget, token);
 
     /// <summary>Whether this part, alone and at quantity one, places on an empty sheet of any
-    /// of the given stock entries with the given engine. Spends one probe from the budget.</summary>
+    /// of the given stock entries with the given engine. A question already answered for the
+    /// same part, engine and physically identical stock is reused; otherwise it spends one
+    /// probe from the budget.</summary>
     private static bool Probe(
         NestJobPart part,
         IReadOnlyList<NestPlateStock> stocks,
@@ -308,6 +310,9 @@ internal static class ClampRemovalRecovery
         CancellationToken token
     )
     {
+        var key = (engine, part.Id, string.Join(";", stocks.Select(Signature).Distinct(StringComparer.Ordinal)));
+        if (budget.Answers.TryGetValue(key, out var known))
+            return known;
         budget.Spend();
         var probePart = new NestJobPart(part.Id, part.Geometry, 1, part.Priority, part.Rotation);
         var probeStock = stocks.Select(s => Unlimited(s)).ToList();
@@ -315,12 +320,29 @@ internal static class ClampRemovalRecovery
         var probeJob = new NestJob(new[] { probePart }, probeStock, probeOptions);
         token.ThrowIfCancellationRequested();
         var result = engine.Solve(probeJob, null, token);
-        return result != null && result.Status == NestJobStatus.Complete;
+        var fits = result != null && result.Status == NestJobStatus.Complete;
+        budget.Answers[key] = fits;
+        return fits;
+    }
+
+    /// <summary>Everything about a stock entry that can change whether a lone part fits:
+    /// sheet size, quadrant, spacings and the exact clamp zones (not its id, cost or
+    /// quantity).</summary>
+    private static string Signature(NestPlateStock stock)
+    {
+        var e = stock.EdgeSpacing;
+        var zones = string.Join(",", stock.SheetClampZones.Select(z =>
+            FormattableString.Invariant($"{z.Id}:{z.Bounds.X:R}/{z.Bounds.Y:R}/{z.Bounds.Length:R}/{z.Bounds.Width:R}")));
+        return FormattableString.Invariant(
+            $"{stock.Size.Width:R}x{stock.Size.Length:R}|q{stock.Quadrant}|{stock.PartSpacing:R}|{e.Left:R},{e.Bottom:R},{e.Right:R},{e.Top:R}|{zones}");
     }
 
     private sealed class ProbeBudget(int solves)
     {
         private int left = solves;
+
+        /// <summary>Answers already paid for, by (engine, part, stock signatures).</summary>
+        public Dictionary<(INestingEngine, string, string), bool> Answers { get; } = new();
 
         /// <summary>Throws <see cref="ProbeBudgetExhaustedException"/> once spent; recovery
         /// then keeps the ordinary result.</summary>

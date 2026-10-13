@@ -333,4 +333,30 @@ public class ClampRemovalRepairTests
         Assert.All(result.Raw.Plates.Where(p => p.StockId.Contains("removed")), p => Assert.Single(p.Stock.ClampZones));
         Assert.Equal(2, result.Raw.StockUsage.Sum(u => u.Used));
     }
+    // Delta review policy gate 3: identical offered stock (four 48x120 sheets with the same
+    // eight-clamp rail) must not multiply the probe count, or a moderate job of full-sheet
+    // parts runs out of budget although every part fits with its clamps removed.
+    [Fact]
+    public void IdenticalStockOptionsShareTheirProbes()
+    {
+        var rail = new ClampRail(1.5, 0.625, new[] { 6.0, 21.0, 36.0, 51.0, 66.0, 81.0, 96.0, 111.0 });
+        var size = new Size(48, 120);
+        var stocks = Enumerable.Range(0, 4)
+            .Select(i => new NestPlateStock($"s{i}", size, null, 0, default, 1, null, rail.ResolveFor(size, 1)) { ClampRail = rail })
+            .ToArray();
+        var parts = Enumerable.Range(0, 8)
+            .Select(i => JobBuilder.Rectangle($"full-{i}", w: 120, h: 48, count: 1, x: i * 1e-3))
+            .ToArray();
+        var job = new NestJob(parts, stocks);
+        var engine = new OpenNest.Engine.NestingEngines.Default.DefaultNestingEngine();
+        var raw = engine.Solve(job);
+        Assert.Empty(raw.Plates);
+
+        var outcome = ClampRemovalRecovery.TryRecover(job, raw, engine, default);
+
+        Assert.NotNull(outcome);
+        Assert.Equal(NestJobStatus.Complete, outcome!.Result.Status);
+        Assert.Equal(8, outcome.Result.Plates.Count);
+        Assert.All(outcome.Result.Plates, sheet => Assert.Empty(sheet.Stock.ClampZones));
+    }
 }
