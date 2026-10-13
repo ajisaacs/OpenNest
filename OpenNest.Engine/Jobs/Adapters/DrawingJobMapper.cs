@@ -58,7 +58,8 @@ public static class DrawingJobMapper
             plate.Quadrant,
             cost: null,
             clampZones: new List<ClampZone>(plate.ClampZones)
-        );
+        )
+        { ClampRail = plate.ClampRail };
     }
 
     public static Program ToProgram(PartGeometrySnapshot geometry)

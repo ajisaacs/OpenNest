@@ -71,7 +71,9 @@ public static class NestPipelineCommit
         if (SameInPlacementFrame(plate.ClampZones, stock.ClampZones, left, bottom))
             return;
 
-        var rail = plate.ClampRail;
+        // A plate without a rail still takes the rail its stock was resolved from, so a
+        // last-resort removal on that stock is never committed without naming the clamp.
+        var rail = plate.ClampRail ?? stock.ClampRail;
         plate.SetClampRail(null); // explicit zones from here on
         foreach (var zone in stock.ClampZones)
             plate.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds.Translate(-left, -bottom)));

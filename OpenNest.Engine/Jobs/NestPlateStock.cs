@@ -81,6 +81,14 @@ public sealed class NestPlateStock
     /// </summary>
     internal IReadOnlyList<ClampZone> SheetClampZones { get; }
 
+    /// <summary>
+    /// The machine clamp rail <see cref="ClampZones"/> were resolved from, when the stock was
+    /// built from a rail-following plate; null for explicit zones. Only rail-backed clamps may
+    /// be taken off as a last resort (D8): the rail is what lets a committed sheet name the
+    /// clamps to pull and carry their removal time, so explicit zones are never removed.
+    /// </summary>
+    internal ClampRail ClampRail { get; init; }
+
     /// <summary>Generic per-physical-sheet cost; null selects area scoring.</summary>
     public double? Cost { get; }
     public string Id { get; }

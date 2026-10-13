@@ -20,8 +20,15 @@ public class ClampRemovalRepairTests
         new ClampZone("clamp-2", new Box(20.25, 0, 1.5, 0.625)),
     };
 
+    private static readonly ClampRail Rail = new(1.5, 0.625, new[] { 6.0, 21.0 });
+
+    /// <summary>Stock resolved from the machine rail (as NestStockBuilder builds it).</summary>
     private static NestPlateStock Stock(int? quantity = null) =>
-        JobBuilder.Stock("sheet", width: 3, length: 23, quantity: quantity, clampZones: Zones());
+        new("sheet", new Size(3, 23), quantity, 0, default, 1, null, Zones()) { ClampRail = Rail };
+
+    /// <summary>The same zones given explicitly, with no rail behind them.</summary>
+    private static NestPlateStock ExplicitStock() =>
+        JobBuilder.Stock("sheet", width: 3, length: 23, clampZones: Zones());
 
     private static NestItem Item(string name, double w, double h, int quantity) =>
         new() { Drawing = new Drawing(name, TestDrawingFactory.Rectangle(w, h)), Quantity = quantity };
@@ -83,5 +90,58 @@ public class ClampRemovalRepairTests
 
         Assert.ThrowsAny<OperationCanceledException>(() =>
             NestPipeline.Run(new CancelOnSecondCallEngine(source), "cancel", request, token: source.Token));
+    }
+    // PM 346d46ed: explicit zones have no rail to name a removed clamp or its time.
+    [Fact]
+    public void ExplicitZonesWithoutARailAreNeverRemoved()
+    {
+        var result = NestPipeline.Run(Request(ExplicitStock(), Item("wide", 14, 3, 1)));
+
+        Assert.NotEqual(NestJobStatus.Complete, result.Status);
+        Assert.All(result.Job.Plates, s => Assert.DoesNotContain("removed", s.Id));
+    }
+
+    [Fact]
+    public void RailStockRemovalIsNamedOnACommittedPlateWithoutARail()
+    {
+        // The stock comes from a rail-following template; the commit target is an empty
+        // sheet holding the same zones explicitly. The removal must still be recorded.
+        var drawing = new Drawing("wide", TestDrawingFactory.Rectangle(14, 3));
+        var template = new Plate(new Size(3, 23)) { EdgeSpacing = new Spacing(0, 0, 0, 0) };
+        template.SetClampRail(Rail);
+        var nest = new Nest();
+        nest.Drawings.Add(drawing);
+        nest.PlateDefaults.Size = new Size(3, 23);
+        nest.PlateDefaults.EdgeSpacing = new Spacing(0, 0, 0, 0);
+        var target = nest.CreatePlate();
+        foreach (var zone in Zones())
+            target.ClampZones.Add(zone);
+        Assert.Null(target.ClampRail);
+        using var manager = new PlateManager(nest);
+
+        var result = NestPipeline.Run(new NestPipelineRequest("Rectangles",
+            new[] { new NestItem { Drawing = drawing, Quantity = 1 } }, NestStockBuilder.SinglePlate(template)));
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        var plate = Assert.Single(NestPipelineCommit.ApplyToEmptyPlates(result, manager));
+
+        Assert.Equal(new[] { "clamp-1" }, plate.RemovedClamps);
+        Assert.NotNull(plate.ClampRail);
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, plate.ClampRemovalMinutes);
+    }
+    // PM 6ded8ac4 (d): the nearest-origin tie-break follows distance along the edge, not
+    // the order the zones happen to be listed in.
+    [Fact]
+    public void TieBreakPrefersTheClampNearestTheOriginWhateverTheZoneOrder()
+    {
+        var reversed = new NestPlateStock("sheet", new Size(3, 23), null, 0, default, 1, null,
+            Zones().Reverse().ToArray())
+        { ClampRail = Rail };
+
+        var result = NestPipeline.Run(Request(reversed, Item("wide", 14, 3, 1)));
+
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        var sheet = Assert.Single(result.Raw.Plates);
+        Assert.DoesNotContain(sheet.Stock.ClampZones, z => z.Id == "clamp-1");
+        Assert.Contains(sheet.Stock.ClampZones, z => z.Id == "clamp-2");
     }
 }

@@ -20,8 +20,14 @@ public class ClampRemovalRecoveryTests
     private static ClampZone Clamp1() => new("clamp-1", new Box(5.25, 0, 1.5, 0.625));
     private static ClampZone Clamp2() => new("clamp-2", new Box(20.25, 0, 1.5, 0.625));
 
+    // The machine rail those zones resolve from: only rail-backed clamps can be removed.
+    private static readonly ClampRail Rail = new(1.5, 0.625, new[] { 6.0, 21.0 });
+
     private static NestPlateStock ClampedSheet(params ClampZone[] zones) =>
-        JobBuilder.Stock("sheet", width: 3, length: 23, clampZones: zones);
+        RailSheet(null, zones);
+
+    private static NestPlateStock RailSheet(int? quantity, params ClampZone[] zones) =>
+        new("sheet", new Size(3, 23), quantity, 0, default, 1, null, zones) { ClampRail = Rail };
 
     private static readonly RectanglesNestingEngine Engine = new();
 
@@ -101,8 +107,7 @@ public class ClampRemovalRecoveryTests
         // The part fits a fresh clamped sheet on its own; only a single-sheet cap stops the
         // second copy. That is a capacity limit, not a clamp block, so nothing is removed.
         var part = JobBuilder.Rectangle("p", w: 12, h: 3, count: 2);
-        var stock = JobBuilder.Stock("sheet", width: 3, length: 23, quantity: 1,
-            clampZones: new[] { Clamp1(), Clamp2() });
+        var stock = RailSheet(1, Clamp1(), Clamp2());
         var job = JobBuilder.Job(new[] { part }, new[] { stock });
 
         var raw = Engine.Solve(job);

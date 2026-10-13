@@ -56,7 +56,7 @@ internal static class ClampRemovalRecovery
             return null;
 
         var availableStock = job.Plates.Where(s => s.Quantity != 0).ToList();
-        if (!availableStock.Any(s => s.ClampZones.Count > 0))
+        if (!availableStock.Any(CanRemoveClamps))
             return null;
 
         var partsById = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
@@ -153,7 +153,7 @@ internal static class ClampRemovalRecovery
         Removal best = null;
         foreach (var stock in stocks)
         {
-            if (stock.ClampZones.Count == 0)
+            if (!CanRemoveClamps(stock))
                 continue;
             token.ThrowIfCancellationRequested();
             var found = MinimalRemovalForStock(part, stock, options, engine, token);
@@ -165,10 +165,16 @@ internal static class ClampRemovalRecovery
         return best;
     }
 
+    /// <summary>Only clamps resolved from a machine rail can be removed (see
+    /// <see cref="NestPlateStock.ClampRail"/>): explicit zones have no clamp to name.</summary>
+    private static bool CanRemoveClamps(NestPlateStock stock) =>
+        stock.ClampRail != null && stock.ClampZones.Count > 0;
+
     /// <summary>
     /// Ascending run size, then ascending start index: the first contiguous run of the
-    /// stock's own clamp zones (already ordered by rail position) whose removal lets the
-    /// part fit alone is both the fewest clamps and, among ties, the run nearest the origin.
+    /// stock's own clamp zones, ordered by distance from the origin along the edge, whose
+    /// removal lets the part fit alone is both the fewest clamps and, among ties, the run
+    /// nearest the origin.
     /// </summary>
     private static Removal MinimalRemovalForStock(
         NestJobPart part,
@@ -178,7 +184,11 @@ internal static class ClampRemovalRecovery
         CancellationToken token
     )
     {
-        var zones = stock.ClampZones;
+        // Placement-frame X is signed from the origin, so |centre X| is the distance along
+        // the edge in every quadrant.
+        var zones = stock.ClampZones
+            .OrderBy(z => System.Math.Abs(z.Bounds.X + z.Bounds.Length / 2))
+            .ToList();
         for (var run = 1; run <= zones.Count; run++)
         {
             for (var start = 0; start + run <= zones.Count; start++)
@@ -263,7 +273,8 @@ internal static class ClampRemovalRecovery
             stock.Quadrant,
             stock.Cost,
             plateFrameZones
-        );
+        )
+        { ClampRail = stock.ClampRail };
     }
 
     private static string Suffixed(string stockId, IReadOnlyList<string> removedIds) =>

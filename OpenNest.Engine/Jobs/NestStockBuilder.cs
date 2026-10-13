@@ -33,7 +33,8 @@ public static class NestStockBuilder
                 template.Quadrant,
                 option.Cost == 0 ? null : option.Cost,
                 ClampZonesFor(template, size)
-            ));
+            )
+            { ClampRail = template.ClampRail });
         }
         NestJobValidator.ValidateStockCosts(stock);
         return stock.AsReadOnly();
