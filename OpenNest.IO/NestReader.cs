@@ -452,8 +452,10 @@ namespace OpenNest.IO
                     .Where(id => !string.IsNullOrEmpty(id))
                     .ToHashSet(StringComparer.Ordinal)
                     ?? new HashSet<string>();
-                if (clampRail != null && clampRail.Matches(plate, removedClamps))
-                    plate.SetClampRail(clampRail, removedClamps);
+                // A sheet saved with its own rail (not the nest default) follows that one.
+                var plateRail = ReadClampRail(p.ClampRail) ?? clampRail;
+                if (plateRail != null && plateRail.Matches(plate, removedClamps))
+                    plate.SetClampRail(plateRail, removedClamps);
 
                 for (var partIndex = 0; partIndex < p.Parts.Count; partIndex++)
                 {

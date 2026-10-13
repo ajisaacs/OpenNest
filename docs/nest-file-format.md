@@ -86,7 +86,9 @@ Auto Nest removed clamps as a last resort lists their rail ids in an optional
 `removedClamps` array (omitted when none were removed); its `clamps` already
 exclude them, and it follows the rail minus those ids. A malformed
 `removedClamps` value reads as none removed (non-string entries are skipped);
-the saved `clamps` load either way.
+the saved `clamps` load either way. A plate that follows a rail other than the nest's default
+saves it in its own optional `clampRail` (same shape), so its removal state and
+time survive a reload; plates following the default rail omit it.
 
 An empty plate (no parts, no cut-offs) is omitted from the file unless that
 would lose clamp zones: it is omitted like any other empty plate only when a

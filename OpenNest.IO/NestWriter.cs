@@ -135,15 +135,7 @@ namespace OpenNest.IO
                     Right = pd.EdgeSpacing.Right,
                     Bottom = pd.EdgeSpacing.Bottom,
                 },
-                ClampRail = pd.ClampRail == null
-                    ? null
-                    : new ClampRailDto
-                    {
-                        Width = pd.ClampRail.Width,
-                        Depth = pd.ClampRail.Depth,
-                        Centers = pd.ClampRail.Centers.ToList(),
-                        RemovalMinutes = pd.ClampRail.RemovalMinutes,
-                    },
+                ClampRail = ToDto(pd.ClampRail),
             };
         }
 
@@ -221,6 +213,17 @@ namespace OpenNest.IO
                 && plate.Quadrant == defaults.Quadrant
                 && rail.Matches(plate);
         }
+
+        private static ClampRailDto ToDto(ClampRail rail) =>
+            rail == null
+                ? null
+                : new ClampRailDto
+                {
+                    Width = rail.Width,
+                    Depth = rail.Depth,
+                    Centers = rail.Centers.ToList(),
+                    RemovalMinutes = rail.RemovalMinutes,
+                };
 
         /// <summary>Numeric suffix of a rail clamp id ("clamp-3" -&gt; 3), for a natural sort of
         /// <see cref="PlateDto.RemovedClamps"/> instead of lexical ("clamp-10" before "clamp-2").
@@ -343,6 +346,10 @@ namespace OpenNest.IO
                                 .OrderBy(ClampIndex)
                                 .ThenBy(id => id, StringComparer.Ordinal)
                                 .ToList(),
+                        // Only a rail other than the nest default needs saving per sheet.
+                        ClampRail = Equals(plate.ClampRail, nest.PlateDefaults.ClampRail)
+                            ? null
+                            : ToDto(plate.ClampRail),
                     }
                 );
             }

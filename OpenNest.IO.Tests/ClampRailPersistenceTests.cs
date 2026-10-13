@@ -424,6 +424,32 @@ public class ClampRailPersistenceTests
         Assert.Contains("\"removedClamps\"", ReadNestJson(RemovedClamp3Nest()), StringComparison.Ordinal);
     }
 
+    // PM 22daec3d: a sheet following a rail other than the nest default keeps its rail,
+    // removed clamps and removal time through save/reload.
+    [Fact]
+    public void SheetRailDifferentFromTheDefaultsSurvivesReload()
+    {
+        var nest = new Nest("no-default-rail");
+        nest.PlateDefaults.Size = new Size(48, 120);
+        var plate = nest.CreatePlate();
+        plate.SetClampRail(Machine(), new[] { "clamp-3" });
+
+        var reopened = Assert.Single(RoundTrip(nest).Plates);
+
+        Assert.Equal(Machine(), reopened.ClampRail);
+        Assert.Equal(new[] { "clamp-3" }, reopened.RemovedClamps);
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, reopened.ClampRemovalMinutes);
+        Assert.Null(RoundTrip(nest).PlateDefaults.ClampRail);
+    }
+
+    [Fact]
+    public void SheetsFollowingTheDefaultRailWriteNoPerSheetRail()
+    {
+        var json = ReadNestJson(RemovedClamp3Nest());
+        var root = JsonNode.Parse(json)!;
+        Assert.Null(root["plates"]![0]!["clampRail"]);
+    }
+
     /// <summary>Removes a named property wherever it appears in the document, simulating a
     /// key an older writer never emitted. Rebuilds via <see cref="JsonNode"/> so the result
     /// is always valid JSON regardless of whether the property was first, last or only one

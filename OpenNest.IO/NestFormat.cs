@@ -214,6 +214,15 @@ namespace OpenNest.IO
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             [JsonConverter(typeof(LenientStringListConverter))]
             public List<string> RemovedClamps { get; init; } = new();
+
+            /// <summary>
+            /// The machine clamp rail this sheet follows, written only when it is not the
+            /// nest's default rail (otherwise the sheet re-attaches to that one on load).
+            /// Read leniently like <see cref="PlateDefaultsDto.ClampRail"/>.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientClampRailConverter))]
+            public ClampRailDto ClampRail { get; init; }
         }
 
         public record ClampZoneDto
