@@ -73,6 +73,9 @@ shows all three check categories, even when there are no findings:
   an obstacle yet. Actual uncut gaps are respected; enabling tabs in settings alone
   is not evidence that a gap exists. Clamp-rapid warnings are conservative: head
   height/retracts are not modeled, so inspect the emitted route and machine setup.
+  A clamp whose footprint covers the program start point warns on every posting
+  attempt by design; there is no exemption for the first rapid and no persisted
+  bypass (settled decision D10).
 
 Findings identify the plate and part's position in the cutting sequence. Read the
 scrollable report, cancel to fix the nest, then post again to rerun verification.
