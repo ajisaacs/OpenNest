@@ -24,20 +24,23 @@ public sealed class OverlapGeometryStamp
             entries[i] = new Entry(plate.Parts[i]);
         zones = new (string, long, long, long, long)[plate.ClampZones.Count];
         for (var i = 0; i < zones.Length; i++)
-        {
-            var zone = plate.ClampZones[i];
-            var box = zone.Bounds;
-            zones[i] = (zone.Id, Bits(box.X), Bits(box.Y), Bits(box.Length), Bits(box.Width));
-        }
+            zones[i] = ZoneState(plate.ClampZones[i]);
         cutoffs = new (CutOff, CutOffAxis, long, long, long?, long?)[plate.CutOffs.Count];
         for (var i = 0; i < cutoffs.Length; i++)
             cutoffs[i] = CutOffState(plate.CutOffs[i]);
     }
 
+    // Missing entries are malformed input the analysis itself reports; freshness must not
+    // throw first (the desktop captures it before its error boundary).
+    private static (string, long, long, long, long) ZoneState(ClampZone zone) =>
+        zone?.Bounds is not { } box ? default
+            : (zone.Id, Bits(box.X), Bits(box.Y), Bits(box.Length), Bits(box.Width));
+
     private static (CutOff, CutOffAxis, long, long, long?, long?) CutOffState(CutOff cut) =>
-        (cut, cut.Axis, Bits(cut.Position.X), Bits(cut.Position.Y),
-            cut.StartLimit.HasValue ? Bits(cut.StartLimit.Value) : null,
-            cut.EndLimit.HasValue ? Bits(cut.EndLimit.Value) : null);
+        cut == null ? default
+            : (cut, cut.Axis, Bits(cut.Position.X), Bits(cut.Position.Y),
+                cut.StartLimit.HasValue ? Bits(cut.StartLimit.Value) : null,
+                cut.EndLimit.HasValue ? Bits(cut.EndLimit.Value) : null);
 
     private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 
@@ -54,12 +57,8 @@ public sealed class OverlapGeometryStamp
             || sheet != SheetState(current))
             return false;
         for (var i = 0; i < zones.Length; i++)
-        {
-            var zone = current.ClampZones[i];
-            var box = zone.Bounds;
-            if (zones[i] != (zone.Id, Bits(box.X), Bits(box.Y), Bits(box.Length), Bits(box.Width)))
+            if (zones[i] != ZoneState(current.ClampZones[i]))
                 return false;
-        }
         return true;
     }
 

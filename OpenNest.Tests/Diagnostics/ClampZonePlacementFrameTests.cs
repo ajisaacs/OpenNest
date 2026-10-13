@@ -274,6 +274,31 @@ public class ClampZonePlacementFrameTests
     }
 
     [Fact]
+    public void FreshnessCaptureToleratesMissingCutOffsAndZones()
+    {
+        var plate = new Plate(24, 48);
+        plate.CutOffs.Add(null!);
+        plate.ClampZones.Add(null!);
+
+        var stamp = OverlapGeometryStamp.Capture(plate);
+        var state = new OverlapReportState();
+        state.Begin(plate);
+
+        Assert.True(stamp.Matches(plate));
+        // The whole-plate capture refuses the malformed input inside the desktop's error boundary.
+        Assert.Throws<ArgumentException>(() => PlateOverlapAnalyzer.CapturePlate(plate));
+        plate.CutOffs.Clear();
+        plate.CutOffs.Add(new CutOff(new Vector(5, 0), CutOffAxis.Vertical));
+        Assert.False(stamp.Matches(plate));
+        plate.CutOffs.Clear();
+        plate.CutOffs.Add(null!);
+        Assert.True(stamp.Matches(plate));
+        plate.ClampZones.Clear();
+        plate.ClampZones.Add(new ClampZone("front", new Box(10, 0, 1.5, 0.625)));
+        Assert.False(stamp.Matches(plate));
+    }
+
+    [Fact]
     public void QuadrantChangeMovesExplicitZonesAndStalesDisplayedClampFindings()
     {
         var plate = new Plate(24, 48);
