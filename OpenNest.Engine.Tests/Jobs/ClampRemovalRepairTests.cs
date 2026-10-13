@@ -279,4 +279,32 @@ public class ClampRemovalRepairTests
         Assert.Null(outcome);
         Assert.True(engine.Calls <= ClampRemovalRecovery.MaxProbeSolves, $"recovery made {engine.Calls} solves");
     }
+    // PM 60f7a673: the removal is recorded whatever the empty target sheet already holds.
+    [Theory]
+    [InlineData("reduced-explicit")] // no rail, already exactly the solved reduced zones
+    [InlineData("other-rail")]       // follows a different rail that cannot recreate them
+    public void CommittedRemovalIsRecordedOnAnyEmptyTarget(string target)
+    {
+        var drawing = new Drawing("wide", TestDrawingFactory.Rectangle(14, 3));
+        var nest = new Nest();
+        nest.Drawings.Add(drawing);
+        nest.PlateDefaults.Size = new Size(3, 23);
+        nest.PlateDefaults.EdgeSpacing = new Spacing(0, 0, 0, 0);
+        var plate = nest.CreatePlate();
+        if (target == "reduced-explicit")
+            plate.ClampZones.Add(Zones()[1]);
+        else
+            plate.SetClampRail(new ClampRail(2, 0.625, new[] { 6.0, 21.0 }));
+        using var manager = new PlateManager(nest);
+
+        var result = NestPipeline.Run(Request(Stock(), Item("wide", 14, 3, 1)));
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        var applied = Assert.Single(NestPipelineCommit.ApplyToEmptyPlates(result, manager));
+
+        Assert.Same(plate, applied);
+        Assert.Same(Rail, applied.ClampRail);
+        Assert.Equal(new[] { "clamp-1" }, applied.RemovedClamps);
+        Assert.Equal(new[] { "clamp-2" }, applied.ClampZones.Select(z => z.Id));
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, applied.ClampRemovalMinutes);
+    }
 }
