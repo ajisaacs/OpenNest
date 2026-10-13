@@ -92,16 +92,16 @@ time survive a reload; plates following the default rail omit it.
 
 An empty plate (no parts, no cut-offs) is omitted from the file unless that
 would lose clamp zones: it is omitted like any other empty plate only when a
-new plate from the saved defaults would recreate it (same size and quadrant,
-zones the saved rail recreates), which keeps the editor's trailing empty sheet
+new plate from the saved defaults would recreate it (same size, quadrant, edge
+and part spacing, zones the saved rail recreates), which keeps the editor's trailing empty sheet
 out of the file while it matches the defaults. Nest-defaults edits move only an
 untouched trailing empty, cutoff-free sheet to the new size, quadrant, edge and
 part spacing, re-resolving its rail. It must have exactly matched the old defaults
 and followed their rail with no removed clamps or explicit zones (or have had no
 rail and no zones when the defaults had none). Edited sheets, middle empty sheets,
 and sheets with parts, cut-offs, removed clamps or explicit zones are not changed.
-An empty plate with other zones, or a rail-following one whose size or quadrant
-differs from the saved defaults, is still written.
+An empty plate with other zones, or a rail-following one whose size, quadrant or
+spacing differs from the saved defaults, is still written.
 
 ## Drawing edits
 

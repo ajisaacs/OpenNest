@@ -200,8 +200,9 @@ namespace OpenNest.IO
 
         /// <summary>
         /// True when a plate created from the saved defaults would be this sheet's clamp
-        /// configuration: same size and quadrant, no last-resort removal, and zones the
-        /// saved rail recreates.
+        /// configuration: same size, quadrant, edge and part spacing, no last-resort
+        /// removal, and zones the saved rail recreates (C17: anything else is configured
+        /// stock and is written).
         /// </summary>
         private bool DefaultsRecreateClamps(Plate plate)
         {
@@ -211,6 +212,11 @@ namespace OpenNest.IO
                 && plate.Size.Width == defaults.Size.Width
                 && plate.Size.Length == defaults.Size.Length
                 && plate.Quadrant == defaults.Quadrant
+                && plate.PartSpacing == defaults.PartSpacing
+                && plate.EdgeSpacing.Left == defaults.EdgeSpacing.Left
+                && plate.EdgeSpacing.Bottom == defaults.EdgeSpacing.Bottom
+                && plate.EdgeSpacing.Right == defaults.EdgeSpacing.Right
+                && plate.EdgeSpacing.Top == defaults.EdgeSpacing.Top
                 && rail.Matches(plate);
         }
 

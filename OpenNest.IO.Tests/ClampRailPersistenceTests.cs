@@ -450,6 +450,26 @@ public class ClampRailPersistenceTests
         Assert.Null(root["plates"]![0]!["clampRail"]);
     }
 
+    // PM 455f6763 (C17): an empty rail sheet whose spacing differs from the defaults is
+    // configured stock, not the editor's sentinel, and is written.
+    [Theory]
+    [InlineData(0.5, 0.0)]
+    [InlineData(0.0, 0.125)]
+    public void EmptyRailSheetWithOtherSpacingIsKept(double partSpacing, double edge)
+    {
+        var nest = new Nest("railed");
+        nest.PlateDefaults.Size = new Size(48, 96);
+        nest.SetClampRail(Machine());
+        var plate = nest.CreatePlate();
+        plate.PartSpacing = partSpacing;
+        plate.EdgeSpacing = new Spacing(edge, edge, edge, edge);
+
+        var kept = Assert.Single(RoundTrip(nest).Plates);
+
+        Assert.Equal(partSpacing, kept.PartSpacing);
+        Assert.Equal(edge, kept.EdgeSpacing.Left);
+    }
+
     /// <summary>Removes a named property wherever it appears in the document, simulating a
     /// key an older writer never emitted. Rebuilds via <see cref="JsonNode"/> so the result
     /// is always valid JSON regardless of whether the property was first, last or only one
