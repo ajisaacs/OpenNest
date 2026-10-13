@@ -45,7 +45,8 @@ public class AutomaticCutOffFormTests
                 Assert.True(expected.HasSeparatedTail);
                 Assert.Equal($"{expected.TailLength:0.####} in", Control<Label>(form, "tailLabel").Text);
                 Assert.Contains("Ready", Control<Label>(form, "statusLabel").Text);
-                Assert.Equal("No issues detected.", Control<TextBox>(form, "diagnosticsBox").Text);
+                Assert.Contains("Notice [SegmentedCut]", Control<TextBox>(form, "diagnosticsBox").Text);
+                Assert.DoesNotContain("BLOCKING", Control<TextBox>(form, "diagnosticsBox").Text);
                 Assert.True(Control<Button>(form, "applyButton").Enabled);
             }
             Assert.Empty(PreviewParts(view));
