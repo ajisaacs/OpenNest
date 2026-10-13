@@ -20,6 +20,13 @@ internal static class ClampRemovalRecovery
     internal sealed record Outcome(NestJob Job, NestJobResult Result);
 
     /// <summary>
+    /// Most engine solves one recovery may spend on feasibility probes, independent of job,
+    /// stock and rail size. Running out abandons the recovery and keeps the ordinary result
+    /// (no clamp is removed on an unfinished search).
+    /// </summary>
+    internal const int MaxProbeSolves = 1000;
+
+    /// <summary>
     /// Null when there is nothing to recover: the job is already complete, no offered stock
     /// has any clamp, no remaining part is genuinely clamp-blocked, or removing clamps did
     /// not let anything new fit. Callers keep their original job/result unchanged in every
@@ -72,8 +79,9 @@ internal static class ClampRemovalRecovery
         // C10: only a part that fits nowhere with every clamp in place is "blocked". One
         // lane's failure is not proof: a part any built-in lane can place clamped is not.
         var lanes = FeasibilityLanes(engine);
+        var budget = new ProbeBudget(MaxProbeSolves);
         var blocked = remaining
-            .Where(x => !lanes.Any(lane => FitsAnywhere(x.Part, availableStock, job.Options, lane, token)))
+            .Where(x => !lanes.Any(lane => FitsAnywhere(x.Part, availableStock, job.Options, lane, budget, token)))
             .Select(x => x.Part)
             .ToList();
         if (blocked.Count == 0)
@@ -86,7 +94,7 @@ internal static class ClampRemovalRecovery
         foreach (var part in blocked)
         {
             token.ThrowIfCancellationRequested();
-            var best = BestRemoval(part, availableStock, job.Options, lanes, token);
+            var best = BestRemoval(part, availableStock, job.Options, lanes, budget, token);
             if (best == null)
                 continue; // Unfit even with every clamp removed: stays unplaced, as today.
             var group = groups.FirstOrDefault(g => g.Removal.Stock.Id == best.Stock.Id);
@@ -194,29 +202,56 @@ internal static class ClampRemovalRecovery
 
     private sealed record Removal(NestPlateStock Stock, string BaseStockId, IReadOnlyList<string> RemovedIds);
 
-    /// <summary>The (stock, removal) with the fewest removed clamps across every offered
-    /// rail-backed stock; ties prefer the stock listed earliest.</summary>
+    /// <summary>
+    /// The (stock, removal) with the fewest removed clamps across every offered rail-backed
+    /// stock; ties prefer the stock listed earliest, then the run nearest the origin. One
+    /// all-clamps-removed probe per stock first dismisses stock the part cannot use at all
+    /// and picks the lanes worth asking; the run search then goes size by size across the
+    /// remaining stock and stops at the first size that fits anywhere.
+    /// </summary>
     private static Removal BestRemoval(
         NestJobPart part,
         IReadOnlyList<NestPlateStock> stocks,
         NestJobOptions options,
         IReadOnlyList<INestingEngine> lanes,
+        ProbeBudget budget,
         CancellationToken token
     )
     {
-        Removal best = null;
+        var candidates = new List<(NestPlateStock Stock, List<ClampZone> Zones, List<INestingEngine> Lanes)>();
         foreach (var stock in stocks)
         {
             if (!CanRemoveClamps(stock))
                 continue;
             token.ThrowIfCancellationRequested();
-            var found = MinimalRemovalForStock(part, stock, options, lanes, token);
-            if (found == null)
-                continue;
-            if (best == null || found.RemovedIds.Count < best.RemovedIds.Count)
-                best = found;
+            // Placement-frame X is signed from the origin, so |centre X| is the distance
+            // along the edge in every quadrant.
+            var zones = stock.ClampZones
+                .OrderBy(z => System.Math.Abs(z.Bounds.X + z.Bounds.Length / 2))
+                .ToList();
+            var allRemoved = Clone(stock, stock.Id, null, zones.Select(z => z.Id).ToList());
+            var fitting = lanes.Where(lane => FitsAlone(part, allRemoved, options, lane, budget, token)).ToList();
+            if (fitting.Count > 0)
+                candidates.Add((stock, zones, fitting));
         }
-        return best;
+
+        var maxRun = candidates.Count == 0 ? 0 : candidates.Max(c => c.Zones.Count);
+        for (var run = 1; run <= maxRun; run++)
+        {
+            foreach (var (stock, zones, fitting) in candidates)
+            {
+                for (var start = 0; start + run <= zones.Count; start++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var removedIds = zones.Skip(start).Take(run).Select(z => z.Id).ToList();
+                    var candidate = Clone(stock, Suffixed(stock.Id, removedIds), null, removedIds);
+                    // Removing every clamp was already probed.
+                    if (run == zones.Count || fitting.Any(lane => FitsAlone(part, candidate, options, lane, budget, token)))
+                        return new Removal(candidate, stock.Id, removedIds);
+                }
+            }
+        }
+        return null;
     }
 
     /// <summary>Only clamps resolved from a machine rail can be removed (see
@@ -224,65 +259,36 @@ internal static class ClampRemovalRecovery
     private static bool CanRemoveClamps(NestPlateStock stock) =>
         stock.ClampRail != null && stock.ClampZones.Count > 0;
 
-    /// <summary>
-    /// Ascending run size, then ascending start index: the first contiguous run of the
-    /// stock's own clamp zones, ordered by distance from the origin along the edge, whose
-    /// removal lets the part fit alone (in any lane) is both the fewest clamps and, among
-    /// ties, the run nearest the origin.
-    /// </summary>
-    private static Removal MinimalRemovalForStock(
-        NestJobPart part,
-        NestPlateStock stock,
-        NestJobOptions options,
-        IReadOnlyList<INestingEngine> lanes,
-        CancellationToken token
-    )
-    {
-        // Placement-frame X is signed from the origin, so |centre X| is the distance along
-        // the edge in every quadrant.
-        var zones = stock.ClampZones
-            .OrderBy(z => System.Math.Abs(z.Bounds.X + z.Bounds.Length / 2))
-            .ToList();
-        for (var run = 1; run <= zones.Count; run++)
-        {
-            for (var start = 0; start + run <= zones.Count; start++)
-            {
-                token.ThrowIfCancellationRequested();
-                var removedIds = zones.Skip(start).Take(run).Select(z => z.Id).ToList();
-                var candidate = Clone(stock, Suffixed(stock.Id, removedIds), null, removedIds);
-                if (lanes.Any(lane => FitsAlone(part, candidate, options, lane, token)))
-                    return new Removal(candidate, stock.Id, removedIds);
-            }
-        }
-        return null;
-    }
-
     private static bool FitsAlone(
         NestJobPart part,
         NestPlateStock stock,
         NestJobOptions options,
         INestingEngine engine,
+        ProbeBudget budget,
         CancellationToken token
-    ) => Probe(part, new[] { stock }, options, engine, token);
+    ) => Probe(part, new[] { stock }, options, engine, budget, token);
 
     private static bool FitsAnywhere(
         NestJobPart part,
         IReadOnlyList<NestPlateStock> stocks,
         NestJobOptions options,
         INestingEngine engine,
+        ProbeBudget budget,
         CancellationToken token
-    ) => Probe(part, stocks, options, engine, token);
+    ) => Probe(part, stocks, options, engine, budget, token);
 
     /// <summary>Whether this part, alone and at quantity one, places on an empty sheet of any
-    /// of the given stock entries with the given engine.</summary>
+    /// of the given stock entries with the given engine. Spends one probe from the budget.</summary>
     private static bool Probe(
         NestJobPart part,
         IReadOnlyList<NestPlateStock> stocks,
         NestJobOptions options,
         INestingEngine engine,
+        ProbeBudget budget,
         CancellationToken token
     )
     {
+        budget.Spend();
         var probePart = new NestJobPart(part.Id, part.Geometry, 1, part.Priority, part.Rotation);
         var probeStock = stocks.Select(s => Unlimited(s)).ToList();
         var probeOptions = new NestJobOptions(options.PlacementStrategy, 1, 0, 0);
@@ -291,6 +297,22 @@ internal static class ClampRemovalRecovery
         var result = engine.Solve(probeJob, null, token);
         return result != null && result.Status == NestJobStatus.Complete;
     }
+
+    private sealed class ProbeBudget(int solves)
+    {
+        private int left = solves;
+
+        /// <summary>Throws <see cref="ProbeBudgetExhaustedException"/> once spent; recovery
+        /// then keeps the ordinary result.</summary>
+        public void Spend()
+        {
+            if (left-- <= 0)
+                throw new ProbeBudgetExhaustedException();
+        }
+    }
+
+    private sealed class ProbeBudgetExhaustedException()
+        : Exception("Clamp removal recovery ran out of feasibility probes.");
 
     /// <summary>Same stock with unlimited quantity (feasibility probes never consume real
     /// inventory); id/zones unchanged.</summary>

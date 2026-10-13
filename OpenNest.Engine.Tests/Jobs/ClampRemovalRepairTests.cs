@@ -219,4 +219,64 @@ public class ClampRemovalRepairTests
         Assert.Equal(1, result.Job.Plates.Sum(s => s.Quantity ?? int.MaxValue));
         Assert.All(result.Raw.StockUsage, u => Assert.True(u.Remaining is null or >= 0));
     }
+    /// <summary>Never places anything; counts how often recovery asks it to.</summary>
+    private sealed class CountingNoFitEngine : INestingEngine
+    {
+        public int Calls;
+
+        public NestJobResult Solve(NestJob job, IProgress<NestJobProgress> progress = null,
+            CancellationToken token = default)
+        {
+            Calls++;
+            return new NestJobResult(NestJobStatus.Incomplete, NestJobStopReason.NoPlacementFound,
+                Array.Empty<NestJobPlateResult>(),
+                job.Parts.Select(p => new PartFulfillment(p.Id, p.Quantity, 0, p.Quantity)).ToList(),
+                job.Plates.Select(s => new StockUsage(s.Id, 0, s.Quantity)).ToList());
+        }
+    }
+
+    private static NestPlateStock WideRailStock(string id, ClampRail rail)
+    {
+        var size = new Size(3, 23);
+        return new NestPlateStock(id, size, null, 0, default, 1, null, rail.ResolveFor(size, 1)) { ClampRail = rail };
+    }
+
+    // PM 0e655fdb: parts that cannot fit even with every clamp removed are dismissed by one
+    // all-clamps-removed probe per stock instead of a search over every clamp run.
+    [Fact]
+    public void PartsThatNeverFitAreDismissedWithoutSearchingClampRuns()
+    {
+        var rail = new ClampRail(0.5, 0.625, Enumerable.Range(0, 20).Select(i => 0.5 + i * 1.1));
+        var stocks = Enumerable.Range(0, 4).Select(i => WideRailStock($"option-{i}", rail)).ToArray();
+        var parts = Enumerable.Range(0, 25).Select(i => JobBuilder.Rectangle($"p{i}", w: 30, h: 3, count: 1)).ToArray();
+        var job = new NestJob(parts, stocks);
+        var engine = new CountingNoFitEngine();
+        var raw = engine.Solve(job);
+        engine.Calls = 0;
+
+        var outcome = ClampRemovalRecovery.TryRecover(job, raw, engine, default);
+
+        Assert.Null(outcome);
+        // One feasibility probe per part plus one all-clamps-removed probe per part and stock.
+        Assert.True(engine.Calls <= 25 + 25 * 4, $"recovery made {engine.Calls} solves");
+    }
+
+    // PM 0e655fdb: the search has a fixed budget; running out keeps the ordinary result.
+    [Fact]
+    public void RecoveryStopsAtItsProbeBudget()
+    {
+        // 23-wide parts fit only with all 20 clamps off: every smaller run is probed first.
+        var rail = new ClampRail(0.5, 0.625, Enumerable.Range(0, 20).Select(i => 0.5 + i * 1.1));
+        var stocks = Enumerable.Range(0, 4).Select(i => WideRailStock($"option-{i}", rail)).ToArray();
+        var parts = Enumerable.Range(0, 25).Select(i => JobBuilder.Rectangle($"p{i}", w: 23, h: 3, count: 1)).ToArray();
+        var job = new NestJob(parts, stocks);
+        var engine = new CountingNoFitEngine();
+        var raw = engine.Solve(job);
+        engine.Calls = 0;
+
+        var outcome = ClampRemovalRecovery.TryRecover(job, raw, engine, default);
+
+        Assert.Null(outcome);
+        Assert.True(engine.Calls <= ClampRemovalRecovery.MaxProbeSolves, $"recovery made {engine.Calls} solves");
+    }
 }
