@@ -19,6 +19,7 @@ partial class AutomaticCutOffForm
 
     private void InitializeComponent()
     {
+        components = new System.ComponentModel.Container();
         layout = new TableLayoutPanel();
         sheetLabel = new Label();
         spacingPanel = new TableLayoutPanel();
@@ -26,11 +27,25 @@ partial class AutomaticCutOffForm
         spacingBox = new TextBox();
         minimumTailLabel = new Label();
         minimumTailBox = new TextBox();
-        warningLabel = new Label();
+        statusLabel = new Label();
+        metricsPanel = new TableLayoutPanel();
+        occupiedCaption = new Label();
+        usedCaption = new Label();
+        separatorCaption = new Label();
+        tailCaption = new Label();
         occupiedLabel = new Label();
         usedLabel = new Label();
         separatorLabel = new Label();
         tailLabel = new Label();
+        warningLabel = new Label();
+        toolTip = new ToolTip(components);
+        plateGrid = new ListView();
+        plateColumn = new ColumnHeader();
+        cutoffsColumn = new ColumnHeader();
+        occupiedColumn = new ColumnHeader();
+        usedColumn = new ColumnHeader();
+        tailColumn = new ColumnHeader();
+        statusColumn = new ColumnHeader();
         diagnosticsLabel = new Label();
         diagnosticsBox = new TextBox();
         buttonsPanel = new FlowLayoutPanel();
@@ -39,6 +54,7 @@ partial class AutomaticCutOffForm
         cancelButton = new Button();
         layout.SuspendLayout();
         spacingPanel.SuspendLayout();
+        metricsPanel.SuspendLayout();
         buttonsPanel.SuspendLayout();
         SuspendLayout();
         //
@@ -48,24 +64,23 @@ partial class AutomaticCutOffForm
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         layout.Controls.Add(sheetLabel, 0, 0);
         layout.Controls.Add(spacingPanel, 0, 1);
-        layout.Controls.Add(warningLabel, 0, 2);
-        layout.Controls.Add(occupiedLabel, 0, 3);
-        layout.Controls.Add(usedLabel, 0, 4);
-        layout.Controls.Add(separatorLabel, 0, 5);
-        layout.Controls.Add(tailLabel, 0, 6);
-        layout.Controls.Add(diagnosticsLabel, 0, 7);
-        layout.Controls.Add(diagnosticsBox, 0, 8);
-        layout.Controls.Add(buttonsPanel, 0, 9);
+        layout.Controls.Add(statusLabel, 0, 2);
+        layout.Controls.Add(metricsPanel, 0, 3);
+        layout.Controls.Add(warningLabel, 0, 4);
+        layout.Controls.Add(plateGrid, 0, 5);
+        layout.Controls.Add(diagnosticsLabel, 0, 6);
+        layout.Controls.Add(diagnosticsBox, 0, 7);
+        layout.Controls.Add(buttonsPanel, 0, 8);
         layout.Dock = DockStyle.Fill;
         layout.Name = "layout";
-        layout.RowCount = 10;
+        layout.RowCount = 9;
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        plateGridRow = new RowStyle(SizeType.Absolute, 112F);
+        layout.RowStyles.Add(plateGridRow);
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -128,59 +143,149 @@ partial class AutomaticCutOffForm
         minimumTailBox.TabIndex = 3;
         minimumTailBox.TextChanged += SettingsBox_TextChanged;
         //
+        // statusLabel
+        //
+        statusLabel.AutoSize = true;
+        statusLabel.Dock = DockStyle.Fill;
+        statusLabel.Font = new Font("Segoe UI", 11.25F, FontStyle.Bold, GraphicsUnit.Point);
+        statusLabel.Margin = new Padding(3, 0, 3, 8);
+        statusLabel.Name = "statusLabel";
+        statusLabel.TabIndex = 2;
+        statusLabel.Text = "Preparing preview…";
+        //
+        // metricsPanel
+        //
+        metricsPanel.AutoSize = true;
+        metricsPanel.ColumnCount = 4;
+        metricsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+        metricsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+        metricsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+        metricsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+        metricsPanel.Controls.Add(occupiedCaption, 0, 0);
+        metricsPanel.Controls.Add(usedCaption, 1, 0);
+        metricsPanel.Controls.Add(separatorCaption, 2, 0);
+        metricsPanel.Controls.Add(tailCaption, 3, 0);
+        metricsPanel.Controls.Add(occupiedLabel, 0, 1);
+        metricsPanel.Controls.Add(usedLabel, 1, 1);
+        metricsPanel.Controls.Add(separatorLabel, 2, 1);
+        metricsPanel.Controls.Add(tailLabel, 3, 1);
+        metricsPanel.Dock = DockStyle.Fill;
+        metricsPanel.Margin = new Padding(0, 0, 0, 6);
+        metricsPanel.Name = "metricsPanel";
+        metricsPanel.RowCount = 2;
+        metricsPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        metricsPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        metricsPanel.TabIndex = 3;
+        //
+        // metric captions
+        //
+        occupiedCaption.AutoSize = true;
+        occupiedCaption.Dock = DockStyle.Fill;
+        occupiedCaption.ForeColor = SystemColors.GrayText;
+        occupiedCaption.Margin = new Padding(3, 0, 6, 0);
+        occupiedCaption.Name = "occupiedCaption";
+        occupiedCaption.Text = "Occupied span";
+        usedCaption.AutoSize = true;
+        usedCaption.Dock = DockStyle.Fill;
+        usedCaption.ForeColor = SystemColors.GrayText;
+        usedCaption.Margin = new Padding(3, 0, 6, 0);
+        usedCaption.Name = "usedCaption";
+        usedCaption.Text = "Used span";
+        separatorCaption.AutoSize = true;
+        separatorCaption.Dock = DockStyle.Fill;
+        separatorCaption.ForeColor = SystemColors.GrayText;
+        separatorCaption.Margin = new Padding(3, 0, 6, 0);
+        separatorCaption.Name = "separatorCaption";
+        separatorCaption.Text = "Separator X";
+        tailCaption.AutoSize = true;
+        tailCaption.Dock = DockStyle.Fill;
+        tailCaption.ForeColor = SystemColors.GrayText;
+        tailCaption.Margin = new Padding(3, 0, 3, 0);
+        tailCaption.Name = "tailCaption";
+        tailCaption.Text = "Retained tail";
+        //
+        // metric values
+        //
+        var valueFont = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point);
+        occupiedLabel.AutoSize = true;
+        occupiedLabel.Dock = DockStyle.Fill;
+        occupiedLabel.Font = valueFont;
+        occupiedLabel.Margin = new Padding(3, 0, 6, 0);
+        occupiedLabel.Name = "occupiedLabel";
+        occupiedLabel.Text = "—";
+        usedLabel.AutoSize = true;
+        usedLabel.Dock = DockStyle.Fill;
+        usedLabel.Font = valueFont;
+        usedLabel.Margin = new Padding(3, 0, 6, 0);
+        usedLabel.Name = "usedLabel";
+        usedLabel.Text = "—";
+        separatorLabel.AutoSize = true;
+        separatorLabel.Dock = DockStyle.Fill;
+        separatorLabel.Font = valueFont;
+        separatorLabel.Margin = new Padding(3, 0, 6, 0);
+        separatorLabel.Name = "separatorLabel";
+        separatorLabel.Text = "—";
+        tailLabel.AutoSize = true;
+        tailLabel.Dock = DockStyle.Fill;
+        tailLabel.Font = valueFont;
+        tailLabel.Margin = new Padding(3, 0, 3, 0);
+        tailLabel.Name = "tailLabel";
+        tailLabel.Text = "—";
+        //
         // warningLabel
         //
         warningLabel.AutoSize = true;
         warningLabel.Dock = DockStyle.Fill;
-        warningLabel.Margin = new Padding(3, 3, 3, 10);
+        warningLabel.ForeColor = WarningColor;
+        warningLabel.Margin = new Padding(3, 0, 3, 8);
         warningLabel.Name = "warningLabel";
-        warningLabel.TabIndex = 2;
-        warningLabel.Text = "Nominal spacing differs from cut-line length. Clearances and omitted segments can leave bridges. "
-            + "Confirm disconnected scrap and hopper fit before relying on it. Tail dimensions describe a proposed program; verify the physical separation.";
+        warningLabel.TabIndex = 4;
+        warningLabel.Text = "⚠ Nominal spacing is not the cut-line length — verify scrap separation and hopper fit.";
+        toolTip.SetToolTip(warningLabel,
+            "Nominal spacing differs from cut-line length. Clearances and omitted segments can leave bridges. "
+            + "Confirm disconnected scrap and hopper fit before relying on it. Tail dimensions describe a proposed "
+            + "program; verify the physical separation.");
+        toolTip.SetToolTip(occupiedCaption, "Distance from the sheet origin to the furthest real material.");
+        toolTip.SetToolTip(usedCaption, "Span through the proposed used area, from the sheet origin.");
+        toolTip.SetToolTip(separatorCaption,
+            "Signed X of the verified separator cut. A negative value means the separator is on the origin side.");
+        toolTip.SetToolTip(tailCaption,
+            "Length along X of the reusable tail beyond the verified separator, at full sheet width.");
         //
-        // occupiedLabel
+        // plateGrid
         //
-        occupiedLabel.AutoSize = true;
-        occupiedLabel.Dock = DockStyle.Fill;
-        occupiedLabel.Margin = new Padding(3, 3, 3, 5);
-        occupiedLabel.Name = "occupiedLabel";
-        occupiedLabel.TabIndex = 3;
-        occupiedLabel.Text = "Occupied span from origin: —";
-        //
-        // usedLabel
-        //
-        usedLabel.AutoSize = true;
-        usedLabel.Dock = DockStyle.Fill;
-        usedLabel.Margin = new Padding(3, 3, 3, 5);
-        usedLabel.Name = "usedLabel";
-        usedLabel.TabIndex = 4;
-        usedLabel.Text = "Proposed used span from origin: —";
-        //
-        // separatorLabel
-        //
-        separatorLabel.AutoSize = true;
-        separatorLabel.Dock = DockStyle.Fill;
-        separatorLabel.Margin = new Padding(3, 3, 3, 5);
-        separatorLabel.Name = "separatorLabel";
-        separatorLabel.TabIndex = 5;
-        separatorLabel.Text = "Verified separator program: —";
-        //
-        // tailLabel
-        //
-        tailLabel.AutoSize = true;
-        tailLabel.Dock = DockStyle.Fill;
-        tailLabel.Margin = new Padding(3, 3, 3, 8);
-        tailLabel.Name = "tailLabel";
-        tailLabel.TabIndex = 6;
-        tailLabel.Text = "Proposed retained tail: —";
+        plateGrid.Columns.AddRange(new ColumnHeader[] {
+            plateColumn, cutoffsColumn, occupiedColumn, usedColumn, tailColumn, statusColumn });
+        plateGrid.Dock = DockStyle.Fill;
+        plateGrid.FullRowSelect = true;
+        plateGrid.GridLines = true;
+        plateGrid.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+        plateGrid.HideSelection = false;
+        plateGrid.MultiSelect = false;
+        plateGrid.Name = "plateGrid";
+        plateGrid.TabIndex = 5;
+        plateGrid.UseCompatibleStateImageBehavior = false;
+        plateGrid.View = View.Details;
+        plateColumn.Text = "Plate";
+        plateColumn.Width = 80;
+        cutoffsColumn.Text = "Cut-offs";
+        cutoffsColumn.Width = 65;
+        occupiedColumn.Text = "Occupied";
+        occupiedColumn.Width = 90;
+        usedColumn.Text = "Used";
+        usedColumn.Width = 90;
+        tailColumn.Text = "Tail";
+        tailColumn.Width = 90;
+        statusColumn.Text = "Status";
+        statusColumn.Width = 150;
         //
         // diagnosticsLabel
         //
         diagnosticsLabel.AutoSize = true;
         diagnosticsLabel.Dock = DockStyle.Fill;
         diagnosticsLabel.Name = "diagnosticsLabel";
-        diagnosticsLabel.TabIndex = 7;
-        diagnosticsLabel.Text = "Diagnostics / plan status:";
+        diagnosticsLabel.TabIndex = 6;
+        diagnosticsLabel.Text = "Details — issues and notices:";
         //
         // diagnosticsBox
         //
@@ -189,7 +294,7 @@ partial class AutomaticCutOffForm
         diagnosticsBox.Name = "diagnosticsBox";
         diagnosticsBox.ReadOnly = true;
         diagnosticsBox.ScrollBars = ScrollBars.Vertical;
-        diagnosticsBox.TabIndex = 8;
+        diagnosticsBox.TabIndex = 7;
         //
         // buttonsPanel
         //
@@ -201,7 +306,7 @@ partial class AutomaticCutOffForm
         buttonsPanel.FlowDirection = FlowDirection.RightToLeft;
         buttonsPanel.Margin = new Padding(0, 8, 0, 0);
         buttonsPanel.Name = "buttonsPanel";
-        buttonsPanel.TabIndex = 9;
+        buttonsPanel.TabIndex = 8;
         buttonsPanel.WrapContents = false;
         //
         // previewButton
@@ -241,7 +346,7 @@ partial class AutomaticCutOffForm
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
         CancelButton = cancelButton;
-        ClientSize = new Size(660, 520);
+        ClientSize = new Size(660, 560);
         Controls.Add(layout);
         Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -257,23 +362,40 @@ partial class AutomaticCutOffForm
         layout.PerformLayout();
         spacingPanel.ResumeLayout(false);
         spacingPanel.PerformLayout();
+        metricsPanel.ResumeLayout(false);
+        metricsPanel.PerformLayout();
         buttonsPanel.ResumeLayout(false);
         buttonsPanel.PerformLayout();
         ResumeLayout(false);
     }
 
     private TableLayoutPanel layout;
+    private RowStyle plateGridRow;
     private Label sheetLabel;
     private TableLayoutPanel spacingPanel;
     private Label spacingLabel;
     private TextBox spacingBox;
     private Label minimumTailLabel;
     private TextBox minimumTailBox;
-    private Label warningLabel;
+    private Label statusLabel;
+    private TableLayoutPanel metricsPanel;
+    private Label occupiedCaption;
+    private Label usedCaption;
+    private Label separatorCaption;
+    private Label tailCaption;
     private Label occupiedLabel;
     private Label usedLabel;
     private Label separatorLabel;
     private Label tailLabel;
+    private Label warningLabel;
+    private ToolTip toolTip;
+    private ListView plateGrid;
+    private ColumnHeader plateColumn;
+    private ColumnHeader cutoffsColumn;
+    private ColumnHeader occupiedColumn;
+    private ColumnHeader usedColumn;
+    private ColumnHeader tailColumn;
+    private ColumnHeader statusColumn;
     private Label diagnosticsLabel;
     private TextBox diagnosticsBox;
     private FlowLayoutPanel buttonsPanel;

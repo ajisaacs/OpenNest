@@ -35,11 +35,17 @@ public class AutomaticCutOffFormTests
             var originalParts = view.Plate.Parts.ToArray();
             using (var form = new AutomaticCutOffForm(view, Units.Inches))
             {
+                Assert.False(Control<ListView>(form, "plateGrid").Visible);
                 Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
                 Assert.NotEmpty(PreviewParts(view));
                 Assert.Empty(view.Plate.CutOffs);
                 Assert.Equal(originalParts, view.Plate.Parts.ToArray());
-                Assert.Contains("36 in width", Control<Label>(form, "tailLabel").Text);
+                var expected = AutomaticCutOffPlanner.Create(view.Plate,
+                    new AutomaticCutOffOptions { Spacing = 35, MinimumTailLength = 12 }, view.CutOffSettings);
+                Assert.True(expected.HasSeparatedTail);
+                Assert.Equal($"{expected.TailLength:0.####} in", Control<Label>(form, "tailLabel").Text);
+                Assert.Contains("Ready", Control<Label>(form, "statusLabel").Text);
+                Assert.Equal("No issues detected.", Control<TextBox>(form, "diagnosticsBox").Text);
                 Assert.True(Control<Button>(form, "applyButton").Enabled);
             }
             Assert.Empty(PreviewParts(view));
@@ -137,6 +143,7 @@ public class AutomaticCutOffFormTests
             Assert.Empty(PreviewParts(view));
             Assert.False(Control<Button>(form, "applyButton").Enabled);
             Assert.Contains("BLOCKING", Control<TextBox>(form, "diagnosticsBox").Text);
+            Assert.Contains("Blocked", Control<Label>(form, "statusLabel").Text);
         });
     }
 
@@ -152,7 +159,8 @@ public class AutomaticCutOffFormTests
             Assert.NotEqual(DialogResult.OK, form.DialogResult);
             Assert.Empty(view.Plate.CutOffs);
             Assert.Empty(view.Plate.Parts);
-            Assert.Contains("No new usable", Control<TextBox>(form, "diagnosticsBox").Text);
+            Assert.Contains("No new cut-offs", Control<Label>(form, "statusLabel").Text);
+            Assert.Equal("No issues detected.", Control<TextBox>(form, "diagnosticsBox").Text);
             Assert.False(Control<Button>(form, "applyButton").Enabled);
         });
     }
@@ -209,8 +217,18 @@ public class AutomaticCutOffFormTests
             using var form = new AutomaticCutOffForm(view, nest);
             Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
             Assert.Contains("All 3 plates", Control<Label>(form, "sheetLabel").Text);
-            Assert.Contains("Plate 2", Control<TextBox>(form, "diagnosticsBox").Text);
-            Assert.Contains("Plate 3", Control<TextBox>(form, "diagnosticsBox").Text);
+            var grid = Control<ListView>(form, "plateGrid");
+            Assert.Equal(3, grid.Items.Count);
+            Assert.Equal("1 (active)", grid.Items[0].Text);
+            Assert.Equal("2", grid.Items[1].Text);
+            Assert.Equal("3", grid.Items[2].Text);
+            Assert.Equal("Ready", grid.Items[0].SubItems[5].Text);
+            Assert.Equal("Ready", grid.Items[1].SubItems[5].Text);
+            Assert.Equal("No change", grid.Items[2].SubItems[5].Text);
+            Assert.Equal("—", grid.Items[2].SubItems[1].Text);
+            Assert.Contains("Ready", Control<Label>(form, "statusLabel").Text);
+            Assert.Contains("across 2 of 3 plates", Control<Label>(form, "statusLabel").Text);
+            Assert.DoesNotContain("BLOCKING", Control<TextBox>(form, "diagnosticsBox").Text);
             Assert.NotEmpty(PreviewParts(view));
             Assert.All(nest.Plates, p => Assert.Empty(p.CutOffs));
 
@@ -247,6 +265,10 @@ public class AutomaticCutOffFormTests
             Assert.False(Control<Button>(form, "applyButton").Enabled);
             Assert.Contains("Plate 2", Control<TextBox>(form, "diagnosticsBox").Text);
             Assert.Contains("BLOCKING", Control<TextBox>(form, "diagnosticsBox").Text);
+            Assert.Contains("Blocked", Control<Label>(form, "statusLabel").Text);
+            var grid = Control<ListView>(form, "plateGrid");
+            Assert.Equal("Ready", grid.Items[0].SubItems[5].Text);
+            Assert.Equal("Blocked", grid.Items[1].SubItems[5].Text);
             Assert.Empty(PreviewParts(view));
         });
     }

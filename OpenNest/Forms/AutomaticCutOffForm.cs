@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
@@ -9,6 +10,11 @@ namespace OpenNest.Forms;
 
 public partial class AutomaticCutOffForm : Form
 {
+    private static readonly Color ReadyColor = Color.FromArgb(0, 102, 0);
+    private static readonly Color BlockedColor = Color.FromArgb(192, 0, 0);
+    private static readonly Color NeutralColor = SystemColors.ControlText;
+    internal static readonly Color WarningColor = Color.FromArgb(120, 70, 0);
+
     private readonly PlateView plateView;
     private readonly Plate plate;
     private readonly Nest nest;
@@ -39,6 +45,12 @@ public partial class AutomaticCutOffForm : Form
             Text = "Automatic Scrap Cutoffs — All Plates";
             applyButton.Text = "&Apply to All Plates";
             sheetLabel.Text = $"All {nest.Plates.Count} plates — active sheet shown below";
+            diagnosticsLabel.Text = "Details — issues and notices (the table above lists every plate):";
+        }
+        else
+        {
+            plateGrid.Visible = false;
+            plateGridRow.Height = 0F;
         }
     }
 
@@ -89,68 +101,102 @@ public partial class AutomaticCutOffForm : Form
         return (plates, plans);
     }
 
-    private IEnumerable<string> Diagnostics(AutomaticCutOffPlan plan) => plan.Diagnostics.Select(d =>
-        $"{(d.IsBlocking ? "BLOCKING" : "Notice")} [{d.Code}]"
-        + (d.X.HasValue ? $" X = {SignedPosition(d.X.Value)}" : string.Empty)
-        + $": {d.Message}");
+    private string DiagnosticLine(AutomaticCutOffPlan plan) => string.Join(Environment.NewLine,
+        plan.Diagnostics.Select(d =>
+            $"{(d.IsBlocking ? "BLOCKING" : "Notice")} [{d.Code}]"
+            + (d.X.HasValue ? $" X = {SignedPosition(d.X.Value)}" : string.Empty)
+            + $": {d.Message}"));
 
-    private static string PlanStatus(AutomaticCutOffPlan plan) => plan.HasBlockingDiagnostics
-        ? "Blocked: resolve the diagnostics before applying."
-        : plan.Definitions.Count == 0
-            ? "No new usable cut-offs to apply."
-            : $"{plan.Definitions.Count} new cut-off definition(s) ready to apply.";
+    private void SetStatus(string message, Color color)
+    {
+        statusLabel.Text = message;
+        statusLabel.ForeColor = color;
+    }
 
     private void DisplayPlans(Plate[] plates, IReadOnlyList<AutomaticCutOffPlan> plans)
     {
         var currentIndex = Array.IndexOf(plates, plate);
         var plan = plans[currentIndex];
-        occupiedLabel.Text = $"Occupied span from origin: {Measure(plan.OccupiedSpan)}";
-        usedLabel.Text = $"Proposed used span from origin: {Measure(plan.UsedSpan)}";
-        separatorLabel.Text = plan.HasSeparatedTail
-            ? $"Verified separator program at signed X: {SignedPosition(plan.TailSeparatorX.Value)}"
-            : "Verified separator program: none";
-        tailLabel.Text = plan.HasSeparatedTail
-            ? $"Proposed retained tail: {Measure(plan.TailLength)} length × {Measure(plate.Size.Width)} width"
-            : "Proposed retained tail: none verified";
+        occupiedLabel.Text = Measure(plan.OccupiedSpan);
+        usedLabel.Text = Measure(plan.UsedSpan);
+        separatorLabel.Text = plan.HasSeparatedTail ? SignedPosition(plan.TailSeparatorX.Value) : "none";
+        tailLabel.Text = plan.HasSeparatedTail ? Measure(plan.TailLength) : "none";
 
         var blocked = plans.Any(p => p.HasBlockingDiagnostics);
         var definitionCount = plans.Sum(p => p.Definitions.Count);
         applyButton.Enabled = !blocked && definitionCount > 0;
-        if (nest == null)
+
+        var issues = new List<string>();
+        for (var index = 0; index < plans.Count; index++)
         {
-            diagnosticsBox.Text = string.Join(Environment.NewLine + Environment.NewLine,
-                new[] { PlanStatus(plan) }.Concat(Diagnostics(plan)));
-            return;
+            var lines = DiagnosticLine(plans[index]);
+            if (lines.Length == 0)
+                continue;
+            issues.Add(nest == null ? lines : $"Plate {index + 1}: {lines}");
+        }
+        diagnosticsBox.Text = issues.Count == 0 ? "No issues detected." : string.Join(Environment.NewLine, issues);
+
+        if (blocked)
+        {
+            var issueCount = plans.Sum(p => p.Diagnostics.Count(d => d.IsBlocking));
+            SetStatus($"Blocked — {issueCount} blocking issue{(issueCount == 1 ? "" : "s")}; nothing will be applied.", BlockedColor);
+        }
+        else if (definitionCount == 0)
+        {
+            SetStatus("No new cut-offs to apply.", NeutralColor);
+        }
+        else if (nest == null)
+        {
+            SetStatus($"Ready — {definitionCount} new cut-off{(definitionCount == 1 ? "" : "s")} will be added.", ReadyColor);
+        }
+        else
+        {
+            var touched = plans.Count(p => p.Definitions.Count > 0);
+            SetStatus($"Ready — {definitionCount} cut-off{(definitionCount == 1 ? "" : "s")} across {touched} of {plans.Count} plates. Unchanged plates stay untouched.", ReadyColor);
         }
 
-        sheetLabel.Text = $"All {plates.Length} plates — active plate {currentIndex + 1}: "
-            + $"{Measure(plate.Size.Length)} length × {Measure(plate.Size.Width)} width";
-        var status = blocked
-            ? "BLOCKED: no plates will be changed until every blocking issue is resolved."
-            : $"{definitionCount} new cut-off definition(s) across {plans.Count(p => p.Definitions.Count > 0)} plate(s). "
-                + "Empty/unchanged plates will be left untouched.";
-        var summaries = plans.Select((p, index) =>
+        if (nest == null)
+            return;
+
+        sheetLabel.Text = $"All {plates.Length} plates — preview shows plate {currentIndex + 1} "
+            + $"({Measure(plate.Size.Length)} length × {Measure(plate.Size.Width)} width)";
+        FillPlateGrid(plans, currentIndex);
+    }
+
+    private void FillPlateGrid(IReadOnlyList<AutomaticCutOffPlan> plans, int activeIndex)
+    {
+        plateGrid.BeginUpdate();
+        plateGrid.Items.Clear();
+        for (var index = 0; index < plans.Count; index++)
         {
-            var sheet = plates[index];
-            var tail = p.HasSeparatedTail
-                ? $"Retained tail: {Measure(p.TailLength)} length × {Measure(sheet.Size.Width)} width; "
-                    + $"separator X = {SignedPosition(p.TailSeparatorX.Value)}."
-                : "Retained tail: none verified.";
-            return string.Join(Environment.NewLine, new[]
-            {
-                $"Plate {index + 1} ({Measure(sheet.Size.Length)} length × {Measure(sheet.Size.Width)} width): {PlanStatus(p)}",
-                $"Occupied: {Measure(p.OccupiedSpan)}; used span: {Measure(p.UsedSpan)}. {tail}",
-            }.Concat(Diagnostics(p)));
-        });
-        diagnosticsBox.Text = string.Join(Environment.NewLine + Environment.NewLine, new[] { status }.Concat(summaries));
+            var plan = plans[index];
+            var label = (index + 1).ToString(CultureInfo.CurrentCulture);
+            if (index == activeIndex)
+                label += " (active)";
+            var row = new ListViewItem(label);
+            row.SubItems.Add(plan.Definitions.Count == 0 ? "—" : plan.Definitions.Count.ToString(CultureInfo.CurrentCulture));
+            row.SubItems.Add(Measure(plan.OccupiedSpan));
+            row.SubItems.Add(Measure(plan.UsedSpan));
+            row.SubItems.Add(plan.HasSeparatedTail ? Measure(plan.TailLength) : "—");
+            row.SubItems.Add(plan.HasBlockingDiagnostics ? "Blocked" : plan.Definitions.Count > 0 ? "Ready" : "No change");
+            if (plan.HasBlockingDiagnostics)
+                row.ForeColor = BlockedColor;
+            else if (plan.Definitions.Count > 0)
+                row.ForeColor = ReadyColor;
+            else
+                row.ForeColor = SystemColors.GrayText;
+            plateGrid.Items.Add(row);
+        }
+        plateGrid.EndUpdate();
     }
 
     private void ResetSummary()
     {
-        occupiedLabel.Text = "Occupied span from origin: —";
-        usedLabel.Text = "Proposed used span from origin: —";
-        separatorLabel.Text = "Verified separator program: —";
-        tailLabel.Text = "Proposed retained tail: —";
+        occupiedLabel.Text = "—";
+        usedLabel.Text = "—";
+        separatorLabel.Text = "—";
+        tailLabel.Text = "—";
+        plateGrid.Items.Clear();
     }
 
     private void ShowError(Exception error)
@@ -158,14 +204,16 @@ public partial class AutomaticCutOffForm : Form
         ClearPreview();
         ResetSummary();
         applyButton.Enabled = false;
-        diagnosticsBox.Text = $"Unable to complete the cut-off operation: {error.Message}";
+        SetStatus($"Error — {error.Message}", BlockedColor);
+        diagnosticsBox.Text = error.Message;
     }
 
     private void SettingsBox_TextChanged(object sender, EventArgs e)
     {
         ClearPreview();
         ResetSummary();
-        diagnosticsBox.Text = "Settings changed. Preview or Apply will calculate a fresh plan.";
+        SetStatus("Settings changed — press Preview.", NeutralColor);
+        diagnosticsBox.Text = string.Empty;
         applyButton.Enabled = true;
     }
 
