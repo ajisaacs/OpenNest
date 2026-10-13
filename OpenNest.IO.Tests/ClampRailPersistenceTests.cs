@@ -470,6 +470,22 @@ public class ClampRailPersistenceTests
         Assert.Equal(edge, kept.EdgeSpacing.Left);
     }
 
+    // Delta review: a sheet whose rail differs from the defaults only in removal time is
+    // configured stock too (ChangePlateDefaults leaves it alone) and must be written.
+    [Fact]
+    public void EmptySheetOnARailWithOtherRemovalTimeIsKept()
+    {
+        var nest = new Nest("railed");
+        nest.PlateDefaults.Size = new Size(48, 96);
+        nest.SetClampRail(Machine());
+        var plate = nest.CreatePlate();
+        plate.SetClampRail(new ClampRail(1.5, 0.625, MachineCenters, removalMinutes: 7));
+
+        var kept = Assert.Single(RoundTrip(nest).Plates);
+
+        Assert.Equal(7, kept.ClampRail.RemovalMinutes);
+    }
+
     /// <summary>Removes a named property wherever it appears in the document, simulating a
     /// key an older writer never emitted. Rebuilds via <see cref="JsonNode"/> so the result
     /// is always valid JSON regardless of whether the property was first, last or only one
