@@ -480,6 +480,63 @@ public class ExpanderTests
     }
 
     [Fact]
+    public void Separate_TouchingHoleWall_UsesOppositeDirectionToOpenGap()
+    {
+        var plate = MakePlate(40, 24, edge: 0);
+        var host = new Part(new Drawing("host", RectangleWithHole(20, 20, 5, 5, 10, 10)), new Vector(0, 0));
+        plate.Parts.Add(host);
+        var insert = AddSquare(plate, 13, 9, 2);
+
+        var (converged, poses, violations) = Expander.Separate(
+            new List<Part> { insert }, plate, spacing: 1
+        );
+        Assert.True(converged, $"contact still blocked: {violations.Count}");
+        Assert.True(poses[0].X <= 12 + 1e-4, $"insert at x={poses[0].X}");
+        Assert.True(poses[0].X >= 5 + 1 - 1e-4);
+        Assert.Equal(13, insert.Location.X);
+        Assert.Equal(0, host.Location.X);
+    }
+
+    [Theory]
+    [InlineData(13, 9)]
+    [InlineData(5, 9)]
+    [InlineData(9, 13)]
+    [InlineData(9, 5)]
+    [InlineData(12.9, 9)] // Positive gap uses its ordinary nearest-boundary direction.
+    public void Separate_FourHoleSides_ReachARealUnitGap(double x, double y)
+    {
+        var plate = MakePlate(40, 24, edge: 0);
+        var host = new Part(new Drawing("host", RectangleWithHole(20, 20, 5, 5, 10, 10)), Vector.Zero);
+        plate.Parts.Add(host);
+        var insert = AddSquare(plate, x, y, 2);
+
+        var (converged, poses, violations) = Expander.Separate(new List<Part> { insert }, plate, 1);
+        Assert.True(converged, $"{x},{y}: {violations.Count} violations");
+        Assert.InRange(poses[0].X, 6 - 1e-4, 12 + 1e-4);
+        Assert.InRange(poses[0].Y, 6 - 1e-4, 12 + 1e-4);
+        Assert.Equal(x, insert.Location.X);
+        Assert.Equal(y, insert.Location.Y);
+    }
+
+    [Fact]
+    public void Expand_TouchingHoleInsertWithSecondSelectedPart_StaysInsideCutout()
+    {
+        var plate = MakePlate(40, 24, edge: 0);
+        var host = new Part(new Drawing("host", RectangleWithHole(20, 20, 5, 5, 10, 10)), Vector.Zero);
+        plate.Parts.Add(host);
+        var insert = AddSquare(plate, 13, 9, 2);
+        var other = AddSquare(plate, 30, 9, 2);
+
+        var result = Expander.Expand(new List<Part> { insert, other }, plate,
+            new Expander.Options { MaxSpacing = 1 });
+        Assert.False(result.Cancelled);
+        Assert.True(result.AchievedSpacing >= 0.99);
+        Assert.InRange(insert.Location.X, 6 - 1e-4, 12 + 1e-4);
+        Assert.False(MateriallyOverlaps(insert, host));
+        Assert.Equal(0, host.Location.X);
+    }
+
+    [Fact]
     public void Expand_WallsAndUnselectedPairs_StayExactlyAtClearance()
     {
         // Selection must not be pushed to open gaps between parts it excludes.

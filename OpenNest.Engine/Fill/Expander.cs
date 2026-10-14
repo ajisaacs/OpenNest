@@ -317,63 +317,22 @@ namespace OpenNest.Engine.Fill
                     // the B side travels the opposite way.
                     var direction = moverIndex == pair.IndexA ? directionA : -directionA;
 
-                    var edgeRoom = context.ClipToWorkArea(
-                        moverIndex,
-                        positions[moverIndex],
-                        direction,
-                        need
-                    );
-                    var room = context.ClipToMaterial(moverIndex, positions, direction, edgeRoom);
-
-                    // Take the largest valid step up to `room`: partial moves let
-                    // a blocked mover advance again once its own blockers move
-                    // away in later iterations (a wave separates a chain).
-                    var applied = 0.0;
-                    var blockedByEdge = false;
-
-                    if (room > 0)
+                    // A zero-distance hole contact can have an ambiguous nearest-
+                    // boundary fallback. Only if the normal candidate makes no
+                    // safe progress, retry its opposite through the same path,
+                    // floor and active-improvement checks. Never move the anchor.
+                    var attempt = ProposeMove(context, positions, pair, distance, direction, need, epsMove);
+                    if (attempt.Applied <= 0 && distance <= 1e-7)
                     {
-                        var trial = positions[moverIndex] + direction * room;
-
-                        if (context.MaintainsValidity(moverIndex, trial, positions, pair, distance))
-                        {
-                            positions[moverIndex] = trial;
-                            applied = room;
-                        }
-                        else
-                        {
-                            var lo = 0.0;
-                            var hi2 = room;
-                            for (var bisect = 0; bisect < 24 && hi2 - lo > 1e-6; bisect++)
-                            {
-                                var mid = (lo + hi2) / 2;
-                                if (
-                                    context.MaintainsValidity(
-                                        moverIndex,
-                                        positions[moverIndex] + direction * mid,
-                                        positions,
-                                        pair,
-                                        distance
-                                    )
-                                )
-                                    lo = mid;
-                                else
-                                    hi2 = mid;
-                            }
-
-                            if (lo > epsMove)
-                            {
-                                positions[moverIndex] = positions[moverIndex] + direction * lo;
-                                applied = lo;
-                            }
-                        }
-
-                        blockedByEdge = applied < need - epsMove;
-                        moved += applied;
+                        var opposite = ProposeMove(context, positions, pair, distance, -direction, need, epsMove);
+                        if (opposite.Applied > attempt.Applied)
+                            attempt = opposite;
                     }
-                    else
+                    var applied = attempt.Applied;
+                    if (applied > 0)
                     {
-                        blockedByEdge = true;
+                        positions[moverIndex] = attempt.Proposal;
+                        moved += applied;
                     }
 
                     // A pair fully separated to the user target (the internal margin
@@ -430,6 +389,38 @@ namespace OpenNest.Engine.Fill
             }
 
             return (violations.Count == 0, positions, violations);
+        }
+
+        private static (double Applied, Vector Proposal, bool EdgeLimited, bool PartLimited) ProposeMove(
+            SeparationContext context, List<Vector> positions, Pair pair,
+            double distance, Vector direction, double need, double epsMove)
+        {
+            var mover = pair.Mover;
+            var start = positions[mover];
+            var edgeRoom = context.ClipToWorkArea(mover, start, direction, need);
+            var room = context.ClipToMaterial(mover, positions, direction, edgeRoom);
+            var edgeLimited = edgeRoom < need - epsMove;
+            var partLimited = room < edgeRoom - epsMove;
+            if (room <= epsMove)
+                return (0, start, edgeLimited, partLimited);
+
+            var trial = start + direction * room;
+            if (context.MaintainsValidity(mover, trial, positions, pair, distance))
+                return (room, trial, edgeLimited, partLimited);
+
+            var lo = 0.0;
+            var hi = room;
+            for (var bisect = 0; bisect < 24 && hi - lo > 1e-6; bisect++)
+            {
+                var mid = (lo + hi) / 2;
+                if (context.MaintainsValidity(mover, start + direction * mid, positions, pair, distance))
+                    lo = mid;
+                else
+                    hi = mid;
+            }
+            return lo > epsMove
+                ? (lo, start + direction * lo, edgeLimited, true)
+                : (0, start, edgeLimited, true);
         }
 
         /// <summary>One constrained part↔part pair with its anchor mover.</summary>
