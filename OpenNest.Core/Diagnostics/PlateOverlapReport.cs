@@ -94,7 +94,9 @@ public sealed class PlateOverlapPair
     /// Finite world-coordinate point on the shared material, inside the pair's largest island:
     /// its pole of inaccessibility, or an interior scan-line point when a thin island defeats
     /// the bounded pole search. Markers, hit testing and inspection rings use this point.
-    /// Returned by value.
+    /// A tolerance-free tiny-clamp finding (a clamp narrower than the chord tolerance) keeps
+    /// its conservative whole-clamp region, so its marker is the clamp's centre, within half
+    /// the clamp's size of the material. Returned by value.
     /// </summary>
     public Vector Marker { get; }
     /// <summary>A fresh world-coordinate bounds copy.</summary>

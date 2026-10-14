@@ -195,6 +195,12 @@ interior run of a horizontal scan line through the island, placed between vertex
 heights. There is one marker per pair, not per island: a second patch has shading
 but no crosshair.
 
+A clamp narrower than the 0.001 chord tolerance is judged tolerance-free against
+finely re-read material rather than by Clipper2. Any material entering it is reported,
+even below the area threshold. The finding's region is then the whole clamp
+rectangle, and its centroid and marker are the clamp's centre: within half the
+clamp's size (under 0.0005) of the material, though not necessarily on it.
+
 `PolygonAreaMoments` evaluates signed moments about local origins. The analyzer
 subtracts each island's hole moments from its outline's (`TrySubtract`), then
 combines the islands with positive area weights (`TryCombine`), on rebased
@@ -213,7 +219,9 @@ approximations. A pair is reported when its total shared area exceeds
 `Tolerance.Epsilon` (`0.00001` square units). Contact and rounding dust below that
 are not overlap. The engine's `Collision` kernel instead drops each convex fragment
 at or below that area, so a sliver it splits into small fragments can read clear
-there while this diagnostic reports it. Floating-point coordinates still have finite
+there while this diagnostic reports it. Rounding to the 1e-8 grid can move an area
+that is within rounding error of the threshold to either side of it, in either
+direction relative to the kernel. Floating-point coordinates still have finite
 resolution.
 
 ## Desktop lifecycle and rendering
