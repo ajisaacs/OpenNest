@@ -60,16 +60,16 @@ namespace OpenNest.Controls
 
         public void DeleteSelected()
         {
-            if (selectedCutOffs.Count > 0)
-            {
-                foreach (var cutOff in selectedCutOffs)
-                    view.Plate.CutOffs.Remove(cutOff);
+            var regenerateCutOffs = view.Plate.CutOffs.Count > 0
+                && (selectedCutOffs.Count > 0 || selectedParts.Count > 0);
+            foreach (var cutOff in selectedCutOffs)
+                view.Plate.CutOffs.Remove(cutOff);
 
-                view.Plate.RegenerateCutOffs(view.CutOffSettings);
-            }
-
-            // A window can select both kinds of object; Delete must remove both.
+            // Finish removing both kinds before rebuilding surviving cut strokes;
+            // otherwise they retain gaps around parts deleted in the same window.
             RemoveSelectedParts();
+            if (regenerateCutOffs)
+                view.Plate.RegenerateCutOffs(view.CutOffSettings);
         }
 
         public void RemoveSelectedParts()

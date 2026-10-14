@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Reflection;
+using System.Windows.Forms;
 using OpenNest.Actions;
 using OpenNest.CNC;
 using OpenNest.Controls;
@@ -108,6 +109,89 @@ public class CutOffWindowSelectionTests
             action.DisconnectEvents();
         }
     });
+
+    [Fact]
+    public void MixedDeleteRegeneratesSurvivingCutOffAfterRemovingPart() => RunSta(() =>
+    {
+        var program = new CNC.Program();
+        program.MoveTo(9, 5);
+        program.LineTo(11, 5);
+        program.LineTo(11, 10);
+        program.LineTo(9, 10);
+        program.LineTo(9, 5);
+        var part = new Part(new Drawing("square", program));
+        var plate = new Plate(20, 20);
+        plate.Parts.Add(part);
+        var removed = new CutOff(new Vector(2, 0), CutOffAxis.Vertical)
+        {
+            StartLimit = 4,
+            EndLimit = 11,
+        };
+        var kept = new CutOff(new Vector(10, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(removed);
+        plate.CutOffs.Add(kept);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        using var view = new PlateView { Plate = plate };
+        var action = (ActionSelect)view.Actions.CurrentAction;
+        action.Point1 = new Vector(0, 3);
+        action.Point2 = new Vector(12, 12);
+        SelectWindow(action);
+        Assert.Contains(view.SelectedParts, selected => selected.BasePart == part);
+        Assert.Same(removed, Assert.Single(view.Selection.SelectedCutOffs));
+        Assert.True(kept.Drawing.Program.Codes.Count > 2);
+
+        view.Selection.DeleteSelected();
+        Assert.Same(kept, Assert.Single(plate.CutOffs));
+        Assert.Empty(view.SelectedParts);
+        Assert.Equal(2, kept.Drawing.Program.Codes.Count);
+        Assert.Equal(2, Assert.Single(plate.Parts).Program.Codes.Count);
+    });
+
+    [Fact]
+    public void EscapeStopsCutOffDragBeforeAnotherWindowSelection() => RunSta(() =>
+    {
+        var plate = new Plate(20, 20);
+        var cutoff = new CutOff(new Vector(10, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        using var view = new EventView { Plate = plate, Size = new System.Drawing.Size(500, 500) };
+        view.ZoomToArea(-2, -2, 24, 24);
+        view.Down(new Vector(10, 2));
+        Assert.True(view.CutOffs.IsDragging);
+        view.ProcessEscapeKey();
+        Assert.Empty(view.Selection.SelectedCutOffs);
+        Assert.False(view.CutOffs.IsDragging);
+        view.Up(new Vector(10, 2));
+        view.Down(new Vector(12, 12));
+        view.MoveTo(new Vector(8, -1), MouseButtons.Left);
+        view.Up(new Vector(8, -1));
+        Assert.Same(cutoff, Assert.Single(view.Selection.SelectedCutOffs));
+        var before = cutoff.Position;
+        view.MoveTo(new Vector(13, 8), MouseButtons.None);
+        Assert.Equal(before.X, cutoff.Position.X);
+    });
+
+    private sealed class EventView : PlateView
+    {
+        public void Down(Vector world)
+        {
+            MoveTo(world, MouseButtons.None);
+            var point = PointWorldToControl(world);
+            OnMouseDown(new MouseEventArgs(MouseButtons.Left, 1, point.X, point.Y, 0));
+        }
+
+        public void Up(Vector world)
+        {
+            var point = PointWorldToControl(world);
+            OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, point.X, point.Y, 0));
+        }
+
+        public void MoveTo(Vector world, MouseButtons buttons)
+        {
+            var point = PointWorldToControl(world);
+            OnMouseMove(new MouseEventArgs(buttons, 0, point.X, point.Y, 0));
+        }
+    }
 
     private static void SelectWindow(ActionSelect action) =>
         typeof(ActionSelect).GetMethod("SelectPartsInWindow", BindingFlags.Instance | BindingFlags.NonPublic)!

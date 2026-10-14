@@ -470,7 +470,7 @@ namespace OpenNest.Controls
                 }
             }
 
-            if (cutOffHandler.IsDragging && selection.SelectedCutOffs.Count > 0)
+            if (e.Button == MouseButtons.Left && cutOffHandler.IsDragging)
             {
                 cutOffHandler.EndDrag();
                 return;
@@ -545,7 +545,8 @@ namespace OpenNest.Controls
             if (InspectionOnly)
                 return;
 
-            if (cutOffHandler.IsDragging && selection.SelectedCutOffs.Count > 0)
+            if (cutOffHandler.IsDragging && e.Button == MouseButtons.Left
+                && selection.SelectedCutOffs.Count > 0)
             {
                 cutOffHandler.UpdateDrag(CurrentPoint, selection.SelectedCutOffs[0]);
                 return;

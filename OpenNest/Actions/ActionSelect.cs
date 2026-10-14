@@ -53,6 +53,7 @@ namespace OpenNest.Actions
         {
             status = Status.SetFirstPoint;
 
+            plateView.CutOffs.EndDrag();
             plateView.DeselectAll();
             plateView.Invalidate();
         }
