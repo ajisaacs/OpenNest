@@ -77,6 +77,7 @@ namespace OpenNest.Engine.Fill
         {
             AfterScratchMove,
             AfterSuccessfulProbe,
+            AfterPairPass,
             BeforeApply,
         }
 
@@ -307,6 +308,15 @@ namespace OpenNest.Engine.Fill
             return Separate(context, positions, spacing, maxIterations, token, null);
         }
 
+        internal static (bool Converged, List<Vector> Positions, List<Violation> Violations) SeparateObserved(
+            List<Part> selected, Plate plate, double spacing,
+            Action<Checkpoint> observer, int maxIterations = 100,
+            CancellationToken token = default)
+        {
+            var context = SeparationContext.Prepare(selected, plate, token);
+            return Separate(context, context.Positions(), spacing, maxIterations, token, observer);
+        }
+
         private static void Apply(List<Part> selected, List<Vector> from, List<Vector> to)
         {
             // Only movers occupy [0, selected.Count); walls never move.
@@ -435,6 +445,9 @@ namespace OpenNest.Engine.Fill
                     // the next pass. The final sweep remeasures all pairs.
                 }
 
+                observer?.Invoke(Checkpoint.AfterPairPass);
+                if (token.IsCancellationRequested)
+                    return (false, start, violations);
                 if (moved < epsMove)
                     break;
             }

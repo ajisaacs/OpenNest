@@ -624,6 +624,34 @@ public class ExpanderTests
     }
 
     [Fact]
+    public void Separate_PinnedBetweenFixedParts_StopsAfterOneNoProgressPass()
+    {
+        var plate = MakePlate(20, 20, edge: 0);
+        var pinned = AddSquare(plate, 8, 8);
+        AddSquare(plate, 3.8, 8);
+        AddSquare(plate, 12.2, 8);
+        AddSquare(plate, 8, 3.8);
+        AddSquare(plate, 8, 12.2);
+        var passes = 0;
+        var initial = pinned.Location;
+
+        var (converged, poses, violations) = Expander.SeparateObserved(
+            new List<Part> { pinned }, plate, spacing: 1,
+            checkpoint =>
+            {
+                if (checkpoint == Expander.Checkpoint.AfterPairPass)
+                    passes++;
+            }, maxIterations: 10000
+        );
+
+        Assert.False(converged);
+        Assert.NotEmpty(violations);
+        Assert.Equal(1, passes); // Not a MaxIterations spin or wall-clock assertion.
+        Assert.Equal(initial, poses[0]);
+        Assert.Equal(initial, pinned.Location);
+    }
+
+    [Fact]
     public void Expand_WallsAndUnselectedPairs_StayExactlyAtClearance()
     {
         // Selection must not be pushed to open gaps between parts it excludes.
