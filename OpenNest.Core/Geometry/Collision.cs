@@ -5,12 +5,14 @@ using OpenNest.Math;
 namespace OpenNest.Geometry
 {
     /// <summary>
-    /// Polygon overlap test with hole subtraction. This is the reference implementation
-    /// for a future GPU kernel, so it deliberately stays hand-rolled instead of using
-    /// Clipper (which is CPU-only and allocation-heavy; see <see cref="ClipperBridge"/>
-    /// for the CPU preparation that feeds it).
+    /// Polygon overlap test with hole subtraction, used by engine and validation per-pair
+    /// checks. It was written as the reference for a GPU kernel; that port is on hold in
+    /// favour of Clipper2, starting with the material-overlap diagnostic. Engine callers
+    /// stay on this kernel until a Clipper2 near-contact differential and the layout gate
+    /// pass.
     /// <para>
-    /// GPU-port contract. Per-polygon preparation, done once per drawing and rotation,
+    /// Former GPU-port contract, kept for reference. Per-polygon preparation, done once
+    /// per drawing and rotation,
     /// then cached and uploaded: the spacing offset (<see cref="ClipperBridge"/>),
     /// triangulation (<see cref="ConvexDecomposition.Triangulate"/>) of the outline and
     /// each hole, and the bounding box of every polygon and triangle. Per-pair work,
