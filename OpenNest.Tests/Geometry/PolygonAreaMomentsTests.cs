@@ -135,6 +135,36 @@ public class PolygonAreaMomentsTests
         Assert.False(PolygonAreaMoments.TryCombine(new[] { default(PolygonAreaMoments), valid }, out _));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1000000000)]
+    [InlineData(-1000000000)]
+    public void TrySubtract_OffCentreHoleShiftsCentroidAway(double offset)
+    {
+        // 4x4 square minus a 1x1 hole centred at (1, 1): area 15, centroid (16*2 - 1)/15 = 2 + 1/15.
+        Assert.True(PolygonAreaMoments.TryCompute(Rectangle(offset, offset, 4, 4), out var outline));
+        Assert.True(PolygonAreaMoments.TryCompute(Rectangle(offset + 0.5, offset + 0.5, 1, 1), out var hole));
+
+        Assert.True(PolygonAreaMoments.TrySubtract(outline, new[] { hole }, out var net));
+
+        Assert.Equal(15, net.Area, 12);
+        Assert.Equal(offset + 2 + 1.0 / 15, net.Centroid.X, 7);
+        Assert.Equal(offset + 2 + 1.0 / 15, net.Centroid.Y, 7);
+        Assert.True(PolygonAreaMoments.TrySubtract(outline, Array.Empty<PolygonAreaMoments>(), out var whole));
+        Assert.Equal((outline.Area, outline.Centroid), (whole.Area, whole.Centroid));
+    }
+
+    [Fact]
+    public void TrySubtract_InvalidOrNonpositiveResultIsRejected()
+    {
+        Assert.True(PolygonAreaMoments.TryCompute(Rectangle(0, 0, 1, 1), out var unit));
+
+        Assert.False(PolygonAreaMoments.TrySubtract(unit, null, out _));
+        Assert.False(PolygonAreaMoments.TrySubtract(default, new[] { unit }, out _));
+        Assert.False(PolygonAreaMoments.TrySubtract(unit, new[] { default(PolygonAreaMoments) }, out _));
+        Assert.False(PolygonAreaMoments.TrySubtract(unit, new[] { unit }, out _));
+    }
+
     private static Vector[] Rectangle(double x, double y, double width, double height) =>
         new[] { new Vector(x, y), new Vector(x + width, y),
             new Vector(x + width, y + height), new Vector(x, y + height) };

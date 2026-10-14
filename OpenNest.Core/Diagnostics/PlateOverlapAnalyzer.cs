@@ -140,7 +140,7 @@ public static class PlateOverlapAnalyzer
         Analyze(Capture(parts, cancellationToken), cancellationToken);
 
     /// <summary>
-    /// Returns deterministic pair reports containing closed world-coordinate overlap fragments.
+    /// Returns deterministic pair reports containing closed world-coordinate overlap islands.
     /// Cancellation throws and publishes no partial report. Check IsComplete before claiming clear.
     /// </summary>
     public static PlateOverlapReport Analyze(PlateOverlapSnapshot snapshot,
@@ -205,32 +205,13 @@ public static class PlateOverlapAnalyzer
                 try
                 {
                     // Keep pair clipping arithmetic near the parts where possible, then
-                    // restore output to world space. Triangulation itself also uses stable
-                    // local-origin winding so tiny holes in a huge part remain correct.
+                    // restore output to world space.
                     var origin = a.Material.Outer.Vertices[0];
                     var localA = a.Material.Transform(0, origin * -1);
                     var localB = b.Material.Transform(0, origin * -1);
-                    var result = Collision.Check(localA.Outer, localB.Outer, localA.Holes, localB.Holes);
-                    if (!result.Overlaps)
+                    if (!TryShare(localA, localB.Outer, localB.Holes, origin, cancellationToken,
+                            out var regions, out var centroid))
                         continue;
-                    // Evaluate every hole-subtracted fragment before restoring world space.
-                    // A failed moment must make this pair incomplete, never an origin marker.
-                    var moments = new List<PolygonAreaMoments>();
-                    var regions = new List<PlateOverlapRegion>();
-                    foreach (var region in result.OverlapRegions)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (!PolygonAreaMoments.TryCompute(region.Vertices, out var fragment))
-                            throw new ArithmeticException("Overlap fragment area moments are invalid.");
-                        moments.Add(fragment);
-                        regions.Add(new PlateOverlapRegion(region.Vertices.Select(point => point + origin),
-                            fragment.Area));
-                    }
-                    if (!PolygonAreaMoments.TryCombine(moments, out var combined))
-                        throw new ArithmeticException("Combined overlap area moments are invalid.");
-                    var centroid = combined.Centroid + origin;
-                    if (!OverlapMaterial.IsFinite(centroid))
-                        throw new ArithmeticException("Overlap centroid is not finite in world coordinates.");
                     pairs.Add(new PlateOverlapPair(a.Input.Id, b.Input.Id,
                         a.Input.Name, b.Input.Name, regions, centroid));
                 }
@@ -299,25 +280,8 @@ public static class PlateOverlapAnalyzer
                     var origin = part.Material.Outer.Vertices[0];
                     var local = part.Material.Transform(0, origin * -1);
                     var rect = RectanglePolygon(zone, origin * -1);
-                    var result = Collision.Check(local.Outer, rect, local.Holes, null);
-                    if (!result.Overlaps)
+                    if (!TryShare(local, rect, null, origin, cancellationToken, out var regions, out var centroid))
                         continue;
-                    var moments = new List<PolygonAreaMoments>();
-                    var regions = new List<PlateOverlapRegion>();
-                    foreach (var region in result.OverlapRegions)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (!PolygonAreaMoments.TryCompute(region.Vertices, out var fragment))
-                            throw new ArithmeticException("Clamp overlap fragment area moments are invalid.");
-                        moments.Add(fragment);
-                        regions.Add(new PlateOverlapRegion(
-                            region.Vertices.Select(point => point + origin), fragment.Area));
-                    }
-                    if (!PolygonAreaMoments.TryCombine(moments, out var combined))
-                        throw new ArithmeticException("Combined clamp overlap area moments are invalid.");
-                    var centroid = combined.Centroid + origin;
-                    if (!OverlapMaterial.IsFinite(centroid))
-                        throw new ArithmeticException("Clamp overlap centroid is not finite in world coordinates.");
                     findings.Add(new PlateOverlapPair(part.Input.Id,
                         ClampFindingSlot.IdFor(clamp.Ordinal), part.Input.Name,
                         $"Clamp '{clamp.Id}'", regions, centroid));
@@ -330,6 +294,39 @@ public static class PlateOverlapAnalyzer
         }
 
         return findings;
+    }
+
+    /// <summary>
+    /// Shared material of a rebased operand with another rebased outline/holes, as world
+    /// regions (connected islands) plus the area centroid of them all. Returns false when the
+    /// total shared area does not exceed <see cref="OpenNest.Math.Tolerance.Epsilon"/>: contact and rounding
+    /// dust are not overlap. Invalid moments throw, so the pair becomes incomplete rather
+    /// than clear or marked at the origin.
+    /// </summary>
+    private static bool TryShare(OverlapMaterial localA, Polygon outerB, List<Polygon> holesB, Vector origin,
+        CancellationToken cancellationToken, out List<PlateOverlapRegion> regions, out Vector centroid)
+    {
+        regions = null;
+        centroid = default;
+        var islands = OverlapClipping.Intersect(localA.Outer, localA.Holes, outerB, holesB);
+        var area = islands.Sum(island => island.Moments.Area);
+        if (!double.IsFinite(area))
+            throw new ArithmeticException("Overlap area moments are invalid.");
+        if (area <= OpenNest.Math.Tolerance.Epsilon)
+            return false;
+        regions = new List<PlateOverlapRegion>(islands.Count);
+        foreach (var island in islands)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            regions.Add(new PlateOverlapRegion(island.Outline.Select(point => point + origin), island.Moments.Area,
+                island.Holes.Select(hole => hole.Select(point => point + origin))));
+        }
+        if (!PolygonAreaMoments.TryCombine(islands.Select(island => island.Moments), out var combined))
+            throw new ArithmeticException("Combined overlap area moments are invalid.");
+        centroid = combined.Centroid + origin;
+        if (!OverlapMaterial.IsFinite(centroid))
+            throw new ArithmeticException("Overlap centroid is not finite in world coordinates.");
+        return true;
     }
 
     private static PlateOverlapPair TinyClampFinding(PreparedPart part, CapturedClamp clamp)

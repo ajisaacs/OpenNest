@@ -97,5 +97,35 @@ public readonly struct PolygonAreaMoments
         return true;
     }
 
+    /// <summary>
+    /// Net moments of an outline minus nonoverlapping holes that lie inside it, all given as
+    /// positive moments (for example from <see cref="TryCompute"/>). Moments are taken about
+    /// the outline's centroid. Fails for an invalid input or a nonpositive or nonfinite result.
+    /// </summary>
+    public static bool TrySubtract(PolygonAreaMoments outline, IEnumerable<PolygonAreaMoments> holes,
+        out PolygonAreaMoments moments)
+    {
+        moments = default;
+        if (holes == null || !double.IsFinite(outline.Area) || outline.Area <= 0 || !IsFinite(outline.Centroid))
+            return false;
+        var area = outline.Area;
+        var firstMoment = Vector.Zero;
+        foreach (var hole in holes)
+        {
+            if (!double.IsFinite(hole.Area) || hole.Area <= 0 || !IsFinite(hole.Centroid))
+                return false;
+            firstMoment -= (hole.Centroid - outline.Centroid) * hole.Area;
+            area -= hole.Area;
+        }
+
+        if (!double.IsFinite(area) || area <= 0 || !IsFinite(firstMoment))
+            return false;
+        var centroid = outline.Centroid + firstMoment / area;
+        if (!IsFinite(centroid))
+            return false;
+        moments = new PolygonAreaMoments(area, centroid);
+        return true;
+    }
+
     private static bool IsFinite(Vector point) => double.IsFinite(point.X) && double.IsFinite(point.Y);
 }

@@ -80,7 +80,7 @@ public sealed class PlateOverlapPair
     public int PartBId { get; }
     public string PartAName { get; }
     public string PartBName { get; }
-    /// <summary>Convex fragments, not connected islands; no mutable kernel polygons are exposed.</summary>
+    /// <summary>Connected islands of shared material; no mutable kernel polygons are exposed.</summary>
     public IReadOnlyList<PlateOverlapRegion> Regions { get; }
     public double Area { get; }
     /// <summary>
@@ -92,17 +92,34 @@ public sealed class PlateOverlapPair
     public Box Bounds => new(bounds.X, bounds.Y, bounds.Length, bounds.Width);
 }
 
-/// <summary>A positive-area, hole-subtracted convex polygon in world coordinates.</summary>
+/// <summary>
+/// One connected island of shared material in world coordinates, after hole subtraction:
+/// a counterclockwise outline and its clockwise holes.
+/// </summary>
 public sealed class PlateOverlapRegion
 {
-    internal PlateOverlapRegion(IEnumerable<Vector> vertices, double area)
+    private static readonly IReadOnlyList<IReadOnlyList<Vector>> NoHoles = System.Array.AsReadOnly(
+        System.Array.Empty<IReadOnlyList<Vector>>());
+
+    internal PlateOverlapRegion(IEnumerable<Vector> vertices, double area,
+        IEnumerable<IEnumerable<Vector>> holes = null)
     {
         Vertices = System.Array.AsReadOnly(vertices.ToArray());
         Area = area;
+        Holes = holes == null
+            ? NoHoles
+            : System.Array.AsReadOnly(holes
+                .Select(hole => (IReadOnlyList<Vector>)System.Array.AsReadOnly(hole.ToArray()))
+                .ToArray());
     }
 
-    /// <summary>Read-only vertices with an exactly repeated closing vertex.</summary>
+    /// <summary>Read-only counterclockwise outline with an exactly repeated closing vertex.</summary>
     public IReadOnlyList<Vector> Vertices { get; }
+
+    /// <summary>Read-only clockwise hole rings, each with an exactly repeated closing vertex.</summary>
+    public IReadOnlyList<IReadOnlyList<Vector>> Holes { get; }
+
+    /// <summary>Positive net area: the outline's area minus its holes'.</summary>
     public double Area { get; }
 }
 

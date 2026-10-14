@@ -62,7 +62,7 @@ public class OverlapPairPresentationTests
         var pairs = PlateOverlapAnalyzer.Analyze(new[] { Rectangle("a"), Rectangle("b"), Rectangle("c") }).Pairs;
         var hits = OverlapPairPresentation.HitTest(pairs.Reverse(), p => p, new Vector(2, 2), 96);
         Assert.Equal(new[] { "1/2", "1/3", "2/3" }, hits.Select(OverlapPairPresentation.Label));
-        Assert.All(hits, p => Assert.True(p.Regions.Count > 1));
+        Assert.All(hits, p => Assert.Single(p.Regions)); // One island per coincident pair.
     }
 
     private static Part Rectangle(string name)
