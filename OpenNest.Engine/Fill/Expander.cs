@@ -47,7 +47,8 @@ namespace OpenNest.Engine.Fill
             public Part A;
             public Part B;
 
-            /// <summary>Clearance actually reached (may be negative for unresolvable overlaps).</summary>
+            /// <summary>Clearance reached (negative for unresolvable overlaps;
+            /// sub-grid clamp overlaps use a negative marker, not a measured depth).</summary>
             public double Achieved;
 
             /// <summary>True when a work-area edge, not a part, blocked the last needed move.</summary>
@@ -552,6 +553,7 @@ namespace OpenNest.Engine.Fill
                 public List<Entity> Boundaries = new(); // native outer + hole loops, local frame
                 public SlideContactGeometry Contact;
                 public Box NativeBounds; // perimeter's native-entity envelope
+                public ShapeProfile MaterialProfile; // immutable local native loops
             }
 
             private SeparationContext(
@@ -646,6 +648,7 @@ namespace OpenNest.Engine.Fill
                 if (entities.Count > 0)
                 {
                     var profile = new ShapeProfile(entities);
+                    prepared.MaterialProfile = profile;
 
                     if (profile.Perimeter != null)
                     {
@@ -747,12 +750,24 @@ namespace OpenNest.Engine.Fill
             {
                 var setA = shapes[indexA];
                 var setB = shapes[indexB];
+                var offsetA = positions[indexA];
+                var offsetB = positions[indexB];
+
+                if (indexB >= clampStart &&
+                    KeepOutOverlap.NeedsToleranceFreeTest(clampBoxes[indexB - clampStart]))
+                {
+                    // Tolerant polygon collision can miss a sub-grid zone even
+                    // when it is wholly contained in part material. The native
+                    // profile test is hole-aware and fail-closed. Its negative
+                    // marker means unresolved overlap, not a measured depth.
+                    var zone = clampBoxes[indexB - clampStart];
+                    if (setA.MaterialProfile?.Perimeter == null ||
+                        KeepOutOverlap.ProfileEnters(setA.MaterialProfile, offsetA, zone))
+                        return (-1e-4, new Vector(1, 0));
+                }
 
                 if (setA.Outer == null || setB.Outer == null)
                     return (0, new Vector(1, 0));
-
-                var offsetA = positions[indexA];
-                var offsetB = positions[indexB];
 
                 var outerA = CloneAt(setA.Outer, offsetA);
                 var outerB = CloneAt(setB.Outer, offsetB);
@@ -853,36 +868,32 @@ namespace OpenNest.Engine.Fill
                         return 0; // Unknown boundary is not empty space.
 
                     var origin = positions[index];
-                    var start = origin;
                     var alreadyOverlapping = Collision.HasOverlap(
                         CloneAt(moving.Outer, origin), CloneAt(stationary.Outer, positions[i]),
                         moving.Holes.Count == 0 ? null : CloneAll(moving.Holes, origin),
                         stationary.Holes.Count == 0 ? null : CloneAll(stationary.Holes, positions[i]));
-                    var exit = 0.0;
                     if (alreadyOverlapping)
                     {
-                        // The ordinary slide query only certifies initially clear
-                        // geometry. A convex line-only overlap can exit directly
-                        // along a separating support normal; other overlaps remain
-                        // accepted input but cannot be moved without a path proof.
-                        if (!TryConvexDirectExit(moving, stationary, origin, positions[i], direction, out exit)
-                            || exit > room)
+                        // An initially overlapping convex pair needs a direct
+                        // separating-path certificate; the normal slide query
+                        // is only for initially clear geometry. A certified
+                        // prefix may still overlap when the edge clips its exit.
+                        // Convex material cannot re-enter along the certified
+                        // separating ray after its single exit.
+                        if (!TryConvexDirectExit(moving, stationary, origin, positions[i], direction, out _))
                             return 0;
-                        start = origin + direction * exit;
-                        if (Collision.HasOverlap(
-                            CloneAt(moving.Outer, start), CloneAt(stationary.Outer, positions[i])))
-                            return 0;
+                        continue;
                     }
 
                     var query = SpatialQuery.DirectionalDistance(
-                        CloneEntitiesAt(moving.Boundaries, start),
+                        CloneEntitiesAt(moving.Boundaries, origin),
                         CloneEntitiesAt(stationary.Boundaries, positions[i]),
                         direction,
-                        new SlideContactClassifier(moving.Contact, start, stationary.Contact, positions[i]));
+                        new SlideContactClassifier(moving.Contact, origin, stationary.Contact, positions[i]));
                     if (double.IsNaN(query) || query < 0)
                         return 0;
                     if (query < double.MaxValue)
-                        room = System.Math.Min(room, exit + query);
+                        room = System.Math.Min(room, query);
                 }
                 return room;
             }
@@ -937,8 +948,28 @@ namespace OpenNest.Engine.Fill
                 Vector direction, out double exit)
             {
                 exit = 0;
-                if (moving.Holes.Count != 0 || stationary.Holes.Count != 0
-                    || moving.Boundaries.Count == 0 || stationary.Boundaries.Count == 0
+                if (moving.Holes.Count != 0 || stationary.Holes.Count != 0)
+                    return false;
+
+                if (TryNativeDisk(moving, out var movingCenter, out var movingRadius) &&
+                    TryNativeDisk(stationary, out var fixedCenter, out var fixedRadius))
+                {
+                    // Full circles are convex. The relative centre distance
+                    // must increase from the start; its ray intersects the
+                    // summed-radius disk at most once in forward travel.
+                    var relative = movingCenter + movePos - fixedCenter - fixedPos;
+                    var approach = relative.DotProduct(direction);
+                    var radius = movingRadius + fixedRadius;
+                    var discriminant = approach * approach + radius * radius
+                        - relative.DotProduct(relative);
+                    if (!double.IsFinite(approach) || approach < -1e-8
+                        || !double.IsFinite(discriminant) || discriminant <= 0)
+                        return false;
+                    exit = -approach + System.Math.Sqrt(discriminant);
+                    return double.IsFinite(exit) && exit > 0;
+                }
+
+                if (moving.Boundaries.Count == 0 || stationary.Boundaries.Count == 0
                     || moving.Boundaries.Any(e => e is not Line)
                     || stationary.Boundaries.Any(e => e is not Line)
                     || !IsConvex(moving.Outer) || !IsConvex(stationary.Outer))
@@ -967,6 +998,40 @@ namespace OpenNest.Engine.Fill
                     return false;
                 exit = System.Math.Max(0, maxB - minA);
                 return double.IsFinite(exit);
+            }
+
+            private static bool TryNativeDisk(RingSet shape, out Vector center, out double radius)
+            {
+                center = Vector.Zero;
+                radius = 0;
+                var boundaries = shape.Boundaries;
+                if (boundaries.Count == 1 && boundaries[0] is Circle circle)
+                {
+                    center = circle.Center;
+                    radius = circle.Radius;
+                }
+                else if (boundaries.Count > 0 && boundaries[0] is Arc first)
+                {
+                    center = first.Center;
+                    radius = first.Radius;
+                    var reversed = first.IsReversed;
+                    var sweep = 0.0;
+                    foreach (var entity in boundaries)
+                    {
+                        if (entity is not Arc arc || arc.Center.X != center.X
+                            || arc.Center.Y != center.Y || arc.Radius != radius
+                            || arc.IsReversed != reversed)
+                            return false;
+                        sweep += arc.SweepAngle();
+                    }
+                    if (System.Math.Abs(sweep - 2 * System.Math.PI) > 1e-7)
+                        return false;
+                }
+                else
+                    return false;
+
+                return double.IsFinite(center.X) && double.IsFinite(center.Y)
+                    && double.IsFinite(radius) && radius > 0;
             }
 
             private static (double Min, double Max) Project(Polygon polygon, Vector origin, Vector axis)
