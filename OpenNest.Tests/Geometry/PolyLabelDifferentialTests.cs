@@ -68,6 +68,21 @@ public class PolyLabelDifferentialTests
         Assert.True(Same(PolyLabel.Find(shape), PolyLabel.Find(shape, null, 0.5, int.MaxValue)));
     }
 
+    // Quality review: at 1e16 a 1-unit grid step no longer changes x (1e16 + 1 == 1e16), and
+    // the starting grid loop never ended, allocating cells without limit even with a budget.
+    [Fact]
+    public async Task Find_FinishesWhenGridStepsStopAdvancingFarFromTheOrigin()
+    {
+        var far = Rectangle(1e16, 0, 8, 1);
+
+        var search = Task.Run(() => (PolyLabel.Find(far, null, 0.01, 4096), PolyLabel.Find(far, null, 0.01)));
+
+        Assert.Same(search, await Task.WhenAny(search, Task.Delay(TimeSpan.FromSeconds(20))));
+        var (bounded, unbounded) = await search;
+        Assert.InRange(bounded.Y, 0, 1);
+        Assert.InRange(unbounded.Y, 0, 1);
+    }
+
     private static (Polygon outer, List<Polygon> holes) RandomShape(Random random)
     {
         var scale = System.Math.Pow(10, random.NextDouble() * 4 - 1);

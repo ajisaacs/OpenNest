@@ -73,8 +73,18 @@ namespace OpenNest.Geometry
             var initial = new List<Cell>();
 
             for (var x = minX; x < maxX; x += cellSize)
+            {
                 for (var y = minY; y < maxY; y += cellSize)
+                {
                     initial.Add(new Cell(x + halfCell, y + halfCell, halfCell, outer, holes));
+                    // Far from the origin a step smaller than the coordinate's precision
+                    // no longer advances; the grid would never end.
+                    if (y + cellSize == y)
+                        break;
+                }
+                if (x + cellSize == x)
+                    break;
+            }
 
             initial.Sort((a, b) => b.MaxDist.CompareTo(a.MaxDist));
 
