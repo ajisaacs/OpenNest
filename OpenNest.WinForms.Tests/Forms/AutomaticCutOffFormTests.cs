@@ -62,6 +62,25 @@ public class AutomaticCutOffFormTests
     }
 
     [Fact]
+    public void EqualMinimumAndSpacing_PreviewReportsMeasuredFixedGridCutting()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            using var form = new AutomaticCutOffForm(view, Units.Inches);
+            Control<TextBox>(form, "minimumStripBox").Text = "35";
+            Invoke(form, "PreviewButton_Click", null, EventArgs.Empty);
+            var expected = AutomaticCutOffPlanner.Create(view.Plate,
+                new AutomaticCutOffOptions { Spacing = 35, MinimumStripLength = 35, MinimumTailLength = 12 },
+                view.CutOffSettings);
+            Assert.True(expected.StripCutLength > 0);
+            Assert.Equal(expected.StripCutLength, expected.FixedGridCutLength);
+            Assert.Contains($"Strip cuts: {expected.StripCutLength:0.####} in (same as the fixed grid)",
+                Control<Label>(form, "stripCutsLabel").Text);
+        });
+    }
+
+    [Fact]
     public void InvalidMinimumStripRefusesApplyWithoutChangingCutoffs()
     {
         RunSta(() =>

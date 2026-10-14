@@ -80,7 +80,7 @@ public sealed class AutomaticCutOffPlan
     /// <summary>Total cut length of proposed new strip lines (excludes the tail separator).</summary>
     public double StripCutLength { get; internal set; }
 
-    /// <summary>Length of nominal strip lines in the same gaps. Zero on the legacy path.</summary>
+    /// <summary>Length of the nominal new strip lines in the same gaps. Equal to StripCutLength on the fixed-grid path.</summary>
     public double FixedGridCutLength { get; internal set; }
 
     public bool HasBlockingDiagnostics => Diagnostics.Any(d => d.IsBlocking);
@@ -161,13 +161,32 @@ public static class AutomaticCutOffPlanner
                 .Where(c => c.Axis == CutOffAxis.Vertical && FullSpanLimits(c, bounds, settings))
                 .Select(c => sign * c.Position.X)
                 .Where(distance => distance > GeometryTolerance && distance < usedSpan - GeometryTolerance)
-                .Distinct().OrderBy(distance => distance);
+                .Distinct().OrderBy(distance => distance).Append(usedSpan);
+            var gaps = new List<(double Start, double End, int Count)>();
             var start = 0.0;
-            foreach (var end in boundaries.Append(usedSpan))
+            var nominalCount = 0;
+            foreach (var end in boundaries)
             {
-                AddShiftedGap(start, end);
+                var count = 0;
+                for (var index = 1; index <= (int)candidateCount; index++)
+                {
+                    if (start + index * options.Spacing >= end - GeometryTolerance)
+                        break;
+                    count++;
+                }
+                gaps.Add((start, end, count));
+                nominalCount += count;
                 start = end;
             }
+            // The origin-based lattice alone fits within 20,000 positions, but its
+            // off-lattice nominal lines need reserved slots too. Budget both before
+            // constructing any row so a valid, dense grid is never refused halfway.
+            Require(nominalCount < MaximumShiftCandidateCount,
+                "Too many nominal strip lines for the shift search.", nameof(options));
+            var step = System.Math.Max(options.Spacing / 700,
+                usedSpan / (MaximumShiftCandidateCount - nominalCount));
+            foreach (var gap in gaps)
+                AddShiftedGap(gap.Start, gap.End, gap.Count, step);
         }
         else
         {
@@ -200,6 +219,10 @@ public static class AutomaticCutOffPlanner
             separated = false;
             separatorX = null;
         }
+        // The legacy placement loop stays untouched. Its detached programs are already
+        // regenerated, so reporting their actual new strip cutting needs no new search.
+        if (!shifted)
+            fixedGridCutLength = stripCutLength;
 
         return new AutomaticCutOffPlan
         {
@@ -214,31 +237,32 @@ public static class AutomaticCutOffPlanner
             FixedGridCutLength = fixedGridCutLength,
         };
 
-        void AddShiftedGap(double start, double end)
+        void AddShiftedGap(double start, double end, int count, double step)
         {
-            var nominal = new List<double>();
-            for (var index = 1; index <= (int)candidateCount; index++)
+            var nominal = new List<double>(count);
+            for (var index = 1; index <= count; index++)
             {
                 var distance = start + index * options.Spacing;
-                if (distance >= end - GeometryTolerance)
-                    break;
                 nominal.Add(distance);
                 fixedGridCutLength += Measure(distance).Length;
             }
-            if (nominal.Count == 0)
+            if (count == 0)
                 return;
-            var step = System.Math.Max(options.Spacing / 700, usedSpan / MaximumShiftCandidateCount);
-            var positions = AutomaticCutOffStripSearch.FindPositions(start, end, nominal.Count,
+            var positions = AutomaticCutOffStripSearch.FindPositions(start, end, count,
                 options.Spacing, options.MinimumStripLength.Value, step, Allowed, Measure) ?? nominal.ToArray();
             for (var index = 0; index < positions.Length; index++)
             {
                 var distance = positions[index];
                 AddCandidate(sign * distance, false);
                 if (!Near(distance, nominal[index]))
+                {
+                    var difference = Measure(nominal[index]).Length - Measure(distance).Length;
+                    var comparison = difference > 0 ? $"{difference:G8} model units less" :
+                        difference < 0 ? $"{-difference:G8} model units more" : "the same length";
                     diagnostics.Add(new AutomaticCutOffDiagnostic(AutomaticCutOffDiagnosticCode.ShiftedCut,
-                        $"Moved from {nominal[index]:G8} to {distance:G8} model units; this line cuts "
-                        + $"{Measure(nominal[index]).Length - Measure(distance).Length:G8} model units less.",
-                        X: sign * distance));
+                        $"Moved from {nominal[index]:G8} to {distance:G8} model units; "
+                        + $"this line cuts {comparison}.", X: sign * distance));
+                }
             }
         }
 
@@ -345,8 +369,16 @@ public static class AutomaticCutOffPlanner
             if (usable && existing == null)
             {
                 definitions.Add(candidate);
-                if (shifted && !isSeparator)
-                    stripCutLength += Measure(System.Math.Abs(x)).Length;
+                if (!isSeparator)
+                {
+                    if (shifted)
+                        stripCutLength += Measure(System.Math.Abs(x)).Length;
+                    else
+                        for (var index = 0; index < program.Codes.Count; index += 2)
+                            stripCutLength += System.Math.Abs(
+                                ((LinearMove)program.Codes[index + 1]).EndPoint.Y -
+                                ((RapidMove)program.Codes[index]).EndPoint.Y);
+                }
             }
         }
 

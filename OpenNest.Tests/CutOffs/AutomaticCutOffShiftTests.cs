@@ -106,8 +106,9 @@ public class AutomaticCutOffShiftTests
         Assert.Equal(legacy.UsedSpan, fixedGrid.UsedSpan);
         Assert.Equal(legacy.StripCutLength, fixedGrid.StripCutLength);
         Assert.Equal(legacy.FixedGridCutLength, fixedGrid.FixedGridCutLength);
-        Assert.Equal(0, legacy.StripCutLength);
-        Assert.Equal(0, legacy.FixedGridCutLength);
+        Assert.Equal(legacy.PreviewParts.Take(legacy.Definitions.Count - (legacy.HasSeparatedTail ? 1 : 0))
+            .Sum(p => CutLength(p.Program)), legacy.StripCutLength, 8);
+        Assert.Equal(legacy.StripCutLength, legacy.FixedGridCutLength);
     }
 
     [Fact]
@@ -313,6 +314,43 @@ public class AutomaticCutOffShiftTests
         Assert.False(plan.HasSeparatedTail);
         Assert.Equal(0, plan.StripCutLength);
         Assert.True(plan.FixedGridCutLength > 0);
+    }
+
+    [Fact]
+    public void LegacyGridReportsActualNewStripCutLengthWithoutChangingItsDefinitions()
+    {
+        var plate = new Plate(60, 120) { PartSpacing = 0.3 };
+        plate.Parts.Add(Rectangle(5, 5, 75, 10));
+        var settings = new CutOffSettings();
+        var options = new AutomaticCutOffOptions { Spacing = 35 };
+        var legacy = AutomaticCutOffPlanner.Create(plate, options, settings);
+        Assert.Equal(new[] { 35.0, 70.0 }, legacy.Definitions.Take(2).Select(c => c.Position.X));
+        Assert.Equal(120, legacy.PreviewParts.Take(2).Sum(p => CutLength(p.Program)));
+        Assert.Equal(120, legacy.StripCutLength);
+        Assert.Equal(legacy.StripCutLength, legacy.FixedGridCutLength);
+        options.MinimumStripLength = 35;
+        var equal = AutomaticCutOffPlanner.Create(plate, options, settings);
+        Assert.Equal(legacy.Definitions.Select(c => c.Position.X), equal.Definitions.Select(c => c.Position.X));
+        Assert.Equal(legacy.Diagnostics, equal.Diagnostics);
+        Assert.Equal(legacy.StripCutLength, equal.StripCutLength);
+        Assert.Equal(legacy.FixedGridCutLength, equal.FixedGridCutLength);
+    }
+
+    [Fact]
+    public void ShiftedSearchKeepsNominalLinesWithoutRejectingAValidDenseGrid()
+    {
+        var plate = new Plate(60, 120) { PartSpacing = 0 };
+        plate.Parts.Add(Rectangle(0.01, 0.01, 109.97009, 0.5));
+        var settings = new CutOffSettings();
+        var fixedGrid = AutomaticCutOffPlanner.Create(plate,
+            new AutomaticCutOffOptions { Spacing = 0.1 }, settings);
+        Assert.Equal(1101, fixedGrid.Definitions.Count);
+
+        var shifted = AutomaticCutOffPlanner.Create(plate,
+            new AutomaticCutOffOptions { Spacing = 0.1, MinimumStripLength = 0.05 }, settings);
+
+        Assert.Equal(fixedGrid.Definitions.Count, shifted.Definitions.Count);
+        Assert.True(shifted.StripCutLength <= shifted.FixedGridCutLength + 0.000001);
     }
 
     internal static void AssertLimits(AutomaticCutOffPlan plan, double spacing, double minimum)

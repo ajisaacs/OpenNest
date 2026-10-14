@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Numerics;
 
 namespace OpenNest;
 
@@ -73,7 +75,7 @@ internal static class AutomaticCutOffStripSearch
                 current.Add(new State
                 {
                     Position = position,
-                    Length = parent.Length + System.Math.Round(cost.Length, 6),
+                    Length = parent.Length + RoundedMicroUnits(cost.Length),
                     Pierces = parent.Pierces + cost.SegmentCount,
                     Deviation = parent.Deviation + System.Math.Abs(nominal[line] - position),
                     Parent = parent,
@@ -95,6 +97,25 @@ internal static class AutomaticCutOffStripSearch
             best = best.Parent;
         }
         return result;
+    }
+
+    private static BigInteger RoundedMicroUnits(double length)
+    {
+        if (!double.IsFinite(length) || length < 0)
+            throw new ArgumentException("Cut-off segment length must be finite and nonnegative.", nameof(length));
+        var rounded = System.Math.Round(length, 6);
+        // Compare sums of the specified decimal-rounded model units, not binary
+        // approximations such as 0.1 + 0.2 versus 0.3. The round-trip string
+        // retains micro-unit digits even at larger (but still fractional) scales.
+        if (rounded < 1e22)
+        {
+            var value = decimal.Parse(rounded.ToString("R", CultureInfo.InvariantCulture),
+                NumberStyles.Float, CultureInfo.InvariantCulture);
+            return new BigInteger(decimal.Round(value * 1_000_000m, 0));
+        }
+        // At this magnitude a double has no fractional model units; avoid a
+        // decimal overflow while retaining an unbounded exact accumulated score.
+        return new BigInteger(rounded) * 1_000_000;
     }
 
     private static int Compare(State left, State right)
@@ -128,7 +149,7 @@ internal static class AutomaticCutOffStripSearch
     private sealed class State
     {
         public double Position;
-        public double Length;
+        public BigInteger Length;
         public int Pierces;
         public double Deviation;
         public State Parent;

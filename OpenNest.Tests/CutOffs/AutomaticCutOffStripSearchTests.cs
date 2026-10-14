@@ -13,6 +13,16 @@ public class AutomaticCutOffStripSearchTests
     }
 
     [Fact]
+    public void DecimalRoundedLengthTie_UsesPierceCountNotBinaryAdditionNoise()
+    {
+        var result = AutomaticCutOffStripSearch.Solve(0,
+            new[] { new[] { 20.0, 35.0 }, new[] { 40.0, 70.0 } },
+            new[] { 35.0, 70.0 }, 35, 17.5,
+            x => x switch { 20 => (0.1, 1), 40 => (0.2, 1), 35 => (0.3, 3), _ => (0.0, 0) });
+        Assert.Equal(new[] { 20.0, 40.0 }, result);
+    }
+
+    [Fact]
     public void GlobalOptimum_IsBetterThanGreedyFirstLine()
     {
         var result = AutomaticCutOffStripSearch.Solve(0,
@@ -39,7 +49,8 @@ public class AutomaticCutOffStripSearchTests
         {
             var rows = new[] { new[] { 18.0, 23, 29, 35 }, new[] { 38.0, 47, 56, 62, 70 }, new[] { 60.0, 74, 81, 91, 105 } };
             var costs = rows.SelectMany(row => row).Distinct().ToDictionary(x => x,
-                _ => (Length: random.Next(0, 4) + random.Next(0, 2) * 0.0000001, SegmentCount: random.Next(0, 3)));
+                _ => (Length: random.Next(0, 4) + random.Next(0, 1_000_000) / 1_000_000d,
+                    SegmentCount: random.Next(0, 3)));
             var nominal = new[] { 35.0, 70, 105 };
             var paths = new List<double[]>();
             foreach (var first in rows[0])
@@ -47,7 +58,7 @@ public class AutomaticCutOffStripSearchTests
                     foreach (var third in rows[2])
                         if (second - first >= 17.5 && second - first <= 35 && third - second >= 17.5 && third - second <= 35)
                             paths.Add(new[] { first, second, third });
-            var expected = paths.OrderBy(path => path.Sum(x => System.Math.Round(costs[x].Length, 6)))
+            var expected = paths.OrderBy(path => path.Sum(x => (decimal)System.Math.Round(costs[x].Length, 6)))
                 .ThenBy(path => path.Sum(x => costs[x].SegmentCount))
                 .ThenBy(path => Enumerable.Range(0, 3).Sum(i => System.Math.Abs(nominal[i] - path[i])))
                 .ThenBy(path => path[0]).ThenBy(path => path[1]).ThenBy(path => path[2]).First();
