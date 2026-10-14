@@ -22,6 +22,30 @@ public partial class AutomaticCutOffForm : Form
     private readonly string unit;
     private bool minimumStripEdited;
     private bool settingMinimumStrip;
+    private bool settingsOnly;
+
+    /// <summary>In settings mode, the options chosen with OK; null otherwise or when cancelled.</summary>
+    internal AutomaticCutOffOptions SelectedOptions { get; private set; }
+
+    /// <summary>
+    /// Opens the same dialog to choose settings for another workflow (Plan Cutting): it previews
+    /// on the active plate exactly as usual, but OK only returns the options and adds nothing.
+    /// </summary>
+    internal static AutomaticCutOffForm ForSettings(PlateView plateView, Units units, Nest nest,
+        AutomaticCutOffOptions initial)
+    {
+        var form = new AutomaticCutOffForm(plateView, units, nest, null) { settingsOnly = true };
+        form.Text = "Automatic Scrap Cut-offs — Settings for Plan Cutting";
+        form.applyButton.Text = "&Use These Settings";
+        if (initial != null)
+        {
+            form.spacingBox.Text = initial.Spacing.ToString(CultureInfo.CurrentCulture);
+            form.minimumStripBox.Text = (initial.MinimumStripLength ?? initial.Spacing).ToString(CultureInfo.CurrentCulture);
+            form.minimumTailBox.Text = initial.MinimumTailLength.ToString(CultureInfo.CurrentCulture);
+            form.minimumStripEdited = true; // Keep the given minimum when the spacing is edited.
+        }
+        return form;
+    }
 
     public AutomaticCutOffForm(PlateView plateView, Units units, Func<bool> isOperationBusy = null)
         : this(plateView, units, null, isOperationBusy) { }
@@ -91,6 +115,16 @@ public partial class AutomaticCutOffForm : Form
         if (!plates.Contains(plate))
             throw new InvalidOperationException("The active plate is no longer in this nest. Close this dialog and try again.");
 
+        var options = ParseOptions();
+        var settings = plateView.CutOffSettings;
+        var plans = apply
+            ? AutomaticCutOffBatch.Apply(plates, options, settings)
+            : AutomaticCutOffBatch.Create(plates, options, settings);
+        return (plates, plans);
+    }
+
+    private AutomaticCutOffOptions ParseOptions()
+    {
         if (!double.TryParse(spacingBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var spacing))
             throw new ArgumentException($"Enter a numeric spacing in {unit}.");
         if (!double.TryParse(minimumStripBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var minimumStrip))
@@ -98,17 +132,12 @@ public partial class AutomaticCutOffForm : Form
         if (!double.TryParse(minimumTailBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var minimumTail))
             throw new ArgumentException($"Enter a numeric minimum tail length in {unit}.");
 
-        var options = new AutomaticCutOffOptions
+        return new AutomaticCutOffOptions
         {
             Spacing = spacing,
             MinimumStripLength = minimumStrip,
             MinimumTailLength = minimumTail,
         };
-        var settings = plateView.CutOffSettings;
-        var plans = apply
-            ? AutomaticCutOffBatch.Apply(plates, options, settings)
-            : AutomaticCutOffBatch.Create(plates, options, settings);
-        return (plates, plans);
     }
 
     private string DiagnosticLine(AutomaticCutOffPlan plan) => string.Join(Environment.NewLine,
@@ -139,7 +168,9 @@ public partial class AutomaticCutOffForm : Form
 
         var blocked = plans.Any(p => p.HasBlockingDiagnostics);
         var definitionCount = plans.Sum(p => p.Definitions.Count);
-        applyButton.Enabled = !blocked && definitionCount > 0;
+        // Settings may be chosen even when this layout needs no new lines or is blocked:
+        // Plan Cutting reports the blocked plate itself.
+        applyButton.Enabled = settingsOnly || !blocked && definitionCount > 0;
 
         var issues = new List<string>();
         for (var index = 0; index < plans.Count; index++)
@@ -280,6 +311,26 @@ public partial class AutomaticCutOffForm : Form
     private void ApplyButton_Click(object sender, EventArgs e)
     {
         ClearPreview();
+        if (settingsOnly)
+        {
+            try
+            {
+                // Validate exactly as planning will, without changing any plate.
+                Calculate(apply: false);
+                SelectedOptions = ParseOptions();
+                DialogResult = DialogResult.OK;
+                Close();
+            }
+            catch (Exception ex)
+            {
+                ShowError(ex);
+            }
+            finally
+            {
+                ClearPreview();
+            }
+            return;
+        }
         try
         {
             // The batch service replans every plate before mutating any; never accept previews.

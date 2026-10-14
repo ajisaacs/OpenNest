@@ -97,6 +97,48 @@ public class AutomaticCutOffFormTests
     }
 
     [Fact]
+    public void SettingsMode_SeedsTheGivenOptionsAndOkReturnsThemWithoutAddingCutoffs()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            var initial = new AutomaticCutOffOptions { Spacing = 30, MinimumStripLength = 20, MinimumTailLength = 8 };
+            using var form = AutomaticCutOffForm.ForSettings(view, Units.Inches, null, initial);
+            Assert.Equal("&Use These Settings", Control<Button>(form, "applyButton").Text);
+            Assert.Equal(30, double.Parse(Control<TextBox>(form, "spacingBox").Text));
+            Assert.Equal(20, double.Parse(Control<TextBox>(form, "minimumStripBox").Text));
+            Assert.Equal(8, double.Parse(Control<TextBox>(form, "minimumTailBox").Text));
+            Control<TextBox>(form, "spacingBox").Text = "40";
+            Assert.Equal(20, double.Parse(Control<TextBox>(form, "minimumStripBox").Text)); // Seeded minimum is kept.
+
+            Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+
+            Assert.Equal(DialogResult.OK, form.DialogResult);
+            Assert.Equal((40.0, (double?)20, 8.0), (form.SelectedOptions!.Spacing, form.SelectedOptions.MinimumStripLength,
+                form.SelectedOptions.MinimumTailLength));
+            Assert.Empty(view.Plate.CutOffs);
+            Assert.DoesNotContain(view.Plate.Parts, p => p.BaseDrawing.IsCutOff);
+            Assert.Empty(PreviewParts(view));
+        });
+    }
+
+    [Fact]
+    public void SettingsMode_InvalidInputReturnsNothing()
+    {
+        RunSta(() =>
+        {
+            using var view = CreateView();
+            using var form = AutomaticCutOffForm.ForSettings(view, Units.Inches, null, null);
+            Control<TextBox>(form, "minimumStripBox").Text = "40";
+            Invoke(form, "ApplyButton_Click", null, EventArgs.Empty);
+            Assert.NotEqual(DialogResult.OK, form.DialogResult);
+            Assert.Null(form.SelectedOptions);
+            Assert.Contains("Minimum strip", Control<TextBox>(form, "diagnosticsBox").Text);
+            Assert.Empty(view.Plate.CutOffs);
+        });
+    }
+
+    [Fact]
     public void PreviewIsDetachedAndDisposeClearsIt()
     {
         RunSta(() =>

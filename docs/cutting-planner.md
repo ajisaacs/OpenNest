@@ -417,13 +417,19 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   Cut-offs...` asks first, then removes every applied lead-in (locked and hand-placed
   ones too), every cut-off and the plates' recorded cutting settings, keeping part
   poses, order and quantities, and replans from scratch. There is no undo.
-- `Add automatic scrap cut-offs` runs the automatic cut-off planner with its dialog
-  defaults (35 in / 889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every
-  plate in scope *before* capture, so the cutting plan sequences the new lines like any
+- `Add automatic scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
+  889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every plate in scope
+  *before* capture, so the cutting plan sequences the new lines like any
   other cut-off. These are the only live changes made before Apply: Apply keeps them,
   while unticking the box, Cancel/Close or switching to Validate removes them and
   restores the earlier cut-offs and sequence. A blocked cut-off plan adds nothing and
   plans nothing; the panel names the plate and reason.
+  `Cut-off Settings...` opens the Automatic Scrap Cut-offs dialog in settings mode for
+  the same scope: it previews on the active plate as usual, but `Use These Settings`
+  only returns the values (it adds nothing), ticks the box and replans. The panel
+  remembers the last settings per unit system until the application closes. A cut-off
+  still goes before every part its nominal line passes through; a line that passes
+  through no part keeps a free position in the order (user decision, 2026-10-13).
 - Lead-ins are optional for planning. With `None` (or a style that emits no lead
   motion), the emitter places the pierce directly on the selected contour point.
   Unlocked contour starts can still move to improve travel; locked programs keep

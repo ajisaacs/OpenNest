@@ -84,7 +84,12 @@ internal sealed class CuttingInspectionPanel : UserControl
         BackColor = SystemColors.Control,
         UseVisualStyleBackColor = true
     };
-    private readonly AutomaticCutOffOptions cutOffOptions;
+    private readonly Button cutOffSettingsButton = new() { Text = "Cut-off Settings…", AutoSize = true };
+    private readonly Units units;
+    private readonly bool allPlates;
+    private AutomaticCutOffOptions cutOffOptions;
+    // Last cut-off settings chosen here, per unit system, for the rest of this session.
+    private static readonly System.Collections.Generic.Dictionary<Units, AutomaticCutOffOptions> lastCutOffOptions = new();
     private AutomaticCutOffStaging stagedCutOffs;
     private readonly CheckBox acceptWarningsCheckBox = new() { Text = "Accept UNVERIFIED plan warnings (post consent happens separately)", AutoSize = true, Visible = false };
     private readonly Label settingsLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
@@ -139,14 +144,15 @@ internal sealed class CuttingInspectionPanel : UserControl
         {
             if (!configuringMode) SwitchMode((CuttingInspectionMode)modeSelector.SelectedIndex);
         };
-        var units = editor.Nest.Units;
-        var unit = UnitsHelper.GetShortString(units);
-        cutOffOptions = DefaultCutOffOptions(units);
-        autoCutOffsCheckBox.Text = $"Add automatic scrap cut-offs ({cutOffOptions.Spacing:0.###} {unit} strips, "
-            + $"keep tails of {cutOffOptions.MinimumTailLength:0.###} {unit} or more)";
+        this.allPlates = allPlates;
+        units = editor.Nest.Units;
+        cutOffOptions = lastCutOffOptions.TryGetValue(units, out var last) ? Copy(last) : DefaultCutOffOptions(units);
+        ShowCutOffOptions();
+        var cutOffRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        cutOffRow.Controls.AddRange([autoCutOffsCheckBox, cutOffSettingsButton]);
         existingWorkLabel.Font = new Font(Font, FontStyle.Bold);
         existingWorkBanner.Controls.AddRange([existingWorkLabel, clearExistingButton]);
-        header.Controls.AddRange([modeSelector, existingWorkBanner, settingsLabel, keepOrderCheckBox, autoCutOffsCheckBox, buttons,
+        header.Controls.AddRange([modeSelector, existingWorkBanner, settingsLabel, keepOrderCheckBox, cutOffRow, buttons,
             acceptWarningsCheckBox, navigation, previewLabel, validationScopeLabel]);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -170,6 +176,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         settingsButton.Click += (_, _) => EditSettings();
         keepOrderCheckBox.CheckedChanged += (_, _) => StartPlanning();
         autoCutOffsCheckBox.CheckedChanged += (_, _) => StartPlanning();
+        cutOffSettingsButton.Click += (_, _) => EditCutOffSettings();
         clearExistingButton.Click += (_, _) => ClearExistingWork();
         acceptWarningsCheckBox.CheckedChanged += (_, _) => UpdateApply();
         applyButton.Click += (_, _) => Apply();
@@ -194,6 +201,78 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     /// <summary>Automatic cut-offs added to the live plates for the current plan, until Apply keeps them.</summary>
     internal AutomaticCutOffStaging StagedCutOffs => stagedCutOffs;
+
+    /// <summary>Shows the cut-off settings dialog; tests replace it. Null uses ShowDialog.</summary>
+    internal Func<AutomaticCutOffForm, DialogResult> ShowCutOffSettings { get; set; }
+
+    internal AutomaticCutOffOptions CutOffOptions => Copy(cutOffOptions);
+
+    private static AutomaticCutOffOptions Copy(AutomaticCutOffOptions options) => new()
+    {
+        Spacing = options.Spacing,
+        MinimumStripLength = options.MinimumStripLength,
+        MinimumTailLength = options.MinimumTailLength,
+    };
+
+    private void ShowCutOffOptions()
+    {
+        var unit = UnitsHelper.GetShortString(units);
+        autoCutOffsCheckBox.Text = $"Add automatic scrap cut-offs ({cutOffOptions.Spacing:0.###} {unit} strips, "
+            + $"keep tails of {cutOffOptions.MinimumTailLength:0.###} {unit} or more)";
+    }
+
+    /// <summary>
+    /// Opens the Automatic Scrap Cut-offs dialog in settings mode for this panel's scope. Unapplied
+    /// cut-offs come off first so its preview starts from the plates' real state; OK ticks the box
+    /// and replans with the chosen settings, Cancel replans with the previous ones.
+    /// </summary>
+    private void EditCutOffSettings()
+    {
+        if (closed || closeRequested || IsPlanning || Mode != CuttingInspectionMode.Plan)
+            return;
+        ClearResult();
+        try
+        {
+            RevertStagedCutOffs();
+        }
+        catch (Exception ex)
+        {
+            resultLabel.Text = $"Unable to remove the unapplied automatic cut-offs: {ex.Message}";
+            return;
+        }
+        RefreshExistingWork();
+        AutomaticCutOffOptions chosen = null;
+        try
+        {
+            using var form = AutomaticCutOffForm.ForSettings(view, units, allPlates ? editor.Nest : null, cutOffOptions);
+            var result = ShowCutOffSettings?.Invoke(form) ?? form.ShowDialog(this);
+            if (result == DialogResult.OK)
+                chosen = form.SelectedOptions;
+        }
+        catch (Exception ex)
+        {
+            resultLabel.Text = $"Unable to open the cut-off settings: {ex.Message}";
+        }
+        finally
+        {
+            if (!view.IsDisposed)
+                view.ClearPreviewParts();
+        }
+        if (closed || closeRequested)
+            return;
+        if (chosen != null)
+        {
+            cutOffOptions = Copy(chosen);
+            lastCutOffOptions[units] = Copy(chosen);
+            ShowCutOffOptions();
+            if (!autoCutOffsCheckBox.Checked)
+            {
+                autoCutOffsCheckBox.Checked = true; // Replans through CheckedChanged.
+                return;
+            }
+        }
+        StartPlanning();
+    }
 
     /// <summary>The automatic cut-off dialog's defaults: 35 in strips, half-strip minimum, 12 in tail.</summary>
     internal static AutomaticCutOffOptions DefaultCutOffOptions(Units units)
@@ -230,7 +309,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         configuringMode = false;
         var planning = Mode == CuttingInspectionMode.Plan;
         settingsButton.Visible = settingsLabel.Visible = keepOrderCheckBox.Visible = applyButton.Visible = planning;
-        autoCutOffsCheckBox.Visible = planning;
+        autoCutOffsCheckBox.Visible = cutOffSettingsButton.Visible = planning;
         RefreshExistingWork();
         previousButton.Visible = nextButton.Visible = planning;
         validationScopeLabel.Visible = !planning;
@@ -501,6 +580,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private void SetPlanning(bool running)
     {
         settingsButton.Enabled = keepOrderCheckBox.Enabled = autoCutOffsCheckBox.Enabled = planButton.Enabled = !running;
+        cutOffSettingsButton.Enabled = !running;
         clearExistingButton.Enabled = !running;
         previousButton.Enabled = !running && selectedPlate > 0;
         nextButton.Enabled = !running && selectedPlate < plates.Length - 1;

@@ -542,6 +542,68 @@ public class CuttingInspectionPanelTests
         panel.RequestClose();
     });
 
+    [Fact]
+    public void CutOffSettingsOpensTheAutomaticCutOffDialogAndReplansWithItsChoice() => RunSta(() =>
+    {
+        var remembered = (System.Collections.IDictionary)typeof(CuttingInspectionPanel)
+            .GetField("lastCutOffOptions", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        try
+        {
+            using var editor = Editor();
+            editor.Show();
+            editor.PlateManager.LoadAt(0);
+            var plate = editor.PlateView.Plate;
+            editor.OpenCuttingInspection();
+            var panel = editor.CuttingInspection!;
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.Equal(35, panel.CutOffOptions.Spacing);
+
+            panel.ShowCutOffSettings = form => DialogResult.Cancel;
+            Field<Button>(panel, "cutOffSettingsButton").PerformClick();
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.False(Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked);
+            Assert.Equal(35, panel.CutOffOptions.Spacing);
+            Assert.Empty(plate.CutOffs);
+
+            AutomaticCutOffForm? shown = null;
+            panel.ShowCutOffSettings = form =>
+            {
+                shown = form;
+                Assert.Equal(35, double.Parse(form.Controls.Find("spacingBox", true).Single().Text));
+                form.Controls.Find("spacingBox", true).Single().Text = "30";
+                form.Controls.Find("minimumTailBox", true).Single().Text = "10";
+                typeof(AutomaticCutOffForm).GetMethod("ApplyButton_Click",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(form, [null, EventArgs.Empty]);
+                Assert.Empty(plate.CutOffs); // The dialog only chooses settings.
+                return form.DialogResult;
+            };
+            Field<Button>(panel, "cutOffSettingsButton").PerformClick();
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+
+            Assert.NotNull(shown);
+            Assert.Equal((30.0, 10.0), (panel.CutOffOptions.Spacing, panel.CutOffOptions.MinimumTailLength));
+            Assert.True(Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked);
+            Assert.Contains("30 in strips", Field<CheckBox>(panel, "autoCutOffsCheckBox").Text);
+            Assert.NotNull(panel.StagedCutOffs);
+            Assert.NotEmpty(plate.CutOffs);
+            Assert.Equal(plate.CutOffs.Count, panel.Proposal.Plates[0].Result.ProposedOrder.Count(p => p.IsCutOff));
+            panel.RequestClose();
+            Assert.Empty(plate.CutOffs);
+
+            editor.OpenCuttingInspection();
+            var reopened = editor.CuttingInspection!;
+            Assert.Equal(30, reopened.CutOffOptions.Spacing); // Remembered for this session.
+            PumpUntil(() => reopened.Proposal != null && !reopened.IsPlanning);
+            reopened.RequestClose();
+        }
+        finally
+        {
+            remembered.Clear();
+        }
+    });
+
     private sealed class MenuHost : MainForm
     {
         protected override void OnLoad(EventArgs e) { }
