@@ -45,10 +45,11 @@ namespace OpenNest.Engine.Fill
         public sealed class Violation
         {
             public Part A;
-            public Part B;
+            public Part B; // null for an invalid work-area pose
 
-            /// <summary>Clearance reached (negative for unresolvable overlaps;
-            /// sub-grid clamp overlaps use a negative marker, not a measured depth).</summary>
+            /// <summary>Signed clearance for a pair, or negative overshoot
+            /// for an invalid work-area pose. Sub-grid uncertain material uses a
+            /// negative marker, not a measured penetration depth.</summary>
             public double Achieved;
 
             /// <summary>True when a work-area edge, not a part, blocked the last needed move.</summary>
@@ -60,15 +61,17 @@ namespace OpenNest.Engine.Fill
             /// <summary>
             /// Minimum part-to-part clearance the returned layout satisfies,
             /// never below zero. 0 with violations means the layout was only
-            /// cleaned up as far as possible, not opened up.
+            /// cleaned up as far as possible or still has invalid input (such as
+            /// a selected part outside the work area), not opened up.
             /// </summary>
             public double AchievedSpacing;
 
             /// <summary>True when the run was cancelled; no positions were changed.</summary>
             public bool Cancelled;
 
-            /// <summary>Pairs still below the attempted spacing, including
-            /// unresolved negative clearances when no positive target was feasible.</summary>
+            /// <summary>Pairs still below the attempted spacing and invalid
+            /// work-area poses, including unresolved negative clearances when no
+            /// positive target was feasible.</summary>
             public List<Violation> Violations = new();
         }
 
@@ -277,7 +280,9 @@ namespace OpenNest.Engine.Fill
             }
             Apply(selected, entry, positions);
 
-            result.AchievedSpacing = System.Math.Max(0, System.Math.Min(System.Math.Max(0, sGood), measured));
+            result.AchievedSpacing = final.Violations.Any(v => v.B == null)
+                ? 0
+                : System.Math.Max(0, System.Math.Min(System.Math.Max(0, sGood), measured));
             result.Violations = final.Violations;
             return result;
         }
@@ -496,6 +501,7 @@ namespace OpenNest.Engine.Fill
                 );
             }
 
+            violations.AddRange(context.WorkAreaViolations(positions));
             return (violations.Count == 0, positions, violations);
         }
 
@@ -766,6 +772,38 @@ namespace OpenNest.Engine.Fill
                 var offsetA = positions[indexA];
                 var offsetB = positions[indexB];
 
+                if (indexB < clampStart && !parts[indexB].BaseDrawing.IsCutOff &&
+                    (setA.Contact?.IsResolved != true || setB.Contact?.IsResolved != true))
+                {
+                    // Unresolved or sub-scale material cannot be pronounced
+                    // clear by a tolerant overlap kernel. Native envelopes
+                    // intersecting at positive area yield an honest unresolved
+                    // violation; disjoint envelopes may still use the usual
+                    // boundary distance. Never infer a penetration depth here.
+                    var boxA = setA.NativeBounds?.Translate(offsetA);
+                    var boxB = setB.NativeBounds?.Translate(offsetB);
+                    if (boxA == null || boxB == null ||
+                        !double.IsFinite(boxA.Left) || !double.IsFinite(boxB.Left) ||
+                        boxA.Right > boxB.Left && boxB.Right > boxA.Left &&
+                        boxA.Top > boxB.Bottom && boxB.Top > boxA.Bottom)
+                        return (-1e-4, new Vector(1, 0));
+                }
+
+                if (setA.Holes.Count == 0 && setB.Holes.Count == 0 &&
+                    TryNativeDisk(setA, out var centerA, out var radiusA) &&
+                    TryNativeDisk(setB, out var centerB, out var radiusB))
+                {
+                    // Flattened polygons can miss a shallow arc overlap and
+                    // report a positive boundary gap. Full disks admit an exact
+                    // signed clearance and radial direction at every scratch pose.
+                    var delta = centerA + offsetA - centerB - offsetB;
+                    var length = System.Math.Sqrt(delta.DotProduct(delta));
+                    if (!double.IsFinite(length))
+                        return (0, new Vector(1, 0));
+                    return (length - radiusA - radiusB,
+                        length > 1e-12 ? delta / length : new Vector(1, 0));
+                }
+
                 if (indexB >= clampStart &&
                     KeepOutOverlap.NeedsToleranceFreeTest(clampBoxes[indexB - clampStart]))
                 {
@@ -865,6 +903,43 @@ namespace OpenNest.Engine.Fill
                     if (i == index)
                         continue;
                     var stationary = shapes[i];
+                    if (parts[i].BaseDrawing.IsCutOff)
+                    {
+                        // Regenerated cut-offs are intentional open cut paths,
+                        // not malformed closed material. The unresolved contact
+                        // classifier blocks their first native line contact;
+                        // remote paths with no events do not pin every mover.
+                        // Never treat an unknown/nonlinear cutoff as empty space.
+                        if (stationary.Boundaries.Count == 0)
+                            continue;
+                        if (stationary.Boundaries.Any(e => e is not Line))
+                            return 0;
+                        var movingBox = moving.NativeBounds.Translate(positions[index]);
+                        foreach (var entity in stationary.Boundaries)
+                        {
+                            var line = (Line)entity;
+                            if (!double.IsFinite(line.StartPoint.X) || !double.IsFinite(line.StartPoint.Y)
+                                || !double.IsFinite(line.EndPoint.X) || !double.IsFinite(line.EndPoint.Y)
+                                || line.StartPoint.X == line.EndPoint.X && line.StartPoint.Y == line.EndPoint.Y)
+                                return 0;
+                            // An already-intersecting open path has no certified
+                            // exit; refuse uncertain motion, not the input itself.
+                            var segmentBox = line.BoundingBox.Translate(positions[i]);
+                            if (movingBox.Right > segmentBox.Left && movingBox.Left < segmentBox.Right
+                                && movingBox.Top >= segmentBox.Bottom && movingBox.Bottom <= segmentBox.Top)
+                                return 0;
+                        }
+                        var hit = SpatialQuery.DirectionalDistance(
+                            CloneEntitiesAt(moving.Boundaries, positions[index]),
+                            CloneEntitiesAt(stationary.Boundaries, positions[i]), direction,
+                            new SlideContactClassifier(moving.Contact, positions[index],
+                                stationary.Contact, positions[i]));
+                        if (double.IsNaN(hit) || hit < 0)
+                            return 0;
+                        if (hit < double.MaxValue)
+                            room = System.Math.Min(room, hit);
+                        continue;
+                    }
                     if (i >= clampStart && KeepOutOverlap.NeedsToleranceFreeTest(clampBoxes[i - clampStart]))
                     {
                         // Slide contact and polygon overlap have tolerances larger
@@ -885,6 +960,17 @@ namespace OpenNest.Engine.Fill
                         CloneAt(moving.Outer, origin), CloneAt(stationary.Outer, positions[i]),
                         moving.Holes.Count == 0 ? null : CloneAll(moving.Holes, origin),
                         stationary.Holes.Count == 0 ? null : CloneAll(stationary.Holes, positions[i]));
+                    if (!alreadyOverlapping && moving.Holes.Count == 0 && stationary.Holes.Count == 0 &&
+                        TryNativeDisk(moving, out var mc, out var mr) &&
+                        TryNativeDisk(stationary, out var sc, out var sr))
+                    {
+                        var delta = mc + origin - sc - positions[i];
+                        var distanceSquared = delta.DotProduct(delta);
+                        var contactSquared = (mr + sr) * (mr + sr);
+                        if (!double.IsFinite(distanceSquared) || !double.IsFinite(contactSquared))
+                            return 0;
+                        alreadyOverlapping = distanceSquared < contactSquared;
+                    }
                     if (alreadyOverlapping)
                     {
                         // An initially overlapping convex pair needs a direct
@@ -1084,6 +1170,28 @@ namespace OpenNest.Engine.Fill
                 return sign != 0;
             }
 
+            public List<Violation> WorkAreaViolations(List<Vector> positions)
+            {
+                var violations = new List<Violation>();
+                for (var i = 0; i < moverCount; i++)
+                {
+                    if (InsideWorkArea(i, positions[i]))
+                        continue;
+                    var box = localBoxes[i].Translate(positions[i]);
+                    var overshoot = System.Math.Max(
+                        System.Math.Max(workArea.Left - box.Left, box.Right - workArea.Right),
+                        System.Math.Max(workArea.Bottom - box.Bottom, box.Top - workArea.Top));
+                    violations.Add(new Violation
+                    {
+                        A = parts[i],
+                        B = null,
+                        Achieved = double.IsFinite(overshoot) ? -System.Math.Max(0, overshoot) : -1e-4,
+                        BlockedByEdge = true,
+                    });
+                }
+                return violations;
+            }
+
             // Smaller than the 0.002 tessellation margin; immutable entry floors
             // prevent this comparison tolerance accumulating over iterations.
             private const double FloorTolerance = 1e-6;
@@ -1106,7 +1214,11 @@ namespace OpenNest.Engine.Fill
             private bool InsideWorkArea(int index, Vector position)
             {
                 var box = localBoxes[index].Translate(position);
-                return box.Left >= workArea.Left - 1e-9
+                return double.IsFinite(box.Left) && double.IsFinite(box.Right)
+                    && double.IsFinite(box.Bottom) && double.IsFinite(box.Top)
+                    && double.IsFinite(workArea.Left) && double.IsFinite(workArea.Right)
+                    && double.IsFinite(workArea.Bottom) && double.IsFinite(workArea.Top)
+                    && box.Left >= workArea.Left - 1e-9
                     && box.Right <= workArea.Right + 1e-9
                     && box.Bottom >= workArea.Bottom - 1e-9
                     && box.Top <= workArea.Top + 1e-9;
