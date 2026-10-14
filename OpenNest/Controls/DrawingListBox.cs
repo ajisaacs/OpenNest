@@ -12,6 +12,7 @@ namespace OpenNest.Controls
         private readonly Size imageSize;
         private readonly Font nameFont;
         private Point lastClickLocation;
+        private Drawing pressedDrawing;
 
         public DrawingListBox()
         {
@@ -38,6 +39,16 @@ namespace OpenNest.Controls
         }
 
         public event EventHandler<Drawing> DeleteRequested;
+
+        /// <summary>
+        /// Raised when the left button is pressed on a drawing's row.
+        /// </summary>
+        public event EventHandler<Drawing> DrawingPickedUp;
+
+        /// <summary>
+        /// Raised when a drawing dragged out of the list was accepted by a drop target.
+        /// </summary>
+        public event EventHandler<Drawing> DrawingDropped;
 
         public Units Units { get; set; }
 
@@ -152,19 +163,53 @@ namespace OpenNest.Controls
         {
             base.OnMouseMove(e);
 
-            var item = SelectedItem as Drawing;
+            var drawing = pressedDrawing;
 
-            if (item == null)
+            if (drawing == null || e.Button != MouseButtons.Left)
                 return;
 
-            if (e.Button == MouseButtons.Left && e.Location.DistanceTo(lastClickLocation) > 3)
-                DoDragDrop(item, DragDropEffects.Copy);
+            if (e.Location.DistanceTo(lastClickLocation) <= 3)
+                return;
+
+            pressedDrawing = null;
+
+            if (DoDragDrop(drawing, DragDropEffects.Copy) != DragDropEffects.None)
+                DrawingDropped?.Invoke(this, drawing);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
             lastClickLocation = e.Location;
+
+            // Pick the part up on the press. Waiting for Click loses the pickup
+            // whenever the mouse moves a few pixels first: the drag that starts
+            // takes mouse capture and the list never raises Click.
+            pressedDrawing =
+                e.Button == MouseButtons.Left && e.Clicks == 1 ? DrawingAt(e.Location) : null;
+
+            if (pressedDrawing != null)
+                DrawingPickedUp?.Invoke(this, pressedDrawing);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            pressedDrawing = null;
+            base.OnMouseUp(e);
+        }
+
+        /// <summary>
+        /// The drawing whose row contains <paramref name="location"/>, or null
+        /// when the point is in the empty area below the last row.
+        /// </summary>
+        internal Drawing DrawingAt(Point location)
+        {
+            var index = IndexFromPoint(location);
+
+            if (index < 0 || index >= Items.Count)
+                return null;
+
+            return GetItemRectangle(index).Contains(location) ? Items[index] as Drawing : null;
         }
 
         protected override void WndProc(ref Message m)
