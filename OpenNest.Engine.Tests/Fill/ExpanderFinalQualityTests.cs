@@ -52,6 +52,18 @@ public class ExpanderFinalQualityTests
     }
 
     [Fact]
+    public void Separate_CurvedExactContact_CanStillGrowARealGap()
+    {
+        var plate = Sheet();
+        Add(plate, Disk(2), 10, 6);
+        var mover = Add(plate, Rectangle(1, 1), 12, 5.5);
+        var result = Expander.Separate(new List<Part> { mover }, plate, spacing: 1);
+        Assert.True(result.Converged, $"curved contact pinned: {result.Violations.Count} violations");
+        Assert.True(result.Positions[0].X >= 13 - 1e-3);
+        Assert.Equal(12, mover.Location.X);
+    }
+
+    [Fact]
     public void Separate_SmallConcaveOverlap_MustNotClaimConvergedAtZero()
     {
         var plate = Sheet();

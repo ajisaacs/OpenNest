@@ -35,6 +35,28 @@ public class ClearanceTests
         return p;
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OpenPathBoundaryDistanceUsesSegmentInterior_NotFirstEndpoint(bool vertical)
+    {
+        var part = Square(0, 0, 2, 2);
+        var path = vertical
+            ? new Line(new Vector(10, -20), new Vector(10, 20))
+            : new Line(new Vector(-20, 10), new Vector(20, 10));
+        var lines = new List<Line> { path };
+
+        var initial = Clearance.BoundaryDistance(part.ToLines(), lines);
+        Assert.Equal(8, initial.Distance, 6); // Independent axis-aligned box gap.
+        Assert.Equal(vertical ? -1 : 0, initial.Direction.X, 6);
+        Assert.Equal(vertical ? 0 : -1, initial.Direction.Y, 6);
+
+        // A parallel translation leaves the true gap unchanged even though
+        // distance to the first endpoint changes substantially.
+        part.Offset(vertical ? new Vector(0, 3) : new Vector(3, 0));
+        Assert.Equal(8, Clearance.BoundaryDistance(part.ToLines(), lines).Distance, 6);
+    }
+
     // ---- Separation ----
 
     [Fact]

@@ -573,6 +573,7 @@ namespace OpenNest.Engine.Fill
                 public SlideContactGeometry Contact;
                 public Box NativeBounds; // perimeter's native-entity envelope
                 public ShapeProfile MaterialProfile; // immutable local native loops
+                public bool HasCurves;
             }
 
             private SeparationContext(
@@ -691,6 +692,7 @@ namespace OpenNest.Engine.Fill
                             prepared.Boundaries.AddRange(cutout.Entities);
                         }
                         prepared.Contact = SlideContactGeometry.Prepare(prepared.Boundaries);
+                        prepared.HasCurves = prepared.Boundaries.Any(e => e is Arc || e is Circle);
                     }
                 }
 
@@ -771,6 +773,30 @@ namespace OpenNest.Engine.Fill
                 var setB = shapes[indexB];
                 var offsetA = positions[indexA];
                 var offsetB = positions[indexB];
+
+                if (parts[indexB].BaseDrawing.IsCutOff)
+                {
+                    // A regenerated cutoff is a set of open native segments.
+                    // Polygon.Close would invent an endpoint chord and miss the
+                    // interior witness that sets the immutable entry floor.
+                    if (setB.Boundaries.Count == 0)
+                        return (double.MaxValue, new Vector(1, 0));
+                    if (setA.Outer == null || setB.Boundaries.Any(e => e is not Line))
+                        return (-1e-4, new Vector(1, 0));
+                    var lines = CloneEntitiesAt(setB.Boundaries, offsetB).Cast<Line>().ToList();
+                    var cutoffBest = double.MaxValue;
+                    var cutoffDirection = new Vector(1, 0);
+                    foreach (var ring in setA.Rings)
+                    {
+                        var clearance = Clearance.BoundaryDistance(CloneAt(ring, offsetA).ToLines(), lines);
+                        if (clearance.Distance < cutoffBest)
+                        {
+                            cutoffBest = clearance.Distance;
+                            cutoffDirection = clearance.Direction;
+                        }
+                    }
+                    return (cutoffBest, cutoffDirection);
+                }
 
                 if (indexB < clampStart && !parts[indexB].BaseDrawing.IsCutOff &&
                     (setA.Contact?.IsResolved != true || setB.Contact?.IsResolved != true))
@@ -855,6 +881,12 @@ namespace OpenNest.Engine.Fill
                     }
                 }
 
+                // Each prepared arc can sit up to 0.001 outside its inscribed
+                // chord. A positive polygon gap inside the combined chord band
+                // is not proof of native clearance. Keep the input but report
+                // uncertainty as a violation rather than a false clear.
+                if ((setA.HasCurves || setB.HasCurves) && best >= 0 && best < 0.002)
+                    return (-1e-4, bestDir);
                 return (best, bestDir);
             }
 
