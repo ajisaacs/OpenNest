@@ -339,6 +339,7 @@ public static class PlateOverlapAnalyzer
         {
             new Vector(zone.Left, zone.Bottom), new Vector(zone.Right, zone.Bottom),
             new Vector(zone.Right, zone.Top), new Vector(zone.Left, zone.Top),
+            new Vector(zone.Left, zone.Bottom), // Regions repeat their closing vertex exactly.
         };
         var centre = new Vector((zone.Left + zone.Right) / 2, (zone.Bottom + zone.Top) / 2);
         return new PlateOverlapPair(part.Input.Id, ClampFindingSlot.IdFor(clamp.Ordinal), part.Input.Name,

@@ -214,6 +214,22 @@ public class PlateOverlapAnalyzerClampZoneTests
         Assert.Equal(overlaps, report.ClampFindings.Any(f => f.PartBName.Contains("tiny")));
     }
 
+    // Region vertices repeat their closing vertex (PlateOverlapRegion contract); the desktop
+    // overlay drops the last vertex, so an open tiny-clamp rectangle drew as a triangle.
+    [Fact]
+    public void TinyClampFindingRegionIsAClosedRectangle()
+    {
+        var tiny = new ClampZone("tiny", new Box(8, 0, 1e-5, 1e-5));
+        var parts = new List<Part> { new(Square("p", 2), new Vector(7.5, 0)) };
+
+        var report = PlateOverlapAnalyzer.Analyze(PlateOverlapAnalyzer.Capture(parts, new[] { tiny }));
+
+        var region = Assert.Single(Assert.Single(report.ClampFindings).Regions);
+        Assert.Equal(5, region.Vertices.Count);
+        Assert.Equal(region.Vertices[0], region.Vertices[^1]);
+        Assert.Equal(4, region.Vertices.Take(4).Distinct().Count());
+    }
+
     // PM 407f5eb7: real material, not the 0.001 arc flattening, decides a tiny clamp.
     [Theory]
     [InlineData("rect", 8.00002, 0.5, true)]
