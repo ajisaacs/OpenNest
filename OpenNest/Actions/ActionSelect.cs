@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.Controls;
@@ -59,7 +59,8 @@ namespace OpenNest.Actions
 
         public override bool IsBusy()
         {
-            return status != Status.SetFirstPoint || plateView.SelectedParts.Count > 0;
+            return status != Status.SetFirstPoint || plateView.SelectedParts.Count > 0
+                || plateView.Selection.SelectedCutOffs.Count > 0;
         }
 
         private void plateView_MouseMove(object sender, MouseEventArgs e)
@@ -183,7 +184,8 @@ namespace OpenNest.Actions
 
         private void SelectPartsInWindow()
         {
-            var parts = plateView.GetPartsFromWindow(GetRectangle(), SelectionType);
+            var rect = GetRectangle();
+            var parts = plateView.GetPartsFromWindow(rect, SelectionType);
 
             foreach (var part in parts)
             {
@@ -192,6 +194,12 @@ namespace OpenNest.Actions
 
                 plateView.SelectedParts.Add(part);
                 part.IsSelected = true;
+            }
+
+            foreach (var cutOff in plateView.Selection.GetCutOffsFromWindow(rect, SelectionType))
+            {
+                if (!plateView.Selection.SelectedCutOffs.Contains(cutOff))
+                    plateView.Selection.SelectedCutOffs.Add(cutOff);
             }
 
             plateView.NotifySelectionChanged();

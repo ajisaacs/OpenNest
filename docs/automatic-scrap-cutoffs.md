@@ -59,6 +59,8 @@ The command is one-shot; spacing, minimum-strip and minimum-tail inputs start at
 
 Rerunning unchanged suppresses equivalent existing full-span lines. A limited cutoff at a proposed line is a conflict requiring manual review, not permission to replace it or add overlapping NC moves. Existing definitions are never silently deleted or expanded.
 
+In the plate view, a left-to-right selection window selects a cut-off only when it encloses every visible cut segment; a right-to-left window selects it when it crosses any visible segment (not an empty gap). Cut-offs and parts can be selected together and deleted together. Clicking a cut-off still starts its existing single-line drag.
+
 Saving `.nest` retains ordinary cutoff positions, axes, limits, and sequence. Loading regenerates cutoff programs using the reader's default cutoff settings; exact toolpaths made with nondefault cutoff settings are not guaranteed to round-trip. Review regenerated paths before posting.
 
 ## Implementation boundary

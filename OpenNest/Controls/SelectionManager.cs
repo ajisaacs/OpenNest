@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using OpenNest.CNC;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
 
@@ -64,14 +65,11 @@ namespace OpenNest.Controls
                 foreach (var cutOff in selectedCutOffs)
                     view.Plate.CutOffs.Remove(cutOff);
 
-                selectedCutOffs.Clear();
                 view.Plate.RegenerateCutOffs(view.CutOffSettings);
-                view.Invalidate();
             }
-            else
-            {
-                RemoveSelectedParts();
-            }
+
+            // A window can select both kinds of object; Delete must remove both.
+            RemoveSelectedParts();
         }
 
         public void RemoveSelectedParts()
@@ -250,6 +248,90 @@ namespace OpenNest.Controls
             }
 
             return list;
+        }
+
+        public IList<CutOff> GetCutOffsFromWindow(RectangleF rect, SelectionType selectionType)
+        {
+            var result = new List<CutOff>();
+            foreach (var cutOff in view.Plate.CutOffs)
+            {
+                var program = cutOff.Drawing?.Program;
+                if (program == null)
+                    continue;
+
+                var hasSegment = false;
+                var matches = selectionType == SelectionType.Contains;
+                // Match the actual cut strokes drawn by PlateRenderer, not the nominal
+                // full-length line: a gap around a part is not selectable material.
+                for (var i = 0; i < program.Codes.Count - 1; i += 2)
+                {
+                    if (program.Codes[i] is not RapidMove rapid
+                        || program.Codes[i + 1] is not LinearMove linear)
+                        continue;
+
+                    hasSegment = true;
+                    var start = view.PointWorldToGraph(rapid.EndPoint);
+                    var end = view.PointWorldToGraph(linear.EndPoint);
+                    var hit = selectionType == SelectionType.Contains
+                        ? ContainsInclusive(rect, start) && ContainsInclusive(rect, end)
+                        : SegmentIntersects(rect, start, end);
+                    if (selectionType == SelectionType.Intersect && hit)
+                    {
+                        matches = true;
+                        break;
+                    }
+                    if (selectionType == SelectionType.Contains && !hit)
+                    {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (hasSegment && matches)
+                    result.Add(cutOff);
+            }
+            return result;
+        }
+
+        private static bool ContainsInclusive(RectangleF rect, PointF point) =>
+            point.X >= rect.Left && point.X <= rect.Right
+            && point.Y >= rect.Top && point.Y <= rect.Bottom;
+
+        private static bool SegmentIntersects(RectangleF rect, PointF start, PointF end)
+        {
+            if (ContainsInclusive(rect, start) || ContainsInclusive(rect, end))
+                return true;
+
+            // Clip the segment against all four window edges. Endpoints alone miss
+            // a stroke that enters and exits the window without ending inside it.
+            var min = 0.0;
+            var max = 1.0;
+            var dx = (double)end.X - start.X;
+            var dy = (double)end.Y - start.Y;
+            return Clip(-dx, start.X - rect.Left)
+                && Clip(dx, rect.Right - start.X)
+                && Clip(-dy, start.Y - rect.Top)
+                && Clip(dy, rect.Bottom - start.Y);
+
+            bool Clip(double p, double q)
+            {
+                if (p == 0)
+                    return q >= 0;
+                var t = q / p;
+                if (p < 0)
+                {
+                    if (t > max)
+                        return false;
+                    min = System.Math.Max(min, t);
+                }
+                else
+                {
+                    if (t < min)
+                        return false;
+                    max = System.Math.Min(max, t);
+                }
+                return min <= max;
+            }
         }
 
         public void Clear()
