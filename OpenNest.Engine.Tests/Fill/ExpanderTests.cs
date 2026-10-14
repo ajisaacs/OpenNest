@@ -579,6 +579,50 @@ public class ExpanderTests
         Assert.True(poses[1].X + 2 <= wall.Location.X + 1e-6);
     }
 
+    [Theory]
+    [InlineData((int)Expander.Checkpoint.AfterScratchMove)]
+    [InlineData((int)Expander.Checkpoint.AfterSuccessfulProbe)]
+    [InlineData((int)Expander.Checkpoint.BeforeApply)]
+    public void Expand_CancellationAtDeterministicCheckpoint_LeavesLiveStateBitIdentical(int stage)
+    {
+        var cancelAt = (Expander.Checkpoint)stage;
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 5, 4);
+        var moving = AddSquare(plate, 10, 4);
+        var wall = AddSquare(plate, 0, 4);
+        var before = plate.Parts.Select(p => (
+            Part: p, Program: p.Program,
+            X: BitConverter.DoubleToInt64Bits(p.Location.X),
+            Y: BitConverter.DoubleToInt64Bits(p.Location.Y),
+            Left: BitConverter.DoubleToInt64Bits(p.BoundingBox.Left))).ToArray();
+        var partSpacing = plate.PartSpacing;
+        var edgeSpacing = plate.EdgeSpacing;
+        using var cts = new CancellationTokenSource();
+        var seen = false;
+
+        var result = Expander.ExpandObserved(new List<Part> { anchor, moving }, plate,
+            new Expander.Options { MaxSpacing = 3 }, checkpoint =>
+            {
+                if (checkpoint != cancelAt)
+                    return;
+                seen = true;
+                cts.Cancel();
+            }, cts.Token);
+
+        Assert.True(seen, $"checkpoint {cancelAt} was not reached");
+        Assert.True(result.Cancelled);
+        foreach (var state in before)
+        {
+            Assert.Same(state.Program, state.Part.Program);
+            Assert.Equal(state.X, BitConverter.DoubleToInt64Bits(state.Part.Location.X));
+            Assert.Equal(state.Y, BitConverter.DoubleToInt64Bits(state.Part.Location.Y));
+            Assert.Equal(state.Left, BitConverter.DoubleToInt64Bits(state.Part.BoundingBox.Left));
+        }
+        Assert.Equal(partSpacing, plate.PartSpacing);
+        Assert.Equal(edgeSpacing, plate.EdgeSpacing);
+        Assert.Equal(0, wall.Location.X);
+    }
+
     [Fact]
     public void Expand_WallsAndUnselectedPairs_StayExactlyAtClearance()
     {

@@ -71,6 +71,19 @@ namespace OpenNest.Engine.Fill
             public List<Violation> Violations = new();
         }
 
+        /// <summary>Per-call test checkpoints; no process-global mutable hook.</summary>
+        internal enum Checkpoint
+        {
+            AfterScratchMove,
+            AfterSuccessfulProbe,
+            BeforeApply,
+        }
+
+        internal static Result ExpandObserved(
+            List<Part> selected, Plate plate, Options options,
+            Action<Checkpoint> observer, CancellationToken token = default
+        ) => ExpandCore(selected, plate, options, token, observer);
+
         /// <summary>
         /// Raises the part-to-part spacing of the selection as far as the plate
         /// and its other parts allow, applying the best spacing found. Plate
@@ -86,6 +99,14 @@ namespace OpenNest.Engine.Fill
             Plate plate,
             Options options = null,
             CancellationToken token = default
+        ) => ExpandCore(selected, plate, options, token, null);
+
+        private static Result ExpandCore(
+            List<Part> selected,
+            Plate plate,
+            Options options,
+            CancellationToken token,
+            Action<Checkpoint> observer
         )
         {
             if (plate == null)
@@ -102,11 +123,29 @@ namespace OpenNest.Engine.Fill
                 );
 
             var opt = options ?? new Options();
-            var context = SeparationContext.Prepare(selected, plate);
-            var entry = context.Positions(); // all parts; movers are [0, count)
             var result = new Result();
+            SeparationContext context;
+            try
+            {
+                context = SeparationContext.Prepare(selected, plate, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                result.Cancelled = true;
+                return result;
+            }
+            var entry = context.Positions(); // all parts; movers are [0, count)
 
-            var sMin = MinimumPairClearance(context, entry);
+            double sMin;
+            try
+            {
+                sMin = MinimumPairClearance(context, entry, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                result.Cancelled = true;
+                return result;
+            }
             result.AchievedSpacing = System.Math.Max(0, sMin);
 
             if (token.IsCancellationRequested)
@@ -121,7 +160,9 @@ namespace OpenNest.Engine.Fill
 
             (bool Converged, List<Vector> Positions) Probe(double spacing)
             {
-                var attempt = Separate(context, entry, spacing, opt.MaxIterations, token);
+                var attempt = Separate(context, entry, spacing, opt.MaxIterations, token, observer);
+                if (attempt.Converged)
+                    observer?.Invoke(Checkpoint.AfterSuccessfulProbe);
                 return (attempt.Converged, attempt.Positions);
             }
 
@@ -151,6 +192,11 @@ namespace OpenNest.Engine.Fill
                 }
 
                 var probe = Probe(s);
+                if (token.IsCancellationRequested)
+                {
+                    result.Cancelled = true;
+                    return result;
+                }
 
                 if (probe.Converged)
                 {
@@ -179,7 +225,13 @@ namespace OpenNest.Engine.Fill
                     }
 
                     var mid = (lo + hi) / 2;
-                    if (Probe(mid).Converged)
+                    var midProbe = Probe(mid);
+                    if (token.IsCancellationRequested)
+                    {
+                        result.Cancelled = true;
+                        return result;
+                    }
+                    if (midProbe.Converged)
                         lo = mid;
                     else
                         hi = mid;
@@ -191,8 +243,9 @@ namespace OpenNest.Engine.Fill
             // Deterministic, so this reproduces any committed probe exactly; when
             // sGood was never probed (overlapping entry) it still performs the
             // best-effort cleanup and yields the violation report.
-            var final = Separate(context, entry, System.Math.Max(0, sGood), opt.MaxIterations, token);
+            var final = Separate(context, entry, System.Math.Max(0, sGood), opt.MaxIterations, token, observer);
 
+            observer?.Invoke(Checkpoint.BeforeApply);
             if (token.IsCancellationRequested)
             {
                 result.Cancelled = true;
@@ -205,9 +258,23 @@ namespace OpenNest.Engine.Fill
             if (!context.MeetsEntryFloors(positions, entry))
                 throw new InvalidOperationException("Expand proposal violates an entry clearance floor.");
 
+            double measured;
+            try
+            {
+                measured = MinimumPairClearance(context, positions, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                result.Cancelled = true;
+                return result;
+            }
+            if (token.IsCancellationRequested)
+            {
+                result.Cancelled = true;
+                return result;
+            }
             Apply(selected, entry, positions);
 
-            var measured = MinimumPairClearance(context, positions);
             result.AchievedSpacing = System.Math.Max(0, System.Math.Min(System.Math.Max(0, sGood), measured));
             result.Violations = final.Violations;
             return result;
@@ -226,9 +293,17 @@ namespace OpenNest.Engine.Fill
             CancellationToken token = default
         )
         {
-            var context = SeparationContext.Prepare(selected, plate);
+            SeparationContext context;
+            try
+            {
+                context = SeparationContext.Prepare(selected, plate, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                return (false, selected.Select(p => p.Location).ToList(), new List<Violation>());
+            }
             var positions = context.Positions();
-            return Separate(context, positions, spacing, maxIterations, token);
+            return Separate(context, positions, spacing, maxIterations, token, null);
         }
 
         private static void Apply(List<Part> selected, List<Vector> from, List<Vector> to)
@@ -242,12 +317,14 @@ namespace OpenNest.Engine.Fill
             }
         }
 
-        private static double MinimumPairClearance(SeparationContext context, List<Vector> positions)
+        private static double MinimumPairClearance(
+            SeparationContext context, List<Vector> positions, CancellationToken token)
         {
             var min = double.MaxValue;
 
             foreach (var pair in context.Pairs)
             {
+                token.ThrowIfCancellationRequested();
                 var (distance, _) = context.PairClearance(pair.IndexA, pair.IndexB, positions);
                 if (distance < min)
                     min = distance;
@@ -261,7 +338,8 @@ namespace OpenNest.Engine.Fill
             List<Vector> start,
             double spacing,
             int maxIterations,
-            CancellationToken token
+            CancellationToken token,
+            Action<Checkpoint> observer
         )
         {
             var positions = new List<Vector>(start);
@@ -285,7 +363,8 @@ namespace OpenNest.Engine.Fill
 
                 foreach (var pair in context.Pairs)
                 {
-
+                    if (token.IsCancellationRequested)
+                        return (false, start, violations);
                     var (distance, directionA) = context.PairClearance(
                         pair.IndexA,
                         pair.IndexB,
@@ -330,6 +409,9 @@ namespace OpenNest.Engine.Fill
                     {
                         positions[moverIndex] = attempt.Proposal;
                         moved += applied;
+                        observer?.Invoke(Checkpoint.AfterScratchMove);
+                        if (token.IsCancellationRequested)
+                            return (false, start, violations);
                     }
 
                     // A pair fully separated to the user target (the internal margin
@@ -364,6 +446,8 @@ namespace OpenNest.Engine.Fill
             violations.Clear();
             foreach (var pair in context.Pairs)
             {
+                if (token.IsCancellationRequested)
+                    return (false, start, violations);
                 var (distance, directionA) = context.PairClearance(
                     pair.IndexA,
                     pair.IndexB,
@@ -491,8 +575,9 @@ namespace OpenNest.Engine.Fill
                 SpacingCap = spacingCap;
             }
 
-            public static SeparationContext Prepare(List<Part> selected, Plate plate)
+            public static SeparationContext Prepare(List<Part> selected, Plate plate, CancellationToken token)
             {
+                token.ThrowIfCancellationRequested();
                 var movers = new List<Part>(selected);
                 var walls = plate.Parts.Where(p => !movers.Contains(p)).ToList();
                 var clampStart = movers.Count + walls.Count;
@@ -514,6 +599,7 @@ namespace OpenNest.Engine.Fill
 
                 for (var i = 0; i < parts.Count; i++)
                 {
+                    token.ThrowIfCancellationRequested();
                     shapes.Add(PrepareProgram(programs, parts[i].Program));
                     localBoxes[i] = LocalBox(parts[i]);
                 }
@@ -533,10 +619,13 @@ namespace OpenNest.Engine.Fill
                     workArea,
                     spacingCap
                 );
-                context.BuildPairs();
+                context.BuildPairs(token);
                 var entry = context.Positions();
                 foreach (var pair in context.Pairs)
+                {
+                    token.ThrowIfCancellationRequested();
                     pair.EntryFloor = context.PairClearance(pair.IndexA, pair.IndexB, entry).Distance;
+                }
                 return context;
             }
 
@@ -609,10 +698,11 @@ namespace OpenNest.Engine.Fill
                 );
             }
 
-            private void BuildPairs()
+            private void BuildPairs(CancellationToken token)
             {
                 for (var a = 0; a < parts.Count; a++)
                 {
+                    token.ThrowIfCancellationRequested();
                     for (var b = a + 1; b < parts.Count; b++)
                     {
                         var aMover = a < moverCount;
