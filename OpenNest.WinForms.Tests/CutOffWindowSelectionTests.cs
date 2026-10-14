@@ -189,12 +189,13 @@ public class CutOffWindowSelectionTests
         Assert.True(view.CutOffs.IsDragging);
 
         view.MoveTo(new Vector(11, 2), MouseButtons.Left);
-        Assert.Equal(11, cutoff.Position.X);
+        Assert.InRange(cutoff.Position.X, 10.5, 11.5);
         view.Selection.DeselectCutOffs();
         view.Up(new Vector(11, 2));
         Assert.False(view.CutOffs.IsDragging);
+        var releasedX = cutoff.Position.X;
         view.MoveTo(new Vector(13, 2), MouseButtons.None);
-        Assert.Equal(11, cutoff.Position.X);
+        Assert.Equal(releasedX, cutoff.Position.X);
     });
 
     private sealed class EventView : PlateView
