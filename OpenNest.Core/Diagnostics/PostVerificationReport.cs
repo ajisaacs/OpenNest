@@ -24,6 +24,8 @@ public sealed record PostVerificationFinding(PostVerificationKind Kind, int Plat
     /// <summary>Rapid boundary contacts in travel order; collinear contact spans use their endpoints.</summary>
     public IReadOnlyList<Vector> ContactPoints { get; init; } = Array.Empty<Vector>();
     public PlateOverlapPair Overlap { get; init; }
+    /// <summary>Active clamp contacted by a cut-off or direct XY rapid, if applicable.</summary>
+    public string ClampId { get; init; }
 }
 
 /// <summary>Owned, immutable findings. Consent is evaluated afresh, never stored.</summary>

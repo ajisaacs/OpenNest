@@ -83,6 +83,16 @@ internal sealed class CuttingDependencyGraph
         {
             if (!nodes[cut].IsCutOff)
                 continue;
+            if (nodes[cut].SeparatesSheet)
+            {
+                // Cutting a line that splits the sheet comes after every part and every other
+                // cutoff, so the head never travels back across the separated edge. Such a line
+                // is continuous, so it passes through no part and needs no crossing edge.
+                for (var other = 0; other < nodes.Count; other++)
+                    if (!nodes[other].SeparatesSheet)
+                        edges[cut].Add(other);
+                continue;
+            }
             var definition = nodes[cut].CutOff;
             for (var part = 0; part < nodes.Count; part++)
             {
@@ -190,9 +200,10 @@ internal sealed class DependencyNode
     private LeadMaterialSnapshot material;
 
     internal DependencyNode(bool isCutOff, CutOffDefinition cutOff, Box placedBounds, Box cleanBounds,
-        Func<LeadMaterialSnapshot> materialFactory)
+        Func<LeadMaterialSnapshot> materialFactory, bool separatesSheet = false)
     {
         IsCutOff = isCutOff;
+        SeparatesSheet = isCutOff && separatesSheet;
         CutOff = cutOff;
         PlacedBounds = Copy(placedBounds);
         CleanBounds = cleanBounds == null ? null : Copy(cleanBounds);
@@ -201,6 +212,8 @@ internal sealed class DependencyNode
     }
 
     internal bool IsCutOff { get; }
+    /// <summary>A cutoff whose placed program is one continuous cut across the whole sheet.</summary>
+    internal bool SeparatesSheet { get; }
     internal CutOffDefinition CutOff { get; }
     internal Box PlacedBounds { get; }
     internal Box CleanBounds { get; }

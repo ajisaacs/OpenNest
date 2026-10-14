@@ -67,6 +67,42 @@ or invalid Fill proposal leaves singles and pairs available. Large enclosed-pock
 pending the hole-geometry integration; containment cutting order and shop-use safety acceptance
 remain separate sequencer/verification work.
 
+## Rectangular clamp zones
+
+Whole-job Rectangles and Irregular exclude each stock's rectangular clamp zones,
+expanded on all sides by its bottom edge spacing. Part spacing is not added to clamp
+clearance. Default runs and validates both lanes as usual. Empty clamp collections
+leave the existing packing path unchanged; clamps never become requested or placed parts.
+
+Every `Plate`, including plates the engine builds from stock, stores clamp zones relative
+to the sheet's lower-left corner; `NestPlateStock.ClampZones` carries them in the signed
+placement frame of part coordinates. Code that compares a plate's zones with parts, cuts
+or motions maps them through `ClampZoneFrame.ToPlacement`, which reproduces the stock's
+zones exactly; reading `Plate.ClampZones` bounds directly is wrong in quadrants 2-4.
+
+Irregular prepares static rectangle obstacles and their cached no-fit polygons once
+per stock per solve, separately from the part-spacing cache. Every orientation's initial
+free region excludes these obstacles, including extra orientations introduced by pairs
+or Fill blocks. Blocks still size their proposals from work-area/placed-part rectangles;
+member free regions determine whether the whole proposal can actually fit around clamps.
+Open notches and material between clamps remain available. Inflated synthetic rectangles
+are enclosed on the existing clipping grid before NFP preparation, retaining at least one
+grid interval per axis so positive sub-grid clamps cannot disappear. Existing arc/grid
+safety margins, covered-hole certification and cancellation apply without relaxed tolerances.
+
+Rectangles blocks each clamp's keep-out out of its free list. When part spacing is so
+large that the spacing-adjusted block would invert, it blocks a zero-width line at the
+clamp edge facing the sheet interior instead: parts on that side keep the exact clearance
+and the unavoidable extra exclusion falls toward the nearer sheet edge. Keep-outs narrower
+than 0.001" on either axis are judged by a tolerance-free rectangle test
+(`KeepOutOverlap`) in layout validation, interactive fill and the overlap check, so they
+can neither crash validation nor be called clear.
+
+Desktop clamp editing, the stock-size resolution of a nest's clamp rail, last-resort clamp
+removal and the other clamp-aware tools are described in
+[automatic nesting](automatic-nesting.md#machine-edge-clamps). Other engines and
+plug-ins have not gained clamp-aware placement from this change.
+
 ## Repeating completed layouts
 
 Rectangles and Irregular can skip repeated sheet searches after selecting one nonempty layout

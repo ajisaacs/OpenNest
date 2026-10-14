@@ -33,6 +33,13 @@ public class ExpanderTests
         return part;
     }
 
+    private static Part AddRectangle(Plate plate, double x, double y, double length, double width)
+    {
+        var part = new Part(new Drawing($"rect{plate.Parts.Count}", Rectangle(length, width)), new Vector(x, y));
+        plate.Parts.Add(part);
+        return part;
+    }
+
     private static Plate MakePlate(double lengthX, double widthY, double edge = 0.5)
     {
         var plate = new Plate(new Size(widthY, lengthX));
@@ -325,6 +332,323 @@ public class ExpanderTests
         Assert.Throws<ArgumentException>(() => Expander.Expand(new List<Part> { a }, plate));
         Assert.Throws<ArgumentException>(() => Expander.Expand(new List<Part> { a, stranger }, plate));
         Assert.Throws<ArgumentNullException>(() => Expander.Expand(new List<Part> { a, a }, null));
+    }
+
+    [Fact]
+    public void Separate_PreservesEachEntryGap_EvenWhenTargetIsSmaller()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var mover = AddSquare(plate, 4, 4, 2);
+        var wall = AddSquare(plate, 12, 4, 2);
+        var initialWallGap = wall.Location.X - (mover.Location.X + 2);
+
+        var (converged, positions, _) = Expander.Separate(
+            new List<Part> { anchor, mover }, plate, spacing: 3
+        );
+
+        // The wall is six units away at entry. Merely clearing the requested
+        // three-unit spacing is not permission to consume that original gap.
+        Assert.True(positions[1].X + 2 <= wall.Location.X - initialWallGap + 1e-6,
+            $"entry gap {initialWallGap}, proposed gap {wall.Location.X - positions[1].X - 2}");
+        Assert.Equal(new Vector(4, 4), mover.Location);
+        Assert.Equal(new Vector(12, 4), wall.Location);
+        Assert.False(converged); // This direct translation cannot reach 3 safely.
+    }
+
+    [Fact]
+    public void Separate_RetriesMiddleAfterLaterBlockerMoves()
+    {
+        var plate = MakePlate(60, 14, edge: 0);
+        var first = AddSquare(plate, 5, 5);
+        var middle = AddSquare(plate, 10, 5);
+        var last = AddSquare(plate, 14, 5);
+        var selected = new List<Part> { first, middle, last };
+
+        var (converged, positions, violations) = Expander.Separate(selected, plate, spacing: 2);
+        Assert.True(converged, $"remaining: {violations.Count}");
+        Assert.Empty(violations);
+        Assert.Equal(5, positions[0].X);
+        Assert.True(positions[1].X >= 11 - 1e-4);
+        Assert.True(positions[2].X >= positions[1].X + 6 - 1e-4);
+        Assert.Equal(10, middle.Location.X); // Separate is scratch-only.
+        Assert.Equal(14, last.Location.X);
+
+        var result = Expander.Expand(selected, plate, new Expander.Options { MaxSpacing = 2 });
+        Assert.True(result.AchievedSpacing >= 1.99, $"achieved {result.AchievedSpacing}");
+        Assert.True(middle.Location.X >= 11 - 1e-4);
+        Assert.True(last.Location.X >= middle.Location.X + 6 - 1e-4);
+        Assert.Equal(5, first.Location.X);
+    }
+
+    [Fact]
+    public void Separate_CannotPassThroughFullHeightWall_ToClearEndpoint()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var moving = AddSquare(plate, 4, 4, 2);
+        var wall = AddRectangle(plate, 6.5, 0, 0.2, 12);
+
+        // Target 5 puts the otherwise clear endpoint beyond the wall AND
+        // preserves the entry wall gap of 0.5. An endpoint-only check passes it.
+        var (converged, poses, violations) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 5
+        );
+        Assert.False(converged);
+        Assert.NotEmpty(violations);
+        Assert.True(poses[1].X + 2 <= wall.Location.X + 1e-6,
+            $"move crossed wall: right={poses[1].X + 2}, wall={wall.Location.X}");
+        Assert.Equal(4, moving.Location.X); // public Separate never commits.
+        Assert.Equal(6.5, wall.Location.X);
+
+        var result = Expander.Expand(new List<Part> { anchor, moving }, plate,
+            new Expander.Options { InitialStep = 5, MaxSpacing = 5 });
+        Assert.True(moving.Location.X + 2 <= wall.Location.X + 1e-6);
+        Assert.True(result.AchievedSpacing < 5);
+    }
+
+    [Fact]
+    public void Separate_OverlappingPair_CannotExitAcrossThirdWall()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 5, 4);
+        var moving = AddSquare(plate, 7, 4); // Overlaps anchor by two.
+        var wall = AddRectangle(plate, 12, 0, 0.2, 12);
+
+        var (converged, poses, violations) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 5
+        );
+        Assert.False(converged);
+        Assert.NotEmpty(violations);
+        Assert.True(poses[1].X + 4 <= wall.Location.X + 1e-6,
+            $"overlap exit crossed third wall: {poses[1].X}");
+        Assert.Equal(7, moving.Location.X);
+        Assert.Equal(12, wall.Location.X);
+    }
+
+    [Fact]
+    public void Separate_CannotCrossOppositeCutoutWall()
+    {
+        var plate = MakePlate(40, 20, edge: 0);
+        var host = new Part(new Drawing("host", RectangleWithHole(10, 10, 0.2, 0.2, 9.6, 9.6)), new Vector(5, 1));
+        plate.Parts.Add(host);
+        var anchor = AddSquare(plate, 1, 5, 1);
+        var moving = AddSquare(plate, 5.2, 5, 1); // Touches inner left wall.
+
+        var (converged, poses, _) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 14
+        );
+        Assert.False(converged);
+        Assert.True(poses[1].X + 1 <= 14.8 + 1e-6,
+            $"insert crossed opposite hole wall: {poses[1].X}");
+        Assert.Equal(5.2, moving.Location.X);
+    }
+
+    [Fact]
+    public void Separate_TinyClampZone_IsNotAnInvisibleWall()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        plate.ClampZones.Add(new ClampZone("tiny", new Box(6.5, 0, 1e-5, 1e-5)));
+        var anchor = AddSquare(plate, 1, 0, 2);
+        var moving = AddSquare(plate, 4, 0, 2);
+
+        var (converged, poses, _) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 6
+        );
+        Assert.False(converged);
+        Assert.True(poses[1].X + 2 <= 6.5 + 1e-6,
+            $"crossed tiny clamp at x=6.5: right={poses[1].X + 2}");
+        Assert.Equal(4, moving.Location.X);
+    }
+
+    [Fact]
+    public void Separate_RemoteTinyClampDoesNotPinUnrelatedGrowth()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        plate.ClampZones.Add(new ClampZone("tiny", new Box(0, 0, 1e-5, 1e-5)));
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var moving = AddSquare(plate, 4, 4, 2);
+
+        var (converged, poses, violations) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 3
+        );
+        Assert.True(converged, $"remote zone pinned growth: {violations.Count} violations, " +
+            $"poses {poses[0].X:R},{poses[1].X:R}; " +
+            string.Join("; ", violations.Select(v => $"{v.A.BaseDrawing.Name}/{v.B.BaseDrawing.Name}={v.Achieved:R}")));
+        Assert.True(poses[1].X >= 6 - 1e-4);
+        Assert.Equal(4, moving.Location.X);
+    }
+
+    [Fact]
+    public void Separate_TouchingHoleWall_UsesOppositeDirectionToOpenGap()
+    {
+        var plate = MakePlate(40, 24, edge: 0);
+        var host = new Part(new Drawing("host", RectangleWithHole(20, 20, 5, 5, 10, 10)), new Vector(0, 0));
+        plate.Parts.Add(host);
+        var insert = AddSquare(plate, 13, 9, 2);
+
+        var (converged, poses, violations) = Expander.Separate(
+            new List<Part> { insert }, plate, spacing: 1
+        );
+        Assert.True(converged, $"contact still blocked: {violations.Count}");
+        Assert.True(poses[0].X <= 12 + 1e-4, $"insert at x={poses[0].X}");
+        Assert.True(poses[0].X >= 5 + 1 - 1e-4);
+        Assert.Equal(13, insert.Location.X);
+        Assert.Equal(0, host.Location.X);
+    }
+
+    [Theory]
+    [InlineData(13, 9)]
+    [InlineData(5, 9)]
+    [InlineData(9, 13)]
+    [InlineData(9, 5)]
+    [InlineData(12.9, 9)] // Positive gap uses its ordinary nearest-boundary direction.
+    public void Separate_FourHoleSides_ReachARealUnitGap(double x, double y)
+    {
+        var plate = MakePlate(40, 24, edge: 0);
+        var host = new Part(new Drawing("host", RectangleWithHole(20, 20, 5, 5, 10, 10)), Vector.Zero);
+        plate.Parts.Add(host);
+        var insert = AddSquare(plate, x, y, 2);
+
+        var (converged, poses, violations) = Expander.Separate(new List<Part> { insert }, plate, 1);
+        Assert.True(converged, $"{x},{y}: {violations.Count} violations");
+        Assert.InRange(poses[0].X, 6 - 1e-4, 12 + 1e-4);
+        Assert.InRange(poses[0].Y, 6 - 1e-4, 12 + 1e-4);
+        Assert.Equal(x, insert.Location.X);
+        Assert.Equal(y, insert.Location.Y);
+    }
+
+    [Fact]
+    public void Expand_TouchingHoleInsertWithSecondSelectedPart_StaysInsideCutout()
+    {
+        var plate = MakePlate(40, 24, edge: 0);
+        var host = new Part(new Drawing("host", RectangleWithHole(20, 20, 5, 5, 10, 10)), Vector.Zero);
+        plate.Parts.Add(host);
+        var insert = AddSquare(plate, 13, 9, 2);
+        var other = AddSquare(plate, 30, 9, 2);
+
+        var result = Expander.Expand(new List<Part> { insert, other }, plate,
+            new Expander.Options { MaxSpacing = 1 });
+        Assert.False(result.Cancelled);
+        Assert.True(result.AchievedSpacing >= 0.99);
+        Assert.InRange(insert.Location.X, 6 - 1e-4, 12 + 1e-4);
+        Assert.False(MateriallyOverlaps(insert, host));
+        Assert.Equal(0, host.Location.X);
+    }
+
+    [Fact]
+    public void Separate_ReportsPartBlockerRatherThanPlateEdge()
+    {
+        var plate = MakePlate(20, 20, edge: 0);
+        var pinned = AddSquare(plate, 8, 8);
+        AddSquare(plate, 3.8, 8);
+        AddSquare(plate, 12.2, 8);
+        AddSquare(plate, 8, 3.8);
+        AddSquare(plate, 8, 12.2);
+
+        var (_, poses, violations) = Expander.Separate(new List<Part> { pinned }, plate, 1);
+        Assert.NotEmpty(violations);
+        Assert.All(violations, v => Assert.False(v.BlockedByEdge,
+            $"{v.B.BaseDrawing.Name}: blocker before the work-area edge, pose={poses[0]}"));
+    }
+
+    [Fact]
+    public void Separate_ReportsActualPlateEdgeWhenItLimitsMovement()
+    {
+        var plate = MakePlate(12, 12, edge: 0);
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var moving = AddSquare(plate, 7, 4, 2);
+
+        var (_, poses, violations) = Expander.Separate(new List<Part> { anchor, moving }, plate, 9);
+        var pair = Assert.Single(violations.Where(v => ReferenceEquals(v.A, anchor) && ReferenceEquals(v.B, moving)));
+        Assert.True(pair.BlockedByEdge);
+        Assert.True(poses[1].X + 2 <= 12 + 1e-6);
+    }
+
+    [Fact]
+    public void Separate_ReportsPartBeforeFartherEdge_OnNarrowPlate()
+    {
+        var plate = MakePlate(9, 2, edge: 0);
+        var anchor = AddSquare(plate, 0, 0, 2);
+        var moving = AddSquare(plate, 3, 0, 2);
+        var wall = AddRectangle(plate, 5.5, 0, 0.2, 2);
+
+        var (_, poses, violations) = Expander.Separate(new List<Part> { anchor, moving }, plate, 4);
+        var pair = Assert.Single(violations.Where(v => ReferenceEquals(v.A, anchor) && ReferenceEquals(v.B, moving)));
+        Assert.False(pair.BlockedByEdge);
+        Assert.True(poses[1].X + 2 <= wall.Location.X + 1e-6);
+    }
+
+    [Theory]
+    [InlineData((int)Expander.Checkpoint.AfterScratchMove)]
+    [InlineData((int)Expander.Checkpoint.AfterSuccessfulProbe)]
+    [InlineData((int)Expander.Checkpoint.BeforeApply)]
+    public void Expand_CancellationAtDeterministicCheckpoint_LeavesLiveStateBitIdentical(int stage)
+    {
+        var cancelAt = (Expander.Checkpoint)stage;
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 5, 4);
+        var moving = AddSquare(plate, 10, 4);
+        var wall = AddSquare(plate, 0, 4);
+        var before = plate.Parts.Select(p => (
+            Part: p, Program: p.Program,
+            X: BitConverter.DoubleToInt64Bits(p.Location.X),
+            Y: BitConverter.DoubleToInt64Bits(p.Location.Y),
+            Left: BitConverter.DoubleToInt64Bits(p.BoundingBox.Left))).ToArray();
+        var partSpacing = plate.PartSpacing;
+        var edgeSpacing = plate.EdgeSpacing;
+        using var cts = new CancellationTokenSource();
+        var seen = false;
+
+        var result = Expander.ExpandObserved(new List<Part> { anchor, moving }, plate,
+            new Expander.Options { MaxSpacing = 3 }, checkpoint =>
+            {
+                if (checkpoint != cancelAt)
+                    return;
+                seen = true;
+                cts.Cancel();
+            }, cts.Token);
+
+        Assert.True(seen, $"checkpoint {cancelAt} was not reached");
+        Assert.True(result.Cancelled);
+        foreach (var state in before)
+        {
+            Assert.Same(state.Program, state.Part.Program);
+            Assert.Equal(state.X, BitConverter.DoubleToInt64Bits(state.Part.Location.X));
+            Assert.Equal(state.Y, BitConverter.DoubleToInt64Bits(state.Part.Location.Y));
+            Assert.Equal(state.Left, BitConverter.DoubleToInt64Bits(state.Part.BoundingBox.Left));
+        }
+        Assert.Equal(partSpacing, plate.PartSpacing);
+        Assert.Equal(edgeSpacing, plate.EdgeSpacing);
+        Assert.Equal(0, wall.Location.X);
+    }
+
+    [Fact]
+    public void Separate_PinnedBetweenFixedParts_StopsAfterOneNoProgressPass()
+    {
+        var plate = MakePlate(20, 20, edge: 0);
+        var pinned = AddSquare(plate, 8, 8);
+        AddSquare(plate, 3.8, 8);
+        AddSquare(plate, 12.2, 8);
+        AddSquare(plate, 8, 3.8);
+        AddSquare(plate, 8, 12.2);
+        var passes = 0;
+        var initial = pinned.Location;
+
+        var (converged, poses, violations) = Expander.SeparateObserved(
+            new List<Part> { pinned }, plate, spacing: 1,
+            checkpoint =>
+            {
+                if (checkpoint == Expander.Checkpoint.AfterPairPass)
+                    passes++;
+            }, maxIterations: 10000
+        );
+
+        Assert.False(converged);
+        Assert.NotEmpty(violations);
+        Assert.Equal(1, passes); // Not a MaxIterations spin or wall-clock assertion.
+        Assert.Equal(initial, poses[0]);
+        Assert.Equal(initial, pinned.Location);
     }
 
     [Fact]

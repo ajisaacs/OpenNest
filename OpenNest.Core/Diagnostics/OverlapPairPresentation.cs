@@ -9,12 +9,19 @@ namespace OpenNest.Diagnostics;
 /// <summary>Read-only pair presentation; no geometry preparation or collision queries.</summary>
 public static class OverlapPairPresentation
 {
-    public static string Label(PlateOverlapPair pair) => $"{pair.PartAId + 1}/{pair.PartBId + 1}";
+    /// <summary>True for part-vs-clamp findings carried on the report (negative clamp slot).</summary>
+    public static bool IsClampFinding(PlateOverlapPair pair) => pair.PartBId < 0;
+
+    public static string Label(PlateOverlapPair pair) =>
+        IsClampFinding(pair) ? $"{pair.PartAId + 1}/clamp" : $"{pair.PartAId + 1}/{pair.PartBId + 1}";
 
     public static string Details(PlateOverlapPair pair, Units capturedUnits, IFormatProvider provider = null)
     {
         var units = UnitsHelper.GetShortString(capturedUnits);
-        return $"Pair {Label(pair)}: {pair.PartAName} / {pair.PartBName}\n"
+        var head = IsClampFinding(pair)
+            ? $"Clamp overlap: {pair.PartAName} / {pair.PartBName}"
+            : $"Pair {Label(pair)}: {pair.PartAName} / {pair.PartBName}";
+        return head + "\n"
             + $"Shared area ≈ {Number(pair.Area, provider)} {units}²\n"
             + $"Centroid: ({Number(pair.Centroid.X, provider)}, {Number(pair.Centroid.Y, provider)}) {units}";
     }

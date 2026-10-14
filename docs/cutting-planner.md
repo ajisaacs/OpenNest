@@ -95,6 +95,15 @@ the final replay enforce them:
   plate-scoped request; they are always fixed programs, need no lead-in, are not
   material for lead validation and, being open cuts, never become rapid obstacles.
   Rapids into and out of them are still checked.
+- A cutoff that splits the whole sheet is cut after every part and every other
+  cutoff, so the head never travels back across the separated edge. It qualifies
+  when its placed program is one continuous straight cut on its own line spanning
+  the sheet from edge to edge (`CutOff.SeparatesSheet`). A line trimmed around parts,
+  limited short of an edge, on the sheet edge, stale after a move or in an
+  unrecognised program form does not qualify and keeps the crossing rule above.
+  Being continuous, a separating line passes through no part. A kept order that cuts
+  it earlier is a constraint conflict naming the separating cutoff (user decision,
+  2026-10-13).
 - A part whose perimeter lies strictly inside a cutout of another part precedes
   that host. Material bounds (never rapids or scribe marks) only select candidate
   pairs; containment is proven on native clean material. Touching or crossing boundaries, or material that cannot be
@@ -411,6 +420,25 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   whole-part order; either change replans. The settings are confirmed parameters: every
   unlocked part's lead-ins are regenerated. Locked parts keep their exact programs;
   the strict route checks them, while any best-effort warnings require explicit review below.
+- When a plate in scope already carries applied lead-ins or cut-offs, a red banner
+  above the settings says how many (and how many lead-ins are locked), and that the
+  plan keeps locked lead-ins and existing cut-offs unchanged. `Clear Lead-ins &
+  Cut-offs...` asks first, then removes every applied lead-in (locked and hand-placed
+  ones too), every cut-off and the plates' recorded cutting settings, keeping part
+  poses, order and quantities, and replans from scratch. There is no undo.
+- `Add automatic scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
+  889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every plate in scope
+  *before* capture, so the cutting plan sequences the new lines like any
+  other cut-off. These are the only live changes made before Apply: Apply keeps them,
+  while unticking the box, Cancel/Close or switching to Validate removes them and
+  restores the earlier cut-offs and sequence. A blocked cut-off plan adds nothing and
+  plans nothing; the panel names the plate and reason.
+  `Cut-off Settings...` opens the Automatic Scrap Cut-offs dialog in settings mode for
+  the same scope: it previews on the active plate as usual, but `Use These Settings`
+  only returns the values (it adds nothing), ticks the box and replans. The panel
+  remembers the last settings per unit system until the application closes. Cut-off
+  order follows the dependency rules above: crossing cut-offs before the parts they
+  pass through, sheet-separating cut-offs last.
 - Lead-ins are optional for planning. With `None` (or a style that emits no lead
   motion), the emitter places the pierce directly on the selected contour point.
   Unlocked contour starts can still move to improve travel; locked programs keep

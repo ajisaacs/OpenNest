@@ -176,6 +176,20 @@ public static class NestPipeline
         var solveTime = clock.Elapsed;
         token.ThrowIfCancellationRequested();
 
+        // D8/C10: only the main (non-cutout-preview) path offers last-resort clamp removal.
+        // No-op whenever nothing is blocked, so an ordinary solve is unaffected (C10).
+        if (prepass == null)
+        {
+            var recovered = ClampRemovalRecovery.TryRecover(job, raw, engine, token);
+            if (recovered != null)
+            {
+                job = recovered.Job;
+                engineJob = recovered.Job;
+                raw = recovered.Result;
+            }
+        }
+        token.ThrowIfCancellationRequested();
+
         clock.Restart();
         var names = drawingsByPartId.ToDictionary(
             kv => kv.Key,

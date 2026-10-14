@@ -36,6 +36,7 @@ internal sealed class OverlapOverlayController : IDisposable
     private IReadOnlyList<PlateOverlapPair> pathPairs;
     private float pathScale;
     private Units capturedUnits;
+    private Plate observedPlate;
     private IReadOnlyList<PlateOverlapPair> hoveredPairs = Array.Empty<PlateOverlapPair>();
     private string hoverText;
     private OverlapHoverPages hoverPages;
@@ -110,6 +111,9 @@ internal sealed class OverlapOverlayController : IDisposable
         autoCheck.Reset();
         baseline = null;
         ReleasePath();
+        observedPlate = plate;
+        if (observedPlate != null)
+            observedPlate.ClampZonesChanged += ZonesChanged;
         observedParts = plate?.Parts;
         if (observedParts != null)
         {
@@ -144,7 +148,7 @@ internal sealed class OverlapOverlayController : IDisposable
         try
         {
             // Do not include PreviewManager parts. Capture owns clean geometry and stable names.
-            var snapshot = PlateOverlapAnalyzer.Capture(plate.Parts.ToArray(), materialCache, token);
+            var snapshot = PlateOverlapAnalyzer.CapturePlate(plate, materialCache, token);
             var previous = baseline;
             var analyze = Analyze ?? ((input, cancel) => PlateOverlapAnalyzer.Analyze(input, previous, cancel));
             var report = await Task.Run(() => analyze(snapshot, token), token);
@@ -331,6 +335,7 @@ internal sealed class OverlapOverlayController : IDisposable
         || System.Windows.Forms.Application.OpenForms.Cast<System.Windows.Forms.Form>()
             .Any(form => form.Modal || form is NestProgressForm);
 
+    private void ZonesChanged(object sender, EventArgs e) => Invalidate();
     private void PartAdded(object sender, ItemAddedEventArgs<Part> e) => Invalidate();
     private void PartRemoved(object sender, ItemRemovedEventArgs<Part> e) => Invalidate();
     private void PartChanged(object sender, ItemChangedEventArgs<Part> e) => Invalidate();
@@ -338,6 +343,11 @@ internal sealed class OverlapOverlayController : IDisposable
 
     private void Unsubscribe()
     {
+        if (observedPlate != null)
+        {
+            observedPlate.ClampZonesChanged -= ZonesChanged;
+            observedPlate = null;
+        }
         if (observedParts == null)
             return;
         observedParts.ItemAdded -= PartAdded;
@@ -370,6 +380,8 @@ internal sealed class OverlapOverlayController : IDisposable
             if (ShowsCentroids)
                 DrawCentroids(graphics);
         }
+        if (state.DisplayMode != OverlapDisplayMode.Off)
+            DrawCutOffClampContacts(graphics);
         DrawStateLabel(graphics);
     }
 
@@ -418,7 +430,7 @@ internal sealed class OverlapOverlayController : IDisposable
 
         // Graph coordinates are already screen-scaled; remove pan from the pointer once.
         var graphPoint = view.PointControlToGraph(point);
-        var hits = OverlapPairPresentation.HitTest(state.Report.Pairs, world =>
+        var hits = OverlapPairPresentation.HitTest(state.DisplayPairs, world =>
         {
             var graph = view.PointWorldToGraph(world);
             return new Vector(graph.X, graph.Y);
@@ -584,6 +596,32 @@ internal sealed class OverlapOverlayController : IDisposable
         {
             next.Dispose();
             throw;
+        }
+    }
+
+    private void DrawCutOffClampContacts(Graphics graphics)
+    {
+        var dpi = view.DeviceDpi / 96f;
+        using var halo = new Pen(Color.White, 4 * dpi);
+        using var warning = new Pen(Color.DarkRed, 2 * dpi);
+        foreach (var finding in state.DisplayCutOffClampFindings)
+        {
+            var point = view.PointWorldToGraph(finding.Location);
+            if (!float.IsFinite(point.X) || !float.IsFinite(point.Y))
+                continue;
+            foreach (var pen in new[] { halo, warning })
+            {
+                graphics.DrawLine(pen, point.X - 8 * dpi, point.Y - 8 * dpi,
+                    point.X + 8 * dpi, point.Y + 8 * dpi);
+                graphics.DrawLine(pen, point.X - 8 * dpi, point.Y + 8 * dpi,
+                    point.X + 8 * dpi, point.Y - 8 * dpi);
+            }
+            var label = $"Cut-off {finding.CutOffIndex + 1} / {finding.ClampId}";
+            var size = graphics.MeasureString(label, view.Font);
+            var x = point.X + 10 * dpi;
+            var y = point.Y - size.Height;
+            graphics.FillRectangle(Brushes.White, x, y, size.Width, size.Height);
+            graphics.DrawString(label, view.Font, Brushes.DarkRed, x, y);
         }
     }
 

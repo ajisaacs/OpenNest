@@ -80,6 +80,16 @@ namespace OpenNest.Geometry
             return Separation(linesA, linesB);
         }
 
+        /// <summary>Distance from a closed boundary's segments to every segment
+        /// of an intentional open cutting path. Unlike polygonizing that path,
+        /// this retains segment interiors and disjoint subpaths.</summary>
+        internal static ClearanceResult BoundaryDistance(List<Line> closed, List<Line> open)
+        {
+            if (closed.Count == 0 || open.Count == 0)
+                return new ClearanceResult(0, new Vector(1, 0));
+            return Separation(closed, open);
+        }
+
         /// <summary>
         /// Minimum boundary distance between two non-overlapping rings and the
         /// direction that translates <paramref name="linesA"/> away from

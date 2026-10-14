@@ -168,6 +168,80 @@ namespace OpenNest.Controls
                 DrawAllCutDirectionArrows(g);
         }
 
+        // Machine clamps are fixtures, not material: a hatched amber keep-out drawn over the
+        // sheet and parts (translucent, so a part placed on a clamp stays visible). They take
+        // part in no hit test, selection or sequencing.
+        private static readonly Color ClampHatchColor = Color.FromArgb(150, 70, 80, 90);
+        private static readonly Color ClampBackColor = Color.FromArgb(70, 230, 170, 40);
+        private static readonly Color ClampOutlineColor = Color.FromArgb(220, 150, 100, 0);
+
+        public void DrawClampZones(Graphics g)
+        {
+            var plate = view.DisplayPlate;
+            if (plate == null || plate.ClampZones.Count == 0)
+                return;
+
+            // Zones are in plate coordinates (lower-left sheet corner); move them to the
+            // sheet's place around the origin, as DrawPlate places the sheet itself.
+            var left = plate.Quadrant is 2 or 3 ? -plate.Size.Length : 0;
+            var bottom = plate.Quadrant is 3 or 4 ? -plate.Size.Width : 0;
+
+            using var fill = new HatchBrush(HatchStyle.WideUpwardDiagonal, ClampHatchColor, ClampBackColor);
+            using var pen = new Pen(ClampOutlineColor, 1.5f);
+
+            foreach (var zone in plate.ClampZones)
+            {
+                var box = zone.Bounds.Translate(left, bottom);
+                var rect = new RectangleF
+                {
+                    Location = view.PointWorldToGraph(box.Location),
+                    Width = view.LengthWorldToGui(box.Length),
+                    Height = view.LengthWorldToGui(box.Width),
+                };
+                rect.Y -= rect.Height;
+
+                g.FillRectangle(fill, rect);
+                g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+            }
+        }
+
+        // D8: a clamp Auto Nest pulled as a last resort. Distinct from an active clamp - a
+        // dashed grey outline and a small "remove" marker, still display + exclusion only
+        // (no hit test, selection or sequencing).
+        private static readonly Color RemovedClampOutlineColor = Color.FromArgb(200, 110, 110, 110);
+
+        public void DrawRemovedClamps(Graphics g)
+        {
+            var plate = view.DisplayPlate;
+            if (plate?.ClampRail == null || plate.RemovedClamps.Count == 0)
+                return;
+
+            var left = plate.Quadrant is 2 or 3 ? -plate.Size.Length : 0;
+            var bottom = plate.Quadrant is 3 or 4 ? -plate.Size.Width : 0;
+
+            using var pen = new Pen(RemovedClampOutlineColor, 1.5f) { DashStyle = DashStyle.Dash };
+            using var font = new Font(FontFamily.GenericSansSerif, 7f);
+            using var textBrush = new SolidBrush(RemovedClampOutlineColor);
+
+            foreach (var zone in plate.ClampRail.ResolveFor(plate.Size, plate.Quadrant))
+            {
+                if (!plate.RemovedClamps.Contains(zone.Id))
+                    continue;
+
+                var box = zone.Bounds.Translate(left, bottom);
+                var rect = new RectangleF
+                {
+                    Location = view.PointWorldToGraph(box.Location),
+                    Width = view.LengthWorldToGui(box.Length),
+                    Height = view.LengthWorldToGui(box.Width),
+                };
+                rect.Y -= rect.Height;
+
+                g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+                g.DrawString("remove", font, textBrush, rect.X, rect.Y - font.GetHeight(g));
+            }
+        }
+
         public void DrawCutOffs(Graphics g)
         {
             var plate = view.DisplayPlate;

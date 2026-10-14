@@ -65,6 +65,21 @@ namespace OpenNest
             return plate;
         }
 
+        /// <summary>
+        /// Makes <paramref name="rail"/> this nest's machine clamp rail: new plates follow it
+        /// (<see cref="PlateSettings.ClampRail"/>) and every existing plate re-resolves its
+        /// zones from it. Null, or a rail without clamps, removes the rail and every plate's
+        /// zones; the rail is nest-wide, so per-plate zones are replaced either way.
+        /// </summary>
+        public void SetClampRail(ClampRail rail)
+        {
+            if (rail != null && rail.Centers.Count == 0)
+                rail = null;
+            PlateDefaults.ClampRail = rail;
+            foreach (var plate in Plates)
+                plate.SetClampRail(rail);
+        }
+
         public void UpdateDrawingQuantities()
         {
             foreach (var drawing in Drawings)
@@ -114,6 +129,12 @@ namespace OpenNest
                 set { plate.PartSpacing = value; }
             }
 
+            /// <summary>
+            /// The machine clamp rail new plates follow, or null for none. Set through
+            /// <see cref="Nest.SetClampRail"/> to also update existing plates.
+            /// </summary>
+            public ClampRail ClampRail { get; set; }
+
             public void SetFromExisting(Plate plate)
             {
                 Quadrant = plate.Quadrant;
@@ -124,7 +145,7 @@ namespace OpenNest
 
             public Plate CreateNew()
             {
-                return new Plate()
+                var created = new Plate()
                 {
                     Size = Size,
                     EdgeSpacing = EdgeSpacing,
@@ -132,6 +153,9 @@ namespace OpenNest
                     Quadrant = Quadrant,
                     Quantity = 1,
                 };
+                if (ClampRail != null)
+                    created.SetClampRail(ClampRail);
+                return created;
             }
         }
     }

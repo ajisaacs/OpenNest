@@ -11,20 +11,71 @@ public sealed class OverlapGeometryStamp
 {
     private readonly Plate plate;
     private readonly Entry[] entries;
+    private readonly (string Id, long X, long Y, long Length, long Width)[] zones;
+    private readonly (CutOff Definition, CutOffAxis Axis, long X, long Y, long? Start, long? End)[] cutoffs;
+    private readonly (long Width, long Length, int Quadrant) sheet;
 
     private OverlapGeometryStamp(Plate plate)
     {
         this.plate = plate;
+        sheet = SheetState(plate);
         entries = new Entry[plate.Parts.Count];
         for (var i = 0; i < entries.Length; i++)
             entries[i] = new Entry(plate.Parts[i]);
+        zones = new (string, long, long, long, long)[plate.ClampZones.Count];
+        for (var i = 0; i < zones.Length; i++)
+            zones[i] = ZoneState(plate.ClampZones[i]);
+        cutoffs = new (CutOff, CutOffAxis, long, long, long?, long?)[plate.CutOffs.Count];
+        for (var i = 0; i < cutoffs.Length; i++)
+            cutoffs[i] = CutOffState(plate.CutOffs[i]);
     }
+
+    // Missing entries are malformed input the analysis itself reports; freshness must not
+    // throw first (the desktop captures it before its error boundary).
+    private static (string, long, long, long, long) ZoneState(ClampZone zone) =>
+        zone?.Bounds is not { } box ? default
+            : (zone.Id, Bits(box.X), Bits(box.Y), Bits(box.Length), Bits(box.Width));
+
+    private static (CutOff, CutOffAxis, long, long, long?, long?) CutOffState(CutOff cut) =>
+        cut == null ? default
+            : (cut, cut.Axis, Bits(cut.Position.X), Bits(cut.Position.Y),
+                cut.StartLimit.HasValue ? Bits(cut.StartLimit.Value) : null,
+                cut.EndLimit.HasValue ? Bits(cut.EndLimit.Value) : null);
+
+    private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
+
+    private static (long, long, int) SheetState(Plate plate) =>
+        (Bits(plate.Size.Width), Bits(plate.Size.Length), plate.Quadrant);
 
     public static OverlapGeometryStamp Capture(Plate plate) => new(plate);
 
+    internal bool SameZones(Plate current)
+    {
+        // Stored zones are sheet-relative: a size or quadrant change moves them in the
+        // parts' frame without changing their bits.
+        if (!ReferenceEquals(plate, current) || current.ClampZones.Count != zones.Length
+            || sheet != SheetState(current))
+            return false;
+        for (var i = 0; i < zones.Length; i++)
+            if (zones[i] != ZoneState(current.ClampZones[i]))
+                return false;
+        return true;
+    }
+
+    internal bool SameCutOffs(Plate current)
+    {
+        if (!ReferenceEquals(plate, current) || current.CutOffs.Count != cutoffs.Length
+            || sheet != SheetState(current))
+            return false;
+        for (var i = 0; i < cutoffs.Length; i++)
+            if (cutoffs[i] != CutOffState(current.CutOffs[i]))
+                return false;
+        return true;
+    }
+
     public bool Matches(Plate current)
     {
-        if (!ReferenceEquals(plate, current) || current.Parts.Count != entries.Length)
+        if (current.Parts.Count != entries.Length || !SameZones(current) || !SameCutOffs(current))
             return false;
         for (var i = 0; i < entries.Length; i++)
             if (!entries[i].Matches(current.Parts[i]))

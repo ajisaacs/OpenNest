@@ -50,6 +50,17 @@ the plate, zero-based part index, and entry; File > Open displays these warnings
 The program reader is not a general G-code or geometric safety validator; the
 saved cutting geometry is not validated against the drawing.
 
+Nests converted from PEP before their drawings carried etch marks keep those
+marks only in the saved placed programs. When a drawing has no etch (scribe)
+moves and every placement with a saved program carries the same marks, the
+reader adds those marks to the drawing in its own frame (after its existing
+moves) and refreshes that drawing's clean placements, so Remove Lead-ins and
+Clear Lead-ins & Cut-offs keep the marks. Saved programs are never changed. If
+the saved programs disagree, the drawing is left without marks and no warning
+is raised. The drawing hash is checked against the file text before this
+repair, so saved programs still load; the next save writes the marks into
+`programs/program-N`.
+
 ## Plate cutting parameters
 
 Each plate's optional `cuttingParameters` stores the settings used by Assign
@@ -58,6 +69,50 @@ selection behavior. `OpenNest.IO.CuttingParametersSerializer` owns the shared
 cross-platform DTO mapping; the desktop settings serializer delegates to it so
 existing saved settings keep their JSON contract. Settings are independent of
 the saved part programs: restoring settings never regenerates those programs.
+
+## Clamp zones
+
+Each plate may carry an optional `clamps` array of fixed rectangular keep-out
+regions in plate coordinates: `id`, `x`, `y`, `length` (X extent) and `width`
+(Y extent, the depth intrusion from the `y = 0` operator-side edge for machine
+clamps). Zones are exclusion and display data only - never material, quantity,
+utilization, cut sequence or CNC output. Files without the key load with no
+zones, and an individually malformed entry (blank id, non-positive size) is
+dropped while the rest of the nest loads.
+
+`plateDefaults.clampRail` optionally stores the nest's machine clamp rail:
+`width` (along the edge), `depth` (into the sheet) and `centers` (X positions
+measured from the plate origin along the origin-side edge). New plates follow
+the rail and resolve it for their own size and quadrant; clamps wholly beyond a
+sheet are skipped and one still reaching onto it keeps its whole footprint, so
+a zone may extend past the sheet edge. The key is omitted
+when a nest has no rail, so such files are unchanged; a missing, empty or
+malformed rail loads as none. On load a plate follows the rail again only when
+its saved `clamps` are exactly the rail's zones for that sheet; any other saved
+zones are kept as written.
+
+The rail's optional `removalMinutes` is the time to take one clamp off and put
+it back; a missing or invalid value loads as five minutes. A plate on which
+Auto Nest removed clamps as a last resort lists their rail ids in an optional
+`removedClamps` array (omitted when none were removed); its `clamps` already
+exclude them, and it follows the rail minus those ids. A malformed
+`removedClamps` value reads as none removed (non-string entries are skipped);
+the saved `clamps` load either way. A plate that follows a rail other than the nest's default
+saves it in its own optional `clampRail` (same shape), so its removal state and
+time survive a reload; plates following the default rail omit it.
+
+An empty plate (no parts, no cut-offs) is omitted from the file unless that
+would lose clamp zones: it is omitted like any other empty plate only when a
+new plate from the saved defaults would recreate it (same size, quadrant, edge
+and part spacing, zones the saved rail recreates), which keeps the editor's trailing empty sheet
+out of the file while it matches the defaults. Nest-defaults edits move only an
+untouched trailing empty, cutoff-free sheet to the new size, quadrant, edge and
+part spacing, re-resolving its rail. It must have exactly matched the old defaults
+and followed their rail with no removed clamps or explicit zones (or have had no
+rail and no zones when the defaults had none). Edited sheets, middle empty sheets,
+and sheets with parts, cut-offs, removed clamps or explicit zones are not changed.
+An empty plate with other zones, or a rail-following one whose size, quadrant or
+spacing differs from the saved defaults, is still written.
 
 ## Drawing edits
 

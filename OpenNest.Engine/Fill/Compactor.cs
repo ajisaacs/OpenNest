@@ -12,11 +12,22 @@ namespace OpenNest.Engine.Fill
     /// </summary>
     public static class Compactor
     {
+        /// <summary>
+        /// The plate's clamp zones as static push obstacles (C1). Unlike ordinary
+        /// already-overlapping parts, a clamp stays a wall even when a selected member
+        /// straddles it: dropping it would let other clear members move into the zone.
+        /// Empty zone lists change every caller's arithmetic by nothing (C2).
+        /// </summary>
+        private static List<Part> ZoneObstacles(Plate plate) =>
+            Jobs.InteractiveClamps.ObstacleParts(plate);
         public static double Push(List<Part> movingParts, Plate plate, PushDirection direction)
         {
-            var obstacleParts = plate
-                .Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
-                .ToList();
+            var obstacleParts = ZoneObstacles(plate);
+            obstacleParts.InsertRange(
+                0,
+                plate.Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
+                    .ToList()
+            );
 
             return Push(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, direction);
         }
@@ -26,9 +37,12 @@ namespace OpenNest.Engine.Fill
         /// </summary>
         public static double Push(List<Part> movingParts, Plate plate, double angle)
         {
-            var obstacleParts = plate
-                .Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
-                .ToList();
+            var obstacleParts = ZoneObstacles(plate);
+            obstacleParts.InsertRange(
+                0,
+                plate.Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
+                    .ToList()
+            );
 
             var direction = new Vector(System.Math.Cos(angle), System.Math.Sin(angle));
             return Push(movingParts, obstacleParts, plate.WorkArea(), plate.PartSpacing, direction);
@@ -214,9 +228,12 @@ namespace OpenNest.Engine.Fill
             PushDirection direction
         )
         {
-            var obstacleParts = plate
-                .Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
-                .ToList();
+            var obstacleParts = ZoneObstacles(plate);
+            obstacleParts.InsertRange(
+                0,
+                plate.Parts.Where(p => !movingParts.Contains(p) && !IntersectsAny(p, movingParts))
+                    .ToList()
+            );
 
             return PushBoundingBox(
                 movingParts,
@@ -369,6 +386,47 @@ namespace OpenNest.Engine.Fill
                 var moved = 0.0;
                 moved += Push(parts, noObstacles, workArea, partSpacing, PushDirection.Left);
                 moved += Push(parts, noObstacles, workArea, partSpacing, PushDirection.Down);
+
+                if (moved < threshold)
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// As <see cref="Settle(List{Part}, Box, double, double, int)"/>, settling inside the
+        /// plate's work area with its clamp zones as static obstacles: settling never parks
+        /// a part inside a keep-out (C1), and a clear cluster still compacts against zones
+        /// like any other obstacle. With no zones this behaves exactly like settling in the
+        /// plate's work area (C2).
+        /// </summary>
+        public static void Settle(
+            List<Part> parts,
+            Plate plate,
+            double threshold = 0.01,
+            int maxIterations = 20
+        ) => Settle(parts, plate, plate.WorkArea(), threshold, maxIterations);
+
+        /// <summary>Keep a fill group's own work-area bounds while excluding plate clamps.</summary>
+        public static void Settle(
+            List<Part> parts,
+            Plate plate,
+            Box workArea,
+            double threshold = 0.01,
+            int maxIterations = 20
+        )
+        {
+            if (parts.Count < 2)
+                return;
+
+            var obstacles = Jobs.InteractiveClamps.ObstacleParts(plate);
+            obstacles.AddRange(plate.Parts.Where(part => !parts.Contains(part)
+                && !part.BaseDrawing.IsCutOff));
+
+            for (var i = 0; i < maxIterations; i++)
+            {
+                var moved = 0.0;
+                moved += Push(parts, obstacles, workArea, plate.PartSpacing, PushDirection.Left);
+                moved += Push(parts, obstacles, workArea, plate.PartSpacing, PushDirection.Down);
 
                 if (moved < threshold)
                     break;

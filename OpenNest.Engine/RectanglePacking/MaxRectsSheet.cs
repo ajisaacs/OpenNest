@@ -92,6 +92,20 @@ internal sealed class MaxRectsSheet
     /// <summary>Commits an item and splits every free rectangle it intersects.</summary>
     public void Place(Rect item)
     {
+        Split(item);
+        used.Add(item);
+    }
+
+    /// <summary>
+    /// Carves a keep-out rectangle (a machine clamp's inflated exclusion, for example) out
+    /// of the free space before any packing: same split logic as placements, but not a used
+    /// item - it consumes no material and contributes nothing to contact scoring. The
+    /// rectangle may extend past the bin; only interior intersections count.
+    /// </summary>
+    public void Block(Rect keepOut) => Split(keepOut);
+
+    private void Split(Rect item)
+    {
         var next = new List<Rect>(free.Count + 8);
         foreach (var f in free)
         {
@@ -111,7 +125,6 @@ internal sealed class MaxRectsSheet
         }
         free.Clear();
         free.AddRange(Prune(next));
-        used.Add(item);
     }
 
     private static List<Rect> Prune(List<Rect> rects)

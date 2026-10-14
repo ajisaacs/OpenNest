@@ -18,12 +18,40 @@ public static class PlateOverlapAnalyzer
     public const double ChordTolerance = 0.001;
 
     /// <summary>
+    /// Capture a whole plate including active clamps and nominal cut-off definitions.
+    /// Use this entry for the desktop overlap check so manual cut-off contacts
+    /// cannot be mistaken for a clear plate merely because cut-offs are not material.
+    /// Clamp zones are mapped from the sheet's lower-left frame into the parts' signed
+    /// placement frame; a malformed zone throws <see cref="ArgumentException"/>.
+    /// </summary>
+    public static PlateOverlapSnapshot CapturePlate(Plate plate, OverlapMaterialCache cache = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(plate);
+        var material = Capture(plate.Parts.ToArray(), ClampZoneFrame.ToPlacement(plate).ToArray(),
+            cache ?? new OverlapMaterialCache(), cancellationToken);
+        var cutoffs = ClampCutDiagnostics.Find(plate);
+        cancellationToken.ThrowIfCancellationRequested();
+        return new PlateOverlapSnapshot(material.Parts.ToList(), material.Issues.ToList(),
+            material.Clamps.ToList(), cutoffs.ToList());
+    }
+
+    /// <summary>
     /// Captures poses and converts each distinct clean source program to owned entities once.
     /// Inputs must not change during capture. Later analysis never reads live domain objects.
     /// </summary>
     public static PlateOverlapSnapshot Capture(IReadOnlyList<Part> parts,
         CancellationToken cancellationToken = default) =>
-        Capture(parts, new OverlapMaterialCache(), cancellationToken);
+        Capture(parts, null, new OverlapMaterialCache(), cancellationToken);
+
+    /// <summary>
+    /// As <see cref="Capture(IReadOnlyList{Part}, CancellationToken)"/>, additionally capturing
+    /// the plate's clamp keep-out rectangles: Analyze then reports part-vs-clamp findings
+    /// (C1) alongside part pairs. Null means no zones.
+    /// </summary>
+    public static PlateOverlapSnapshot Capture(IReadOnlyList<Part> parts,
+        IReadOnlyList<ClampZone> clampZones, CancellationToken cancellationToken = default) =>
+        Capture(parts, clampZones, new OverlapMaterialCache(), cancellationToken);
 
     /// <summary>
     /// As <see cref="Capture(IReadOnlyList{Part}, CancellationToken)"/>, but reuses converted
@@ -31,6 +59,12 @@ public static class PlateOverlapAnalyzer
     /// cache before any in-place clean-program edit (see <see cref="OverlapMaterialCache"/>).
     /// </summary>
     public static PlateOverlapSnapshot Capture(IReadOnlyList<Part> parts, OverlapMaterialCache cache,
+        CancellationToken cancellationToken = default) =>
+        Capture(parts, null, cache, cancellationToken);
+
+    /// <inheritdoc cref="Capture(IReadOnlyList{Part}, IReadOnlyList{ClampZone}, CancellationToken)"/>
+    public static PlateOverlapSnapshot Capture(IReadOnlyList<Part> parts,
+        IReadOnlyList<ClampZone> clampZones, OverlapMaterialCache cache,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(parts);
@@ -64,8 +98,21 @@ public static class PlateOverlapAnalyzer
                 issues.Add(new PlateOverlapIssue(id, null, exception.Message));
             }
         }
+        var clamps = new List<CapturedClamp>();
+        if (clampZones != null)
+        {
+            for (var ordinal = 0; ordinal < clampZones.Count; ordinal++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var zone = clampZones[ordinal];
+                // ClampZone validates finiteness and positive size at construction; the
+                // snapshot still owns its own copy so later plate edits never move it.
+                clamps.Add(new CapturedClamp(ordinal, zone.Id,
+                    new Box(zone.Bounds.X, zone.Bounds.Y, zone.Bounds.Length, zone.Bounds.Width)));
+            }
+        }
         cancellationToken.ThrowIfCancellationRequested();
-        return new PlateOverlapSnapshot(captured, issues);
+        return new PlateOverlapSnapshot(captured, issues, clamps);
     }
 
     private static OverlapSource CaptureSource(Program program)
@@ -194,9 +241,120 @@ public static class PlateOverlapAnalyzer
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
+        var clampFindings = FindClampOverlaps(prepared, snapshot, issues, cancellationToken);
         return new PlateOverlapReport(pairs.OrderBy(pair => pair.PartAId)
             .ThenBy(pair => pair.PartBId).ToList(), issues.OrderBy(issue => issue.PartAId)
-            .ThenBy(issue => issue.PartBId).ToList(), snapshot);
+            .ThenBy(issue => issue.PartBId).ToList(), snapshot, clampFindings
+            .OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId).ToList(),
+            snapshot.CutOffClampFindings.ToList());
+    }
+
+    /// <summary>
+    /// C1 part-vs-clamp findings: the prepared hole-aware material against each captured
+    /// zone rectangle with the same exact Collision oracle as part pairs. Deterministic in
+    /// (part input id, clamp ordinal) order; failures become part issues like any other
+    /// pair geometry failure. Empty zone lists return without touching the material.
+    /// </summary>
+    private static List<PlateOverlapPair> FindClampOverlaps(List<PreparedPart> prepared,
+        PlateOverlapSnapshot snapshot, List<PlateOverlapIssue> issues,
+        CancellationToken cancellationToken)
+    {
+        var findings = new List<PlateOverlapPair>();
+        if (snapshot.Clamps.Count == 0)
+            return findings;
+
+        foreach (var part in prepared)
+        {
+            var partBounds = part.Material.Outer.BoundingBox;
+            foreach (var clamp in snapshot.Clamps)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var zone = clamp.Bounds;
+                // The prepared material is inscribed at ChordTolerance, so real material can
+                // reach that far past its bounds; a tiny clamp there must still be checked.
+                var reach = KeepOutOverlap.NeedsToleranceFreeTest(zone) ? ChordTolerance : 0;
+                if (partBounds.Right + reach <= zone.Left || zone.Right <= partBounds.Left - reach
+                    || partBounds.Top + reach <= zone.Bottom || zone.Top <= partBounds.Bottom - reach)
+                    continue;
+                try
+                {
+                    // A clamp below the polygon tolerance collapses in Collision.Check and would
+                    // read as clear (PM aa995123): judge it tolerance-free and report the whole
+                    // (negligibly small) clamp rectangle as the overlap fragment.
+                    if (KeepOutOverlap.NeedsToleranceFreeTest(zone))
+                    {
+                        // Re-read the native contours conservatively and finely enough for
+                        // this clamp: the shared 0.001 chords can hide material between an
+                        // arc and its chord.
+                        var profile = new ShapeProfile(part.Input.Source.Entities.Select(e => e.Clone()).ToList());
+                        if (profile.Perimeter == null)
+                            throw new ArgumentException("Drawing has no closed material contour.");
+                        if (KeepOutOverlap.ConservativePolygons(profile, zone)
+                            .Select(polygons => new OverlapMaterial(polygons.Perimeter, polygons.Holes)
+                                .Transform(part.Input.Rotation, part.Input.Location))
+                            .Any(fine => KeepOutOverlap.MaterialEnters(fine.Outer, fine.Holes, zone)))
+                            findings.Add(TinyClampFinding(part, clamp));
+                        continue;
+                    }
+                    var origin = part.Material.Outer.Vertices[0];
+                    var local = part.Material.Transform(0, origin * -1);
+                    var rect = RectanglePolygon(zone, origin * -1);
+                    var result = Collision.Check(local.Outer, rect, local.Holes, null);
+                    if (!result.Overlaps)
+                        continue;
+                    var moments = new List<PolygonAreaMoments>();
+                    var regions = new List<PlateOverlapRegion>();
+                    foreach (var region in result.OverlapRegions)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!PolygonAreaMoments.TryCompute(region.Vertices, out var fragment))
+                            throw new ArithmeticException("Clamp overlap fragment area moments are invalid.");
+                        moments.Add(fragment);
+                        regions.Add(new PlateOverlapRegion(
+                            region.Vertices.Select(point => point + origin), fragment.Area));
+                    }
+                    if (!PolygonAreaMoments.TryCombine(moments, out var combined))
+                        throw new ArithmeticException("Combined clamp overlap area moments are invalid.");
+                    var centroid = combined.Centroid + origin;
+                    if (!OverlapMaterial.IsFinite(centroid))
+                        throw new ArithmeticException("Clamp overlap centroid is not finite in world coordinates.");
+                    findings.Add(new PlateOverlapPair(part.Input.Id,
+                        ClampFindingSlot.IdFor(clamp.Ordinal), part.Input.Name,
+                        $"Clamp '{clamp.Id}'", regions, centroid));
+                }
+                catch (Exception exception) when (IsGeometryFailure(exception))
+                {
+                    issues.Add(new PlateOverlapIssue(part.Input.Id, null, exception.Message));
+                }
+            }
+        }
+
+        return findings;
+    }
+
+    private static PlateOverlapPair TinyClampFinding(PreparedPart part, CapturedClamp clamp)
+    {
+        var zone = clamp.Bounds;
+        var corners = new[]
+        {
+            new Vector(zone.Left, zone.Bottom), new Vector(zone.Right, zone.Bottom),
+            new Vector(zone.Right, zone.Top), new Vector(zone.Left, zone.Top),
+        };
+        var centre = new Vector((zone.Left + zone.Right) / 2, (zone.Bottom + zone.Top) / 2);
+        return new PlateOverlapPair(part.Input.Id, ClampFindingSlot.IdFor(clamp.Ordinal), part.Input.Name,
+            $"Clamp '{clamp.Id}'", new List<PlateOverlapRegion> { new(corners, zone.Length * zone.Width) }, centre);
+    }
+
+    private static Polygon RectanglePolygon(Box box, Vector offset)
+    {
+        var polygon = new Polygon();
+        polygon.Vertices.Add(new Vector(box.Left + offset.X, box.Bottom + offset.Y));
+        polygon.Vertices.Add(new Vector(box.Right + offset.X, box.Bottom + offset.Y));
+        polygon.Vertices.Add(new Vector(box.Right + offset.X, box.Top + offset.Y));
+        polygon.Vertices.Add(new Vector(box.Left + offset.X, box.Top + offset.Y));
+        polygon.Close();
+        polygon.UpdateBounds();
+        return polygon;
     }
 
     /// <summary>

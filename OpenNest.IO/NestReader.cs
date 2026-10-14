@@ -46,6 +46,9 @@ namespace OpenNest.IO
             var drawingMap = BuildDrawings(dto, programs, entitySets);
             ReadBestFits(drawingMap);
             var nest = BuildNest(dto, drawingMap);
+            // Nests converted from PEP kept etch marks only in the placed programs; give them
+            // back to the drawing so removing lead-ins does not remove the marks too.
+            DrawingMarkRecovery.Apply(nest);
 
             zipArchive.Dispose();
             stream.Close();
@@ -327,6 +330,31 @@ namespace OpenNest.IO
             }
         }
 
+        /// <summary>
+        /// The saved machine clamp rail, or null when absent, empty or malformed (a bad rail
+        /// is ignored rather than failing the nest; each plate's saved zones still load). A
+        /// missing or invalid removal-minutes value falls back to <see cref="ClampRail.DefaultRemovalMinutes"/>.
+        /// </summary>
+        private static ClampRail ReadClampRail(ClampRailDto dto)
+        {
+            if (dto?.Centers == null || dto.Centers.Count == 0)
+                return null;
+            try
+            {
+                // An invalid removal time (negative or not finite) falls back to the default
+                // rather than dropping the rail, which would also discard every sheet's
+                // removed-clamp state.
+                var minutes = dto.RemovalMinutes is double m && double.IsFinite(m) && m >= 0
+                    ? m
+                    : ClampRail.DefaultRemovalMinutes;
+                return new ClampRail(dto.Width, dto.Depth, dto.Centers, minutes);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+
         private Nest BuildNest(NestDto dto, Dictionary<int, Drawing> drawingMap)
         {
             var nest = new Nest();
@@ -363,6 +391,8 @@ namespace OpenNest.IO
                 pd.EdgeSpacing.Right,
                 pd.EdgeSpacing.Top
             );
+            var clampRail = ReadClampRail(pd.ClampRail);
+            nest.PlateDefaults.ClampRail = clampRail;
 
             // Stock options: sheet sizes and salvage rate
             nest.SalvageRate = dto.SalvageRate;
@@ -398,6 +428,37 @@ namespace OpenNest.IO
                 );
                 plate.GrainAngle = p.GrainAngle;
                 plate.CuttingParameters = CuttingParametersSerializer.FromDto(p.CuttingParameters);
+
+                // Clamp zones: older files have no key at all; an individually invalid
+                // entry is dropped rather than poisoning the whole nest.
+                if (p.Clamps != null)
+                {
+                    foreach (var c in p.Clamps)
+                    {
+                        try
+                        {
+                            plate.ClampZones.Add(
+                                new ClampZone(c.Id, new OpenNest.Geometry.Box(c.X, c.Y, c.Length, c.Width))
+                            );
+                        }
+                        catch (ArgumentException)
+                        {
+                            // Invalid zone definition; ignore this one entry.
+                        }
+                    }
+                }
+
+                // A plate follows the nest rail only when its saved zones are exactly the
+                // rail's for this sheet minus any saved removed-clamp ids (C13); otherwise
+                // the saved zones are kept as static, explicit data.
+                var removedClamps = p.RemovedClamps?
+                    .Where(id => !string.IsNullOrEmpty(id))
+                    .ToHashSet(StringComparer.Ordinal)
+                    ?? new HashSet<string>();
+                // A sheet saved with its own rail (not the nest default) follows that one.
+                var plateRail = ReadClampRail(p.ClampRail) ?? clampRail;
+                if (plateRail != null && plateRail.Matches(plate, removedClamps))
+                    plate.SetClampRail(plateRail, removedClamps);
 
                 for (var partIndex = 0; partIndex < p.Parts.Count; partIndex++)
                 {

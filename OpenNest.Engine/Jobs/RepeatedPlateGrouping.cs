@@ -41,7 +41,31 @@ internal static class RepeatedPlateGrouping
         && Bits(a.EdgeSpacing.Bottom) == Bits(b.EdgeSpacing.Bottom)
         && a.Quantity == b.Quantity
         && a.Cost.HasValue == b.Cost.HasValue
-        && (!a.Cost.HasValue || Bits(a.Cost.Value) == Bits(b.Cost.Value));
+        && (!a.Cost.HasValue || Bits(a.Cost.Value) == Bits(b.Cost.Value))
+        && SameZones(a.ClampZones, b.ClampZones);
+
+    // C8: a layout solved with clamps is never reused for a plate without them - and a
+    // different clamp set is different stock. Ordered; ids and exact bits participate.
+    private static bool SameZones(
+        System.Collections.Generic.IReadOnlyList<ClampZone> x,
+        System.Collections.Generic.IReadOnlyList<ClampZone> y
+    )
+    {
+        if (x.Count != y.Count)
+            return false;
+        for (var i = 0; i < x.Count; i++)
+        {
+            if (
+                !string.Equals(x[i].Id, y[i].Id, StringComparison.Ordinal)
+                || Bits(x[i].Bounds.X) != Bits(y[i].Bounds.X)
+                || Bits(x[i].Bounds.Y) != Bits(y[i].Bounds.Y)
+                || Bits(x[i].Bounds.Length) != Bits(y[i].Bounds.Length)
+                || Bits(x[i].Bounds.Width) != Bits(y[i].Bounds.Width)
+            )
+                return false;
+        }
+        return true;
+    }
 
     private static long Bits(double value) => BitConverter.DoubleToInt64Bits(value);
 

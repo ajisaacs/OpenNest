@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenNest.Geometry;
 
 namespace OpenNest.Engine.Jobs;
@@ -14,19 +15,21 @@ public sealed class NestPlateStock
         int? quantity = null,
         double partSpacing = 0,
         Spacing edgeSpacing = default,
-        int quadrant = 1
+        int quadrant = 1,
+        IReadOnlyList<ClampZone> clampZones = null
     )
-        : this(id, size, quantity, partSpacing, edgeSpacing, quadrant, null) { }
+        : this(id, size, quantity, partSpacing, edgeSpacing, quadrant, null, clampZones) { }
 
     public NestPlateStock(string id, Size size, int? quantity, double partSpacing,
-        Spacing edgeSpacing, int quadrant, double? cost)
+        Spacing edgeSpacing, int quadrant, double? cost,
+        IReadOnlyList<ClampZone> clampZones = null)
     {
         if (cost.HasValue && (!double.IsFinite(cost.Value) || cost.Value <= 0))
             throw new ArgumentOutOfRangeException(nameof(cost), $"Stock {id}: cost must be finite and positive, or null.");
-        Cost = cost;
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         if (quantity < 0)
             throw new ArgumentOutOfRangeException(nameof(quantity));
+        Cost = cost;
         Id = id;
         Size = size;
         Quantity = quantity;
@@ -41,7 +44,50 @@ public sealed class NestPlateStock
             size.Length - edgeSpacing.Left - edgeSpacing.Right,
             size.Width - edgeSpacing.Bottom - edgeSpacing.Top
         );
+        // Zones arrive in plate coordinates and are carried in the placement frame,
+        // translated exactly like WorkArea. Detached copies: stock is immutable input.
+        if (clampZones == null || clampZones.Count == 0)
+        {
+            ClampZones = Array.Empty<ClampZone>();
+            SheetClampZones = Array.Empty<ClampZone>();
+        }
+        else
+        {
+            var zones = new ClampZone[clampZones.Count];
+            var sheetZones = new ClampZone[clampZones.Count];
+            for (var i = 0; i < zones.Length; i++)
+            {
+                zones[i] = new ClampZone(clampZones[i].Id, clampZones[i].Bounds.Translate(left, bottom));
+                sheetZones[i] = new ClampZone(clampZones[i].Id, clampZones[i].Bounds);
+            }
+            ClampZones = new DetachedZones(zones);
+            SheetClampZones = sheetZones;
+        }
     }
+
+    /// <summary>
+    /// Keep-out rectangles in the placement frame (quadrant applied), translated exactly
+    /// like <see cref="WorkArea"/>. Empty when the plate defines none; never null. Every
+    /// read returns detached copies: zone bounds are mutable, and the stock must stay
+    /// consistent with the zones its materialized plates use.
+    /// </summary>
+    public IReadOnlyList<ClampZone> ClampZones { get; }
+
+    /// <summary>
+    /// The same zones exactly as given, in plate coordinates (the frame of
+    /// <see cref="Plate.ClampZones"/>), for plates built from this stock. Keeping the input
+    /// avoids a lossy translate-and-back; <see cref="ClampZoneFrame.ToPlacement"/> of such a
+    /// plate reproduces <see cref="ClampZones"/> bit for bit.
+    /// </summary>
+    internal IReadOnlyList<ClampZone> SheetClampZones { get; }
+
+    /// <summary>
+    /// The machine clamp rail <see cref="ClampZones"/> were resolved from, when the stock was
+    /// built from a rail-following plate; null for explicit zones. Only rail-backed clamps may
+    /// be taken off as a last resort (D8): the rail is what lets a committed sheet name the
+    /// clamps to pull and carry their removal time, so explicit zones are never removed.
+    /// </summary>
+    internal ClampRail ClampRail { get; init; }
 
     /// <summary>Generic per-physical-sheet cost; null selects area scoring.</summary>
     public double? Cost { get; }
@@ -66,4 +112,26 @@ public sealed class NestPlateStock
     /// <summary>True when a width (X) by height (Y) envelope fits the work area within epsilon.</summary>
     public bool Fits(double width, double height, double epsilon = 1e-9) =>
         width <= workArea.Length + epsilon && height <= workArea.Width + epsilon;
+
+    private sealed class DetachedZones : IReadOnlyList<ClampZone>
+    {
+        private readonly ClampZone[] zones;
+
+        public DetachedZones(ClampZone[] zones) => this.zones = zones;
+
+        public int Count => zones.Length;
+
+        public ClampZone this[int index] => Copy(zones[index]);
+
+        public IEnumerator<ClampZone> GetEnumerator()
+        {
+            foreach (var zone in zones)
+                yield return Copy(zone);
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+
+        // The ClampZone constructor copies the rectangle, keeping its exact bits.
+        private static ClampZone Copy(ClampZone zone) => new(zone.Id, zone.Bounds);
+    }
 }

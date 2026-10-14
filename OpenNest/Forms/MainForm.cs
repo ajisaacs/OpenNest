@@ -202,8 +202,46 @@ namespace OpenNest.Forms
         {
             var nest = new Nest();
             LoadNestDefaults().ApplyTo(nest);
+            // After the defaults so the rail is converted to the new nest's units.
+            LoadClampSettings(this).ApplyToNewNest(nest);
             return nest;
         }
+
+        /// <summary>
+        /// Loads the machine clamp settings for creating new nests (New, BOM import); an
+        /// unreadable or partly invalid file warns once per session, because the new nest's
+        /// clamps may not match the machine.
+        /// </summary>
+        internal static ClampSettings LoadClampSettings(IWin32Window owner)
+        {
+            var settings = LoadSavedClampSettings(out var status);
+
+            if (
+                status is ClampSettingsStatus.Invalid or ClampSettingsStatus.Partial
+                && !clampSettingsWarned
+            )
+            {
+                clampSettingsWarned = true;
+                var problem =
+                    status == ClampSettingsStatus.Invalid
+                        ? "could not be read, so new nests have no clamps"
+                        : "has invalid values that were ignored, so new nests may be missing clamps";
+                MessageBox.Show(
+                    owner,
+                    $"The clamp settings file {problem}:\n{ClampSettings.DefaultPath}\n\nCheck the clamps in Nest > Clamps and use Save as Machine Defaults to rewrite the file.",
+                    "Clamps",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+            }
+            return settings;
+        }
+
+        private static bool clampSettingsWarned;
+
+        /// <summary>The single desktop entry point for the persisted machine clamp settings.</summary>
+        internal static ClampSettings LoadSavedClampSettings(out ClampSettingsStatus status) =>
+            ClampSettings.Load(ClampSettings.DefaultPath, out status);
 
         /// <summary>
         /// Loads the persisted nest defaults (see <see cref="LoadSavedNestDefaults"/>);
@@ -1442,6 +1480,45 @@ namespace OpenNest.Forms
             activeForm.ShowNestInfoEditor();
         }
 
+        private void Clamps_Click(object sender, EventArgs e)
+        {
+            var editForm = activeForm;
+            if (editForm == null)
+                return;
+
+            var nest = editForm.Nest;
+            var views = MdiChildren
+                .OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, nest))
+                .Select(form => form.PlateView)
+                .ToArray();
+            // Clamps feed nesting and validation: never change them under a running operation.
+            if (
+                nestingInProgress
+                || Application.OpenForms.OfType<NestProgressForm>().Any()
+                || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true)
+            )
+            {
+                MessageBox.Show(
+                    this,
+                    "Finish or cancel the current nesting or plate action first.",
+                    "Clamps",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return;
+            }
+
+            var defaults = LoadSavedClampSettings(out _);
+            using var form = new ClampsForm(nest.PlateDefaults.ClampRail, nest.Units, defaults);
+            if (form.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            form.Editor.ApplyTo(nest);
+            foreach (var view in views)
+                view.Invalidate();
+        }
+
         private void RemoveEmptyPlates_Click(object sender, EventArgs e)
         {
             if (activeForm == null)
@@ -1630,6 +1707,18 @@ namespace OpenNest.Forms
                     target.OverlapDisplay = OverlapDisplayMode.Both;
                     await target.CheckOverlapsAsync();
                 }
+                // D8/D9: name every clamp Auto Nest pulled as a last resort and its added time.
+                var removalNotices = applied
+                    .Where(plate => plate.RemovedClamps.Count > 0)
+                    .Select(plate => $"Sheet {target.Nest.Plates.IndexOf(plate) + 1}: remove "
+                        + $"{string.Join(", ", plate.RemovedClamps.OrderBy(id => id, StringComparer.Ordinal))} "
+                        + $"(+{plate.ClampRemovalMinutes:0.#} min)")
+                    .ToList();
+                if (removalNotices.Count > 0)
+                    MessageBox.Show(this,
+                        "Auto Nest removed clamps as a last resort so a part that would not "
+                            + "otherwise fit could be nested:\n\n" + string.Join("\n", removalNotices),
+                        "Auto Nest", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 if (costs?.Basis == "supplied-cost")
                     MessageBox.Show(this, $"Gross sheet cost: {costs.GrossTotal:G}\nEstimated salvage credit: {costs.SalvageCredit:G}\nNet score: {costs.NetScore:G}",
                         "Auto Nest Cost", MessageBoxButtons.OK, MessageBoxIcon.Information);

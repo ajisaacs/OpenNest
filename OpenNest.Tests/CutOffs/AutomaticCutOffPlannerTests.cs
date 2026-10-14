@@ -189,6 +189,171 @@ public class AutomaticCutOffPlannerTests
         Assert.Equal(80.5 + Tolerance.Epsilon, plan.UsedSpan);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void ClampWall_SkipsNominalLineAndRefusesTailSeparator(int quadrant)
+    {
+        var plate = MakePlate(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        // Real rail zones are stored in the sheet's lower-left frame in every quadrant.
+        plate.SetClampRail(new ClampRail(0.2, 0.625, new[] { 35.2, 80.7 }));
+        var before = plate.Parts.ToArray();
+        var plan = Plan(plate);
+        Assert.Equal(new[] { sign * 70.0 }, Positions(plan));
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Equal(0, plan.TailLength);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeTailSeparator);
+        Assert.Equal(before, plate.Parts.ToArray());
+        Assert.Empty(plate.CutOffs);
+    }
+
+    [Fact]
+    public void ClampOnlyBlocksItsInflatedSpan_AndRemovedClampStopsBlocking()
+    {
+        var plate = MakePlate();
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.ClampZones.Add(new ClampZone("front", new Box(35.25, 0, 1.5, 0.625)));
+        var blocked = Plan(plate);
+        Assert.Equal(new[] { 70, 80.5 + Tolerance.Epsilon }, Positions(blocked));
+        Assert.True(blocked.HasSeparatedTail);
+        plate.ClampZones.Clear();
+        Assert.Equal(new[] { 35, 70, 80.5 + Tolerance.Epsilon }, Positions(Plan(plate)));
+    }
+
+    [Fact]
+    public void ExistingLineAcrossClampCannotCertifyTail_AndPartialFootprintBlocks()
+    {
+        var plate = MakePlate();
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.ClampZones.Add(new ClampZone("hanging", new Box(80.6, 0, 0.2, 0.625)));
+        var existing = new CutOff(new Vector(80.5 + Tolerance.Epsilon, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(existing);
+        existing.Regenerate(plate, new CutOffSettings());
+        var original = existing.Drawing.Program;
+        var plan = Plan(plate);
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Null(plan.TailSeparatorX);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeTailSeparator);
+        Assert.Same(original, existing.Drawing.Program);
+        Assert.Same(existing, Assert.Single(plate.CutOffs));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void NearEquivalentExistingSeparatorInsideClampCannotCertifyTail(int quadrant)
+    {
+        // The nominal separator (80.50001) lies just beyond the clamp edge (80.5000075),
+        // but the equivalent existing line that would be certified (80.500005) is inside it.
+        var plate = MakePlate(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        // Footprint 79.500005..80.5000075 from the origin along the edge, in every quadrant.
+        plate.SetClampRail(new ClampRail(1.0000025, 0.625, new[] { 80.00000625 }));
+        var existing = new CutOff(new Vector(sign * 80.500005, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(existing);
+        existing.Regenerate(plate, new CutOffSettings());
+        var original = existing.Drawing.Program;
+
+        var plan = Plan(plate);
+
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Null(plan.TailSeparatorX);
+        Assert.Equal(0, plan.TailLength);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.ClampBlockedCut);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeTailSeparator);
+        Assert.DoesNotContain(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.ExistingCutOff);
+        Assert.Equal(new[] { sign * 35.0, sign * 70.0 }, Positions(plan));
+        Assert.Same(original, existing.Drawing.Program);
+        Assert.Same(existing, Assert.Single(plate.CutOffs));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void RailClampsBlockGridAndTailInEveryQuadrant(int quadrant)
+    {
+        // Rail clamps centered 35 and 80.5 from the origin, 1.5 wide, plus 0.25 clearance:
+        // the grid line at 35 and the separator at 80.50001 both cross a clamp.
+        var plate = MakePlate(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.SetClampRail(new ClampRail(1.5, 0.625, new[] { 35.0, 80.5 }));
+
+        var plan = Plan(plate);
+
+        Assert.Equal(new[] { sign * 70.0 }, Positions(plan));
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Equal(2, plan.Diagnostics.Count(d => d.Code == AutomaticCutOffDiagnosticCode.ClampBlockedCut));
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.NoSafeTailSeparator);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void RailClampClearanceOnlyContactBlocksAndClearLineSurvives(int quadrant)
+    {
+        // Physical footprint 36..37.5; the 0.25 clearance reaches a line at 35.75 but not 35.
+        var plate = MakePlate(quadrant);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.SetClampRail(new ClampRail(1.5, 0.625, new[] { 36.75 }));
+        Assert.Equal(new[] { sign * 35.0, sign * 70.0, sign * (80.5 + Tolerance.Epsilon) },
+            Positions(Plan(plate)));
+        Assert.Equal(new[] { sign * 71.5, sign * (80.5 + Tolerance.Epsilon) },
+            Positions(Plan(plate, spacing: 35.75)));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void HangingRailClampKeepsWholeFootprintForTail(int quadrant)
+    {
+        // Clamp centered 120.5 on a 120-long sheet covers 119.75..121.25 from the origin;
+        // with 0.25 clearance it blocks the separator at 119.50001 behind a 119-long envelope.
+        var plate = MakePlate(quadrant, occupied: 119);
+        plate.EdgeSpacing = new Spacing(0.25, 0.25);
+        plate.SetClampRail(new ClampRail(1.5, 0.625, new[] { 120.5 }));
+        var plan = Plan(plate, spacing: 119.6);
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.ClampBlockedCut);
+        Assert.Empty(plan.Definitions);
+    }
+
+    [Theory]
+    [InlineData(35)]
+    [InlineData(80.50001)]
+    public void SameLineLimitedManualCutOnClamp_StillBlocksWholePlan(double x)
+    {
+        var plate = MakePlate();
+        plate.ClampZones.Add(new ClampZone("under-manual", new Box(x - 0.75, 0, 1.5, 0.625)));
+        var manual = new CutOff(new Vector(x, 0), CutOffAxis.Vertical) { StartLimit = 10, EndLimit = 60 };
+        plate.CutOffs.Add(manual);
+        var program = manual.Drawing.Program;
+
+        var plan = Plan(plate);
+
+        Assert.True(plan.HasBlockingDiagnostics);
+        Assert.Empty(plan.Definitions);
+        Assert.Empty(plan.PreviewParts);
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Contains(plan.Diagnostics, d => d.IsBlocking &&
+            d.Code == AutomaticCutOffDiagnosticCode.LimitedCutOffConflict);
+        Assert.Same(program, manual.Drawing.Program);
+        Assert.Same(manual, Assert.Single(plate.CutOffs));
+    }
+
     [Fact]
     public void Planning_DoesNotMutateAnyLiveObjectsOrSequence()
     {
@@ -548,7 +713,7 @@ public class AutomaticCutOffPlannerTests
     }
 
     [Fact]
-    public void ToleranceCloseExistingSeparator_ThatStillTouchesClearance_DoesNotClaimTail()
+    public void NearEquivalentExistingSeparator_ThatStillTouchesClearance_DoesNotClaimTail()
     {
         var plate = MakePlate();
         plate.PartSpacing = 0;

@@ -245,20 +245,42 @@ public class PlateSequencingTests
     }
 
     [Fact]
-    public void Apply_NonCrossingTailCutOff_KeepsItsNormalSequencePlace()
+    public void Apply_SheetSeparatingCutOff_GoesAfterEveryPartAndCrossingCutOff()
     {
-        var part = TestHelpers.MakePartAt(10, 10, 10);
-        var plate = TestHelpers.MakePlate(60, 120, part);
-        var tail = new CutOff(new Vector(40, 0), CutOffAxis.Vertical);
-        plate.CutOffs.Add(tail);
-        plate.RegenerateCutOffs(new CutOffSettings());
-        var parameters = new SequenceParameters { Method = SequenceMethod.LeftSide };
-        var expected = Baseline(plate, parameters);
-        Assert.Same(part, expected[0]);
+        var hazards = 0;
+        foreach (var method in Enum.GetValues<SequenceMethod>())
+        {
+            var left = TestHelpers.MakePartAt(10, 10, 10);
+            var right = TestHelpers.MakePartAt(80, 10, 10);
+            var plate = TestHelpers.MakePlate(60, 120, left, right);
+            var separator = new CutOff(new Vector(40, 0), CutOffAxis.Vertical);
+            var crossing = new CutOff(new Vector(85, 0), CutOffAxis.Vertical);
+            plate.CutOffs.Add(separator);
+            plate.CutOffs.Add(crossing);
+            plate.RegenerateCutOffs(new CutOffSettings());
+            var parameters = new SequenceParameters { Method = method };
+            var separatorPart = plate.Parts.Single(p => ReferenceEquals(p.BaseDrawing, separator.Drawing));
+            List<Part> baseline;
+            try
+            {
+                baseline = Baseline(plate, parameters).ToList();
+            }
+            catch (NotSupportedException)
+            {
+                continue;
+            }
+            if (baseline.IndexOf(separatorPart) < baseline.IndexOf(right)
+                || baseline.IndexOf(separatorPart) < baseline.IndexOf(left))
+                hazards++;
 
-        PlateSequencing.Apply(plate, parameters);
+            PlateSequencing.Apply(plate, parameters);
 
-        Assert.Equal(expected, plate.Parts);
+            Assert.Same(separatorPart, plate.Parts[^1]);
+            AssertPrecedes(plate, crossing, right);
+            Assert.Equal(4, plate.Parts.Count);
+        }
+        // Without the rule, at least one route cuts the separator before a part.
+        Assert.True(hazards > 0);
     }
 
     [Fact]

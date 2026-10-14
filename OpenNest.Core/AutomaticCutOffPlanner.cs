@@ -21,6 +21,12 @@ public sealed class AutomaticCutOffOptions
     /// The desktop default is 12 inches (304.8 mm).
     /// </summary>
     public double MinimumTailLength { get; set; }
+
+    /// <summary>
+    /// Minimum strip length in model units. Null or equal to Spacing preserves the fixed grid.
+    /// Otherwise must be finite, greater than MinimumSpacing and no greater than Spacing.
+    /// </summary>
+    public double? MinimumStripLength { get; set; }
 }
 
 public enum AutomaticCutOffDiagnosticCode
@@ -29,8 +35,10 @@ public enum AutomaticCutOffDiagnosticCode
     LimitedCutOffConflict,
     EmptyCut,
     SegmentedCut,
+    ClampBlockedCut,
     NoSafeTailSeparator,
     TailBelowMinimum,
+    ShiftedCut,
 }
 
 public sealed record AutomaticCutOffDiagnostic(
@@ -69,6 +77,12 @@ public sealed class AutomaticCutOffPlan
     /// <summary>True only for a verified full-width separator, never just a nominal boundary.</summary>
     public bool HasSeparatedTail => TailSeparatorX.HasValue;
 
+    /// <summary>Total cut length of proposed new strip lines (excludes the tail separator).</summary>
+    public double StripCutLength { get; internal set; }
+
+    /// <summary>Length of the nominal new strip lines in the same gaps. Equal to StripCutLength on the fixed-grid path.</summary>
+    public double FixedGridCutLength { get; internal set; }
+
     public bool HasBlockingDiagnostics => Diagnostics.Any(d => d.IsBlocking);
 }
 
@@ -78,6 +92,7 @@ public static class AutomaticCutOffPlanner
     public const double GeometryTolerance = Tolerance.Epsilon;
     public const double MinimumSpacing = 2 * GeometryTolerance;
     public const int MaximumCandidateCount = 10000;
+    public const int MaximumShiftCandidateCount = 20000;
 
     /// <summary>
     /// Plans without changing the plate, its parts, or existing cut-off definitions/programs.
@@ -93,6 +108,8 @@ public static class AutomaticCutOffPlanner
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(settings);
         ValidateInputs(plate, options, settings);
+        // Stored zones use the sheet's lower-left frame; cut positions are signed.
+        var clamps = ClampZoneFrame.ToPlacement(plate);
         var bounds = plate.BoundingBox(false);
         Require(ValidBox(bounds) && double.IsFinite(bounds.Top + settings.Overtravel),
             "Physical sheet bounds and overtravel must be finite.", nameof(plate));
@@ -130,14 +147,57 @@ public static class AutomaticCutOffPlanner
         var diagnostics = new List<AutomaticCutOffDiagnostic>();
         var separated = false;
         var separatorX = (double?)null;
+        var shifted = options.MinimumStripLength.HasValue && options.MinimumStripLength.Value < options.Spacing;
+        var stripCutLength = 0.0;
+        var fixedGridCutLength = 0.0;
+        var measurements = new Dictionary<double, (double Length, int SegmentCount)>();
+        var candidates = new HashSet<double>();
 
-        // Multiplication by an integer avoids drift from repeated floating-point addition.
-        for (var index = 1; index <= (int)candidateCount; index++)
+        if (shifted)
         {
-            var distance = index * options.Spacing;
-            if (distance >= usedSpan - GeometryTolerance)
-                break;
-            AddCandidate(sign * distance, false);
+            // Full-span definitions fix the strip boundaries, even when their emitted
+            // programs are segmented. Partial cuts remain obstacles, not boundaries.
+            var boundaries = plate.CutOffs
+                .Where(c => c.Axis == CutOffAxis.Vertical && FullSpanLimits(c, bounds, settings))
+                .Select(c => sign * c.Position.X)
+                .Where(distance => distance > GeometryTolerance && distance < usedSpan - GeometryTolerance)
+                .Distinct().OrderBy(distance => distance).Append(usedSpan);
+            var gaps = new List<(double Start, double End, int Count)>();
+            var start = 0.0;
+            var nominalCount = 0;
+            foreach (var end in boundaries)
+            {
+                var count = 0;
+                for (var index = 1; index <= (int)candidateCount; index++)
+                {
+                    if (start + index * options.Spacing >= end - GeometryTolerance)
+                        break;
+                    count++;
+                }
+                gaps.Add((start, end, count));
+                nominalCount += count;
+                start = end;
+            }
+            // The origin-based lattice alone fits within 20,000 positions, but its
+            // off-lattice nominal lines need reserved slots too. Budget both before
+            // constructing any row so a valid, dense grid is never refused halfway.
+            Require(nominalCount < MaximumShiftCandidateCount,
+                "Too many nominal strip lines for the shift search.", nameof(options));
+            var step = System.Math.Max(options.Spacing / 700,
+                usedSpan / (MaximumShiftCandidateCount - nominalCount));
+            foreach (var gap in gaps)
+                AddShiftedGap(gap.Start, gap.End, gap.Count, step);
+        }
+        else
+        {
+            // Keep the legacy loop and certification unchanged when shifting is disabled.
+            for (var index = 1; index <= (int)candidateCount; index++)
+            {
+                var distance = index * options.Spacing;
+                if (distance >= usedSpan - GeometryTolerance)
+                    break;
+                AddCandidate(sign * distance, false);
+            }
         }
         if (hasTailCandidate)
         {
@@ -155,9 +215,14 @@ public static class AutomaticCutOffPlanner
         {
             // A partial proposal must not accidentally be accepted around a manual conflict.
             definitions.Clear();
+            stripCutLength = 0;
             separated = false;
             separatorX = null;
         }
+        // The legacy placement loop stays untouched. Its detached programs are already
+        // regenerated, so reporting their actual new strip cutting needs no new search.
+        if (!shifted)
+            fixedGridCutLength = stripCutLength;
 
         return new AutomaticCutOffPlan
         {
@@ -168,18 +233,98 @@ public static class AutomaticCutOffPlanner
             UsedSpan = separated ? System.Math.Abs(separatorX.Value) : length,
             TailLength = separated ? length - System.Math.Abs(separatorX.Value) : 0,
             TailSeparatorX = separatorX,
+            StripCutLength = stripCutLength,
+            FixedGridCutLength = fixedGridCutLength,
         };
+
+        void AddShiftedGap(double start, double end, int count, double step)
+        {
+            var nominal = new List<double>(count);
+            for (var index = 1; index <= count; index++)
+            {
+                var distance = start + index * options.Spacing;
+                nominal.Add(distance);
+                fixedGridCutLength += Measure(distance).Length;
+            }
+            if (count == 0)
+                return;
+            var positions = AutomaticCutOffStripSearch.FindPositions(start, end, count,
+                options.Spacing, options.MinimumStripLength.Value, step, Allowed, Measure) ?? nominal.ToArray();
+            for (var index = 0; index < positions.Length; index++)
+            {
+                var distance = positions[index];
+                AddCandidate(sign * distance, false);
+                if (!Near(distance, nominal[index]))
+                {
+                    var difference = Measure(nominal[index]).Length - Measure(distance).Length;
+                    var comparison = difference > 0 ? $"{difference:G8} model units less" :
+                        difference < 0 ? $"{-difference:G8} model units more" : "the same length";
+                    diagnostics.Add(new AutomaticCutOffDiagnostic(AutomaticCutOffDiagnosticCode.ShiftedCut,
+                        $"Moved from {nominal[index]:G8} to {distance:G8} model units; "
+                        + $"this line cuts {comparison}.", X: sign * distance));
+                }
+            }
+        }
+
+        bool Allowed(double distance)
+        {
+            RegisterCandidate(distance);
+            // Use the certification path's exact Near predicate, including its ULP
+            // allowance, so a selected line cannot rediscover a limited-cut conflict.
+            var x = sign * distance;
+            return !plate.CutOffs.Any(c => c.Axis == CutOffAxis.Vertical && Near(c.Position.X, x)) &&
+                !clamps.Any(zone => CrossesClamp(zone, x));
+        }
+
+        void RegisterCandidate(double distance)
+        {
+            if (candidates.Add(distance))
+                Require(candidates.Count <= MaximumShiftCandidateCount,
+                    $"Shift search would generate more than {MaximumShiftCandidateCount} distinct positions. "
+                    + "Increase spacing or the minimum strip length, or use the fixed grid.", nameof(options));
+        }
+
+        (double Length, int SegmentCount) Measure(double distance)
+        {
+            RegisterCandidate(distance);
+            if (!measurements.TryGetValue(distance, out var measured))
+            {
+                measured = new CutOff(new Vector(sign * distance, 0), CutOffAxis.Vertical)
+                    .MeasureSegments(plate, settings, cache);
+                measurements.Add(distance, measured);
+            }
+            return measured;
+        }
 
         void AddCandidate(double x, bool isSeparator)
         {
             var matches = plate.CutOffs.Where(c => c.Axis == CutOffAxis.Vertical &&
                 Near(c.Position.X, x)).ToList();
+
             if (matches.Any(c => !FullSpanLimits(c, bounds, settings)))
             {
                 diagnostics.Add(new AutomaticCutOffDiagnostic(
                     AutomaticCutOffDiagnosticCode.LimitedCutOffConflict,
                     "A same-line manual cut has different limits. Manual review is required; no cuts may be applied.",
                     true, x));
+                if (isSeparator)
+                    WarnNoSeparator(x);
+                return;
+            }
+
+            // A full-width cut crosses every active front-edge clamp at its X. Test the
+            // proposed X and every equivalent existing definition, because a tolerance-close
+            // existing line is regenerated and certified at its own X. Keep the whole
+            // footprint when it hangs off the sheet. A same-line manual limit conflict above
+            // still blocks the whole plan, clamp or not.
+            var blocked = clamps.FirstOrDefault(zone =>
+                matches.Select(c => c.Position.X).Prepend(x).Any(position => CrossesClamp(zone, position)));
+            if (blocked != null)
+            {
+                diagnostics.Add(new AutomaticCutOffDiagnostic(
+                    AutomaticCutOffDiagnosticCode.ClampBlockedCut,
+                    $"The proposed cut crosses clamp '{blocked.Id}' (including bottom-edge clearance); it was skipped.",
+                    X: x));
                 if (isSeparator)
                     WarnNoSeparator(x);
                 return;
@@ -222,8 +367,25 @@ public static class AutomaticCutOffPlanner
                     X: x));
 
             if (usable && existing == null)
+            {
                 definitions.Add(candidate);
+                if (!isSeparator)
+                {
+                    if (shifted)
+                        stripCutLength += Measure(System.Math.Abs(x)).Length;
+                    else
+                        for (var index = 0; index < program.Codes.Count; index += 2)
+                            stripCutLength += System.Math.Abs(
+                                ((LinearMove)program.Codes[index + 1]).EndPoint.Y -
+                                ((RapidMove)program.Codes[index]).EndPoint.Y);
+                }
+            }
         }
+
+        // Share the exact placement-frame predicate with candidate exclusion and final
+        // certification. Infeasible gaps still use nominal lines through AddCandidate.
+        bool CrossesClamp(ClampZone zone, double x) =>
+            x >= zone.Bounds.Left - plate.EdgeSpacing.Bottom && x <= zone.Bounds.Right + plate.EdgeSpacing.Bottom;
 
         void WarnNoSeparator(double x) => diagnostics.Add(new AutomaticCutOffDiagnostic(
             AutomaticCutOffDiagnosticCode.NoSafeTailSeparator,
@@ -235,6 +397,10 @@ public static class AutomaticCutOffPlanner
     {
         Require(double.IsFinite(options.Spacing) && options.Spacing > MinimumSpacing,
             $"Spacing must be finite and greater than {MinimumSpacing} model units.", nameof(options));
+        Require(!options.MinimumStripLength.HasValue ||
+            (double.IsFinite(options.MinimumStripLength.Value) && options.MinimumStripLength.Value > MinimumSpacing &&
+                options.MinimumStripLength.Value <= options.Spacing),
+            $"Minimum strip length must be finite, greater than {MinimumSpacing} and no greater than spacing.", nameof(options));
         Require(Nonnegative(options.MinimumTailLength),
             "Minimum tail length must be finite and nonnegative.", nameof(options));
         Require(double.IsFinite(plate.Size.Length) && plate.Size.Length > 0 &&
@@ -242,6 +408,9 @@ public static class AutomaticCutOffPlanner
             "Sheet length and width must be positive and finite.", nameof(plate));
         Require(plate.Quadrant is >= 1 and <= 4, "Quadrant must be 1 through 4.", nameof(plate));
         Require(Nonnegative(plate.PartSpacing), "Part spacing must be finite and nonnegative.", nameof(plate));
+        Require(plate.ClampZones != null && (plate.ClampZones.Count == 0 ||
+            Nonnegative(plate.EdgeSpacing.Bottom)),
+            "Clamp zones and bottom-edge clearance must be finite and valid.", nameof(plate));
         Require(Nonnegative(settings.PartClearance) && Nonnegative(settings.MinSegmentLength) &&
             Nonnegative(settings.Overtravel), "Cut-off settings must be finite and nonnegative.", nameof(settings));
         Require(Enum.IsDefined(settings.CutDirection), "Unknown cut direction.", nameof(settings));

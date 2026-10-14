@@ -40,6 +40,58 @@ maps to the engine that replaced it (see [nesting engines](nesting-engines.md)).
 If the saved engine is unavailable, Default is selected and the status bar
 reports the fallback; startup does not replace the saved missing-engine preference.
 
+## Machine edge clamps
+
+A nest can carry the machine's fixed clamp rail: identical rectangular clamps
+(width along the edge, depth into the sheet) at X centers measured from the
+plate origin along the origin-side edge. **Nest > Clamps...** edits the current
+nest's rail. **OK** applies it to every plate of the nest (**Cancel** discards
+the edits); removing every center removes the clamps. **Load Machine Defaults**
+only fills the dialog. **Save as Machine Defaults** writes
+`%APPDATA%\OpenNest\clamps.json` immediately, with the clamps, their units and
+whether new nests receive them; Cancel does not undo that write. The dialog
+refuses to open while nesting or a plate action is running.
+
+Clamps are off by default. Until `clamps.json` is saved with clamps enabled and
+at least one center, New and BOM import create nests without clamps exactly as
+before. When enabled, a new nest gets the rail converted to its units. A missing
+file keeps clamps off; an unreadable file, or one with ignored invalid values
+(a bad clamp center is dropped), warns once per session that new nests may not
+match the machine.
+
+Every plate follows the nest's rail at its own size and quadrant: clamps wholly
+beyond a shorter sheet are left off it, one still reaching onto the sheet keeps
+its whole footprint as the avoidance area (it may hang past the sheet edge), and
+resizing or rotating a plate re-resolves its clamps. Auto Nest
+offers each stock size with the rail resolved for that size, and every committed
+sheet keeps exactly the clamps its layout was validated against. Clamps are
+drawn as hatched amber rectangles over the sheet; they cannot be selected,
+moved or sequenced and never count as parts. Interactive fill, pack and push
+keep parts clear of clamps, Check Overlaps reports parts on a clamp and manual
+cut-offs crossing one, automatic cutoffs never place a cut through a clamp, and
+pre-post verification warns (with per-attempt consent) about parts, cut-offs
+and direct rapids crossing an active clamp - including the first rapid when a
+clamp covers the program start point.
+
+### Last-resort clamp removal
+
+When a part cannot be placed on an empty sheet of any offered size with every
+clamp in place - neither the selected engine nor the Irregular or Rectangles
+lane finds a clamped placement - Auto Nest takes the fewest clamps off one sheet
+that let it fit (not necessarily neighbours: a notch may let a clamp between
+them stay; the clamps nearest the origin on ties) and nests it
+on extra sheets with those clamps removed; other unplaced parts may share the
+freed sheets. It never removes a clamp to save material, never re-plans a sheet
+the normal nest already used, draws only on stock that is left, and only
+removes clamps resolved from the machine rail. The completion summary lists
+"Sheet N: remove clamp K (+M min)", the sheet shows each removed clamp dashed
+with "remove", and each removed clamp on the sheet adds the rail's removal
+minutes (default 5, set in **Nest > Clamps...**) to that sheet's cut time.
+
+Limits: the search stops after 1000 single-part trial solves and then keeps the
+normal result, removing nothing; and a part whose material clears a clamp by
+less than the engines' 0.0001" grid may still be reported as needing a removal.
+
 ## Integration constraints
 
 Callers must hold drawings and target state stable from snapshot through attachment. Do not append whole-job placements to an occupied target or flatten multiple returned sheets onto one plate: that would commit a layout different from the one checked. Do not trust arbitrary engine fulfillment metadata as a substitute for counting returned placements.

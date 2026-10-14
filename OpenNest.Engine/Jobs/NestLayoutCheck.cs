@@ -153,9 +153,85 @@ public static class NestLayoutCheck
             ValidateBounds(parts, plate, requirements, result);
             ValidateAreaBudget(parts, plate, result);
             ValidateSpacing(parts, plate.PartSpacing, requirements, result);
+            if (plate.ClampZones.Count > 0)
+                ValidateClamps(parts, plate, requirements, result);
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// C1/C5: no part material may enter a clamp zone inflated by the plate's bottom-edge
+    /// spacing (D6) - the same clearance the part owes the sheet edge, enforced with the
+    /// shared spacing slack so exact engine placements are not reddened by rounding.
+    /// </summary>
+    private static void ValidateClamps(
+        List<Part> parts,
+        Plate plate,
+        IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements,
+        List<string> result
+    )
+    {
+        var inflateBy = InflationFor(plate.EdgeSpacing.Bottom);
+
+        // Plate zones are stored in sheet coordinates; parts are in the placement frame.
+        foreach (var zone in ClampZoneFrame.ToPlacement(plate))
+        {
+            // Box.Offset(d) grows the rectangle on all four sides.
+            var keepOut = zone.Bounds.Offset(inflateBy);
+            var keepOutOutline = RectangleOutline(keepOut);
+
+            foreach (var part in parts)
+            {
+                if (!BoxesTouch(keepOut, MaterialBounds(part)))
+                    continue;
+
+                if (!OverlapsKeepOut(part, keepOutOutline, keepOut))
+                    continue;
+
+                result.Add(
+                    $"'{DisplayName(part, requirements)}' at ({part.Location.X:F2},{part.Location.Y:F2}) overlaps "
+                        + $"clamp zone '{zone.Id}' including its edge clearance"
+                );
+            }
+        }
+    }
+
+    /// <summary>
+    /// The keep-out as an exact four-vertex ring. Routing a synthetic rectangle through the
+    /// tolerance-based validation offset collapses a zone smaller than that tolerance to
+    /// nothing (PM 6859db53), so the rectangle is never offset or flattened here.
+    /// </summary>
+    private static PartOutline RectangleOutline(Box box)
+    {
+        var perimeter = new Polygon();
+        perimeter.Vertices.Add(new Vector(box.Left, box.Bottom));
+        perimeter.Vertices.Add(new Vector(box.Right, box.Bottom));
+        perimeter.Vertices.Add(new Vector(box.Right, box.Top));
+        perimeter.Vertices.Add(new Vector(box.Left, box.Top));
+        perimeter.Vertices.Add(new Vector(box.Left, box.Bottom));
+        perimeter.UpdateBounds();
+        return new PartOutline { Perimeter = perimeter, Holes = new List<Polygon>() };
+    }
+
+    /// <summary>
+    /// Material against a keep-out rectangle. A rectangle below the outline tolerance, or one
+    /// the triangulated test cannot prepare, is judged by the tolerance-free rectangle test
+    /// on the part's native contours (not the grid-rounded validation outline): the
+    /// tolerant path would call real overlap clear. A part without material is skipped.
+    /// </summary>
+    private static bool OverlapsKeepOut(Part part, PartOutline keepOutOutline, Box keepOut)
+    {
+        if (KeepOutOverlap.NeedsToleranceFreeTest(keepOut) || keepOutOutline.Triangles == null)
+        {
+            var entities = ConvertProgram.ToGeometry(part.Program)
+                .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                .ToList();
+            var profile = entities.Count == 0 ? null : new ShapeProfile(entities);
+            return profile?.Perimeter != null && KeepOutOverlap.ProfileEnters(profile, part.Location, keepOut);
+        }
+        var material = Outline(part, 0);
+        return material != null && Overlaps(material, keepOutOutline);
     }
 
     /// <summary>
@@ -239,7 +315,30 @@ public static class NestLayoutCheck
             && expected.EdgeSpacing.Top.IsEqualTo(actual.EdgeSpacing.Top)
             && expected.EdgeSpacing.Bottom.IsEqualTo(actual.EdgeSpacing.Bottom)
             && expected.Quadrant == actual.Quadrant
+            && SameZones(expected.ClampZones, actual.ClampZones)
         );
+
+    // Clamp sets are part of stock settings; a different set is not the offered stock.
+    private static bool SameZones(
+        IReadOnlyList<ClampZone> x,
+        IReadOnlyList<ClampZone> y
+    )
+    {
+        if (x.Count != y.Count)
+            return false;
+        for (var i = 0; i < x.Count; i++)
+        {
+            if (
+                !string.Equals(x[i].Id, y[i].Id, StringComparison.Ordinal)
+                || !x[i].Bounds.X.IsEqualTo(y[i].Bounds.X)
+                || !x[i].Bounds.Y.IsEqualTo(y[i].Bounds.Y)
+                || !x[i].Bounds.Length.IsEqualTo(y[i].Bounds.Length)
+                || !x[i].Bounds.Width.IsEqualTo(y[i].Bounds.Width)
+            )
+                return false;
+        }
+        return true;
+    }
 
     private static string Describe(RotationPolicy policy) =>
         policy.Kind switch

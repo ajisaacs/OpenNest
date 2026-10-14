@@ -54,18 +54,30 @@ The desktop's **Nest > Post > (post processor)** workflow checks every plate aft
 post settings are accepted and before asking where to save CNC output. The review
 shows all three check categories, even when there are no findings:
 
-- **Overlapping parts:** shared material between placed parts, including containment.
-  Holes are subtracted; placing a part inside a sufficiently large cutout is not
-  itself an overlap. This uses clean drawing geometry, not added lead-in/out paths.
+- **Overlapping parts and clamps:** shared material between placed parts, including containment,
+  and physical material overlapping an active clamp. Holes are subtracted; placing a part inside
+  a sufficiently large cutout is not itself an overlap. The same review also warns if a nominal
+  manual cut-off line crosses an active clamp, even when its regenerated cut is currently trimmed;
+  a line contact has no material-overlap area. Removed clamps on that sheet are not checked.
+  The placed cut-off program is checked too, so a definition edited without regenerating its
+  cut still warns where the posted cut would cross a clamp (one warning per cut-off and clamp).
+  Clamp zones are compared in the plate's quadrant frame. A missing or malformed clamp zone
+  makes the clamp checks incomplete (a warning), never a clear result.
+  This uses clean drawing geometry, not added lead-in/out paths.
 - **Missing lead-ins:** cutting contours without an actual, nonzero lead-in in the
   placed program. Applying a lead-in to only one contour does not clear the other
   contours. Scribe-only work and scrap cutoff lines do not require lead-ins here.
   The cutting planner supports direct contour piercing without lead-ins; that does
   not suppress this pre-post review warning or grant posting consent.
 - **Rapid crossings:** direct XY moves crossing closed, already-cut, untabbed
-  contours in cutting order. This includes earlier holes within the same part and
-  previously cut parts. A future cut is not an obstacle yet. Actual uncut gaps are
-  respected; enabling tabs in settings alone is not evidence that a gap exists.
+  contours in cutting order, or an active clamp's physical footprint. This includes
+  earlier holes within the same part and previously cut parts. A future cut is not
+  an obstacle yet. Actual uncut gaps are respected; enabling tabs in settings alone
+  is not evidence that a gap exists. Clamp-rapid warnings are conservative: head
+  height/retracts are not modeled, so inspect the emitted route and machine setup.
+  A clamp whose footprint covers the program start point warns on every posting
+  attempt by design; there is no exemption for the first rapid and no persisted
+  bypass (settled decision D10).
 
 Findings identify the plate and part's position in the cutting sequence. Read the
 scrollable report, cancel to fix the nest, then post again to rerun verification.
@@ -122,9 +134,9 @@ change does not silently alter their existing CNC output order.
 These checks are warnings, not a machine safety certification. They inspect the
 nest's placed programs and direct XY travel, not a simulation of final NC output.
 A post processor or controller may change routing, cutting order, lead-ins,
-retract height, or parking moves. The checks do not model tipping, slats, clamps,
-actual tab strength, kerf, or safe Z height. Review the generated CNC program and
-machine setup before cutting, even when this report has no warnings.
+retract height, or parking moves. They check planar clamp footprints but not clamp
+height, actual head clearance, tipping, slats or tab strength. Review the generated
+CNC program and machine setup before cutting, even when this report has no warnings.
 
 `OpenNest.Core/Diagnostics/PostVerificationAnalyzer` owns the cross-platform logic;
 its report exposes findings, display text, and `CanPost(risksAcknowledged)`. Use

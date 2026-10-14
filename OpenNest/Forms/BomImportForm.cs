@@ -410,6 +410,8 @@ namespace OpenNest.Forms
             var jobName = txtJobName.Text.Trim();
             var nestsCreated = 0;
             var importErrors = new List<string>();
+            // Read when the nests are created, warning (once per session) like New does.
+            var clamps = MainForm.LoadClampSettings(this);
 
             foreach (var group in groups)
             {
@@ -427,7 +429,17 @@ namespace OpenNest.Forms
                     };
                 }
 
-                var result = BomNestBuilder.Build(group, plate, jobName, _defaults.ApplyTo);
+                var result = BomNestBuilder.Build(
+                    group,
+                    plate,
+                    jobName,
+                    nest =>
+                    {
+                        // As New does: saved defaults, then the machine clamps in those units.
+                        _defaults.ApplyTo(nest);
+                        clamps.ApplyToNewNest(nest);
+                    }
+                );
                 importErrors.AddRange(result.Errors);
 
                 if (result.Nest == null)

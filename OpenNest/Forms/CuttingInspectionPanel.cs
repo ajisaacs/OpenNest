@@ -58,6 +58,39 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly Button previousButton = new() { Text = "Previous", AutoSize = true };
     private readonly Button nextButton = new() { Text = "Next", AutoSize = true };
     private readonly CheckBox keepOrderCheckBox = new() { Text = "Keep current part order", AutoSize = true };
+    private readonly CheckBox autoCutOffsCheckBox = new() { AutoSize = true };
+    private readonly FlowLayoutPanel existingWorkBanner = new()
+    {
+        AutoSize = true,
+        FlowDirection = FlowDirection.TopDown,
+        WrapContents = false,
+        BackColor = Color.FromArgb(192, 0, 0),
+        Padding = new Padding(6),
+        Margin = new Padding(3, 3, 3, 6),
+        Visible = false
+    };
+    private readonly Label existingWorkLabel = new()
+    {
+        AutoSize = true,
+        MaximumSize = new Size(428, 0),
+        ForeColor = Color.White,
+        BackColor = Color.Transparent,
+        AccessibleName = "Existing lead-ins and cut-offs warning"
+    };
+    private readonly Button clearExistingButton = new()
+    {
+        Text = "Clear Lead-ins && Cut-offs…",
+        AutoSize = true,
+        BackColor = SystemColors.Control,
+        UseVisualStyleBackColor = true
+    };
+    private readonly Button cutOffSettingsButton = new() { Text = "Cut-off Settings…", AutoSize = true };
+    private readonly Units units;
+    private readonly bool allPlates;
+    private AutomaticCutOffOptions cutOffOptions;
+    // Last cut-off settings chosen here, per unit system, for the rest of this session.
+    private static readonly System.Collections.Generic.Dictionary<Units, AutomaticCutOffOptions> lastCutOffOptions = new();
+    private AutomaticCutOffStaging stagedCutOffs;
     private readonly CheckBox acceptWarningsCheckBox = new() { Text = "Accept UNVERIFIED plan warnings (post consent happens separately)", AutoSize = true, Visible = false };
     private readonly Label settingsLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
     private readonly Label previewLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
@@ -111,7 +144,16 @@ internal sealed class CuttingInspectionPanel : UserControl
         {
             if (!configuringMode) SwitchMode((CuttingInspectionMode)modeSelector.SelectedIndex);
         };
-        header.Controls.AddRange([modeSelector, settingsLabel, keepOrderCheckBox, buttons, acceptWarningsCheckBox, navigation, previewLabel, validationScopeLabel]);
+        this.allPlates = allPlates;
+        units = editor.Nest.Units;
+        cutOffOptions = lastCutOffOptions.TryGetValue(units, out var last) ? Copy(last) : DefaultCutOffOptions(units);
+        ShowCutOffOptions();
+        var cutOffRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        cutOffRow.Controls.AddRange([autoCutOffsCheckBox, cutOffSettingsButton]);
+        existingWorkLabel.Font = new Font(Font, FontStyle.Bold);
+        existingWorkBanner.Controls.AddRange([existingWorkLabel, clearExistingButton]);
+        header.Controls.AddRange([modeSelector, existingWorkBanner, settingsLabel, keepOrderCheckBox, cutOffRow, buttons,
+            acceptWarningsCheckBox, navigation, previewLabel, validationScopeLabel]);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
@@ -133,13 +175,17 @@ internal sealed class CuttingInspectionPanel : UserControl
         cancelButton.Click += (_, _) => RequestClose();
         settingsButton.Click += (_, _) => EditSettings();
         keepOrderCheckBox.CheckedChanged += (_, _) => StartPlanning();
+        autoCutOffsCheckBox.CheckedChanged += (_, _) => StartPlanning();
+        cutOffSettingsButton.Click += (_, _) => EditCutOffSettings();
+        clearExistingButton.Click += (_, _) => ClearExistingWork();
         acceptWarningsCheckBox.CheckedChanged += (_, _) => UpdateApply();
         applyButton.Click += (_, _) => Apply();
         previousButton.Click += (_, _) => ShowPlate(selectedPlate - 1);
         nextButton.Click += (_, _) => ShowPlate(selectedPlate + 1);
         warningGrid.SelectionChanged += (_, _) => NavigateFinding();
         ShowSettings();
-        resultLabel.Text = "Read-only proposal inspection. Nothing live changes before Apply.";
+        resultLabel.Text = "Read-only proposal inspection. Nothing live changes before Apply, except automatic cut-offs "
+            + "you choose to add; those are removed again unless you Apply.";
     }
 
     internal bool IsPlanning => inspection.IsRunning || validationCancellation != null;
@@ -149,6 +195,96 @@ internal sealed class CuttingInspectionPanel : UserControl
     internal Action BeforePostApply { get; set; }
     internal Action<Exception> OnPostApplyError { get; set; }
     internal CuttingPlanProposal Proposal => inspection.Proposal;
+
+    /// <summary>Asks before discarding applied lead-ins and cut-offs; null shows a Yes/No box (tests replace it).</summary>
+    internal Func<string, bool> ConfirmClearExisting { get; set; }
+
+    /// <summary>Automatic cut-offs added to the live plates for the current plan, until Apply keeps them.</summary>
+    internal AutomaticCutOffStaging StagedCutOffs => stagedCutOffs;
+
+    /// <summary>Shows the cut-off settings dialog; tests replace it. Null uses ShowDialog.</summary>
+    internal Func<AutomaticCutOffForm, DialogResult> ShowCutOffSettings { get; set; }
+
+    internal AutomaticCutOffOptions CutOffOptions => Copy(cutOffOptions);
+
+    private static AutomaticCutOffOptions Copy(AutomaticCutOffOptions options) => new()
+    {
+        Spacing = options.Spacing,
+        MinimumStripLength = options.MinimumStripLength,
+        MinimumTailLength = options.MinimumTailLength,
+    };
+
+    private void ShowCutOffOptions()
+    {
+        var unit = UnitsHelper.GetShortString(units);
+        autoCutOffsCheckBox.Text = $"Add automatic scrap cut-offs ({cutOffOptions.Spacing:0.###} {unit} strips, "
+            + $"keep tails of {cutOffOptions.MinimumTailLength:0.###} {unit} or more)";
+    }
+
+    /// <summary>
+    /// Opens the Automatic Scrap Cut-offs dialog in settings mode for this panel's scope. Unapplied
+    /// cut-offs come off first so its preview starts from the plates' real state; OK ticks the box
+    /// and replans with the chosen settings, Cancel replans with the previous ones.
+    /// </summary>
+    private void EditCutOffSettings()
+    {
+        if (closed || closeRequested || IsPlanning || Mode != CuttingInspectionMode.Plan)
+            return;
+        ClearResult();
+        try
+        {
+            RevertStagedCutOffs();
+        }
+        catch (Exception ex)
+        {
+            resultLabel.Text = $"Unable to remove the unapplied automatic cut-offs: {ex.Message}";
+            return;
+        }
+        RefreshExistingWork();
+        AutomaticCutOffOptions chosen = null;
+        try
+        {
+            using var form = AutomaticCutOffForm.ForSettings(view, units, allPlates ? editor.Nest : null, cutOffOptions);
+            var result = ShowCutOffSettings?.Invoke(form) ?? form.ShowDialog(this);
+            if (result == DialogResult.OK)
+                chosen = form.SelectedOptions;
+        }
+        catch (Exception ex)
+        {
+            resultLabel.Text = $"Unable to open the cut-off settings: {ex.Message}";
+        }
+        finally
+        {
+            if (!view.IsDisposed)
+                view.ClearPreviewParts();
+        }
+        if (closed || closeRequested)
+            return;
+        if (chosen != null)
+        {
+            cutOffOptions = Copy(chosen);
+            lastCutOffOptions[units] = Copy(chosen);
+            ShowCutOffOptions();
+            if (!autoCutOffsCheckBox.Checked)
+            {
+                autoCutOffsCheckBox.Checked = true; // Replans through CheckedChanged.
+                return;
+            }
+        }
+        StartPlanning();
+    }
+
+    /// <summary>The automatic cut-off dialog's defaults: 35 in strips, half-strip minimum, 12 in tail.</summary>
+    internal static AutomaticCutOffOptions DefaultCutOffOptions(Units units)
+    {
+        var spacing = units == Units.Millimeters ? 889 : 35;
+        return new AutomaticCutOffOptions
+        {
+            Spacing = spacing,
+            MinimumStripLength = spacing / 2.0,
+            MinimumTailLength = units == Units.Millimeters ? 304.8 : 12,
+        };
+    }
 
     internal void Open()
     {
@@ -173,6 +309,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         configuringMode = false;
         var planning = Mode == CuttingInspectionMode.Plan;
         settingsButton.Visible = settingsLabel.Visible = keepOrderCheckBox.Visible = applyButton.Visible = planning;
+        autoCutOffsCheckBox.Visible = cutOffSettingsButton.Visible = planning;
+        RefreshExistingWork();
         previousButton.Visible = nextButton.Visible = planning;
         validationScopeLabel.Visible = !planning;
         planButton.Text = planning ? "Replan" : "Recheck all plates";
@@ -217,6 +355,12 @@ internal sealed class CuttingInspectionPanel : UserControl
     {
         if (closed || closeRequested || IsPlanning) return;
         ClearResult();
+        try { RevertStagedCutOffs(); } // Validate what is really on the plates, not an unapplied plan.
+        catch (Exception ex)
+        {
+            resultLabel.Text = $"Unable to remove the unapplied automatic cut-offs: {ex.Message}";
+            return;
+        }
         ConfigureMode();
         SetPlanning(true);
         resultLabel.Text = "Checking all live plates: overlaps, missing lead-ins and rapid crossings…";
@@ -302,7 +446,11 @@ internal sealed class CuttingInspectionPanel : UserControl
         view.ShowValidationFinding(finding with { Location = location });
         var hint = finding.Kind switch
         {
+            PostVerificationKind.Overlap when finding.ClampId != null =>
+                "The ring marks a nominal cut-off contacting a clamp; no material-overlap area is implied.",
             PostVerificationKind.Overlap => "Shaded material is the overlap. The ring marks its area centroid, which can lie between separate patches.",
+            PostVerificationKind.RapidCrossing when finding.ClampId != null =>
+                "The crosshair marks the rapid's contact with the clamp. Head height is not modeled.",
             PostVerificationKind.RapidCrossing => finding.ContactPoints.Count > 0
                 ? "Crosshairs mark contacts with the completed contour. The pulsing dashed orange line shows the rapid."
                 : "The pulsing dashed orange line shows the rapid inside the completed contour; there is no boundary contact point to mark.",
@@ -319,8 +467,16 @@ internal sealed class CuttingInspectionPanel : UserControl
         if (Mode != CuttingInspectionMode.Plan || closed || IsPlanning || closeRequested || inspection.CloseRequested)
             return;
         ClearResult();
+        if (!SyncStagedCutOffs())
+        {
+            RefreshExistingWork();
+            return;
+        }
+        RefreshExistingWork();
         SetPlanning(true);
-        resultLabel.Text = "Planning… Read-only; the live plate is unchanged.";
+        resultLabel.Text = stagedCutOffs != null
+            ? "Planning… Automatic cut-offs were added for this plan; they are removed again unless you Apply."
+            : "Planning… Read-only; the live plate is unchanged.";
         try
         {
             // Capture on the owner thread; no worker recapture of the live plate or settings.
@@ -423,7 +579,9 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     private void SetPlanning(bool running)
     {
-        settingsButton.Enabled = keepOrderCheckBox.Enabled = planButton.Enabled = !running;
+        settingsButton.Enabled = keepOrderCheckBox.Enabled = autoCutOffsCheckBox.Enabled = planButton.Enabled = !running;
+        cutOffSettingsButton.Enabled = !running;
+        clearExistingButton.Enabled = !running;
         previousButton.Enabled = !running && selectedPlate > 0;
         nextButton.Enabled = !running && selectedPlate < plates.Length - 1;
         acceptWarningsCheckBox.Enabled = !running;
@@ -537,6 +695,9 @@ internal sealed class CuttingInspectionPanel : UserControl
         CommitResult = Proposal.Apply(acceptWarningsCheckBox.Checked);
         if (CommitResult.Status == CuttingCommitStatus.Applied)
         {
+            // The plan was made with these cut-offs in place; applying it keeps them.
+            stagedCutOffs?.Keep();
+            stagedCutOffs = null;
             Exception postApplyError = null;
             try
             {
@@ -589,6 +750,101 @@ internal sealed class CuttingInspectionPanel : UserControl
         return Regex.Replace(name, "(?<=[a-z])(?=[A-Z])", " ").ToLowerInvariant();
     }
 
+    /// <summary>
+    /// Adds or removes this panel's automatic cut-offs to match the check box, on the owner
+    /// thread before capture, so the plan sequences them. False when planning cannot start.
+    /// </summary>
+    private bool SyncStagedCutOffs()
+    {
+        try
+        {
+            if (!autoCutOffsCheckBox.Checked)
+            {
+                RevertStagedCutOffs();
+                return true;
+            }
+            if (stagedCutOffs != null)
+                return true;
+            var staging = AutomaticCutOffBatch.Stage(plates, cutOffOptions, view.CutOffSettings);
+            if (staging.IsBlocked)
+            {
+                var reasons = staging.Plans.SelectMany((plan, index) => plan.Diagnostics.Where(d => d.IsBlocking)
+                    .Select(d => $"Plate {plateNumbers[index]}: {d.Message}"));
+                resultLabel.Text = "Automatic cut-offs were not added, so nothing was planned:" + Environment.NewLine
+                    + string.Join(Environment.NewLine, reasons) + Environment.NewLine
+                    + "Untick \"Add automatic scrap cut-offs\" to plan without them, or clear or fix the existing cut-offs.";
+                return false;
+            }
+            stagedCutOffs = staging.CanRevert ? staging : null;
+            view.Invalidate();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            resultLabel.Text = $"Automatic cut-offs could not be added: {ex.Message} Nothing was planned.";
+            return false;
+        }
+    }
+
+    private void RevertStagedCutOffs()
+    {
+        var staged = stagedCutOffs;
+        stagedCutOffs = null;
+        if (staged == null)
+            return;
+        staged.Revert();
+        if (!view.IsDisposed)
+            view.Invalidate();
+    }
+
+    private void RefreshExistingWork()
+    {
+        var summary = AppliedCuttingWork.Summarize(plates, plateNumbers, stagedCutOffs?.Definitions);
+        existingWorkLabel.Text = summary.Describe();
+        existingWorkBanner.Visible = Mode == CuttingInspectionMode.Plan && summary.HasExistingWork;
+    }
+
+    private void ClearExistingWork()
+    {
+        if (closed || closeRequested || IsPlanning || Mode != CuttingInspectionMode.Plan)
+            return;
+        var summary = AppliedCuttingWork.Summarize(plates, plateNumbers, stagedCutOffs?.Definitions);
+        if (!summary.HasExistingWork)
+            return;
+        var message = $"Remove the applied lead-ins ({summary.LeadInParts} parts, {summary.LockedLeadInParts} locked) and "
+            + $"{summary.CutOffs} cut-offs from plate(s) {string.Join(", ", summary.PlateNumbers)}?"
+            + Environment.NewLine + Environment.NewLine
+            + "Locked and hand-placed lead-ins are removed too, and this cannot be undone. The plan is then recalculated.";
+        var confirmed = ConfirmClearExisting?.Invoke(message)
+            ?? MessageBox.Show(editor, message, "Clear Lead-ins and Cut-offs", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+        if (!confirmed || closed || closeRequested || IsPlanning)
+            return;
+        ClearResult();
+        try
+        {
+            RevertStagedCutOffs();
+            AppliedCuttingWork.Clear(plates, plateNumbers);
+        }
+        catch (Exception ex)
+        {
+            RefreshExistingWork();
+            resultLabel.Text = $"Clearing stopped part-way: {ex.Message} Review the plates before planning or posting.";
+            return;
+        }
+        finally
+        {
+            foreach (var part in view.Parts)
+            {
+                part.IsDirty = true;
+                part.Update();
+            }
+            view.Invalidate();
+            editor.UpdatePlateList();
+        }
+        StartPlanning();
+    }
+
     internal void RequestClose()
     {
         if (closed)
@@ -615,6 +871,14 @@ internal sealed class CuttingInspectionPanel : UserControl
         Exception restoreError = null;
         var ownedScope = scope;
         scope = null;
+        try
+        {
+            RevertStagedCutOffs(); // Closing without Apply leaves the plates as they were.
+        }
+        catch (Exception ex)
+        {
+            restoreError = ex;
+        }
         try
         {
             RestoreLiveView();

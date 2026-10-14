@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenNest.CNC;
 
 namespace OpenNest.Engine.Jobs.Adapters;
@@ -54,8 +55,11 @@ public static class DrawingJobMapper
             quantity,
             plate.PartSpacing,
             plate.EdgeSpacing,
-            plate.Quadrant
-        );
+            plate.Quadrant,
+            cost: null,
+            clampZones: new List<ClampZone>(plate.ClampZones)
+        )
+        { ClampRail = plate.ClampRail };
     }
 
     public static Program ToProgram(PartGeometrySnapshot geometry)
@@ -104,12 +108,19 @@ public static class DrawingJobMapper
     internal static double LegacyStep(RotationPolicy policy) =>
         policy.Kind == RotationPolicyKind.Fixed ? OpenNest.Math.Angle.TwoPI : policy.Step;
 
-    internal static Plate CreatePlate(NestPlateStock stock) =>
-        new(stock.Size)
+    internal static Plate CreatePlate(NestPlateStock stock)
+    {
+        var plate = new Plate(stock.Size)
         {
             Quantity = 1,
             PartSpacing = stock.PartSpacing,
             EdgeSpacing = stock.EdgeSpacing,
             Quadrant = stock.Quadrant,
         };
+        // Every Plate stores zones in plate (sheet lower-left) coordinates; consumers map
+        // them into the placement frame through ClampZoneFrame, exactly as the stock did.
+        foreach (var zone in stock.SheetClampZones)
+            plate.ClampZones.Add(new ClampZone(zone.Id, zone.Bounds));
+        return plate;
+    }
 }

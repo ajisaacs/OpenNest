@@ -40,6 +40,67 @@ public class CuttingDependencyTests
     }
 
     [Fact]
+    public void Plan_SheetSeparatingCutOff_IsCutAfterEveryPartAndOtherCutOff()
+    {
+        var parameters = ExplicitContourTests.Parameters();
+        var (plate, separator, crossing, left, right) = SeparatedPlate();
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate, confirmedParameters: parameters));
+        var separatorIndex = plate.Parts.IndexOf(separator);
+        Assert.Equal(Enumerable.Range(0, plate.Parts.Count).Where(i => i != separatorIndex),
+            snapshot.Dependencies.PrerequisitesOf(separatorIndex));
+
+        var result = CuttingPlanService.Plan(snapshot);
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, Describe(result));
+        var order = result.ProposedOrder.Select(o => o.SourcePart).ToList();
+        Assert.Same(separator, order[^1]);
+        Assert.True(result.ProposedOrder[^1].SeparatesSheet);
+        Assert.False(result.ProposedOrder.Single(o => ReferenceEquals(o.SourcePart, crossing)).SeparatesSheet);
+        Assert.True(order.IndexOf(crossing) < order.IndexOf(left));
+        Assert.Equal(CuttingCommitStatus.Applied, CuttingPlanService.Apply([result]).Status);
+        Assert.Same(separator, plate.Parts[^1]);
+        Assert.Contains(right, plate.Parts);
+    }
+
+    [Fact]
+    public void Plan_KeptOrderCuttingTheSeparatorFirst_IsAConstraintConflictThatSaysWhy()
+    {
+        var (plate, separator, _, _, _) = SeparatedPlate();
+        Assert.Same(separator, plate.Parts[0]);
+
+        var result = CuttingPlanService.Plan(CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters(), preservePartOrder: true)));
+
+        Assert.Equal(CuttingPlanStatus.ConstraintConflict, result.Status);
+        Assert.Contains(result.Findings, f => f.Message.Contains("sheet-separating cutoff")
+            && f.Message.Contains("before the sheet is separated"));
+    }
+
+    // 100 x 100 sheet: squares at X 1-11 and 60-70; a cutoff at X 5 is trimmed around the left
+    // square, while a continuous line at X 40 splits the sheet. Both cutoffs start the sequence.
+    private static (Plate, Part Separator, Part Crossing, Part Left, Part Right) SeparatedPlate()
+    {
+        var nest = new Nest();
+        var plate = nest.CreatePlate();
+        plate.Size = new Size(100, 100);
+        var left = new Part(new Drawing("left", ExplicitContourTests.Square(false)), new Vector(1, 1));
+        var right = new Part(new Drawing("right", ExplicitContourTests.Square(false)), new Vector(60, 1));
+        plate.Parts.Add(left);
+        plate.Parts.Add(right);
+        var separator = new CutOff(new Vector(40, 0), CutOffAxis.Vertical);
+        var crossing = new CutOff(new Vector(5, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(separator);
+        plate.CutOffs.Add(crossing);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        var cuts = plate.Parts.Where(p => p.BaseDrawing.IsCutOff).ToArray();
+        Assert.Equal(2, cuts.Length);
+        var separatorPart = cuts.Single(p => ReferenceEquals(p.BaseDrawing, separator.Drawing));
+        var crossingPart = cuts.Single(p => ReferenceEquals(p.BaseDrawing, crossing.Drawing));
+        plate.Parts.Reorder([separatorPart, crossingPart, left, right]);
+        return (plate, separatorPart, crossingPart, left, right);
+    }
+
+    [Fact]
     public void Apply_CutOffReclassifiedAfterPlanning_IsStale()
     {
         var (_, plate, p, q, cut) = CutOffPlate(ExplicitContourTests.Parameters(), orphan: false);

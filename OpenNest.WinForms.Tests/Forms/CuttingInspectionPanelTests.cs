@@ -436,6 +436,174 @@ public class CuttingInspectionPanelTests
         panel.RequestClose();
     });
 
+    [Fact]
+    public void AutomaticCutOffsAreStagedForThePlanAndRemovedOnCancelOrUntick() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        var plate = editor.PlateView.Plate;
+        var original = plate.Parts.ToArray();
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.Empty(plate.CutOffs);
+
+        Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = true;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+
+        Assert.NotNull(panel.StagedCutOffs);
+        Assert.NotEmpty(plate.CutOffs);
+        Assert.Equal(plate.CutOffs.Count, plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
+        Assert.Equal(plate.CutOffs.Count, panel.Proposal.Plates[0].Result.ProposedOrder.Count(p => p.IsCutOff));
+        Assert.False(Field<FlowLayoutPanel>(panel, "existingWorkBanner").Visible); // Staged lines are not "existing".
+
+        Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = false;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.Null(panel.StagedCutOffs);
+        Assert.Empty(plate.CutOffs);
+        Assert.Equal(original, plate.Parts);
+
+        Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = true;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.NotEmpty(plate.CutOffs);
+        panel.RequestClose();
+        Assert.Null(editor.CuttingInspection);
+        Assert.Empty(plate.CutOffs);
+        Assert.Equal(original, plate.Parts);
+        Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
+    });
+
+    [Fact]
+    public void ApplyKeepsTheStagedAutomaticCutOffsInThePlannedOrder() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        var plate = editor.PlateView.Plate;
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = true;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var staged = panel.StagedCutOffs!.Definitions.ToArray();
+        var planned = panel.Proposal.Plates[0].Result.ProposedOrder.Select(p => p.SourcePart).ToArray();
+
+        Field<Button>(panel, "applyButton").PerformClick();
+
+        Assert.Equal(OpenNest.CNC.CuttingPlanning.CuttingCommitStatus.Applied, panel.CommitResult!.Status);
+        Assert.Null(editor.CuttingInspection);
+        Assert.Equal(staged, plate.CutOffs);
+        Assert.Equal(planned, plate.Parts);
+        Assert.All(plate.Parts.Where(p => !p.BaseDrawing.IsCutOff), part => Assert.True(part.HasManualLeadIns));
+    });
+
+    [Fact]
+    public void ExistingLeadInsShowTheRedBannerAndClearRecalculatesFromScratch() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        var plate = editor.PlateView.Plate;
+        editor.OpenCuttingInspection();
+        var first = editor.CuttingInspection!;
+        PumpUntil(() => first.Proposal != null && !first.IsPlanning);
+        Assert.False(Field<FlowLayoutPanel>(first, "existingWorkBanner").Visible);
+        Field<Button>(first, "applyButton").PerformClick();
+        Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
+        plate.CutOffs.Add(new CutOff(new Vector(60, 0), CutOffAxis.Vertical));
+        plate.RegenerateCutOffs(editor.PlateView.CutOffSettings);
+        var real = plate.Parts.Where(p => !p.BaseDrawing.IsCutOff).ToArray();
+
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var banner = Field<FlowLayoutPanel>(panel, "existingWorkBanner");
+        Assert.True(banner.Visible);
+        Assert.Contains("ALREADY APPLIED: lead-ins on 2 parts and 1 cut-off on plate 1.",
+            Field<Label>(panel, "existingWorkLabel").Text);
+
+        string? asked = null;
+        panel.ConfirmClearExisting = message => { asked = message; return false; };
+        Field<Button>(panel, "clearExistingButton").PerformClick();
+        Assert.Contains("cannot be undone", asked);
+        Assert.Single(plate.CutOffs);
+        Assert.All(real, part => Assert.True(part.HasManualLeadIns));
+
+        panel.ConfirmClearExisting = _ => true;
+        Field<Button>(panel, "clearExistingButton").PerformClick();
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+
+        Assert.Empty(plate.CutOffs);
+        Assert.Equal(real, plate.Parts);
+        Assert.All(real, part => Assert.False(part.HasManualLeadIns));
+        Assert.False(banner.Visible);
+        Assert.True(panel.Proposal.CanApply);
+        panel.RequestClose();
+    });
+
+    [Fact]
+    public void CutOffSettingsOpensTheAutomaticCutOffDialogAndReplansWithItsChoice() => RunSta(() =>
+    {
+        var remembered = (System.Collections.IDictionary)typeof(CuttingInspectionPanel)
+            .GetField("lastCutOffOptions", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .GetValue(null)!;
+        try
+        {
+            using var editor = Editor();
+            editor.Show();
+            editor.PlateManager.LoadAt(0);
+            var plate = editor.PlateView.Plate;
+            editor.OpenCuttingInspection();
+            var panel = editor.CuttingInspection!;
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.Equal(35, panel.CutOffOptions.Spacing);
+
+            panel.ShowCutOffSettings = form => DialogResult.Cancel;
+            Field<Button>(panel, "cutOffSettingsButton").PerformClick();
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.False(Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked);
+            Assert.Equal(35, panel.CutOffOptions.Spacing);
+            Assert.Empty(plate.CutOffs);
+
+            AutomaticCutOffForm? shown = null;
+            panel.ShowCutOffSettings = form =>
+            {
+                shown = form;
+                Assert.Equal(35, double.Parse(form.Controls.Find("spacingBox", true).Single().Text));
+                form.Controls.Find("spacingBox", true).Single().Text = "30";
+                form.Controls.Find("minimumTailBox", true).Single().Text = "10";
+                typeof(AutomaticCutOffForm).GetMethod("ApplyButton_Click",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(form, [null, EventArgs.Empty]);
+                Assert.Empty(plate.CutOffs); // The dialog only chooses settings.
+                return form.DialogResult;
+            };
+            Field<Button>(panel, "cutOffSettingsButton").PerformClick();
+            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+
+            Assert.NotNull(shown);
+            Assert.Equal((30.0, 10.0), (panel.CutOffOptions.Spacing, panel.CutOffOptions.MinimumTailLength));
+            Assert.True(Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked);
+            Assert.Contains("30 in strips", Field<CheckBox>(panel, "autoCutOffsCheckBox").Text);
+            Assert.NotNull(panel.StagedCutOffs);
+            Assert.NotEmpty(plate.CutOffs);
+            Assert.Equal(plate.CutOffs.Count, panel.Proposal.Plates[0].Result.ProposedOrder.Count(p => p.IsCutOff));
+            panel.RequestClose();
+            Assert.Empty(plate.CutOffs);
+
+            editor.OpenCuttingInspection();
+            var reopened = editor.CuttingInspection!;
+            Assert.Equal(30, reopened.CutOffOptions.Spacing); // Remembered for this session.
+            PumpUntil(() => reopened.Proposal != null && !reopened.IsPlanning);
+            reopened.RequestClose();
+        }
+        finally
+        {
+            remembered.Clear();
+        }
+    });
+
     private sealed class MenuHost : MainForm
     {
         protected override void OnLoad(EventArgs e) { }

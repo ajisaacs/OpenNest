@@ -135,6 +135,7 @@ namespace OpenNest.IO
                     Right = pd.EdgeSpacing.Right,
                     Bottom = pd.EdgeSpacing.Bottom,
                 },
+                ClampRail = ToDto(pd.ClampRail),
             };
         }
 
@@ -197,6 +198,50 @@ namespace OpenNest.IO
             return list;
         }
 
+        /// <summary>
+        /// True when a plate created from the saved defaults would be this sheet's clamp
+        /// configuration: same size, quadrant, edge and part spacing, no last-resort
+        /// removal, not following another rail (removal time included), and zones the
+        /// saved rail recreates (C17: anything else is configured
+        /// stock and is written).
+        /// </summary>
+        private bool DefaultsRecreateClamps(Plate plate)
+        {
+            var defaults = nest.PlateDefaults;
+            return defaults.ClampRail is { } rail
+                && plate.RemovedClamps.Count == 0
+                && plate.Size.Width == defaults.Size.Width
+                && plate.Size.Length == defaults.Size.Length
+                && plate.Quadrant == defaults.Quadrant
+                && plate.PartSpacing == defaults.PartSpacing
+                && plate.EdgeSpacing.Left == defaults.EdgeSpacing.Left
+                && plate.EdgeSpacing.Bottom == defaults.EdgeSpacing.Bottom
+                && plate.EdgeSpacing.Right == defaults.EdgeSpacing.Right
+                && plate.EdgeSpacing.Top == defaults.EdgeSpacing.Top
+                && (plate.ClampRail == null || Equals(plate.ClampRail, rail))
+                && rail.Matches(plate);
+        }
+
+        private static ClampRailDto ToDto(ClampRail rail) =>
+            rail == null
+                ? null
+                : new ClampRailDto
+                {
+                    Width = rail.Width,
+                    Depth = rail.Depth,
+                    Centers = rail.Centers.ToList(),
+                    RemovalMinutes = rail.RemovalMinutes,
+                };
+
+        /// <summary>Numeric suffix of a rail clamp id ("clamp-3" -&gt; 3), for a natural sort of
+        /// <see cref="PlateDto.RemovedClamps"/> instead of lexical ("clamp-10" before "clamp-2").
+        /// A non-matching id sorts last by its own ordinal text.</summary>
+        private static int ClampIndex(string id) =>
+            id != null && id.StartsWith("clamp-", StringComparison.Ordinal)
+                && int.TryParse(id.AsSpan(6), out var index)
+                ? index
+                : int.MaxValue;
+
         private List<PlateDto> BuildPlateDtos()
         {
             var list = new List<PlateDto>();
@@ -205,9 +250,17 @@ namespace OpenNest.IO
             {
                 var plate = nest.Plates[i];
 
+                // An empty plate is omitted unless that would lose a clamp configuration the
+                // saved defaults cannot recreate. PlateManager moves an untouched trailing
+                // sentinel to new defaults during an edit, so it remains omitted; configured
+                // nondefault clamp sheets are still written.
                 if (
                     plate.Parts.Count(p => !p.BaseDrawing.IsCutOff) == 0
                     && plate.CutOffs.Count == 0
+                    && (
+                        (plate.ClampZones.Count == 0 && plate.RemovedClamps.Count == 0)
+                        || DefaultsRecreateClamps(plate)
+                    )
                 )
                     continue;
 
@@ -283,6 +336,28 @@ namespace OpenNest.IO
                         CutOffs = cutoffs,
                         GrainAngle = plate.GrainAngle,
                         CuttingParameters = CuttingParametersSerializer.ToDto(plate.CuttingParameters),
+                        Clamps = plate.ClampZones
+                            .Select(z => new ClampZoneDto
+                            {
+                                Id = z.Id,
+                                X = z.Bounds.X,
+                                Y = z.Bounds.Y,
+                                Length = z.Bounds.Length,
+                                Width = z.Bounds.Width,
+                            })
+                            .ToList(),
+                        // Omitted unless a clamp was removed (files without the feature
+                        // stay unchanged).
+                        RemovedClamps = plate.RemovedClamps.Count == 0
+                            ? null
+                            : plate.RemovedClamps
+                                .OrderBy(ClampIndex)
+                                .ThenBy(id => id, StringComparer.Ordinal)
+                                .ToList(),
+                        // Only a rail other than the nest default needs saving per sheet.
+                        ClampRail = Equals(plate.ClampRail, nest.PlateDefaults.ClampRail)
+                            ? null
+                            : ToDto(plate.ClampRail),
                     }
                 );
             }

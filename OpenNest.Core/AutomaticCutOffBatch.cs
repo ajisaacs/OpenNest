@@ -42,11 +42,19 @@ public static class AutomaticCutOffBatch
     /// Returned plans describe the fresh proposal, not preview parts to accept into a plate.
     /// </summary>
     public static IReadOnlyList<AutomaticCutOffPlan> Apply(IReadOnlyList<Plate> plates,
+        AutomaticCutOffOptions options, CutOffSettings settings) => Stage(plates, options, settings).Plans;
+
+    /// <summary>
+    /// Applies like <see cref="Apply"/>, but keeps the recovery state so the caller can take the
+    /// new cut-offs back off again (<see cref="AutomaticCutOffStaging.Revert"/>) when the work they
+    /// were added for is abandoned. A blocked batch changes nothing and has nothing to revert.
+    /// </summary>
+    public static AutomaticCutOffStaging Stage(IReadOnlyList<Plate> plates,
         AutomaticCutOffOptions options, CutOffSettings settings)
     {
         var plans = Create(plates, options, settings);
         if (plans.Any(plan => plan.HasBlockingDiagnostics))
-            return plans;
+            return new AutomaticCutOffStaging(plans, []);
 
         var restoreActions = new List<(int PlateNumber, Action Restore)>();
         try
@@ -66,21 +74,7 @@ public static class AutomaticCutOffBatch
         }
         catch (Exception applyError)
         {
-            var rollbackErrors = new List<Exception>();
-            for (var index = restoreActions.Count - 1; index >= 0; index--)
-            {
-                var saved = restoreActions[index];
-                try
-                {
-                    saved.Restore();
-                }
-                catch (Exception rollbackError)
-                {
-                    // A broken observer on one plate must not prevent recovery of the others.
-                    rollbackErrors.Add(new InvalidOperationException(
-                        $"Plate {saved.PlateNumber}: {rollbackError.Message}", rollbackError));
-                }
-            }
+            var rollbackErrors = RestoreAll(restoreActions);
             if (rollbackErrors.Count > 0)
                 throw new InvalidOperationException(
                     $"Apply failed: {applyError.Message}\nRestoring cut-offs also failed: "
@@ -91,7 +85,27 @@ public static class AutomaticCutOffBatch
             throw new InvalidOperationException(
                 $"No new cut-offs were retained; original cut-offs were restored. {applyError.Message}", applyError);
         }
-        return plans;
+        return new AutomaticCutOffStaging(plans, restoreActions);
+    }
+
+    internal static List<Exception> RestoreAll(IReadOnlyList<(int PlateNumber, Action Restore)> restoreActions)
+    {
+        var errors = new List<Exception>();
+        for (var index = restoreActions.Count - 1; index >= 0; index--)
+        {
+            var saved = restoreActions[index];
+            try
+            {
+                saved.Restore();
+            }
+            catch (Exception rollbackError)
+            {
+                // A broken observer on one plate must not prevent recovery of the others.
+                errors.Add(new InvalidOperationException(
+                    $"Plate {saved.PlateNumber}: {rollbackError.Message}", rollbackError));
+            }
+        }
+        return errors;
     }
 
     private static Action CaptureRestore(Plate plate, AutomaticCutOffPlan plan)
@@ -115,5 +129,54 @@ public static class AutomaticCutOffBatch
             foreach (var saved in parts)
                 plate.Parts.Insert(saved.Index, saved.Part);
         };
+    }
+}
+
+/// <summary>
+/// Cut-offs added by <see cref="AutomaticCutOffBatch.Stage"/> that are still provisional: either
+/// <see cref="Keep"/> them once the work they belong to is committed, or <see cref="Revert"/> them.
+/// Owner-thread only, like the plates it changed.
+/// </summary>
+public sealed class AutomaticCutOffStaging
+{
+    private IReadOnlyList<(int PlateNumber, Action Restore)> restoreActions;
+
+    internal AutomaticCutOffStaging(IReadOnlyList<AutomaticCutOffPlan> plans,
+        IReadOnlyList<(int PlateNumber, Action Restore)> restoreActions)
+    {
+        Plans = plans;
+        this.restoreActions = restoreActions;
+        Definitions = plans.SelectMany(plan => plan.HasBlockingDiagnostics ? [] : plan.Definitions).ToArray();
+    }
+
+    /// <summary>The fresh plans, one per plate in the order given.</summary>
+    public IReadOnlyList<AutomaticCutOffPlan> Plans { get; }
+
+    /// <summary>True when any plate blocked the batch; then nothing was added.</summary>
+    public bool IsBlocked => Plans.Any(plan => plan.HasBlockingDiagnostics);
+
+    /// <summary>The definitions this staging added (empty when blocked or nothing was needed).</summary>
+    public IReadOnlyList<CutOff> Definitions { get; }
+
+    /// <summary>True while the added cut-offs can still be reverted.</summary>
+    public bool CanRevert => restoreActions.Count > 0;
+
+    /// <summary>Makes the added cut-offs permanent; a later <see cref="Revert"/> does nothing.</summary>
+    public void Keep() => restoreActions = [];
+
+    /// <summary>
+    /// Removes the added cut-offs and restores each touched plate's previous cut-off programs and
+    /// sequence. Real parts are not touched. Runs once; throws if any plate could not be restored.
+    /// </summary>
+    public void Revert()
+    {
+        var actions = restoreActions;
+        restoreActions = [];
+        var errors = AutomaticCutOffBatch.RestoreAll(actions);
+        if (errors.Count > 0)
+            throw new InvalidOperationException(
+                "Removing the added cut-offs failed: " + string.Join("; ", errors.Select(e => e.Message))
+                + "\nThe nest may be incomplete; review it before saving or cutting.",
+                new AggregateException(errors));
     }
 }

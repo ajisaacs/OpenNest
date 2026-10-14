@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace OpenNest.IO
 {
@@ -43,6 +45,131 @@ namespace OpenNest.IO
             public double PartSpacing { get; init; }
             public MaterialDto Material { get; init; } = new();
             public SpacingDto EdgeSpacing { get; init; } = new();
+
+            /// <summary>
+            /// The nest's machine clamp rail, which new plates follow. Omitted when the nest
+            /// has none; older files and older readers simply have no rail.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientClampRailConverter))]
+            public ClampRailDto ClampRail { get; init; }
+        }
+
+        /// <summary>
+        /// Reads a malformed or wrongly typed clamp rail as no rail instead of failing the
+        /// whole nest; the reader still validates the values (sign, size) it receives.
+        /// </summary>
+        public sealed class LenientClampRailConverter : JsonConverter<ClampRailDto>
+        {
+            public override ClampRailDto Read(
+                ref Utf8JsonReader reader,
+                Type typeToConvert,
+                JsonSerializerOptions options
+            )
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                var rail = document.RootElement;
+                if (
+                    rail.ValueKind != JsonValueKind.Object
+                    || !TryNumber(rail, "width", out var width)
+                    || !TryNumber(rail, "depth", out var depth)
+                    || !rail.TryGetProperty("centers", out var centers)
+                    || centers.ValueKind != JsonValueKind.Array
+                )
+                    return null;
+
+                var list = new List<double>();
+                foreach (var center in centers.EnumerateArray())
+                {
+                    if (center.ValueKind != JsonValueKind.Number || !center.TryGetDouble(out var x))
+                        return null;
+                    list.Add(x);
+                }
+                // Missing or unreadable -> null; the reader then falls back to the default.
+                double? removalMinutes = TryNumber(rail, "removalMinutes", out var minutes)
+                    ? minutes
+                    : null;
+                return new ClampRailDto { Width = width, Depth = depth, Centers = list, RemovalMinutes = removalMinutes };
+            }
+
+            public override void Write(
+                Utf8JsonWriter writer,
+                ClampRailDto value,
+                JsonSerializerOptions options
+            )
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("width", value.Width);
+                writer.WriteNumber("depth", value.Depth);
+                writer.WriteStartArray("centers");
+                foreach (var center in value.Centers ?? new List<double>())
+                    writer.WriteNumberValue(center);
+                writer.WriteEndArray();
+                if (value.RemovalMinutes is double removalMinutes)
+                    writer.WriteNumber("removalMinutes", removalMinutes);
+                writer.WriteEndObject();
+            }
+
+            private static bool TryNumber(JsonElement rail, string name, out double value)
+            {
+                value = 0;
+                return rail.TryGetProperty(name, out var element)
+                    && element.ValueKind == JsonValueKind.Number
+                    && element.TryGetDouble(out value);
+            }
+        }
+
+        /// <summary>
+        /// Reads an optional list of strings without failing the nest: a non-array value
+        /// reads as an empty list and non-string entries are skipped.
+        /// </summary>
+        public sealed class LenientStringListConverter : JsonConverter<List<string>>
+        {
+            public override List<string> Read(
+                ref Utf8JsonReader reader,
+                Type typeToConvert,
+                JsonSerializerOptions options
+            )
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                var list = new List<string>();
+                if (document.RootElement.ValueKind != JsonValueKind.Array)
+                    return list;
+                foreach (var element in document.RootElement.EnumerateArray())
+                    if (element.ValueKind == JsonValueKind.String)
+                        list.Add(element.GetString());
+                return list;
+            }
+
+            public override void Write(
+                Utf8JsonWriter writer,
+                List<string> value,
+                JsonSerializerOptions options
+            )
+            {
+                writer.WriteStartArray();
+                foreach (var item in value)
+                    writer.WriteStringValue(item);
+                writer.WriteEndArray();
+            }
+        }
+
+        public record ClampRailDto
+        {
+            /// <summary>Clamp extent along the origin-side edge (X).</summary>
+            public double Width { get; init; }
+
+            /// <summary>Clamp intrusion into the sheet from that edge (Y).</summary>
+            public double Depth { get; init; }
+
+            /// <summary>Clamp centers along X, measured from the plate origin.</summary>
+            public List<double> Centers { get; init; } = new();
+
+            /// <summary>
+            /// Minutes to remove one clamp and put it back after cutting (D9). Null in older
+            /// files and readers fall back to <see cref="OpenNest.ClampRail.DefaultRemovalMinutes"/>.
+            /// </summary>
+            public double? RemovalMinutes { get; init; }
         }
 
         public record DrawingDto
@@ -71,6 +198,44 @@ namespace OpenNest.IO
             public CuttingParametersDto CuttingParameters { get; init; }
             public List<PartDto> Parts { get; init; } = new();
             public List<CutOffDto> CutOffs { get; init; } = new();
+
+            /// <summary>
+            /// Machine clamp keep-out rectangles in plate coordinates. Missing in older
+            /// files, which load with no zones.
+            /// </summary>
+            public List<ClampZoneDto> Clamps { get; init; } = new();
+
+            /// <summary>
+            /// Rail clamp ids removed from this sheet as a last resort (D8). Omitted when none
+            /// were removed; missing or empty means none; <see cref="Clamps"/> already excludes them. Read
+            /// leniently: a wrongly shaped value reads as none removed, non-string entries
+            /// are skipped, and the saved zones load either way.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientStringListConverter))]
+            public List<string> RemovedClamps { get; init; } = new();
+
+            /// <summary>
+            /// The machine clamp rail this sheet follows, written only when it is not the
+            /// nest's default rail (otherwise the sheet re-attaches to that one on load).
+            /// Read leniently like <see cref="PlateDefaultsDto.ClampRail"/>.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientClampRailConverter))]
+            public ClampRailDto ClampRail { get; init; }
+        }
+
+        public record ClampZoneDto
+        {
+            public string Id { get; init; } = "";
+            public double X { get; init; }
+            public double Y { get; init; }
+
+            /// <summary>Extent along X.</summary>
+            public double Length { get; init; }
+
+            /// <summary>Extent along Y (depth from the y = 0 operator-side edge).</summary>
+            public double Width { get; init; }
         }
 
         public record PartDto

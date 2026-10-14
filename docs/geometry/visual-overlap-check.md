@@ -8,7 +8,10 @@ selection, cutting paths, or export behavior. Cutoffs and temporary preview part
 are excluded. **Cancel Check** discards the running request. **Display > Off /
 Areas / Centroids / Both** changes visibility without rerunning analysis. Areas
 is the default; rechecking preserves a visible mode, while checking from Off
-shows Areas. Display preferences belong to the current document and are not saved.
+shows Areas. Clamp overlaps are shown as part/clamp findings with the clamp ID
+in hover details; clamps are not selectable parts and are not added to quantity
+or machining. A clamp edit invalidates the diagnostic and schedules a fresh
+check. Display preferences belong to the current document and are not saved.
 
 Centroids and Both show fixed-screen-size, DPI-scaled pair crosshairs with a
 contrasting halo. Labels such as `1/3` identify the two plate sequence positions
@@ -95,8 +98,8 @@ vertices cannot mutate the snapshot, report, or live geometry.
 ## Capture once, analyze off-thread
 
 ```csharp
-// UI thread, while parts/drawings are stable:
-var snapshot = PlateOverlapAnalyzer.Capture(parts, cancellationToken);
+// UI thread, while the plate and drawings are stable:
+var snapshot = PlateOverlapAnalyzer.CapturePlate(plate, cancellationToken: cancellationToken);
 
 // Worker thread, no access to live Part/Drawing/Program objects:
 var report = await Task.Run(
@@ -155,6 +158,16 @@ triangulation, or `Collision.Check` call is not internally interruptible.
   preserve overlaps found among other valid parts. Unexpected failures propagate.
   A report with any issue has `IsComplete == false`, even if `Pairs` is empty.
 - No part, drawing, quantity, pose, cutting state, or selection is modified.
+
+For a full plate, `PlateOverlapAnalyzer.CapturePlate(plate)` also captures active
+clamps and nominal manual cut-off definitions. `CutOffClampFindings` is a separate
+list of zero-area line/rectangle contacts, not `Pairs` or material overlap. The
+view marks these with an X and a cut-off number/clamp ID, including contacts whose
+current regenerated program has been trimmed. Removed clamps produce no contact.
+Zones are mapped from the sheet's lower-left frame into the parts' quadrant frame; a
+malformed zone fails the check rather than being skipped. Editing definitions, sheet
+size/quadrant or zones stales the result (including part/clamp findings, because a size or
+quadrant change moves the zones); posting runs its own fresh check with per-attempt consent.
 
 ## Interpretation and limits
 

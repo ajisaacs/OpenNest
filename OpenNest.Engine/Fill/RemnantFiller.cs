@@ -15,10 +15,18 @@ namespace OpenNest.Engine.Fill
         private readonly RemnantFinder finder;
         private readonly double spacing;
 
-        public RemnantFiller(Box workArea, double spacing)
+        /// <summary>
+        /// <paramref name="boxObstacles"/> are kept-out rectangles (e.g. inflated clamp
+        /// zones) treated like occupied space: they are excluded from the remnant areas
+        /// every fill attempt sees. Null keeps today's behaviour exactly.
+        /// </summary>
+        public RemnantFiller(Box workArea, double spacing, IEnumerable<Box> boxObstacles = null)
         {
             this.spacing = spacing;
             finder = new RemnantFinder(workArea);
+            if (boxObstacles != null)
+                foreach (var box in boxObstacles)
+                    finder.AddObstacle(box);
         }
 
         public void AddObstacles(IEnumerable<Part> parts)
