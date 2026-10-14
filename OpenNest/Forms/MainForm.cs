@@ -36,6 +36,17 @@ namespace OpenNest.Forms
         private bool databaseOpenInProgress;
         private readonly ToolStripMenuItem storageModeMenu = new("Storage Mode...");
         private readonly ToolStripMenuItem exportNestMenu = new("Export .nest...");
+        private readonly ToolStripDropDownButton postButton = new()
+        {
+            Name = "btnPost",
+            Text = "Post",
+            ToolTipText = "Post CNC program",
+            DisplayStyle = ToolStripItemDisplayStyle.Image,
+            Image = Resources.post,
+            ImageScaling = ToolStripItemImageScaling.None,
+            Padding = new Padding(5, 0, 5, 0),
+            Visible = false,
+        };
 
         private const float ZoomInFactor = 1.5f;
         private const float ZoomOutFactor = 1.0f / ZoomInFactor;
@@ -93,6 +104,11 @@ namespace OpenNest.Forms
         public MainForm()
         {
             InitializeComponent();
+            toolStrip1.Items.Add(CreateActionButton("btnCutPlanner", "Plan Cutting",
+                Resources.cut_planner, PlatePlanCutting_Click));
+            toolStrip1.Items.Add(CreateActionButton("btnManualSequence", "Manual Sequence",
+                Resources.manual_sequence, ManualSequenceParts_Click));
+            toolStrip1.Items.Add(postButton);
             storageModeMenu.Click += StorageMode_Click;
             exportNestMenu.Click += ExportNest_Click;
             mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExport), exportNestMenu);
@@ -543,6 +559,23 @@ namespace OpenNest.Forms
             }
         }
 
+        private static ToolStripButton CreateActionButton(string name, string text, Image image,
+            EventHandler click)
+        {
+            var button = new ToolStripButton
+            {
+                Name = name,
+                Text = text,
+                ToolTipText = text,
+                DisplayStyle = ToolStripItemDisplayStyle.Image,
+                Image = image,
+                ImageScaling = ToolStripItemImageScaling.None,
+                Padding = new Padding(5, 0, 5, 0),
+            };
+            button.Click += click;
+            return button;
+        }
+
         private void LoadPosts()
         {
             var exepath = Assembly.GetEntryAssembly().Location;
@@ -565,6 +598,10 @@ namespace OpenNest.Forms
                         postProcessorMenuItem.Click += PostProcessor_Click;
                         mnuNestPost.DropDownItems.Add(postProcessorMenuItem);
 
+                        var toolbarPost = new ToolStripMenuItem(postProcessor.Name) { Tag = postProcessor };
+                        toolbarPost.Click += PostProcessor_Click;
+                        postButton.DropDownItems.Add(toolbarPost);
+
                         if (postProcessor is IMaterialProvidingPostProcessor materialProvider)
                             PostProcessorMaterials.AddFrom(materialProvider);
                     }
@@ -572,6 +609,7 @@ namespace OpenNest.Forms
             }
 
             mnuNestPost.Visible = mnuNestPost.DropDownItems.Count > 0;
+            postButton.Visible = postButton.DropDownItems.Count > 0;
         }
 
         #region Overrides
