@@ -100,7 +100,10 @@ namespace OpenNest.Actions
             if (program.Codes.Count == 0)
                 return;
 
-            using var pen = new Pen(Color.FromArgb(128, 64, 64, 64), 1.5f / plateView.ViewScale)
+            // Match the applied cut-off line's look (orange-red dash) so the
+            // preview is exactly what the click produces; the alpha keeps it
+            // reading as a preview.
+            using var pen = new Pen(Color.FromArgb(128, 255, 69, 0), 1.5f / plateView.ViewScale)
             {
                 DashStyle = DashStyle.Dash,
             };
