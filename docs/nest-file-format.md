@@ -50,6 +50,17 @@ the plate, zero-based part index, and entry; File > Open displays these warnings
 The program reader is not a general G-code or geometric safety validator; the
 saved cutting geometry is not validated against the drawing.
 
+Nests converted from PEP before their drawings carried etch marks keep those
+marks only in the saved placed programs. When a drawing has no etch (scribe)
+moves and every placement with a saved program carries the same marks, the
+reader adds those marks to the drawing in its own frame (after its existing
+moves) and refreshes that drawing's clean placements, so Remove Lead-ins and
+Clear Lead-ins & Cut-offs keep the marks. Saved programs are never changed. If
+the saved programs disagree, the drawing is left without marks and no warning
+is raised. The drawing hash is checked against the file text before this
+repair, so saved programs still load; the next save writes the marks into
+`programs/program-N`.
+
 ## Plate cutting parameters
 
 Each plate's optional `cuttingParameters` stores the settings used by Assign

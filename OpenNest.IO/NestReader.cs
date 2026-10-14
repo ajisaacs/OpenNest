@@ -46,6 +46,9 @@ namespace OpenNest.IO
             var drawingMap = BuildDrawings(dto, programs, entitySets);
             ReadBestFits(drawingMap);
             var nest = BuildNest(dto, drawingMap);
+            // Nests converted from PEP kept etch marks only in the placed programs; give them
+            // back to the drawing so removing lead-ins does not remove the marks too.
+            DrawingMarkRecovery.Apply(nest);
 
             zipArchive.Dispose();
             stream.Close();
