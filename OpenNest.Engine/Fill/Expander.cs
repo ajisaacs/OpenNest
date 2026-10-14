@@ -200,7 +200,7 @@ namespace OpenNest.Engine.Fill
             var positions = final.Positions;
             // Floors belong to this public operation, not to any individual probe.
             // A failed final check leaves every live part untouched.
-            if (!context.MeetsEntryFloors(positions))
+            if (!context.MeetsEntryFloors(positions, entry))
                 throw new InvalidOperationException("Expand proposal violates an entry clearance floor.");
 
             Apply(selected, entry, positions);
@@ -317,12 +317,13 @@ namespace OpenNest.Engine.Fill
                     // the B side travels the opposite way.
                     var direction = moverIndex == pair.IndexA ? directionA : -directionA;
 
-                    var room = context.ClipToWorkArea(
+                    var edgeRoom = context.ClipToWorkArea(
                         moverIndex,
                         positions[moverIndex],
                         direction,
                         need
                     );
+                    var room = context.ClipToMaterial(moverIndex, positions, direction, edgeRoom);
 
                     // Take the largest valid step up to `room`: partial moves let
                     // a blocked mover advance again once its own blockers move
@@ -452,6 +453,8 @@ namespace OpenNest.Engine.Fill
             private readonly List<RingSet> shapes; // per part
             private readonly Box[] localBoxes; // per part, local frame
             private readonly int moverCount;
+            private readonly int clampStart; // synthetic walls, after actual plate parts
+            private readonly IReadOnlyList<Box> clampBoxes; // exact placement-frame keep-outs
             private readonly Box workArea;
 
             public readonly List<Pair> Pairs = new();
@@ -462,6 +465,9 @@ namespace OpenNest.Engine.Fill
                 public Polygon Outer;
                 public List<Polygon> Rings = new(); // outer + cutout rings, local frame
                 public List<Polygon> Holes = new();
+                public List<Entity> Boundaries = new(); // native outer + hole loops, local frame
+                public SlideContactGeometry Contact;
+                public Box NativeBounds; // perimeter's native-entity envelope
             }
 
             private SeparationContext(
@@ -469,6 +475,8 @@ namespace OpenNest.Engine.Fill
                 List<RingSet> shapes,
                 Box[] localBoxes,
                 int moverCount,
+                int clampStart,
+                IReadOnlyList<Box> clampBoxes,
                 Box workArea,
                 double spacingCap
             )
@@ -477,6 +485,8 @@ namespace OpenNest.Engine.Fill
                 this.shapes = shapes;
                 this.localBoxes = localBoxes;
                 this.moverCount = moverCount;
+                this.clampStart = clampStart;
+                this.clampBoxes = clampBoxes;
                 this.workArea = workArea;
                 SpacingCap = spacingCap;
             }
@@ -485,11 +495,12 @@ namespace OpenNest.Engine.Fill
             {
                 var movers = new List<Part>(selected);
                 var walls = plate.Parts.Where(p => !movers.Contains(p)).ToList();
-                // Slice 4 (C1): the plate's clamp keep-outs are static walls - growth that
-                // would consume a zone stops against it like an edge, and violations
-                // against zones are reported instead of crashed through. Zone rectangles
-                // carry no program of their own part spacing: walls are the raw keep-outs.
+                var clampStart = movers.Count + walls.Count;
+                // Clamp walls include the bottom-edge clearance envelope.
+                var clampBoxes = Jobs.InteractiveClamps.ClearanceRectangles(plate);
                 walls.AddRange(Jobs.InteractiveClamps.WallParts(plate));
+                if (clampBoxes.Count != walls.Count + movers.Count - clampStart)
+                    throw new InvalidOperationException("Clamp wall preparation changed its ordering.");
 
                 var parts = new List<Part>(movers.Count + walls.Count);
                 parts.AddRange(movers);
@@ -517,6 +528,8 @@ namespace OpenNest.Engine.Fill
                     shapes,
                     localBoxes,
                     movers.Count,
+                    clampStart,
+                    clampBoxes,
                     workArea,
                     spacingCap
                 );
@@ -547,20 +560,42 @@ namespace OpenNest.Engine.Fill
 
                     if (profile.Perimeter != null)
                     {
+                        prepared.NativeBounds = profile.Perimeter.BoundingBox;
                         prepared.Outer = profile.Perimeter.ToPolygonWithTolerance(0.001);
+                        // Polygon.Cleanup compares vertices at geometry epsilon and
+                        // can erase an accepted sub-grid clamp. Preserve exact line
+                        // endpoints instead of treating its material as empty.
+                        if ((profile.Perimeter.BoundingBox.Length < KeepOutOverlap.ToleranceFreeBelow
+                            || profile.Perimeter.BoundingBox.Width < KeepOutOverlap.ToleranceFreeBelow)
+                            && profile.Perimeter.Entities.All(e => e is Line))
+                            prepared.Outer = ExactLineRing(profile.Perimeter.Entities);
                         prepared.Rings.Add(prepared.Outer);
+                        prepared.Boundaries.AddRange(profile.Perimeter.Entities);
 
                         foreach (var cutout in profile.Cutouts)
                         {
                             var hole = cutout.ToPolygonWithTolerance(0.001);
                             prepared.Rings.Add(hole);
                             prepared.Holes.Add(hole);
+                            prepared.Boundaries.AddRange(cutout.Entities);
                         }
+                        prepared.Contact = SlideContactGeometry.Prepare(prepared.Boundaries);
                     }
                 }
 
                 programs.Add(program, prepared);
                 return prepared;
+            }
+
+            private static Polygon ExactLineRing(List<Entity> entities)
+            {
+                var polygon = new Polygon();
+                foreach (var entity in entities)
+                    polygon.Vertices.Add(((Line)entity).StartPoint);
+                if (polygon.Vertices.Count > 0)
+                    polygon.Vertices.Add(polygon.Vertices[0]);
+                polygon.UpdateBounds();
+                return polygon;
             }
 
             private static Box LocalBox(Part part)
@@ -696,14 +731,203 @@ namespace OpenNest.Engine.Fill
                 return max < 0 ? 0 : max;
             }
 
+            /// <summary>
+            /// Stop at the first material-blocking contact along the whole straight
+            /// translation, including hole walls. Destination clearance alone can
+            /// accept a pose on the far side of a thin wall.
+            /// </summary>
+            public double ClipToMaterial(int index, List<Vector> positions, Vector direction, double room)
+            {
+                if (room <= 0 || !double.IsFinite(room)
+                    || !double.IsFinite(direction.X) || !double.IsFinite(direction.Y))
+                    return 0;
+                var moving = shapes[index];
+                if (moving.Contact?.IsResolved != true || moving.Outer == null)
+                    return 0;
+
+                for (var i = 0; i < parts.Count; i++)
+                {
+                    if (i == index)
+                        continue;
+                    var stationary = shapes[i];
+                    if (i >= clampStart && KeepOutOverlap.NeedsToleranceFreeTest(clampBoxes[i - clampStart]))
+                    {
+                        // Slide contact and polygon overlap have tolerances larger
+                        // than a tiny keep-out. Clip at the earliest possible
+                        // native-bound contact; if bounds overlap already, refuse
+                        // uncertain motion instead of crossing the physical zone.
+                        room = System.Math.Min(room, ClipToNativeBox(
+                            moving, positions[index], direction, room, clampBoxes[i - clampStart]));
+                        if (room <= 0)
+                            return 0;
+                        continue;
+                    }
+                    if (stationary.Contact?.IsResolved != true || stationary.Outer == null)
+                        return 0; // Unknown boundary is not empty space.
+
+                    var origin = positions[index];
+                    var start = origin;
+                    var alreadyOverlapping = Collision.HasOverlap(
+                        CloneAt(moving.Outer, origin), CloneAt(stationary.Outer, positions[i]),
+                        moving.Holes.Count == 0 ? null : CloneAll(moving.Holes, origin),
+                        stationary.Holes.Count == 0 ? null : CloneAll(stationary.Holes, positions[i]));
+                    var exit = 0.0;
+                    if (alreadyOverlapping)
+                    {
+                        // The ordinary slide query only certifies initially clear
+                        // geometry. A convex line-only overlap can exit directly
+                        // along a separating support normal; other overlaps remain
+                        // accepted input but cannot be moved without a path proof.
+                        if (!TryConvexDirectExit(moving, stationary, origin, positions[i], direction, out exit)
+                            || exit > room)
+                            return 0;
+                        start = origin + direction * exit;
+                        if (Collision.HasOverlap(
+                            CloneAt(moving.Outer, start), CloneAt(stationary.Outer, positions[i])))
+                            return 0;
+                    }
+
+                    var query = SpatialQuery.DirectionalDistance(
+                        CloneEntitiesAt(moving.Boundaries, start),
+                        CloneEntitiesAt(stationary.Boundaries, positions[i]),
+                        direction,
+                        new SlideContactClassifier(moving.Contact, start, stationary.Contact, positions[i]));
+                    if (double.IsNaN(query) || query < 0)
+                        return 0;
+                    if (query < double.MaxValue)
+                        room = System.Math.Min(room, exit + query);
+                }
+                return room;
+            }
+
+            private static double ClipToNativeBox(
+                RingSet mover, Vector start, Vector direction, double room, Box obstacle)
+            {
+                var bounds = mover.NativeBounds;
+                if (bounds == null || !double.IsFinite(bounds.Left) || !double.IsFinite(bounds.Right)
+                    || !double.IsFinite(bounds.Bottom) || !double.IsFinite(bounds.Top)
+                    || !double.IsFinite(obstacle.Left) || !double.IsFinite(obstacle.Right)
+                    || !double.IsFinite(obstacle.Bottom) || !double.IsFinite(obstacle.Top))
+                    return 0;
+                var from = bounds.Translate(start);
+                var enter = double.NegativeInfinity;
+                var leave = double.PositiveInfinity;
+                if (!Slab(from.Left, from.Right, obstacle.Left, obstacle.Right,
+                    direction.X, ref enter, ref leave)
+                    || !Slab(from.Bottom, from.Top, obstacle.Bottom, obstacle.Top,
+                        direction.Y, ref enter, ref leave)
+                    || leave <= 0 || enter >= room)
+                    return room;
+                return System.Math.Max(0, enter);
+            }
+
+            private static bool Slab(double low, double high, double wallLow, double wallHigh,
+                double speed, ref double enter, ref double leave)
+            {
+                if (speed == 0)
+                    return high > wallLow && low < wallHigh;
+                var first = (wallLow - high) / speed;
+                var last = (wallHigh - low) / speed;
+                enter = System.Math.Max(enter, System.Math.Min(first, last));
+                leave = System.Math.Min(leave, System.Math.Max(first, last));
+                return enter < leave;
+            }
+
+            private static List<Entity> CloneEntitiesAt(List<Entity> entities, Vector position)
+            {
+                var result = new List<Entity>(entities.Count);
+                foreach (var entity in entities)
+                {
+                    var copy = entity.Clone();
+                    copy.Offset(position);
+                    result.Add(copy);
+                }
+                return result;
+            }
+
+            private static bool TryConvexDirectExit(
+                RingSet moving, RingSet stationary, Vector movePos, Vector fixedPos,
+                Vector direction, out double exit)
+            {
+                exit = 0;
+                if (moving.Holes.Count != 0 || stationary.Holes.Count != 0
+                    || moving.Boundaries.Count == 0 || stationary.Boundaries.Count == 0
+                    || moving.Boundaries.Any(e => e is not Line)
+                    || stationary.Boundaries.Any(e => e is not Line)
+                    || !IsConvex(moving.Outer) || !IsConvex(stationary.Outer))
+                    return false;
+
+                // The ray must point along an actual separating support normal.
+                // It must be the nearer exit, not the direction that burrows
+                // through the other convex part before reaching its far side.
+                var normal = false;
+                foreach (var ring in new[] { moving.Outer, stationary.Outer })
+                    foreach (var line in ring.ToLines())
+                    {
+                        var edge = line.pt2 - line.pt1;
+                        var length = System.Math.Sqrt(edge.DotProduct(edge));
+                        if (length > 1e-8 &&
+                            System.Math.Abs((edge.X * direction.X + edge.Y * direction.Y) / length) < 1e-7)
+                            normal = true;
+                    }
+                if (!normal)
+                    return false;
+
+                var (minA, maxA) = Project(moving.Outer, movePos, direction);
+                var (minB, maxB) = Project(stationary.Outer, fixedPos, direction);
+                if (!double.IsFinite(minA) || !double.IsFinite(maxB)
+                    || maxB - minA > maxA - minB + 1e-7)
+                    return false;
+                exit = System.Math.Max(0, maxB - minA);
+                return double.IsFinite(exit);
+            }
+
+            private static (double Min, double Max) Project(Polygon polygon, Vector origin, Vector axis)
+            {
+                var min = double.PositiveInfinity;
+                var max = double.NegativeInfinity;
+                foreach (var point in polygon.Vertices)
+                {
+                    var projection = (point + origin).DotProduct(axis);
+                    min = System.Math.Min(min, projection);
+                    max = System.Math.Max(max, projection);
+                }
+                return (min, max);
+            }
+
+            private static bool IsConvex(Polygon polygon)
+            {
+                var points = polygon.Vertices;
+                if (points.Count < 4)
+                    return false;
+                var sign = 0;
+                for (var i = 0; i < points.Count - 1; i++)
+                {
+                    var a = points[i];
+                    var b = points[(i + 1) % (points.Count - 1)];
+                    var c = points[(i + 2) % (points.Count - 1)];
+                    var cross = (b.X - a.X) * (c.Y - b.Y) - (b.Y - a.Y) * (c.X - b.X);
+                    if (!double.IsFinite(cross))
+                        return false;
+                    if (System.Math.Abs(cross) < 1e-8)
+                        continue;
+                    var next = System.Math.Sign(cross);
+                    if (sign != 0 && sign != next)
+                        return false;
+                    sign = next;
+                }
+                return sign != 0;
+            }
+
             // Smaller than the 0.002 tessellation margin; immutable entry floors
             // prevent this comparison tolerance accumulating over iterations.
             private const double FloorTolerance = 1e-6;
 
-            public bool MeetsEntryFloors(List<Vector> positions)
+            public bool MeetsEntryFloors(List<Vector> positions, List<Vector> entry)
             {
                 for (var i = 0; i < moverCount; i++)
-                    if (!InsideWorkArea(i, positions[i]))
+                    if (!InsideWorkArea(i, positions[i]) &&
+                        (positions[i].X != entry[i].X || positions[i].Y != entry[i].Y))
                         return false;
                 foreach (var pair in Pairs)
                 {

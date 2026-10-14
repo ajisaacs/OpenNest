@@ -33,6 +33,13 @@ public class ExpanderTests
         return part;
     }
 
+    private static Part AddRectangle(Plate plate, double x, double y, double length, double width)
+    {
+        var part = new Part(new Drawing($"rect{plate.Parts.Count}", Rectangle(length, width)), new Vector(x, y));
+        plate.Parts.Add(part);
+        return part;
+    }
+
     private static Plate MakePlate(double lengthX, double widthY, double edge = 0.5)
     {
         var plate = new Plate(new Size(widthY, lengthX));
@@ -372,6 +379,104 @@ public class ExpanderTests
         Assert.True(middle.Location.X >= 11 - 1e-4);
         Assert.True(last.Location.X >= middle.Location.X + 6 - 1e-4);
         Assert.Equal(5, first.Location.X);
+    }
+
+    [Fact]
+    public void Separate_CannotPassThroughFullHeightWall_ToClearEndpoint()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var moving = AddSquare(plate, 4, 4, 2);
+        var wall = AddRectangle(plate, 6.5, 0, 0.2, 12);
+
+        // Target 5 puts the otherwise clear endpoint beyond the wall AND
+        // preserves the entry wall gap of 0.5. An endpoint-only check passes it.
+        var (converged, poses, violations) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 5
+        );
+        Assert.False(converged);
+        Assert.NotEmpty(violations);
+        Assert.True(poses[1].X + 2 <= wall.Location.X + 1e-6,
+            $"move crossed wall: right={poses[1].X + 2}, wall={wall.Location.X}");
+        Assert.Equal(4, moving.Location.X); // public Separate never commits.
+        Assert.Equal(6.5, wall.Location.X);
+
+        var result = Expander.Expand(new List<Part> { anchor, moving }, plate,
+            new Expander.Options { InitialStep = 5, MaxSpacing = 5 });
+        Assert.True(moving.Location.X + 2 <= wall.Location.X + 1e-6);
+        Assert.True(result.AchievedSpacing < 5);
+    }
+
+    [Fact]
+    public void Separate_OverlappingPair_CannotExitAcrossThirdWall()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 5, 4);
+        var moving = AddSquare(plate, 7, 4); // Overlaps anchor by two.
+        var wall = AddRectangle(plate, 12, 0, 0.2, 12);
+
+        var (converged, poses, violations) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 5
+        );
+        Assert.False(converged);
+        Assert.NotEmpty(violations);
+        Assert.True(poses[1].X + 4 <= wall.Location.X + 1e-6,
+            $"overlap exit crossed third wall: {poses[1].X}");
+        Assert.Equal(7, moving.Location.X);
+        Assert.Equal(12, wall.Location.X);
+    }
+
+    [Fact]
+    public void Separate_CannotCrossOppositeCutoutWall()
+    {
+        var plate = MakePlate(40, 20, edge: 0);
+        var host = new Part(new Drawing("host", RectangleWithHole(10, 10, 0.2, 0.2, 9.6, 9.6)), new Vector(5, 1));
+        plate.Parts.Add(host);
+        var anchor = AddSquare(plate, 1, 5, 1);
+        var moving = AddSquare(plate, 5.2, 5, 1); // Touches inner left wall.
+
+        var (converged, poses, _) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 14
+        );
+        Assert.False(converged);
+        Assert.True(poses[1].X + 1 <= 14.8 + 1e-6,
+            $"insert crossed opposite hole wall: {poses[1].X}");
+        Assert.Equal(5.2, moving.Location.X);
+    }
+
+    [Fact]
+    public void Separate_TinyClampZone_IsNotAnInvisibleWall()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        plate.ClampZones.Add(new ClampZone("tiny", new Box(6.5, 0, 1e-5, 1e-5)));
+        var anchor = AddSquare(plate, 1, 0, 2);
+        var moving = AddSquare(plate, 4, 0, 2);
+
+        var (converged, poses, _) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 6
+        );
+        Assert.False(converged);
+        Assert.True(poses[1].X + 2 <= 6.5 + 1e-6,
+            $"crossed tiny clamp at x=6.5: right={poses[1].X + 2}");
+        Assert.Equal(4, moving.Location.X);
+    }
+
+    [Fact]
+    public void Separate_RemoteTinyClampDoesNotPinUnrelatedGrowth()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        plate.ClampZones.Add(new ClampZone("tiny", new Box(0, 0, 1e-5, 1e-5)));
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var moving = AddSquare(plate, 4, 4, 2);
+
+        var (converged, poses, violations) = Expander.Separate(
+            new List<Part> { anchor, moving }, plate, spacing: 3
+        );
+        Assert.True(converged, $"remote zone pinned growth: {violations.Count} violations, " +
+            $"poses {poses[0].X:R},{poses[1].X:R}; " +
+            string.Join("; ", violations.Select(v => $"{v.A.BaseDrawing.Name}/{v.B.BaseDrawing.Name}={v.Achieved:R}")));
+        Assert.True(poses[1].X >= 6 - 1e-4);
+        Assert.Equal(4, moving.Location.X);
     }
 
     [Fact]
