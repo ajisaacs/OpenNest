@@ -50,6 +50,61 @@ namespace OpenNest
             return (segments.Sum(s => s.End - s.Start), segments.Count);
         }
 
+        /// <summary>
+        /// True when <paramref name="part"/>, the placed part of <paramref name="definition"/>, cuts
+        /// one continuous straight line on the definition's axis across the whole sheet, so it
+        /// splits the sheet in two. Anything else (gaps around parts, limits short of an edge, a
+        /// line on the sheet edge, a stale or unrecognised program) does not separate the sheet.
+        /// </summary>
+        internal static bool SeparatesSheet(Part part, CutOff definition, Box sheet)
+        {
+            if (part?.Program == null || definition == null || sheet == null
+                || part.Program.Mode != Mode.Absolute)
+                return false;
+            var vertical = definition.Axis == CutOffAxis.Vertical;
+            var line = vertical ? definition.Position.X : definition.Position.Y;
+            var acrossMin = vertical ? sheet.Left : sheet.Bottom;
+            var acrossMax = vertical ? sheet.Right : sheet.Top;
+            var alongMin = vertical ? sheet.Bottom : sheet.Left;
+            var alongMax = vertical ? sheet.Top : sheet.Right;
+            if (!(line > acrossMin + Math.Tolerance.Epsilon && line < acrossMax - Math.Tolerance.Epsilon))
+                return false;
+
+            Vector? position = null;
+            double? low = null, high = null;
+            var cutting = false;
+            foreach (var code in part.Program.Codes)
+            {
+                switch (code)
+                {
+                    case RapidMove rapid:
+                        if (cutting)
+                            return false; // A second pierce leaves an uncut gap.
+                        position = rapid.EndPoint + part.Location;
+                        break;
+                    case LinearMove move when position != null:
+                        var end = move.EndPoint + part.Location;
+                        if (!OnLine(position.Value) || !OnLine(end))
+                            return false;
+                        foreach (var value in new[] { Along(position.Value), Along(end) })
+                        {
+                            low = low == null ? value : System.Math.Min(low.Value, value);
+                            high = high == null ? value : System.Math.Max(high.Value, value);
+                        }
+                        position = end;
+                        cutting = true;
+                        break;
+                    case Motion:
+                        return false;
+                }
+            }
+            return cutting && low <= alongMin + Math.Tolerance.Epsilon && high >= alongMax - Math.Tolerance.Epsilon;
+
+            bool OnLine(Vector point) =>
+                System.Math.Abs((vertical ? point.X : point.Y) - line) <= Math.Tolerance.Epsilon;
+            double Along(Vector point) => vertical ? point.Y : point.X;
+        }
+
         private string GetName()
         {
             var axisChar = Axis == CutOffAxis.Vertical ? "V" : "H";

@@ -147,11 +147,14 @@ public sealed class FixedProgramPlacement
         }
         return new(SourcePart, SourceOrdinal, Location, Rotation, LeadInsLocked, execution,
             OwnedProgramCopy.Copy(proposed, token), Prepared, Material, choices)
-        { SelectedProgram = selected, IsCutOff = IsCutOff };
+        { SelectedProgram = selected, IsCutOff = IsCutOff, SeparatesSheet = SeparatesSheet };
     }
 
     /// <summary>A cutoff: always a fixed open-cut program, never material or regenerated.</summary>
     public bool IsCutOff { get; internal init; }
+
+    /// <summary>A cutoff that splits the whole sheet; it is cut after every other placement.</summary>
+    public bool SeparatesSheet { get; internal init; }
 
     public Part SourcePart { get; }
     public int SourceOrdinal { get; }

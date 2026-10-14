@@ -34,16 +34,27 @@ namespace OpenNest.Engine.Sequencing
 
         private static List<Part> OrderCutOffsFirst(List<Part> ordered, Plate plate)
         {
-            var cuts = ordered.Select((part, index) => (Part: part, Index: index))
-                .Where(item => item.Part.BaseDrawing.IsCutOff).ToList();
-            if (cuts.Count == 0)
-                return ordered;
-
             var definitions = new Dictionary<Drawing, CutOff>(ReferenceEqualityComparer.Instance);
             foreach (var cutOff in plate.CutOffs)
                 definitions[cutOff.Drawing] = cutOff;
-
             var bounds = plate.BoundingBox(includeParts: false);
+
+            // A cutoff that splits the whole sheet goes after every part and other cutoff, so the
+            // head never travels back across it. It passes through no part.
+            var separating = ordered.Where(part => part.BaseDrawing.IsCutOff
+                && definitions.TryGetValue(part.BaseDrawing, out var definition)
+                && CutOff.SeparatesSheet(part, definition, bounds)).ToList();
+            if (separating.Count > 0)
+            {
+                var last = new HashSet<Part>(separating, ReferenceEqualityComparer.Instance);
+                ordered = ordered.Where(part => !last.Contains(part)).ToList();
+            }
+
+            var cuts = ordered.Select((part, index) => (Part: part, Index: index))
+                .Where(item => item.Part.BaseDrawing.IsCutOff).ToList();
+            if (cuts.Count == 0)
+                return ordered.Concat(separating).ToList();
+
             var emitted = new bool[ordered.Count];
             var result = new List<Part>(ordered.Count);
             for (var i = 0; i < ordered.Count; i++)
@@ -75,6 +86,7 @@ namespace OpenNest.Engine.Sequencing
                 }
             }
 
+            result.AddRange(separating);
             return result;
         }
     }

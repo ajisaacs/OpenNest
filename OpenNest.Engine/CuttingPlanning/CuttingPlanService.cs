@@ -78,12 +78,15 @@ public static class CuttingPlanService
                     var cut = ExecutionMotionReader.ReadSupported(source.Program, source.Location, request.StartPoint, token);
                     if (!cut.HasCuttingContour)
                         throw new ArgumentException("Placed cutoff program has no nonzero cutting motions.");
-                    nodes.Add(new(true, definitions.TryGetValue(source.BaseDrawing, out var definition)
+                    var defined = definitions.TryGetValue(source.BaseDrawing, out var definition);
+                    var separates = defined && CutOff.SeparatesSheet(source, definition,
+                        request.Plate.BoundingBox(includeParts: false));
+                    nodes.Add(new(true, defined
                         ? new(definition.Axis, definition.Position, definition.StartLimit, definition.EndLimit) : null,
-                        source.BoundingBox, null, null));
+                        source.BoundingBox, null, null, separates));
                     placements.Add(new(source, index, source.Location, source.Rotation, source.LeadInsLocked,
                         cut, OwnedProgramCopy.Copy(source.Program, token))
-                    { IsCutOff = true });
+                    { IsCutOff = true, SeparatesSheet = separates });
                     continue;
                 }
                 var clean = ExecutionMotionReader.ReadSupported(source.BaseDrawing.Program, Vector.Zero, null, token);
@@ -382,6 +385,10 @@ public static class CuttingPlanService
     {
         var part = snapshot.Placements[violation.Part];
         var prerequisite = snapshot.Placements[violation.Prerequisite];
+        if (part.SeparatesSheet)
+            return new(part.SourceOrdinal, part.SourcePart, prerequisite.SourceOrdinal, prerequisite.SourcePart, null,
+                $"{subject} cuts the sheet-separating cutoff (part {part.SourceOrdinal + 1}) before part "
+                + $"{prerequisite.SourceOrdinal + 1}; every part and other cutoff must be cut before the sheet is separated.");
         var reason = prerequisite.IsCutOff ? "the cutoff crossing it" : "the part nested in its cutout";
         return new(part.SourceOrdinal, part.SourcePart, prerequisite.SourceOrdinal, prerequisite.SourcePart, null,
             $"{subject} cuts part {part.SourceOrdinal + 1} before {reason} (part {prerequisite.SourceOrdinal + 1}).");

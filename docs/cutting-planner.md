@@ -95,6 +95,15 @@ the final replay enforce them:
   plate-scoped request; they are always fixed programs, need no lead-in, are not
   material for lead validation and, being open cuts, never become rapid obstacles.
   Rapids into and out of them are still checked.
+- A cutoff that splits the whole sheet is cut after every part and every other
+  cutoff, so the head never travels back across the separated edge. It qualifies
+  when its placed program is one continuous straight cut on its own line spanning
+  the sheet from edge to edge (`CutOff.SeparatesSheet`). A line trimmed around parts,
+  limited short of an edge, on the sheet edge, stale after a move or in an
+  unrecognised program form does not qualify and keeps the crossing rule above.
+  Being continuous, a separating line passes through no part. A kept order that cuts
+  it earlier is a constraint conflict naming the separating cutoff (user decision,
+  2026-10-13).
 - A part whose perimeter lies strictly inside a cutout of another part precedes
   that host. Material bounds (never rapids or scribe marks) only select candidate
   pairs; containment is proven on native clean material. Touching or crossing boundaries, or material that cannot be
@@ -427,9 +436,9 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   `Cut-off Settings...` opens the Automatic Scrap Cut-offs dialog in settings mode for
   the same scope: it previews on the active plate as usual, but `Use These Settings`
   only returns the values (it adds nothing), ticks the box and replans. The panel
-  remembers the last settings per unit system until the application closes. A cut-off
-  still goes before every part its nominal line passes through; a line that passes
-  through no part keeps a free position in the order (user decision, 2026-10-13).
+  remembers the last settings per unit system until the application closes. Cut-off
+  order follows the dependency rules above: crossing cut-offs before the parts they
+  pass through, sheet-separating cut-offs last.
 - Lead-ins are optional for planning. With `None` (or a style that emits no lead
   motion), the emitter places the pierce directly on the selected contour point.
   Unlocked contour starts can still move to improve travel; locked programs keep
