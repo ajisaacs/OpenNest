@@ -784,6 +784,10 @@ namespace OpenNest.Engine.Fill
                     if (setA.Outer == null || setB.Boundaries.Any(e => e is not Line))
                         return (-1e-4, new Vector(1, 0));
                     var lines = CloneEntitiesAt(setB.Boundaries, offsetB).Cast<Line>().ToList();
+                    var worldOuter = CloneAt(setA.Outer, offsetA);
+                    var worldHoles = setA.Holes.Count == 0 ? null : CloneAll(setA.Holes, offsetA);
+                    if (OpenPathMaterial.Enters(worldOuter, worldHoles, lines))
+                        return (-1e-4, new Vector(1, 0));
                     var cutoffBest = double.MaxValue;
                     var cutoffDirection = new Vector(1, 0);
                     foreach (var ring in setA.Rings)
@@ -795,6 +799,8 @@ namespace OpenNest.Engine.Fill
                             cutoffDirection = clearance.Direction;
                         }
                     }
+                    if (setA.HasCurves && cutoffBest >= 0 && cutoffBest < 0.002)
+                        return (-1e-4, cutoffDirection);
                     return (cutoffBest, cutoffDirection);
                 }
 
@@ -946,7 +952,6 @@ namespace OpenNest.Engine.Fill
                             continue;
                         if (stationary.Boundaries.Any(e => e is not Line))
                             return 0;
-                        var movingBox = moving.NativeBounds.Translate(positions[index]);
                         foreach (var entity in stationary.Boundaries)
                         {
                             var line = (Line)entity;
@@ -954,13 +959,13 @@ namespace OpenNest.Engine.Fill
                                 || !double.IsFinite(line.EndPoint.X) || !double.IsFinite(line.EndPoint.Y)
                                 || line.StartPoint.X == line.EndPoint.X && line.StartPoint.Y == line.EndPoint.Y)
                                 return 0;
-                            // An already-intersecting open path has no certified
-                            // exit; refuse uncertain motion, not the input itself.
-                            var segmentBox = line.BoundingBox.Translate(positions[i]);
-                            if (movingBox.Right > segmentBox.Left && movingBox.Left < segmentBox.Right
-                                && movingBox.Top >= segmentBox.Bottom && movingBox.Bottom <= segmentBox.Top)
-                                return 0;
                         }
+                        // A segment box can overlap a concave/oblique part box
+                        // while its actual open path remains far away. Use the
+                        // same strict material-entry verdict as entry floors
+                        // and final reporting, not the box as a blocker.
+                        if (PairClearance(index, i, positions).Distance < 0)
+                            return 0;
                         var hit = SpatialQuery.DirectionalDistance(
                             CloneEntitiesAt(moving.Boundaries, positions[index]),
                             CloneEntitiesAt(stationary.Boundaries, positions[i]), direction,
