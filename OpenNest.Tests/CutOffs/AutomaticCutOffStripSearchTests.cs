@@ -23,6 +23,20 @@ public class AutomaticCutOffStripSearchTests
     }
 
     [Fact]
+    public void IntegralDoubleTie_UsesExactValueBeforePierces()
+    {
+        var first = 10576245042702564d;
+        var second = 16257049472735948d;
+        var combined = 26833294515438512d;
+        Assert.Equal((decimal)first + (decimal)second, (decimal)combined);
+        var result = AutomaticCutOffStripSearch.Solve(0,
+            new[] { new[] { 20.0, 35.0 }, new[] { 40.0, 70.0 } },
+            new[] { 35.0, 70.0 }, 35, 17.5,
+            x => x switch { 20 => (first, 1), 40 => (second, 1), 35 => (combined, 3), _ => (0.0, 0) });
+        Assert.Equal(new[] { 20.0, 40.0 }, result);
+    }
+
+    [Fact]
     public void GlobalOptimum_IsBetterThanGreedyFirstLine()
     {
         var result = AutomaticCutOffStripSearch.Solve(0,

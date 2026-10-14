@@ -104,18 +104,17 @@ internal static class AutomaticCutOffStripSearch
         if (!double.IsFinite(length) || length < 0)
             throw new ArgumentException("Cut-off segment length must be finite and nonnegative.", nameof(length));
         var rounded = System.Math.Round(length, 6);
+        // A shortest round-trip decimal may spell a different integer near 1e16
+        // (for example 26833294515438512d prints as 26833294515438510).
+        // An already-integral double is exact; never round it through text.
+        if (rounded == System.Math.Truncate(rounded))
+            return new BigInteger(rounded) * 1_000_000;
         // Compare sums of the specified decimal-rounded model units, not binary
         // approximations such as 0.1 + 0.2 versus 0.3. The round-trip string
-        // retains micro-unit digits even at larger (but still fractional) scales.
-        if (rounded < 1e22)
-        {
-            var value = decimal.Parse(rounded.ToString("R", CultureInfo.InvariantCulture),
-                NumberStyles.Float, CultureInfo.InvariantCulture);
-            return new BigInteger(decimal.Round(value * 1_000_000m, 0));
-        }
-        // At this magnitude a double has no fractional model units; avoid a
-        // decimal overflow while retaining an unbounded exact accumulated score.
-        return new BigInteger(rounded) * 1_000_000;
+        // retains micro-unit digits for fractional scores.
+        var value = decimal.Parse(rounded.ToString("R", CultureInfo.InvariantCulture),
+            NumberStyles.Float, CultureInfo.InvariantCulture);
+        return new BigInteger(decimal.Round(value * 1_000_000m, 0));
     }
 
     private static int Compare(State left, State right)
