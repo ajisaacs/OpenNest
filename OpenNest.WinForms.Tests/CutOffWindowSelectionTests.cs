@@ -171,6 +171,32 @@ public class CutOffWindowSelectionTests
         Assert.Equal(before.X, cutoff.Position.X);
     });
 
+    [Fact]
+    public void ActiveCutOffDragNeedsLeftMotionAndEndsAfterSelectionClears() => RunSta(() =>
+    {
+        var plate = new Plate(20, 20);
+        var cutoff = new CutOff(new Vector(10, 0), CutOffAxis.Vertical);
+        plate.CutOffs.Add(cutoff);
+        plate.RegenerateCutOffs(new CutOffSettings());
+        using var view = new EventView { Plate = plate, Size = new System.Drawing.Size(500, 500) };
+        view.ZoomToArea(-2, -2, 24, 24);
+        view.Down(new Vector(10, 2));
+        Assert.True(view.CutOffs.IsDragging);
+
+        view.MoveTo(new Vector(13, 2), MouseButtons.None);
+        Assert.Equal(10, cutoff.Position.X);
+        view.UpRight(new Vector(13, 2));
+        Assert.True(view.CutOffs.IsDragging);
+
+        view.MoveTo(new Vector(11, 2), MouseButtons.Left);
+        Assert.Equal(11, cutoff.Position.X);
+        view.Selection.DeselectCutOffs();
+        view.Up(new Vector(11, 2));
+        Assert.False(view.CutOffs.IsDragging);
+        view.MoveTo(new Vector(13, 2), MouseButtons.None);
+        Assert.Equal(11, cutoff.Position.X);
+    });
+
     private sealed class EventView : PlateView
     {
         public void Down(Vector world)
@@ -184,6 +210,12 @@ public class CutOffWindowSelectionTests
         {
             var point = PointWorldToControl(world);
             OnMouseUp(new MouseEventArgs(MouseButtons.Left, 1, point.X, point.Y, 0));
+        }
+
+        public void UpRight(Vector world)
+        {
+            var point = PointWorldToControl(world);
+            OnMouseUp(new MouseEventArgs(MouseButtons.Right, 1, point.X, point.Y, 0));
         }
 
         public void MoveTo(Vector world, MouseButtons buttons)
