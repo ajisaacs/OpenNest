@@ -328,6 +328,53 @@ public class ExpanderTests
     }
 
     [Fact]
+    public void Separate_PreservesEachEntryGap_EvenWhenTargetIsSmaller()
+    {
+        var plate = MakePlate(30, 12, edge: 0);
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var mover = AddSquare(plate, 4, 4, 2);
+        var wall = AddSquare(plate, 12, 4, 2);
+        var initialWallGap = wall.Location.X - (mover.Location.X + 2);
+
+        var (converged, positions, _) = Expander.Separate(
+            new List<Part> { anchor, mover }, plate, spacing: 3
+        );
+
+        // The wall is six units away at entry. Merely clearing the requested
+        // three-unit spacing is not permission to consume that original gap.
+        Assert.True(positions[1].X + 2 <= wall.Location.X - initialWallGap + 1e-6,
+            $"entry gap {initialWallGap}, proposed gap {wall.Location.X - positions[1].X - 2}");
+        Assert.Equal(new Vector(4, 4), mover.Location);
+        Assert.Equal(new Vector(12, 4), wall.Location);
+        Assert.False(converged); // This direct translation cannot reach 3 safely.
+    }
+
+    [Fact]
+    public void Separate_RetriesMiddleAfterLaterBlockerMoves()
+    {
+        var plate = MakePlate(60, 14, edge: 0);
+        var first = AddSquare(plate, 5, 5);
+        var middle = AddSquare(plate, 10, 5);
+        var last = AddSquare(plate, 14, 5);
+        var selected = new List<Part> { first, middle, last };
+
+        var (converged, positions, violations) = Expander.Separate(selected, plate, spacing: 2);
+        Assert.True(converged, $"remaining: {violations.Count}");
+        Assert.Empty(violations);
+        Assert.Equal(5, positions[0].X);
+        Assert.True(positions[1].X >= 11 - 1e-4);
+        Assert.True(positions[2].X >= positions[1].X + 6 - 1e-4);
+        Assert.Equal(10, middle.Location.X); // Separate is scratch-only.
+        Assert.Equal(14, last.Location.X);
+
+        var result = Expander.Expand(selected, plate, new Expander.Options { MaxSpacing = 2 });
+        Assert.True(result.AchievedSpacing >= 1.99, $"achieved {result.AchievedSpacing}");
+        Assert.True(middle.Location.X >= 11 - 1e-4);
+        Assert.True(last.Location.X >= middle.Location.X + 6 - 1e-4);
+        Assert.Equal(5, first.Location.X);
+    }
+
+    [Fact]
     public void Expand_WallsAndUnselectedPairs_StayExactlyAtClearance()
     {
         // Selection must not be pushed to open gaps between parts it excludes.

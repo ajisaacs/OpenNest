@@ -198,6 +198,10 @@ namespace OpenNest.Engine.Fill
             }
 
             var positions = final.Positions;
+            // Floors belong to this public operation, not to any individual probe.
+            // A failed final check leaves every live part untouched.
+            if (!context.MeetsEntryFloors(positions))
+                throw new InvalidOperationException("Expand proposal violates an entry clearance floor.");
 
             Apply(selected, entry, positions);
 
@@ -274,8 +278,11 @@ namespace OpenNest.Engine.Fill
                 if (token.IsCancellationRequested)
                     return (false, start, violations);
 
+                // Parking is pass-local. A blocker later in this pass may move,
+                // so retry the pair on the next pass; a pass with no progress
+                // terminates pinned layouts without exhausting the iteration cap.
+                stuck.Clear();
                 var moved = 0.0;
-                var stuckChanged = false;
 
                 foreach (var pair in context.Pairs)
                 {
@@ -327,7 +334,7 @@ namespace OpenNest.Engine.Fill
                     {
                         var trial = positions[moverIndex] + direction * room;
 
-                        if (context.MaintainsValidity(moverIndex, trial, positions))
+                        if (context.MaintainsValidity(moverIndex, trial, positions, pair, distance))
                         {
                             positions[moverIndex] = trial;
                             applied = room;
@@ -343,7 +350,9 @@ namespace OpenNest.Engine.Fill
                                     context.MaintainsValidity(
                                         moverIndex,
                                         positions[moverIndex] + direction * mid,
-                                        positions
+                                        positions,
+                                        pair,
+                                        distance
                                     )
                                 )
                                     lo = mid;
@@ -382,16 +391,12 @@ namespace OpenNest.Engine.Fill
                         continue;
                     }
 
-                    // Zero progress twice in a row parks the pair; the final sweep
-                    // re-measures everything, so mid-loop bookkeeping never lies.
-                    if (stuck.Contains(pair.Id))
-                        continue;
-
+                    // Zero progress parks the pair for this pass; movement of a
+                    // different part can unblock it on the next pass.
                     stuck.Add(pair.Id);
-                    stuckChanged = true;
                 }
 
-                if (moved < epsMove && !stuckChanged)
+                if (moved < epsMove)
                     break;
             }
 
@@ -433,6 +438,7 @@ namespace OpenNest.Engine.Fill
             public int IndexA;
             public int IndexB;
             public int Mover;
+            public double EntryFloor;
         }
 
         /// <summary>
@@ -515,6 +521,9 @@ namespace OpenNest.Engine.Fill
                     spacingCap
                 );
                 context.BuildPairs();
+                var entry = context.Positions();
+                foreach (var pair in context.Pairs)
+                    pair.EntryFloor = context.PairClearance(pair.IndexA, pair.IndexB, entry).Distance;
                 return context;
             }
 
@@ -687,62 +696,71 @@ namespace OpenNest.Engine.Fill
                 return max < 0 ? 0 : max;
             }
 
-            /// <summary>
-            /// True when the part at <paramref name="trial"/> stays inside the work
-            /// area and keeps no material overlap with any other part (Collision
-            /// oracle with hole subtraction, so part-in-cutout stays legal).
-            /// </summary>
-            public bool MaintainsValidity(int index, Vector trial, List<Vector> positions)
+            // Smaller than the 0.002 tessellation margin; immutable entry floors
+            // prevent this comparison tolerance accumulating over iterations.
+            private const double FloorTolerance = 1e-6;
+
+            public bool MeetsEntryFloors(List<Vector> positions)
             {
-                var box = localBoxes[index];
-                var movedBox = box.Translate(trial);
-
-                if (
-                    movedBox.Left < workArea.Left - 1e-9
-                    || movedBox.Right > workArea.Right + 1e-9
-                    || movedBox.Bottom < workArea.Bottom - 1e-9
-                    || movedBox.Top > workArea.Top + 1e-9
-                )
-                    return false;
-
-                var outer = shapes[index].Outer;
-                if (outer == null)
-                    return true;
-
-                var worldOuter = CloneAt(outer, trial);
-                var worldHoles = shapes[index].Holes.Count == 0
-                    ? null
-                    : CloneAll(shapes[index].Holes, trial);
-
-                for (var i = 0; i < parts.Count; i++)
+                for (var i = 0; i < moverCount; i++)
+                    if (!InsideWorkArea(i, positions[i]))
+                        return false;
+                foreach (var pair in Pairs)
                 {
-                    if (i == index)
-                        continue;
-
-                    var otherOuter = shapes[i].Outer;
-                    if (otherOuter == null)
-                        continue;
-
-                    if (!BoxOverlap(movedBox, localBoxes[i].Translate(positions[i]), 0.002))
-                        continue;
-
-                    var worldOther = CloneAt(otherOuter, positions[i]);
-                    var worldOtherHoles = shapes[i].Holes.Count == 0
-                        ? null
-                        : CloneAll(shapes[i].Holes, positions[i]);
-
-                    if (
-                        Collision.HasOverlap(
-                            worldOuter,
-                            worldOther,
-                            worldHoles,
-                            worldOtherHoles
-                        )
-                    )
+                    var clearance = PairClearance(pair.IndexA, pair.IndexB, positions).Distance;
+                    if (!double.IsFinite(clearance) || clearance < pair.EntryFloor - FloorTolerance)
                         return false;
                 }
-
                 return true;
+            }
+
+            private bool InsideWorkArea(int index, Vector position)
+            {
+                var box = localBoxes[index].Translate(position);
+                return box.Left >= workArea.Left - 1e-9
+                    && box.Right <= workArea.Right + 1e-9
+                    && box.Bottom >= workArea.Bottom - 1e-9
+                    && box.Top <= workArea.Top + 1e-9;
+            }
+
+            /// <summary>Check active improvement and every affected pair against
+            /// its immutable operation-entry floor on scratch positions.</summary>
+            public bool MaintainsValidity(
+                int index, Vector trial, List<Vector> positions, Pair active, double activeDistance)
+            {
+                if (!InsideWorkArea(index, trial))
+                    return false;
+
+                var current = positions[index];
+                positions[index] = trial;
+                try
+                {
+                    var improved = PairClearance(active.IndexA, active.IndexB, positions).Distance;
+                    if (!double.IsFinite(improved) || improved <= activeDistance + 1e-7)
+                        return false;
+                    foreach (var pair in Pairs)
+                    {
+                        if (pair.IndexA != index && pair.IndexB != index)
+                            continue;
+                        var clearance = PairClearance(pair.IndexA, pair.IndexB, positions).Distance;
+                        if (!double.IsFinite(clearance) || clearance < pair.EntryFloor - FloorTolerance)
+                            return false;
+                        // Once an initial overlap is cleared, never reintroduce it.
+                        if (clearance < 0)
+                        {
+                            positions[index] = current;
+                            var before = PairClearance(pair.IndexA, pair.IndexB, positions).Distance;
+                            positions[index] = trial;
+                            if (before >= 0)
+                                return false;
+                        }
+                    }
+                    return true;
+                }
+                finally
+                {
+                    positions[index] = current;
+                }
             }
 
             private static List<Polygon> CloneAll(List<Polygon> polygons, Vector offset)
