@@ -14,16 +14,15 @@ namespace OpenNest.Engine.Fill
     /// boundaries. The inverse of <see cref="Compactor"/>: it grows gaps instead
     /// of closing them.
     /// <para>
-    /// Input with overlaps is accepted: an overlapping pair is a pair with
-    /// negative clearance and is separated along the minimum-translation
-    /// direction. Moves are straight-line only — a pair that could separate only
-    /// by routing around a blocker is reported as a violation instead. Final
-    /// positions are always overlap-free; nothing moves off the work area.
+    /// Input with overlaps is accepted for safe direct separation; unresolved
+    /// overlaps remain in the violation report. Moves are straight-line only —
+    /// a pair that requires routing around a blocker remains unresolved.
+    /// Plate edges retain their EdgeSpacing floor.
     /// </para>
     /// <para>
-    /// Anchor policy: within a violated pair the later-indexed selected part
-    /// moves; the counterpart moves only as a fallback when the anchor mover is
-    /// fully blocked by a work-area edge. Walls (non-selected parts) never move.
+    /// Anchor policy: within a violated selected pair only its later-indexed
+    /// selected part moves. Nonselected parts never move; there is no counterpart
+    /// fallback when the prescribed mover is blocked.
     /// </para>
     /// </summary>
     public static class Expander
@@ -67,7 +66,8 @@ namespace OpenNest.Engine.Fill
             /// <summary>True when the run was cancelled; no positions were changed.</summary>
             public bool Cancelled;
 
-            /// <summary>Pairs that could not reach <see cref="AchievedSpacing"/>.</summary>
+            /// <summary>Pairs still below the attempted spacing, including
+            /// unresolved negative clearances when no positive target was feasible.</summary>
             public List<Violation> Violations = new();
         }
 
@@ -76,8 +76,10 @@ namespace OpenNest.Engine.Fill
         /// and its other parts allow, applying the best spacing found. Plate
         /// PartSpacing/EdgeSpacing are not modified; edges keep their own
         /// EdgeSpacing floor while only part-to-part clearance chases the target.
-        /// Mutates <paramref name="selected"/> locations; probing never touches
-        /// them, so a failed or cancelled run leaves the layout unchanged.
+        /// Mutates <paramref name="selected"/> locations only after the final
+        /// proposal passes validation; failed individual probes and cancellation
+        /// leave all live locations unchanged. A completed run can apply safe
+        /// partial separation and report any remaining violations.
         /// </summary>
         public static Result Expand(
             List<Part> selected,
@@ -263,7 +265,6 @@ namespace OpenNest.Engine.Fill
         )
         {
             var positions = new List<Vector>(start);
-            var stuck = new HashSet<int>();
             var violations = new List<Violation>();
             var epsMove = 1e-4;
 
@@ -278,16 +279,12 @@ namespace OpenNest.Engine.Fill
                 if (token.IsCancellationRequested)
                     return (false, start, violations);
 
-                // Parking is pass-local. A blocker later in this pass may move,
-                // so retry the pair on the next pass; a pass with no progress
-                // terminates pinned layouts without exhausting the iteration cap.
-                stuck.Clear();
+                // Retry every pair on the next pass if another blocker moved;
+                // a complete pass without progress stops genuinely pinned layouts.
                 var moved = 0.0;
 
                 foreach (var pair in context.Pairs)
                 {
-                    if (stuck.Contains(pair.Id))
-                        continue;
 
                     var (distance, directionA) = context.PairClearance(
                         pair.IndexA,
@@ -351,9 +348,8 @@ namespace OpenNest.Engine.Fill
                         continue;
                     }
 
-                    // Zero progress parks the pair for this pass; movement of a
-                    // different part can unblock it on the next pass.
-                    stuck.Add(pair.Id);
+                    // No progress now; a later part may unblock this pair on
+                    // the next pass. The final sweep remeasures all pairs.
                 }
 
                 if (moved < epsMove)
@@ -368,7 +364,7 @@ namespace OpenNest.Engine.Fill
             violations.Clear();
             foreach (var pair in context.Pairs)
             {
-                var (distance, _) = context.PairClearance(
+                var (distance, directionA) = context.PairClearance(
                     pair.IndexA,
                     pair.IndexB,
                     positions
@@ -377,13 +373,27 @@ namespace OpenNest.Engine.Fill
                 if (distance >= spacing)
                     continue;
 
+                var direction = pair.Mover == pair.IndexA ? directionA : -directionA;
+                var need = target - distance;
+                var attempt = ProposeMove(context, positions, pair, distance, direction, need, epsMove);
+                if (attempt.Applied <= 0 && distance <= 1e-7)
+                {
+                    var opposite = ProposeMove(context, positions, pair, distance, -direction, need, epsMove);
+                    if (opposite.Applied > attempt.Applied)
+                        attempt = opposite;
+                }
+                // Only an actual first work-area limit is an edge blocker.
+                // An available move at the iteration budget, or a part/floor
+                // limiting first, is not evidence of an edge obstruction.
+                var blockedByEdge = attempt.EdgeLimited && !attempt.PartLimited
+                    && attempt.Applied < need - epsMove;
                 violations.Add(
                     new Violation
                     {
                         A = context.PartOf(pair.IndexA),
                         B = context.PartOf(pair.IndexB),
                         Achieved = distance,
-                        BlockedByEdge = stuck.Contains(pair.Id),
+                        BlockedByEdge = blockedByEdge,
                     }
                 );
             }
@@ -426,7 +436,6 @@ namespace OpenNest.Engine.Fill
         /// <summary>One constrained part↔part pair with its anchor mover.</summary>
         private sealed class Pair
         {
-            public int Id;
             public int IndexA;
             public int IndexB;
             public int Mover;
@@ -602,8 +611,6 @@ namespace OpenNest.Engine.Fill
 
             private void BuildPairs()
             {
-                var id = 0;
-
                 for (var a = 0; a < parts.Count; a++)
                 {
                     for (var b = a + 1; b < parts.Count; b++)
@@ -617,7 +624,6 @@ namespace OpenNest.Engine.Fill
                         Pairs.Add(
                             new Pair
                             {
-                                Id = id++,
                                 IndexA = a,
                                 IndexB = b,
                                 // Anchor policy: the later-index mover moves.

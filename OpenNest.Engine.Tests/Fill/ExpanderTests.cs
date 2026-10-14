@@ -537,6 +537,49 @@ public class ExpanderTests
     }
 
     [Fact]
+    public void Separate_ReportsPartBlockerRatherThanPlateEdge()
+    {
+        var plate = MakePlate(20, 20, edge: 0);
+        var pinned = AddSquare(plate, 8, 8);
+        AddSquare(plate, 3.8, 8);
+        AddSquare(plate, 12.2, 8);
+        AddSquare(plate, 8, 3.8);
+        AddSquare(plate, 8, 12.2);
+
+        var (_, poses, violations) = Expander.Separate(new List<Part> { pinned }, plate, 1);
+        Assert.NotEmpty(violations);
+        Assert.All(violations, v => Assert.False(v.BlockedByEdge,
+            $"{v.B.BaseDrawing.Name}: blocker before the work-area edge, pose={poses[0]}"));
+    }
+
+    [Fact]
+    public void Separate_ReportsActualPlateEdgeWhenItLimitsMovement()
+    {
+        var plate = MakePlate(12, 12, edge: 0);
+        var anchor = AddSquare(plate, 1, 4, 2);
+        var moving = AddSquare(plate, 7, 4, 2);
+
+        var (_, poses, violations) = Expander.Separate(new List<Part> { anchor, moving }, plate, 9);
+        var pair = Assert.Single(violations.Where(v => ReferenceEquals(v.A, anchor) && ReferenceEquals(v.B, moving)));
+        Assert.True(pair.BlockedByEdge);
+        Assert.True(poses[1].X + 2 <= 12 + 1e-6);
+    }
+
+    [Fact]
+    public void Separate_ReportsPartBeforeFartherEdge_OnNarrowPlate()
+    {
+        var plate = MakePlate(9, 2, edge: 0);
+        var anchor = AddSquare(plate, 0, 0, 2);
+        var moving = AddSquare(plate, 3, 0, 2);
+        var wall = AddRectangle(plate, 5.5, 0, 0.2, 2);
+
+        var (_, poses, violations) = Expander.Separate(new List<Part> { anchor, moving }, plate, 4);
+        var pair = Assert.Single(violations.Where(v => ReferenceEquals(v.A, anchor) && ReferenceEquals(v.B, moving)));
+        Assert.False(pair.BlockedByEdge);
+        Assert.True(poses[1].X + 2 <= wall.Location.X + 1e-6);
+    }
+
+    [Fact]
     public void Expand_WallsAndUnselectedPairs_StayExactlyAtClearance()
     {
         // Selection must not be pushed to open gaps between parts it excludes.
