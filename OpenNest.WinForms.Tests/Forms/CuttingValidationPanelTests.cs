@@ -251,7 +251,7 @@ public class CuttingValidationPanelTests
         var view = editor.PlateView;
         Assert.Same(plate, view.Plate);
         Assert.NotNull(view.ValidationOverlay.Finding.Overlap);
-        Assert.Contains("centroid", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Contains("largest patch", Field<TextBox>(panel, "resultLabel").Text);
         var scale = view.ViewScale;
         InvokeView(view, "OnMouseWheel", new MouseEventArgs(MouseButtons.None, 0, 100, 100, 120));
         Assert.True(view.ViewScale > scale);

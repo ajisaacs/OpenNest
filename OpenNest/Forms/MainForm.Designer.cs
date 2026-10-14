@@ -390,7 +390,7 @@ namespace OpenNest.Forms
             // mnuOverlapCentroids
             //
             mnuOverlapCentroids.Name = "mnuOverlapCentroids";
-            mnuOverlapCentroids.Text = "Centroids";
+            mnuOverlapCentroids.Text = "Markers";
             mnuOverlapCentroids.Click += OverlapCentroids_Click;
             //
             // mnuOverlapBoth

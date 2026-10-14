@@ -210,10 +210,10 @@ public static class PlateOverlapAnalyzer
                     var localA = a.Material.Transform(0, origin * -1);
                     var localB = b.Material.Transform(0, origin * -1);
                     if (!TryShare(localA, localB.Outer, localB.Holes, origin, cancellationToken,
-                            out var regions, out var centroid))
+                            out var regions, out var centroid, out var marker))
                         continue;
                     pairs.Add(new PlateOverlapPair(a.Input.Id, b.Input.Id,
-                        a.Input.Name, b.Input.Name, regions, centroid));
+                        a.Input.Name, b.Input.Name, regions, centroid, marker));
                 }
                 catch (Exception exception) when (IsGeometryFailure(exception))
                 {
@@ -280,11 +280,12 @@ public static class PlateOverlapAnalyzer
                     var origin = part.Material.Outer.Vertices[0];
                     var local = part.Material.Transform(0, origin * -1);
                     var rect = RectanglePolygon(zone, origin * -1);
-                    if (!TryShare(local, rect, null, origin, cancellationToken, out var regions, out var centroid))
+                    if (!TryShare(local, rect, null, origin, cancellationToken,
+                            out var regions, out var centroid, out var marker))
                         continue;
                     findings.Add(new PlateOverlapPair(part.Input.Id,
                         ClampFindingSlot.IdFor(clamp.Ordinal), part.Input.Name,
-                        $"Clamp '{clamp.Id}'", regions, centroid));
+                        $"Clamp '{clamp.Id}'", regions, centroid, marker));
                 }
                 catch (Exception exception) when (IsGeometryFailure(exception))
                 {
@@ -298,16 +299,19 @@ public static class PlateOverlapAnalyzer
 
     /// <summary>
     /// Shared material of a rebased operand with another rebased outline/holes, as world
-    /// regions (connected islands) plus the area centroid of them all. Returns false when the
+    /// regions (connected islands) plus the area centroid of them all and a marker point
+    /// inside the largest island. Returns false when the
     /// total shared area does not exceed <see cref="OpenNest.Math.Tolerance.Epsilon"/>: contact and rounding
     /// dust are not overlap. Invalid moments throw, so the pair becomes incomplete rather
     /// than clear or marked at the origin.
     /// </summary>
     private static bool TryShare(OverlapMaterial localA, Polygon outerB, List<Polygon> holesB, Vector origin,
-        CancellationToken cancellationToken, out List<PlateOverlapRegion> regions, out Vector centroid)
+        CancellationToken cancellationToken, out List<PlateOverlapRegion> regions, out Vector centroid,
+        out Vector marker)
     {
         regions = null;
         centroid = default;
+        marker = default;
         var islands = OverlapClipping.Intersect(localA.Outer, localA.Holes, outerB, holesB);
         var area = islands.Sum(island => island.Moments.Area);
         if (!double.IsFinite(area))
@@ -326,6 +330,12 @@ public static class PlateOverlapAnalyzer
         centroid = combined.Centroid + origin;
         if (!OverlapMaterial.IsFinite(centroid))
             throw new ArithmeticException("Overlap centroid is not finite in world coordinates.");
+        // The area centroid can lie between islands or in a hole: mark the largest island.
+        var largest = islands.Aggregate((best, island) => island.Moments.Area > best.Moments.Area ? island : best);
+        marker = OverlapMarker.Find(largest.Outline, largest.Holes, largest.Moments.Area, largest.Moments.Centroid)
+            + origin;
+        if (!OverlapMaterial.IsFinite(marker))
+            throw new ArithmeticException("Overlap marker is not finite in world coordinates.");
         return true;
     }
 
@@ -340,7 +350,8 @@ public static class PlateOverlapAnalyzer
         };
         var centre = new Vector((zone.Left + zone.Right) / 2, (zone.Bottom + zone.Top) / 2);
         return new PlateOverlapPair(part.Input.Id, ClampFindingSlot.IdFor(clamp.Ordinal), part.Input.Name,
-            $"Clamp '{clamp.Id}'", new List<PlateOverlapRegion> { new(corners, zone.Length * zone.Width) }, centre);
+            $"Clamp '{clamp.Id}'", new List<PlateOverlapRegion> { new(corners, zone.Length * zone.Width) }, centre,
+            centre);
     }
 
     private static Polygon RectanglePolygon(Box box, Vector offset)

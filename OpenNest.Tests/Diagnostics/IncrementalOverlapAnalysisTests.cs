@@ -142,8 +142,9 @@ public class IncrementalOverlapAnalysisTests
     private static string Describe(PlateOverlapReport report) =>
         string.Join(";", report.Pairs.Select(pair =>
             $"{pair.PartAId}/{pair.PartBId}[{pair.PartAName}|{pair.PartBName}]:{pair.Area:R}:"
-            + $"{pair.Centroid.X:R},{pair.Centroid.Y:R}:"
-            + string.Join(",", pair.Regions.SelectMany(region => region.Vertices).Select(v => $"{v.X:R} {v.Y:R}"))))
+            + $"{pair.Centroid.X:R},{pair.Centroid.Y:R}:{pair.Marker.X:R},{pair.Marker.Y:R}:"
+            + string.Join(",", pair.Regions.SelectMany(region => region.Vertices
+                .Concat(region.Holes.SelectMany(hole => hole))).Select(v => $"{v.X:R} {v.Y:R}"))))
         + "|" + string.Join(";", report.Issues.Select(issue => $"{issue.PartAId}/{issue.PartBId}:{issue.Message}"));
 
     private static Drawing Square(string name, double size) =>

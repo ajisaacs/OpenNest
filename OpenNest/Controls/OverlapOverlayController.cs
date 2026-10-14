@@ -488,7 +488,7 @@ internal sealed class OverlapOverlayController : IDisposable
         var labelRows = new Dictionary<PointF, int>();
         foreach (var pair in state.DisplayPairs.OrderBy(pair => pair.PartAId).ThenBy(pair => pair.PartBId))
         {
-            var center = view.PointWorldToGraph(pair.Centroid);
+            var center = view.PointWorldToGraph(pair.Marker);
             if (!float.IsFinite(center.X) || !float.IsFinite(center.Y))
                 continue;
             foreach (var pen in new[] { halo, crosshair })

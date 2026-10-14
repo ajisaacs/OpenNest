@@ -448,7 +448,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         {
             PostVerificationKind.Overlap when finding.ClampId != null =>
                 "The ring marks a nominal cut-off contacting a clamp; no material-overlap area is implied.",
-            PostVerificationKind.Overlap => "Shaded material is the overlap. The ring marks its area centroid, which can lie between separate patches.",
+            PostVerificationKind.Overlap => "Shaded material is the overlap. The ring marks a point inside its largest patch.",
             PostVerificationKind.RapidCrossing when finding.ClampId != null =>
                 "The crosshair marks the rapid's contact with the clamp. Head height is not modeled.",
             PostVerificationKind.RapidCrossing => finding.ContactPoints.Count > 0

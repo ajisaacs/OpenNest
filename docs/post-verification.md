@@ -18,8 +18,8 @@ restores normal rendering without changing drawing colors or selection.
 
 Overlaps use the same magenta material shading as **View > Overlap Check**. A
 DPI-scaled ring expands and fades continuously while the finding is selected;
-both its color and contrasting halo fade as it grows. For overlaps the ring marks the area centroid (possibly between
-separate patches); for missing lead-ins it marks the contour start. Rapid warnings
+both its color and contrasting halo fade as it grows. For overlaps the ring marks a point inside the largest
+shared patch; for missing lead-ins it marks the contour start. Rapid warnings
 pulse the offending orange dashed segment continuously and mark its contacts with
 the completed contour using fixed-screen-size magenta crosshairs with white halos.
 Contacts use native lines/arcs and the rapid check's existing numerical tolerances;

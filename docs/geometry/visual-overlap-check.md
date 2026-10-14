@@ -6,17 +6,17 @@ Choose **View > Overlap Check > Check Active Plate** to check committed parts on
 this plate. Shared material is shaded red/magenta without changing the nest,
 selection, cutting paths, or export behavior. Cutoffs and temporary preview parts
 are excluded. **Cancel Check** discards the running request. **Display > Off /
-Areas / Centroids / Both** changes visibility without rerunning analysis. Areas
+Areas / Markers / Both** changes visibility without rerunning analysis. Areas
 is the default; rechecking preserves a visible mode, while checking from Off
 shows Areas. Clamp overlaps are shown as part/clamp findings with the clamp ID
 in hover details; clamps are not selectable parts and are not added to quantity
 or machining. A clamp edit invalidates the diagnostic and schedules a fresh
 check. Display preferences belong to the current document and are not saved.
 
-Centroids and Both show fixed-screen-size, DPI-scaled pair crosshairs with a
+Markers and Both show fixed-screen-size, DPI-scaled pair crosshairs with a
 contrasting halo. Labels such as `1/3` identify the two plate sequence positions
 at capture time, including gaps occupied by cutoffs. Hover near a marker to see
-captured names, approximate shared area in in² or mm², and centroid coordinates
+captured names, approximate shared area in in² or mm², and marker coordinates
 in the same linear units. Units are captured with the request; hover does not
 relabel an old report from live settings. Nearby/coincident markers show all
 matching pairs in sequence order. If details exceed the view, the tooltip wraps
@@ -73,7 +73,7 @@ var areas = report.Pairs.SelectMany(pair => pair.Regions).ToList();
 foreach (var pair in report.Pairs)
 {
     // IDs are zero-based positions in the original input list, including skipped cutoffs.
-    Console.WriteLine($"{pair.PartAId} / {pair.PartBId}: {pair.Area}, centroid {pair.Centroid}");
+    Console.WriteLine($"{pair.PartAId} / {pair.PartBId}: {pair.Area}, marker {pair.Marker}");
     foreach (var region in pair.Regions)
     {
         // region.Vertices: closed, read-only, counterclockwise world-coordinate outline
@@ -183,11 +183,17 @@ so summing all pair areas double-counts shared plate locations.
 
 `pair.Centroid` is the true area-weighted center of every shared-material island
 for that pair, after hole subtraction. It is not an average of crossings or
-vertices. For a disconnected or concave overlap, the mathematical centroid can
-lie outside the red material (for example, between two separate patches). This
-is intentional: shaded Areas are authoritative for actual overlap locations;
-use Both for detailed inspection rather than interpreting a centroid as an
-interior collision point. There is one centroid per pair, not per connected island.
+vertices. For a disconnected, holed or concave overlap it can lie outside the red
+material (between two patches, in a hole, or inside a curve).
+
+`pair.Marker` is where markers, hover hit testing and cutting-inspection rings go:
+a point on the shared material, inside the pair's largest island. It is that
+island's pole of inaccessibility (`PolyLabel`), searched to a tenth of the island's
+area/perimeter with a budget of 4096 distance evaluations. If that bounded search
+does not land inside (a long thin sliver), the marker is the midpoint of the widest
+interior run of a horizontal scan line through the island, placed between vertex
+heights. There is one marker per pair, not per island: a second patch has shading
+but no crosshair.
 
 `PolygonAreaMoments` evaluates signed moments about local origins. The analyzer
 subtracts each island's hole moments from its outline's (`TrySubtract`), then
@@ -256,7 +262,8 @@ failure clear all retained highlights.
 Measured on 389 real PEP-converted plates (252 nests), a from-scratch check takes
 median 0.8 ms, p99 97 ms and max 3.2 s. Nearly all of the slow cases are first-time
 material preparation for a hole-heavy drawing. With material prepared, clipping every
-candidate pair takes median 0.05 ms, p99 27 ms and max 52 ms. The triangle-pair kernel
+candidate pair and placing markers takes median 0.05 ms, p99 34 ms and max 76 ms
+(markers added about 0.4 ms per overlapping pair). The triangle-pair kernel
 took up to 2.6 s on the same plates. On those plates Clipper2 and the previous kernel
 found identical pair, clamp and issue sets. Areas differed by at most 0.0002 square
 units, always smaller from the kernel, consistent with its dropping fragments below
@@ -275,7 +282,7 @@ and triple coverage does not darken. World-to-graph conversion excludes pan,
 because PlateView already applies origin translation. Paths are rebuilt for
 displayed-pair/scale changes, not ordinary repaints or panning. The state label
 saves/restores graphics state.
-Centroid hit tests use only cached report coordinates and DPI-scaled screen
+Marker hit tests use only cached report coordinates and DPI-scaled screen
 radii. Hover clears on edits, mode/request/view changes, leave, and teardown.
 Diagnostic details draw above action adorners and take precedence over the normal
 part-name tooltip only while visible.
@@ -295,7 +302,7 @@ inputs, snapshot isolation, read-only output, cutting-program independence, and
 cancellation. Run:
 
 ```sh
-dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests|FullyQualifiedName~PolygonAreaMomentsTests|FullyQualifiedName~OverlapPairPresentationTests|FullyQualifiedName~OverlapHoverPagesTests|FullyQualifiedName~IncrementalOverlapAnalysisTests|FullyQualifiedName~OverlapAutoCheckSchedulerTests'
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter 'FullyQualifiedName~PlateOverlapAnalyzerTests|FullyQualifiedName~OverlapReportStateTests|FullyQualifiedName~PolygonAreaMomentsTests|FullyQualifiedName~OverlapPairPresentationTests|FullyQualifiedName~OverlapHoverPagesTests|FullyQualifiedName~IncrementalOverlapAnalysisTests|FullyQualifiedName~OverlapAutoCheckSchedulerTests|FullyQualifiedName~OverlapMarkerTests|FullyQualifiedName~PolyLabel'
 ```
 
 `IncrementalOverlapAnalysisTests` compares incremental rechecks with uncached full
@@ -312,6 +319,10 @@ translations, and invalid/overflow cases. `OverlapPairPresentationTests` checks 
 formatting, sequence labels, coincident ordering, and zoom-independent DPI hit
 radii. `OverlapHoverPagesTests` proves bounded continuation pages retain every
 pair and long/Unicode name, with navigation bounds and explicit tiny-view failure.
+`OverlapMarkerTests` covers the pole, the scan-line fallback after an exhausted search
+budget, and the last-resort fallback; `PolyLabelDifferentialTests` proves the heap
+queue returns bit-identical poles to the former sorted list, so label positions
+elsewhere do not move.
 `OpenNest.WinForms.Tests/PlateOverlapOverlayTests.cs` adds STA worker/publication,
 menu/MDI, path-cache, uniform-fill pixel, control-lifetime, and automatic-recheck
 (debounce, drag detection, busy wait, supersession, display/status) checks. Run those
@@ -323,7 +334,8 @@ dotnet test OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj
 
 Linux can cross-build with `-p:EnableWindowsTargeting=true`, but that does not
 execute Windows tests or verify appearance, DPI, or interaction. On Windows,
-check partial overlap, containment, inside-hole placement, pan/zoom and quadrant
+check partial overlap, containment, inside-hole placement, markers on concave,
+holed and two-patch overlaps, pan/zoom and quadrant
 alignment, changed-pair clearing and unchanged-pair retention during edits and
 pending rechecks, full clearing on plate switches and converter cancellation,
 the pending label and automatic recheck after dragging a part onto another,

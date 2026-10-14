@@ -22,7 +22,7 @@ public class OverlapHoverPagesTests
         Assert.Equal(text.Replace("\n", ""), displayed);
         Assert.Contains("Pair 11/12: part-11 / part-12", displayed);
         Assert.Contains("Shared area ≈ 16 mm²", displayed);
-        Assert.Contains("Centroid: (2, 2) mm", displayed);
+        Assert.Contains("Marker: (2, 2) mm", displayed);
         Assert.Equal(pages.PageCount - 1, pages.PageIndex);
         Assert.Contains($"Page {pages.PageCount}/{pages.PageCount}", string.Join("", pages.NavigationLines));
         Assert.Contains("66 pairs", string.Join("", pages.NavigationLines));

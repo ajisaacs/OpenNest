@@ -553,6 +553,66 @@ public class PlateOverlapAnalyzerTests
         return twice / 2;
     }
 
+    // Each row's area centroid lies off the red material (between patches, in a hole, or
+    // inside a curve); the marker must sit on the shared material instead.
+    [Theory]
+    [InlineData("two patches")]
+    [InlineData("frame covered")]
+    [InlineData("half annulus")]
+    [InlineData("thin crescent")]
+    public void Analyze_MarkerLiesOnSharedMaterialWhereTheCentroidDoesNot(string scenario)
+    {
+        var parts = scenario switch
+        {
+            "two patches" => new[]
+            {
+                WithContours(new[]
+                {
+                    new Vector(0, 0), new Vector(3, 0), new Vector(3, 3), new Vector(2, 3),
+                    new Vector(2, 1), new Vector(1, 1), new Vector(1, 3), new Vector(0, 3)
+                }),
+                Rectangle(0, 2, 3, 1)
+            },
+            "frame covered" => new[] { Rectangle(-1, -1, 6, 6), WithContours(Square(0, 0, 4), Square(1, 1, 2)) },
+            "half annulus" => new[] { WithContours(Circle(0, 0, 5), Circle(0, 0, 4.5)), Rectangle(0, -10, 10, 20) },
+            _ => new[] { WithContours(Circle(0, 0, 10)), WithContours(Square(-15, -15, 30), Circle(0.01, 0, 10)) },
+        };
+
+        var report = PlateOverlapAnalyzer.Analyze(parts);
+
+        Assert.True(report.IsComplete, string.Join("; ", report.Issues));
+        var pair = Assert.Single(report.Pairs);
+        Assert.False(OnMaterial(pair, pair.Centroid), "precondition: the centroid is off the material");
+        Assert.True(OnMaterial(pair, pair.Marker), $"marker {pair.Marker.X:R}, {pair.Marker.Y:R}");
+    }
+
+    [Fact]
+    public void Analyze_LongStraightSliverMarkerIsOnTheSliver()
+    {
+        var report = PlateOverlapAnalyzer.Analyze(new[] { Rectangle(0, 0, 48, 24), Rectangle(0, 23.998, 48, 24) });
+
+        var pair = Assert.Single(report.Pairs);
+        Assert.True(OnMaterial(pair, pair.Marker), $"marker {pair.Marker.X:R}, {pair.Marker.Y:R}");
+    }
+
+    private static bool OnMaterial(PlateOverlapPair pair, Vector point) =>
+        pair.Regions.Any(region => InsideRing(region.Vertices, point)
+            && !region.Holes.Any(hole => InsideRing(hole, point)));
+
+    private static bool InsideRing(IReadOnlyList<Vector> ring, Vector point)
+    {
+        var inside = false;
+        for (int i = 0, j = ring.Count - 1; i < ring.Count; j = i++)
+            if ((ring[i].Y > point.Y) != (ring[j].Y > point.Y)
+                && point.X < (ring[j].X - ring[i].X) * (point.Y - ring[i].Y) / (ring[j].Y - ring[i].Y) + ring[i].X)
+                inside = !inside;
+        return inside;
+    }
+
+    private static Vector[] Circle(double x, double y, double radius) =>
+        Enumerable.Range(0, 256).Select(i => new Vector(x + radius * System.Math.Cos(i * System.Math.PI / 128),
+            y + radius * System.Math.Sin(i * System.Math.PI / 128))).ToArray();
+
     // A's square hole closes the mouth of B's C-shaped hole, so the material enclosed by
     // both holes is a separate island inside the shared hole and must not be dropped.
     [Fact]

@@ -201,11 +201,11 @@ public static class PostVerificationAnalyzer
             foreach (var pair in overlap.Pairs)
                 findings.Add(new(PostVerificationKind.Overlap, plateNumber, indices[pair.PartAId],
                     indices[pair.PartBId], "Clean drawing material overlaps (holes subtracted).")
-                { Location = pair.Centroid, Overlap = pair });
+                { Location = pair.Marker, Overlap = pair });
             foreach (var pair in overlap.ClampFindings)
                 findings.Add(new(PostVerificationKind.Overlap, plateNumber, indices[pair.PartAId],
                     null, $"Clean drawing material overlaps {pair.PartBName} (holes subtracted).")
-                { Location = pair.Centroid, Overlap = pair });
+                { Location = pair.Marker, Overlap = pair });
             foreach (var issue in overlap.Issues)
                 findings.Add(new(PostVerificationKind.Incomplete, plateNumber, indices[issue.PartAId],
                     issue.PartBId is { } other ? indices[other] : null, "Overlap check: " + issue.Message));

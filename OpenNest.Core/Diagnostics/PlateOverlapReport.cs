@@ -52,6 +52,7 @@ public sealed class PlateOverlapPair
         Regions = source.Regions;
         Area = source.Area;
         Centroid = source.Centroid;
+        Marker = source.Marker;
         bounds = source.bounds;
     }
 
@@ -60,7 +61,7 @@ public sealed class PlateOverlapPair
         new(this, partAId, partBId, partAName, partBName);
 
     internal PlateOverlapPair(int partAId, int partBId, string partAName, string partBName,
-        List<PlateOverlapRegion> regions, Vector centroid)
+        List<PlateOverlapRegion> regions, Vector centroid, Vector marker)
     {
         PartAId = partAId;
         PartBId = partBId;
@@ -69,6 +70,7 @@ public sealed class PlateOverlapPair
         Regions = regions.AsReadOnly();
         Area = regions.Sum(region => region.Area);
         Centroid = centroid;
+        Marker = marker;
         var points = regions.SelectMany(region => region.Vertices).ToArray();
         var left = points.Min(point => point.X);
         var bottom = points.Min(point => point.Y);
@@ -88,6 +90,13 @@ public sealed class PlateOverlapPair
     /// This can lie outside disconnected or concave shared material. Returned by value.
     /// </summary>
     public Vector Centroid { get; }
+    /// <summary>
+    /// Finite world-coordinate point on the shared material, inside the pair's largest island:
+    /// its pole of inaccessibility, or an interior scan-line point when a thin island defeats
+    /// the bounded pole search. Markers, hit testing and inspection rings use this point.
+    /// Returned by value.
+    /// </summary>
+    public Vector Marker { get; }
     /// <summary>A fresh world-coordinate bounds copy.</summary>
     public Box Bounds => new(bounds.X, bounds.Y, bounds.Length, bounds.Width);
 }

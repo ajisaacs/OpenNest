@@ -19,7 +19,7 @@ public class OverlapPairPresentationTests
         var pair = Assert.Single(PlateOverlapAnalyzer.Analyze(snapshot).Pairs);
         Assert.Equal("2/3", OverlapPairPresentation.Label(pair));
         var text = OverlapPairPresentation.Details(pair, units, CultureInfo.InvariantCulture);
-        Assert.Equal($"Pair 2/3: left / right\nShared area ≈ 16 {symbol}²\nCentroid: (2, 2) {symbol}", text);
+        Assert.Equal($"Pair 2/3: left / right\nShared area ≈ 16 {symbol}²\nMarker: (2, 2) {symbol}", text);
     }
 
     [Theory]
@@ -45,7 +45,7 @@ public class OverlapPairPresentationTests
         foreach (var zoom in new[] { 0.5, 20.0, 500.0 })
         {
             Vector ToScreen(Vector world) => new(100 + world.X * zoom, 200 - world.Y * zoom);
-            var center = ToScreen(pairs[0].Centroid);
+            var center = ToScreen(pairs[0].Marker);
             var radius = OverlapPairPresentation.HitRadius(dpi);
             Assert.Single(OverlapPairPresentation.HitTest(pairs, ToScreen,
                 center + new Vector(radius, 0), dpi));
