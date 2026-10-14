@@ -78,6 +78,11 @@ namespace OpenNest.Forms
                     return true;
                 }
                 // Standard inspection navigation reaches the canvas/panel; menu shortcuts cannot mutate.
+                // The zoom shortcuts stay live with the header zoom buttons.
+                if (keyData == mnuViewZoomIn.ShortcutKeys)
+                    ZoomIn_Click(this, EventArgs.Empty);
+                else if (keyData == mnuViewZoomOut.ShortcutKeys)
+                    ZoomOut_Click(this, EventArgs.Empty);
                 if ((keyData & (Keys.Control | Keys.Alt)) != 0)
                     return true;
             }

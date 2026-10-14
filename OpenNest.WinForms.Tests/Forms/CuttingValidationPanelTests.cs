@@ -271,6 +271,35 @@ public class CuttingValidationPanelTests
         Assert.False(view.ValidationOverlay.IsAnimating);
     });
 
+    [Fact]
+    public void HeaderZoomStaysLiveWhilePlateNavigationIsLocked() => RunSta(() =>
+    {
+        using var editor = RapidEditor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenValidationInspection();
+        var panel = editor.CuttingInspection!;
+        Pump(() => panel.ValidationReport != null && !panel.IsPlanning);
+        var view = editor.PlateView;
+        Button Zoom(string name) => Assert.IsType<Button>(editor.Controls.Find(name, true).Single());
+        Zoom("btnZoomToFit").PerformClick(); // The docked panel narrowed the canvas.
+        var fit = view.ViewScale;
+        Zoom("btnZoomIn").PerformClick();
+        Assert.True(view.ViewScale > fit);
+        var zoomed = view.ViewScale;
+        Zoom("btnZoomOut").PerformClick();
+        Assert.True(view.ViewScale < zoomed);
+        Zoom("btnZoomIn").PerformClick();
+        Zoom("btnZoomToFit").PerformClick();
+        Assert.Equal(fit, view.ViewScale, 3);
+        var next = Field<Button>(editor, "btnNextPlate");
+        next.PerformClick();
+        Assert.Equal(0, editor.PlateManager.CurrentIndex);
+        panel.RequestClose();
+        next.PerformClick();
+        Assert.Equal(1, editor.PlateManager.CurrentIndex);
+    });
+
     private static void InvokeView(Control target, string name, params object[] args) => target.GetType()
         .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(target, args);
 

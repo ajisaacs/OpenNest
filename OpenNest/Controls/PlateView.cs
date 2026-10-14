@@ -586,6 +586,8 @@ namespace OpenNest.Controls
                     InspectionCloseRequested();
                 else if (keyData == Keys.F)
                     ZoomToFit();
+                else if (keyData is (Keys.Control | Keys.Oemplus) or (Keys.Control | Keys.OemMinus))
+                    return base.ProcessCmdKey(ref msg, keyData); // The host's zoom shortcuts stay live.
                 return true;
             }
             // Audited: DrawControl/PlateView, Action key handlers, EditNestForm,

@@ -159,6 +159,12 @@ namespace OpenNest.Forms
             btnNextPlate.Location = new Point(btnSize.Width * 2, 0);
             btnLastPlate.Location = new Point(btnSize.Width * 3, 0);
 
+            // Inspection locks plate navigation as one container but leaves zoom live.
+            var plateButtons = new Panel { Size = new System.Drawing.Size(btnSize.Width * 4, btnSize.Height) };
+            plateButtons.Controls.AddRange(
+                new Control[] { btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate });
+            ZoomControls = [zoomOutButton, zoomInButton, zoomToFitButton];
+
             zoomOutButton.Location = new Point(btnSize.Width * 4 + 8, 0);
             zoomInButton.Location = new Point(btnSize.Width * 5 + 8, 0);
             zoomToFitButton.Location = new Point(btnSize.Width * 6 + 8, 0);
@@ -174,8 +180,7 @@ namespace OpenNest.Forms
             navPanel.Controls.AddRange(
                 new Control[]
                 {
-                    btnFirstPlate, btnPreviousPlate, btnNextPlate, btnLastPlate,
-                    separator, zoomOutButton, zoomInButton, zoomToFitButton
+                    plateButtons, separator, zoomOutButton, zoomInButton, zoomToFitButton
                 }
             );
 
@@ -263,6 +268,7 @@ namespace OpenNest.Forms
         public bool IsSidePanelVisible => !viewSplitContainer.Panel2Collapsed;
 
         internal Control SidePanelHeader { get; private set; }
+        internal Control[] ZoomControls { get; private set; }
         internal CuttingInspectionPanel CuttingInspection { get; private set; }
         private bool disposeAfterCuttingInspection;
         private bool closeAfterCuttingInspection;
