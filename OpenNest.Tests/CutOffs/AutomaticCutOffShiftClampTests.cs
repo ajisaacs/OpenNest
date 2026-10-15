@@ -46,7 +46,8 @@ public class AutomaticCutOffShiftClampTests
         var options = AutomaticCutOffShiftTests.Options();
         var withoutClearance = AutomaticCutOffPlanner.Create(plate, options, settings);
         var first = System.Math.Abs(withoutClearance.Definitions[0].Position.X);
-        Assert.InRange(first, 34.69, 34.71);
+        // The line on the part's right edge ties with lines inside it and is nearest nominal.
+        Assert.InRange(first, 34.74, 34.76);
         Assert.True(first < rail.Centers[0] - rail.Width / 2);
 
         // Bottom clearance is the physical rail clearance in every quadrant, not Top.

@@ -13,6 +13,35 @@ namespace OpenNest.WinForms.Tests.Forms;
 public class NestReportExportTests
 {
     [Fact]
+    public void CuttingToolbarExposesExistingActionsAndOnlyAvailablePosts() => RunSta(() =>
+    {
+        using var host = new TestMainForm();
+        var toolbar = (ToolStrip)typeof(MainForm)
+            .GetField("toolStrip1", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(host)!;
+        foreach (var name in new[] { "btnCutPlanner", "btnManualSequence", "btnPost" })
+        {
+            var item = Assert.Single(toolbar.Items.Find(name, false));
+            Assert.Equal(24, item.Image!.Width);
+            Assert.Equal(24, item.Image.Height);
+        }
+
+        var post = Assert.IsType<ToolStripDropDownButton>(toolbar.Items["btnPost"]);
+        var menu = Menu(host, "mnuNestPost");
+        Assert.Equal(menu.Visible, post.Visible);
+        Assert.Equal(menu.DropDownItems.Count, post.DropDownItems.Count);
+        // Without a document these toolbar shortcuts must be harmless.
+        ((ToolStripButton)toolbar.Items["btnCutPlanner"]!).PerformClick();
+        ((ToolStripButton)toolbar.Items["btnManualSequence"]!).PerformClick();
+        foreach (ToolStripMenuItem item in menu.DropDownItems)
+        {
+            var toolbarItem = Assert.Single(post.DropDownItems.OfType<ToolStripMenuItem>(),
+                candidate => candidate.Text == item.Text);
+            Assert.Same(item.Tag, toolbarItem.Tag);
+        }
+    });
+
+    [Fact]
     public void MenuFollowsActiveDocument() => RunSta(() =>
     {
         using var host = new TestMainForm();

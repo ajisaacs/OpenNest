@@ -73,6 +73,27 @@ namespace OpenNest.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap cut_planner {
+            get {
+                object obj = ResourceManager.GetObject("cut_planner", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
+        internal static System.Drawing.Bitmap manual_sequence {
+            get {
+                object obj = ResourceManager.GetObject("manual_sequence", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
+        internal static System.Drawing.Bitmap post {
+            get {
+                object obj = ResourceManager.GetObject("post", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+
         internal static System.Drawing.Bitmap clear {
             get {
                 object obj = ResourceManager.GetObject("clear", resourceCulture);

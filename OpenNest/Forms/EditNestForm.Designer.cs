@@ -213,7 +213,6 @@
             drawingListBox1.Size = new System.Drawing.Size(265, 394);
             drawingListBox1.TabIndex = 1;
             drawingListBox1.Units = Units.Inches;
-            drawingListBox1.Click += drawingListBox1_Click;
             drawingListBox1.DoubleClick += drawingListBox1_DoubleClick;
             // 
             // toolStrip2

@@ -438,6 +438,8 @@ namespace OpenNest.Forms
             Text = Nest.Name;
             drawingListBox1.Units = Nest.Units;
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
+            drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
+            drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
         }
 
         public void UpdatePlateList()
@@ -1429,9 +1431,17 @@ namespace OpenNest.Forms
             PlateView.Invalidate();
         }
 
-        private void drawingListBox1_Click(object sender, EventArgs e)
+        private void drawingListBox1_DrawingPickedUp(object sender, Drawing drawing)
         {
+            // Armed on the press, so moving the mouse before release still
+            // attaches the part when the pointer reaches the plate.
             addPart = true;
+        }
+
+        private void drawingListBox1_DrawingDropped(object sender, Drawing drawing)
+        {
+            // The drop already placed the part; don't attach another copy.
+            addPart = false;
         }
 
         private void PlateView_MouseEnter(object sender, EventArgs e)

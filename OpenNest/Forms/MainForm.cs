@@ -36,6 +36,17 @@ namespace OpenNest.Forms
         private bool databaseOpenInProgress;
         private readonly ToolStripMenuItem storageModeMenu = new("Storage Mode...");
         private readonly ToolStripMenuItem exportNestMenu = new("Export .nest...");
+        private readonly ToolStripDropDownButton postButton = new()
+        {
+            Name = "btnPost",
+            Text = "Post",
+            ToolTipText = "Post CNC program",
+            DisplayStyle = ToolStripItemDisplayStyle.Image,
+            Image = Resources.post,
+            ImageScaling = ToolStripItemImageScaling.None,
+            Padding = new Padding(5, 0, 5, 0),
+            Visible = false,
+        };
 
         private const float ZoomInFactor = 1.5f;
         private const float ZoomOutFactor = 1.0f / ZoomInFactor;
@@ -98,6 +109,11 @@ namespace OpenNest.Forms
         public MainForm()
         {
             InitializeComponent();
+            toolStrip1.Items.Add(CreateActionButton("btnCutPlanner", "Plan Cutting",
+                Resources.cut_planner, PlatePlanCutting_Click));
+            toolStrip1.Items.Add(CreateActionButton("btnManualSequence", "Manual Sequence",
+                Resources.manual_sequence, ManualSequenceParts_Click));
+            toolStrip1.Items.Add(postButton);
             storageModeMenu.Click += StorageMode_Click;
             exportNestMenu.Click += ExportNest_Click;
             mnuFile.DropDownItems.Insert(mnuFile.DropDownItems.IndexOf(mnuFileExport), exportNestMenu);
@@ -548,6 +564,23 @@ namespace OpenNest.Forms
             }
         }
 
+        private static ToolStripButton CreateActionButton(string name, string text, Image image,
+            EventHandler click)
+        {
+            var button = new ToolStripButton
+            {
+                Name = name,
+                Text = text,
+                ToolTipText = text,
+                DisplayStyle = ToolStripItemDisplayStyle.Image,
+                Image = image,
+                ImageScaling = ToolStripItemImageScaling.None,
+                Padding = new Padding(5, 0, 5, 0),
+            };
+            button.Click += click;
+            return button;
+        }
+
         private void LoadPosts()
         {
             var exepath = Assembly.GetEntryAssembly().Location;
@@ -570,6 +603,10 @@ namespace OpenNest.Forms
                         postProcessorMenuItem.Click += PostProcessor_Click;
                         mnuNestPost.DropDownItems.Add(postProcessorMenuItem);
 
+                        var toolbarPost = new ToolStripMenuItem(postProcessor.Name) { Tag = postProcessor };
+                        toolbarPost.Click += PostProcessor_Click;
+                        postButton.DropDownItems.Add(toolbarPost);
+
                         if (postProcessor is IMaterialProvidingPostProcessor materialProvider)
                             PostProcessorMaterials.AddFrom(materialProvider);
                     }
@@ -577,6 +614,7 @@ namespace OpenNest.Forms
             }
 
             mnuNestPost.Visible = mnuNestPost.DropDownItems.Count > 0;
+            postButton.Visible = postButton.DropDownItems.Count > 0;
         }
 
         #region Overrides
@@ -1266,12 +1304,59 @@ namespace OpenNest.Forms
 
         private void ExpandSpacing_Click(object sender, EventArgs e)
         {
-            if (activeForm == null)
+            var editForm = activeForm;
+            if (editForm == null)
                 return;
 
-            if (!activeForm.PlateView.ExpandSelected())
+            // The search reads the plate on a worker, so a nest or fill that can still
+            // add parts must finish first.
+            if (IsExpandSpacingBusy(editForm))
+            {
+                ShowExpandSpacingNotice(
+                    "Finish or cancel the current nesting or fill before Expand Spacing."
+                );
+                return;
+            }
+
+            // Complex layouts can search for minutes; run behind a Cancel window.
+            var expanded = editForm.PlateView.ExpandSelected(work =>
+                OperationProgressForm.Run(
+                    this,
+                    "Expand Spacing",
+                    "Expanding spacing between the selected parts...",
+                    work
+                )
+            );
+
+            if (!expanded)
+                ShowExpandSpacingNotice("Select at least two parts on the plate to expand.");
+        }
+
+        /// <summary>
+        /// True while whole-job nesting or a fill on any view of the nest can still
+        /// change its plates. Unlike the other plate commands' guard, a busy current
+        /// action does not count: ActionSelect reports busy whenever parts are
+        /// selected, and Expand Spacing needs a selection.
+        /// </summary>
+        internal bool IsExpandSpacingBusy(EditNestForm editForm) =>
+            nestingInProgress
+            || Application.OpenForms.OfType<NestProgressForm>().Any()
+            || MdiChildren
+                .OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, editForm.Nest))
+                .Any(form => form.PlateView.IsFillInProgress);
+
+        // Native tests capture this notice without opening a modal dialog in session zero.
+        internal System.Action<string> ExpandSpacingNotice { get; set; }
+
+        private void ShowExpandSpacingNotice(string message)
+        {
+            if (ExpandSpacingNotice != null)
+                ExpandSpacingNotice(message);
+            else
                 MessageBox.Show(
-                    "Select at least two parts on the plate to expand.",
+                    this,
+                    message,
                     "Expand Spacing",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information

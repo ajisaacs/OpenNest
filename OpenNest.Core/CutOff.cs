@@ -281,6 +281,9 @@ namespace OpenNest
         )
         {
             var offset = OffsetOutward(perimeter, clearance);
+            if (offset != null && offset.All(target => target is Polygon))
+                return SlicePolygons(offset.Cast<Polygon>(), cutPosition);
+
             var usedOffset = offset != null;
             var targets = offset ?? new List<Entity> { perimeter };
             var cutLine = new Line(
@@ -321,6 +324,51 @@ namespace OpenNest
                 result.Add((coords[i] - padding, coords[i + 1] + padding));
 
             return result;
+        }
+
+        /// <summary>
+        /// Exact cross-section of the clearance outline on the cut line. A vertex on the line
+        /// counts as below it (half-open edges), so a line through a vertex counts one
+        /// crossing when the outline passes through and zero or two when it only touches. Edges
+        /// lying on the line are excluded whole. Unlike <see cref="Entity.Intersects"/>, which
+        /// reports a shared vertex once per incident edge, this never needs the bounding-box
+        /// fallback, so a lattice line through a vertex is trimmed like any other line.
+        /// </summary>
+        private List<(double Start, double End)> SlicePolygons(IEnumerable<Polygon> polygons, double cutPosition)
+        {
+            var crossings = new List<double>();
+            var result = new List<(double Start, double End)>();
+            foreach (var polygon in polygons)
+            {
+                var vertices = polygon.Vertices;
+                if (vertices.Count < 3)
+                    return null;
+                var closed = vertices[0].X == vertices[^1].X && vertices[0].Y == vertices[^1].Y;
+                var edges = closed ? vertices.Count - 1 : vertices.Count;
+                for (var i = 0; i < edges; i++)
+                {
+                    var from = vertices[i];
+                    var to = vertices[(i + 1) % vertices.Count];
+                    var (acrossFrom, alongFrom) = Split(from);
+                    var (acrossTo, alongTo) = Split(to);
+                    if (acrossFrom == cutPosition && acrossTo == cutPosition)
+                        result.Add((System.Math.Min(alongFrom, alongTo), System.Math.Max(alongFrom, alongTo)));
+                    else if (acrossFrom > cutPosition != acrossTo > cutPosition)
+                        crossings.Add(acrossFrom == cutPosition ? alongFrom
+                            : acrossTo == cutPosition ? alongTo
+                            : alongFrom + (cutPosition - acrossFrom) * (alongTo - alongFrom) / (acrossTo - acrossFrom));
+                }
+            }
+
+            if (crossings.Count % 2 != 0)
+                return null;
+            crossings.Sort();
+            for (var i = 0; i < crossings.Count; i += 2)
+                result.Add((crossings[i], crossings[i + 1]));
+            return result;
+
+            (double Across, double Along) Split(Vector point) =>
+                Axis == CutOffAxis.Vertical ? (point.X, point.Y) : (point.Y, point.X);
         }
 
         /// <summary>

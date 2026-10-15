@@ -242,13 +242,17 @@ namespace OpenNest.Controls
             }
         }
 
+        // Scrap cut-off lines must stand out from the dark part outlines and the
+        // sheet: a saturated orange-red dash, not another solid near-black line.
+        private static readonly Color CutOffLineColor = Color.OrangeRed;
+
         public void DrawCutOffs(Graphics g)
         {
             var plate = view.DisplayPlate;
             if (plate?.CutOffs == null || plate.CutOffs.Count == 0)
                 return;
 
-            using var pen = new Pen(Color.FromArgb(64, 64, 64), 1.5f);
+            using var pen = new Pen(CutOffLineColor, 2.0f) { DashStyle = DashStyle.Dash };
             using var selectedPen = new Pen(Color.FromArgb(0, 120, 255), 3.5f);
 
             foreach (var cutoff in plate.CutOffs)
