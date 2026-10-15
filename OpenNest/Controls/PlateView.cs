@@ -1048,7 +1048,9 @@ namespace OpenNest.Controls
 
         public void PushSelected(PushDirection direction) => selection.PushSelected(direction);
 
-        public bool ExpandSelected() => selection.ExpandSelected();
+        public bool ExpandSelected(
+            Func<Func<CancellationToken, Expander.Result>, Expander.Result> run = null
+        ) => selection.ExpandSelected(run);
 
         public void RotateSelectedParts(double angle) => selection.RotateSelectedParts(angle);
 

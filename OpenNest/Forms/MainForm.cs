@@ -1302,7 +1302,17 @@ namespace OpenNest.Forms
             if (activeForm == null)
                 return;
 
-            if (!activeForm.PlateView.ExpandSelected())
+            // Complex layouts can search for minutes; run behind a Cancel window.
+            var expanded = activeForm.PlateView.ExpandSelected(work =>
+                OperationProgressForm.Run(
+                    this,
+                    "Expand Spacing",
+                    "Expanding spacing between the selected parts...",
+                    work
+                )
+            );
+
+            if (!expanded)
                 MessageBox.Show(
                     "Select at least two parts on the plate to expand.",
                     "Expand Spacing",

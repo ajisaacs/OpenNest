@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Threading;
 using OpenNest.CNC;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
@@ -167,19 +168,31 @@ namespace OpenNest.Controls
 
         /// <summary>
         /// Grows the part-to-part spacing of the selection as far as the plate
-        /// allows (Expander). Returns false when nothing could be done.
+        /// allows (Expander). <paramref name="run"/> executes the search and may
+        /// cancel it through its token (the desktop shows a Cancel window); by
+        /// default it runs synchronously. A cancelled run moves no part. Returns
+        /// false only when fewer than two parts are selected.
         /// </summary>
-        public bool ExpandSelected()
+        public bool ExpandSelected(
+            Func<Func<CancellationToken, Expander.Result>, Expander.Result> run = null
+        )
         {
             var movingParts = selectedParts.Select(p => p.BasePart).ToList();
 
             if (movingParts.Count < 2)
                 return false;
 
-            var result = Expander.Expand(movingParts, view.Plate);
+            var plate = view.Plate;
+            Expander.Result Work(CancellationToken token) =>
+                Expander.Expand(movingParts, plate, null, token);
+
+            var result = run != null ? run(Work) : Work(CancellationToken.None);
 
             if (result.Cancelled)
-                return false;
+            {
+                view.Status = "Expand Spacing cancelled - no parts were moved";
+                return true;
+            }
 
             selectedParts.ForEach(p => p.IsDirty = true);
 
