@@ -1299,11 +1299,22 @@ namespace OpenNest.Forms
 
         private void ExpandSpacing_Click(object sender, EventArgs e)
         {
-            if (activeForm == null)
+            var editForm = activeForm;
+            if (editForm == null)
                 return;
 
+            // The search reads the plate on a worker, so a nest or fill that can still
+            // add parts must finish first.
+            if (IsExpandSpacingBusy(editForm))
+            {
+                ShowExpandSpacingNotice(
+                    "Finish or cancel the current nesting or fill before Expand Spacing."
+                );
+                return;
+            }
+
             // Complex layouts can search for minutes; run behind a Cancel window.
-            var expanded = activeForm.PlateView.ExpandSelected(work =>
+            var expanded = editForm.PlateView.ExpandSelected(work =>
                 OperationProgressForm.Run(
                     this,
                     "Expand Spacing",
@@ -1313,8 +1324,34 @@ namespace OpenNest.Forms
             );
 
             if (!expanded)
+                ShowExpandSpacingNotice("Select at least two parts on the plate to expand.");
+        }
+
+        /// <summary>
+        /// True while whole-job nesting or a fill on any view of the nest can still
+        /// change its plates. Unlike the other plate commands' guard, a busy current
+        /// action does not count: ActionSelect reports busy whenever parts are
+        /// selected, and Expand Spacing needs a selection.
+        /// </summary>
+        internal bool IsExpandSpacingBusy(EditNestForm editForm) =>
+            nestingInProgress
+            || Application.OpenForms.OfType<NestProgressForm>().Any()
+            || MdiChildren
+                .OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, editForm.Nest))
+                .Any(form => form.PlateView.IsFillInProgress);
+
+        // Native tests capture this notice without opening a modal dialog in session zero.
+        internal System.Action<string> ExpandSpacingNotice { get; set; }
+
+        private void ShowExpandSpacingNotice(string message)
+        {
+            if (ExpandSpacingNotice != null)
+                ExpandSpacingNotice(message);
+            else
                 MessageBox.Show(
-                    "Select at least two parts on the plate to expand.",
+                    this,
+                    message,
                     "Expand Spacing",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
