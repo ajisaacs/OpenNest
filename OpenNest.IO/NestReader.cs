@@ -8,6 +8,7 @@ using System.Text.Json;
 using OpenNest.Bending;
 using OpenNest.BestFit;
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Converters;
 using OpenNest.Geometry;
 using static OpenNest.IO.NestFormat;
@@ -274,6 +275,7 @@ namespace OpenNest.IO
                 }
 
                 drawing.Library = ReadLibraryLink(d);
+                drawing.CutPins = ReadCutPins(d);
                 map[d.Id] = drawing;
             }
             return map;
@@ -303,6 +305,35 @@ namespace OpenNest.IO
             warnings.Add($"Drawing '{d.Name}': its drawing library link could not be read; "
                 + "loaded it as a nest drawing without a library revision.");
             return null;
+        }
+
+        // Pins are independent: one that cannot be trusted is skipped and the rest still apply.
+        private List<ContourCutPin> ReadCutPins(DrawingDto d)
+        {
+            var pins = new List<ContourCutPin>();
+            if (d.CutPins == null)
+                return pins;
+
+            for (var i = 0; i < d.CutPins.Count; i++)
+            {
+                var pin = CutPinFormat.Read(d.CutPins[i], out var problem);
+                if (pin != null)
+                    pins.Add(pin);
+                else
+                    warnings.Add($"Drawing '{d.Name}': cut pin {i + 1} could not be read ({problem}); "
+                        + "skipped it, so that contour uses the nest's cutting settings.");
+            }
+            return pins;
+        }
+
+        private bool ReadPinsOff(PartDto dto, int plateId, int partIndex, Part part)
+        {
+            if (dto.DrawingPinsOff is bool pinsOff)
+                return pinsOff;
+
+            warnings.Add($"Plate {plateId}, part {partIndex} ('{part.BaseDrawing.Name}'): its drawing pins "
+                + "setting could not be read; the drawing's cut pins apply.");
+            return false;
         }
 
         // Single enum names only: Enum.TryParse also accepts numbers and comma lists.
@@ -503,6 +534,7 @@ namespace OpenNest.IO
                     part.Rotate(partDto.Rotation);
                     part.Offset(new Vector(partDto.X, partDto.Y));
                     RestorePartProgram(part, partDto, p.Id, partIndex);
+                    part.DrawingPinsOff = ReadPinsOff(partDto, p.Id, partIndex, part);
                     plate.Parts.Add(part);
                 }
 

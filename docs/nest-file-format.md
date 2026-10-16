@@ -157,6 +157,26 @@ thickness loads the drawing without a link and adds a reader warning. Converter
 edits keep the link as provenance; split pieces get none. Drawing packages leave
 the link out, so linking a drawing does not change its package bytes.
 
+## Drawing cut pins
+
+A drawing may carry a `cutPins` array, omitted when empty. Each pin has `x`/`y`
+in the drawing's source frame (the frame of its source entities, which does not
+move when the program is re-origined at its first rapid; the program frame is the
+source frame minus `source.offset`), a `leadIn` and `leadOut` in the same shape as
+plate cutting parameters, and an optional `tab` omitted for a closed contour.
+Pins are part of the drawing's content, so drawing packages carry them and they
+change the package hash. Pins are read strictly per entry but leniently per file:
+an entry that is not an object, has wrong types, an unknown lead or tab type, an
+invalid dimension, or a tab together with a lead-out is skipped with a reader
+warning naming the drawing and pin; the other pins and the drawing load. A
+`cutPins` value that is not an array loads no pins, with a warning. Converter
+edits keep pins (they stay in the source frame); split pieces and canonical
+engine copies get none.
+
+A placement may write `drawingPinsOff: true` to ignore its drawing's pins on that
+part only; it is omitted when false. Any value other than a boolean loads as
+false (the drawing's pins apply) with a warning naming the plate and part.
+
 ## Verification and limits
 
 The automated tests cover save/reopen/re-save, rotated/manual/locked parts,

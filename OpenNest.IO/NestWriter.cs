@@ -199,6 +199,7 @@ namespace OpenNest.IO
                                 .ToList()
                             ?? new List<BendDto>(),
                         Library = ToLibraryLinkDto(d.Library),
+                        CutPins = d.CutPins?.Count > 0 ? d.CutPins.Select(CutPinFormat.ToDto).ToList() : null,
                     }
                 );
             }
@@ -311,6 +312,7 @@ namespace OpenNest.IO
                             LeadInsLocked = part.LeadInsLocked,
                             Program = programName,
                             DrawingHash = programName == null ? null : drawingHashes[match.Key],
+                            DrawingPinsOff = part.DrawingPinsOff ? true : null,
                         }
                     );
                 }

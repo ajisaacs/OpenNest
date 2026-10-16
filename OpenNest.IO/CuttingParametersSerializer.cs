@@ -102,7 +102,7 @@ public static class CuttingParametersSerializer
         };
     }
 
-    private static LeadInDto ToLeadInDto(LeadIn leadIn) => leadIn switch
+    internal static LeadInDto ToLeadInDto(LeadIn leadIn) => leadIn switch
     {
         LineLeadIn line => new LeadInDto
         {
@@ -136,7 +136,7 @@ public static class CuttingParametersSerializer
         _ => new LeadInDto { Type = "None" },
     };
 
-    private static LeadIn FromLeadInDto(LeadInDto dto) => dto?.Type switch
+    internal static LeadIn FromLeadInDto(LeadInDto dto) => dto?.Type switch
     {
         "Line" => new LineLeadIn { Length = dto.Length, ApproachAngle = dto.ApproachAngle },
         "Arc" => new ArcLeadIn { Radius = dto.Radius },
@@ -162,7 +162,7 @@ public static class CuttingParametersSerializer
         _ => new NoLeadIn(),
     };
 
-    private static LeadOutDto ToLeadOutDto(LeadOut leadOut) => leadOut switch
+    internal static LeadOutDto ToLeadOutDto(LeadOut leadOut) => leadOut switch
     {
         LineLeadOut line => new LeadOutDto
         {
@@ -174,14 +174,14 @@ public static class CuttingParametersSerializer
         _ => new LeadOutDto { Type = "None" },
     };
 
-    private static LeadOut FromLeadOutDto(LeadOutDto dto) => dto?.Type switch
+    internal static LeadOut FromLeadOutDto(LeadOutDto dto) => dto?.Type switch
     {
         "Line" => new LineLeadOut { Length = dto.Length, ApproachAngle = dto.ApproachAngle },
         "Arc" => new ArcLeadOut { Radius = dto.Radius },
         _ => new NoLeadOut(),
     };
 
-    private static TabDto ToTabDto(Tab tab)
+    internal static TabDto ToTabDto(Tab tab)
     {
         var dto = tab switch
         {
@@ -212,7 +212,7 @@ public static class CuttingParametersSerializer
         return dto;
     }
 
-    private static Tab FromTabDto(TabDto dto)
+    internal static Tab FromTabDto(TabDto dto)
     {
         var tab = dto.Type switch
         {

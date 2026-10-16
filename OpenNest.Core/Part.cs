@@ -64,6 +64,12 @@ namespace OpenNest
 
         public bool LeadInsLocked { get; set; }
 
+        /// <summary>
+        /// True when this placement ignores its drawing's cut pins and is cut with the nest's
+        /// settings instead. Saved with the nest; never changes the drawing or its library.
+        /// </summary>
+        public bool DrawingPinsOff { get; set; }
+
         public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
 
         public void ApplyLeadIns(
