@@ -70,14 +70,18 @@ internal static class SheetPacker
             .Select(p => new Placed(types[p.Type], types[p.Type].Orientations[p.Size], p.X, p.Y))
             .ToList();
 
-        var area = 0.0;
+        var counts = new int[types.Count];
         Box? envelope = null;
         foreach (var p in placed)
         {
-            area += p.Type.MaterialArea;
+            counts[p.Type.Index]++;
             var box = new Box(work.Left + p.Left, work.Bottom + p.Bottom, p.Orientation.Width, p.Orientation.Height);
             envelope = envelope == null ? box : Union(envelope, box);
         }
+        // Summed per type in type order, the same form as the engine's demand area: plans placing
+        // the same parts get bit-identical areas, so the engine's material-area tie-break cannot
+        // be decided by placement-order rounding (which differs across platform math libraries).
+        var area = types.Sum(t => counts[t.Index] * t.MaterialArea);
 
         var world = placed
             .Select(p => p with { Left = work.Left + p.Left, Bottom = work.Bottom + p.Bottom })
