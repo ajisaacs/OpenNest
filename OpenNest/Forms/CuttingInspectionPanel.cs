@@ -101,7 +101,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         Visible = false,
         Text = "LIVE NEST only — reviews overlaps, lead-ins and rapid crossings. Confirm minimum spacing, plate boundaries and final post output separately, before posting."
     };
-    private readonly DataGridView warningGrid = new()
+    private readonly DataGridView warningGrid = GridStyle.Apply(new DataGridView
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
@@ -111,7 +111,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         RowHeadersVisible = false,
         AutoGenerateColumns = false
-    };
+    });
     private ValidationInspectionScope scope;
     private bool closed;
     private int generation;

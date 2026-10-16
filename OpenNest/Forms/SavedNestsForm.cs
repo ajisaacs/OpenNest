@@ -377,39 +377,17 @@ public sealed class SavedNestsForm : Form
 
     private static DataGridView CreateGrid()
     {
-        var grid = new DataGridView
+        return GridStyle.Apply(new DataGridView
         {
             Dock = DockStyle.Fill,
             ReadOnly = true,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
-            AllowUserToResizeRows = false,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-            BackgroundColor = SystemColors.Window,
-            BorderStyle = BorderStyle.None,
-            GridColor = Color.FromArgb(230, 230, 230),
-            EnableHeadersVisualStyles = false,
-            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
-            RowHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
-            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
-            RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.DisableResizing,
             StandardTab = true,
-        };
-        grid.RowTemplate.Height = 22;
-        grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(204, 228, 247);
-        grid.DefaultCellStyle.SelectionForeColor = Color.Black;
-        grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
-        grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(90, 90, 90);
-        grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(245, 245, 245);
-        grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-        grid.RowHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
-        grid.RowHeadersDefaultCellStyle.ForeColor = Color.FromArgb(90, 90, 90);
-        grid.RowHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(204, 228, 247);
-        grid.RowHeadersDefaultCellStyle.SelectionForeColor = Color.Black;
-        grid.RowHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-        return grid;
+        });
     }
 
     private static DataGridViewTextBoxColumn AddColumn(

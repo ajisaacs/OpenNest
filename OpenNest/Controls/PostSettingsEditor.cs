@@ -252,22 +252,18 @@ namespace OpenNest.Controls
             AddSpanning(grid, label);
             AddHelp(grid, field.Description, spanning: true);
 
-            var table = new DataGridView
+            var table = GridStyle.Apply(new DataGridView
             {
                 Dock = DockStyle.Fill,
                 Height = 200,
                 AllowUserToAddRows = true,
                 AllowUserToDeleteRows = true,
-                AllowUserToResizeRows = false,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                BackgroundColor = SystemColors.Window,
-                BorderStyle = BorderStyle.FixedSingle,
-                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
                 RowHeadersWidth = 28,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = true,
                 Margin = new Padding(0, 4, 0, 0),
-            };
+            });
             table.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = field.KeyHeader, FillWeight = 65 });
             table.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = field.ValueHeader, FillWeight = 35 });
 

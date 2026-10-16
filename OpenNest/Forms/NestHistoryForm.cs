@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Data;
 using OpenNest.IO;
 
@@ -118,7 +119,7 @@ public sealed class NestHistoryForm : Form
         UpdateButtons();
     }
 
-    private static DataGridView Grid() => new()
+    private static DataGridView Grid() => GridStyle.Apply(new DataGridView
     {
         Dock = DockStyle.Fill,
         ReadOnly = true,
@@ -128,7 +129,7 @@ public sealed class NestHistoryForm : Form
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         AutoGenerateColumns = false,
         RowHeadersVisible = false,
-    };
+    });
 
     private NestRecord SelectedRevision => revisions.SelectedRows.Count > 0 ? revisions.SelectedRows[0].Tag as NestRecord : null;
 
