@@ -58,7 +58,7 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly Button previousButton = new() { Text = "Previous", AutoSize = true };
     private readonly Button nextButton = new() { Text = "Next", AutoSize = true };
     private readonly CheckBox keepOrderCheckBox = new() { Text = "Keep current part order", AutoSize = true };
-    private readonly CheckBox autoCutOffsCheckBox = new() { AutoSize = true };
+    private readonly CheckBox autoCutOffsCheckBox = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
     private readonly FlowLayoutPanel existingWorkBanner = new()
     {
         AutoSize = true,
@@ -148,7 +148,13 @@ internal sealed class CuttingInspectionPanel : UserControl
         units = editor.Nest.Units;
         cutOffOptions = lastCutOffOptions.TryGetValue(units, out var last) ? Copy(last) : DefaultCutOffOptions(units);
         ShowCutOffOptions();
-        var cutOffRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        var cutOffRow = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Margin = Padding.Empty
+        };
         cutOffRow.Controls.AddRange([autoCutOffsCheckBox, cutOffSettingsButton]);
         existingWorkLabel.Font = new Font(Font, FontStyle.Bold);
         existingWorkBanner.Controls.AddRange([existingWorkLabel, clearExistingButton]);

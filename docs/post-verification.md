@@ -37,7 +37,9 @@ fresh verification and consent flow.
 Finish or cancel active nesting/fill operations before validating. The panel is
 exclusive with editing and other side-panel actions while it owns the nest. The
 main plate view remains available for wheel zoom, middle-button pan, and **F**
-or middle-button double-click to fit. Panel X, Cancel or Escape requests
+or middle-button double-click to fit. The plate header's zoom buttons and the
+**Ctrl+Plus**/**Ctrl+Minus** shortcuts also stay live; its plate navigation
+buttons stay locked. Panel X, Cancel or Escape requests
 cancellation and waits for the worker to stop before restoring editing controls.
 Switching to Plan mode also waits for any validation worker; it does not promote
 a live validation report into a plan check. Closing the editor or main window

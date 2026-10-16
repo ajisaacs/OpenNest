@@ -13,8 +13,7 @@ internal sealed class ValidationInspectionScope : IDisposable
     private readonly List<(Form Form, bool AllowDrop)> hosts = new();
     private bool disposed;
     private readonly PlateView view;
-    private readonly Control inspector;
-    private readonly Control header;
+    private readonly Control[] live;
     private readonly Action close;
     private Form closingHost;
     private readonly bool previousInspection;
@@ -22,8 +21,8 @@ internal sealed class ValidationInspectionScope : IDisposable
     public ValidationInspectionScope(EditNestForm editor, Control inspector, Control header, Action close)
     {
         view = editor.PlateView;
-        this.inspector = inspector;
-        this.header = header;
+        // The header zoom buttons only change the viewport, like the canvas wheel.
+        live = new[] { view, inspector, header }.Concat(editor.ZoomControls).Where(control => control != null).ToArray();
         this.close = close;
         previousInspection = view.InspectionOnly;
         view.InspectionOnly = true;
@@ -43,9 +42,9 @@ internal sealed class ValidationInspectionScope : IDisposable
     {
         foreach (var child in parent.Controls.Cast<Control>())
         {
-            if (ReferenceEquals(child, view) || ReferenceEquals(child, inspector) || ReferenceEquals(child, header))
+            if (live.Contains(child))
                 continue;
-            if (child.Contains(view) || child.Contains(inspector) || header != null && child.Contains(header))
+            if (live.Any(child.Contains))
                 DisableExceptCanvas(child);
             else
             {
