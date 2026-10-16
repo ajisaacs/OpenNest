@@ -4,6 +4,12 @@ namespace OpenNest.Data;
 internal static class ServerUrl
 {
     /// <summary>
+    /// The key that binds saved nests and library links to a server: the address trimmed,
+    /// without trailing slashes. Two settings that differ only that way name the same server.
+    /// </summary>
+    public static string Key(string? url) => (url ?? "").Trim().TrimEnd('/');
+
+    /// <summary>
     /// Returns the absolute http(s) base address with exactly one trailing slash, so
     /// relative combines replace no path segment. Throws for any other address.
     /// </summary>
