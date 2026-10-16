@@ -432,11 +432,13 @@ namespace OpenNest
         /// Copies the lead-in state that goes with a copied program. Without it a copy of a
         /// lead-in part reads its rotation from the rebuilt program (zero), and lead-in
         /// assignment does not know to strip the copied lead-ins before adding new ones.
+        /// A copy of a placement with drawing pins off keeps them off.
         /// </summary>
         private void CopyLeadInStateFrom(Part source)
         {
             HasManualLeadIns = source.HasManualLeadIns;
             LeadInsLocked = source.LeadInsLocked;
+            DrawingPinsOff = source.DrawingPinsOff;
             CuttingParameters = source.CuttingParameters;
             preLeadInRotation = source.preLeadInRotation;
         }

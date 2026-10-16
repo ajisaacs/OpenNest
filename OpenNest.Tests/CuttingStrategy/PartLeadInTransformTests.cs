@@ -182,4 +182,24 @@ public class PartLeadInTransformTests
         Assert.Equal(before.Width, after.Length, 6);
         Assert.Equal(before.Length, after.Width, 6);
     }
+
+    [Fact]
+    public void Copies_KeepDrawingPinsOff()
+    {
+        var drawing = MakeSquareWithHole();
+        var clean = MakeCleanPart(drawing, QuarterTurn, new Vector(2, 3));
+        clean.DrawingPinsOff = true;
+        var withLeadIns = MakeLeadInPart(drawing, QuarterTurn);
+        withLeadIns.DrawingPinsOff = true;
+
+        Assert.True(((Part)clean.Clone()).DrawingPinsOff);
+        Assert.True(clean.CloneAtOffset(new Vector(1, 1)).DrawingPinsOff);
+        Assert.True(((Part)withLeadIns.Clone()).DrawingPinsOff);
+        Assert.True(withLeadIns.CloneAtOffset(new Vector(1, 1)).DrawingPinsOff);
+        Assert.False(((Part)MakeCleanPart(drawing, 0, Vector.Zero).Clone()).DrawingPinsOff);
+
+        // Pins-off is a placement choice, not lead-in state: clearing lead-ins keeps it.
+        withLeadIns.RemoveLeadIns();
+        Assert.True(withLeadIns.DrawingPinsOff);
+    }
 }

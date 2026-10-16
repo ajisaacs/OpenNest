@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Data;
+using OpenNest.Geometry;
 using OpenNest.Shapes;
 
 namespace OpenNest.Tests.Data;
@@ -37,6 +39,8 @@ public class LibraryDrawingInsertTests
         var drawing = new RectangleShape { Name = "old package name", Length = 4, Width = 2 }.GetDrawing();
         drawing.Material = new Material("Package material", "Package grade", 0.284);
         drawing.Customer = "Package customer";
+        drawing.CutPins.Add(new ContourCutPin(new Vector(4, 2), new LineLeadIn { Length = 0.25 }, new NoLeadOut(),
+            new NormalTab { Size = 0.03 }));
         return new LibraryPackage(PackageBytes, drawing, units, warnings);
     }
 
@@ -57,6 +61,7 @@ public class LibraryDrawingInsertTests
 
         var drawing = Assert.Single(nest.Drawings);
         Assert.Same(package.Drawing, drawing);
+        Assert.Equal(new Vector(4, 2), Assert.Single(drawing.CutPins).Point);
         Assert.Equal(("SYN-101", "Synthetic customer", 5), (drawing.Name, drawing.Customer, drawing.Quantity.Required));
         Assert.Equal(("Synthetic Steel", "Grade A", 0.284), (drawing.Material.Name, drawing.Material.Grade, drawing.Material.Density));
         var link = drawing.Library!;
@@ -98,8 +103,11 @@ public class LibraryDrawingInsertTests
         Assert.Contains(expected, warning);
         Assert.Contains("'SYN-101'", warning);
         Assert.Contains("cut pins are dropped", warning);
+        Assert.Empty(insert.Drawing!.CutPins);
         insert.Apply();
-        Assert.Single(nest.Drawings);
+        var drawing = Assert.Single(nest.Drawings);
+        Assert.Empty(drawing.CutPins);
+        Assert.NotNull(drawing.Library);
     }
 
     [Fact]

@@ -74,9 +74,9 @@ public sealed class LibraryDrawingInsert
     public int Quantity { get; }
 
     /// <summary>
-    /// For a new copy, true when the library drawing's cut pins may be used in this nest:
-    /// the library material, grade and thickness match the nest's. An added quantity
-    /// leaves the existing copy as it is.
+    /// For a new copy, true when the library drawing's cut pins come with it: the library
+    /// material, grade and thickness match the nest's. Otherwise the copy has no pins. An
+    /// added quantity leaves the existing copy as it is.
     /// </summary>
     public bool KeepPins { get; }
 
@@ -142,6 +142,10 @@ public sealed class LibraryDrawingInsert
         drawing.Material = new Material(record.MaterialName, record.MaterialGrade, drawing.Material?.Density ?? 0);
         drawing.Quantity.Required = quantity;
         drawing.Library = link;
+        // Pins were authored for the library material and thickness; elsewhere the nest's
+        // cutting settings apply (D3). The link still records the revision the copy came from.
+        if (differences.Count > 0)
+            drawing.CutPins.Clear();
         return new LibraryDrawingInsert(nest, LibraryInsertKind.AddDrawing, drawing, quantity,
             keepPins: differences.Count == 0, warnings, "");
     }
