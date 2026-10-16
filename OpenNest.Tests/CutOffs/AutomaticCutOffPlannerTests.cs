@@ -73,17 +73,18 @@ public class AutomaticCutOffPlannerTests
     [InlineData(2)]
     [InlineData(3)]
     [InlineData(4)]
-    public void MinimumTail_SkipsOnlyFinalSeparatorWithoutExtendingSkeletonGrid(int quadrant)
+    public void MinimumTail_SkippedSeparatorExtendsSkeletonGridToSheetEnd(int quadrant)
     {
         // The proposed separator is just before X=105, with a tail shorter than 16.
-        // Skipping it must not add the otherwise-next nominal line at X=105.
+        // Skipping it leaves the tail on the skeleton, so the grid must continue with
+        // the line at X=105; otherwise the final strip would run 70 to 120.
         var plate = MakePlate(quadrant, occupied: 104);
-        var before = Plan(plate);
+        var sign = quadrant is 2 or 3 ? -1 : 1;
         var options = new AutomaticCutOffOptions { Spacing = 35, MinimumTailLength = 16 };
 
         var plan = AutomaticCutOffPlanner.Create(plate, options, new CutOffSettings());
 
-        Assert.Equal(before.Definitions.Take(before.Definitions.Count - 1).Select(c => c.Position.X), Positions(plan));
+        Assert.Equal(new[] { 35.0, 70, 105 }.Select(x => sign * x), Positions(plan));
         Assert.False(plan.HasSeparatedTail);
         Assert.Null(plan.TailSeparatorX);
         Assert.Equal(0, plan.TailLength);
@@ -91,6 +92,37 @@ public class AutomaticCutOffPlannerTests
         Assert.Contains(plan.Diagnostics, d => d.Message.Contains("minimum tail length"));
         Assert.Empty(plate.CutOffs);
         Assert.Single(plate.Parts);
+    }
+
+    [Theory]
+    [InlineData(1, null)]
+    [InlineData(1, 17.5)]
+    [InlineData(2, 17.5)]
+    [InlineData(3, 17.5)]
+    [InlineData(4, 17.5)]
+    public void MinimumTail_SkippedSeparatorKeepsEveryStripWithinSpacing(int quadrant, double? minimumStrip)
+    {
+        // A 144-long sheet used through 139.75 proposes a separator at 140 with a 4-long
+        // tail. With the separator skipped, no strip may exceed the 35 spacing.
+        var plate = new Plate(60, 144) { Quadrant = quadrant, PartSpacing = 0.25 };
+        var sign = quadrant is 2 or 3 ? -1 : 1;
+        plate.Parts.Add(Rectangle(138, 8, new Vector(quadrant is 2 or 3 ? -139.75 : 1.75,
+            quadrant is 3 or 4 ? -10 : 2)));
+        var options = new AutomaticCutOffOptions
+        {
+            Spacing = 35,
+            MinimumStripLength = minimumStrip,
+            MinimumTailLength = 12,
+        };
+
+        var plan = AutomaticCutOffPlanner.Create(plate, options, new CutOffSettings());
+
+        Assert.False(plan.HasSeparatedTail);
+        Assert.Contains(plan.Diagnostics, d => d.Code == AutomaticCutOffDiagnosticCode.TailBelowMinimum);
+        var boundaries = Positions(plan).Select(x => sign * x).Prepend(0).Append(144).OrderBy(x => x).ToArray();
+        Assert.Equal(6, boundaries.Length);
+        Assert.All(boundaries.Zip(boundaries.Skip(1), (a, b) => b - a),
+            strip => Assert.InRange(strip, Tolerance.Epsilon, 35 + Tolerance.Epsilon));
     }
 
     [Theory]

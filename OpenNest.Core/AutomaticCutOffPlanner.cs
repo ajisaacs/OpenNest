@@ -135,7 +135,11 @@ public static class AutomaticCutOffPlanner
         var separator = occupied + System.Math.Max(plate.PartSpacing, settings.PartClearance)
             + GeometryTolerance;
         var hasTailCandidate = double.IsFinite(separator) && separator < length - GeometryTolerance;
-        var usedSpan = hasTailCandidate ? separator : length;
+        // A tail too short to keep stays attached to the skeleton, so the strip grid must
+        // continue to the sheet end; stopping at the skipped separator would leave a final
+        // strip longer than the spacing.
+        var keepsTail = hasTailCandidate && length - separator >= options.MinimumTailLength;
+        var usedSpan = keepsTail ? separator : length;
         var candidateCount = System.Math.Ceiling(usedSpan / options.Spacing);
         Require(double.IsFinite(candidateCount) && candidateCount <= MaximumCandidateCount,
             $"Spacing would generate more than {MaximumCandidateCount} cut-off candidates.", nameof(options));
@@ -199,17 +203,14 @@ public static class AutomaticCutOffPlanner
                 AddCandidate(sign * distance, false);
             }
         }
-        if (hasTailCandidate)
-        {
-            if (length - separator >= options.MinimumTailLength)
-                AddCandidate(sign * separator, true);
-            else
-                diagnostics.Add(new AutomaticCutOffDiagnostic(
-                    AutomaticCutOffDiagnosticCode.TailBelowMinimum,
-                    "The proposed tail is shorter than the minimum tail length; the final separator was skipped. "
-                    + "Other automatic lines and existing cut-offs are unchanged. No retained tail is claimed.",
-                    X: sign * separator));
-        }
+        if (keepsTail)
+            AddCandidate(sign * separator, true);
+        else if (hasTailCandidate)
+            diagnostics.Add(new AutomaticCutOffDiagnostic(
+                AutomaticCutOffDiagnosticCode.TailBelowMinimum,
+                "The proposed tail is shorter than the minimum tail length; the final separator was skipped "
+                + "and strip lines continue to the sheet end. Existing cut-offs are unchanged. No retained tail is claimed.",
+                X: sign * separator));
 
         if (diagnostics.Any(d => d.IsBlocking))
         {
