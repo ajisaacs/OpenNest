@@ -16,7 +16,7 @@ namespace OpenNest.Data;
 /// the library raises <see cref="ServerTooOldException"/>; this client never falls back
 /// to another store. Other failures surface as <see cref="IOException"/>.
 /// </summary>
-public sealed class RemoteDrawingLibrary : IDisposable
+public sealed class RemoteDrawingLibrary : IDrawingLibrary, IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
