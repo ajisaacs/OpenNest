@@ -48,10 +48,12 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly Label statusLabel = new()
     {
         AutoSize = true,
-        MaximumSize = new Size(440, 0),
-        Margin = new Padding(3, 10, 3, 3),
+        MaximumSize = new Size(410, 0),
+        Margin = Padding.Empty,
+        BackColor = Color.Transparent,
         AccessibleName = "Cutting plan outcome"
     };
+    private readonly StatusBanner statusBanner = new() { Dock = DockStyle.Fill, Margin = new Padding(3, 0, 3, 8) };
     private readonly Label detailLabel = new()
     {
         AutoSize = true,
@@ -65,21 +67,12 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly Button nextButton = new() { Text = "Next", AutoSize = true };
     private readonly CheckBox keepOrderCheckBox = new() { Text = "Keep current part order", AutoSize = true };
     private readonly CheckBox autoCutOffsCheckBox = new() { AutoSize = true };
-    private readonly FlowLayoutPanel existingWorkBanner = new()
-    {
-        AutoSize = true,
-        FlowDirection = FlowDirection.TopDown,
-        WrapContents = false,
-        BackColor = Color.FromArgb(192, 0, 0),
-        Padding = new Padding(6),
-        Margin = new Padding(3, 3, 3, 6),
-        Visible = false
-    };
+    private readonly StatusBanner existingWorkBanner = new() { Margin = new Padding(3, 3, 3, 8) };
     private readonly Label existingWorkLabel = new()
     {
         AutoSize = true,
-        MaximumSize = new Size(428, 0),
-        ForeColor = Color.White,
+        MaximumSize = new Size(410, 0),
+        Margin = new Padding(0, 0, 0, 6),
         BackColor = Color.Transparent,
         AccessibleName = "Existing lead-ins and cut-offs warning"
     };
@@ -171,13 +164,17 @@ internal sealed class CuttingInspectionPanel : UserControl
         cutOffRow.Controls.AddRange([autoCutOffsCheckBox, cutOffSettingsButton]);
         existingWorkLabel.Font = new Font(Font, FontStyle.Bold);
         existingWorkBanner.Controls.AddRange([existingWorkLabel, clearExistingButton]);
+        existingWorkBanner.SetTone(Tone.Bad);
         header.Controls.AddRange([modeSelector, existingWorkBanner, settingsRow, keepOrderCheckBox, cutOffRow,
-            validationScopeLabel, buttons, acceptWarningsCheckBox, statusLabel, navigation, previewLabel, detailLabel]);
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+            validationScopeLabel, buttons, acceptWarningsCheckBox, navigation, previewLabel, detailLabel]);
+        statusBanner.Controls.Add(statusLabel);
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.Controls.Add(header, 0, 0);
-        layout.Controls.Add(warningGrid, 0, 1);
+        layout.Controls.Add(statusBanner, 0, 0);
+        layout.Controls.Add(header, 0, 1);
+        layout.Controls.Add(warningGrid, 0, 2);
         Controls.Add(layout);
         foreach (var name in new[] { "Plate", "Part", "With", "Issue" })
             warningGrid.Columns.Add(new DataGridViewTextBoxColumn
@@ -203,19 +200,15 @@ internal sealed class CuttingInspectionPanel : UserControl
         ShowSettings();
     }
 
-    private enum Tone { Neutral, Good, Warning, Bad }
+    // Busy marks the slow part-order search, so it stands out while the operator waits.
+    private enum Tone { Neutral, Good, Warning, Bad, Busy }
 
-    /// <summary>Sets the headline and replaces the detail line (empty hides it).</summary>
+    /// <summary>Sets the headline banner and replaces the detail line (empty hides either).</summary>
     private void SetStatus(Tone tone, string text, string detail = null)
     {
         statusLabel.Text = text;
-        statusLabel.ForeColor = tone switch
-        {
-            Tone.Good => Color.FromArgb(0, 128, 0),
-            Tone.Warning => Color.FromArgb(176, 96, 0),
-            Tone.Bad => Color.FromArgb(192, 0, 0),
-            _ => SystemColors.ControlText,
-        };
+        statusBanner.SetTone(tone);
+        statusBanner.Visible = !string.IsNullOrEmpty(text);
         SetDetail(detail);
     }
 
@@ -563,7 +556,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             var progress = new PostingProgress(context, value =>
             {
                 if (!closed && !inspection.CloseRequested && inspection.IsRunning && generation == run)
-                    SetStatus(Tone.Neutral, (plates.Length > 1 ? $"Planning plate {value.PlateNumber}: " : "Planning: ")
+                    SetStatus(value.Phase == CuttingPlanPhase.Reordering ? Tone.Busy : Tone.Neutral, (plates.Length > 1 ? $"Planning plate {value.PlateNumber}: " : "Planning: ")
                         + PhaseText(value.Phase) + "…");
             });
             var work = inspection.BeginPlanning(batch, BeforePlan, progress);
@@ -1114,6 +1107,51 @@ internal sealed class CuttingInspectionPanel : UserControl
             return true;
         }
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    /// <summary>
+    /// One alert style for the panel: a pale tint with dark text and border in the same hue.
+    /// Busy alone is a saturated orange so the slow part-order search stands out.
+    /// </summary>
+    private sealed class StatusBanner : FlowLayoutPanel
+    {
+        private Color ink = SystemColors.ControlText;
+
+        public StatusBanner()
+        {
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            FlowDirection = FlowDirection.TopDown;
+            WrapContents = false;
+            Padding = new Padding(12, 10, 12, 10);
+            Visible = false;
+            DoubleBuffered = true;
+            ResizeRedraw = true;
+        }
+
+        public void SetTone(Tone tone)
+        {
+            (BackColor, ink) = tone switch
+            {
+                Tone.Good => (Color.FromArgb(221, 240, 214), Color.FromArgb(28, 88, 28)),
+                Tone.Warning => (Color.FromArgb(252, 241, 200), Color.FromArgb(118, 78, 0)),
+                Tone.Bad => (Color.FromArgb(248, 215, 215), Color.FromArgb(132, 20, 20)),
+                Tone.Busy => (Color.FromArgb(255, 136, 0), Color.FromArgb(70, 30, 0)),
+                _ => (Color.FromArgb(236, 236, 236), Color.FromArgb(60, 60, 60)),
+            };
+            foreach (var label in Controls.OfType<Label>())
+                label.ForeColor = ink;
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            const int border = 2;
+            const ButtonBorderStyle style = ButtonBorderStyle.Solid;
+            ControlPaint.DrawBorder(e.Graphics, ClientRectangle, ink, border, style, ink, border, style,
+                ink, border, style, ink, border, style);
+        }
     }
 
     private sealed class PostingProgress(SynchronizationContext context, Action<CuttingPlanProgress> handler)
