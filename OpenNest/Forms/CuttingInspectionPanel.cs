@@ -200,8 +200,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         ShowSettings();
     }
 
-    // Busy marks the slow part-order search, so it stands out while the operator waits.
-    private enum Tone { Neutral, Good, Warning, Bad, Busy }
+    private enum Tone { Neutral, Good, Warning, Bad }
 
     /// <summary>Sets the headline banner and replaces the detail line (empty hides either).</summary>
     private void SetStatus(Tone tone, string text, string detail = null)
@@ -556,7 +555,7 @@ internal sealed class CuttingInspectionPanel : UserControl
             var progress = new PostingProgress(context, value =>
             {
                 if (!closed && !inspection.CloseRequested && inspection.IsRunning && generation == run)
-                    SetStatus(value.Phase == CuttingPlanPhase.Reordering ? Tone.Busy : Tone.Neutral, (plates.Length > 1 ? $"Planning plate {value.PlateNumber}: " : "Planning: ")
+                    SetStatus(Tone.Neutral, (plates.Length > 1 ? $"Planning plate {value.PlateNumber}: " : "Planning: ")
                         + PhaseText(value.Phase) + "…");
             });
             var work = inspection.BeginPlanning(batch, BeforePlan, progress);
@@ -1111,7 +1110,6 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     /// <summary>
     /// One alert style for the panel: a pale tint with dark text and border in the same hue.
-    /// Busy alone is a saturated orange so the slow part-order search stands out.
     /// </summary>
     private sealed class StatusBanner : FlowLayoutPanel
     {
@@ -1136,7 +1134,6 @@ internal sealed class CuttingInspectionPanel : UserControl
                 Tone.Good => (Color.FromArgb(221, 240, 214), Color.FromArgb(28, 88, 28)),
                 Tone.Warning => (Color.FromArgb(252, 241, 200), Color.FromArgb(118, 78, 0)),
                 Tone.Bad => (Color.FromArgb(248, 215, 215), Color.FromArgb(132, 20, 20)),
-                Tone.Busy => (Color.FromArgb(255, 136, 0), Color.FromArgb(70, 30, 0)),
                 _ => (Color.FromArgb(236, 236, 236), Color.FromArgb(60, 60, 60)),
             };
             foreach (var label in Controls.OfType<Label>())
