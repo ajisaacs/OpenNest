@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
@@ -1040,12 +1041,13 @@ namespace OpenNest.Forms
             SaveCuttingParameters(parameters);
 
             var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
-            assigner.Assign(plate);
+            var kept = assigner.Assign(plate);
 
             foreach (var lp in PlateView.Parts)
                 lp.IsDirty = true;
 
             PlateView.Invalidate();
+            ShowKeptDrawingLeadIns([(Nest.Plates.IndexOf(plate) + 1, PartNumbers(plate, kept))]);
         }
 
         public void RemoveLeadIns_Click(object sender, EventArgs e)
@@ -1097,15 +1099,29 @@ namespace OpenNest.Forms
             SaveCuttingParameters(parameters);
 
             var assigner = new LeadInAssigner { Sequencer = new LeftSideSequencer() };
+            var kept = new List<(int, IReadOnlyList<int>)>();
 
-            foreach (var plate in Nest.Plates)
+            for (var index = 0; index < Nest.Plates.Count; index++)
             {
+                var plate = Nest.Plates[index];
                 plate.CuttingParameters = parameters;
-                assigner.Assign(plate);
+                kept.Add((index + 1, PartNumbers(plate, assigner.Assign(plate))));
             }
 
             PlateView.Invalidate();
+            ShowKeptDrawingLeadIns(kept);
         }
+
+        // Assign Lead-ins never overwrites drawing pins; say which parts it left for Plan Cutting.
+        private void ShowKeptDrawingLeadIns(IReadOnlyList<(int PlateNumber, IReadOnlyList<int> PartNumbers)> kept)
+        {
+            var message = LeadInAssigner.KeptMessage(kept);
+            if (message != null)
+                MessageBox.Show(this, message, "Assign Lead-ins", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private static IReadOnlyList<int> PartNumbers(Plate plate, IReadOnlyList<Part> parts) =>
+            parts.Select(part => plate.Parts.IndexOf(part) + 1).Order().ToList();
 
         public void RemoveLeadInsAllPlates()
         {

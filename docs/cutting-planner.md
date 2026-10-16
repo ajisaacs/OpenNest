@@ -419,6 +419,13 @@ clean contours with `CutPinResolver` and prepares them with
 - The plate state compared by `Apply` includes each drawing's pin list (reference and exact
   content, `StateFingerprint.Of(pins)`) and each part's pins-off flag, so changing either
   after capture makes the proposal `Stale`.
+- Only Plan Cutting applies pins. The legacy Assign Lead-ins (`LeadInAssigner`) leaves every
+  unlocked part with active pins unchanged and returns those parts; the desktop then says
+  "N parts kept their drawing lead-ins (plate P: parts ...); use Plan Cutting to apply their
+  drawing pins." It never overwrites a pin with the plate's settings.
+- The [pre-post review](post-verification.md) warns "Drawing pins not applied" for a part
+  with active pins whose placed program does not cut its pinned contours as pinned, and
+  re-checks pinned leads like locked ones.
 
 ## Apply
 

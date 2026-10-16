@@ -194,8 +194,8 @@ public static class PostVerificationAnalyzer
                     plateNumber, partNumber, null, message));
             }
             cancellationToken.ThrowIfCancellationRequested();
-            // Leads Plan Cutting accepted as given (locked programs) are checked again here.
-            FixedLeadReview.Add(plate, plateNumber, findings, cancellationToken);
+            // Leads Plan Cutting accepted as given (locked and drawing-pinned) are checked again here.
+            FixedLeadReview.Add(plate, plateNumber, findings, clamps, cancellationToken);
             var overlap = PlateOverlapAnalyzer.Analyze(
                 PlateOverlapAnalyzer.Capture(materialParts, (clamps ?? Array.Empty<ClampZone>()).ToArray(),
                     cancellationToken),
@@ -217,7 +217,7 @@ public static class PostVerificationAnalyzer
     }
 
     // Lines are tested exactly; an arc conservatively by its whole supporting extent.
-    private static bool CutTouches(ExecutionMotion move, Vector from, Box zone, out Vector contact)
+    internal static bool CutTouches(ExecutionMotion move, Vector from, Box zone, out Vector contact)
     {
         if (move.Curve == null || move.Curve.IsLine)
             return ClampCutDiagnostics.Intersects(from, move.End, zone, out contact);

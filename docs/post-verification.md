@@ -80,12 +80,18 @@ shows the first three check categories, even when there are no findings:
   A clamp whose footprint covers the program start point warns on every posting
   attempt by design; there is no exemption for the first rapid and no persisted
   bypass (settled decision D10).
-- **Fixed leads:** on a plate with a locked part, every lead-in and lead-out of each
-  locked program is checked against the clean material of every part on the plate,
-  its own included. Plan Cutting accepts these fixed emissions as given and only warns
-  (see [cutting planner](cutting-planner.md#fixed-emissions-warn)), so posting reports
-  them again. A part whose clean material cannot be captured makes the check incomplete
-  for leads near it. This line appears in the summary only when there is such a finding.
+- **Fixed leads:** Plan Cutting accepts fixed emissions as given and only warns (see
+  [cutting planner](cutting-planner.md#fixed-emissions-warn)), so posting checks them
+  again: every lead-in and lead-out of a locked program, and of each contour a part's
+  active drawing pins fix, against the clean material of every part on the plate (its own
+  included) and against active clamps. A pinned contour counts as applied only where the
+  placed program cuts it exactly as the pin's own emission, motion for motion, with the
+  part's cutting settings. A part with active drawing pins that its program does not apply
+  (never planned, hand-edited, locked lead-ins overriding the pins, or a pin that no longer
+  matches the geometry) warns "Drawing pins not applied"; pins switched off for that part
+  are not reported. A part whose clean material cannot be captured makes the check
+  incomplete for leads near it. This line appears in the summary only when there is such
+  a finding.
 
 Findings identify the plate and part's position in the cutting sequence. Read the
 scrollable report, cancel to fix the nest, then post again to rerun verification.
