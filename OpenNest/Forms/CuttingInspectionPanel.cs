@@ -468,6 +468,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         PostVerificationKind.MissingLeadIn => "Missing lead-in",
         PostVerificationKind.RapidCrossing => "Rapid crossing",
         PostVerificationKind.Incomplete => "Not checked",
+        PostVerificationKind.FixedLead => "Fixed lead",
         _ => kind.ToString(),
     };
 

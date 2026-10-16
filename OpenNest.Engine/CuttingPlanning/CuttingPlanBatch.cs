@@ -169,7 +169,9 @@ public sealed class CuttingPlanBatch
             && snapshot.ExpansionBudget > firstPassBudget)
         {
             var first = CuttingPlanService.Plan(snapshot.WithSearchLimits(firstPassBudget, FirstPassEntries), token);
-            if ((first.Status == CuttingPlanStatus.Ready && first.IndependentlyReplayed)
+            // A replayed proposal whose only warnings are fixed emissions passed every strict
+            // check; fixed emissions never steer the search, so the full pass cannot improve it.
+            if (first.IndependentlyReplayed && first.Status is CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort
                 || first.Status == CuttingPlanStatus.Cancelled)
                 return first;
         }
@@ -229,6 +231,13 @@ public sealed class CuttingPlanPlateResult
     /// <summary>Owned readable output is available, but not all geometric checks passed.</summary>
     public bool CanApplyWithWarnings => Overlap != null && Overlap.Pairs.Count == 0
         && (IsRouteReady || Result.Status == CuttingPlanStatus.BestEffort);
+
+    /// <summary>
+    /// The route was replayed and passed every strict check; only fixed emissions (locked or
+    /// pinned leads) carry warnings, so the proposal is UNVERIFIED and needs acceptance.
+    /// </summary>
+    public bool HasOnlyFixedLeadWarnings => Result.Status == CuttingPlanStatus.BestEffort
+        && Result.IndependentlyReplayed && IsOverlapClear;
     public int PartCount => Result.ProposedOrder.Count;
     public int RegeneratedCount => Result.ProposedOrder.Count(p => p.IsRegenerated);
 
@@ -372,7 +381,10 @@ public sealed class CuttingPlanProposal
                 + $"{Count(Plates.Count(p => p.OrderChanged), "plate")} with a new part order, "
                 + $"{Count(Plates.Sum(p => p.RegeneratedCount), "part program")} regenerated.");
         else if (RequiresWarningAcceptance)
-            lines.Add("Best-effort plan available. Review the warnings and accept the unverified plan to apply. "
+            lines.Add((Plates.All(p => p.IsReady || p.HasOnlyFixedLeadWarnings)
+                    ? "Unverified plan available: fixed lead-ins could not be certified. "
+                    : "Best-effort plan available. ")
+                + "Review the warnings and accept the unverified plan to apply. "
                 + "Posting CNC output still requires its own review and approval.");
         else
             lines.Add($"Apply is unavailable: {blocked} of {Count(Plates.Count, "plate")} could not "
@@ -409,8 +421,11 @@ public sealed class CuttingPlanProposal
 
         if (plate.CanApplyWithWarnings)
         {
-            yield return heading + $"best-effort, unverified. {Count(plate.PartCount, "part")}, "
-                + $"{plate.RegeneratedCount} regenerated; review lead-ins and cutting order.";
+            yield return heading + (plate.HasOnlyFixedLeadWarnings
+                ? $"unverified: fixed lead-ins need review. {Count(plate.PartCount, "part")}, "
+                    + $"{plate.RegeneratedCount} regenerated; every planned motion passed its checks."
+                : $"best-effort, unverified. {Count(plate.PartCount, "part")}, "
+                    + $"{plate.RegeneratedCount} regenerated; review lead-ins and cutting order.");
             // Unverified Apply requires the operator to see every finding, not just a
             // bounded diagnostic summary that hides later parts behind "... and N more".
             foreach (var line in DescribeOverlap(plate.Overlap).Concat(result.Findings.Select(DescribeFinding)))

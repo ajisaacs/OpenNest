@@ -328,7 +328,8 @@ produce a separate `BestEffort` proposal as described below; it never labels it 
 sets `IndependentlyReplayed`.
 
 - `ConstraintConflict`: fixed programs or explored fixed routing violate the
-  modeled constraints. Locked internal crossings cannot be repaired by regeneration.
+  modeled constraints. Locked internal crossings cannot be repaired by regeneration;
+  with confirmed parameters they warn instead (see [fixed emissions](#fixed-emissions-warn)).
 - `UnsupportedGeometry`: unsupported motion/material semantics or an incomplete
   check. Open nominal outlines, ambiguous release states or containment, cutoffs
   in a detached part list and scribe-only source drawings are not silently accepted.
@@ -341,13 +342,41 @@ sets `IndependentlyReplayed`.
 Malformed original executed graphs are refused, not salvaged. Valid but incomplete
 old programs can regenerate from clean geometry. Regenerated programs retain genuine
 configured tab gaps; stale tab settings do not establish retention. In confirmed-
-parameters mode, locked/ineligible programs must cover the complete directed clean
-boundary: an open fixed program has no certified selected tab metadata and is refused,
-not repaired, even if it may have been intentionally tabbed. The no-parameter route
-retains its narrower compatibility contract. A lead-out that may bridge a tab, or
-a malformed emitted arc, is refused, not automatically repaired. Tabbed lead-outs
-leave from the trimmed cut end, but a lead-out after an open contour still needs
-manual review of its retention gap, so confirmed-parameters planning refuses it.
+parameters mode, an unlocked program a caller left ineligible must cover the complete
+directed clean boundary: an open one has no certified selected tab metadata and is
+refused, not repaired. A locked program that does not (a tab gap, a partial, reversed
+or retraced cut) is kept as given with a fixed-lead warning instead; see below. The
+no-parameter route retains its narrower compatibility contract and still refuses
+fixed-program violations. A planned lead-out that may bridge a tab, or a malformed
+emitted arc, is refused, not automatically repaired. Tabbed lead-outs leave from the
+trimmed cut end, but a lead-out after an open contour still needs manual review of
+its retention gap, so confirmed-parameters planning refuses it in a planned contour.
+
+### Fixed emissions warn
+
+With confirmed parameters, a locked program (Place Lead-in locks, PEP-imported locked
+parts) is a fixed emission: everything it does after the planner's rapid into it is
+accepted as given (user decision D1a, 2026-10-14). Its violations are not refusals:
+
+- Its lead-ins and lead-outs meeting another part's material or its own, a rapid inside
+  it crossing a completed contour, a lead-out after its own open contour, and coverage
+  that cannot be certified (a tab gap, a partial, reversed or retraced cut) each become a
+  `PostVerificationKind.FixedLead` finding naming the part, the cutting contour where
+  known and the other part hit (`CuttingPlanFinding.FixedLead`).
+- Fixed emissions never constrain the search: they neither reject a candidate nor teach
+  an order rule. Independent replay reports them. Every planner-chosen motion keeps
+  every strict check, including the rapid into the locked program and every
+  regenerated lead.
+- A plate whose only findings are these warnings yields `BestEffort` with
+  `IndependentlyReplayed` set (`CuttingPlanPlateResult.HasOnlyFixedLeadWarnings`): never
+  `Ready`, so `IsReady`/`CanApply` stay false and `CanApplyWithWarnings` with the
+  per-proposal acceptance checkbox is the only way to Apply. `CuttingPlanService.Apply`
+  still rejects it. The locked program is never replaced.
+- Known part-to-part material overlap, unreadable or unsupported programs, stale input
+  and cancellation still block. Unlocked programs a caller left ineligible keep the
+  strict rule above.
+- The [pre-post review](post-verification.md) checks locked leads again before posting;
+  accepting the plan is not posting consent.
 
 ## Apply
 
@@ -419,8 +448,9 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
 - The panel starts from the plate's cutting settings (or the last-used settings) and plans
   at once. `Cutting Settings...` edits them and `Keep the current part order` fixes the
   whole-part order; either change replans. The settings are confirmed parameters: every
-  unlocked part's lead-ins are regenerated. Locked parts keep their exact programs;
-  the strict route checks them, while any best-effort warnings require explicit review below.
+  unlocked part's lead-ins are regenerated. Locked parts keep their exact programs; their
+  own violations are fixed-lead warnings on an UNVERIFIED plate (see
+  [fixed emissions](#fixed-emissions-warn)), and any warnings require explicit review below.
 - When a plate in scope already carries applied lead-ins or cut-offs, a red banner
   above the settings says how many (and how many lead-ins are locked), and that the
   plan keeps locked lead-ins and existing cut-offs unchanged. `Clear Lead-ins &
@@ -557,7 +587,10 @@ dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release --filter 'FullyQuali
 ```
 
 Synthetic fixtures exercise whole-part routing and internal-hole crossing repair,
-locked/ineligible refusal, actual native lead paths, shared subprograms, ownership,
+ineligible refusal and locked fixed-lead warnings, actual native lead paths, shared subprograms, ownership,
 entry/whole-part backtracking, deterministic budgets, cancellation and fresh replay
 rejection. Retained emission characterizations cover styles, winding, corner rules,
 circle rounding/clamping and tabs; unsupported cases remain explicit refusals.
+`PlanningCharacterizationTests` freeze the batch output (proposals, expansions, emitted
+motions) for the six synthetic nests and focused fixtures; a change that is meant to
+leave plates without fixed-lead warnings untouched must keep those digests.

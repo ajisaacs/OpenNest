@@ -194,6 +194,8 @@ public static class PostVerificationAnalyzer
                     plateNumber, partNumber, null, message));
             }
             cancellationToken.ThrowIfCancellationRequested();
+            // Leads Plan Cutting accepted as given (locked programs) are checked again here.
+            FixedLeadReview.Add(plate, plateNumber, findings, cancellationToken);
             var overlap = PlateOverlapAnalyzer.Analyze(
                 PlateOverlapAnalyzer.Capture(materialParts, (clamps ?? Array.Empty<ClampZone>()).ToArray(),
                     cancellationToken),

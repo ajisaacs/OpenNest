@@ -11,7 +11,13 @@ public enum PostVerificationKind
     Overlap,
     MissingLeadIn,
     RapidCrossing,
-    Incomplete
+    Incomplete,
+
+    /// <summary>
+    /// A violation inside a fixed emission (a locked program, or a contour cut exactly as its
+    /// drawing pins it): accepted as given, never repaired, always reported for review.
+    /// </summary>
+    FixedLead
 }
 
 /// <summary>Plate and part numbers are one-based; plate zero denotes a whole-post limitation.</summary>
@@ -50,6 +56,9 @@ public sealed class PostVerificationReport
         Summary(PostVerificationKind.Overlap, "Overlap");
         Summary(PostVerificationKind.MissingLeadIn, "Missing lead-ins");
         Summary(PostVerificationKind.RapidCrossing, "Rapid crossings");
+        // Only nests with fixed-lead findings gain the line, so other reports read as before.
+        if (Findings.Any(finding => finding.Kind == PostVerificationKind.FixedLead))
+            Summary(PostVerificationKind.FixedLead, "Fixed leads");
         foreach (var finding in Findings)
         {
             text.Append(finding.PlateNumber == 0 ? "Post processor" : $"Plate {finding.PlateNumber}");

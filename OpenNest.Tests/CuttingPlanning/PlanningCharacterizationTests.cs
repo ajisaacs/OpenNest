@@ -84,45 +84,18 @@ public class PlanningCharacterizationTests
     }
 
     /// <summary>
-    /// Red row for D1a: a locked hole lead that runs into the material of a part nested in
-    /// that hole. Today the plate is refused and offers no proposal.
-    /// </summary>
-    [Fact]
-    public void LockedHoleLeadIntoNeighbourMaterial_IsRefusedToday()
-    {
-        var (plate, _, _) = LockedHoleLeadFixture();
-
-        var planned = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan().Plates[0];
-
-        Assert.False(planned.CanApplyWithWarnings, Describe(planned));
-        Assert.Empty(planned.Result.ProposedOrder);
-        Assert.Contains(planned.Result.Findings, f => f.Message.Contains("another placed material"));
-    }
-
-    /// <summary>Red row for D1a: a locked tabbed perimeter has no certified tab and is refused today.</summary>
-    [Fact]
-    public void LockedTabbedPerimeter_IsRefusedToday()
-    {
-        var (plate, _) = LockedTabbedFixture();
-
-        var planned = CuttingPlanBatch.Capture([plate], ExplicitContourTests.Parameters(), false).Plan().Plates[0];
-
-        Assert.False(planned.CanApplyWithWarnings);
-        Assert.Empty(planned.Result.ProposedOrder);
-    }
-
-    /// <summary>
     /// A 20 x 20 host with a 10 x 10 cutout and a 2 x 2 part nested in it. The host is locked
-    /// with a hole lead-in that starts inside the nested part's material.
+    /// with a hole lead-in that runs straight through the nested part. Before D1a this plate
+    /// was refused; <see cref="FixedLeadWarningTests"/> holds its rows now.
     /// </summary>
-    internal static (Plate Plate, Part Host, Part Nested) LockedHoleLeadFixture()
+    internal static (Plate Plate, Part Host, Part Nested, Nest Nest) LockedHoleLeadFixture()
     {
         var clean = new Program();
         clean.MoveTo(5, 5); clean.LineTo(15, 5); clean.LineTo(15, 15); clean.LineTo(5, 15); clean.LineTo(5, 5);
         clean.MoveTo(0, 0); clean.LineTo(0, 20); clean.LineTo(20, 20); clean.LineTo(20, 0); clean.LineTo(0, 0);
         var host = new Part(new Drawing("host", clean), new Vector(0, 0));
         var locked = new Program();
-        locked.MoveTo(7, 10);
+        locked.MoveTo(9, 10);
         locked.Codes.Add(new LinearMove(5, 10) { Layer = LayerType.Leadin });
         locked.LineTo(5, 5); locked.LineTo(15, 5); locked.LineTo(15, 15); locked.LineTo(5, 15); locked.LineTo(5, 10);
         locked.MoveTo(-0.3, 10);
@@ -131,7 +104,7 @@ public class PlanningCharacterizationTests
         Assert.True(host.RestoreLeadInProgram(locked, true));
         var nested = new Part(new Drawing("nested", LeadPathValidationTests.Rectangle(0, 0, 2, 2)), new Vector(6, 9));
         var nest = new Nest();
-        return (Plate(nest, nested, host), host, nested);
+        return (Plate(nest, nested, host), host, nested, nest);
     }
 
     /// <summary>A single 10 x 10 square locked with a program that leaves a 0.2 tab at its entry.</summary>
@@ -145,9 +118,6 @@ public class PlanningCharacterizationTests
         Assert.True(part.RestoreLeadInProgram(prepared.Emit([prepared.ClosestEntry(0, new Vector(-1, 5))]), true));
         return (Plate(new Nest(), part), part);
     }
-
-    private static string Describe(CuttingPlanPlateResult planned) => planned.Result.Status + ": "
-        + string.Join("\n", planned.Result.Findings.Select(f => $"{f.SourceOrdinal} {f.Kind} {f.Message}"));
 
     internal static void Check(string name, string expected, Plate[] plates, CuttingParameters parameters,
         bool preservePartOrder)

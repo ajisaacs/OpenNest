@@ -130,6 +130,20 @@ public sealed class FixedProgramPlacement
     public Program CopyProgram() => program == null ? null : OwnedProgramCopy.Copy(program);
     internal SelectedContourProgram SelectedProgram { get; private init; }
 
+    /// <summary>
+    /// The motions of <paramref name="execution"/> (this placement's own program read with its
+    /// incoming rapid first) that are a fixed emission, accepted as given in regeneration mode:
+    /// everything a locked program does after the planner's rapid into it. Null when nothing is
+    /// fixed. Cutoffs and unlocked programs a caller left ineligible keep their strict checks.
+    /// </summary>
+    internal Func<int, bool> FixedMotions(OwnedExecution execution)
+    {
+        if (IsCutOff || Prepared != null || !LeadInsLocked)
+            return null;
+        var opensWithRapid = execution.Motions.Count != 0 && execution.Motions[0].Rapid;
+        return motion => motion > 0 || !opensWithRapid;
+    }
+
     internal FixedProgramPlacement Propose(Program proposed, OwnedExecution execution, IReadOnlyList<ContourChoice> choices,
         System.Threading.CancellationToken token = default)
     {
@@ -187,6 +201,12 @@ public sealed record CuttingPlanFinding(int? SourceOrdinal, Part SourcePart,
     /// </summary>
     public PostVerificationFinding Witness { get; init; }
 
+    /// <summary>
+    /// For a <see cref="PostVerificationKind.FixedLead"/> warning, what the fixed emission is and
+    /// what it hits; null otherwise. Not part of equality (the message already names both).
+    /// </summary>
+    public FixedLeadWarning FixedLead { get; init; }
+
     public bool Equals(CuttingPlanFinding other) => other is not null
         && SourceOrdinal == other.SourceOrdinal && Equals(SourcePart, other.SourcePart)
         && OtherSourceOrdinal == other.OtherSourceOrdinal && Equals(OtherSourcePart, other.OtherSourcePart)
@@ -197,10 +217,22 @@ public sealed record CuttingPlanFinding(int? SourceOrdinal, Part SourcePart,
 }
 
 /// <summary>
+/// A violation inside a fixed emission, accepted as given rather than refused (D1a); the part is
+/// the finding's source part. <see cref="ContourNumber"/> is one-based in the part's program
+/// (null when the whole program is concerned); <see cref="PinNumber"/> is the one-based drawing
+/// pin, or null for a locked program; <see cref="ObstacleSourceOrdinal"/> is the other part hit,
+/// or null for the part's own material, a released contour named in the message, or an
+/// uncertifiable gap.
+/// </summary>
+public sealed record FixedLeadWarning(int? ContourNumber, int? PinNumber, int? ObstacleSourceOrdinal);
+
+/// <summary>
 /// A replayed direct-XY proposal, optionally with regenerated programs, that respects the
 /// captured cutoff/containment prerequisites. Not physical safety or posting consent. Apply
 /// installs it only for a plate-scoped request whose plate is unchanged. BestEffort is explicitly
-/// unverified and requires batch warning acceptance; other failures contain no proposals.
+/// unverified and requires batch warning acceptance; other failures contain no proposals. A
+/// BestEffort result that is also <see cref="IndependentlyReplayed"/> passed every strict check
+/// except inside fixed emissions, whose violations are its FixedLead warnings.
 /// </summary>
 public sealed class CuttingPlanResult
 {
