@@ -18,7 +18,7 @@ namespace OpenNest.Forms;
 /// server one bounded page at a time; filtering, sorting and paging run on the server
 /// through <see cref="NestBrowseSession"/>. The lower tabs show plates and drawings
 /// from <see cref="NestDetailsSession"/> and on-demand version history beside a plate
-/// preview. This form renders the selected nest without editing its archive.
+/// preview. Nest Information edits a detached snapshot through guarded database saves.
 /// </summary>
 public sealed class SavedNestsForm : Form
 {
@@ -63,6 +63,11 @@ public sealed class SavedNestsForm : Form
     private readonly ToolStripMenuItem openMenuItem;
     private readonly ToolStripMenuItem deleteMenuItem;
     private bool deleting;
+    private bool editingInfo;
+    private readonly Button infoButton;
+    private readonly ToolStripMenuItem infoMenuItem;
+
+    internal Func<EditNestInfoForm, DialogResult> ShowNestInfoDialog { get; set; }
     private IReadOnlyList<Plate> previewPlates = Array.Empty<Plate>();
     private int previewIndex = -1;
 
@@ -143,7 +148,8 @@ public sealed class SavedNestsForm : Form
         openMenuItem = new ToolStripMenuItem("Open", null, (_, _) => OpenSelected()) { ShortcutKeyDisplayString = "Enter" };
         deleteMenuItem = new ToolStripMenuItem("Delete...", null, async (_, _) => await DeleteSelectedAsync());
         var refreshMenuItem = new ToolStripMenuItem("Refresh", null, async (_, _) => await RunAsync(session.RefreshAsync));
-        menu.Items.AddRange(new ToolStripItem[] { openMenuItem, deleteMenuItem, new ToolStripSeparator(), refreshMenuItem });
+        infoMenuItem = new ToolStripMenuItem("Nest Information...", null, async (_, _) => await EditSelectedInfoAsync());
+        menu.Items.AddRange(new ToolStripItem[] { openMenuItem, infoMenuItem, deleteMenuItem, new ToolStripSeparator(), refreshMenuItem });
         nestGrid.ContextMenuStrip = menu;
 
         // Details of the highlighted nest.
@@ -237,7 +243,14 @@ public sealed class SavedNestsForm : Form
             SplitterWidth = 6,
         };
         split.Panel1.Controls.Add(nestGrid);
-        split.Panel1.Controls.Add(SectionLabel("Nests", DockStyle.Top));
+        infoButton = new Button { Text = "Nest Information...", AutoSize = true, Dock = DockStyle.Right };
+        infoButton.Click += async (_, _) => await EditSelectedInfoAsync();
+        var nestsHeader = new Panel { Dock = DockStyle.Top, Height = 36 };
+        nestsHeader.Controls.Add(infoButton);
+        nestsHeader.Controls.Add(SectionLabel("Nests", DockStyle.Left));
+        split.Panel1.Controls.Add(nestsHeader);
+        ShowNestInfoDialog = dialog => dialog.ShowDialog(this);
+        FormClosing += (_, e) => e.Cancel = editingInfo;
         split.Panel2.Controls.Add(detailsSplit);
         split.Panel2.Controls.Add(detailsHeader);
 
@@ -322,6 +335,8 @@ public sealed class SavedNestsForm : Form
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        if (editingInfo)
+            return true;
         switch (keyData)
         {
             case Keys.Enter when searchBox.Focused:
@@ -492,9 +507,11 @@ public sealed class SavedNestsForm : Form
 
     private void UpdateCommands()
     {
-        var hasSelection = SelectedNestId() != null;
+        var hasSelection = SelectedNestId() != null && !editingInfo && !deleting;
         openMenuItem.Enabled = hasSelection;
-        deleteMenuItem.Enabled = hasSelection && !deleting;
+        infoButton.Enabled = hasSelection;
+        infoMenuItem.Enabled = hasSelection;
+        deleteMenuItem.Enabled = hasSelection;
     }
 
     private void UpdateTitle(string summary)
@@ -759,7 +776,7 @@ public sealed class SavedNestsForm : Form
 
     private void OpenSelected()
     {
-        if (SelectedNestId() is not Guid id)
+        if (editingInfo || SelectedNestId() is not Guid id)
             return;
         SelectedId = id;
         DialogResult = DialogResult.OK;
@@ -798,6 +815,84 @@ public sealed class SavedNestsForm : Form
             details = new NestDetailsSession(LoadDetailsAsync);
             ShowDetailsMessage("");
             await RunAsync(session.RefreshAsync);
+        }
+    }
+
+    /// <summary>Edits a detached current snapshot without opening an MDI document.</summary>
+    internal async Task EditSelectedInfoAsync()
+    {
+        if (editingInfo || deleting || SelectedNestId() is not Guid id)
+            return;
+        summaryLabel.Text = "Loading nest information...";
+        editingInfo = true;
+        Enabled = false;
+        UpdateCommands();
+        try
+        {
+            var snapshot = await NestHistorySession.ReadCurrentAsync(repository, id, serverUrl);
+            if (IsDisposed) return;
+            if (snapshot.Metadata.Revision < 1)
+                throw new NotSupportedException("Upgrade the nest server and refresh before editing nest information.");
+            var nest = await Task.Run(() =>
+            {
+                using var source = new MemoryStream(snapshot.Archive);
+                var loaded = new NestReader(source).Read();
+                // Metadata-only revisions can be newer than the archived fields.
+                NestRecordFactory.ApplyMetadata(loaded, snapshot.Metadata);
+                return loaded;
+            });
+            if (IsDisposed) return;
+            using var dialog = new EditNestInfoForm();
+            dialog.LoadNestInfo(nest);
+            if (ShowNestInfoDialog(dialog) != DialogResult.OK)
+                return;
+            // Same default propagation as Nest > Nest Info in the open editor.
+            using var manager = new PlateManager(nest);
+            manager.ChangePlateDefaults(() => dialog.SaveNestInfo(nest));
+            nest.DateLastModified = DateTime.Now;
+            summaryLabel.Text = "Saving nest information...";
+            var bytes = await Task.Run(() =>
+            {
+                using var output = new MemoryStream();
+                new NestWriter(nest).Write(output);
+                return output.ToArray();
+            });
+            var save = new NestSaveSession();
+            save.Bind(id, snapshot.ServerUrl, snapshot.Metadata.Revision);
+            summaryLabel.Text = "Sending nest information...";
+            var saved = await save.SaveAsync(repository, snapshot.ServerUrl, nest, bytes);
+            var verified = await NestHistorySession.ReadCurrentAsync(repository, id, snapshot.ServerUrl);
+            if (verified.Metadata.Revision != saved.Revision
+                || !System.Linq.Enumerable.SequenceEqual(bytes, verified.Archive))
+                throw new InvalidDataException("Could not verify the saved nest information.");
+            if (IsDisposed) return;
+            // Drop archive previews and embedded history, including prefetched snapshots.
+            details.Dispose();
+            details = new NestDetailsSession(LoadDetailsAsync);
+            historyView?.Dispose();
+            historyView = null;
+            historyId = null;
+            ShowDetailsMessage("");
+            await RunAsync(session.RefreshAsync);
+            foreach (DataGridViewRow row in nestGrid.Rows)
+                if (row.Cells[IdColumn].Value is Guid rowId && rowId == id)
+                    nestGrid.CurrentCell = row.Cells[0];
+        }
+        catch (Exception ex)
+        {
+            if (!IsDisposed)
+                summaryLabel.Text = $"Could not edit nest information: {ex.Message} Refresh and reopen Nest Information before trying again; the save may already have reached the server.";
+        }
+        finally
+        {
+            editingInfo = false;
+            if (!IsDisposed)
+            {
+                Enabled = true;
+                if (summaryLabel.Text == "Loading nest information...")
+                    summaryLabel.Text = session.Summary;
+                UpdateCommands();
+            }
         }
     }
 
