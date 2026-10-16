@@ -270,5 +270,18 @@ namespace OpenNest.Properties {
                 this["UpdateFeedUrl"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Laser")]
+        // Cut type last chosen in Save to Drawing Library on this PC.
+        public string DrawingLibraryCutType {
+            get {
+                return ((string)(this["DrawingLibraryCutType"]));
+            }
+            set {
+                this["DrawingLibraryCutType"] = value;
+            }
+        }
     }
 }

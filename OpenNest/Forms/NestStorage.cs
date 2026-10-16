@@ -57,7 +57,7 @@ namespace OpenNest.Forms
         /// The shared drawing library client for the current server URL, recreated only when
         /// the URL changes. Throws <see cref="ArgumentException"/> for an invalid URL.
         /// </summary>
-        public static IDrawingLibrary CreateDrawingLibrary()
+        public static IDrawingLibraryStore CreateDrawingLibrary()
         {
             if (cachedLibrary == null || cachedLibraryUrl != settings.ServerUrl)
             {

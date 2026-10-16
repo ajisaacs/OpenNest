@@ -29,16 +29,40 @@ namespace OpenNest.Controls
                 if (SelectedItem is Drawing drawing)
                     DeleteRequested?.Invoke(this, drawing);
             };
+            var saveToLibraryItem = new ToolStripMenuItem("Save to Drawing Library...");
+            saveToLibraryItem.Click += (s, e) =>
+            {
+                if (SelectedItem is Drawing drawing)
+                    SaveToLibraryRequested?.Invoke(this, drawing);
+            };
+            var saveToLibrarySeparator = new ToolStripSeparator();
+            menu.ShowItemToolTips = true;
             menu.Opening += (s, e) =>
             {
                 if (SelectedItem == null)
+                {
                     e.Cancel = true;
+                    return;
+                }
+
+                // Only hosts that handle the request offer it.
+                saveToLibraryItem.Visible = saveToLibrarySeparator.Visible = SaveToLibraryRequested != null;
+                saveToLibraryItem.Enabled = SaveToLibraryUnavailableReason == null;
+                saveToLibraryItem.ToolTipText = SaveToLibraryUnavailableReason ?? "";
             };
+            menu.Items.Add(saveToLibraryItem);
+            menu.Items.Add(saveToLibrarySeparator);
             menu.Items.Add(deleteItem);
             ContextMenuStrip = menu;
         }
 
         public event EventHandler<Drawing> DeleteRequested;
+
+        /// <summary>Raised when Save to Drawing Library is chosen for the selected drawing.</summary>
+        public event EventHandler<Drawing> SaveToLibraryRequested;
+
+        /// <summary>Why Save to Drawing Library is disabled, shown as its tooltip; null enables it.</summary>
+        public string SaveToLibraryUnavailableReason { get; set; }
 
         /// <summary>
         /// Raised when the left button is pressed on a drawing's row.

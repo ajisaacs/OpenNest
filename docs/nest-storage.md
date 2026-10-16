@@ -144,8 +144,8 @@ only the requested page of metadata (never archive bytes):
 ## Drawing library endpoints
 
 The server also keeps a shared library of drawings (schema v4). The desktop
-can add library drawings to a nest (below); saving to the library is not built
-yet. A drawing's geometry travels as an opaque
+adds library drawings to a nest and saves nest drawings to the library (below).
+A drawing's geometry travels as an opaque
 **drawing package**: a `.nest` archive holding exactly one drawing and no plates,
 written and read on the client by `OpenNest.IO.DrawingPackage`. The server never
 parses it.
@@ -222,6 +222,37 @@ The added drawing is an independent copy carrying a library link (server key,
 id, revision and a snapshot of the library details) that is saved with the nest
 (see [the nest file format](nest-file-format.md#drawing-library-links)). Editing it
 in the nest never changes the library.
+
+### Save to Drawing Library (desktop)
+
+Right-click a drawing in the drawing list > **Save to Drawing Library...**
+(Database mode only; disabled with "Database mode only" in File mode). The
+dialog (`OpenNest.Data.DrawingLibrarySaveSession`) prefills name and customer
+from the drawing (the nest's customer when the drawing has none), material,
+grade, thickness and units from the nest (the drawing's material when the nest
+has none), and the cut type and notes of the linked revision when the drawing
+came from this server's library, otherwise the cut type last saved on this PC.
+Units follow the nest and cannot be changed.
+
+Whenever the details change, the dialog looks up active library drawings with
+the same normalized customer, name, material and grade and the exact thickness,
+units and cut type, and offers **Save as**:
+
+- No match: a separate (new) library drawing.
+- One match, or the drawing's own linked library drawing among several: the
+  next revision of it, guarded by `If-Match` on the revision listed.
+- Several matches: no default; the operator chooses one or a separate drawing.
+- A linked drawing whose details no longer match is offered but never the
+  default, so changing thickness cannot silently rewrite it.
+
+Save stays disabled until the lookup for the current details has finished. A
+409 (someone else saved first) is shown and the choices are refreshed. A save
+that fails without a definite answer stays pending: the next Save first looks
+for the revision it would have produced and adopts it when the package hash
+and details match, so it is never stored twice and a retried new drawing keeps
+its client-allocated id. Saving identical content at the current revision is a
+no-op. On success only the nest drawing's library link changes, to the saved
+revision; save the nest to keep it.
 
 ## Storage
 

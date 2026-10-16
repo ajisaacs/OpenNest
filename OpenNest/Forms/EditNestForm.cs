@@ -438,6 +438,7 @@ namespace OpenNest.Forms
             Text = Nest.Name;
             drawingListBox1.Units = Nest.Units;
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
+            drawingListBox1.SaveToLibraryRequested += drawingListBox1_SaveToLibraryRequested;
             drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
             drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
             Activated += (_, _) => UpdateDrawingLibraryCommand();
@@ -1200,6 +1201,7 @@ namespace OpenNest.Forms
             var enabled = NestStorage.Settings.IsDatabaseMode;
             drawingLibraryButton.Enabled = enabled;
             drawingLibraryButton.ToolTipText = enabled ? "Add from Drawing Library" : NestStorage.DatabaseModeOnly;
+            drawingListBox1.SaveToLibraryUnavailableReason = enabled ? null : NestStorage.DatabaseModeOnly;
         }
 
         /// <summary>Opens the drawing library browser and lists whatever it added.</summary>
@@ -1223,6 +1225,43 @@ namespace OpenNest.Forms
             form.ShowDialog(this);
             if (form.AddedDrawings.Count > 0)
                 UpdateDrawingList();
+        }
+
+        private void drawingListBox1_SaveToLibraryRequested(object sender, Drawing drawing)
+        {
+            SaveDrawingToLibrary(drawing);
+        }
+
+        /// <summary>
+        /// Saves one nest drawing to the drawing library as a new drawing or a revision of a
+        /// matching one. On success only the drawing's library link changes.
+        /// </summary>
+        public void SaveDrawingToLibrary(Drawing drawing)
+        {
+            if (drawing == null || !NestStorage.Settings.IsDatabaseMode)
+                return;
+
+            IDrawingLibraryStore library;
+            try
+            {
+                library = NestStorage.CreateDrawingLibrary();
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Drawing Library", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            var lastCutType = Enum.TryParse<CutType>(Properties.Settings.Default.DrawingLibraryCutType, out var cutType)
+                && Enum.IsDefined(cutType) ? cutType : CutType.Laser;
+            using var form = new SaveToDrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest, drawing,
+                lastCutType, Environment.UserName);
+            if (form.ShowDialog(this) != DialogResult.OK || form.Result == null)
+                return;
+
+            Properties.Settings.Default.DrawingLibraryCutType = form.Result.Saved.CutType.ToString();
+            Properties.Settings.Default.Save();
+            UpdateDrawingList();
         }
 
         private void EditDrawingsInConverter_Click(object sender, EventArgs e)
