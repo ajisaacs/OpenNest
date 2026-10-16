@@ -1,6 +1,6 @@
 using System;
 
-namespace OpenNest.Api;
+namespace OpenNest;
 
 public class CutParameters
 {

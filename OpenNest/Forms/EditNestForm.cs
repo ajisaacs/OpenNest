@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Actions;
-using OpenNest.Api;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Controls;
