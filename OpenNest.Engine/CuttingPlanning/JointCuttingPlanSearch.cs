@@ -179,7 +179,8 @@ internal static class JointCuttingPlanSearch
             var source = f.PartNumber is { } p ? snapshot.Placements[p - 1] : null;
             var other = f.OtherPartNumber is { } o ? snapshot.Placements[o - 1] : null;
             return new CuttingPlanFinding(source?.SourceOrdinal, source?.SourcePart,
-                other?.SourceOrdinal, other?.SourcePart, f.Kind, f.Message);
+                other?.SourceOrdinal, other?.SourcePart, f.Kind, f.Message)
+            { Witness = f };
         });
 
     /// <summary>

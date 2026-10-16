@@ -238,7 +238,11 @@ public sealed class CuttingPlanPlateResult
 
 /// <summary>A diagnostic tied to captured plate and source part positions, not display text.</summary>
 public sealed record CuttingPlanDiagnosticRow(int PlateIndex, int PlateNumber, int? PartNumber,
-    int? OtherPartNumber, string Message);
+    int? OtherPartNumber, string Message)
+{
+    /// <summary>World-coordinate markers for the problem (overlap area, rapid, contacts); null when none.</summary>
+    public PostVerificationFinding Witness { get; init; }
+}
 
 /// <summary>
 /// The outcome of a batch. Apply is all-or-nothing. Unverified output needs explicit acceptance.
@@ -277,9 +281,16 @@ public sealed class CuttingPlanProposal
             if (plate.Overlap != null)
             {
                 foreach (var pair in plate.Overlap.Pairs)
-                    rows.Add(new(index, plate.PlateNumber, pair.PartAId + 1, pair.PartBId + 1,
-                        $"Part {pair.PartAId + 1}{Name(pair.PartAName)} overlaps part "
-                        + $"{pair.PartBId + 1}{Name(pair.PartBName)}."));
+                {
+                    var message = $"Part {pair.PartAId + 1}{Name(pair.PartAName)} overlaps part "
+                        + $"{pair.PartBId + 1}{Name(pair.PartBName)}.";
+                    rows.Add(new(index, plate.PlateNumber, pair.PartAId + 1, pair.PartBId + 1, message)
+                    {
+                        Witness = new(PostVerificationKind.Overlap, plate.PlateNumber, pair.PartAId + 1,
+                            pair.PartBId + 1, message)
+                        { Location = pair.Marker, Overlap = pair }
+                    });
+                }
                 foreach (var issue in plate.Overlap.Issues)
                     rows.Add(new(index, plate.PlateNumber, issue.PartAId + 1,
                         issue.PartBId is int other ? other + 1 : null,
@@ -291,7 +302,8 @@ public sealed class CuttingPlanProposal
                 rows.Add(new(index, plate.PlateNumber,
                     finding.SourceOrdinal is int part ? part + 1 : null,
                     finding.OtherSourceOrdinal is int other ? other + 1 : null,
-                    DescribeFinding(finding)));
+                    DescribeFinding(finding))
+                { Witness = finding.Witness });
         }
         return rows;
     }

@@ -728,14 +728,15 @@ namespace OpenNest.Controls
             renderer.DrawParts(e.Graphics);
             renderer.DrawClampZones(e.Graphics);
             renderer.DrawRemovedClamps(e.Graphics);
+            renderer.DrawCutOffs(e.Graphics);
             if (!HasProposalDisplay)
             {
-                renderer.DrawCutOffs(e.Graphics);
                 renderer.DrawActiveWorkArea(e.Graphics);
                 renderer.DrawDebugRemnants(e.Graphics);
                 DrawOverlapOverlay(e.Graphics);
-                validationOverlay.Draw(e.Graphics);
             }
+            // Plan Cutting marks findings on its proposal as well as on the live plate.
+            validationOverlay.Draw(e.Graphics);
 
             base.OnPaint(e);
 
