@@ -145,6 +145,18 @@ without one, a reader skips them unparsed and a writer writes none. The front
 ends pass the engine's `BestFitCacheStore.Shared`, which adds loaded sets to
 the process-wide `BestFitCache` without replacing sets already computed.
 
+## Drawing library links
+
+A drawing copied from a server drawing library carries a `library` object:
+`serverKey` (the normalized server URL), `id`, `revision`, and a snapshot of that
+revision's `cutType`, `thickness`, `materialName`, `materialGrade`, `units`, `notes`
+and `packageSha256`. It is omitted for other drawings. Read leniently: a value that
+is not an object, has the wrong types, a blank server key, an empty id, a revision
+below 1, a cut type or units that are not one supported name, or a negative
+thickness loads the drawing without a link and adds a reader warning. Converter
+edits keep the link as provenance; split pieces get none. Drawing packages leave
+the link out, so linking a drawing does not change its package bytes.
+
 ## Verification and limits
 
 The automated tests cover save/reopen/re-save, rotated/manual/locked parts,

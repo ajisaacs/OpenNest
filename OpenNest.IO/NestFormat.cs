@@ -184,6 +184,68 @@ namespace OpenNest.IO
             public MaterialDto Material { get; init; } = new();
             public SourceDto Source { get; init; } = new();
             public List<BendDto> Bends { get; init; } = new();
+
+            /// <summary>
+            /// The drawing library revision this drawing was copied from. Omitted when the
+            /// drawing did not come from a library. Read leniently: a malformed value reads
+            /// as <see cref="DrawingLibraryLinkDto.Malformed"/> and the reader drops it with a warning.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            [JsonConverter(typeof(LenientDrawingLibraryLinkConverter))]
+            public DrawingLibraryLinkDto Library { get; init; }
+        }
+
+        public record DrawingLibraryLinkDto
+        {
+            public string ServerKey { get; init; } = "";
+            public Guid Id { get; init; }
+            public int Revision { get; init; }
+            public string CutType { get; init; } = "";
+            public double Thickness { get; init; }
+            public string MaterialName { get; init; } = "";
+            public string MaterialGrade { get; init; } = "";
+            public string Units { get; init; } = "";
+            public string Notes { get; init; } = "";
+            public string PackageSha256 { get; init; } = "";
+
+            /// <summary>Set only by the lenient reader for a value it could not read.</summary>
+            [JsonIgnore]
+            public bool Malformed { get; init; }
+        }
+
+        /// <summary>
+        /// Reads a wrongly shaped or typed library link as a malformed marker instead of
+        /// failing the whole nest; the nest reader validates the values it receives.
+        /// </summary>
+        public sealed class LenientDrawingLibraryLinkConverter : JsonConverter<DrawingLibraryLinkDto>
+        {
+            public override DrawingLibraryLinkDto Read(
+                ref Utf8JsonReader reader,
+                Type typeToConvert,
+                JsonSerializerOptions options
+            )
+            {
+                using var document = JsonDocument.ParseValue(ref reader);
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                    return new DrawingLibraryLinkDto { Malformed = true };
+
+                try
+                {
+                    return document.RootElement.Deserialize<DrawingLibraryLinkDto>(options)
+                        ?? new DrawingLibraryLinkDto { Malformed = true };
+                }
+                catch (Exception ex) when (ex is JsonException || ex is FormatException || ex is InvalidOperationException)
+                {
+                    return new DrawingLibraryLinkDto { Malformed = true };
+                }
+            }
+
+            // The converter sits on the property, not the type, so this does not recurse.
+            public override void Write(
+                Utf8JsonWriter writer,
+                DrawingLibraryLinkDto value,
+                JsonSerializerOptions options
+            ) => JsonSerializer.Serialize(writer, value, options);
         }
 
         public record PlateDto

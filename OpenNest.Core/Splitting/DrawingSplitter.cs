@@ -132,6 +132,8 @@ public static class DrawingSplitter
         piece.Material = source.Material;
         piece.Constraints = source.Constraints;
         piece.Customer = source.Customer;
+        // A piece is new geometry, not the library revision the source was copied from.
+        piece.Library = null;
         piece.Source = source.Source;
         piece.Quantity.Required = source.Quantity.Required;
 
@@ -269,15 +271,15 @@ public static class DrawingSplitter
 
         var regions = new List<Box>();
         for (var yi = 0; yi < yEdges.Count - 1; yi++)
-        for (var xi = 0; xi < xEdges.Count - 1; xi++)
-            regions.Add(
-                new Box(
-                    xEdges[xi],
-                    yEdges[yi],
-                    xEdges[xi + 1] - xEdges[xi],
-                    yEdges[yi + 1] - yEdges[yi]
-                )
-            );
+            for (var xi = 0; xi < xEdges.Count - 1; xi++)
+                regions.Add(
+                    new Box(
+                        xEdges[xi],
+                        yEdges[yi],
+                        xEdges[xi + 1] - xEdges[xi],
+                        yEdges[yi + 1] - yEdges[yi]
+                    )
+                );
 
         return regions;
     }

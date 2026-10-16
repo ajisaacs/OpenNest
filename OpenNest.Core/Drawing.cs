@@ -113,6 +113,12 @@ namespace OpenNest
         public List<Bend> Bends { get; set; } = new List<Bend>();
 
         /// <summary>
+        /// The library revision this drawing was copied from, or null when it did not come
+        /// from a drawing library. Editing the drawing in a nest keeps the link as provenance.
+        /// </summary>
+        public DrawingLibraryLink Library { get; set; }
+
+        /// <summary>
         /// Complete set of source entities with stable GUIDs.
         /// Null when the drawing was created from G-code or an older nest file.
         /// </summary>

@@ -198,11 +198,29 @@ namespace OpenNest.IO
                             })
                                 .ToList()
                             ?? new List<BendDto>(),
+                        Library = ToLibraryLinkDto(d.Library),
                     }
                 );
             }
             return list;
         }
+
+        private static DrawingLibraryLinkDto ToLibraryLinkDto(DrawingLibraryLink link) =>
+            link == null
+                ? null
+                : new DrawingLibraryLinkDto
+                {
+                    ServerKey = link.ServerKey,
+                    Id = link.Id,
+                    Revision = link.Revision,
+                    CutType = link.CutType.ToString(),
+                    Thickness = link.Thickness,
+                    MaterialName = link.MaterialName,
+                    MaterialGrade = link.MaterialGrade,
+                    Units = link.Units.ToString(),
+                    Notes = link.Notes,
+                    PackageSha256 = link.PackageSha256,
+                };
 
         /// <summary>
         /// True when a plate created from the saved defaults would be this sheet's clamp

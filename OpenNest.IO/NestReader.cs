@@ -21,7 +21,7 @@ namespace OpenNest.IO
         private readonly Dictionary<int, string> drawingHashes = new();
         private readonly List<string> warnings = new();
 
-        /// <summary>Part programs that could not be restored; other parts still load.</summary>
+        /// <summary>Part programs and library links that could not be restored; everything else still loads.</summary>
         public IReadOnlyList<string> Warnings => warnings.AsReadOnly();
 
         /// <summary>
@@ -273,9 +273,47 @@ namespace OpenNest.IO
                     }
                 }
 
+                drawing.Library = ReadLibraryLink(d);
                 map[d.Id] = drawing;
             }
             return map;
+        }
+
+        // A link that cannot be fully trusted is dropped: the drawing loads as a plain nest
+        // drawing, which is what it is without a verifiable library revision.
+        private DrawingLibraryLink ReadLibraryLink(DrawingDto d)
+        {
+            var link = d.Library;
+            if (link == null)
+                return null;
+
+            if (!link.Malformed
+                && !string.IsNullOrWhiteSpace(link.ServerKey)
+                && link.Id != Guid.Empty
+                && link.Revision >= 1
+                && TryParseName<CutType>(link.CutType, out var cutType)
+                && TryParseName<Units>(link.Units, out var units)
+                && double.IsFinite(link.Thickness)
+                && link.Thickness >= 0)
+            {
+                return new DrawingLibraryLink(link.ServerKey, link.Id, link.Revision, cutType, link.Thickness,
+                    link.MaterialName, link.MaterialGrade, units, link.Notes, link.PackageSha256);
+            }
+
+            warnings.Add($"Drawing '{d.Name}': its drawing library link could not be read; "
+                + "loaded it as a nest drawing without a library revision.");
+            return null;
+        }
+
+        // Single enum names only: Enum.TryParse also accepts numbers and comma lists.
+        private static bool TryParseName<T>(string text, out T value)
+            where T : struct, Enum
+        {
+            value = default;
+            return !string.IsNullOrEmpty(text)
+                && text.All(char.IsAsciiLetter)
+                && Enum.TryParse(text, ignoreCase: false, out value)
+                && Enum.IsDefined(value);
         }
 
         private void ReadBestFits(Dictionary<int, Drawing> drawingMap)

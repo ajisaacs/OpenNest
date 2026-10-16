@@ -14,7 +14,7 @@ namespace OpenNest.IO
     /// plates, written and read by the ordinary <see cref="NestWriter"/>/<see cref="NestReader"/>.
     /// Packages are canonical, so the same drawing content always has the same bytes and
     /// SHA-256: archive timestamps and nest dates are fixed, the nest-specific required
-    /// quantity is zero, and derived best-fit caches are left out.
+    /// quantity is zero, and derived best-fit caches and library links are left out.
     /// </summary>
     public static class DrawingPackage
     {
@@ -123,8 +123,12 @@ namespace OpenNest.IO
             if (root["drawings"] is JsonArray drawings)
             {
                 foreach (var drawing in drawings.OfType<JsonObject>())
+                {
                     if (drawing["quantity"] is JsonObject quantity)
                         quantity["required"] = 0;
+                    // A library link is nest-side provenance; the server's record describes the package.
+                    drawing.Remove("library");
+                }
             }
 
             return root.ToJsonString(NestFormat.JsonOptions);
