@@ -159,11 +159,9 @@ public class CuttingInspectionPanelTests
         using var editor = Editor();
         var second = editor.Nest.Plates[^1]; // Fill the managed empty sentinel; a new one is appended.
         second.Size = new OpenNest.Geometry.Size(100, 100);
-        var locked = Square("locked", 1);
-        var crossing = (OpenNest.CNC.Program)locked.Program.Clone();
-        crossing.MoveTo(5, 5);
-        Assert.True(locked.RestoreLeadInProgram(crossing, true));
-        second.Parts.Add(locked);
+        // Overlapping material blocks the plate (a locked program's own crossing only warns).
+        second.Parts.Add(Square("first", 1));
+        second.Parts.Add(Square("second", 5));
         editor.Show();
         editor.PlateManager.LoadAt(editor.Nest.Plates.Count - 1); // Different empty sentinel.
         var original = editor.PlateView.Plate;
