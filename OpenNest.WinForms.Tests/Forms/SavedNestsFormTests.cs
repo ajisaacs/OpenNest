@@ -145,6 +145,80 @@ public class SavedNestsFormTests
             "The saved-nest dialog test did not complete.");
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void NestInformation_SavesOnlyOnAccept_AndRefusesStaleWrites(bool accept, bool conflict)
+    {
+        StaTestThread.Run(() =>
+        {
+            var record = Record("Current name");
+            record.Revision = 3;
+            record.Comments = "Current metadata notes";
+            record.Status = NestStatus.ToBeCut;
+            var repository = new FakeRepository(record) { Conflict = conflict };
+            repository.Files[record.Id] = NestFile((Quantity: 2, Parts: 3));
+            record.FileSize = repository.Files[record.Id].Length;
+            var original = repository.Files[record.Id].ToArray();
+            using var form = new SavedNestsForm(repository, "http://nest-server:5000");
+            form.Show();
+            PumpUntil(() => Field<DataGridView>(form, "nestGrid").Rows.Count == 1, "the nest page");
+            var shown = false;
+            form.ShowNestInfoDialog = dialog =>
+            {
+                shown = true;
+                Assert.Equal(record.Name, dialog.NestName);
+                Assert.Equal(record.Comments, dialog.Notes);
+                Assert.Equal(NestStatus.ToBeCut, dialog.Status);
+                dialog.Customer = "Updated customer";
+                dialog.Notes = "Updated notes";
+                dialog.Status = NestStatus.HasBeenCut;
+                dialog.MadeBy = "Operator";
+                dialog.MaterialName = "Steel";
+                dialog.Thickness = 0.25;
+                return accept ? DialogResult.OK : DialogResult.Cancel;
+            };
+            var button = Field<Button>(form, "infoButton");
+            Assert.True(button.Enabled);
+            Assert.Contains(Field<DataGridView>(form, "nestGrid").ContextMenuStrip!.Items.Cast<ToolStripItem>(),
+                item => item.Text == "Nest Information...");
+            button.PerformClick();
+            PumpUntil(() => shown && form.Enabled, "the information edit");
+            Assert.True(shown);
+            Assert.True(form.Enabled);
+            Assert.Equal(DialogResult.None, form.DialogResult);
+            Assert.Equal(Guid.Empty, form.SelectedId);
+            Assert.Equal(accept ? 1 : 0, repository.UpdateAttempts);
+            if (accept && !conflict)
+            {
+                Assert.Equal(3, repository.ExpectedRevision);
+                Assert.Equal(4, record.Revision);
+                Assert.Equal("Updated customer", record.Customer);
+                Assert.Equal("Updated notes", record.Comments);
+                using var stream = new MemoryStream(repository.Files[record.Id]);
+                var nest = new NestReader(stream).Read();
+                Assert.Equal("Updated customer", nest.Customer);
+                Assert.Equal("Updated notes", nest.Notes);
+                Assert.Equal(NestStatus.HasBeenCut, nest.Status);
+                Assert.Equal("Operator", nest.MadeBy);
+                Assert.Equal("Steel", nest.Material.Name);
+                Assert.Equal(0.25, nest.Thickness);
+                Assert.Single(nest.Plates);
+                Assert.Equal(2, nest.Plates[0].Quantity);
+                Assert.Equal(3, nest.Plates[0].Parts.Count);
+                Assert.Equal("Updated customer", Field<DataGridView>(form, "nestGrid").Rows[0].Cells["Customer"].Value);
+            }
+            else
+            {
+                Assert.Equal(original, repository.Files[record.Id]);
+                Assert.Equal(3, record.Revision);
+                if (conflict)
+                    Assert.Contains("409", Field<Label>(form, "summaryLabel").Text);
+            }
+        }, TestTimeout, "The information edit did not complete.");
+    }
+
     private static NestRecord Record(string name) =>
         new() { Id = Guid.NewGuid(), Name = name, SavedAt = DateTime.Now };
 
@@ -203,7 +277,38 @@ public class SavedNestsFormTests
 
         public FakeRepository(params NestRecord[] records) => _records = records;
 
+        public bool Conflict { get; set; }
+        public int UpdateAttempts { get; private set; }
+        public int ExpectedRevision { get; private set; }
         public Dictionary<Guid, byte[]> Files { get; } = new();
+
+        public Task<byte[]?> GetRevisionFileAsync(Guid id, int revisionNumber, CancellationToken cancellationToken = default) =>
+            GetFileAsync(id, cancellationToken);
+
+        public Task<NestRevisionPage> GetRevisionsAsync(Guid id, int offset = 0, int limit = 100, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new NestRevisionPage());
+
+        public Task<NestRecord> UpdateFileAsync(Guid id, byte[] bytes, NestRecord metadata, int expectedRevision,
+            CancellationToken cancellationToken = default)
+        {
+            UpdateAttempts++;
+            ExpectedRevision = expectedRevision;
+            if (Conflict) throw new IOException("409: changed on another PC");
+            var current = _records.Single(r => r.Id == id);
+            Assert.Equal(current.Revision, expectedRevision);
+            current.Revision++;
+            current.Name = metadata.Name;
+            current.Customer = metadata.Customer;
+            current.Comments = metadata.Comments;
+            current.Material = metadata.Material;
+            current.Thickness = metadata.Thickness;
+            current.Status = metadata.Status;
+            current.MadeBy = metadata.MadeBy;
+            current.DateModified = metadata.DateModified;
+            current.FileSize = bytes.Length;
+            Files[id] = bytes;
+            return Task.FromResult(current);
+        }
 
         public Task<NestPage> QueryAsync(NestQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult(new NestPage
@@ -221,7 +326,7 @@ public class SavedNestsFormTests
             throw new NotSupportedException();
 
         public Task<NestRecord?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult(_records.SingleOrDefault(r => r.Id == id));
 
         public Task<NestRecord> UploadAsync(byte[] nestFile, NestRecord record, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

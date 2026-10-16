@@ -28,6 +28,17 @@ The desktop app can save nests two ways:
   previous one. On the Versions tab, **Open read-only...** previews one snapshot
   without binding an editable document, and **Download selected version...** saves
   its exact archived bytes.
+  Select a nest and click **Nest Information...** above the list (or use the
+  row's right-click menu) to edit the same information as **Nest > Nest Info**
+  without opening the nest in the main editor. **OK** saves immediately to the
+  same database ID as a new version, then refreshes the list, preview and history;
+  **Cancel** makes no change. The dialog starts with the latest saved metadata.
+  Plate defaults follow the same rules as the open editor: populated sheets are
+  not resized or re-nested. This action requires a version-aware server and
+  refuses to overwrite a newer save from another PC. After a conflict or network
+  error, refresh and reopen the information dialog before trying again; a lost
+  reply can mean the save already reached the server. An already-open editor is
+  not modified; reload it before saving further changes to that same nest.
   A separate confirmed **Restore selected version...** creates a new current
   revision of the same ID and keeps all intervening versions. **Delete...** hides
   the record from ordinary browsing but retains every archive; **Deleted nests...**
