@@ -1,4 +1,5 @@
 using OpenNest.BestFit;
+using OpenNest.Engine;
 using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using OpenNest.Shapes;
@@ -71,7 +72,7 @@ public class BestFitCacheStoreTests
     }
 
     [Fact]
-    public void Import_PopulatesCacheWithCandidatesBoundToTheDrawing()
+    public void Import_PopulatesCacheWithCandidatesOnACanonicalCopyOfTheDrawing()
     {
         BestFitCache.Clear();
         var drawing = MakeDrawing();
@@ -82,7 +83,9 @@ public class BestFitCacheStoreTests
         var restored = Assert.Single(BestFitCache.GetAllForDrawing(drawing));
         Assert.Equal((60.0, 40.0, Spacing), restored.Key);
         var result = Assert.Single(restored.Value);
-        Assert.Same(drawing, result.Candidate.Drawing);
+        Assert.NotSame(drawing, result.Candidate.Drawing);
+        Assert.Same(drawing, CanonicalFrame.SourceOf(result.Candidate.Drawing));
+        Assert.Equal(0.0, result.Candidate.Drawing.Source.Angle);
         Assert.Equal(0.5, result.Candidate.Part1Rotation);
         Assert.Equal(System.Math.PI, result.Candidate.Part2Rotation);
         Assert.Equal(new Vector(3.25, -1.5), result.Candidate.Part2Offset);

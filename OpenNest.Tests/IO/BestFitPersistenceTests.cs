@@ -137,11 +137,10 @@ public class BestFitPersistenceTests
     }
 
     [Fact]
-    public void RoundTrip_RotatedSource_LoadedCandidatesHoldTheSourceDrawingNotACanonicalCopy()
+    public void RoundTrip_RotatedSource_LoadedCandidatesRebuildTheSavedPair()
     {
-        // Pins current behaviour: computed candidates hold a canonical copy (angle 0), while
-        // loaded candidates hold the loaded source drawing itself, so BuildCanonicalParts on a
-        // loaded result builds from the source frame.
+        // Saved pairs are in the canonical frame. Loaded candidates must hold a canonical copy,
+        // as computed ones do, or the source drawing rebuilds a different pair.
         BestFitCache.Clear();
         var nest = CreateNest(MakeRotatedTShape());
         var source = nest.Drawings.First();
@@ -156,18 +155,19 @@ public class BestFitPersistenceTests
 
         Assert.False(Tolerance.IsEqualTo(drawing.Source.Angle, 0));
         Assert.Equal(source.Source.Angle, drawing.Source.Angle, 9);
-        Assert.Same(drawing, loaded.Candidate.Drawing);
+        Assert.NotSame(drawing, loaded.Candidate.Drawing);
+        Assert.Same(drawing, CanonicalFrame.SourceOf(loaded.Candidate.Drawing));
+        Assert.Equal(0.0, loaded.Candidate.Drawing.Source.Angle);
 
-        Assert.Equal(0.0, computed.BuildCanonicalParts()[0].BaseDrawing.Source.Angle);
-        Assert.Same(drawing, loaded.BuildCanonicalParts()[0].BaseDrawing);
-
-        // The computed pair rebuilds to its saved bounds; the loaded one, built from the
-        // source frame with canonical-frame offsets, does not.
-        var computedBounds = computed.GetCutBounds(computed.BuildSourceParts(source));
-        Assert.Equal(computed.BoundingWidth, computedBounds.Length, 2);
-        Assert.Equal(computed.BoundingHeight, computedBounds.Width, 2);
-        var loadedBounds = loaded.GetCutBounds(loaded.BuildSourceParts(drawing));
-        Assert.NotEqual(loaded.BoundingWidth * loaded.BoundingHeight, loadedBounds.Length * loadedBounds.Width, 2);
+        foreach (var (result, owner) in new[] { (computed, source), (loaded, drawing) })
+        {
+            var parts = result.BuildSourceParts(owner);
+            var bounds = result.GetCutBounds(parts);
+            Assert.All(parts, p => Assert.Same(owner, p.BaseDrawing));
+            Assert.Equal(result.BoundingWidth, bounds.Length, 2);
+            Assert.Equal(result.BoundingHeight, bounds.Width, 2);
+            Assert.False(parts[0].Intersects(parts[1], out _));
+        }
     }
 
     [Fact]
@@ -263,7 +263,7 @@ public class BestFitPersistenceTests
         {
             var e = expected[i];
             var a = actual[i];
-            Assert.Same(loadedDrawing, a.Candidate.Drawing);
+            Assert.Same(loadedDrawing, CanonicalFrame.SourceOf(a.Candidate.Drawing));
             AssertBits(e.Candidate.Part1Rotation, a.Candidate.Part1Rotation);
             AssertBits(e.Candidate.Part2Rotation, a.Candidate.Part2Rotation);
             AssertBits(e.Candidate.Part2Offset.X, a.Candidate.Part2Offset.X);

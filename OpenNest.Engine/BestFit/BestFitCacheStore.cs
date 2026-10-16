@@ -58,14 +58,22 @@ namespace OpenNest.Engine.BestFit
 
         public void Import(Drawing drawing, IReadOnlyList<SavedPairSet> sets)
         {
+            // Saved pairs are in the canonical frame, so their candidates hold a canonical copy,
+            // as computed ones do; the source drawing would rebuild a different pair.
+            Drawing canonical = null;
+
             foreach (var set in sets)
             {
+                if (set.Results.Count == 0)
+                    continue;
+
+                canonical ??= CanonicalFrame.AsCanonicalCopy(drawing);
                 var results = set
                     .Results.Select(r => new BestFitResult
                     {
                         Candidate = new PairCandidate
                         {
-                            Drawing = drawing,
+                            Drawing = canonical,
                             Part1Rotation = r.Part1Rotation,
                             Part2Rotation = r.Part2Rotation,
                             Part2Offset = new Vector(r.Part2OffsetX, r.Part2OffsetY),
