@@ -356,7 +356,8 @@ its retention gap, so confirmed-parameters planning refuses it in a planned cont
 
 With confirmed parameters, a locked program (Place Lead-in locks, PEP-imported locked
 parts) is a fixed emission: everything it does after the planner's rapid into it is
-accepted as given (user decision D1a, 2026-10-14). Its violations are not refusals:
+accepted as given (user decision D1a, 2026-10-14). So is each drawing-pinned contour of a
+regenerated part (see [drawing pins](#drawing-pins)). Their violations are not refusals:
 
 - Its lead-ins and lead-outs meeting another part's material or its own, a rapid inside
   it crossing a completed contour, a lead-out after its own open contour, and coverage
@@ -400,6 +401,14 @@ clean contours with `CutPinResolver` and prepares them with
   "Drawing pin 2 no longer matches the geometry; planned with nest settings.", which makes the
   plate UNVERIFIED. A tab pinned on an internal contour is not honoured either: only the
   outside is tabbed.
+- A pinned contour's lead-in, cut, lead-out and tab are a fixed emission like a locked program
+  (see [fixed emissions](#fixed-emissions-warn)): a pinned lead that meets another part's
+  material or its own part's (an already-cut hole included) is a `FixedLead` warning naming
+  the part, cutting contour, pin and the part hit, with the advice "Increase spacing or switch
+  off drawing pins for this part (right-click > Drawing Pins Off)". The entry is never moved
+  and the lead never shortened to fit; the feasibility precheck accepts it as given. The
+  rapids between contours, including the one into a pinned contour, stay strict. Plan
+  Cutting does not model clamps, for pinned leads or any other.
 - A placement with `Part.DrawingPinsOff` ignores its drawing's pins and plans entirely from
   the plate settings, with no warning (D1's per-part escape hatch). `Part.HasActiveDrawingPins`
   is the shared test for "pins apply here".

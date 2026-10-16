@@ -133,15 +133,69 @@ public sealed class FixedProgramPlacement
     /// <summary>
     /// The motions of <paramref name="execution"/> (this placement's own program read with its
     /// incoming rapid first) that are a fixed emission, accepted as given in regeneration mode:
-    /// everything a locked program does after the planner's rapid into it. Null when nothing is
-    /// fixed. Cutoffs and unlocked programs a caller left ineligible keep their strict checks.
+    /// everything a locked program does after the planner's rapid into it, and the lead-in, cut,
+    /// lead-out and tab of every drawing-pinned contour in a regenerated program, whose
+    /// <paramref name="choices"/> (default: this proposal's) were emitted. The rapids between
+    /// contours stay the planner's. Null when nothing is fixed. Cutoffs and unlocked programs a
+    /// caller left ineligible keep their strict checks.
     /// </summary>
-    internal Func<int, bool> FixedMotions(OwnedExecution execution)
+    internal Func<int, bool> FixedMotions(OwnedExecution execution, IReadOnlyList<ContourChoice> choices = null)
     {
-        if (IsCutOff || Prepared != null || !LeadInsLocked)
+        if (IsCutOff)
+            return null;
+        if (Prepared != null)
+        {
+            var pins = PinsByMotion(execution, choices);
+            return pins == null ? null : motion => pins[motion] != null;
+        }
+        if (!LeadInsLocked)
             return null;
         var opensWithRapid = execution.Motions.Count != 0 && execution.Motions[0].Rapid;
         return motion => motion > 0 || !opensWithRapid;
+    }
+
+    /// <summary>
+    /// For each motion of a regenerated program emitted from <paramref name="choices"/>, the
+    /// one-based drawing pin whose contour it cuts (lead-ins, cuts, lead-outs; never the rapid
+    /// into the contour), or null. Null overall when no choice is pinned, or when the motions do
+    /// not split into one group per choice after the scribes, so nothing is treated as fixed.
+    /// </summary>
+    internal int?[] PinsByMotion(OwnedExecution execution, IReadOnlyList<ContourChoice> choices = null)
+    {
+        choices ??= ContourChoices;
+        if (Prepared == null || !choices.Any(c => Prepared.IsPinned(c.ContourOrdinal)))
+            return null;
+        var pins = new int?[execution.Motions.Count];
+        var group = -1;
+        var opening = true; // Inside the rapids that open a group.
+        int? pin = null;
+        for (var index = 0; index < execution.Motions.Count; index++)
+        {
+            var motion = execution.Motions[index];
+            if (motion.Rapid)
+            {
+                if (!opening)
+                    opening = true;
+                continue;
+            }
+            if (opening)
+            {
+                opening = false;
+                // Scribes are emitted first, before any contour.
+                if (motion.Layer == LayerType.Scribe)
+                {
+                    pin = null;
+                    if (group >= 0)
+                        return null;
+                    continue;
+                }
+                if (++group >= choices.Count)
+                    return null;
+                pin = Prepared.PinNumberOf(choices[group].ContourOrdinal);
+            }
+            pins[index] = pin;
+        }
+        return group == choices.Count - 1 ? pins : null;
     }
 
     internal FixedProgramPlacement Propose(Program proposed, OwnedExecution execution, IReadOnlyList<ContourChoice> choices,

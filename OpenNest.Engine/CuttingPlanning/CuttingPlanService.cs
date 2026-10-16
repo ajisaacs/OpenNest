@@ -369,7 +369,7 @@ public static class CuttingPlanService
                 return new(CuttingPlanStatus.UnsupportedGeometry,
                     findings: [JointCuttingPlanSearch.Finding(source, PostVerificationKind.Incomplete, ex.Message)], expansions: expansions);
             }
-            var isFixed = source.FixedMotions(execution);
+            var isFixed = proposal.FixedMotions(execution);
             var (strict, fixedFindings) = checker.Check(execution, position, source.SourceOrdinal + 1,
                 source.IsCutOff, isFixed, token);
             findings.AddRange(JointCuttingPlanSearch.Map(snapshot, strict));
@@ -380,7 +380,9 @@ public static class CuttingPlanService
             if (!lead.IsComplete || !lead.IsClear)
                 findings.Add(JointCuttingPlanSearch.Finding(source,
                     lead.IsComplete ? null : PostVerificationKind.Incomplete, lead.Reason));
-            warnings.AddRange(fixedLeads.Select(f => FixedLeadWarnings.FromLead(source, execution, f, materialOwners)));
+            var pins = proposal.PinsByMotion(execution);
+            warnings.AddRange(fixedLeads.Select(f => FixedLeadWarnings.FromLead(source, execution, f, materialOwners,
+                pins?[f.Motion])));
             // A locked program's coverage (a tab gap, a partial or reversed cut) has no certified
             // selection to compare with; a regenerated program's never escapes the strict rule.
             if (!complete && source.Prepared == null && isFixed != null)

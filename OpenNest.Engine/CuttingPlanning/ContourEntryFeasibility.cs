@@ -88,6 +88,10 @@ public sealed class ContourEntryFeasibility
         // substitute for the isolated emitter's owned-choice check.
         if (!ReferenceEquals(choice.Owner, prepared))
             return new(ContourFeasibilityStatus.Incomplete, "Foreign contour choice.");
+        // A drawing pin's entry is a fixed emission, accepted as given: it is never filtered
+        // out here. The emitted program's checks report its violations as warnings.
+        if (prepared.PinnedEntry(choice.ContourOrdinal) == choice)
+            return new(ContourFeasibilityStatus.Clear, null);
         var key = new Key(choice.ContourOrdinal, choice.EntityOrdinal,
             choice.Point.X, choice.Point.Y, nodeContext ?? string.Empty);
         if (cache.TryGetValue(key, out var known))
