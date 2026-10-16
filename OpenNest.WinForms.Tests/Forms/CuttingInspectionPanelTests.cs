@@ -522,7 +522,7 @@ public class CuttingInspectionPanelTests
         Assert.NotEmpty(plate.CutOffs);
         Assert.Equal(plate.CutOffs.Count, plate.Parts.Count(p => p.BaseDrawing.IsCutOff));
         Assert.Equal(plate.CutOffs.Count, panel.Proposal.Plates[0].Result.ProposedOrder.Count(p => p.IsCutOff));
-        Assert.False(Field<FlowLayoutPanel>(panel, "existingWorkBanner").Visible); // Staged lines are not "existing".
+        Assert.False(Field<Control>(panel, "existingWorkBanner").Visible); // Staged lines are not "existing".
 
         Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = false;
         PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
@@ -574,7 +574,7 @@ public class CuttingInspectionPanelTests
         editor.OpenCuttingInspection();
         var first = editor.CuttingInspection!;
         PumpUntil(() => first.Proposal != null && !first.IsPlanning);
-        Assert.False(Field<FlowLayoutPanel>(first, "existingWorkBanner").Visible);
+        Assert.False(Field<Control>(first, "existingWorkBanner").Visible);
         Field<Button>(first, "applyButton").PerformClick();
         Assert.All(plate.Parts, part => Assert.True(part.HasManualLeadIns));
         plate.CutOffs.Add(new CutOff(new Vector(60, 0), CutOffAxis.Vertical));
@@ -584,7 +584,7 @@ public class CuttingInspectionPanelTests
         editor.OpenCuttingInspection();
         var panel = editor.CuttingInspection!;
         PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
-        var banner = Field<FlowLayoutPanel>(panel, "existingWorkBanner");
+        var banner = Field<Control>(panel, "existingWorkBanner");
         Assert.True(banner.Visible);
         Assert.Contains("ALREADY APPLIED: lead-ins on 2 parts and 1 cut-off on plate 1.",
             Field<Label>(panel, "existingWorkLabel").Text);
@@ -675,7 +675,7 @@ public class CuttingInspectionPanelTests
         protected override void OnLoad(EventArgs e) { }
     }
 
-    private static T Field<T>(object target, string name) => Assert.IsType<T>(target.GetType()
+    private static T Field<T>(object target, string name) => Assert.IsAssignableFrom<T>(target.GetType()
         .GetField(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(target));
 
     private static void OpenAll(EditNestForm editor)
