@@ -9,7 +9,7 @@ namespace OpenNest.Server;
 /// so a PC that loses its local id mapping can still re-upload under a new id;
 /// updates keep the id.
 /// </summary>
-public sealed class NestDatabase : IDisposable
+public sealed partial class NestDatabase : IDisposable
 {
     // One reentrant monitor owns each complete connection operation, including
     // readers, nested Get readbacks, health checks, and disposal.
@@ -316,7 +316,7 @@ public sealed class NestDatabase : IDisposable
             command.Transaction = transaction;
             command.CommandText = "PRAGMA user_version";
             var version = (long)command.ExecuteScalar()!;
-            if (version > 3) throw new InvalidOperationException("Database schema is newer than this server.");
+            if (version > 4) throw new InvalidOperationException("Database schema is newer than this server.");
             if (version == 0)
             {
                 command.CommandText = """
@@ -344,6 +344,11 @@ public sealed class NestDatabase : IDisposable
                     ALTER TABLE nest_revisions ADD COLUMN restoredFromRevision INTEGER;
                     PRAGMA user_version=3;
                     """;
+                command.ExecuteNonQuery();
+            }
+            if (version < 4)
+            {
+                command.CommandText = DrawingLibrarySchema;
                 command.ExecuteNonQuery();
             }
             transaction.Commit();
