@@ -153,6 +153,8 @@ public class SavedNestsFormTests
     {
         StaTestThread.Run(() =>
         {
+            // PerformClick outside Application.Run needs the real UI dispatcher installed.
+            using var context = new WindowsFormsSynchronizationContext();
             var record = Record("Current name");
             record.Revision = 3;
             record.Comments = "Current metadata notes";
@@ -167,6 +169,7 @@ public class SavedNestsFormTests
             using var form = new SavedNestsForm(repository, "http://nest-server:5000");
             form.Show();
             PumpUntil(() => Field<DataGridView>(form, "nestGrid").Rows.Count == 1, "the nest page");
+            SynchronizationContext.SetSynchronizationContext(context);
             var shown = false;
             form.ShowNestInfoDialog = dialog =>
             {
@@ -232,6 +235,8 @@ public class SavedNestsFormTests
     {
         StaTestThread.Run(() =>
         {
+            // PerformClick outside Application.Run needs the real UI dispatcher installed.
+            using var context = new WindowsFormsSynchronizationContext();
             var record = Record("Busy job");
             record.Revision = 1;
             var repository = new FakeRepository(record);
@@ -243,6 +248,7 @@ public class SavedNestsFormTests
             var oldDetails = Field<NestDetailsSession>(form, "details");
             repository.ReadGate = new TaskCompletionSource<bool>();
             repository.SaveGate = new TaskCompletionSource<bool>();
+            SynchronizationContext.SetSynchronizationContext(context);
             var shown = false;
             form.ShowNestInfoDialog = dialog =>
             {

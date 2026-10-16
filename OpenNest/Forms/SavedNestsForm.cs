@@ -823,6 +823,7 @@ public sealed class SavedNestsForm : Form
     {
         if (editingInfo || deleting || SelectedNestId() is not Guid id)
             return;
+        summaryLabel.Text = "Loading nest information...";
         editingInfo = true;
         Enabled = false;
         UpdateCommands();
@@ -849,6 +850,7 @@ public sealed class SavedNestsForm : Form
             using var manager = new PlateManager(nest);
             manager.ChangePlateDefaults(() => dialog.SaveNestInfo(nest));
             nest.DateLastModified = DateTime.Now;
+            summaryLabel.Text = "Saving nest information...";
             var bytes = await Task.Run(() =>
             {
                 using var output = new MemoryStream();
@@ -857,6 +859,7 @@ public sealed class SavedNestsForm : Form
             });
             var save = new NestSaveSession();
             save.Bind(id, snapshot.ServerUrl, snapshot.Metadata.Revision);
+            summaryLabel.Text = "Sending nest information...";
             var saved = await save.SaveAsync(repository, snapshot.ServerUrl, nest, bytes);
             var verified = await NestHistorySession.ReadCurrentAsync(repository, id, snapshot.ServerUrl);
             if (verified.Metadata.Revision != saved.Revision
@@ -886,6 +889,8 @@ public sealed class SavedNestsForm : Form
             if (!IsDisposed)
             {
                 Enabled = true;
+                if (summaryLabel.Text == "Loading nest information...")
+                    summaryLabel.Text = session.Summary;
                 UpdateCommands();
             }
         }
