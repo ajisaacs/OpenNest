@@ -90,7 +90,9 @@ public sealed class ContourEntryFeasibility
             return new(ContourFeasibilityStatus.Incomplete, "Foreign contour choice.");
         // A drawing pin's entry is a fixed emission, accepted as given: it is never filtered
         // out here. The emitted program's checks report its violations as warnings.
-        if (prepared.PinnedEntry(choice.ContourOrdinal) == choice)
+        // A forged ordinal falls through to the probe, which refuses it as Incomplete.
+        if (choice.ContourOrdinal >= 0 && choice.ContourOrdinal < prepared.Count
+            && prepared.PinnedEntry(choice.ContourOrdinal) == choice)
             return new(ContourFeasibilityStatus.Clear, null);
         var key = new Key(choice.ContourOrdinal, choice.EntityOrdinal,
             choice.Point.X, choice.Point.Y, nodeContext ?? string.Empty);
