@@ -110,6 +110,74 @@ public sealed class DrawingLibraryEndToEndTests
         Assert.Equal(new[] { 2, 1 }, history!.Items.Select(r => r.Revision));
     }
 
+    private static Nest SyntheticNest() => new("Synthetic job")
+    {
+        Units = Units.Inches,
+        Thickness = 0.25,
+        Material = new Material("Synthetic Steel", "Grade A"),
+    };
+
+    [Fact]
+    public async Task SaveSession_CreatesThenDefaultsToTheNextRevisionOfTheDuplicate()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var library = new RemoteDrawingLibrary(client, client.BaseAddress!.ToString());
+        var nest = SyntheticNest();
+        var drawing = SyntheticDrawing("Synthetic bracket", 2);
+        nest.Drawings.Add(drawing);
+        var first = new DrawingLibrarySaveSession(library, client.BaseAddress!.ToString(), nest, drawing);
+        var metadata = first.Prefill(CutType.Laser, "Synthetic operator");
+
+        var none = await first.FindDuplicatesAsync(metadata);
+        var created = await first.SaveAsync(metadata, DrawingPackage.Write(drawing, nest.Units), none.Default);
+
+        // Another nest's copy, moved hole, same details: D4 offers revision 2 by default.
+        var otherNest = SyntheticNest();
+        var copy = SyntheticDrawing("Synthetic bracket", 5);
+        otherNest.Drawings.Add(copy);
+        var second = new DrawingLibrarySaveSession(library, client.BaseAddress!.ToString(), otherNest, copy);
+        var again = second.Prefill(CutType.Laser, "Synthetic operator");
+        var duplicates = await second.FindDuplicatesAsync(again);
+        var package = DrawingPackage.Write(copy, otherNest.Units);
+        var revised = await second.SaveAsync(again, package, duplicates.Default);
+
+        Assert.Empty(none.Matches);
+        Assert.Equal((DrawingLibrarySaveOutcome.Created, 1), (created.Outcome, created.Saved.Revision));
+        Assert.Equal(created.Saved.Id, duplicates.Default!.Id);
+        Assert.Equal((DrawingLibrarySaveOutcome.Revised, 2), (revised.Outcome, revised.Saved.Revision));
+        Assert.Equal((created.Saved.Id, 2), (copy.Library!.Id, copy.Library.Revision));
+        Assert.Equal((created.Saved.Id, 1), (drawing.Library!.Id, drawing.Library.Revision));
+        Assert.Equal(package, await library.GetPackageAsync(created.Saved.Id));
+        Assert.Equal(revised.Saved.PackageSha256, copy.Library.PackageSha256);
+    }
+
+    [Fact]
+    public async Task SaveSession_StaleChoiceConflictsAndChangesNothing()
+    {
+        using var factory = new ServerFactory();
+        using var client = factory.CreateClient();
+        using var library = new RemoteDrawingLibrary(client, client.BaseAddress!.ToString());
+        var nest = SyntheticNest();
+        var drawing = SyntheticDrawing("Synthetic bracket", 2);
+        nest.Drawings.Add(drawing);
+        var session = new DrawingLibrarySaveSession(library, client.BaseAddress!.ToString(), nest, drawing);
+        var metadata = session.Prefill(CutType.Laser, "Synthetic operator");
+        await session.SaveAsync(metadata, DrawingPackage.Write(drawing, nest.Units), null);
+        var duplicates = await session.FindDuplicatesAsync(metadata);
+        var moved = DrawingPackage.Write(SyntheticDrawing("Synthetic bracket", 5), Units.Inches);
+        var current = await library.UpdatePackageAsync(duplicates.Default!.Id, metadata, moved, 1);
+
+        var conflict = await Assert.ThrowsAsync<DrawingLibraryConflictException>(() =>
+            session.SaveAsync(metadata, DrawingPackage.Write(SyntheticDrawing("Synthetic bracket", 6), Units.Inches), duplicates.Default));
+
+        Assert.Equal(2, conflict.Current.Revision);
+        Assert.False(session.HasPendingSave);
+        Assert.Equal(1, drawing.Library!.Revision);
+        Assert.Equal(current.PackageSha256, (await library.GetAsync(current.Id))!.PackageSha256);
+        Assert.Equal(moved, await library.GetPackageAsync(current.Id));
+    }
+
     [Fact]
     public async Task ArchiveRestoreAndMetadata_ThroughTheClient()
     {
