@@ -149,6 +149,25 @@ public sealed class PreparedContours
         }
     }
 
+    /// <summary>
+    /// Every contour with a native entity within <paramref name="tolerance"/> of
+    /// <paramref name="point"/>, in ordinal order, each with its closest entity and the exact
+    /// closest native point on it. A locating aid for drawing pins, not an entry choice.
+    /// </summary>
+    internal IReadOnlyList<(int ContourOrdinal, int EntityOrdinal, Vector Point)> ContoursNear(Vector point, double tolerance)
+    {
+        PostVerificationGeometry.Validate(point);
+        var found = new List<(int, int, Vector)>();
+        for (var ordinal = 0; ordinal < Count; ordinal++)
+        {
+            var shape = shapes[ordinal];
+            var closest = shape.ClosestPointTo(point, out var entity);
+            if (closest.DistanceTo(point) <= tolerance)
+                found.Add((ordinal, shape.Entities.IndexOf(entity), closest));
+        }
+        return found;
+    }
+
     public ContourChoice Entry(int contourOrdinal, int entityOrdinal, Vector point)
     {
         var choice = new ContourChoice(contourOrdinal, entityOrdinal, point) { Owner = this };

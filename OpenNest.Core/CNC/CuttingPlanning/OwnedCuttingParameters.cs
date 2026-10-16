@@ -65,7 +65,7 @@ internal static class OwnedCuttingParameters
         };
     }
 
-    private static LeadIn CopyLeadIn(LeadIn source) => source switch
+    internal static LeadIn CopyLeadIn(LeadIn source) => source switch
     {
         NoLeadIn n when n.GetType() == typeof(NoLeadIn) => new NoLeadIn(),
         LineLeadIn n when n.GetType() == typeof(LineLeadIn) => new LineLeadIn
@@ -86,7 +86,7 @@ internal static class OwnedCuttingParameters
         _ => throw new NotSupportedException("Unsupported lead-in runtime type.")
     };
 
-    private static LeadOut CopyLeadOut(LeadOut source) => source switch
+    internal static LeadOut CopyLeadOut(LeadOut source) => source switch
     {
         NoLeadOut n when n.GetType() == typeof(NoLeadOut) => new NoLeadOut(),
         LineLeadOut n when n.GetType() == typeof(LineLeadOut) => new LineLeadOut
@@ -96,7 +96,7 @@ internal static class OwnedCuttingParameters
         _ => throw new NotSupportedException("Unsupported lead-out runtime type.")
     };
 
-    private static Tab CopyTab(Tab source)
+    internal static Tab CopyTab(Tab source)
     {
         Tab copy = source switch
         {
