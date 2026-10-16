@@ -124,6 +124,8 @@ public static class CuttingPlanService
                     if (!source.LeadInsLocked && (request.EligibleParts == null || eligible.Contains(source)))
                         prepared = DrawingPinCapture.Prepare(source, index, ownedClean, request.ConfirmedParameters,
                             warnings, token);
+                    else if (source.HasActiveDrawingPins)
+                        warnings.Add(DrawingPinCapture.NotApplied(source, index));
                 }
                 var captured = material;
                 // Fixed-route material is captured only for a pair whose bounds admit containment.

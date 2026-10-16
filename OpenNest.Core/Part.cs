@@ -70,6 +70,9 @@ namespace OpenNest
         /// </summary>
         public bool DrawingPinsOff { get; set; }
 
+        /// <summary>True when the drawing has cut pins and this placement has not switched them off.</summary>
+        public bool HasActiveDrawingPins => !DrawingPinsOff && BaseDrawing?.CutPins is { Count: > 0 };
+
         public CNC.CuttingStrategy.CuttingParameters CuttingParameters { get; set; }
 
         public void ApplyLeadIns(

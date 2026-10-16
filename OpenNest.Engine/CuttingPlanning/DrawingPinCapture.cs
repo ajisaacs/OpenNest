@@ -19,7 +19,8 @@ internal static class DrawingPinCapture
         CuttingParameters parameters, List<CuttingPlanFinding> warnings, CancellationToken token)
     {
         var prepared = PreparedContours.Capture(ownedClean, parameters, token);
-        if (source.BaseDrawing.CutPins is not { Count: > 0 })
+        // Pins switched off for this placement (D1's escape hatch) leave it to the plate settings.
+        if (!source.HasActiveDrawingPins)
             return prepared;
         // The clean program is the drawing's own program rotated by the part's rotation, so the
         // resolver maps the source-frame pins onto exactly these contours.
@@ -32,6 +33,17 @@ internal static class DrawingPinCapture
                 + "internal contour, but only the outside can be tabbed; planned with nest settings."));
         return pinned;
     }
+
+    /// <summary>
+    /// A part with active pins whose program is kept: locked lead-ins override the pins (they
+    /// are kept exactly, never refused), and an unlocked part a caller left ineligible is not
+    /// regenerated at all.
+    /// </summary>
+    internal static CuttingPlanFinding NotApplied(Part source, int ordinal) =>
+        new(ordinal, source, null, null, PostVerificationKind.FixedLead, source.LeadInsLocked
+            ? $"Locked lead-ins override drawing pins on part {ordinal + 1}; Clear Lead-ins to apply the pins."
+            : $"Drawing pins on part {ordinal + 1} are not applied: the part is not regenerated.")
+        { FixedLead = new(null, null, null) };
 
     private static string Unresolved(CutPinResolution resolution)
     {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using OpenNest.CNC.CuttingStrategy;
@@ -23,11 +24,51 @@ internal static class StateFingerprint
     /// <exception cref="NotSupportedException">A settings object is not an exact built-in type.</exception>
     internal static string Of(CuttingParameters settings)
     {
-        var text = new StringBuilder();
-        Settings(settings);
-        return text.ToString();
+        var writer = new Writer();
+        writer.Settings(settings);
+        return writer.ToString();
+    }
 
-        void Settings(CuttingParameters p)
+    /// <summary>
+    /// Fingerprint of a drawing's cut pins in order: each pin's point, lead-in, lead-out and
+    /// tab. A null list and an empty list differ.
+    /// </summary>
+    internal static string Of(IReadOnlyList<ContourCutPin> pins)
+    {
+        var writer = new Writer();
+        writer.Pins(pins);
+        return writer.ToString();
+    }
+
+    private sealed class Writer
+    {
+        private readonly StringBuilder text = new();
+
+        public override string ToString() => text.ToString();
+
+        internal void Pins(IReadOnlyList<ContourCutPin> pins)
+        {
+            if (pins == null)
+            {
+                text.Append("null;");
+                return;
+            }
+            text.Append("Pins{");
+            foreach (var pin in pins)
+            {
+                if (!Begin(pin, typeof(ContourCutPin)))
+                    continue;
+                Number(pin.Point.X);
+                Number(pin.Point.Y);
+                Lead(pin.LeadIn);
+                Out(pin.LeadOut);
+                TabSettings(pin.Tab);
+                text.Append('}');
+            }
+            text.Append('}');
+        }
+
+        internal void Settings(CuttingParameters p)
         {
             if (!Begin(p, typeof(CuttingParameters)))
                 return;
@@ -56,7 +97,7 @@ internal static class StateFingerprint
             text.Append('}');
         }
 
-        void Sequence(SequenceParameters s)
+        private void Sequence(SequenceParameters s)
         {
             if (!Begin(s, typeof(SequenceParameters)))
                 return;
@@ -72,7 +113,7 @@ internal static class StateFingerprint
             text.Append('}');
         }
 
-        void Assignment(AssignmentParameters a)
+        private void Assignment(AssignmentParameters a)
         {
             if (!Begin(a, typeof(AssignmentParameters)))
                 return;
@@ -82,7 +123,7 @@ internal static class StateFingerprint
             text.Append('}');
         }
 
-        void Lead(LeadIn lead)
+        private void Lead(LeadIn lead)
         {
             if (lead == null)
             {
@@ -122,7 +163,7 @@ internal static class StateFingerprint
             text.Append('}');
         }
 
-        void Out(LeadOut lead)
+        private void Out(LeadOut lead)
         {
             if (lead == null)
             {
@@ -146,7 +187,7 @@ internal static class StateFingerprint
             text.Append('}');
         }
 
-        void TabSettings(Tab tab)
+        private void TabSettings(Tab tab)
         {
             if (tab == null)
             {
@@ -180,7 +221,7 @@ internal static class StateFingerprint
 
         // Writes the exact type tag and returns true; null writes a marker and returns false.
         // A runtime type other than the expected exact type throws before any member is read.
-        bool Begin(object value, Type exact)
+        private bool Begin(object value, Type exact)
         {
             if (value == null)
             {
@@ -193,15 +234,15 @@ internal static class StateFingerprint
             return true;
         }
 
-        void Number(double value) =>
+        private void Number(double value) =>
             text.Append(BitConverter.DoubleToInt64Bits(value).ToString(CultureInfo.InvariantCulture)).Append(';');
 
-        void Int(int value) => text.Append(value.ToString(CultureInfo.InvariantCulture)).Append(';');
+        private void Int(int value) => text.Append(value.ToString(CultureInfo.InvariantCulture)).Append(';');
 
-        void Flag(bool value) => text.Append(value ? "1;" : "0;");
+        private void Flag(bool value) => text.Append(value ? "1;" : "0;");
 
         // Length-prefixed so a delimiter inside the text cannot shift fields; null differs from "".
-        void Text(string value)
+        private void Text(string value)
         {
             if (value == null)
                 text.Append("~;");

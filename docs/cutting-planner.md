@@ -400,6 +400,16 @@ clean contours with `CutPinResolver` and prepares them with
   "Drawing pin 2 no longer matches the geometry; planned with nest settings.", which makes the
   plate UNVERIFIED. A tab pinned on an internal contour is not honoured either: only the
   outside is tabbed.
+- A placement with `Part.DrawingPinsOff` ignores its drawing's pins and plans entirely from
+  the plate settings, with no warning (D1's per-part escape hatch). `Part.HasActiveDrawingPins`
+  is the shared test for "pins apply here".
+- A pinned part is regenerated like any unlocked part, whatever lead-ins or settings it
+  carried before. A locked part keeps its exact locked program and warns "Locked lead-ins
+  override drawing pins on part N; Clear Lead-ins to apply the pins." It is not refused. An
+  unlocked part a caller left ineligible warns that its pins are not applied.
+- The plate state compared by `Apply` includes each drawing's pin list (reference and exact
+  content, `StateFingerprint.Of(pins)`) and each part's pins-off flag, so changing either
+  after capture makes the proposal `Stale`.
 
 ## Apply
 
@@ -412,8 +422,8 @@ results from plate-scoped requests; anything else is `InvalidInput`. Apply never
 replans. Each plate is compared exactly with the state captured with its request:
 part list instance and order, plate quantity/size/quadrant and settings, cutoff
 definitions, and for every part its program reference and exact content (an
-in-place edit counts), drawing program and cutoff classification, pose bits,
-lead-in/lock flags, settings (reference and exact content) and bounds. Any
+in-place edit counts), drawing program, cutoff classification and cut pins, pose bits,
+lead-in/lock/pins-off flags, settings (reference and exact content) and bounds. Any
 difference on any plate returns `Stale` and changes nothing, so a proposal that
 changes a plate can be applied once; an unchanged (no-op) proposal stays current.
 A malformed live program is also `Stale`, not an exception. A part repeated on
