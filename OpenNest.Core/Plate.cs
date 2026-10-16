@@ -291,50 +291,59 @@ namespace OpenNest
                 if (part.BaseDrawing.IsCutOff)
                     continue;
 
-                Geometry.Entity perimeter = null;
-                try
-                {
-                    var entities = Converters
-                        .ConvertProgram.ToGeometry(part.Program)
-                        .Where(e => SpecialLayers.IsMaterial(e.Layer))
-                        .ToList();
-
-                    if (entities.Count > 0)
-                    {
-                        // Leads are cutting paths in scrap, not boundary edges. Chaining them
-                        // into the outline can make a closed part appear open and replace its
-                        // recesses with a convex hull. Keep the full geometry for the existing
-                        // conservative fallback when the material contour really is open.
-                        var outline = entities.Where(e => e.Layer != SpecialLayers.Leadin &&
-                            e.Layer != SpecialLayers.Leadout).ToList();
-                        var profile = new Geometry.ShapeProfile(outline);
-
-                        if (profile.Perimeter.IsClosed())
-                        {
-                            perimeter = profile.Perimeter;
-                            perimeter.Offset(part.Location);
-                        }
-                        else
-                        {
-                            var points = entities.CollectPoints();
-                            if (points.Count >= 3)
-                            {
-                                var hull = Geometry.ConvexHull.Compute(points);
-                                hull.Offset(part.Location);
-                                perimeter = hull;
-                            }
-                        }
-                    }
-                }
-                catch
-                {
-                    perimeter = null;
-                }
-
-                cache[part] = perimeter;
+                cache[part] = BuildPartPerimeter(part);
             }
 
             return cache;
+        }
+
+        /// <summary>
+        /// Converts one part's own program into its placed perimeter entity (closed
+        /// profile, or a convex hull fallback for a genuinely open contour). This is
+        /// the same conversion <see cref="BuildPerimeterCache"/> runs per part; callers
+        /// without a pre-built cache (e.g. a direct, uncached <see cref="CutOff.Regenerate"/>
+        /// call) use it to get the same conservative, converted-material envelope instead
+        /// of trusting the part's cached bounding box alone.
+        /// </summary>
+        public static Geometry.Entity BuildPartPerimeter(Part part)
+        {
+            try
+            {
+                var entities = Converters
+                    .ConvertProgram.ToGeometry(part.Program)
+                    .Where(e => SpecialLayers.IsMaterial(e.Layer))
+                    .ToList();
+
+                if (entities.Count == 0)
+                    return null;
+
+                // Leads are cutting paths in scrap, not boundary edges. Chaining them
+                // into the outline can make a closed part appear open and replace its
+                // recesses with a convex hull. Keep the full geometry for the existing
+                // conservative fallback when the material contour really is open.
+                var outline = entities.Where(e => e.Layer != SpecialLayers.Leadin &&
+                    e.Layer != SpecialLayers.Leadout).ToList();
+                var profile = new Geometry.ShapeProfile(outline);
+
+                if (profile.Perimeter.IsClosed())
+                {
+                    var perimeter = profile.Perimeter;
+                    perimeter.Offset(part.Location);
+                    return perimeter;
+                }
+
+                var points = entities.CollectPoints();
+                if (points.Count < 3)
+                    return null;
+
+                var hull = Geometry.ConvexHull.Compute(points);
+                hull.Offset(part.Location);
+                return hull;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>

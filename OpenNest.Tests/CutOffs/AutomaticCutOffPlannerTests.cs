@@ -861,6 +861,28 @@ public class AutomaticCutOffPlannerTests
     }
 
     [Fact]
+    public void LargeArcRefit_UncachedDirectRegenerate_DoesNotCrossConvertedPerimeter()
+    {
+        // Same large-refit scenario as above, but the caller never built a
+        // perimeter cache at all (OpenNest PM 13f7a685: a direct/uncached
+        // CutOff.Regenerate call used to trust the bare BoundingBox and could
+        // emit a segment crossing the arc's true converted extent).
+        var plate = MakeArcPlate(0.0001);
+        var part = Assert.Single(plate.Parts);
+        var cachedBox = part.BoundingBox;
+        var arc = Assert.Single(ConvertProgram.ToGeometry(part.Program).OfType<Arc>());
+        arc.Offset(part.Location);
+        var x = (cachedBox.Right + arc.BoundingBox.Right) / 2;
+        Assert.True(x > cachedBox.Right); // The unsafe line sits outside the cached bounds.
+
+        var manual = new CutOff(new Vector(x, 0), CutOffAxis.Vertical);
+        manual.Regenerate(plate, new CutOffSettings { PartClearance = 0 }); // No cache argument.
+
+        foreach (var segment in Segments(manual.Drawing.Program))
+            Assert.False(arc.Intersects(new Line(segment.From, segment.To), out _));
+    }
+
+    [Fact]
     public void ExactArcWithinCachedBounds_PlansAndMaterializesSafeCuts()
     {
         var plate = MakeArcPlate(0);

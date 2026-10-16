@@ -144,8 +144,21 @@ namespace OpenNest
                 if (part.BaseDrawing.IsCutOff)
                     continue;
 
-                Entity perimeter = null;
-                cache?.TryGetValue(part, out perimeter);
+                Entity perimeter;
+                if (cache != null)
+                {
+                    cache.TryGetValue(part, out perimeter);
+                }
+                else
+                {
+                    // No pre-built cache: this is a direct/uncached caller (e.g. an
+                    // external API consumer calling Regenerate without going through
+                    // Plate.RegenerateCutOffs or the UI handlers, which always pass a
+                    // cache). Build the same converted-material envelope on the fly so
+                    // this path gets the same safety as the cached one, instead of
+                    // silently trusting the part's bare BoundingBox.
+                    perimeter = Plate.BuildPartPerimeter(part);
+                }
                 var partExclusions = GetPartExclusions(
                     part,
                     perimeter,
