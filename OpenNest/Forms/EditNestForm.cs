@@ -9,6 +9,7 @@ using OpenNest.Actions;
 using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Collections;
 using OpenNest.Controls;
+using OpenNest.Data;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Sequencing;
@@ -439,6 +440,8 @@ namespace OpenNest.Forms
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
             drawingListBox1.DrawingPickedUp += drawingListBox1_DrawingPickedUp;
             drawingListBox1.DrawingDropped += drawingListBox1_DrawingDropped;
+            Activated += (_, _) => UpdateDrawingLibraryCommand();
+            UpdateDrawingLibraryCommand();
         }
 
         public void UpdatePlateList()
@@ -1184,6 +1187,42 @@ namespace OpenNest.Forms
 
             drawings.ForEach(d => Nest.Drawings.Add(d));
             UpdateDrawingList();
+        }
+
+        private void DrawingLibrary_Click(object sender, EventArgs e)
+        {
+            AddFromDrawingLibrary();
+        }
+
+        /// <summary>The library is on the nest server, so it is offered in Database mode only.</summary>
+        public void UpdateDrawingLibraryCommand()
+        {
+            var enabled = NestStorage.Settings.IsDatabaseMode;
+            drawingLibraryButton.Enabled = enabled;
+            drawingLibraryButton.ToolTipText = enabled ? "Add from Drawing Library" : NestStorage.DatabaseModeOnly;
+        }
+
+        /// <summary>Opens the drawing library browser and lists whatever it added.</summary>
+        public void AddFromDrawingLibrary()
+        {
+            if (!NestStorage.Settings.IsDatabaseMode)
+                return;
+
+            IDrawingLibrary library;
+            try
+            {
+                library = NestStorage.CreateDrawingLibrary();
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Drawing Library", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            using var form = new DrawingLibraryForm(library, NestStorage.Settings.ServerUrl, Nest);
+            form.ShowDialog(this);
+            if (form.AddedDrawings.Count > 0)
+                UpdateDrawingList();
         }
 
         private void EditDrawingsInConverter_Click(object sender, EventArgs e)

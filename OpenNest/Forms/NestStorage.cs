@@ -15,6 +15,11 @@ namespace OpenNest.Forms
 
         private static RemoteNestRepository cachedRepository;
         private static string cachedServerUrl;
+        private static RemoteDrawingLibrary cachedLibrary;
+        private static string cachedLibraryUrl;
+
+        /// <summary>Tooltip for drawing library commands while File mode is active.</summary>
+        public const string DatabaseModeOnly = "Database mode only";
 
         /// <summary>Current settings, loaded once at process start.</summary>
         public static NestStorageSettings Settings => settings;
@@ -46,6 +51,22 @@ namespace OpenNest.Forms
             }
 
             return cachedRepository;
+        }
+
+        /// <summary>
+        /// The shared drawing library client for the current server URL, recreated only when
+        /// the URL changes. Throws <see cref="ArgumentException"/> for an invalid URL.
+        /// </summary>
+        public static IDrawingLibrary CreateDrawingLibrary()
+        {
+            if (cachedLibrary == null || cachedLibraryUrl != settings.ServerUrl)
+            {
+                cachedLibrary?.Dispose();
+                cachedLibrary = new RemoteDrawingLibrary(settings.ServerUrl);
+                cachedLibraryUrl = settings.ServerUrl;
+            }
+
+            return cachedLibrary;
         }
     }
 }

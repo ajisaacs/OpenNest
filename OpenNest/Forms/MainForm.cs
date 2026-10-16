@@ -939,6 +939,8 @@ namespace OpenNest.Forms
             {
                 NestStorage.Save(dlg.SelectedMode, dlg.ServerUrl);
                 statusLabel1.Text = $"Nest storage: {dlg.SelectedMode}";
+                foreach (var form in MdiChildren.OfType<EditNestForm>())
+                    form.UpdateDrawingLibraryCommand();
             }
             catch (Exception ex)
             {
@@ -1556,6 +1558,20 @@ namespace OpenNest.Forms
 
             drawings.ForEach(d => activeForm.Nest.Drawings.Add(d));
             activeForm.UpdateDrawingList();
+        }
+
+        private void DrawingLibrary_Click(object sender, EventArgs e)
+        {
+            activeForm?.AddFromDrawingLibrary();
+        }
+
+        private void NestMenu_Opening(object sender, EventArgs e)
+        {
+            // The drawing library lives on the nest server; File mode has nothing to browse.
+            var databaseMode = NestStorage.Settings.IsDatabaseMode;
+            mnuNest.DropDown.ShowItemToolTips = true;
+            mnuNestDrawingLibrary.Enabled = activeForm != null && databaseMode;
+            mnuNestDrawingLibrary.ToolTipText = databaseMode ? "" : NestStorage.DatabaseModeOnly;
         }
 
         private void EditNest_Click(object sender, EventArgs e)

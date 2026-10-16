@@ -144,8 +144,8 @@ only the requested page of metadata (never archive bytes):
 ## Drawing library endpoints
 
 The server also keeps a shared library of drawings (schema v4). The desktop
-workflow is not built yet; these routes and `OpenNest.Data.RemoteDrawingLibrary`
-are the storage layer for it. A drawing's geometry travels as an opaque
+can add library drawings to a nest (below); saving to the library is not built
+yet. A drawing's geometry travels as an opaque
 **drawing package**: a `.nest` archive holding exactly one drawing and no plates,
 written and read on the client by `OpenNest.IO.DrawingPackage`. The server never
 parses it.
@@ -198,6 +198,30 @@ v4 database, so rolling back after the upgrade needs the pre-upgrade backup (see
 [Backup, restore, and upgrade](#backup-restore-and-upgrade)). The stopped-volume
 `tar` backup includes the drawing tables, but `nest_manifest.py` and
 `restore_check` do not verify drawings yet.
+
+### Add from Drawing Library (desktop)
+
+**Nest > Add from Drawing Library...** and the **Library** button above the
+drawing list open a paged browser of active library drawings (Database mode
+only; in File mode both are disabled with "Database mode only"). It starts
+filtered to the nest's material, grade and thickness; **Show all** lifts that
+filter. Selecting a drawing shows its notes. **Add to Nest** (or double-click /
+Enter) downloads that exact revision, checks its SHA-256 against the record and
+plans the insert (`OpenNest.Data.LibraryDrawingInsert`) before changing anything:
+
+- Material, grade or thickness differing from the nest: a warning names each
+  difference and the operator confirms. The drawing is added, but its cut pins
+  will not apply; the nest's cutting settings do.
+- Different units: refused (no conversion).
+- The same revision from the same server already in the nest: only the
+  quantity is raised. A different revision of that drawing: refused; change
+  revisions through Update Drawings.
+- Another drawing with the same name: refused, naming both.
+
+The added drawing is an independent copy carrying a library link (server key,
+id, revision and a snapshot of the library details) that is saved with the nest
+(see [the nest file format](nest-file-format.md#drawing-library-links)). Editing it
+in the nest never changes the library.
 
 ## Storage
 
