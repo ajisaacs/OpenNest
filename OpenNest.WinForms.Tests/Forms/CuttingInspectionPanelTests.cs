@@ -171,13 +171,13 @@ public class CuttingInspectionPanelTests
         var panel = editor.CuttingInspection!;
         PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
         Assert.Equal(2, panel.Proposal.Plates.Count);
-        Assert.Equal(ScrollBars.Vertical, Field<TextBox>(panel, "resultLabel").ScrollBars);
+        Assert.Contains("Can't apply", Field<Label>(panel, "statusLabel").Text);
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         Assert.True(editor.PlateView.HasProposalDisplay);
         Field<Button>(panel, "nextButton").PerformClick();
         Assert.Same(second, editor.PlateView.Plate); // Refusal shows the requested live plate, not the opening plate.
         Assert.False(editor.PlateView.HasProposalDisplay);
-        Assert.Contains("no current preview", Field<Label>(panel, "previewLabel").Text);
+        Assert.Contains("blocked", Field<Label>(panel, "previewLabel").Text);
         var grid = Field<DataGridView>(panel, "warningGrid");
         Assert.Equal(panel.Proposal.DiagnosticRows().Count, grid.Rows.Count);
         var row = grid.Rows.Cast<DataGridViewRow>().First(r => r.Tag is OpenNest.Engine.CuttingPlanning.CuttingPlanDiagnosticRow d && d.PlateIndex == 1);
@@ -187,6 +187,34 @@ public class CuttingInspectionPanelTests
         Assert.All(editor.Nest.Plates[0].Parts, p => Assert.False(p.HasManualLeadIns));
         panel.RequestClose();
         Assert.Same(original, editor.PlateView.Plate);
+    });
+
+    [Fact]
+    public void BlockedOverlapRowShadesTheOverlapOnTheLivePlate() => RunSta(() =>
+    {
+        using var editor = Editor();
+        var plate = editor.Nest.Plates[0];
+        plate.Parts.Add(Square("overlapping", 5));
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.False(Field<Button>(panel, "applyButton").Enabled);
+        Assert.Contains("Can't apply", Field<Label>(panel, "statusLabel").Text);
+        Assert.Contains("parts overlap", Field<Label>(panel, "previewLabel").Text);
+        var view = editor.PlateView;
+        Assert.False(view.HasProposalDisplay);
+        var grid = Field<DataGridView>(panel, "warningGrid");
+        var row = grid.Rows.Cast<DataGridViewRow>().First(r =>
+            r.Tag is OpenNest.Engine.CuttingPlanning.CuttingPlanDiagnosticRow { Witness.Overlap: not null });
+        grid.ClearSelection();
+        row.Selected = true;
+        Assert.Same(plate, view.Plate);
+        Assert.NotNull(view.ValidationOverlay.Finding?.Overlap);
+        Assert.Contains("overlapping material", Field<Label>(panel, "detailLabel").Text);
+        panel.RequestClose();
+        Assert.Null(view.ValidationOverlay.Finding);
     });
 
     [Fact]
@@ -260,7 +288,10 @@ public class CuttingInspectionPanelTests
         var partRow = grid.Rows.Cast<DataGridViewRow>().First(r => r.Cells[1].Value is int);
         grid.ClearSelection();
         partRow.Selected = true;
-        Assert.Contains("affected part extent", Field<Label>(panel, "previewLabel").Text);
+        if (partRow.Tag is OpenNest.Engine.CuttingPlanning.CuttingPlanDiagnosticRow { Witness.Location: not null })
+            Assert.NotNull(editor.PlateView.ValidationOverlay.Finding);
+        else
+            Assert.Contains("affected part", Field<Label>(panel, "detailLabel").Text);
         Field<Button>(panel, "applyButton").PerformClick();
         Assert.Null(panel.CommitResult);
         Assert.All(plate.Parts, part => Assert.False(part.HasManualLeadIns));
@@ -287,7 +318,7 @@ public class CuttingInspectionPanelTests
         Assert.False(editor.PlateView.HasProposalDisplay);
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         Assert.False(Field<CheckBox>(panel, "acceptWarningsCheckBox").Checked);
-        Assert.Contains("Replan", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Contains("Replan", Field<Label>(panel, "statusLabel").Text);
         Assert.Equal(programs, plate.Parts.Select(p => p.Program));
         Assert.All(plate.Parts, p => Assert.False(p.HasManualLeadIns));
         panel.StartPlanning();
@@ -349,7 +380,7 @@ public class CuttingInspectionPanelTests
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         Assert.False(Field<CheckBox>(panel, "acceptWarningsCheckBox").Checked);
         Assert.False(editor.PlateView.HasProposalDisplay);
-        Assert.Contains("Nothing can be applied", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Contains("Nothing can be applied", Field<Label>(panel, "statusLabel").Text);
         Assert.Equal(original, editor.PlateView.Plate.Parts);
         panel.RequestClose();
     });

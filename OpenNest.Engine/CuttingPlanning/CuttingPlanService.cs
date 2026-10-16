@@ -403,6 +403,7 @@ public static class CuttingPlanService
         var source = finding.PartNumber is { } part ? snapshot.Placements[part - 1] : null;
         var other = finding.OtherPartNumber is { } otherPart ? snapshot.Placements[otherPart - 1] : null;
         return new CuttingPlanFinding(source?.SourceOrdinal, source?.SourcePart,
-            other?.SourceOrdinal, other?.SourcePart, finding.Kind, finding.Message);
+            other?.SourceOrdinal, other?.SourcePart, finding.Kind, finding.Message)
+        { Witness = finding };
     });
 }

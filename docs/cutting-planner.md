@@ -397,8 +397,9 @@ on an `Applied` result, not as a rollback.
 It captures scope on the editor thread, plans on a worker, and shows only a fresh,
 supported detached proposal in that canvas, including proposed part numbers and
 rapids. The live `Plate`, part order, programs and quantities remain unchanged
-until Apply. The summary and complete structured findings remain available while
-navigating plates; selecting a finding frames its affected part extent, not an
+until Apply. The outcome and complete structured findings remain available while
+navigating plates; selecting a finding marks its recorded witness (overlap area, rapid,
+contacts) like Validate Nest, or frames the affected part extent when it has none, never an
 invented contact point. Unsupported or stale output has no proposal preview.
 
 The panel shows the current cutting settings; editing them or switching Keep current
@@ -407,7 +408,7 @@ the exact captured proposal, with an unchecked per-proposal acceptance required
 for UNVERIFIED results; a blocked plate disables the whole-batch Apply. A successful
 Apply persists the confirmed settings and refreshes the editor; a failed/stale Apply
 changes nothing and requires replanning. Escape, the panel X or Cancel restores the
-live view and prior viewport; closing during planning waits for the worker before
+live view and prior viewport; Close during planning waits for the worker before
 unlocking inspection. Planning is not live-nest validation or posting consent. The
 panel's **Validate Nest (live programs)** mode separately checks current installed
 programs across all plates and navigates typed findings on the live canvas; it
@@ -426,11 +427,11 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   Cut-offs...` asks first, then removes every applied lead-in (locked and hand-placed
   ones too), every cut-off and the plates' recorded cutting settings, keeping part
   poses, order and quantities, and replans from scratch. There is no undo.
-- `Add automatic scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
+- `Add scrap cut-offs` runs the automatic cut-off planner (defaults 35 in /
   889 mm strips, half-strip minimum, 12 in / 304.8 mm tail) on every plate in scope
   *before* capture, so the cutting plan sequences the new lines like any
   other cut-off. These are the only live changes made before Apply: Apply keeps them,
-  while unticking the box, Cancel/Close or switching to Validate removes them and
+  while unticking the box, Close or switching to Validate removes them and
   restores the earlier cut-offs and sequence. A blocked cut-off plan adds nothing and
   plans nothing; the panel names the plate and reason.
   `Cut-off Settings...` opens the Automatic Scrap Cut-offs dialog in settings mode for
@@ -466,19 +467,22 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   `NoSolutionWithinBudget` is retried once with the current part order, and the summary
   says the order was kept. Both are allowed 400 expansions per part (at least the
   default 20000), because both still plan contour order and entries for every part.
-- The docked panel keeps the batch outcome and plate headings above a
-  read-only, unsorted warning grid with Plate, source Part, With, and full finding text. Every
-  overlap issue/pair and every planner finding has its own selectable row, including findings
-  hidden by the compact blocked-plate summary. **Previous**/**Next** and warning selection
-  navigate the editor to that plate's live source sheet, then display its detached proposal
-  when available. Warning selection zooms to the affected part extent (or both parts for a
-  pair), mapping source positions to proposed cutting order. This is not an exact contact
-  marker: most findings do not carry a geometric witness. If a plate cannot produce a
-  current, supported proposal preview, its own live sheet remains visible; no unsupported
-  geometry is cloned or focused. Replanning, cancellation and stale Apply clear old warning
-  targets.
-- The summary lists every plate: ready plates with part counts and rapid travel, others
-  with their status and findings. Unverified proposals retain every overlap and route
+- The docked panel keeps text short: one colored outcome line for the batch, one line for the
+  shown plate, and one detail line (a remedy for a blocked plate, or what the selected marker
+  shows). Below them is a read-only, unsorted issue grid with Plate, source Part, With, and full
+  finding text. Every overlap issue/pair and every planner finding has its own selectable row.
+  **Previous**/**Next** (shown for more than one plate) and issue selection navigate the editor
+  to that plate's live source sheet, then display its detached proposal when available.
+  Overlap pairs and checker findings carry their world-coordinate witness
+  (`CuttingPlanDiagnosticRow.Witness`, from `CuttingPlanFinding.Witness`), so selection shades
+  the overlap or draws the rapid and its contacts with the Validate Nest overlay, on the
+  proposal or on a blocked plate's live sheet. Findings without a witness zoom to the affected
+  part extent (or both parts for a pair), mapping source positions to proposed cutting order.
+  If a plate cannot produce a current, supported proposal preview, its own live sheet remains
+  visible; no unsupported geometry is cloned. Replanning, cancellation and stale Apply clear
+  old warning targets.
+- The plate line gives ready plates' part counts, order change and rapid travel, and other
+  plates' blocking reason. Unverified proposals retain every overlap and route
   warning in the selectable grid before the acceptance checkbox is used; they do
   not truncate later parts' warnings. Finding part numbers are the plate's current order, as the
   editor numbers them. The panel shows the selected plate detached from the nest (quantity
@@ -486,14 +490,14 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   programs. Ready and best-effort proposals can be previewed only while the plate still
   matches capture. Best-effort previews are labelled `UNVERIFIED`. Refused program graphs
   are never copied, and changed plates require replanning.
-- Apply requires usable output for every plate and remains all or nothing. The summary
+- Apply requires usable output for every plate and remains all or nothing. The outcome line
   counts best-effort proposals as usable when reporting how many plates block Apply;
   their warnings still require acceptance. Open nominal contour findings identify the
   contour number, endpoint gap in model units (the nest's linear units), and closure
   tolerance, so the source can be reviewed in the drawing editor. Reporting never
   closes gaps or changes the validation tolerance. A fully ready batch
   can apply immediately; an unverified batch requires the unchecked, per-proposal
-  `Accept UNVERIFIED plan warnings (post consent happens separately)` checkbox. Replanning clears it.
+  `Accept the unverified plan` checkbox (posting consent is still separate). Replanning clears it.
   Both use the same owned-program, freshness and rollback boundary. After it applies, each plate keeps its own copy of the
   confirmed settings, which also become the saved defaults. `Stale` keeps the panel open
   and asks for a replan; nothing changes.

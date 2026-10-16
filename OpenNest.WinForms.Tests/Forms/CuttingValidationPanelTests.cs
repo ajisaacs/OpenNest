@@ -57,10 +57,10 @@ public class CuttingValidationPanelTests
         Assert.Contains(Enumerable.Range(-2, 5).SelectMany(dx => Enumerable.Range(3, 7)
             .Select(dy => bitmap.GetPixel(cx + dx, cy + dy))), pixel =>
             pixel.R > 150 && pixel.B > 50 && pixel.G < 100);
-        Assert.Contains("Crosshairs", Field<TextBox>(panel, "resultLabel").Text);
-        Assert.Contains("Confirm minimum spacing, plate boundaries and final post output separately", Field<Label>(panel, "validationScopeLabel").Text);
+        Assert.Contains("crosshairs", Field<Label>(panel, "detailLabel").Text);
+        Assert.Contains("Spacing, plate edges and post output are not checked", Field<Label>(panel, "validationScopeLabel").Text);
         Assert.True(Field<Label>(panel, "validationScopeLabel").Visible);
-        Assert.Contains("Nest validation (live programs)", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Contains("rapid crossing", Field<Label>(panel, "statusLabel").Text);
         panel.RequestClose();
         Assert.Same(original, view.Plate);
         Assert.Equal(viewport, view.CaptureViewport());
@@ -82,9 +82,9 @@ public class CuttingValidationPanelTests
         editor.OpenValidationInspection();
         var panel = editor.CuttingInspection!;
         Pump(() => panel.ValidationReport != null && !panel.IsPlanning);
-        Assert.Contains(incomplete ? "Validation incomplete" : "No warnings found", Field<Label>(panel, "previewLabel").Text);
+        Assert.Contains(incomplete ? "Validation incomplete" : "No warnings found", Field<Label>(panel, "statusLabel").Text);
         Assert.True(Field<Label>(panel, "validationScopeLabel").Visible);
-        Assert.Contains("LIVE NEST only", Field<Label>(panel, "validationScopeLabel").Text);
+        Assert.Contains("live nest", Field<Label>(panel, "validationScopeLabel").Text);
         Assert.False(Field<Button>(panel, "applyButton").Enabled);
         panel.RequestClose();
     });
@@ -184,8 +184,8 @@ public class CuttingValidationPanelTests
         Assert.Null(panel.ValidationReport);
         Assert.Null(editor.PlateView.ValidationOverlay.Finding);
         Assert.Empty(Field<DataGridView>(panel, "warningGrid").Rows.Cast<DataGridViewRow>());
-        Assert.Contains("Validation failed", Field<TextBox>(panel, "resultLabel").Text);
-        Assert.DoesNotContain("No warnings found", Field<Label>(panel, "previewLabel").Text);
+        Assert.Contains("Validation failed", Field<Label>(panel, "statusLabel").Text);
+        Assert.DoesNotContain("No warnings found", Field<Label>(panel, "statusLabel").Text);
         panel.RequestClose();
     });
 
@@ -245,13 +245,12 @@ public class CuttingValidationPanelTests
         Assert.True(grid.ReadOnly);
         Assert.Equal(DataGridViewSelectionMode.FullRowSelect, grid.SelectionMode);
         Assert.All(grid.Columns.Cast<DataGridViewColumn>(), c => Assert.Equal(DataGridViewColumnSortMode.NotSortable, c.SortMode));
-        Assert.True(Field<TextBox>(panel, "resultLabel").ReadOnly);
         var row = grid.Rows.Cast<DataGridViewRow>().Single(r => r.Tag is PostVerificationFinding { Kind: PostVerificationKind.Overlap });
         row.Selected = true;
         var view = editor.PlateView;
         Assert.Same(plate, view.Plate);
         Assert.NotNull(view.ValidationOverlay.Finding.Overlap);
-        Assert.Contains("largest patch", Field<TextBox>(panel, "resultLabel").Text);
+        Assert.Contains("overlapping material", Field<Label>(panel, "detailLabel").Text);
         var scale = view.ViewScale;
         InvokeView(view, "OnMouseWheel", new MouseEventArgs(MouseButtons.None, 0, 100, 100, 120));
         Assert.True(view.ViewScale > scale);

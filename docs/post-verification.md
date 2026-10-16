@@ -9,8 +9,10 @@ in **Validate Nest (live programs)** mode, distinct from the panel's unapplied
 missing lead-ins, and rapid crossings in the existing placed programs and cutting
 order. Findings identify plate and part sequence numbers in a read-only grid;
 incomplete or failed checks are never reported as clear. Select a row to switch
-the main plate view to that plate and focus the finding. The scrollable report
-retains every result and the selected finding's explanation.
+the main plate view to that plate and focus the finding. A colored headline gives
+the warning count by kind (or says the check is incomplete or clear), a single line
+explains the selected marker, and the grid retains every result. **Plan Cutting**
+marks its overlap and route findings with the same overlay.
 While a finding is selected, its named parts retain their normal colors; other
 parts use muted gray fills and visible gray outlines, lead-ins, and marks. Selecting
 another finding updates the emphasis. Clearing the finding or closing validation

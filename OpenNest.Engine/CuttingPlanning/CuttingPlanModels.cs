@@ -178,7 +178,23 @@ public enum CuttingPlanStatus
 
 /// <summary>Ordinals are zero-based source positions, not proposed sequence positions.</summary>
 public sealed record CuttingPlanFinding(int? SourceOrdinal, Part SourcePart,
-    int? OtherSourceOrdinal, Part OtherSourcePart, PostVerificationKind? Kind, string Message);
+    int? OtherSourceOrdinal, Part OtherSourcePart, PostVerificationKind? Kind, string Message)
+{
+    /// <summary>
+    /// The check's own finding, for its world-coordinate markers (location, rapid, contacts).
+    /// Its part numbers are check positions, not source ordinals. Null when the check gave none.
+    /// Not part of equality: repeated rejections of the same problem stay one finding.
+    /// </summary>
+    public PostVerificationFinding Witness { get; init; }
+
+    public bool Equals(CuttingPlanFinding other) => other is not null
+        && SourceOrdinal == other.SourceOrdinal && Equals(SourcePart, other.SourcePart)
+        && OtherSourceOrdinal == other.OtherSourceOrdinal && Equals(OtherSourcePart, other.OtherSourcePart)
+        && Kind == other.Kind && Message == other.Message;
+
+    public override int GetHashCode() =>
+        HashCode.Combine(SourceOrdinal, SourcePart, OtherSourceOrdinal, OtherSourcePart, Kind, Message);
+}
 
 /// <summary>
 /// A replayed direct-XY proposal, optionally with regenerated programs, that respects the
