@@ -665,6 +665,8 @@ namespace OpenNest.Forms
             activeForm.PlateView.SelectionChanged += PlateView_SelectionChanged;
             activeForm.PlateView.PartAdded += PlateView_PartAdded;
             activeForm.PlateView.PartRemoved += PlateView_PartRemoved;
+            var activeNest = activeForm.Nest;
+            activeForm.PlateView.CanEditClamps = () => !ClampsInUse(activeNest);
             mnuViewDrawRapids.Checked = activeForm.PlateView.DrawRapid;
             mnuViewDrawPiercePoints.Checked = activeForm.PlateView.DrawPiercePoints;
             mnuViewDrawBounds.Checked = activeForm.PlateView.DrawBounds;
@@ -1560,6 +1562,22 @@ namespace OpenNest.Forms
             activeForm.ShowNestInfoEditor();
         }
 
+        private PlateView[] ViewsOf(Nest nest) =>
+            MdiChildren
+                .OfType<EditNestForm>()
+                .Where(form => ReferenceEquals(form.Nest, nest))
+                .Select(form => form.PlateView)
+                .ToArray();
+
+        /// <summary>
+        /// True while a nest run or fill may be reading <paramref name="nest"/>'s clamps.
+        /// Clamps feed nesting and validation: never change them under a running operation.
+        /// </summary>
+        private bool ClampsInUse(Nest nest) =>
+            nestingInProgress
+            || Application.OpenForms.OfType<NestProgressForm>().Any()
+            || ViewsOf(nest).Any(v => v.IsFillInProgress);
+
         private void Clamps_Click(object sender, EventArgs e)
         {
             var editForm = activeForm;
@@ -1567,17 +1585,8 @@ namespace OpenNest.Forms
                 return;
 
             var nest = editForm.Nest;
-            var views = MdiChildren
-                .OfType<EditNestForm>()
-                .Where(form => ReferenceEquals(form.Nest, nest))
-                .Select(form => form.PlateView)
-                .ToArray();
-            // Clamps feed nesting and validation: never change them under a running operation.
-            if (
-                nestingInProgress
-                || Application.OpenForms.OfType<NestProgressForm>().Any()
-                || views.Any(v => v.IsFillInProgress || v.Actions.CurrentAction?.IsBusy() == true)
-            )
+            var views = ViewsOf(nest);
+            if (ClampsInUse(nest) || views.Any(v => v.Actions.CurrentAction?.IsBusy() == true))
             {
                 MessageBox.Show(
                     this,

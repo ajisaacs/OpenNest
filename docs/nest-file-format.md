@@ -93,7 +93,7 @@ zones are kept as written.
 
 The rail's optional `removalMinutes` is the time to take one clamp off and put
 it back; a missing or invalid value loads as five minutes. A plate on which
-Auto Nest removed clamps as a last resort lists their rail ids in an optional
+clamps were removed (by Auto Nest as a last resort, or by hand) lists their rail ids in an optional
 `removedClamps` array (omitted when none were removed); its `clamps` already
 exclude them, and it follows the rail minus those ids. A malformed
 `removedClamps` value reads as none removed (non-string entries are skipped);

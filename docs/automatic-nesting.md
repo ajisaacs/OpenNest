@@ -73,6 +73,19 @@ pre-post verification warns (with per-attempt consent) about parts, cut-offs
 and direct rapids crossing an active clamp - including the first rapid when a
 clamp covers the program start point.
 
+### Removing a clamp by hand
+
+In Select mode, right-click a clamp on the sheet and choose **Remove clamp-N
+from This Sheet**. Only that sheet changes. The clamp is drawn dashed with
+"remove", parts may be placed over it, and it adds the rail's removal minutes to
+that sheet's cut time, the same as a clamp Auto Nest removed. To put it back,
+right-click the dashed clamp and choose **Put clamp-N Back on This Sheet**.
+Parts already over the restored clamp are not moved; Check Overlaps and pre-post
+verification report them. The menu is not offered while inspecting or
+previewing a proposal. The change is refused while nesting or a fill is
+running. **OK** in **Nest > Clamps...** re-resolves every plate from the edited
+rail and puts every removed clamp back, whether removed by hand or by Auto Nest.
+
 ### Last-resort clamp removal
 
 When a part cannot be placed on an empty sheet of any offered size with every

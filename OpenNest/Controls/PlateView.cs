@@ -33,6 +33,7 @@ namespace OpenNest.Controls
         private CutOffSettings cutOffSettings = new CutOffSettings();
         private SelectionManager selection;
         private CutOffHandler cutOffHandler;
+        private readonly ClampMenuHandler clampMenu;
         private PreviewManager previewManager;
         protected List<LayoutPart> parts;
         private Point middleMouseDownPoint;
@@ -72,6 +73,7 @@ namespace OpenNest.Controls
 
         internal SelectionManager Selection => selection;
         internal CutOffHandler CutOffs => cutOffHandler;
+        internal ClampMenuHandler ClampMenu => clampMenu;
         internal ActionManager Actions => actionManager;
         internal PreviewManager Previews => previewManager;
 
@@ -109,6 +111,7 @@ namespace OpenNest.Controls
             parts = new List<LayoutPart>();
             selection = new SelectionManager(this);
             cutOffHandler = new CutOffHandler(this);
+            clampMenu = new ClampMenuHandler(this);
             previewManager = new PreviewManager(this);
 
             redrawTimer = new Timer()
@@ -155,6 +158,12 @@ namespace OpenNest.Controls
 
         internal bool InspectionOnly { get; set; }
         internal System.Action InspectionCloseRequested { get; set; }
+
+        /// <summary>
+        /// Asked before a right-click changes which clamps are on the sheet; false refuses
+        /// (e.g. a nest run is using the clamps). Null allows.
+        /// </summary>
+        internal Func<bool> CanEditClamps { get; set; }
 
         public bool AllowZoom { get; set; }
 
@@ -476,6 +485,9 @@ namespace OpenNest.Controls
                 return;
             }
 
+            if (e.Button == MouseButtons.Right)
+                clampMenu.TryShow(e.Location, 3.0 / ViewScale);
+
             base.OnMouseUp(e);
         }
 
@@ -769,7 +781,10 @@ namespace OpenNest.Controls
                     plate.PartAdded -= plate_PartAdded;
                     plate.PartRemoved -= plate_PartRemoved;
                     plate.PartsReordered -= plate_PartsReordered;
+                    plate.ClampZonesChanged -= plate_ClampZonesChanged;
                 }
+                clampMenu?.Dispose();
+                CanEditClamps = null;
                 overlapOverlay?.Dispose();
                 validationOverlay?.Dispose();
                 hoverTimer?.Dispose();

@@ -205,7 +205,8 @@ namespace OpenNest.Controls
             }
         }
 
-        // D8: a clamp Auto Nest pulled as a last resort. Distinct from an active clamp - a
+        // D8: a clamp taken off this sheet, by Auto Nest as a last resort or by hand (right-click).
+        // Distinct from an active clamp - a
         // dashed grey outline and a small "remove" marker, still display + exclusion only
         // (no hit test, selection or sequencing).
         private static readonly Color RemovedClampOutlineColor = Color.FromArgb(200, 110, 110, 110);

@@ -395,4 +395,104 @@ public class ClampRailTests
         Assert.True(((ICollection<string>)removed.RemovedClamps).IsReadOnly);
         Assert.True(((ICollection<string>)untouched.RemovedClamps).IsReadOnly);
     }
+
+    // Manual per-sheet removal (right-click in the plate view).
+
+    [Fact]
+    public void SetClampRemovedTakesAClampOffAndPutsItBack()
+    {
+        var plate = Sheet(48, 120);
+        plate.SetClampRail(Machine());
+        var changes = 0;
+        plate.ClampZonesChanged += (_, _) => changes++;
+
+        Assert.True(plate.SetClampRemoved("clamp-3", true));
+        Assert.Equal(new[] { "clamp-3" }, plate.RemovedClamps);
+        Assert.DoesNotContain(plate.ClampZones, z => z.Id == "clamp-3");
+        Assert.Equal(ClampRail.DefaultRemovalMinutes, plate.ClampRemovalMinutes);
+        Assert.True(changes > 0);
+
+        Assert.True(plate.SetClampRemoved("clamp-3", false));
+        Assert.Empty(plate.RemovedClamps);
+        Assert.True(Machine().Matches(plate));
+        Assert.Equal(0, plate.ClampRemovalMinutes);
+    }
+
+    [Fact]
+    public void SetClampRemovedKeepsOtherRemovedClamps()
+    {
+        var plate = Sheet(48, 120);
+        plate.SetClampRail(Machine(), new[] { "clamp-1" });
+
+        Assert.True(plate.SetClampRemoved("clamp-3", true));
+        Assert.Equal(new[] { "clamp-1", "clamp-3" }, plate.RemovedClamps.OrderBy(id => id));
+
+        Assert.True(plate.SetClampRemoved("clamp-1", false));
+        Assert.Equal(new[] { "clamp-3" }, plate.RemovedClamps);
+        Assert.Equal(Machine(), plate.ClampRail);
+    }
+
+    [Fact]
+    public void SetClampRemovedReportsNoChange()
+    {
+        var bare = Sheet(48, 120);
+        Assert.False(bare.SetClampRemoved("clamp-1", true)); // no rail
+
+        var plate = Sheet(48, 60);
+        plate.SetClampRail(Machine());
+        Assert.False(plate.SetClampRemoved("clamp-1", false)); // already in place
+        Assert.False(plate.SetClampRemoved("clamp-8", true)); // beyond this sheet
+        Assert.False(plate.SetClampRemoved("clamp-99", true)); // unknown to the rail
+        Assert.False(plate.SetClampRemoved(null!, true));
+        Assert.Empty(plate.RemovedClamps);
+
+        Assert.True(plate.SetClampRemoved("clamp-2", true));
+        Assert.False(plate.SetClampRemoved("clamp-2", true)); // already removed
+    }
+
+    [Fact]
+    public void ARemovedClampBeyondTheSheetCanStillBePutBack()
+    {
+        var plate = Sheet(48, 120);
+        plate.SetClampRail(Machine(), new[] { "clamp-8" });
+        plate.Size = new Size(48, 60);
+
+        Assert.True(plate.SetClampRemoved("clamp-8", false));
+        Assert.Empty(plate.RemovedClamps);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void RailClampAtFindsClampsInThePartsPlacementFrame(int quadrant)
+    {
+        var plate = Sheet(48, 120, quadrant);
+        plate.SetClampRail(Machine(), new[] { "clamp-3" });
+        var full = Sheet(48, 120, quadrant);
+        full.SetClampRail(Machine());
+        var expected = ClampZoneFrame.ToPlacement(full); // every clamp, removed ones too
+
+        foreach (var zone in expected)
+        {
+            var hit = plate.RailClampAt(zone.Bounds.Center);
+            Assert.NotNull(hit);
+            Assert.Equal(zone.Id, hit.Id);
+            Assert.Equal(zone.Bounds.X, hit.Bounds.X, 9);
+            Assert.Equal(zone.Bounds.Y, hit.Bounds.Y, 9);
+        }
+    }
+
+    [Fact]
+    public void RailClampAtHonoursTheToleranceAndNeedsARail()
+    {
+        var plate = Sheet(48, 120);
+        Assert.Null(plate.RailClampAt(new Vector(36, 0.3))); // no rail
+
+        plate.SetClampRail(Machine());
+        Assert.Equal("clamp-3", plate.RailClampAt(new Vector(36, 0.3))?.Id);
+        Assert.Null(plate.RailClampAt(new Vector(36, 0.7)));
+        Assert.Equal("clamp-3", plate.RailClampAt(new Vector(36, 0.7), tolerance: 0.1)?.Id);
+    }
 }
