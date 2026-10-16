@@ -125,6 +125,26 @@ Name, quantity, and color edits leave placed programs alone. The properties
 editor previously called `LayoutPart.Update`, a color refresh, not `Part.Update`;
 it now explicitly refreshes only the edited drawing's layout colors.
 
+## Saved best-fit pairs (cache only)
+
+Optional `bestfits/bestfit-N` entries hold drawing N's cached best-fit pair
+results: a JSON array of sets, each with `plateWidth`, `plateHeight` and
+`spacing` (the plate size and part spacing it was filtered for) and `results`.
+Each result has `part1Rotation`, `part2Rotation`, `part2OffsetX`,
+`part2OffsetY`, `strategyType`, `testNumber`, `candidateSpacing`,
+`rotatedArea`, `boundingWidth`, `boundingHeight`, `optimalRotation`, `keep`,
+`reason`, `trueArea` and `hullAngles`. Angles are radians; pair geometry is in
+the drawing's canonical frame.
+
+The entries are only a cache: readers may ignore them and writers may omit
+them, at the cost of recomputing pairs. Writers save only sets whose
+(width, length, spacing) matches a plate in the nest, and only kept results; a
+drawing without such a set gets no entry. `NestReader` and `NestWriter` touch
+these entries only when given an `IBestFitStore` through `BestFitStore`;
+without one, a reader skips them unparsed and a writer writes none. The front
+ends pass the engine's `BestFitCacheStore.Shared`, which adds loaded sets to
+the process-wide `BestFitCache` without replacing sets already computed.
+
 ## Verification and limits
 
 The automated tests cover save/reopen/re-save, rotated/manual/locked parts,
