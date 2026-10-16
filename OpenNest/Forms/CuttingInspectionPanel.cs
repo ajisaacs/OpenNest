@@ -805,6 +805,11 @@ internal sealed class CuttingInspectionPanel : UserControl
         view.ZoomToFit();
     }
 
+    /// <summary>A source part number as numbered on the canvas: proposed order on a preview, else unchanged.</summary>
+    private int? ShownPartNumber(int plateIndex, int? sourceNumber) =>
+        preview == null || sourceNumber is not int source ? sourceNumber
+            : CuttingProposalInspection.ProposedPosition(Proposal, plateIndex, source) + 1;
+
     private void NavigateFinding()
     {
         if (Mode == CuttingInspectionMode.Validate)
@@ -817,7 +822,12 @@ internal sealed class CuttingInspectionPanel : UserControl
             return;
         ShowPlate(row.PlateIndex);
         // Witnesses are world coordinates, so they mark the proposal and a blocked plate's live view alike.
-        if (row.Witness is { } witness && ShowMarker(witness))
+        // Their part numbers drive which parts stay highlighted: use the shown plate's numbering.
+        if (row.Witness is { } witness && ShowMarker(witness with
+        {
+            PartNumber = ShownPartNumber(row.PlateIndex, row.PartNumber),
+            OtherPartNumber = ShownPartNumber(row.PlateIndex, row.OtherPartNumber),
+        }))
         {
             SetDetail(MarkerHint(witness));
             return;

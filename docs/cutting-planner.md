@@ -432,7 +432,8 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   *before* capture, so the cutting plan sequences the new lines like any
   other cut-off. These are the only live changes made before Apply: Apply keeps them,
   while unticking the box, Close or switching to Validate removes them and
-  restores the earlier cut-offs and sequence. A blocked cut-off plan adds nothing and
+  restores the earlier cut-offs and sequence. The proposal preview draws planned cut-offs
+  with the same orange-red dashed line as the editor. A blocked cut-off plan adds nothing and
   plans nothing; the panel names the plate and reason.
   `Cut-off Settings...` opens the Automatic Scrap Cut-offs dialog in settings mode for
   the same scope: it previews on the active plate as usual, but `Use These Settings`

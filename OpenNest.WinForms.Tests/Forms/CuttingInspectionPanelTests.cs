@@ -218,6 +218,41 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void PlannedCutOffsKeepTheCutOffLineStyleOnTheProposal() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Size = new System.Drawing.Size(1300, 800);
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var view = editor.PlateView;
+        var baseline = CutOffPixels(view);
+        Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked = true;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.True(view.HasProposalDisplay);
+        Assert.Contains(view.DisplayPlate.Parts, part => part.BaseDrawing.IsCutOff);
+        Assert.True(CutOffPixels(view) > baseline + 50, "Planned cut-offs should draw as orange-red dashes.");
+        panel.RequestClose();
+
+        static int CutOffPixels(OpenNest.Controls.PlateView view)
+        {
+            using var bitmap = new System.Drawing.Bitmap(view.Width, view.Height);
+            view.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, view.Width, view.Height));
+            var count = 0;
+            for (var x = 0; x < bitmap.Width; x++)
+                for (var y = 0; y < bitmap.Height; y++)
+                {
+                    var pixel = bitmap.GetPixel(x, y);
+                    if (pixel.R > 220 && pixel.G is > 40 and < 110 && pixel.B < 40)
+                        count++;
+                }
+            return count;
+        }
+    });
+
+    [Fact]
     public void NextAndPreviousShowTheSelectedReadyPlateNotTheOpeningPlate() => RunSta(() =>
     {
         using var editor = Editor();
