@@ -804,32 +804,7 @@ namespace OpenNest.Forms
         {
             foreach (var drawing in drawings)
             {
-                List<Entity> entities;
-
-                if (drawing.SourceEntities != null)
-                {
-                    // Use stored entities with stable GUIDs; apply suppression state
-                    entities = new List<Entity>(drawing.SourceEntities);
-
-                    foreach (var entity in entities)
-                        entity.IsVisible = !drawing.SuppressedEntityIds.Contains(entity.Id);
-                }
-                else
-                {
-                    // Fallback: derive entities from Program (older drawings without source entities)
-                    entities = ConvertProgram.ToGeometry(drawing.Program);
-
-                    // Re-apply source offset so entities appear in their natural position
-                    if (drawing.Source?.Offset != null && drawing.Source.Offset != Vector.Zero)
-                    {
-                        foreach (var entity in entities)
-                            entity.Offset(drawing.Source.Offset);
-                    }
-
-                    // Remove rapid traversals — they aren't part of the cut geometry
-                    entities.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
-                }
-
+                var entities = CadImporter.EditableEntities(drawing);
                 var bounds = entities.GetBoundingBox();
 
                 var item = new FileListItem

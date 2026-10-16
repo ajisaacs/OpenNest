@@ -185,6 +185,57 @@ namespace OpenNest.IO
             return drawing;
         }
 
+        /// <summary>
+        /// The entities an editor shows for an existing drawing, in its source frame: the stored
+        /// source entities with their suppression applied to <see cref="Entity.IsVisible"/>, or
+        /// for older drawings without them, the program geometry moved back by
+        /// <c>Source.Offset</c> without rapids.
+        /// </summary>
+        public static List<Entity> EditableEntities(Drawing drawing)
+        {
+            if (drawing.SourceEntities != null)
+            {
+                // Use stored entities with stable GUIDs; apply suppression state
+                var entities = new List<Entity>(drawing.SourceEntities);
+
+                foreach (var entity in entities)
+                    entity.IsVisible = !drawing.SuppressedEntityIds.Contains(entity.Id);
+
+                return entities;
+            }
+
+            var derived = ConvertProgram.ToGeometry(drawing.Program);
+
+            // Re-apply source offset so entities appear in their natural position
+            if (drawing.Source?.Offset != null && drawing.Source.Offset != Vector.Zero)
+            {
+                foreach (var entity in derived)
+                    entity.Offset(drawing.Source.Offset);
+            }
+
+            // Remove rapid traversals — they aren't part of the cut geometry
+            derived.RemoveAll(e => e.Layer == SpecialLayers.Rapid);
+            return derived;
+        }
+
+        /// <summary>
+        /// Applies an edited rebuild of <paramref name="existing"/> in place, so placed parts keep
+        /// their drawing reference. Geometry, source, customer, quantity and bends are taken from
+        /// <paramref name="edited"/>; the library link and cut pins stay, since pins live in the
+        /// source frame and are resolved against the new program when used.
+        /// </summary>
+        public static void ApplyEdit(Drawing existing, Drawing edited)
+        {
+            existing.Program = edited.Program;
+            existing.SourceEntities = edited.SourceEntities;
+            existing.SuppressedEntityIds = edited.SuppressedEntityIds;
+            existing.Source = edited.Source;
+            existing.Customer = edited.Customer;
+            existing.Quantity.Required = edited.Quantity.Required;
+            existing.Bends.Clear();
+            existing.Bends.AddRange(edited.Bends);
+        }
+
         private static bool IsRepairMark(Entity e) =>
             string.Equals(e.Layer?.Name, "ETCH", System.StringComparison.OrdinalIgnoreCase)
             || string.Equals(e.Layer?.Name, "SCRIBE", System.StringComparison.OrdinalIgnoreCase);
