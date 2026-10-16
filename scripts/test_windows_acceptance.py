@@ -2,6 +2,7 @@
 
 import copy
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -51,6 +52,17 @@ class WindowsAcceptanceTests(unittest.TestCase):
 
     def evaluate(self):
         return acceptance.evaluate(self.manifest, self.path)
+
+    def test_repository_overlay_manifest_methods_exist_in_the_source(self):
+        root = Path(__file__).resolve().parents[1]
+        manifest = json.loads((root / "scripts/windows-acceptance.json").read_text(encoding="utf-8"))
+        source = (root / "OpenNest.WinForms.Tests/PlateOverlapOverlayTests.cs").read_text(encoding="utf-8-sig")
+        prefix = "OpenNest.WinForms.Tests.PlateOverlapOverlayTests."
+        required = {test["method"] for group in manifest["groups"] for test in group["required_tests"]
+                    if test["method"].startswith(prefix)}
+        declared = {prefix + name for name in re.findall(r"\bpublic\s+(?:async\s+)?(?:void|Task)\s+(\w+)\s*\(", source)}
+        self.assertTrue(required, "The overlay acceptance mapping must not disappear")
+        self.assertFalse(required - declared, f"Stale overlay test names: {sorted(required - declared)}")
 
     def test_complete_theory_passes_and_retains_manual_gate(self):
         self.write_trx()
