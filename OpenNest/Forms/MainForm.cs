@@ -884,13 +884,27 @@ namespace OpenNest.Forms
             if (form == null || databaseSaveInProgress)
                 return;
             if (NestStorage.Settings.Mode == NestStorageMode.File)
+            {
                 form.SaveAs();
-            else
-                await SaveDatabaseAsync(form, saveCopy: true);
+                return;
+            }
+
+            // A pending upload is reconciled without writing, so only ask for a name
+            // when this click will actually create the copy.
+            string copyName = null;
+            if (!form.Document.PendingCreateRequiresReconciliation)
+            {
+                using var dlg = new NestNameForm(form.Nest.Name);
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                    return;
+                copyName = dlg.NestName;
+            }
+            await SaveDatabaseAsync(form, saveCopy: true, copyName);
         }
 
-        private async Task SaveDatabaseAsync(EditNestForm form, bool saveCopy)
+        private async Task SaveDatabaseAsync(EditNestForm form, bool saveCopy, string copyName = null)
         {
+            var originalName = form.Nest.Name;
             databaseSaveInProgress = true;
             storageModeMenu.Enabled = false;
             mnuToolsOptions.Enabled = false;
@@ -908,6 +922,8 @@ namespace OpenNest.Forms
                             : $"Found saved version {reconciled.Revision}. Review the current nest before saving again.";
                     return; // Never combine reconciliation with a write in the same click.
                 }
+                if (copyName != null)
+                    form.Nest.Name = copyName;
                 var saved = await form.Document.SaveToDatabaseAsync(
                     repository, serverUrl, saveCopy);
                 if (!form.IsDisposed)
@@ -917,6 +933,10 @@ namespace OpenNest.Forms
             }
             catch (Exception ex)
             {
+                // Keep the new name only while its copy may still be pending on the server;
+                // otherwise a later Save would rename the original nest.
+                if (copyName != null && !form.Document.PendingCreateWasCopy)
+                    form.Nest.Name = originalName;
                 if (!IsDisposed)
                     ShowStorageError("save", ex);
             }
