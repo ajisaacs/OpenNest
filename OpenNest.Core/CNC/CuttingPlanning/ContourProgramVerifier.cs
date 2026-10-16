@@ -75,12 +75,13 @@ internal static class ContourProgramVerifier
             // Capture admits a nominal ring that closes within NominalContourClosure.Tolerance, and
             // preparation agrees at that inclusive boundary. A rotated tool path bridges that one
             // admitted joint, so this ring's positional and length agreement carries exactly that
-            // admitted slack. Direction, coverage order and retrace accounting stay at the epsilon.
+            // admitted slack, whether bridging it shortens or lengthens the cut.
             var tolerance = AdmittedClosureSlack(ring);
             var nominalLength = ring.Sum(c => c.Length);
             var cutLength = run.Curves.Sum(c => c.Length);
             var missing = nominalLength - cutLength;
-            if (missing < -Epsilon) return false; // Never a second circuit/retrace.
+            // Bridging the admitted joint may add up to its gap; a second circuit/retrace never passes.
+            if (missing < -tolerance) return false;
             if (missing > tolerance)
             {
                 // Fixed legacy payloads have no certified selected tab/entry metadata.
@@ -135,7 +136,9 @@ internal static class ContourProgramVerifier
         foreach (var curve in actual)
         {
             var consumed = 0.0;
-            while (consumed < curve.Length - Epsilon)
+            // Like the nominal side below, a remainder within the slack is consumed: a path that
+            // bridges the admitted joint leaves exactly that much on the edge it extends.
+            while (consumed < curve.Length - tolerance)
             {
                 Query(token, ref budget);
                 if (index >= expected.Count)
