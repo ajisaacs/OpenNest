@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.IO;
 
@@ -101,7 +102,7 @@ public class NestResponse
 
         var nestEntry = zip.CreateEntry("nest.nest");
         using var nestMs = new MemoryStream();
-        new NestWriter(Nest).Write(nestMs);
+        new NestWriter(Nest) { BestFitStore = BestFitCacheStore.Shared }.Write(nestMs);
         nestMs.Position = 0;
         await using (var stream = nestEntry.Open())
         {
@@ -158,7 +159,7 @@ public class NestResponse
                 await stream.CopyToAsync(nestMs);
             }
             nestMs.Position = 0;
-            nest = new NestReader(nestMs).Read();
+            nest = new NestReader(nestMs) { BestFitStore = BestFitCacheStore.Shared }.Read();
         }
 
         return new NestResponse

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Data;
+using OpenNest.Engine.BestFit;
 using OpenNest.IO;
 using Timer = System.Windows.Forms.Timer;
 
@@ -673,7 +674,7 @@ public sealed class SavedNestsForm : Form
             () =>
             {
                 using var stream = new MemoryStream(file);
-                return NestDetails.FromNest(new NestReader(stream).Read());
+                return NestDetails.FromNest(new NestReader(stream) { BestFitStore = BestFitCacheStore.Shared }.Read());
             },
             cancellationToken);
     }
@@ -814,7 +815,7 @@ public sealed class SavedNestsForm : Form
             var nest = await Task.Run(() =>
             {
                 using var source = new MemoryStream(snapshot.Archive);
-                var loaded = new NestReader(source).Read();
+                var loaded = new NestReader(source) { BestFitStore = BestFitCacheStore.Shared }.Read();
                 // Metadata-only revisions can be newer than the archived fields.
                 NestRecordFactory.ApplyMetadata(loaded, snapshot.Metadata);
                 return loaded;
@@ -832,7 +833,7 @@ public sealed class SavedNestsForm : Form
             var bytes = await Task.Run(() =>
             {
                 using var output = new MemoryStream();
-                new NestWriter(nest).Write(output);
+                new NestWriter(nest) { BestFitStore = BestFitCacheStore.Shared }.Write(output);
                 return output.ToArray();
             });
             var save = new NestSaveSession();

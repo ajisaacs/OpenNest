@@ -6,9 +6,9 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using OpenNest.Bending;
+using OpenNest.BestFit;
 using OpenNest.CNC;
 using OpenNest.Converters;
-using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using static OpenNest.IO.NestFormat;
 
@@ -23,6 +23,12 @@ namespace OpenNest.IO
 
         /// <summary>Part programs that could not be restored; other parts still load.</summary>
         public IReadOnlyList<string> Warnings => warnings.AsReadOnly();
+
+        /// <summary>
+        /// Receives saved best-fit sets. Without a store, <c>bestfits/</c> entries are skipped
+        /// unread; they are only a cache.
+        /// </summary>
+        public IBestFitStore BestFitStore { get; init; }
 
         public NestReader(string file)
         {
@@ -274,6 +280,9 @@ namespace OpenNest.IO
 
         private void ReadBestFits(Dictionary<int, Drawing> drawingMap)
         {
+            if (BestFitStore == null)
+                return;
+
             foreach (var kvp in drawingMap)
             {
                 var entry = zipArchive.GetEntry($"bestfits/bestfit-{kvp.Key}");
@@ -288,47 +297,33 @@ namespace OpenNest.IO
                 if (sets == null)
                     continue;
 
-                PopulateBestFitSets(kvp.Value, sets);
+                BestFitStore.Import(kvp.Value, sets.Select(FromDto).ToList());
             }
         }
 
-        private void PopulateBestFitSets(Drawing drawing, List<BestFitSetDto> sets)
-        {
-            foreach (var set in sets)
-            {
-                var results = set
-                    .Results.Select(r => new BestFitResult
-                    {
-                        Candidate = new PairCandidate
-                        {
-                            Drawing = drawing,
-                            Part1Rotation = r.Part1Rotation,
-                            Part2Rotation = r.Part2Rotation,
-                            Part2Offset = new Vector(r.Part2OffsetX, r.Part2OffsetY),
-                            StrategyIndex = r.StrategyType,
-                            TestNumber = r.TestNumber,
-                            Spacing = r.CandidateSpacing,
-                        },
-                        RotatedArea = r.RotatedArea,
-                        BoundingWidth = r.BoundingWidth,
-                        BoundingHeight = r.BoundingHeight,
-                        OptimalRotation = r.OptimalRotation,
-                        Keep = r.Keep,
-                        Reason = r.Reason,
-                        TrueArea = r.TrueArea,
-                        HullAngles = r.HullAngles,
-                    })
-                    .ToList();
-
-                BestFitCache.Populate(
-                    drawing,
-                    set.PlateWidth,
-                    set.PlateHeight,
-                    set.Spacing,
-                    results
-                );
-            }
-        }
+        private static SavedPairSet FromDto(BestFitSetDto set) =>
+            new(
+                set.PlateWidth,
+                set.PlateHeight,
+                set.Spacing,
+                set.Results.Select(r => new SavedPairResult(
+                    r.Part1Rotation,
+                    r.Part2Rotation,
+                    r.Part2OffsetX,
+                    r.Part2OffsetY,
+                    r.StrategyType,
+                    r.TestNumber,
+                    r.CandidateSpacing,
+                    r.RotatedArea,
+                    r.BoundingWidth,
+                    r.BoundingHeight,
+                    r.OptimalRotation,
+                    r.Keep,
+                    r.Reason,
+                    r.TrueArea,
+                    r.HullAngles
+                )).ToList()
+            );
 
         /// <summary>
         /// The saved machine clamp rail, or null when absent, empty or malformed (a bad rail

@@ -9,6 +9,7 @@ using System.Threading;
 using OpenNest;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
+using OpenNest.Engine.BestFit;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
@@ -273,7 +274,7 @@ static class NestConsole
         // If we have a nest file, load it and optionally add DXFs.
         if (nestFile != null)
         {
-            var nest = new NestReader(nestFile).Read();
+            var nest = new NestReader(nestFile) { BestFitStore = BestFitCacheStore.Shared }.Read();
 
             if (nest.Plates.Count == 0)
             {
@@ -377,7 +378,7 @@ static class NestConsole
             return;
         }
 
-        var templateNest = new NestReader(options.TemplateFile).Read();
+        var templateNest = new NestReader(options.TemplateFile) { BestFitStore = BestFitCacheStore.Shared }.Read();
         var templatePlate = templateNest.PlateDefaults.CreateNew();
         plate.Quadrant = templatePlate.Quadrant;
         plate.EdgeSpacing = templatePlate.EdgeSpacing;
@@ -599,7 +600,7 @@ static class NestConsole
 
         var outputFile = NestOutputPath(options);
 
-        new NestWriter(nest).Write(outputFile);
+        new NestWriter(nest) { BestFitStore = BestFitCacheStore.Shared }.Write(outputFile);
         Console.WriteLine($"Saved: {outputFile}");
     }
 

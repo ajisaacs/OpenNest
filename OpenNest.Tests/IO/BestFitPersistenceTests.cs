@@ -290,11 +290,11 @@ public class BestFitPersistenceTests
     private static byte[] Save(Nest nest)
     {
         using var stream = new MemoryStream();
-        new NestWriter(nest).Write(stream);
+        new NestWriter(nest) { BestFitStore = BestFitCacheStore.Shared }.Write(stream);
         return stream.ToArray();
     }
 
-    private static Nest Load(byte[] bytes) => new NestReader(new MemoryStream(bytes)).Read();
+    private static Nest Load(byte[] bytes) => new NestReader(new MemoryStream(bytes)) { BestFitStore = BestFitCacheStore.Shared }.Read();
 
     private static System.Collections.Generic.Dictionary<string, byte[]> ReadEntries(byte[] bytes)
     {

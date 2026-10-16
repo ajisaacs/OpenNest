@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using OpenNest.IO;
 
@@ -39,7 +40,7 @@ namespace OpenNest.Benchmark
 
                 try
                 {
-                    nest = new NestReader(file).Read();
+                    nest = new NestReader(file) { BestFitStore = BestFitCacheStore.Shared }.Read();
                 }
                 catch (Exception ex)
                 {

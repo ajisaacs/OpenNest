@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Data;
+using OpenNest.Engine.BestFit;
 using OpenNest.IO;
 
 namespace OpenNest.Forms;
@@ -215,7 +216,7 @@ public sealed class NestHistoryForm : Form
             var nest = await Task.Run(() =>
             {
                 using var stream = new MemoryStream(bytes);
-                var reader = new NestReader(stream);
+                var reader = new NestReader(stream) { BestFitStore = BestFitCacheStore.Shared };
                 var loaded = reader.Read();
                 if (reader.Warnings.Count > 0)
                     throw new InvalidDataException(string.Join(Environment.NewLine, reader.Warnings));

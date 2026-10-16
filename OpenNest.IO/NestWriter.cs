@@ -7,8 +7,8 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using OpenNest.BestFit;
 using OpenNest.CNC;
-using OpenNest.Engine.BestFit;
 using static OpenNest.IO.NestFormat;
 
 namespace OpenNest.IO
@@ -22,6 +22,12 @@ namespace OpenNest.IO
         private Dictionary<int, Drawing> drawingDict;
         private readonly Dictionary<int, string> drawingHashes = new();
         private readonly Dictionary<string, Program> partPrograms = new();
+
+        /// <summary>
+        /// Supplies best-fit sets to save. Without a store, no <c>bestfits/</c> entries are
+        /// written; they are only a cache.
+        /// </summary>
+        public IBestFitStore BestFitStore { get; init; }
 
         public NestWriter(Nest nest)
         {
@@ -364,64 +370,19 @@ namespace OpenNest.IO
             return list;
         }
 
-        private List<BestFitSetDto> BuildBestFitDtos(Drawing drawing)
-        {
-            var allBestFits = BestFitCache.GetAllForDrawing(drawing);
-            var sets = new List<BestFitSetDto>();
-
-            // Only save best-fit sets for plate sizes actually used in this nest.
-            var plateSizes = new HashSet<(double, double, double)>();
-            foreach (var plate in nest.Plates)
-                plateSizes.Add((plate.Size.Width, plate.Size.Length, plate.PartSpacing));
-
-            foreach (var kvp in allBestFits)
-            {
-                if (
-                    !plateSizes.Contains((kvp.Key.PlateWidth, kvp.Key.PlateHeight, kvp.Key.Spacing))
-                )
-                    continue;
-
-                var results = kvp
-                    .Value.Where(r => r.Keep)
-                    .Select(r => new BestFitResultDto
-                    {
-                        Part1Rotation = r.Candidate.Part1Rotation,
-                        Part2Rotation = r.Candidate.Part2Rotation,
-                        Part2OffsetX = r.Candidate.Part2Offset.X,
-                        Part2OffsetY = r.Candidate.Part2Offset.Y,
-                        StrategyType = r.Candidate.StrategyIndex,
-                        TestNumber = r.Candidate.TestNumber,
-                        CandidateSpacing = r.Candidate.Spacing,
-                        RotatedArea = r.RotatedArea,
-                        BoundingWidth = r.BoundingWidth,
-                        BoundingHeight = r.BoundingHeight,
-                        OptimalRotation = r.OptimalRotation,
-                        Keep = r.Keep,
-                        Reason = r.Reason ?? "",
-                        TrueArea = r.TrueArea,
-                        HullAngles = r.HullAngles ?? new List<double>(),
-                    })
-                    .ToList();
-
-                sets.Add(
-                    new BestFitSetDto
-                    {
-                        PlateWidth = kvp.Key.PlateWidth,
-                        PlateHeight = kvp.Key.PlateHeight,
-                        Spacing = kvp.Key.Spacing,
-                        Results = results,
-                    }
-                );
-            }
-
-            return sets;
-        }
-
         private void WriteBestFits(ZipArchive zipArchive)
         {
+            if (BestFitStore == null)
+                return;
+
+            // Only save best-fit sets for plate sizes actually used in this nest.
+            var plateKeys = new HashSet<(double Width, double Length, double Spacing)>();
+            foreach (var plate in nest.Plates)
+                plateKeys.Add((plate.Size.Width, plate.Size.Length, plate.PartSpacing));
+
             foreach (var kvp in drawingDict.OrderBy(k => k.Key))
             {
-                var sets = BuildBestFitDtos(kvp.Value);
+                var sets = BestFitStore.Export(kvp.Value, plateKeys).Select(ToDto).ToList();
                 if (sets.Count == 0)
                     continue;
 
@@ -432,6 +393,34 @@ namespace OpenNest.IO
                 writer.Write(json);
             }
         }
+
+        private static BestFitSetDto ToDto(SavedPairSet set) =>
+            new()
+            {
+                PlateWidth = set.PlateWidth,
+                PlateHeight = set.PlateHeight,
+                Spacing = set.Spacing,
+                Results = set
+                    .Results.Select(r => new BestFitResultDto
+                    {
+                        Part1Rotation = r.Part1Rotation,
+                        Part2Rotation = r.Part2Rotation,
+                        Part2OffsetX = r.Part2OffsetX,
+                        Part2OffsetY = r.Part2OffsetY,
+                        StrategyType = r.StrategyType,
+                        TestNumber = r.TestNumber,
+                        CandidateSpacing = r.CandidateSpacing,
+                        RotatedArea = r.RotatedArea,
+                        BoundingWidth = r.BoundingWidth,
+                        BoundingHeight = r.BoundingHeight,
+                        OptimalRotation = r.OptimalRotation,
+                        Keep = r.Keep,
+                        Reason = r.Reason ?? "",
+                        TrueArea = r.TrueArea,
+                        HullAngles = r.HullAngles?.ToList() ?? new List<double>(),
+                    })
+                    .ToList(),
+            };
 
         private void WritePrograms(ZipArchive zipArchive)
         {

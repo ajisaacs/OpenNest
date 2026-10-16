@@ -685,7 +685,7 @@ namespace OpenNest.Forms
             {
                 try
                 {
-                    var nest = new NestReader(templatePath).Read();
+                    var nest = new NestReader(templatePath) { BestFitStore = BestFitCacheStore.Shared }.Read();
                     NestDefaults.FromNest(nest).Save(NestDefaults.DefaultPath);
                 }
                 catch (Exception ex)
@@ -737,7 +737,7 @@ namespace OpenNest.Forms
                 if (!string.Equals(Path.GetExtension(path), NestFormat.FileExtension, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                var reader = new NestReader(path);
+                var reader = new NestReader(path) { BestFitStore = BestFitCacheStore.Shared };
                 var nest = reader.Read();
                 LoadNest(nest);
                 ShowNestWarnings(reader);
@@ -781,7 +781,7 @@ namespace OpenNest.Forms
                 using var dlg = new OpenFileDialog { Filter = NestFormat.FileFilter, Multiselect = true };
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
-                    var reader = new NestReader(dlg.FileName);
+                    var reader = new NestReader(dlg.FileName) { BestFitStore = BestFitCacheStore.Shared };
                     var nest = reader.Read();
                     LoadNest(nest);
                     ShowNestWarnings(reader);
@@ -802,7 +802,7 @@ namespace OpenNest.Forms
                 mnuToolsOptions.Enabled = false;
                 var snapshot = await NestHistorySession.ReadCurrentAsync(repository, dlg.SelectedId, serverUrl);
                 using var stream = new MemoryStream(snapshot.Archive);
-                var reader = new NestReader(stream);
+                var reader = new NestReader(stream) { BestFitStore = BestFitCacheStore.Shared };
                 var nest = reader.Read();
                 // Metadata edits create revisions without rewriting the archive. Use their
                 // current editable fields rather than silently reverting them on the next save.
@@ -957,7 +957,7 @@ namespace OpenNest.Forms
             try
             {
                 // Export never changes the document's save path, remote id, or nest name.
-                new NestWriter(form.Nest).Write(dlg.FileName);
+                new NestWriter(form.Nest) { BestFitStore = BestFitCacheStore.Shared }.Write(dlg.FileName);
                 statusLabel1.Text = $"Exported .nest to {dlg.FileName}";
             }
             catch (Exception ex)

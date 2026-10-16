@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Text;
 using ModelContextProtocol.Server;
+using OpenNest.Engine.BestFit;
 using OpenNest.IO;
 using OpenNest.Shapes;
 using CncProgram = OpenNest.CNC.Program;
@@ -27,7 +28,7 @@ namespace OpenNest.Mcp.Tools
             if (!File.Exists(path))
                 return $"Error: file not found: {path}";
 
-            var reader = new NestReader(path);
+            var reader = new NestReader(path) { BestFitStore = BestFitCacheStore.Shared };
             var nest = reader.Read();
             _session.Nest = nest;
 
@@ -101,7 +102,7 @@ namespace OpenNest.Mcp.Tools
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            var writer = new NestWriter(nest);
+            var writer = new NestWriter(nest) { BestFitStore = BestFitCacheStore.Shared };
             if (!writer.Write(path))
                 return "Error: failed to write nest file";
 

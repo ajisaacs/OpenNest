@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenNest.Data;
+using OpenNest.Engine.BestFit;
 using OpenNest.IO;
 
 namespace OpenNest
@@ -42,7 +43,7 @@ namespace OpenNest
             LastSaveDate = DateTime.Now;
             LastSavePath = path;
 
-            var writer = new NestWriter(Nest);
+            var writer = new NestWriter(Nest) { BestFitStore = BestFitCacheStore.Shared };
             writer.Write(path);
         }
 
@@ -50,7 +51,7 @@ namespace OpenNest
         public byte[] Serialize()
         {
             using var stream = new MemoryStream();
-            new NestWriter(Nest).Write(stream);
+            new NestWriter(Nest) { BestFitStore = BestFitCacheStore.Shared }.Write(stream);
             return stream.ToArray();
         }
 
