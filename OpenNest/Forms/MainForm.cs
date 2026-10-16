@@ -19,7 +19,6 @@ using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
 using OpenNest.Geometry;
-using OpenNest.Gpu;
 using OpenNest.IO;
 using OpenNest.Properties;
 
@@ -136,13 +135,6 @@ namespace OpenNest.Forms
             LoadPosts();
             EnableCheck();
             UpdateStatus();
-            UpdateGpuStatus();
-
-            //if (GpuEvaluatorFactory.GpuAvailable)
-            //    BestFitCache.CreateEvaluator = (drawing, spacing) => GpuEvaluatorFactory.Create(drawing, spacing);
-
-            //if (GpuEvaluatorFactory.GpuAvailable)
-            //    BestFitCache.CreateSlideComputer = () => GpuEvaluatorFactory.CreateSlideComputer();
 
             // Jobs-side plug-in discovery: INestingEngine implementations are registered per
             // assembly/type with per-DLL isolation. Existing plug-ins must implement the jobs
@@ -197,7 +189,7 @@ namespace OpenNest.Forms
                 if (result == DialogResult.Yes)
                     updater.ApplyAndRestart();
             };
-            statusStrip1.Items.Insert(statusStrip1.Items.IndexOf(gpuStatusLabel), updateStatusLabel);
+            statusStrip1.Items.Add(updateStatusLabel);
 
             updater = new global::OpenNest.UpdaterService();
             updater.UpdateReady += version =>
@@ -521,20 +513,6 @@ namespace OpenNest.Forms
             UpdateLocationStatus();
             UpdatePlateStatus();
             UpdateSelectionStatus();
-        }
-
-        private void UpdateGpuStatus()
-        {
-            if (GpuEvaluatorFactory.GpuAvailable)
-            {
-                gpuStatusLabel.Text = $"GPU : {GpuEvaluatorFactory.DeviceName}";
-                gpuStatusLabel.ForeColor = Color.DarkGreen;
-            }
-            else
-            {
-                gpuStatusLabel.Text = "GPU : None (CPU)";
-                gpuStatusLabel.ForeColor = Color.Gray;
-            }
         }
 
         private void EngineComboBox_SelectedIndexChanged(object sender, EventArgs e)

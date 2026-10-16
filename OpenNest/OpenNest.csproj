@@ -26,7 +26,6 @@
     <ProjectReference Include="..\OpenNest.Core\OpenNest.Core.csproj" />
     <ProjectReference Include="..\OpenNest.Data\OpenNest.Data.csproj" />
     <ProjectReference Include="..\OpenNest.Engine\OpenNest.Engine.csproj" />
-    <ProjectReference Include="..\OpenNest.Gpu\OpenNest.Gpu.csproj" />
     <ProjectReference Include="..\OpenNest.IO\OpenNest.IO.csproj" />
     <ProjectReference Include="..\OpenNest.Reporting\OpenNest.Reporting.csproj" />
     <ProjectReference Include="..\Posts\OpenNest.Posts.Cincinnati\OpenNest.Posts.Cincinnati.csproj" ReferenceOutputAssembly="false" />

@@ -168,7 +168,6 @@ namespace OpenNest.Forms
             plateSizeStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateQtyStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             plateUtilStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            gpuStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             selectionStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             toolStrip1 = new System.Windows.Forms.ToolStrip();
             btnNew = new System.Windows.Forms.ToolStripButton();
@@ -1071,7 +1070,7 @@ namespace OpenNest.Forms
             // 
             // statusStrip1
             // 
-            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, plateUtilStatusLabel, gpuStatusLabel });
+            statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { statusLabel1, locationStatusLabel, selectionStatusLabel, spacerLabel, plateIndexStatusLabel, plateSizeStatusLabel, plateQtyStatusLabel, plateUtilStatusLabel });
             statusStrip1.Location = new System.Drawing.Point(0, 630);
             statusStrip1.Name = "statusStrip1";
             statusStrip1.Padding = new System.Windows.Forms.Padding(1, 0, 16, 0);
@@ -1139,13 +1138,6 @@ namespace OpenNest.Forms
             plateUtilStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
             plateUtilStatusLabel.Size = new System.Drawing.Size(75, 19);
             plateUtilStatusLabel.Text = "Util : 0.0%";
-            //
-            // gpuStatusLabel
-            // 
-            gpuStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
-            gpuStatusLabel.Name = "gpuStatusLabel";
-            gpuStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            gpuStatusLabel.Size = new System.Drawing.Size(14, 19);
             // 
             // toolStrip1
             // 
@@ -1430,7 +1422,6 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolStripMenuItem mnuPlateExpandSpacing;
         private System.Windows.Forms.ToolStripButton btnSaveAs;
         private System.Windows.Forms.ToolStripMenuItem centerPartsToolStripMenuItem;
-        private System.Windows.Forms.ToolStripStatusLabel gpuStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel selectionStatusLabel;
         private System.Windows.Forms.ToolStripLabel engineLabel;
         private System.Windows.Forms.ToolStripComboBox engineComboBox;
