@@ -832,15 +832,15 @@ public sealed class SavedNestsForm : Form
             if (IsDisposed) return;
             if (snapshot.Metadata.Revision < 1)
                 throw new NotSupportedException("Upgrade the nest server and refresh before editing nest information.");
-            using var source = new MemoryStream(snapshot.Archive);
-            var nest = new NestReader(source).Read();
-            // Metadata-only revisions can be newer than the fields inside the archive.
-            nest.Name = snapshot.Metadata.Name;
-            nest.Customer = snapshot.Metadata.Customer;
-            nest.Notes = snapshot.Metadata.Comments;
-            nest.Status = snapshot.Metadata.Status;
-            nest.MadeBy = snapshot.Metadata.MadeBy;
-            nest.DateLastModified = snapshot.Metadata.DateModified;
+            var nest = await Task.Run(() =>
+            {
+                using var source = new MemoryStream(snapshot.Archive);
+                var loaded = new NestReader(source).Read();
+                // Metadata-only revisions can be newer than the archived fields.
+                NestRecordFactory.ApplyMetadata(loaded, snapshot.Metadata);
+                return loaded;
+            });
+            if (IsDisposed) return;
             using var dialog = new EditNestInfoForm();
             dialog.LoadNestInfo(nest);
             if (ShowNestInfoDialog(dialog) != DialogResult.OK)
@@ -849,9 +849,12 @@ public sealed class SavedNestsForm : Form
             using var manager = new PlateManager(nest);
             manager.ChangePlateDefaults(() => dialog.SaveNestInfo(nest));
             nest.DateLastModified = DateTime.Now;
-            using var output = new MemoryStream();
-            new NestWriter(nest).Write(output);
-            var bytes = output.ToArray();
+            var bytes = await Task.Run(() =>
+            {
+                using var output = new MemoryStream();
+                new NestWriter(nest).Write(output);
+                return output.ToArray();
+            });
             var save = new NestSaveSession();
             save.Bind(id, snapshot.ServerUrl, snapshot.Metadata.Revision);
             var saved = await save.SaveAsync(repository, snapshot.ServerUrl, nest, bytes);

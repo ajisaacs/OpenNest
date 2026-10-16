@@ -9,6 +9,22 @@ namespace OpenNest.Data;
 /// </summary>
 public static class NestRecordFactory
 {
+    /// <summary>Overlays authoritative current metadata on an archived nest before editing.</summary>
+    public static void ApplyMetadata(Nest nest, NestRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(nest);
+        ArgumentNullException.ThrowIfNull(record);
+        nest.Name = record.Name;
+        nest.Customer = record.Customer;
+        nest.Notes = record.Comments;
+        nest.Status = record.Status;
+        nest.MadeBy = record.MadeBy;
+        nest.DateLastModified = record.DateModified;
+        nest.DateCreated = record.DateCreated;
+        nest.Material = NestMaterialSelection.Apply(nest.Material, record.Material);
+        nest.Thickness = record.Thickness;
+    }
+
     /// <summary>
     /// Builds a record for uploading <paramref name="nest"/>. <paramref name="id"/> is the
     /// client-tracked id: <see cref="System.Guid.Empty"/> for a first save (the server

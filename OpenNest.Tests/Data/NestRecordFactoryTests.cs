@@ -6,6 +6,52 @@ namespace OpenNest.Tests.Data;
 
 public class NestRecordFactoryTests
 {
+    [Theory]
+    [InlineData("Steel", "Aluminum", false)]
+    [InlineData("Aluminum", "Aluminum", true)]
+    public void ApplyMetadata_UsesAllCurrentFields_AndPreservesMatchingMaterialProperties(
+        string archiveMaterial, string currentMaterial, bool sameMaterial)
+    {
+        var nest = new Nest("Old archive")
+        {
+            Material = new Material(archiveMaterial, "Test grade", 0.1),
+            Thickness = 0.125,
+            DateCreated = new DateTime(2025, 1, 1),
+        };
+        var plate = nest.CreatePlate();
+        var current = new NestRecord
+        {
+            Name = "Current name",
+            Customer = "Current customer",
+            Comments = "Current notes",
+            Material = currentMaterial,
+            Thickness = 0.375,
+            DateCreated = new DateTime(2026, 1, 1),
+            DateModified = new DateTime(2026, 2, 1),
+            Status = NestStatus.HasBeenCut,
+            MadeBy = "Operator",
+        };
+        NestRecordFactory.ApplyMetadata(nest, current);
+        var roundTrip = NestRecordFactory.FromNest(nest, Guid.Empty, 0);
+        Assert.Equal(current.Material, roundTrip.Material);
+        Assert.Equal(current.Thickness, roundTrip.Thickness);
+        Assert.Equal(current.DateCreated, roundTrip.DateCreated);
+        Assert.Equal(current.DateModified, roundTrip.DateModified);
+        Assert.Equal(current.Name, roundTrip.Name);
+        Assert.Equal(current.Customer, roundTrip.Customer);
+        Assert.Equal(current.Comments, roundTrip.Comments);
+        Assert.Equal(current.Status, roundTrip.Status);
+        Assert.Equal(current.MadeBy, roundTrip.MadeBy);
+        if (sameMaterial)
+        {
+            Assert.Equal("Test grade", nest.Material.Grade);
+            Assert.Equal(0.1, nest.Material.Density);
+        }
+        else
+            Assert.NotEqual("Test grade", nest.Material.Grade);
+        Assert.Same(plate, Assert.Single(nest.Plates));
+    }
+
     [Fact]
     public void FromNest_CountsPlatesAndNonCutoffParts()
     {
